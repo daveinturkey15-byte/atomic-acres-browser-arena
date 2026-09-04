@@ -486,6 +486,7 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
+import { activeMinimapColliderLayer, activeMinimapCoverLayer } from './minimap-static-layers';
 import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
@@ -27992,137 +27993,6 @@ type MinimapStaticLayer = Readonly<{
 }>;
 let minimapStaticLayer: MinimapStaticLayer | null = null;
 
-/**
- * HF-491 (perf lane 4): the SAME cache HF-399 built for atomic-acres, for
- * every other arena's minimap branch.
- *
- * WHAT IT COSTS WITHOUT THIS. On Nuke Town Rebuild the `else` branch below
- * repainted, at the 30 Hz minimap rate, one `fillRect` + one `strokeRect` per
- * world collider and one `drawMinimapLandmark` + label mapping per physical
- * cover. Measured on the HITL 5 head at the spawn pose (CDP profile,
- * `bisect/lane4-pre-spawn-nuketown2.json`), `updateMinimap` was **0.87 ms of
- * SELF time per rendered frame** - the largest single application function in
- * the profile and about a third of the renderer's own scene walk - plus the
- * Canvas2D raster work that lands in `(program)`.
- *
- * WHY A CACHE IS CORRECT HERE. Neither list is per-frame data:
- *   - `arena.physicalCover` is authored by the arena builder and never mutated
- *     at runtime (the same invariant `MinimapStaticLayer` already documents),
- *     so its layer is keyed on arena identity plus a cover-count tripwire;
- *   - `activeWorldColliders()` IS dynamic (glass, doors, house destruction),
- *     but it is revision-keyed and returns a STABLE ARRAY IDENTITY while
- *     nothing has changed, so the collider layer is keyed on that identity.
- *     A break, a door or a collapse changes the identity and repaints once.
- *
- * Both layers repaint into their own retained canvas rather than allocating a
- * new one, so the worst case (an arena whose collider array identity changes
- * every call, e.g. the gun range's patrolling dummies) is today's cost plus
- * one `drawImage`, never a per-frame canvas allocation.
- *
- * DRAW ORDER IS PRESERVED EXACTLY: colliders, then the live Domination zones,
- * then the cover landmarks, then the live targets. That is why this is two
- * layers and not one.
- */
-type MinimapCachedLayer = Readonly<{
-  canvas: HTMLCanvasElement;
-  context: CanvasRenderingContext2D;
-}>;
-
-function minimapLayerCanvas(cached: MinimapCachedLayer | null, width: number, height: number): MinimapCachedLayer {
-  if (cached && cached.canvas.width === width && cached.canvas.height === height) {
-    cached.context.clearRect(0, 0, width, height);
-    return cached;
-  }
-  const canvas = cached?.canvas ?? document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Canvas2D minimap layer is unavailable');
-  return Object.freeze({ canvas, context });
-}
-
-type MinimapColliderLayer = Readonly<{
-  arena: ArenaMap;
-  colliders: ArenaMap['colliders'];
-  width: number;
-  height: number;
-  layer: MinimapCachedLayer;
-}>;
-let minimapColliderLayer: MinimapColliderLayer | null = null;
-
-function activeMinimapColliderLayer(
-  width: number,
-  height: number,
-  bounds: ArenaMap['bounds'],
-  colliders: ArenaMap['colliders'],
-): MinimapColliderLayer {
-  const cached = minimapColliderLayer;
-  if (
-    cached
-    && cached.arena === arena
-    && cached.colliders === colliders
-    && cached.width === width
-    && cached.height === height
-  ) return cached;
-  const layer = minimapLayerCanvas(cached?.layer ?? null, width, height);
-  const context = layer.context;
-  context.lineWidth = 1.5;
-  context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
-  context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
-  for (const collider of colliders) {
-    const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
-    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
-  }
-  minimapColliderLayer = Object.freeze({ arena, colliders, width, height, layer });
-  return minimapColliderLayer;
-}
-
-type MinimapCoverLayer = Readonly<{
-  arena: ArenaMap;
-  coverCount: number;
-  width: number;
-  height: number;
-  layer: MinimapCachedLayer;
-  labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
-  landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }>;
-}>;
-let minimapCoverLayer: MinimapCoverLayer | null = null;
-
-function activeMinimapCoverLayer(width: number, height: number, bounds: ArenaMap['bounds']): MinimapCoverLayer {
-  const cached = minimapCoverLayer;
-  if (
-    cached
-    && cached.arena === arena
-    && cached.coverCount === arena.physicalCover.length
-    && cached.width === width
-    && cached.height === height
-  ) return cached;
-  const layer = minimapLayerCanvas(cached?.layer ?? null, width, height);
-  const context = layer.context;
-  const labelAnchors: Array<{ label: string; x: number; y: number }> = [];
-  const landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
-  for (const cover of arena.physicalCover) {
-    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-    if (!kind) continue;
-    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-    drawMinimapLandmark(context, cover.id, kind, footprint);
-    const label = minimapLandmarkLabel(kind);
-    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
-    landmarks.push({ id: cover.id, kind, label });
-  }
-  minimapCoverLayer = Object.freeze({
-    arena,
-    coverCount: arena.physicalCover.length,
-    width,
-    height,
-    layer,
-    labelAnchors: Object.freeze(labelAnchors),
-    landmarks,
-  });
-  return minimapCoverLayer;
-}
-
 function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMap['bounds']): MinimapStaticLayer {
   const cached = minimapStaticLayer;
   if (
@@ -28261,7 +28131,12 @@ function updateMinimap(now: number): void {
     // HF-491 perf lane 4: one drawImage of the revision-keyed collider layer
     // instead of two rect calls per collider at 30 Hz. See
     // activeMinimapColliderLayer for the cache key and why it is correct.
-    context.drawImage(activeMinimapColliderLayer(width, height, bounds, activeWorldColliders()).layer.canvas, 0, 0);
+    const colliderStyle = selectedArena.id === 'gun-range'
+      ? { fillStyle: 'rgba(244, 196, 79, .18)', strokeStyle: 'rgba(244, 196, 79, .6)' }
+      : { fillStyle: 'rgba(170, 113, 72, .28)', strokeStyle: 'rgba(221, 164, 111, .65)' };
+    context.drawImage(activeMinimapColliderLayer({
+      arena, colliders: activeWorldColliders(), bounds, width, height, ...colliderStyle,
+    }), 0, 0);
     // Owner 2026-08-30: Domination zones on the minimap - a ringed letter at
     // each zone anchor, coloured by the owning squad, pulsing while contested.
     const dominationMinimap = dominationDisplayState();
@@ -28290,8 +28165,10 @@ function updateMinimap(now: number): void {
     // Domination zones, exactly where the per-cover loop used to run, so the
     // stacking order is unchanged. Label anchors run through the same closed
     // form HF-399 introduced (src/minimap-player-view-transform.test.ts).
-    const coverLayer = activeMinimapCoverLayer(width, height, bounds);
-    context.drawImage(coverLayer.layer.canvas, 0, 0);
+    const coverLayer = activeMinimapCoverLayer({
+      arena, cover: arena.physicalCover, bounds, width, height, draw: drawMinimapLandmark,
+    });
+    context.drawImage(coverLayer.canvas, 0, 0);
     for (const anchor of coverLayer.labelAnchors) {
       const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
       landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
