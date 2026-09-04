@@ -64,3 +64,8 @@ TODO (F2 watch item, larger than this review fix): make the accent material
 optional when no dressing emits an accent at `src/vehicle-forge/build.ts:82-95`
 and remove the unused truck/saloon accent instances at
 `src/nuketown2-arena.ts:2277-2282`.
+
+TODO (F3 watch item, larger than this review fix): if a per-vehicle triangle
+fence trips at `src/vehicle-forge/specs.ts:154-157`, reduce the authored arch
+stations at `src/vehicle-forge/geometry.ts:38` from 33 to 21, then rerun the
+unchanged fence and recheck the silhouette budget.
