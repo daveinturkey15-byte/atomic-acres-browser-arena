@@ -1,3 +1,9 @@
+// Finalizes the Pass 65 original firearm corpus release gate: validates every delivered firearm GLB (spec audit + Khronos validator), records the contact sheet and source provenance digests, and writes the release receipt.
+// Usage: node scripts/qa/finalize-pass65-firearm-corpus-gate.mjs
+// Flags/env: none (reads no process.argv flags and no process.env variables).
+// Writes: artifacts/blender-weapon-families/pass65-firearm-corpus-release-gate.json (creates the containing directory).
+// Exit codes: 0 = gate passed, receipt written (implicit); 1 = one or more audit/Khronos failures, gate BLOCKED (explicit process.exit(1)).
+
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
