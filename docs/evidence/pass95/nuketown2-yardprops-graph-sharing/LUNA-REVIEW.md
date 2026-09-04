@@ -2,8 +2,8 @@
 
 Verdict: **SHIP-WITH-FIXES**
 
-Reviewed revision: `d3293b15ccc940e67b1e1683f612bf2a936011ec`  
-Base: `3e2fd273f385713f8e645ba39bdf12d530b546f4`  
+Reviewed revision: `d3293b15ccc940e67b1e1683f612bf2a936011ec`
+Base: `3e2fd273f385713f8e645ba39bdf12d530b546f4`
 Worktree: clean at review start and before this review write-back.
 
 Three reasons:
