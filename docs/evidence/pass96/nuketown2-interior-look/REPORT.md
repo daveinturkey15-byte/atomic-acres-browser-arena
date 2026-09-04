@@ -68,6 +68,18 @@ No settings-registry entry: there is no new visual stage (static geometry +
 one static uniform), so there is nothing to switch off. No new pipeline, so
 the cold-session precompile reach is unchanged by construction.
 
+## Luna review TODOs
+
+- TODO: obtain the required native-WebGPU interior capture in both supported
+  graphics profiles, including entry sightlines and the dark corners; this
+  review was intentionally no-browser/no-GPU.
+- TODO: add or identify the canonical cold-session precompile reach receipt
+  for this lane. The named glob has no matching test on this base and exits 1;
+  no new pipeline was added, so this remains an evidence gap rather than a
+  relaxed gate.
+- TODO: obtain the quiet-machine frame-time/draw receipt for the claimed zero
+  incremental draw-call and approximately 240-triangle cost.
+
 ## Gate quotes (verbatim, trimmed to the verdict lines)
 
 `npx tsc --noEmit` → `(no output)` exit 0.
