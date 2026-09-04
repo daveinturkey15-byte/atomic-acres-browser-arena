@@ -1,3 +1,16 @@
+// Cross-browser gate contract — pure function computing the gate's PASS/FAIL
+// verdict from per-lane verdicts, so the rule "an uninstalled browser must
+// never read as a pass" is checkable without launching a browser.
+//
+// Usage:
+//   import { LANE_VERDICTS, computeMatrixVerdict } from
+//     './scripts/qa/cross-browser-gate-contract.mjs';
+//   (library module, no CLI entry point; consumed by cross-browser-gate-contract.test.mjs)
+//
+// Flags / environment variables: none (reads no process.argv, no process.env).
+// Writes: nothing (no files, no directories).
+// Exit codes: none (no process.exit calls).
+
 // The verdict rule of the cross-browser gate, as a pure function so it can be
 // tested without launching a browser.
 //
