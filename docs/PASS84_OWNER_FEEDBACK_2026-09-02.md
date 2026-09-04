@@ -1558,3 +1558,27 @@ assets and textures and lighting need to be tip top, raid can come next"
   self-improving meta layer; research "NVIDIA AVO"), and a daily digest.
 - Dispatch: post-reset Opus lanes CP1–CP5 in that repo; the game lanes
   continue in parallel.
+
+## HF-472 / HF-473 — owner 2026-09-04 11:15
+
+- **HF-472 (ingestion policy, standing):** when the owner shares three.js
+  examples or repos, licensed or not: (1) check what our skills and code
+  already cover, (2) measure against a central skills-ingestion hub (to be set
+  up — pre-orchestrated or manual), (3) never copy or fork: re-implement the
+  techniques in our own likeness, adapted to our use case (a "no guns" clause
+  or a missing licence is irrelevant because nothing is copied). This is the
+  stance R1 took for morning-diner; make it the hub's rule.
+- **HF-473 (handedness, decisive owner observation):** "when I play Black Ops
+  2 on Steam the garage is always on the RIGHT of the house from behind it,
+  whereas here both garages are on the LEFT". This is consistent with R4:
+  the real map is 180°-rotationally symmetric (both houses garage-right from
+  their own backyard) and so is ours, but with the opposite handedness. The
+  fix is a MIRROR of the whole layout across the street axis (flip
+  NUKETOWN2_HANDEDNESS), not a rotation; add a gate: viewed from each house's
+  backyard spawn, its garage is on the right. Also the Atomic Acres precedent:
+  the top-right minimap was back-to-front months ago — check the minimap
+  projection too. Reference against BO2 screenshots/videos, not only
+  top-downs; the target is a high-fidelity skeleton of BO2 Nuketown with
+  better graphics and gameplay, evolving from there.
+- **Cadence from the reset:** research and tooling in the remaining hour, then
+  improvements every hour or two with owner HITL feedback (possibly videos).
