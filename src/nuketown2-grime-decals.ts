@@ -50,6 +50,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
+import { nuketown2InteriorJunctionDecals } from './nuketown2-interior-look';
 
 const {
   abs,
@@ -388,6 +389,13 @@ export function nuketown2GrimeDecals(m: Nuketown2GrimeMaterials): readonly Nuket
     size: [0.024, 1.9, 76.0] as const,
     material: m.wallGrime,
   }));
+  // ---- PASS 96 interior look: skirting films at the floor/wall junctions --
+  // Ground rooms only (upper strips would break the wall-grime top rule the
+  // gate pins). Wall-grime family, so the ground-footprint tests skip them
+  // and the one-material-per-family contract holds with zero new materials.
+  for (const junction of nuketown2InteriorJunctionDecals(m.wallGrime)) {
+    out.push(junction);
+  }
 
   return Object.freeze(out);
 }

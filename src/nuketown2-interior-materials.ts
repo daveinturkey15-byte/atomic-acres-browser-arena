@@ -26,9 +26,19 @@ const {
   mix,
   positionWorld,
   smoothstep,
+  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
+
+/**
+ * Shared emissive intensity for every interior practical fixture (both houses,
+ * both garages), threejs-webgpu-interior-lighting-look §3: fixtures are
+ * emissive bodies with ONE uniform intensity, never per-instance values, so a
+ * later dimming pass writes one uniform and every lens follows. Static 1.0 at
+ * build time: zero per-frame cost, no writer in the frame loop.
+ */
+export const NUKETOWN2_INTERIOR_FIXTURE_INTENSITY = uniform(1);
 
 /**
  * Residential wood plank / parquet floor material.
@@ -210,6 +220,9 @@ export function createNuketown2GarageWallMaterial(): MeshStandardNodeMaterial {
 
 /**
  * Ceiling light practical fixture face driven above bloom threshold.
+ * The emissive colour is scaled by NUKETOWN2_INTERIOR_FIXTURE_INTENSITY, the
+ * one shared uniform every fixture in both houses reads: per-instance values
+ * are uniforms, never cloned materials or baked literals.
  * @param warm If true, warm residential ceiling light; if false, cold garage fluorescent tube.
  */
 export function createNuketown2CeilingLightMaterial(warm = true): MeshStandardNodeMaterial {
@@ -219,16 +232,17 @@ export function createNuketown2CeilingLightMaterial(warm = true): MeshStandardNo
   });
   mat.name = warm ? 'nuketown2-warm-ceiling-light' : 'nuketown2-cold-tube-light';
   mat.type = 'MeshStandardMaterial';
+  mat.userData.nuketown2FixtureIntensity = NUKETOWN2_INTERIOR_FIXTURE_INTENSITY;
 
   if (warm) {
     // Warm tungsten residential illumination: rich golden-white
     mat.colorNode = vec3(1.0, 0.94, 0.84);
     // Driven above 1.02 linear bloom threshold per threejs-webgpu-interior-lighting-look
-    mat.emissiveNode = vec3(2.6, 2.1, 1.4);
+    mat.emissiveNode = vec3(2.6, 2.1, 1.4).mul(NUKETOWN2_INTERIOR_FIXTURE_INTENSITY);
   } else {
     // Cold daylight fluorescent tube
     mat.colorNode = vec3(0.88, 0.96, 1.0);
-    mat.emissiveNode = vec3(1.8, 2.3, 3.1);
+    mat.emissiveNode = vec3(1.8, 2.3, 3.1).mul(NUKETOWN2_INTERIOR_FIXTURE_INTENSITY);
   }
 
   return mat;

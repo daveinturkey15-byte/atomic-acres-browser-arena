@@ -249,6 +249,13 @@ export const NUKETOWN2_UPPER_Y0 = NUKETOWN2_GROUND_STOREY_H + NUKETOWN2_FLOOR_T;
  */
 export const NUKETOWN2_GROUND_FLOOR_T = 0.16;
 export const NUKETOWN2_GROUND_FLOOR_TOP = NUKETOWN2_GROUND_FLOOR_T / 2;
+/**
+ * Wall leaf thickness, and house width along the street. Single source for the
+ * arena shell and the interior-look dressing: the width measures 121 px of 400
+ * along the street axis = 0.303 L (11 / 36 = 0.306).
+ */
+export const NUKETOWN2_WALL_T = 0.3;
+export const NUKETOWN2_HOUSE_WIDTH = 11;
 
 const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 const HOUSE_FRONT_Z = NUKETOWN2_HOUSE_FRONT_Z;

@@ -117,6 +117,7 @@ import {
   createNuketown2GrimeMaterials,
   nuketown2GrimeDecals,
 } from './nuketown2-grime-decals';
+import { nuketown2InteriorLampSolids } from './nuketown2-interior-look';
 import {
   createNuketown2YardPropMaterials,
   nuketown2YardPropSolids,
@@ -139,12 +140,14 @@ import {
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HOUSE_WIDTH as HOUSE_WIDTH,
   NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_UPPER_Y0,
+  NUKETOWN2_WALL_T as WALL_T,
   nuketown2HandedSpan,
   nuketown2HandedX,
 } from './nuketown2-layout';
@@ -218,11 +221,7 @@ export {
 const L = NUKETOWN2_STREET_LENGTH;
 
 const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
-/**
- * Width of a house along the street. Reference: the main house block measures
- * 121 px of 400 along the street axis = 0.303 L. 11 / 36 = 0.306.
- */
-const HOUSE_WIDTH = 11;
+// HOUSE_WIDTH lives in layout (NUKETOWN2_HOUSE_WIDTH); the reference note moved with it.
 /**
  * Back yard depth, house back wall to the yard fence. The reference's back lot
  * (house back wall to the playable boundary) is 0.503 L on one side and 0.583 L
@@ -259,7 +258,7 @@ const UPPER_H = 2.9;
 const ROOF_Y0 = UPPER_Y0 + UPPER_H;                         // 6.2
 const ROOF_T = 0.3;
 
-const WALL_T = 0.3;
+// WALL_T lives in layout (NUKETOWN2_WALL_T), shared with the interior-look dressing.
 /** Waist-high cover: breaks a prone or crouched line, and vaultable. */
 const LOW_COVER = 0.95;
 /** Hard cover: clears the 1.65 m standing eye line. */
@@ -2024,6 +2023,17 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house living shelf', [HOUSE_X1 - WALL_T - 0.3, 1.25, HOUSE_BACK_Z + 3.0], [0.55, 2.10, 1.80], m.trim,
     { solid: false, shots: false, cast: true });
+
+  // ---- PASS 96 interior look: table lamps on the furniture -----------------
+  // One lamp per ground room, standing on the counter/bench tops that are
+  // already there. Shades reuse the shared warm lens material, so their
+  // emissive intensity is the one fixture uniform; every body is
+  // presentation-only through pair(), so neither house gains authority, a
+  // draw call, or a pipeline.
+  for (const lamp of nuketown2InteriorLampSolids(m.trim, m.warmLight)) {
+    pair(builder, lamp.name, [...lamp.position], [...lamp.size], lamp.material,
+      { solid: false, shots: false, cast: false });
+  }
 
   // Upper floor stairwell guard rail & balustrade:
   pair(builder, 'house stair rail post 0', [STAIR_X1 + 0.04, UPPER_Y0 + 0.50, -16.5], [0.08, 1.00, 0.08], m.trim,
