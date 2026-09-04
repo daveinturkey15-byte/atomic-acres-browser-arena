@@ -490,7 +490,12 @@ async function runLobby(peers, arena, report, step) {
   }
   const lobbyViews = {};
   for (const role of PEERS) lobbyViews[role] = (await viewOf(peers[role].page).catch(() => null))?.lobby ?? null;
-  const lobbyKeys = PEERS.map((role) => JSON.stringify(lobbyViews[role]));
+  const lobbyKeys = PEERS.map((role) => JSON.stringify(lobbyViews[role] && {
+    phase: lobbyViews[role].phase,
+    revision: lobbyViews[role].revision,
+    arenaId: lobbyViews[role].arenaId,
+    members: lobbyViews[role].members,
+  }));
   measure('L-4', 'authoritative-snapshot-agreement', new Set(lobbyKeys).size === 1, { views: lobbyViews });
 
   // Host picks the arena; every peer must follow the authoritative choice.
@@ -549,6 +554,8 @@ async function runLobby(peers, arena, report, step) {
   measure('L-9', 'telemetry-does-not-advance-revision', steadyRevision !== null && telemetryRevision === steadyRevision, { result: lobby.telemetryRevision });
   step('all-ready');
 
+  const allReadyStartEnabled = await host.page.evaluate(() => document.querySelector('#lobby-start')?.disabled === false);
+  measure('L-3', 'all-ready-start-enabled', allReadyStartEnabled, { result: partial });
   await host.page.click('#lobby-start');
   await sleep(250);
   const countdownTitles = Object.fromEntries(await Promise.all(PEERS.map(async (role) => [
@@ -558,7 +565,6 @@ async function runLobby(peers, arena, report, step) {
   lobby.countdownTitles = countdownTitles;
   const countdownValues = Object.values(countdownTitles).filter((title) => /^DEPLOYING IN [0-5]$/.test(String(title).trim()));
   measure('L-7', 'host-time-countdown', countdownValues.length === PEERS.length, { result: countdownTitles });
-  measure('L-3', 'all-ready-start-enabled', (await host.page.evaluate(() => document.querySelector('#lobby-start')?.disabled ?? null)) === false, { result: partial });
   const deployed = await Promise.allSettled(PEERS.map((role) => peers[role].page.waitForFunction(
     (arenaId) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -833,13 +839,25 @@ async function scenarioPickupAuthority(guest, host, peers, role) {
     const alternative = ['carbine', 'smg', 'ak-alpha', 'm14-ebr'].find((weapon) => weapon !== drop.weapon && weapon !== current);
     if (!alternative) return { ok: false, reason: 'no alternate primary available' };
     const position = drop.position;
+    const currentPosition = debug.snapshot().player.position;
+    if (Math.hypot(currentPosition[0] - position[0], currentPosition[2] - position[2]) > 2.5) {
+      return { ok: false, reason: 'host-authored drop is not at the post-respawn position', position, currentPosition };
+    }
     debug.equipWeapon(alternative);
-    debug.teleportPlayer(position[0], debug.snapshot().player.position[1], position[2]);
-    return { ok: true, dropId: drop.id, weapon: drop.weapon, holding: alternative };
+    return { ok: true, dropId: drop.id, weapon: drop.weapon, holding: alternative, position: currentPosition };
   });
   result.staged = staged;
   if (!staged.ok) return result;
-  await sleep(ACK_BUDGET_MS);
+  await guest.page.waitForTimeout(250);
+  await host.page.waitForFunction(
+    ({ playerId, position }) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers?.find((candidate) => candidate.id === playerId);
+      const hostPosition = remote?.authoritativePosition ?? [];
+      return hostPosition.length === 3 && Math.hypot(hostPosition[0] - position[0], hostPosition[2] - position[2]) <= 1.5;
+    },
+    { playerId: selfId, position: staged.position },
+    { timeout: ACK_BUDGET_MS },
+  ).catch(() => {});
   const marks = { guest: await markOf(guest), host: await markOf(host), other: await markOf(other) };
   await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop());
   await sleep(ACK_BUDGET_MS);
