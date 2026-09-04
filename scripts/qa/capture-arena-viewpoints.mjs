@@ -214,9 +214,19 @@ try {
           return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
         }, undefined, { timeout: PER_ARENA_MS });
         // Freeze the solo bot IMMEDIATELY so it does not wander to the driveway
-        // during settle time before camera review:
+        // during settle time before camera review, and hide/relocate it away from
+        // the camera review viewpoints:
         await page.evaluate(() => {
           window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
+          const scene = window.__ATOMIC_ACRES_DEBUG__.sampleSceneGraph();
+          if (scene) {
+            scene.traverse((obj) => {
+              if (obj.name === 'bot-operator' || obj.name.startsWith('bot-operator')) {
+                obj.position.set(0, -100, 0);
+                obj.visible = false;
+              }
+            });
+          }
         });
         // Let the deploy fade finish and grade/atmosphere settle before the
         // first camera move; a frame grabbed at match-active is still fading.

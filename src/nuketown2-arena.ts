@@ -1022,13 +1022,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [wx + width / 4, 5.39, zFront], [0.05, 1.38, 0.07], m.trim,
       { solid: false, shots: false, cast: true });
     pair(builder, 'house upper front window stool',
-      [wx, UPPER_Y0 + 0.89, zFront + WALL_T / 2 + 0.035], [width + 0.10, 0.03, 0.07], m.trim,
+      [wx, UPPER_Y0 + 0.89, zFront - WALL_T / 2 - 0.035], [width + 0.10, 0.03, 0.07], m.trim,
       { solid: false, shots: false, cast: false });
     pair(builder, 'house upper front window apron',
-      [wx, UPPER_Y0 + 0.83, zFront + WALL_T / 2 + 0.015], [width + 0.06, 0.08, 0.03], m.trim,
+      [wx, UPPER_Y0 + 0.83, zFront - WALL_T / 2 - 0.015], [width + 0.06, 0.08, 0.03], m.trim,
       { solid: false, shots: false, cast: false });
     pair(builder, 'house upper front subwindow drywall',
-      [wx, UPPER_Y0 + 0.40, zFront + WALL_T / 2 + 0.01], [width, 0.80, 0.02], m.interior,
+      [wx, UPPER_Y0 + 0.40, zFront - WALL_T / 2 - 0.01], [width, 0.80, 0.02], m.interior,
       { solid: false, shots: false, cast: false });
   }
   // --- back wall: back door and one upper window ---------------------------
@@ -1078,13 +1078,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [backUpperWx + backUpperW / 4, 5.39, zBack], [0.05, 1.38, 0.07], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house upper back window stool',
-    [backUpperWx, UPPER_Y0 + 0.89, zBack - WALL_T / 2 - 0.035], [backUpperW + 0.10, 0.03, 0.07], m.trim,
+    [backUpperWx, UPPER_Y0 + 0.89, zBack + WALL_T / 2 + 0.035], [backUpperW + 0.10, 0.03, 0.07], m.trim,
     { solid: false, shots: false, cast: false });
   pair(builder, 'house upper back window apron',
-    [backUpperWx, UPPER_Y0 + 0.83, zBack - WALL_T / 2 - 0.015], [backUpperW + 0.06, 0.08, 0.03], m.trim,
+    [backUpperWx, UPPER_Y0 + 0.83, zBack + WALL_T / 2 + 0.015], [backUpperW + 0.06, 0.08, 0.03], m.trim,
     { solid: false, shots: false, cast: false });
   pair(builder, 'house upper back subwindow drywall',
-    [backUpperWx, UPPER_Y0 + 0.40, zBack - WALL_T / 2 - 0.01], [backUpperW, 0.80, 0.02], m.interior,
+    [backUpperWx, UPPER_Y0 + 0.40, zBack + WALL_T / 2 + 0.01], [backUpperW, 0.80, 0.02], m.interior,
     { solid: false, shots: false, cast: false });
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
   // Presentation treads remain visible, but one smooth rotated cuboid owns
@@ -1250,28 +1250,61 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   });
   // Interior drywall lining on ground floor front and back walls:
   // Completes 4-wall domestic interior drywall finish for living room and kitchen
+  // Starts and ends inboard of the side wall linings (LINING_T = 0.02) to avoid corner overlap
+  const LINING_T = 0.02;
+  const groundLiningX0 = HOUSE_X0 + WALL_T + LINING_T;
+  const groundLiningX1 = HOUSE_X1 - WALL_T - LINING_T;
   const frontLiningRuns: [number, number][] = [
-    [HOUSE_X0 + WALL_T, FRONT_WINDOW_A[0]],
+    [groundLiningX0, FRONT_WINDOW_A[0]],
     [FRONT_WINDOW_A[1], FRONT_DOOR[0]],
     [FRONT_DOOR[1], FRONT_WINDOW_B[0]],
-    [FRONT_WINDOW_B[1], HOUSE_X1 - WALL_T],
+    [FRONT_WINDOW_B[1], groundLiningX1],
   ];
   frontLiningRuns.forEach((run, index) => {
     pair(builder, `house ground front wall drywall lining ${index}`,
-      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zFront + WALL_T / 2 + 0.01],
+      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zFront - WALL_T / 2 - 0.01],
       [run[1] - run[0], GROUND_H - 0.08, 0.02], m.interior,
       { solid: false, shots: false, cast: false });
   });
   const backLiningRuns: [number, number][] = [
-    [HOUSE_X0 + WALL_T, BACK_DOOR[0]],
-    [BACK_DOOR[1], HOUSE_X1 - WALL_T],
+    [groundLiningX0, BACK_DOOR[0]],
+    [BACK_DOOR[1], groundLiningX1],
   ];
   backLiningRuns.forEach((run, index) => {
     pair(builder, `house ground back wall drywall lining ${index}`,
-      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zBack - WALL_T / 2 - 0.01],
+      [(run[0] + run[1]) / 2, (GROUND_H - 0.08) / 2, zBack + WALL_T / 2 + 0.01],
       [run[1] - run[0], GROUND_H - 0.08, 0.02], m.interior,
       { solid: false, shots: false, cast: false });
   });
+  // Upper floor bedroom interior drywall lining (west and east walls):
+  // Runs within the front and back rooms between partition and outer linings to avoid corner overlaps
+  const upperFrontZ0 = PARTITION_Z + WALL_T / 2;
+  const upperFrontZ1 = HOUSE_FRONT_Z - WALL_T - LINING_T;
+  const upperFrontDepth = upperFrontZ1 - upperFrontZ0;
+  const upperFrontMidZ = (upperFrontZ0 + upperFrontZ1) / 2;
+  const upperBackZ0 = HOUSE_BACK_Z + WALL_T + LINING_T;
+  const upperBackZ1 = PARTITION_Z - WALL_T / 2;
+  const upperBackDepth = upperBackZ1 - upperBackZ0;
+  const upperBackMidZ = (upperBackZ0 + upperBackZ1) / 2;
+  const upperH = ROOF_Y0 - UPPER_Y0;
+  const upperMidY = (UPPER_Y0 + ROOF_Y0) / 2;
+
+  pair(builder, 'house upper west wall drywall front',
+    [HOUSE_X0 + WALL_T + 0.01, upperMidY, upperFrontMidZ],
+    [0.02, upperH, upperFrontDepth], m.interior,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper west wall drywall back',
+    [HOUSE_X0 + WALL_T + 0.01, upperMidY, upperBackMidZ],
+    [0.02, upperH, upperBackDepth], m.interior,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper east wall drywall front',
+    [HOUSE_X1 - WALL_T - 0.01, upperMidY, upperFrontMidZ],
+    [0.02, upperH, upperFrontDepth], m.interior,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house upper east wall drywall back',
+    [HOUSE_X1 - WALL_T - 0.01, upperMidY, upperBackMidZ],
+    [0.02, upperH, upperBackDepth], m.interior,
+    { solid: false, shots: false, cast: false });
   // HF-440 Cycle 3: Interior partition wall domestic dressing
   // Breaks up massive blank foreground drywall surface with framed artwork, clock & switch
   // Framed vintage wall art on the large foreground partition:
@@ -1379,9 +1412,9 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
 
   // Roll-up garage door tracks and coiled drum:
-  pair(builder, 'garage door track left', [DOOR[0] + 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.trim,
+  pair(builder, 'garage door track left', [DOOR[0] + 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.chrome,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'garage door track right', [DOOR[1] - 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.trim,
+  pair(builder, 'garage door track right', [DOOR[1] - 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.chrome,
     { solid: false, shots: false, cast: true });
   pair(builder, 'garage door drum', [cx, H - 0.35, zFront + 0.22], [DOOR[1] - DOOR[0] + 0.2, 0.35, 0.35], m.trim,
     { solid: false, shots: false, cast: true });
