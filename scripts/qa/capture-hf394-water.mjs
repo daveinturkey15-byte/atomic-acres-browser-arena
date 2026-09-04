@@ -1,3 +1,9 @@
+// HF-394 water review capture: boots the farcrysis arena on the real WebGPU route in installed headless Chrome, deploys into a solo match, teleports to four shoreline/offshore vantages and captures PNG frames of the reflective/refractive sea surface.
+// Usage: node scripts/qa/capture-hf394-water.mjs
+// Flags: none.
+// Env: BASE_URL (default: http://127.0.0.1:41919) — base URL of the app to boot.
+// Writes: artifacts/hf394-water-frames/{beach-waterline,wade-shelf,offshore-inward,offshore-high}.png (one PNG per vantage).
+// Exit codes: 0 = all frames captured; 2 = page is not on the WebGPU backend (aborts before capture rather than reporting a fake pass).
 // HF-394 visual review: boot farcrysis on the real WebGPU route in INSTALLED
 // CHROME HEADLESS (real hardware WebGPU device, no governor browser slot —
 // same launch contract as verify-arena-boot-cdp.mjs), deploy into a solo
