@@ -78,10 +78,10 @@ class below is either in that census or absent from it. [OBSERVED - FINDINGS Q4]
 |---|---|---|---|---|---|---|
 | verge mailbox post/box/flag | 3 | 6 | Q4 grades mailboxes **OPEN**, not absent | THIN | **KEEP one per drive** | kept |
 | verge parcel mailbox pedestal/box | 2 | 4 | none; a second mailbox on the same 36 m | (implied by THIN) | **REMOVE** | done |
-| verge wheelie bin 0/1 + lids | 4 | 8 | none in any BO2-2025 image | THIN verge fill | **REMOVE** | done |
-| verge street bin + lid | 2 | 4 | none | THIN verge fill | **REMOVE** | done |
-| verge hydrant body/cap/nozzles | 3 | 6 | none | THIN verge fill | **REMOVE** | done |
-| verge street sign post / name blade / speed limit | 3 | 6 | Q4 census has no signage; no BO2-2025 street-elevation image exists at all | THIN to pylon + one coach board | **REMOVE** | done |
+| verge wheelie bin 0/1 + lids | 4 | 8 | none in the 6 layout-carrying BO2-2025 images | THIN verge fill | **REMOVE** | done |
+| verge street bin + lid | 2 | 4 | none in those 6 | THIN verge fill | **REMOVE** | done |
+| verge hydrant body/cap/nozzles | 3 | 6 | none in those 6 | THIN verge fill | **REMOVE** | done |
+| verge street sign post / name blade / speed limit | 3 | 6 | Q4 census has no signage; no BO2-2025 image frames the front verge at signage-resolving resolution (street-boii.jpg is a rear-yard viewpoint) | THIN to pylon + one coach board | **REMOVE** | done |
 | verge entry planter urn/shrub | 2 | 4 | none as a distinct mass | THIN, >=3 m gaps | **REMOVE** | done |
 | verge front planter + soil | 2 | 4 | none as a distinct mass | THIN, >=3 m gaps | **REMOVE** | done |
 | verge low wall (HF-437) | 1 | 2 | cover, not dressing | THIN | **KEEP - load-bearing** | kept |
@@ -96,6 +96,11 @@ class below is either in that census or absent from it. [OBSERVED - FINDINGS Q4]
 **Totals: 18 paired emitters deleted = 36 bodies. Verge bodies 79 -> 43 (-45.6 %).
 pair(builder, ...) call sites in nuketown2-arena.ts 215 -> 197. Coplanar scan boxes 757.**
 [MEASURED - grep -c, the new ceiling test own dump, and the coplanar instrument boxes= line]
+
+Every "none" above is scoped, not universal: it means absent from the 6 layout-carrying
+BO2-2025 images in the FINDINGS image list, which is the whole reference corpus this lane
+has - and the 43-body verge-furniture ceiling forces any class those 6 images missed to
+argue its way back in a diff rather than to reappear silently.
 
 Deleted, never hidden - a hidden emitter still costs geometry, a collider, a draw call and
 a line in the size ratchet, and the owner word was "thin out", not "turn off".
@@ -363,3 +368,186 @@ Nothing but this file changed, so the gates are re-run rather than newly claimed
 **HITL 6 owns the landing.** The specification above is buildable in one sitting by anyone
 who starts from the table rather than from the brief; what cost this box was proving that
 the previous table could not be built at all.
+---
+
+## 7. Bays landed - YES. What was built, what it measures, what it cost
+
+Lane: Claude Opus 5 (HITL 6), same worktree and branch, 40-minute box 17:47-18:20. Head at
+entry `04d2ef43`; `68d3a0d6` (the Muse review commit) landed underneath mid-lane from a
+concurrent session in this worktree, so this commit sits on that. **The bays are landed,
+exactly to section 6's corrected specification, with the four tests it names.** Section 6
+stands as written: every number below is the number it derived, reached by building it.
+
+### What was built
+
+| | authored x0 | x1 | length | z (north) | z (south) | area |
+|---|---|---|---|---|---|---|
+| `bay mouth` | -0.2 | 4.05 | 4.25 m | [-7.5, -5.3] | [5.3, 7.5] | 2 x 9.35 m2 |
+| `bay outer` | 9.45 | 17.7 | 8.25 m | [-7.5, -5.3] | [5.3, 7.5] | 2 x 18.15 m2 |
+
+Every one of those eight numbers is an EXPRESSION, never a literal: `mouthX + 0.3`,
+`GARAGE_SPAN.x0 - 0.2`, `GARAGE_SPAN.x1 + 0.2`, `offMapX - 0.3`, and `[KERB, KERB + 2.2]`
+z-mirrored. Section 6 said to author them that way and it was load-bearing straight away -
+the garage span lived in `nuketown2-arena.ts` as a private const, so landing it needed
+`NUKETOWN2_HOUSE_WIDTH`, `NUKETOWN2_HOUSE_CENTRE_X`, `NUKETOWN2_GARAGE_WIDTH` and
+`NUKETOWN2_GARAGE_SPAN` hoisted into `nuketown2-layout.ts`, where the bay runs and the
+house layout now read one source instead of three copies of 11 / 5 / -1.25. [OBSERVED]
+
+Five edits, and that is the whole change:
+
+1. **`nuketown2-layout.ts`** - the garage span above; `NUKETOWN2_BAY_DEPTH = 2.2` and
+   `NUKETOWN2_BAY_RUNS` (the two authored x-runs); `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` grown
+   from 2 rectangles to 6 by **one z-mirror map over the two runs**, so the two sides
+   cannot drift apart; and `isNuketown2BayFootprint()`, the one predicate all three
+   consumers filter on.
+2. **`street()`** - eight new bodies through `centred()`, derived from that same footprint
+   table: `nuketown2 carriageway bay {mouth,outer} {north,south}` (asphalt, centre y -0.06,
+   0.12 m section - the identical slab as `carriageway stem`, so the two abut at |z| = 5.3
+   with no plan overlap) and `... kerb` (0.24 m lip on a 0.3 m tread along the bay's OUTER
+   edge, the identical section as `carriageway stem kerb`, under the 0.42 m autostep).
+3. **`NUKETOWN2_GROUND_DRESSING`** - the stem verge lawn re-tiled from **3 tiles to 11**
+   (6 north, because the north verge also carries the driveway apron; 5 south, where the
+   stem has no apron and three pieces merge into one). Complete cover, no overlaps, all
+   `paired: false`, so they auto-register in `EXPECTED_ASYMMETRIC_CARRIAGEWAY` off the
+   table's own flag.
+4. **`nuketown2-fidelity.test.ts`** - the four ratchet tests, the bay names added to the
+   asymmetric-carriageway list *derived from the footprint table*, the verge ceiling split
+   (below), and one numerical-hygiene fix (below).
+5. **`REPORT.md`** - this section, plus the two Muse SHIP-WITH-FIXES prose corrections
+   (F1 signage scoping, F2 absence-claim scoping) in section 2.
+
+### The measurements
+
+| Quantity | Before | After | Note |
+|---|---|---|---|
+| Paved width at a bay | 10.60 m | **15.00 m** | +4.4 m local, exactly as derived |
+| New hard surface either side of the road | - | **55.00 m2** | 2 x (4.25 + 8.25) x 2.2 |
+| Corridor, front face to front face | 20.00 m | **20.00 m** | untouched |
+| Corridor : house width | 1.818 | **1.818** | untouched, reference 1.825 |
+| Carriageway footprint rectangles | 2 | 6 | 2 authored + 1 z-mirror map |
+| Stem verge lawn tiles | 3 | 11 | the real cut, not a stacked decal |
+| Verge FURNITURE bodies | 36 | **36** | bays are carriageway, not verge |
+| Coplanar scan boxes | 757 | 819 | +8 bay bodies, +46 ground tiles, +8 lawn tiles |
+| Colliders | 293 | 347 | +54, of which 46 are ground tiles |
+| Lawn blades / draw calls | 9,517 / 9 | 8,928 / 11 | grass evicted from 55 m2 of new paving |
+
+[MEASURED - `buildNuketown2()` under tsx, before/after on the same worktree via
+`git stash`; the coplanar instrument's own `boxes=` line]
+
+**Vehicles were NOT re-seated, exactly as section 6 branched.** The longest bay is 8.25 m
+and the street coach is 9.1 m, so no bay holds it; `NUKETOWN2_STREET_COACH` and the 0.150 L
+measured truck offset the overdrive core derives from are byte-identical. The bay-end low
+walls stay **held** for the reason section 6 gave - they would be verge bodies against a
+ceiling with zero headroom - and the four tests assert the kerb lip is 0.24 m so nobody can
+grow one into a wall. [OBSERVED - diff]
+
+### Three things section 6 did not predict, and what was done about them
+
+**(a) The verge ceiling counts lawn decals, and the split fixes it by TIGHTENING.**
+Section 6 said "the 43-body verge ceiling holds untouched" because bays are carriageway
+bodies. True of the bays - and false of the lawn cut they require: the ceiling counts every
+name containing `" verge "`, and 8 of the 11 new stem tiles are `verge lawn stem ...`. The
+count was 36 furniture + 7 dressing decals = 43; it would have become 51.
+
+Raising 43 to 51 would have handed the furniture line eight free props, which is the exact
+failure mode the ceiling exists to prevent. Renaming the tiles to dodge the filter would be
+gaming it. So the count is **split, and both halves ratcheted at their exact current value
+with zero headroom**: furniture <= **36** (excluded by reading the arena's own
+`NUKETOWN2_GROUND_DRESSING` ids, not by a name pattern, so nothing can be renamed into the
+gap) and the aggregate <= **51**. That is strictly stronger than what it replaced on the
+class the gate names - the effective furniture cap drops 43 -> 36 - and it closes a
+laundering route the single count allowed (delete a lawn tile, add a prop, stay at 43).
+**This is a ratchet refinement, not a relaxation, and it is the only gate number that
+moved.** [DERIVED - the test's own dump, before and after]
+
+**(b) The ground-cut gate was passing on floating-point luck.** It asserts an EXACT zero
+overlap area between built tiles and authored rectangles, and reconstructs a tile edge as
+`centre -/+ size / 2` - two float64 roundings. Every cut line in this arena before the bays
+happened to round the harmless way; `4.05`, `9.45` and `17.7` do not, and the gate red-ed
+on overlaps of 6.1e-17 m2 and 3.9e-15 m2. The fix is `snapM()`, which quantises that
+reconstruction to a **nanometre** - eight orders of magnitude below the 1e-4 m plan epsilon
+`nuketown2-arena.ts` itself uses, thirteen below anything a human authors. **No assertion
+was loosened**: they all still demand exact equality, on a number that is now deterministic
+rather than carrying two ulps of reconstruction noise. [MEASURED - both failures reproduced
+and named in the test's own header]
+
+**(c) TODO F3 - the ground tiler multiplies, and it cost 46 tiles.** `buildNuketown2Ground()` emits
+one tile per (x-cut, z-cut) cell, so 4 new x-cuts and 2 new z-cuts across a 36 x 84 m grid
+turned 67 ground tiles into 113 and 293 colliders into 347. That is the cost
+`NUKETOWN2_CARRIAGEWAY_FOOTPRINTS`' own header warns about for the bulb's disc, paid here
+for the bays, and it is reported rather than hidden: no draw-call or collider budget in the
+repository moved (`graphics-profile-contract` and `nuketown-lawn-field` both green), the
+tiles are all one material, and merging same-material ground runs is a real optimisation
+that belongs in its own pass. **OPEN.** Exact follow-up: in
+`src/nuketown2-arena.ts:2462-2488`, merge adjacent coplanar `m.ground` cells that share a
+full edge and identical z-span outside the bay/verge bands (or scope the four bay x-cuts
+to those bands), then add a `groundTiles <= 113` ratchet in
+`src/nuketown2-fidelity.test.ts` after measuring the optimized count. **Falsifier:** a
+frame-time or draw-call measurement on this map showing the ground tiling in the top costs
+- which needs the GPU this lane was told not to touch. [MEASURED / OPEN / TODO]
+
+### The four tests, and what each one ratchets
+
+All in `src/nuketown2-fidelity.test.ts`, in the HF-491 describe block:
+
+1. **`lands a roadside bay on both sides of the stem, each an exact z-mirror of its
+   partner`** - the bay list is derived from the footprint table (never a literal), each
+   rect has an exact z-mirror partner, and for each one the asphalt AND the kerb exist in
+   the world at the authored rectangle, flush with the road surface, kerb 0.24 m and under
+   the 0.30 m kerb ceiling on its outer edge. Then the three headline numbers: 15.0 m
+   paved, +4.4 m local, 55.0 m2 new hard surface, corridor still 20.0 m.
+2. **`keeps every bay clear of the cul-de-sac mouth, so none can be re-authored through
+   pair()`** - every bay starts past `mouthX`, AND the falsifier is asserted positively:
+   each bay's own 180-degree image lands inside the bulb's bounding square, which is *why*
+   no bay of any length can be a `pair()` body. Blocker 1, ratcheted.
+3. **`keeps every bay clear of the driveway aprons that cross the north verge`** - zero
+   overlap against the arena's own apron rects, plus the 0.2 m garage margins and the
+   4.25 / 8.25 m lengths asserted as expressions off `NUKETOWN2_GARAGE_SPAN`, so if the
+   garage moves the bays move with it. Blocker 2, ratcheted so it cannot be rediscovered a
+   third time.
+4. **`cuts the bays out of the lawn table, so no instanced grass grows through the
+   paving`** - three assertions in the order they would fail: no lawn REGION laps a bay; no
+   grass BLADE root stands inside a bay (measured on all 8,928 instances, not inferred from
+   the table); and the re-tiled stem verge still covers its band completely with no
+   overlapping tiles, sampled on a 0.13 m lattice. Blocker 3, ratcheted - **this is the
+   assertion the brief asked for, and it fires on the real instanced field.**
+
+Everything else was kept and re-run, not re-claimed: two-sided corridor-ratio band, verge
+ceiling (now two-sided, see (a)), `pair()`/`centred()` symmetry properties (i)-(iv),
+garage-RIGHT handedness, spawn fairness bands, parity walk-through budget 0, coplanar
+HOUSE-INTERIOR 0 and STREET 0, and the `legacy-main` size ratchet (untouched - this change
+does not go near that file).
+
+### Gates
+
+    npx tsc --noEmit                                 clean (exit 0)
+    npx vitest run src/nuketown2-fidelity.test.ts
+      src/collider-visual-parity-gate.test.ts
+      src/graphics-profile-contract.test.ts
+      src/legacy-main-size-ratchet.test.ts           4 files, 59 tests, all passed
+                                                     (was 55; the four new tests are the +4)
+    npx vitest run src/nuketown-lawn-field.test.ts
+      src/grass-placement.test.ts
+      src/grass-system.test.ts                       3 files, 16 tests, all passed
+    npx tsx scripts/qa/find-coplanar-pairs.ts        boxes=819, pairs<=0.03m: 141,
+                                                     FINDINGS: 0, FENCED: 115,
+                                                     SAME-MATERIAL: 26,
+                                                     HOUSE-INTERIOR: 0, STREET: 0
+
+Also re-run green, because the layout module's exports changed: the six other nuketown test
+files (28 tests) and the four dependent suites - destructible shed registry, overdrive
+line-of-sight, railgun authority, raytracing arena-proxy coverage (30 tests).
+
+### Claim-states
+
+- **MEASURED**: every number in the measurement table, both blocker-(b) overlap values, the
+  before/after tile, collider and blade counts, and every gate line above.
+- **DERIVED**: 55.0 m2, 15.0 m, +4.4 m, the 4.25 / 8.25 m bay lengths - all arithmetic over
+  `NUKETOWN2_CUL_DE_SAC` and `NUKETOWN2_GARAGE_SPAN`, and all now asserted rather than
+  written down.
+- **OPEN**: the 2.2 m bay depth, on section 3's original falsifier (a BO2-2025 orthographic
+  overhead that is not a stylised minimap); the +46 ground tiles, on the falsifier in (c);
+  the bay-end low walls, HELD, and they need a diff that argues the verge ceiling up.
+- **Not claimed**: nothing here was seen running. No browser, no GPU, no preview server was
+  touched this lane - the owner is running ComfyUI. Every statement above comes from node
+  builds of the arena and from the gates.

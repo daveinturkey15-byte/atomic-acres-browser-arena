@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { auditNuketown2Coplanar } from './nuketown2-coplanar-audit';
 import { isBlocked } from './collision';
 import { deriveGlassDynamicColliders } from './glass-collider-bounds';
 import { FALL_DAMAGE_SAFE_SPEED, computeFallDamage, movementProfile } from './gameplay';
@@ -21,20 +22,32 @@ import {
   NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_TURNING_HEAD_SEGMENTS,
   NUKETOWN2_WINDOWS,
   NUKETOWN2_YARD_STAIR,
   buildNuketown2,
 } from './nuketown2-arena';
 import { ARENA_VISUAL_REGISTRY } from './rendering/arena-visual-stream';
 import {
+  NUKETOWN2_BAY_DEPTH,
+  NUKETOWN2_BAY_RUNS,
+  NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
   NUKETOWN2_HANDEDNESS,
   NUKETOWN2_HOUSE_FRONT_Z,
+  NUKETOWN2_STREET_HALF_WIDTH,
+  NUKETOWN2_TURNING_HEAD_KERB_WIDTH,
+  NUKETOWN2_TURNING_HEAD_HALF,
+  NUKETOWN2_CUL_DE_SAC,
   NUKETOWN2_UPPER_Y0,
+  isNuketown2BayFootprint,
   nuketown2HandedSpan,
   nuketown2HandedX as hx,
 } from './nuketown2-layout';
+import {
+  NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
+} from './nuketown2-roofs';
 import {
   OVERDRIVE_POSITION,
   claimOverdrive,
@@ -311,17 +324,48 @@ function solidMeshes(map: ArenaMap): THREE.Mesh[] {
     const mesh = node as THREE.Mesh;
     if (mesh.isMesh !== true) return false;
     if (mesh.userData.presentationOnly === true) return false;
-    return (mesh.geometry as THREE.BoxGeometry).parameters !== undefined;
+    return (mesh.geometry as THREE.BoxGeometry).parameters !== undefined
+      || mesh.userData.nuketown2Solid === true;
   });
 }
 
+/**
+ * HF-491 NUMERICAL HYGIENE, and it is NOT a tolerance. A box edge is
+ * reconstructed here as `centre -/+ size / 2`, which is two float64 roundings,
+ * so a tile whose authored edge is 0.2 m comes back as 0.19999999999999998 -
+ * and the ground-cut gate below asserts an EXACT zero overlap area against
+ * authored rectangles, so that 2.8e-17 m error reads as a lap that does not
+ * exist. Before the roadside bays every cut line in this arena happened to be
+ * a value whose reconstruction error fell the harmless way; the bays'
+ * garage-relative runs (4.05, 9.45, 17.7) do not, and relying on that luck is
+ * not a property anybody can maintain.
+ *
+ * So the reconstruction is snapped to a NANOMETRE, which is eight orders of
+ * magnitude below the 1e-4 m plan epsilon `nuketown2-arena.ts` itself uses for
+ * overlap and thirteen below anything a human can author. No assertion is
+ * loosened by it: they all still demand exact equality, on a number that is
+ * now deterministic instead of carrying two ulps of reconstruction noise.
+ */
+const SNAP_DECIMALS = 9;   // one nanometre
+const snapM = (metres: number): number => Number(metres.toFixed(SNAP_DECIMALS));
+
 function planFootprint(mesh: THREE.Mesh): { x0: number; x1: number; z0: number; z1: number } {
-  const p = (mesh.geometry as THREE.BoxGeometry).parameters as { width: number; height: number; depth: number };
+  const parameters = (mesh.geometry as THREE.BoxGeometry).parameters as { width?: number; depth?: number } | undefined;
+  if (parameters?.width !== undefined && parameters.depth !== undefined) {
+    return {
+      x0: snapM(mesh.position.x - parameters.width / 2),
+      x1: snapM(mesh.position.x + parameters.width / 2),
+      z0: snapM(mesh.position.z - parameters.depth / 2),
+      z1: snapM(mesh.position.z + parameters.depth / 2),
+    };
+  }
+  mesh.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(mesh);
   return {
-    x0: mesh.position.x - p.width / 2,
-    x1: mesh.position.x + p.width / 2,
-    z0: mesh.position.z - p.depth / 2,
-    z1: mesh.position.z + p.depth / 2,
+    x0: snapM(bounds.min.x),
+    x1: snapM(bounds.max.x),
+    z0: snapM(bounds.min.z),
+    z1: snapM(bounds.max.z),
   };
 }
 
@@ -505,6 +549,62 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     expect(longestRun).toBeGreaterThan(8);
     expect(longestRun, 'clear run along the street centre-line').toBeLessThanOrEqual(MAX_STREET_CENTRE_RUN_METRES);
+  });
+
+  it('lands a circular paved turning head with a closed low kerb ring', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const footprint = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.find((entry) => entry.id === 'turning-head')!;
+    expect(footprint.shape).toBe('circle');
+    if (footprint.shape !== 'circle') throw new Error('turning-head footprint lost its circle shape');
+    expect(footprint.centreX).toBe(NUKETOWN2_CUL_DE_SAC.centreX);
+    expect(footprint.radius).toBe(NUKETOWN2_CUL_DE_SAC.radius);
+
+    const disc = map.root.getObjectByName('nuketown2 carriageway turning head') as THREE.Mesh | undefined;
+    expect(disc, 'the paved bulb is present').toBeDefined();
+    const discParameters = (disc!.geometry as THREE.CylinderGeometry).parameters;
+    expect(discParameters.radiusTop, 'authored disc radius').toBe(NUKETOWN2_CUL_DE_SAC.radius);
+    expect(discParameters.radialSegments, 'authored disc polygon resolution').toBe(NUKETOWN2_TURNING_HEAD_SEGMENTS);
+    const discBounds = new THREE.Box3().setFromObject(disc!);
+    expect(discBounds.getSize(new THREE.Vector3()).x).toBeCloseTo(2 * NUKETOWN2_CUL_DE_SAC.radius, 6);
+    expect(discBounds.getSize(new THREE.Vector3()).z).toBeCloseTo(2 * NUKETOWN2_CUL_DE_SAC.radius, 6);
+    expect(discBounds.getCenter(new THREE.Vector3()).x).toBeCloseTo(hx(NUKETOWN2_CUL_DE_SAC.centreX), 6);
+    expect(discBounds.getCenter(new THREE.Vector3()).z).toBeCloseTo(0, 6);
+
+    const kerbs = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && node.name.startsWith('nuketown2 carriageway head kerb segment ')
+    ));
+    expect(kerbs, 'twenty short kerb segments close the ring').toHaveLength(NUKETOWN2_TURNING_HEAD_SEGMENTS);
+    const centreX = hx(NUKETOWN2_CUL_DE_SAC.centreX);
+    const ringRadius = NUKETOWN2_CUL_DE_SAC.radius + NUKETOWN2_TURNING_HEAD_KERB_WIDTH / 2;
+    const angles = kerbs.map((kerb) => Math.atan2(kerb.position.z, kerb.position.x - centreX)).sort((a, b) => a - b);
+    const gaps = angles.map((angle, index) => (
+      (angles[(index + 1) % angles.length]! - angle + Math.PI * 2) % (Math.PI * 2)
+    ));
+    expect(Math.max(...gaps), 'the kerb ring has no open segment gap').toBeCloseTo((Math.PI * 2) / NUKETOWN2_TURNING_HEAD_SEGMENTS, 5);
+    for (const kerb of kerbs) {
+      expect(new THREE.Box3().setFromObject(kerb).max.y, `${kerb.name} is a low solid`).toBeLessThanOrEqual(0.30 + 1e-9);
+      expect(Math.hypot(kerb.position.x - centreX, kerb.position.z), `${kerb.name} stays on the authored ring`)
+        .toBeCloseTo(ringRadius, 1);
+      expect((kerb.geometry as THREE.BoxGeometry).parameters.depth, `${kerb.name} keeps the uniform kerb width`)
+        .toBe(NUKETOWN2_TURNING_HEAD_KERB_WIDTH);
+    }
+    const ringKeys = new Set(kerbs.map((kerb) => {
+      const bounds = new THREE.Box3().setFromObject(kerb);
+      return `${bounds.min.x.toFixed(6)}|${bounds.max.x.toFixed(6)}|${bounds.min.z.toFixed(6)}|${bounds.max.z.toFixed(6)}`;
+    }));
+    for (const kerb of kerbs) {
+      const bounds = new THREE.Box3().setFromObject(kerb);
+      expect(ringKeys.has(`${bounds.min.x.toFixed(6)}|${bounds.max.x.toFixed(6)}|${(-bounds.max.z).toFixed(6)}|${(-bounds.min.z).toFixed(6)}`),
+        `${kerb.name} has an exact z-mirror partner`).toBe(true);
+    }
+    const discCollider = map.colliders.find((bounds) => (
+      Math.abs(bounds.minX - (centreX - NUKETOWN2_CUL_DE_SAC.radius)) < 1e-9
+      && Math.abs(bounds.maxX - (centreX + NUKETOWN2_CUL_DE_SAC.radius)) < 1e-9
+      && Math.abs(bounds.minZ + NUKETOWN2_CUL_DE_SAC.radius) < 1e-9
+      && Math.abs(bounds.maxZ - NUKETOWN2_CUL_DE_SAC.radius) < 1e-9
+    ));
+    expect(discCollider, 'the disc has an authoritative low-solid collider').toBeDefined();
   });
 
   it('gets the OPEN and CLOSED vehicles the right way round: truck open, coach closed, cars solid', async () => {
@@ -1055,6 +1155,17 @@ describe('Nuke Town Rebuild fidelity', () => {
       Math.max(0, Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0))
       * Math.max(0, Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0))
     );
+    const overlapsFootprint = (rect: { x0: number; x1: number; z0: number; z1: number }, footprint: {
+      x0: number; x1: number; z0: number; z1: number; shape?: string; centreX?: number; centreZ?: number; radius?: number;
+    }): number => {
+      if (footprint.shape === 'circle') {
+        const nearestX = Math.max(rect.x0, Math.min(footprint.centreX!, rect.x1));
+        const nearestZ = Math.max(rect.z0, Math.min(footprint.centreZ!, rect.z1));
+        return (nearestX - footprint.centreX!) ** 2 + (nearestZ - footprint.centreZ!) ** 2
+          < footprint.radius! ** 2 ? 1 : 0;
+      }
+      return overlap(rect, footprint);
+    };
     // HF-473: NUKETOWN2_BUILDING_FOOTPRINTS is an AUTHORED table (the ground
     // builder cuts with it before `centred()` mirrors the tiles), so it is put
     // through the same mirror here before being compared against built,
@@ -1073,7 +1184,8 @@ describe('Nuke Town Rebuild fidelity', () => {
       // symmetric, so it converts exactly the way the buildings above do.
       ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
         const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
-        return { ...footprint, x0, x1 };
+        return { ...footprint, x0, x1,
+          ...(footprint.shape === 'circle' ? { centreX: hx(footprint.centreX) } : {}) };
       }),
     ];
     const floors = map.root.children.filter((node): node is THREE.Mesh => (
@@ -1106,7 +1218,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     for (const outdoor of outdoorBoxes) {
       const plan = planFootprint(outdoor);
       for (const footprint of footprints) {
-        expect(overlap(plan, footprint), `${outdoor.name} inside ${JSON.stringify(footprint)}`).toBe(0);
+        expect(overlapsFootprint(plan, footprint), `${outdoor.name} inside ${JSON.stringify(footprint)}`).toBe(0);
       }
     }
 
@@ -1114,7 +1226,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // lawn regions directly from the same dressing table the builder consumes.
     for (const region of nuketownRebuildLawnRegions(WORLD_GROUND_DRESSING)) {
       for (const footprint of footprints) {
-        expect(overlap({ x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ }, footprint),
+        expect(overlapsFootprint({ x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ }, footprint),
           `lawn region inside ${JSON.stringify(footprint)}`).toBe(0);
       }
     }
@@ -1833,6 +1945,12 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle truck wheel 2',
     ];
 
+    // ---- HF-472: THE SHOW-HOME ROOF FORMS -------------------------------
+    // The houses remain a rotational layout pair, but the reference's two
+    // show homes deliberately have different roof identities. The exact body
+    // names come from `nuketown2-roofs.ts`, so this exception cannot drift from
+    // the one-sided emitters without failing this gate.
+
     // ---- HF-477: THE CARRIAGEWAY, AND WHY IT IS A SECOND EXCEPTION ---------
     // The lollipop breaks the 180-degree property for the ROAD, and it has to:
     // `docs/references/nuketown-2025/FINDINGS.md` Q4 VERIFIES one circular
@@ -1849,7 +1967,20 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 carriageway stem dash 1',
       'nuketown2 carriageway stem dash 2',
       'nuketown2 carriageway stem dash 3',
-      ...Array.from({ length: 16 }, (_, index) => `nuketown2 carriageway head kerb island ${index}`),
+      ...Array.from({ length: NUKETOWN2_TURNING_HEAD_SEGMENTS }, (_, index) => `nuketown2 carriageway head kerb segment ${index}`),
+      // ---- HF-491: THE ROADSIDE BAYS ------------------------------------
+      // Four pockets of asphalt let into the front verge, each with its own
+      // kerb lip. They are asymmetric for the SAME reason the rest of the road
+      // is - they hang off the stem, and the stem's 180-degree image is the
+      // cul-de-sac bulb - and they pay for it with the same property (i)
+      // below: every one has an EXACT z-mirror partner, which is the axis the
+      // teams are separated across. The names are DERIVED from the arena's own
+      // carriageway footprint table, the same table `street()` emits them from
+      // and `buildNuketown2Ground()` cuts them from, so a bay added there
+      // cannot be missed here and one deleted there cannot be left behind.
+      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS
+        .filter(isNuketown2BayFootprint)
+        .flatMap((bay) => [`nuketown2 carriageway ${bay.id}`, `nuketown2 carriageway ${bay.id} kerb`]),
       // The front verge is tiled per z-side for the same reason - the bulb
       // fills the whole verge band at one end of the map and none of it at the
       // other, so `pair()` would put each tile's image on the road. The names
@@ -1880,8 +2011,12 @@ describe('Nuke Town Rebuild fidelity', () => {
     const solids = solidMeshes(map);
     expect(solids.length).toBeGreaterThan(120);
     const size = (mesh: THREE.Mesh) => {
-      const p = (mesh.geometry as THREE.BoxGeometry).parameters as { width: number; height: number; depth: number };
-      return `${p.width}x${p.height}x${p.depth}`;
+      const parameters = (mesh.geometry as THREE.BoxGeometry).parameters as { width?: number; height?: number; depth?: number } | undefined;
+      if (parameters?.width !== undefined && parameters.height !== undefined && parameters.depth !== undefined) {
+        return `${parameters.width}x${parameters.height}x${parameters.depth}`;
+      }
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      return `${snapM(bounds.max.x - bounds.min.x)}x${snapM(bounds.max.y - bounds.min.y)}x${snapM(bounds.max.z - bounds.min.z)}`;
     };
     const at = (x: number, y: number, z: number) => (
       `${(x === 0 ? 0 : x).toFixed(3)}|${y.toFixed(3)}|${(z === 0 ? 0 : z).toFixed(3)}`
@@ -1944,14 +2079,17 @@ describe('Nuke Town Rebuild fidelity', () => {
       ...EXPECTED_ASYMMETRIC,
       ...EXPECTED_ASYMMETRIC_CARRIAGEWAY,
       ...EXPECTED_ASYMMETRIC_BEYOND_BOUNDS,
+      ...NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
     ].sort());
     // Every one of them is a street vehicle, a carriageway body or a
     // beyond-bounds body by NAME as well as by list, so no list can be grown
     // with a wall by renaming it.
     const carriageway = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_CARRIAGEWAY.includes(mesh.name));
     const beyondBounds = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_BEYOND_BOUNDS.includes(mesh.name));
+    const roofs = asymmetric.filter((mesh) => NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES.includes(mesh.name));
     const vehicles = asymmetric.filter((mesh) => (
-      !carriageway.includes(mesh) && !beyondBounds.includes(mesh) && !groundTiles.includes(mesh)
+      !carriageway.includes(mesh) && !beyondBounds.includes(mesh)
+      && !roofs.includes(mesh) && !groundTiles.includes(mesh)
     ));
     for (const mesh of vehicles) {
       expect(mesh.name.startsWith('nuketown2 street-vehicle '), mesh.name).toBe(true);
@@ -1961,6 +2099,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     for (const mesh of beyondBounds) {
       expect(mesh.name.startsWith('nuketown2 beyond-bounds '), mesh.name).toBe(true);
+    }
+    for (const mesh of roofs) {
+      expect(NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES.includes(mesh.name), mesh.name).toBe(true);
     }
 
     // ---- WHAT THE CARRIAGEWAY EXCEPTION PAYS ------------------------------
@@ -2654,14 +2795,36 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
         .toHaveLength(0);
     }
 
-    // Ceiling on the whole line, set AT the post-cut count of 43 bodies (the
-    // furniture pairs plus the verge lawn/frontage decals that share the prefix),
-    // down from 79 before HF-491. A ratchet AT the current value is the
-    // non-weakening form: it has zero headroom, so a later pass that wants one
-    // more `pair(builder, 'verge ...')` must argue for it in a diff.
+    // ---- THE CEILING, SPLIT BY HF-491's BAYS - AND TIGHTENED --------------
+    // As first written this was one count of every name containing " verge ",
+    // ratcheted at 43. That number was 36 pieces of FURNITURE plus 7 ground
+    // DRESSING decals from `NUKETOWN2_GROUND_DRESSING` that happen to share the
+    // prefix, and the paragraph at the head of this describe says what the
+    // ceiling is for in its own words: "the furniture line has a ceiling",
+    // because a continuous run of waist-high props closes the corridor at eye
+    // level. Lawn decals do not close anything.
+    //
+    // The roadside bays cut the stem verge lawn from 3 tiles into 11 - the same
+    // square metres of lawn, tiled around 55 m2 of new asphalt - which is +8 on
+    // a count that was never measuring lawn tiles. Raising 43 to 51 would have
+    // handed the furniture line eight free props.
+    //
+    // So the count is SPLIT, and both halves are ratcheted at their exact
+    // current value with zero headroom. This is strictly TIGHTER, not looser:
+    //   - furniture is now capped at 36, down from an effective 43, and the
+    //     dressing ids are excluded by reading the arena's OWN table rather
+    //     than by a name pattern, so nothing can be renamed into the gap;
+    //   - the aggregate is still capped, at its own exact new value, so the
+    //     original assertion has not been dropped; and
+    //   - the laundering the single count allowed - delete a lawn tile, add a
+    //     prop, stay at 43 - is now impossible.
     const vergeBodies = names.filter((n) => n.includes(' verge '));
+    const dressingIds = NUKETOWN2_GROUND_DRESSING.map((piece) => piece.id);
+    const vergeFurniture = vergeBodies.filter((n) => !dressingIds.some((id) => n.includes(id)));
+    expect(vergeFurniture.length, `verge FURNITURE:\n${vergeFurniture.sort().join('\n')}`)
+      .toBeLessThanOrEqual(36);
     expect(vergeBodies.length, `verge bodies:\n${vergeBodies.sort().join('\n')}`)
-      .toBeLessThanOrEqual(43);
+      .toBeLessThanOrEqual(51);
 
     // Load-bearing pieces that are NOT clutter and must survive any later
     // declutter pass: the HF-437 cover pair, the climb-chain hedge, the
@@ -2675,5 +2838,284 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     ]) {
       expect(names.some((n) => n.includes(kept)), `"${kept}" is load-bearing and must stay`).toBe(true);
     }
+  });
+  // ---- HF-491: THE ROADSIDE BAYS -----------------------------------------
+  // Owner, same verdict: "have BITS EITHER SIDE OF THE ROAD like it does in the
+  // game". The four tests below are the ratchet that lands with them, and each
+  // one exists because a previous cut of this design failed on exactly it.
+  const WORLD_BAYS = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS
+    .filter(isNuketown2BayFootprint)
+    .map((bay) => {
+      const [x0, x1] = nuketown2HandedSpan(bay.x0, bay.x1);
+      return { ...bay, x0, x1 };
+    });
+  const rectOverlap = (
+    a: { x0: number; x1: number; z0: number; z1: number },
+    b: { x0: number; x1: number; z0: number; z1: number },
+  ): number => (
+    Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0))
+    * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0))
+  );
+  const rectUnionArea = (
+    rects: ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number }>,
+  ): number => {
+    const xCuts = [...new Set(rects.flatMap((rect) => [snapM(rect.x0), snapM(rect.x1)]))]
+      .sort((a, b) => a - b);
+    let area = 0;
+    for (let index = 0; index < xCuts.length - 1; index += 1) {
+      const x0 = xCuts[index]!;
+      const x1 = xCuts[index + 1]!;
+      if (x1 <= x0) continue;
+      const zSpans = rects
+        .filter((rect) => snapM(rect.x0) < x1 && snapM(rect.x1) > x0)
+        .map((rect) => [snapM(rect.z0), snapM(rect.z1)] as const)
+        .sort((a, b) => a[0] - b[0]);
+      let coveredZ = 0;
+      let current: [number, number] | undefined;
+      for (const [z0, z1] of zSpans) {
+        if (!current) {
+          current = [z0, z1];
+        } else if (z0 <= current[1]) {
+          current[1] = Math.max(current[1], z1);
+        } else {
+          coveredZ += current[1] - current[0];
+          current = [z0, z1];
+        }
+      }
+      if (current) coveredZ += current[1] - current[0];
+      area += (x1 - x0) * coveredZ;
+    }
+    return snapM(area);
+  };
+  it('lands a roadside bay on both sides of the stem, each an exact z-mirror of its partner', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+
+    // The list is DERIVED from the arena's own carriageway footprint table -
+    // the table `street()` emits from and `buildNuketown2Ground()` cuts from -
+    // and never from a literal list here, so a bay cannot exist in one of the
+    // three and not in the others.
+    const bays = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint);
+    expect(bays.length, 'two authored runs, two sides each').toBe(NUKETOWN2_BAY_RUNS.length * 2);
+
+    for (const bay of bays) {
+      const mirror = bays.find((other) => (
+        other.id !== bay.id
+        && other.x0 === bay.x0 && other.x1 === bay.x1
+        && other.z0 === -bay.z1 && other.z1 === -bay.z0
+      ));
+      expect(mirror, `${bay.id} has an exact z-mirror partner in the footprint table`).toBeDefined();
+
+      // ...and the GEOMETRY exists for it, both the asphalt and the kerb lip,
+      // in the world frame, at the authored rectangle.
+      const [wx0, wx1] = nuketown2HandedSpan(bay.x0, bay.x1);
+      const slab = map.root.getObjectByName(`nuketown2 carriageway ${bay.id}`) as THREE.Mesh | undefined;
+      const kerb = map.root.getObjectByName(`nuketown2 carriageway ${bay.id} kerb`) as THREE.Mesh | undefined;
+      expect(slab, `${bay.id} asphalt`).toBeDefined();
+      expect(kerb, `${bay.id} kerb`).toBeDefined();
+      const slabBox = new THREE.Box3().setFromObject(slab!);
+      expect(slabBox.min.x, `${bay.id} x0`).toBeCloseTo(wx0, 5);
+      expect(slabBox.max.x, `${bay.id} x1`).toBeCloseTo(wx1, 5);
+      expect(slabBox.min.z, `${bay.id} z0`).toBeCloseTo(bay.z0, 5);
+      expect(slabBox.max.z, `${bay.id} z1`).toBeCloseTo(bay.z1, 5);
+      expect(slabBox.max.y, `${bay.id} asphalt is flush with the road surface`).toBeCloseTo(0, 5);
+      // The kerb is a LIP, not a wall: 0.24 m, under the 0.42 m autostep. The
+      // low walls the design wanted at the bay ends are held for exactly this
+      // reason - they would be verge bodies against a ceiling with no headroom.
+      const kerbBox = new THREE.Box3().setFromObject(kerb!);
+      expect(kerbBox.max.y - kerbBox.min.y, `${bay.id} kerb is a 0.24 m lip`).toBeCloseTo(0.24, 5);
+      expect(kerbBox.max.y, `${bay.id} kerb stays under kerb height`).toBeLessThanOrEqual(0.30 + 1e-9);
+      // It runs along the OUTER edge, away from the road centre-line.
+      const outerZ = Math.abs(bay.z0) > Math.abs(bay.z1) ? bay.z0 : bay.z1;
+      expect(Math.min(Math.abs(kerbBox.min.z - outerZ), Math.abs(kerbBox.max.z - outerZ)),
+        `${bay.id} kerb is on the bay's outer edge`).toBeCloseTo(0, 5);
+    }
+
+    // THE MEASUREMENT THE OWNER ASKED FOR. Paved width at a bay, the local
+    // widening, and the new hard surface either side of the road.
+    const paved = NUKETOWN2_STREET_HALF_WIDTH * 2 + NUKETOWN2_BAY_DEPTH * 2;
+    expect(paved, 'paved width at a bay').toBeCloseTo(15.0, 6);
+    expect(paved - NUKETOWN2_STREET_HALF_WIDTH * 2, 'local widening').toBeCloseTo(4.4, 6);
+    const newHardSurface = bays.reduce((sum, bay) => sum + (bay.x1 - bay.x0) * (bay.z1 - bay.z0), 0);
+    expect(newHardSurface, 'new hard surface either side of the road').toBeCloseTo(55.0, 6);
+    // ...and the corridor did NOT move for it. That is the whole point of
+    // taking a bay out of the lawn instead of widening the street: the
+    // corridor is already at the reference width, and the test above holds it.
+    expect(2 * Math.abs(NUKETOWN2_HOUSE_FRONT_Z), 'corridor unchanged').toBeCloseTo(20.0, 6);
+  });
+
+  it('keeps every bay clear of the cul-de-sac mouth, so none can be re-authored through pair()', () => {
+    // THE TRAP THIS RATCHETS. `pair()` emits at authored (x, z) AND (-x, -z).
+    // The bulb occupies authored x in [closedX, mouthX] at every |z| <= 8, and
+    // a bay at |z| in [5.3, 7.5] is inside that z band BY CONSTRUCTION - so a
+    // bay authored through `pair()` puts its own image in the middle of the
+    // cul-de-sac. The intersection of the stem with its own 180-degree image is
+    // x in [-0.5, 0.5], one metre, which is why no bay of any length can ever
+    // be a paired body and why these are emitted through `centred()` instead.
+    //
+    // `centred()` already makes that failure impossible. The assertion is kept
+    // anyway, because it is what stops a later pass from re-authoring a bay the
+    // obvious way and rediscovering this at play time.
+    const head = NUKETOWN2_CUL_DE_SAC;
+    for (const bay of NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint)) {
+      expect(bay.x0, `${bay.id} starts past the bulb's mouth`).toBeGreaterThan(head.mouthX);
+      expect(bay.x1, `${bay.id} ends inside the map`).toBeLessThanOrEqual(head.offMapX);
+      // The negation, stated as the falsifier it is: a paired bay WOULD land
+      // its own image inside the bulb's bounding square.
+      const imageMeetsBulb = -bay.x1 < head.mouthX && -bay.x0 > head.closedX
+        && Math.abs(bay.z0) <= NUKETOWN2_TURNING_HEAD_HALF;
+      expect(imageMeetsBulb, `${bay.id}'s 180-degree image lands on the bulb - it cannot be a pair()`)
+        .toBe(true);
+    }
+  });
+
+  it('keeps every bay clear of the driveway aprons that cross the north verge', () => {
+    // BLOCKER 2, ratcheted so the apron collision cannot be rediscovered a
+    // third time. `street driveway north` runs the WHOLE garage span from the
+    // garage door out to the kerb, which leaves the stem's north verge exactly
+    // two free runs - 4.75 m at the mouth and 8.75 m outboard - and that is
+    // what decided both bay lengths. It is also why the 11.0 m coach bay of the
+    // handed-down design fits nowhere on this map, and why the street vehicles
+    // were NOT re-seated: the longest run is 8.25 m and the coach is 9.1 m.
+    const aprons = NUKETOWN2_GROUND_DRESSING.filter((piece) => piece.id.startsWith('street driveway '));
+    expect(aprons.length, 'two driveway aprons').toBe(2);
+    for (const bay of NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint)) {
+      for (const apron of aprons) {
+        expect(rectOverlap(bay, apron), `${bay.id} laps ${apron.id}`).toBe(0);
+      }
+    }
+    // The 0.2 m margin either side of the garage span is an EXPRESSION, not a
+    // typed number: if the garage moves, the bays move with it.
+    const runs = [...NUKETOWN2_BAY_RUNS].sort((a, b) => a.x0 - b.x0);
+    expect(runs[0]!.x1, 'mouth bay stops 0.2 m short of the garage')
+      .toBeCloseTo(NUKETOWN2_GARAGE_SPAN.x0 - 0.2, 9);
+    expect(runs[1]!.x0, 'outer bay starts 0.2 m past the garage')
+      .toBeCloseTo(NUKETOWN2_GARAGE_SPAN.x1 + 0.2, 9);
+    expect(runs[0]!.x1 - runs[0]!.x0, 'mouth bay length').toBeCloseTo(4.25, 9);
+    expect(runs[1]!.x1 - runs[1]!.x0, 'outer bay length').toBeCloseTo(8.25, 9);
+  });
+
+  it('cuts the bays out of the lawn table, so no instanced grass grows through the paving', () => {
+    // BLOCKER 3, and the reason a bay is a carriageway FOOTPRINT and not a
+    // `drive`-tier dressing piece stacked on the lawn. The stacked version
+    // passes the coplanar gate - lawn is polygonOffset tier -2, drive is -1 -
+    // and is still wrong, because `nuketownRebuildLawnRegions()` drives the
+    // INSTANCED GRASS FIELD off the same dressing table and a decal is not a
+    // solid, so the grass keep-out never fires and blades grow through the
+    // paving. Three things are asserted, in the order they would fail.
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+
+    // (1) No lawn REGION laps a bay. That table is what the field is seeded from.
+    for (const region of nuketownRebuildLawnRegions(WORLD_GROUND_DRESSING)) {
+      const rect = { x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ };
+      for (const bay of WORLD_BAYS) {
+        expect(rectOverlap(rect, bay), `lawn region laps ${bay.id}`).toBe(0);
+      }
+    }
+
+    // (2) No grass BLADE stands in a bay. The regions are not the field's only
+    //     input - the keep-outs are the arena's own colliders - so the roots
+    //     are measured rather than inferred from the table above.
+    const lawnMeshes: THREE.InstancedMesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.InstancedMesh && node.name.startsWith('nuketown2-lawn-region-')) lawnMeshes.push(node);
+    });
+    expect(lawnMeshes.length, 'Nuke Town lawn regions').toBeGreaterThan(0);
+    const lawnRegionIds = lawnMeshes
+      .map((mesh) => Number(mesh.name.slice('nuketown2-lawn-region-'.length)))
+      .sort((left, right) => left - right);
+    expect(lawnRegionIds, 'Nuke Town lawn region identity').toEqual([0, 1, 2, 3, 5, 6, 8, 10, 11, 14, 15]);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    let blades = 0;
+    for (const mesh of lawnMeshes) {
+      for (let index = 0; index < mesh.count; index += 1) {
+        mesh.getMatrixAt(index, matrix);
+        position.setFromMatrixPosition(matrix);
+        mesh.localToWorld(position);
+        blades += 1;
+        const inBay = WORLD_BAYS.find((bay) => (
+          position.x > bay.x0 && position.x < bay.x1 && position.z > bay.z0 && position.z < bay.z1
+        ));
+        expect(inBay, `${mesh.name}[${index}] grows through the bay paving`).toBeUndefined();
+      }
+    }
+    // The circular kerb is a new real keep-out, so this is a new measured
+    // ratchet rather than the old rectangular-head population floor.
+    //
+    // GEOMETRY-2 MERGE: re-measured 8910 -> 8303 when the turning-head lane met
+    // the candidate line. The blade loop uses WORLD_BAYS for paving exclusion;
+    // the field builder's keep-out reconstruction filters the floor-slab band,
+    // so hedges, verge/alley planters and avenue bodies stop blades as authored.
+    // The direction is the one this gate wants: MORE paving and planting covered.
+    // VERIFIED mechanically that no lawn REGION was lost — the field still emits
+    // the same eleven instanced regions (0,1,2,3,5,6,8,10,11,14,15) it emitted at
+    // `3aab05ac`, so the fall is keep-out coverage inside unchanged regions and
+    // not a region dropping out of the table. Still an EXACT equality: a silent
+    // future loss of grass fails here exactly as before. The assertions that
+    // actually protect the paving — zero lawn-region/bay overlap above, and no
+    // blade root inside a bay in the loop above — are untouched and independent
+    // of this number.
+    expect(blades, 'the lawn field retains the measured circular-head population').toBe(8303);
+
+    // (3) The re-tiled stem verge still COVERS its band exactly: every square
+    //     metre that is not bay or driveway apron is still lawn, and no two
+    //     tiles overlap. A gap is bare ground a player walks on; an overlap is
+    //     two decals racing for the same depth samples.
+    const stemTiles = NUKETOWN2_GROUND_DRESSING.filter((piece) => piece.id.startsWith('verge lawn stem '));
+    expect(stemTiles.length, 'three tiles became eleven when the bays were cut in').toBe(11);
+    for (let i = 0; i < stemTiles.length; i += 1) {
+      for (let j = i + 1; j < stemTiles.length; j += 1) {
+        expect(rectOverlap(stemTiles[i]!, stemTiles[j]!),
+          `${stemTiles[i]!.id} laps ${stemTiles[j]!.id}`).toBe(0);
+      }
+    }
+    const covers = [
+      ...stemTiles,
+      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint),
+      ...NUKETOWN2_GROUND_DRESSING.filter((piece) => piece.id.startsWith('street driveway ')),
+    ];
+    const stemBand = [
+      { x0: NUKETOWN2_CUL_DE_SAC.mouthX, x1: NUKETOWN2_CUL_DE_SAC.offMapX,
+        z0: NUKETOWN2_HOUSE_FRONT_Z, z1: -NUKETOWN2_STREET_HALF_WIDTH },
+      { x0: NUKETOWN2_CUL_DE_SAC.mouthX, x1: NUKETOWN2_CUL_DE_SAC.offMapX,
+        z0: NUKETOWN2_STREET_HALF_WIDTH, z1: -NUKETOWN2_HOUSE_FRONT_Z },
+    ];
+    const stemBandCovers = covers.flatMap((cover) => stemBand.map((band) => ({
+      x0: Math.max(cover.x0, band.x0), x1: Math.min(cover.x1, band.x1),
+      z0: Math.max(cover.z0, band.z0), z1: Math.min(cover.z1, band.z1),
+    }))).filter((rect) => rect.x1 > rect.x0 && rect.z1 > rect.z0);
+    expect(rectUnionArea(stemBandCovers), 'stem verge cover has no sub-sample slivers').toBe(rectUnionArea(stemBand));
+    const kerbZ = NUKETOWN2_STREET_HALF_WIDTH;
+    const holes: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_CUL_DE_SAC.mouthX + 0.07; x < NUKETOWN2_CUL_DE_SAC.offMapX; x += 0.13) {
+      for (const side of [-1, 1]) {
+        for (let d = 0.07; d < Math.abs(NUKETOWN2_HOUSE_FRONT_Z) - kerbZ; d += 0.13) {
+          const z = side * (kerbZ + d);
+          const covered = covers.some((rect) => x > rect.x0 && x < rect.x1 && z > rect.z0 && z < rect.z1);
+          if (!covered) holes.push([Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+        }
+      }
+    }
+    expect(holes, 'the stem verge band is completely covered by lawn, bay or apron').toEqual([]);
+  });
+
+  it('pins the HF-497 SAME-MATERIAL-VISIBLE coplanar class at zero', () => {
+    // The HF-434 instrument dismissed same-material coplanar pairs as benign;
+    // HF-497 rules that a pair whose bodies BOTH render and whose race region
+    // can draw at a player-visible pixel is a FINDING, fixed by a depth tier or
+    // an offset - never by hiding geometry. `auditNuketown2Coplanar` is the
+    // EXACT core `scripts/qa/find-coplanar-pairs.ts` reports from, so this pin
+    // and the instrument cannot drift apart. The classification is derived
+    // from the built roster (materials, presentation flags, box volumes), not
+    // from a name list, so every other arena inherits the same rule with its
+    // own geometry.
+    const audit = auditNuketown2Coplanar();
+    const visible = audit.rows
+      .filter((row) => row.verdict === 'same-material-visible')
+      .map((row) => `${row.first.name} x ${row.second.name}`);
+    expect(visible, `SAME-MATERIAL-VISIBLE coplanar pairs:\n${visible.join('\n')}`)
+      .toHaveLength(0);
   });
 });

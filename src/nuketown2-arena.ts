@@ -15,7 +15,8 @@
  * shipped `atomic-acres` is the only `authoring: 'import'` arena in the game —
  * a 7.3 MB Blender bake plus 1,110 lines of hand-written collision in
  * `src/map.ts`. Nothing here imports a mesh, an image, a font or a LUT. Every
- * wall, vehicle, fence and kerb below is a TypeScript box with a collider.
+ * wall, vehicle, fence and kerb below is TypeScript geometry with a collider;
+ * the turning head is the one authored low polygon solid.
  *
  * THE PROPORTIONS ARE MEASURED OFF THE REFERENCE'S OWN OVERHEADS.
  * `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md` is the authority, and it is
@@ -107,6 +108,8 @@ import {
   spawnRecord,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { classifyImpactSurface } from './combat-feedback';
+import { createBallisticSurface } from './ballistics';
 import {
   NUKETOWN2_FOREST_ENVELOPE,
   buildNuketownForestSurround,
@@ -127,11 +130,15 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_BAY_DEPTH,
+  NUKETOWN2_BAY_RUNS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
+  NUKETOWN2_GARAGE_SPAN,
+  NUKETOWN2_GARAGE_WIDTH,
   NUKETOWN2_GROUND_FLOOR_T,
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
@@ -139,12 +146,16 @@ import {
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HOUSE_WIDTH,
   NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_TURNING_HEAD_KERB_WIDTH,
+  NUKETOWN2_TURNING_HEAD_SEGMENTS,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_UPPER_Y0,
+  isNuketown2BayFootprint,
   nuketown2HandedSpan,
   nuketown2HandedX,
 } from './nuketown2-layout';
@@ -187,6 +198,11 @@ import {
   createNuketown2TruckCabMaterial,
   createNuketown2VehicleGlassMaterial,
 } from './nuketown2-vehicle-materials';
+import {
+  buildNuketown2ExteriorStairs,
+  buildNuketown2Rooflines,
+  type Nuketown2RoofMaterials,
+} from './nuketown2-roofs';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -201,6 +217,8 @@ import {
 export {
   NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_BAY_DEPTH,
+  NUKETOWN2_BAY_RUNS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
@@ -208,10 +226,14 @@ export {
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_TURNING_HEAD_KERB_WIDTH,
+  NUKETOWN2_TURNING_HEAD_SEGMENTS,
   NUKETOWN2_TURNING_HEAD_HALF,
+  NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_HANDEDNESS,
+  isNuketown2BayFootprint,
 } from './nuketown2-layout';
 
 /** The ratio base. Every "0.nnn L" in this file is a fraction of this. */
@@ -221,8 +243,12 @@ const HOUSE_DEPTH = NUKETOWN2_HOUSE_DEPTH;
 /**
  * Width of a house along the street. Reference: the main house block measures
  * 121 px of 400 along the street axis = 0.303 L. 11 / 36 = 0.306.
+ *
+ * HF-491 moved the number itself into `nuketown2-layout.ts`, because the
+ * roadside bays are authored off the GARAGE span and the garage hangs off this
+ * width - so both files now read one constant instead of re-typing it.
  */
-const HOUSE_WIDTH = 11;
+const HOUSE_WIDTH = NUKETOWN2_HOUSE_WIDTH;
 /**
  * Back yard depth, house back wall to the yard fence. The reference's back lot
  * (house back wall to the playable boundary) is 0.503 L on one side and 0.583 L
@@ -276,9 +302,13 @@ const HOUSE_X1 = NUKETOWN2_HOUSE_LAYOUT[0].x + HOUSE_WIDTH / 2;  // 4.25
  * 180-degree rotation then puts the two garages at opposite ends, which is
  * where the map's diagonal actually comes from.
  */
-const GARAGE_WIDTH = 5;
-const GARAGE_X0 = HOUSE_X1;                                       // 4.25
-const GARAGE_X1 = GARAGE_X0 + GARAGE_WIDTH;                       // 9.25
+const GARAGE_WIDTH = NUKETOWN2_GARAGE_WIDTH;
+// HF-491: read from the layout's own span rather than re-derived here, so the
+// bay runs (`NUKETOWN2_BAY_RUNS`, authored as GARAGE_X0 - 0.2 and
+// GARAGE_X1 + 0.2) and the apron below cannot come apart. Both are still
+// exactly HOUSE_X1 and HOUSE_X1 + GARAGE_WIDTH; the fidelity gate asserts it.
+const GARAGE_X0 = NUKETOWN2_GARAGE_SPAN.x0;                       // 4.25, flush with HOUSE_X1
+const GARAGE_X1 = NUKETOWN2_GARAGE_SPAN.x1;                       // 9.25
 /** Set-back of the garage front from the house front. Reference 67 px of 400 = 0.168 L. */
 const GARAGE_SETBACK = 6;
 const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
@@ -572,7 +602,7 @@ export const NUKETOWN2_BALCONY = Object.freeze({
  * treads stay presentation - so it is walkable by construction and the
  * existing probe pattern covers it.
  *
- * 11 risers of exactly 0.30 span the 3.30 m to the upper floor. It runs
+ * 17 risers of exactly 3.30 / 17 span the 3.30 m to the upper floor. It runs
  * PARALLEL to the back wall, off the deck's NON-GARAGE end, in the 1.4 m of
  * the deck's depth nearest the house (see YARD_STAIR_Z for why that half and
  * not the other). Nothing is ever over it, so STAIR_MAX_FEET_UNDER_CEILING
@@ -580,8 +610,8 @@ export const NUKETOWN2_BALCONY = Object.freeze({
  * the yard stays open: a perpendicular flight would drive a 3.3 m ramp 4.2 m
  * into the yard and cut the spawn's own sightlines.
  */
-const YARD_STAIR_RISERS = 11;
-const YARD_STAIR_GOING = 0.42;
+const YARD_STAIR_RISERS = 17;
+const YARD_STAIR_GOING = 4.2 / 16;
 const YARD_STAIR_WIDTH = 1.4;
 const YARD_STAIR_RUN = YARD_STAIR_GOING * (YARD_STAIR_RISERS - 1);
 const YARD_STAIR_OVERLAP = 0.12;
@@ -950,6 +980,63 @@ function centred(
 ): THREE.Mesh {
   return box(builder, `nuketown2 ${name}`,
     [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
+}
+
+/** Emit one authored low solid without creating the forbidden 180-degree pair. */
+function centredPolygon(
+  builder: Builder,
+  name: string,
+  position: [number, number, number],
+  radius: number,
+  height: number,
+  segments: number,
+  material: THREE.Material,
+  options: { solid?: boolean; shots?: boolean; cast?: boolean } = {},
+): THREE.Mesh {
+  const worldX = nuketown2HandedX(position[0]);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments, 1, false), material);
+  mesh.name = `nuketown2 ${name}`;
+  mesh.position.set(worldX, position[1], position[2]);
+  mesh.castShadow = options.cast !== false;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = classifyImpactSurface({
+    name: mesh.name,
+    metalness: material instanceof THREE.MeshStandardMaterial ? material.metalness : undefined,
+  });
+  mesh.userData.nuketown2Solid = options.solid !== false;
+  builder.root.add(mesh);
+
+  const bounds = {
+    minX: worldX - radius,
+    maxX: worldX + radius,
+    minZ: position[2] - radius,
+    maxZ: position[2] + radius,
+    minY: position[1] - height / 2,
+    maxY: position[1] + height / 2,
+  };
+  const solid = options.solid !== false;
+  const shots = options.shots ?? solid;
+  if (shots) {
+    builder.raycastMeshes.push(mesh);
+    const surface = createBallisticSurface(
+      `${builder.root.name}:${builder.ballisticSurfaceSequence}:${mesh.name}`,
+      mesh.name,
+      bounds,
+      { impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface> },
+    );
+    builder.ballisticSurfaceSequence += 1;
+    builder.shotSurfaces.push(surface);
+    mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
+  }
+  if (solid) {
+    // Deliberately register the floor-level cylinder as its bounding-square AABB;
+    // the visual/shot surface remains the circular mesh, and this low floor
+    // collider must not be copied as a wall-authority pattern.
+    builder.colliders.push(bounds);
+    builder.physicsColliders.push(bounds);
+  }
+  return mesh;
 }
 
 /**
@@ -1695,9 +1782,21 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       bal.deckTop + bal.railHeight / 2, bal.outboardZ + balconyNewelDepth / 2],
     [bal.railThickness, bal.railHeight, balconyNewelDepth], m.trim,
     { ballisticMaterial: 'wood' });
+  // HF-497: the cap lies flush on the outboard rail (0.53 m2 of exactly
+  // coplanar top face, street-visible over the whole balcony) with the SAME
+  // trim material, so the instrument's SAME-MATERIAL-VISIBLE class caught the
+  // pair. Give the CAP the arena's -1 decal tier on its own cloned material:
+  // the cap top then wins the race deterministically on both backends, from
+  // every range. Same paint, same geometry - only the depth tie-break moved;
+  // `m.trim` itself stays clean for every other body.
+  const balconyRailCapMaterial = m.trim.clone();
+  balconyRailCapMaterial.name = 'nuketown2-balcony-rail-cap';
+  balconyRailCapMaterial.polygonOffset = true;
+  balconyRailCapMaterial.polygonOffsetFactor = -1;
+  balconyRailCapMaterial.polygonOffsetUnits = -1;
   pair(builder, 'balcony rail cap',
     [bal.centreX, bal.deckTop + bal.railHeight - 0.05, bal.outboardZ + bal.railThickness / 2],
-    [bal.width + 0.08, 0.10, bal.railThickness + 0.06], m.trim,
+    [bal.width + 0.08, 0.10, bal.railThickness + 0.06], balconyRailCapMaterial,
     { solid: false, shots: false, cast: true });
   // ---- HF-477: THE UNDERCROFT UNDER THE DECK -------------------------------
   // FINDINGS Q3, VERIFIED on `nt2025-street-boii.jpg`: the deck sits "over a
@@ -1730,11 +1829,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Same frame, same sentence: "a circular concrete patio sits at the foot of
   // the flight." Everything in this arena is an axis-aligned box (see the file
   // header - a yawed solid measured 0.11 coverage against its own mesh on
-  // map3), so the circle is a BANDED APPROXIMATION: seven z-bands whose widths
-  // are the chords of a real circle of PATIO_RADIUS, sampled at each band's
-  // mid-line. Presentation only and 0.14 m thick like every other apron decal,
-  // so a stepped edge costs nothing but a silhouette - and at 0.35 m bands on a
-  // 2.45 m radius the step is under a boot width.
+  // map3), so the circle is a BANDED APPROXIMATION: thirteen z-bands whose
+  // widths are the chords of a real circle of PATIO_RADIUS, sampled at each
+  // band's mid-line. Presentation only, with its underside sunk 0.06 m below
+  // the ground datum and its top 0.06 m proud, so it cannot share a ground face.
   //
   // THE RADIUS IS SET BY WHAT IS ALREADY IN THE YARD, not by taste. The flight
   // lands at x = -9.4 in a 2.8 m slot: the destructible shed's registered
@@ -1743,7 +1841,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // the shed by 0.6 m, the butt pad by 0.1 m and the house corner by 0.75 m,
   // and still puts the stair foot inside the disc.
   const PATIO_RADIUS = 1.9;
-  const PATIO_BANDS = 7;
+  const PATIO_BANDS = 13;
   const patioCentreX = NUKETOWN2_YARD_STAIR.footX;
   const patioCentreZ = HOUSE_BACK_Z - 0.3;
   for (let index = 0; index < PATIO_BANDS; index += 1) {
@@ -1752,8 +1850,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     const mid = (t0 + t1) / 2;
     const chordHalf = PATIO_RADIUS * Math.sqrt(Math.max(0, 1 - mid * mid));
     pair(builder, `balcony stair patio band ${index}`,
-      [patioCentreX, 0.04, patioCentreZ + PATIO_RADIUS * mid],
-      [chordHalf * 2, 0.08, PATIO_RADIUS * (t1 - t0)], m.drive,
+      [patioCentreX, 0.00, patioCentreZ + PATIO_RADIUS * mid],
+      [chordHalf * 2, 0.12, PATIO_RADIUS * (t1 - t0)], m.drive,
       { solid: false, shots: false, cast: false });
   }
 
@@ -1790,13 +1888,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // rotated OBBs are kept in physicsColliders (the live authority) only.
   const yardRampBounds = new Set(builder.physicsColliders.slice(-2));
   builder.colliders = builder.colliders.filter((bounds) => !yardRampBounds.has(bounds));
-  for (let i = 0; i < yardStair.risers - 1; i += 1) {
-    const treadTop = bal.deckTop - yardStair.riser * (i + 1);
-    pair(builder, `yard stair ${i}`,
-      [yardStair.topX - yardStair.going * (i + 0.5), treadTop - 0.08 / 2, yardStair.centreZ],
-      [yardStair.going, 0.08, yardStair.width], m.trim,
-      { solid: false, shots: false, cast: true });
-  }
+  // Timber stringers, closed risers, treads and the outboard handrail are
+  // emitted after the presentation batch in buildNuketown2(), so each body
+  // remains individually auditable. The two ramps above remain the only
+  // movement authority for both flights.
 
   // ---- HF-465: the front ledge and the porch canopy ------------------------
   // PASS 94 INTEGRATION, and it is the same defect HF-467 was written to kill.
@@ -2634,6 +2729,11 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
  * proud of the interior floor, and every gate in the repository stayed green.
  */
 const HEAD = NUKETOWN2_CUL_DE_SAC;
+/** The two HF-491 bay runs, read from the layout table and never re-typed. */
+const BAY_MOUTH = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'mouth')!;
+const BAY_OUTER = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'outer')!;
+/** North-side outer edge of a bay: the kerb line pushed 2.2 m into the verge. */
+const BAY_BACK_Z = KERB_Z - NUKETOWN2_BAY_DEPTH;
 export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] = Object.freeze([
   // Driveway apron: garage door out to the kerb. HF-477 ran it the last 2.7 m
   // to KERB_Z instead of stopping at the old centred head's |z| = 8 edge -
@@ -2675,11 +2775,35 @@ export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] =
   // exactly there.
   Object.freeze({ id: 'verge lawn head end', material: 'lawn' as const, paired: false, x0: NUKETOWN2_BOUNDS.minX, x1: HEAD.closedX, z0: HOUSE_FRONT_Z, z1: -HOUSE_FRONT_Z }),
   Object.freeze({ id: 'verge lawn head frontage north', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: HEAD.mouthX, z0: HOUSE_FRONT_Z, z1: -NUKETOWN2_TURNING_HEAD_HALF }),
-  Object.freeze({ id: 'verge lawn stem north 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: GARAGE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
-  Object.freeze({ id: 'verge lawn stem north 1', material: 'lawn' as const, paired: false, x0: GARAGE_X1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  // ---- HF-491: THE STEM VERGE, RE-TILED AROUND THE ROADSIDE BAYS ---------
+  // Three tiles became eleven, and every edge below is an expression on one of
+  // the bay runs, the garage span or the map bound. The bays are CARRIAGEWAY
+  // FOOTPRINTS (see NUKETOWN2_CARRIAGEWAY_FOOTPRINTS), so the ground-cut gate
+  // fails on any dressing that laps one: this is the real cut in the lawn
+  // table the bays need, not a decal stacked on top of the lawn. A decal
+  // passes the coplanar gate and still grows instanced grass through the
+  // paving, because `nuketownRebuildLawnRegions()` reads THIS table.
+  //
+  // The band is z in [HOUSE_FRONT_Z, KERB_Z] on the north side. `BAY_BACK_Z`
+  // is the bay's outer edge, so a tile over a bay run keeps only the strip
+  // BEHIND the bay and a tile between two bay runs keeps its full depth.
+  // North carries the driveway apron over the whole garage span, so it needs
+  // six tiles; south has no apron on the stem, so its three middle pieces
+  // merge into one and it needs five. Complete cover with no overlaps, and
+  // `nuketown2-fidelity.test.ts` measures exactly that.
+  Object.freeze({ id: 'verge lawn stem north 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: BAY_MOUTH.x0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 1', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x0, x1: BAY_MOUTH.x1, z0: HOUSE_FRONT_Z, z1: BAY_BACK_Z }),
+  Object.freeze({ id: 'verge lawn stem north 2', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x1, x1: GARAGE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 3', material: 'lawn' as const, paired: false, x0: GARAGE_X1, x1: BAY_OUTER.x0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 4', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x0, x1: BAY_OUTER.x1, z0: HOUSE_FRONT_Z, z1: BAY_BACK_Z }),
+  Object.freeze({ id: 'verge lawn stem north 5', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
   Object.freeze({ id: 'verge lawn head frontage south 0', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: -GARAGE_X1, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
   Object.freeze({ id: 'verge lawn head frontage south 1', material: 'lawn' as const, paired: false, x0: -GARAGE_X0, x1: HEAD.mouthX, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
-  Object.freeze({ id: 'verge lawn stem south', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: NUKETOWN2_BOUNDS.maxX, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: BAY_MOUTH.x0, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 1', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x0, x1: BAY_MOUTH.x1, z0: -BAY_BACK_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 2', material: 'lawn' as const, paired: false, x0: BAY_MOUTH.x1, x1: BAY_OUTER.x0, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 3', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x0, x1: BAY_OUTER.x1, z0: -BAY_BACK_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south 4', material: 'lawn' as const, paired: false, x0: BAY_OUTER.x1, x1: NUKETOWN2_BOUNDS.maxX, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
 ]);
 
 /**
@@ -2695,13 +2819,36 @@ export const NUKETOWN2_BUILDING_FOOTPRINTS = Object.freeze([
 
 type Nuketown2PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
 
+type Nuketown2GroundCut = Nuketown2PlanRect | Readonly<{
+  shape: 'circle';
+  centreX: number;
+  centreZ: number;
+  radius: number;
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}>;
+
 function planRectOverlaps(first: Nuketown2PlanRect, second: Nuketown2PlanRect): boolean {
   return Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0) > 1e-4
     && Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0) > 1e-4;
 }
 
+function circleOverlapsPlanRect(circle: Extract<Nuketown2GroundCut, { shape: 'circle' }>, rect: Nuketown2PlanRect): boolean {
+  const nearestX = Math.max(rect.x0, Math.min(circle.centreX, rect.x1));
+  const nearestZ = Math.max(rect.z0, Math.min(circle.centreZ, rect.z1));
+  return (nearestX - circle.centreX) ** 2 + (nearestZ - circle.centreZ) ** 2 < circle.radius ** 2;
+}
+
+function groundCutOverlapsCell(cut: Nuketown2GroundCut, cell: Nuketown2PlanRect): boolean {
+  return 'shape' in cut && cut.shape === 'circle'
+    ? circleOverlapsPlanRect(cut, cell)
+    : planRectOverlaps(cell, cut);
+}
+
 /** Structures and the carriageway own exact ground cut-outs. */
-function allNuketown2GroundCuts(): readonly Nuketown2PlanRect[] {
+function allNuketown2GroundCuts(): readonly Nuketown2GroundCut[] {
   return Object.freeze([
     ...NUKETOWN2_BUILDING_FOOTPRINTS,
     ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => Object.freeze({
@@ -2741,7 +2888,7 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
       const z0 = zCuts[z]!;
       const z1 = zCuts[z + 1]!;
       const cell = { x0, x1, z0, z1 };
-      if (cuts.some((cut) => planRectOverlaps(cell, cut))) continue;
+      if (cuts.some((cut) => groundCutOverlapsCell(cut, cell))) continue;
       centred(builder, `ground tile ${tile}`, [(x0 + x1) / 2, -0.7, (z0 + z1) / 2],
         [x1 - x0, 1.4, z1 - z0], m.ground, { cast: false });
       tile += 1;
@@ -2771,51 +2918,27 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   // MIRROR-SYMMETRIC across z = 0, which is the axis that separates the two
   // teams - so both teams still get an identical road.
   //
-  // The bulb's ASPHALT is its bounding square, not a disc. The circle is drawn
-  // by the KERB ISLANDS below, which fill square-minus-disc - and that is what
-  // the reference has: `nt2025-aerial-boii.jpg` shows a broad pale concrete
-  // kerb apron ringing the asphalt, not a lawn verge meeting it.
-  centred(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
-    [head.radius * 2, 0.12, head.radius * 2], m.asphalt, { ...road, ballisticMaterial: 'concrete' });
+  // The bulb is the authored 16 m CIRCULAR paved head. Its ground cut uses the
+  // same circle, so the outdoor slab and lawn cannot survive in its corners.
+  centredPolygon(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
+    head.radius, 0.12, NUKETOWN2_TURNING_HEAD_SEGMENTS, m.asphalt, road);
   centred(builder, 'carriageway stem', [(head.mouthX + head.offMapX) / 2, -0.06, 0],
     [head.offMapX - head.mouthX, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt,
     { ...road, ballisticMaterial: 'concrete' });
 
-  // THE KERB RING, as a banded approximation of the disc. Everything in this
-  // arena is axis-aligned (see the file header: a yawed solid measured 0.11
-  // coverage against its own mesh on map3), so the circle is z-banded and each
-  // band's chord half-width is sampled at the band's own mid-line.
-  //
-  // The band edges are NOT uniform: they are pinned at +/- the stem's own half
-  // width, because that is where the ring has to open. Inside |z| <= 5.3 the
-  // ring is suppressed on the mouth side, so the asphalt runs continuously from
-  // the disc through the square's edge and into the stem - which is the flared
-  // mouth of a real lollipop. Outside it, both sides carry the ring and it
-  // closes round the head.
-  //
-  // Islands are kerb height (0.24 m, under the 0.42 m autostep, exactly as the
-  // straight kerb runs already are), so they read as a kerb and are never a
-  // wall. Bands whose island is thinner than 0.15 m are dropped: at the closed
-  // end's own mid-line the disc is 0.05 m inside the square, which is a body
-  // no player can see and a collider nobody can stand on.
-  const HEAD_BAND_EDGES = [-8, -7, -6.2, -5.3, -3.6, -1.8, 0, 1.8, 3.6, 5.3, 6.2, 7, 8] as const;
-  const ISLAND_MIN_WIDTH = 0.15;
-  let island = 0;
-  for (let index = 0; index < HEAD_BAND_EDGES.length - 1; index += 1) {
-    const z0 = HEAD_BAND_EDGES[index]!;
-    const z1 = HEAD_BAND_EDGES[index + 1]!;
-    const mid = (z0 + z1) / 2;
-    const chordHalf = head.radius * Math.sqrt(Math.max(0, 1 - (mid / head.radius) ** 2));
-    const runs: [number, number][] = [[head.closedX, head.centreX - chordHalf]];
-    // The mouth side only closes where the stem is not passing through.
-    if (Math.abs(mid) > NUKETOWN2_STREET_HALF_WIDTH) runs.push([head.centreX + chordHalf, head.mouthX]);
-    for (const run of runs) {
-      if (run[1] - run[0] < ISLAND_MIN_WIDTH) continue;
-      centred(builder, `carriageway head kerb island ${island}`,
-        [(run[0] + run[1]) / 2, 0.06, (z0 + z1) / 2],
-        [run[1] - run[0], 0.24, z1 - z0], m.kerb, { cast: false, ballisticMaterial: 'concrete' });
-      island += 1;
-    }
+  // A 15 cm kerb band closes around the disc as short straight segments. The
+  // polygon resolution and its ring share the authored centre/radius, while the
+  // stem kerbs meet the ring at the tangent mouth. Every segment is a low solid.
+  const kerbRadius = head.radius + NUKETOWN2_TURNING_HEAD_KERB_WIDTH / 2;
+  const segmentAngle = (Math.PI * 2) / NUKETOWN2_TURNING_HEAD_SEGMENTS;
+  const chord = 2 * head.radius * Math.sin(segmentAngle / 2);
+  for (let index = 0; index < NUKETOWN2_TURNING_HEAD_SEGMENTS; index += 1) {
+    const angle = (index + 0.5) * segmentAngle;
+    const authoredX = head.centreX + Math.cos(angle) * kerbRadius;
+    const authoredZ = Math.sin(angle) * kerbRadius;
+    centred(builder, `carriageway head kerb segment ${index}`,
+      [authoredX, 0.06, authoredZ], [chord, 0.24, NUKETOWN2_TURNING_HEAD_KERB_WIDTH], m.kerb,
+      { cast: false, rotation: [0, angle - Math.PI / 2, 0] });
   }
 
   // The stem's own kerbs, one per side, from the bulb's mouth to the map edge.
@@ -2826,6 +2949,41 @@ function street(builder: Builder, m: Nuketown2Materials): void {
       [(head.mouthX + head.offMapX) / 2, 0.06, side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15)],
       [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, { cast: false, ballisticMaterial: 'concrete' });
   }
+  // ---- HF-491: THE ROADSIDE BAYS -------------------------------------------
+  // Owner, 2026-09-04: the map "needs to be WIDER IN THE MIDDLE, have BITS
+  // EITHER SIDE OF THE ROAD like it does in the game".
+  //
+  // Each bay is emitted through `centred()`, ONCE per side, from the SAME four
+  // rectangles `buildNuketown2Ground()` cuts and `find-coplanar-pairs.ts`
+  // classifies STREET against - one table, three consumers, so the paving, the
+  // hole in the lawn and the instrument can never describe different ground.
+  //
+  // THEY ARE NOT `pair()` BODIES, and they cannot be. `pair()` emits at (x, z)
+  // AND (-x, -z); the bulb fills authored x in [closedX, mouthX] at every
+  // |z| <= 8, and a bay at |z| in [5.3, 7.5] is inside that z band by
+  // construction, so a paired bay lands its own image in the middle of the
+  // cul-de-sac. The intersection of the stem with its own 180-degree image is
+  // one metre wide. The z-MIRROR the two rectangles already carry is the
+  // fairness property that actually matters - the teams are separated across
+  // z - and `nuketown2-fidelity.test.ts` property (i) checks it directly.
+  //
+  // Section: the same 0.12 m asphalt slab as `carriageway stem`, at the same
+  // centre y, so bay and stem abut at |z| = 5.3 with no plan overlap and
+  // cannot become a coplanar pair; and the same 0.24 m lip on a 0.3 m tread as
+  // `carriageway stem kerb`, along the bay's OUTER edge, well under the 0.42 m
+  // autostep so it reads as a kerb and is never a wall.
+  for (const bay of NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.filter(isNuketown2BayFootprint)) {
+    const length = bay.x1 - bay.x0;
+    const midX = (bay.x0 + bay.x1) / 2;
+    centred(builder, `carriageway ${bay.id}`, [midX, -0.06, (bay.z0 + bay.z1) / 2],
+      [length, 0.12, NUKETOWN2_BAY_DEPTH], m.asphalt, road);
+    // Outer edge = the one further from the road centre-line; the kerb's 0.3 m
+    // tread sits INSIDE the bay, exactly as the stem kerb sits inside the stem.
+    const outerZ = Math.abs(bay.z0) > Math.abs(bay.z1) ? bay.z0 : bay.z1;
+    centred(builder, `carriageway ${bay.id} kerb`, [midX, 0.06, outerZ - Math.sign(outerZ) * 0.15],
+      [length, 0.24, 0.3], m.kerb, { cast: false });
+  }
+
   // Centre line, down the stem only: a cul-de-sac bulb is not marked.
   for (let i = 0; i < 4; i += 1) {
     // HF-463: the dash is a real 0.04 m solid raised 0.04 m above the road.
@@ -3128,7 +3286,19 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
   pair(builder, 'yard cover wall footing', [5.5, 0.04, HOUSE_BACK_Z - 5.5], [7.30, 0.08, 0.55], m.drive,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'yard butt pad', [-8.5, 0.04, -26], [1.40, 0.08, 1.40], m.drive,
+  // HF-497: the butt pad overlaps the cover crate pad by 0.5 m2 at exactly the
+  // same 0.08 m top, same `drive` material - the instrument's
+  // SAME-MATERIAL-VISIBLE class caught it (lawn level, fully player-visible).
+  // The SMALLER body gets the arena's -1 decal tier on its own cloned
+  // material, so its top wins the shared plane deterministically on both
+  // backends. Same paint, same geometry - only the depth tie-break moved;
+  // `m.drive` itself stays clean for every other pad.
+  const yardButtPadMaterial = m.drive.clone();
+  yardButtPadMaterial.name = 'nuketown2-yard-butt-pad';
+  yardButtPadMaterial.polygonOffset = true;
+  yardButtPadMaterial.polygonOffsetFactor = -1;
+  yardButtPadMaterial.polygonOffsetUnits = -1;
+  pair(builder, 'yard butt pad', [-8.5, 0.04, -26], [1.40, 0.08, 1.40], yardButtPadMaterial,
     { solid: false, shots: false, cast: false });
   pair(builder, 'yard patio table slab', [-14.5, 0.04, -31.5], [2.60, 0.08, 2.60], m.drive,
     { solid: false, shots: false, cast: false });
@@ -3219,7 +3389,19 @@ function perimeter(builder: Builder, m: Nuketown2Materials): void {
   // either frame and the wrong material in a suburb. Same wall, same cover,
   // same collider; only the paint moved.
   pair(builder, 'perimeter wall long', [0, H / 2, NUKETOWN2_BOUNDS.minZ + 0.2], [width, H, 0.4], m.fence);
-  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.25, H / 2, 0], [0.4, H, depth], m.fence);
+  // HF-497: at all four corners the long wall and the end wall are exactly
+  // coplanar solids of the SAME material (0.16 m2 of shared top face per
+  // corner, fully street-visible), so the instrument's SAME-MATERIAL-VISIBLE
+  // class caught them. Give the end wall the arena's -1 decal tier on its own
+  // cloned material: the end top then wins every corner race deterministically
+  // on both backends. Same paint, same geometry - only the depth tie-break
+  // moved; `m.fence` itself stays clean for every other body.
+  const perimeterWallEndMaterial = m.fence.clone();
+  perimeterWallEndMaterial.name = 'nuketown2-perimeter-wall-end';
+  perimeterWallEndMaterial.polygonOffset = true;
+  perimeterWallEndMaterial.polygonOffsetFactor = -1;
+  perimeterWallEndMaterial.polygonOffsetUnits = -1;
+  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.25, H / 2, 0], [0.4, H, depth], perimeterWallEndMaterial);
 }
 
 // ---------------------------------------------------------------------------
@@ -3290,6 +3472,18 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   }
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
+  buildNuketown2Rooflines(builder, {
+    roof: m.roof,
+    roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
+    timber: m.fence,
+  } satisfies Nuketown2RoofMaterials);
+  buildNuketown2ExteriorStairs(builder, {
+    roof: m.roof,
+    roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
+    timber: m.fence,
+  } satisfies Nuketown2RoofMaterials);
 
   // ---- HF-426 JOB 3: the shipped map's LAWN, on this map's own rectangles --
   // Built HERE, after every prop, because `builder.colliders` is the keep-out
@@ -3308,6 +3502,11 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       return { ...piece, x0, x1 };
     }),
     keepOuts: builder.colliders.slice(groundColliderCount),
+    keepOutCircles: [{
+      centreX: nuketown2HandedX(NUKETOWN2_CUL_DE_SAC.centreX),
+      centreZ: 0,
+      radius: NUKETOWN2_CUL_DE_SAC.radius,
+    }],
   });
   builder.root.userData.nuketown2LawnStats = lawn.stats;
 
