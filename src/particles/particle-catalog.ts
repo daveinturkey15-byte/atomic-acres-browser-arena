@@ -220,59 +220,64 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
   // Suburban summer: pollen, lawn dust, a few burnt flakes off the reactor haze.
   // Pass 79 enrichment: denser ambient populations across every arena so the
   // air reads as air at a glance; capacities and readability ceilings unchanged.
+  // Pass 96 (look F2, HF-486/503): the nuketown2 visibility floor is now the
+  // whole catalog's. Every arena's motes draw at 0.026 m / alpha 0.11 and its
+  // drift at 0.055 m / alpha 0.15 — the measured-visible values — and every
+  // density is byte-identical, so the instance, draw and buffer budgets did
+  // not move. The measured rationale lives on `nuketown2` below.
   'atomic-acres': arena(
     'atomic-acres', 'suburban-pollen-and-ash',
-    { density: 0.7, colorWarm: 0xf6e7c4, colorCool: 0xcfd6c2, radiusM: 0.016, riseMps: 0.05, swirlMps: 0.16, windPull: 0.55, opacity: 0.085 },
-    { density: 0.5, kind: 'ash', colorWarm: 0xe0d2b4, colorCool: 0x9a9382, radiusM: 0.045, fallMps: 0.34, windPull: 0.8, flutterMps: 0.5, spinRadiansPerSecond: 1.5, opacity: 0.12 },
+    { density: 0.7, colorWarm: 0xf6e7c4, colorCool: 0xcfd6c2, radiusM: 0.026, riseMps: 0.05, swirlMps: 0.16, windPull: 0.55, opacity: 0.11 },
+    { density: 0.5, kind: 'ash', colorWarm: 0xe0d2b4, colorCool: 0x9a9382, radiusM: 0.055, fallMps: 0.34, windPull: 0.8, flutterMps: 0.5, spinRadiansPerSecond: 1.5, opacity: 0.15 },
     0.55, 20, 12, 4,
   ),
   // Jet apron: fuel haze and grit funnelled between terminal and hangar.
   'skyline-terminal': arena(
     'skyline-terminal', 'apron-fuel-haze-and-grit',
-    { density: 0.62, colorWarm: 0xdfe4ec, colorCool: 0xb8c4d4, radiusM: 0.014, riseMps: 0.09, swirlMps: 0.22, windPull: 0.72, opacity: 0.08 },
-    { density: 0.42, kind: 'lint', colorWarm: 0xd7d9d2, colorCool: 0x8f948f, radiusM: 0.038, fallMps: 0.42, windPull: 0.92, flutterMps: 0.62, spinRadiansPerSecond: 2.2, opacity: 0.1 },
+    { density: 0.62, colorWarm: 0xdfe4ec, colorCool: 0xb8c4d4, radiusM: 0.026, riseMps: 0.09, swirlMps: 0.22, windPull: 0.72, opacity: 0.11 },
+    { density: 0.42, kind: 'lint', colorWarm: 0xd7d9d2, colorCool: 0x8f948f, radiusM: 0.055, fallMps: 0.42, windPull: 0.92, flutterMps: 0.62, spinRadiansPerSecond: 2.2, opacity: 0.15 },
     0.4, 22, 14, 4,
   ),
   // North-sea rig: salt mist and rust flakes off the deck, hard one-way wind.
   'rustworks-1v1': arena(
     'rustworks-1v1', 'north-sea-salt-and-rust',
-    { density: 0.58, colorWarm: 0xd9dee2, colorCool: 0xa8b6c0, radiusM: 0.018, riseMps: 0.12, swirlMps: 0.3, windPull: 0.85, opacity: 0.09 },
-    { density: 0.55, kind: 'foam', colorWarm: 0xf0f4f6, colorCool: 0xbfae96, radiusM: 0.05, fallMps: -0.05, windPull: 0.95, flutterMps: 0.8, spinRadiansPerSecond: 1.1, opacity: 0.13 },
+    { density: 0.58, colorWarm: 0xd9dee2, colorCool: 0xa8b6c0, radiusM: 0.026, riseMps: 0.12, swirlMps: 0.3, windPull: 0.85, opacity: 0.11 },
+    { density: 0.55, kind: 'foam', colorWarm: 0xf0f4f6, colorCool: 0xbfae96, radiusM: 0.055, fallMps: -0.05, windPull: 0.95, flutterMps: 0.8, spinRadiansPerSecond: 1.1, opacity: 0.15 },
     0.3, 22, 13, 5,
   ),
   // Indoors. The classic shooting-range look: motes hanging in the strip lights.
   'gun-range': arena(
     'gun-range', 'indoor-motes-in-strip-light',
-    { density: 1, colorWarm: 0xfff2d8, colorCool: 0xe6e2d4, radiusM: 0.012, riseMps: 0.035, swirlMps: 0.1, windPull: 0.25, opacity: 0.11 },
-    { density: 0.2, kind: 'lint', colorWarm: 0xf2ece0, colorCool: 0xcac3b4, radiusM: 0.03, fallMps: 0.2, windPull: 0.3, flutterMps: 0.3, spinRadiansPerSecond: 1.8, opacity: 0.09 },
+    { density: 1, colorWarm: 0xfff2d8, colorCool: 0xe6e2d4, radiusM: 0.026, riseMps: 0.035, swirlMps: 0.1, windPull: 0.25, opacity: 0.11 },
+    { density: 0.2, kind: 'lint', colorWarm: 0xf2ece0, colorCool: 0xcac3b4, radiusM: 0.055, fallMps: 0.2, windPull: 0.3, flutterMps: 0.3, spinRadiansPerSecond: 1.8, opacity: 0.15 },
     0.9, 14, 7, 3,
   ),
   // Tropical: pollen and seed fluff in the shafts, leaves off the palms.
   farcrysis: arena(
     'farcrysis', 'jungle-pollen-and-leaf-fall',
-    { density: 0.85, colorWarm: 0xfff0cc, colorCool: 0xd8e6bc, radiusM: 0.015, riseMps: 0.07, swirlMps: 0.2, windPull: 0.6, opacity: 0.1 },
-    { density: 0.75, kind: 'leaf', colorWarm: 0xc7d97a, colorCool: 0x7d9a44, radiusM: 0.075, fallMps: 0.5, windPull: 0.88, flutterMps: 1.15, spinRadiansPerSecond: 2.6, opacity: 0.16 },
+    { density: 0.85, colorWarm: 0xfff0cc, colorCool: 0xd8e6bc, radiusM: 0.026, riseMps: 0.07, swirlMps: 0.2, windPull: 0.6, opacity: 0.11 },
+    { density: 0.75, kind: 'leaf', colorWarm: 0xc7d97a, colorCool: 0x7d9a44, radiusM: 0.055, fallMps: 0.5, windPull: 0.88, flutterMps: 1.15, spinRadiansPerSecond: 2.6, opacity: 0.15 },
     1, 21, 14, 4,
   ),
   // Open water: salt haze and torn foam off the crests.
   'high-seas': arena(
     'high-seas', 'open-ocean-spray-and-salt',
-    { density: 0.62, colorWarm: 0xe8f1f6, colorCool: 0xbcd2de, radiusM: 0.017, riseMps: 0.14, swirlMps: 0.34, windPull: 0.9, opacity: 0.095 },
+    { density: 0.62, colorWarm: 0xe8f1f6, colorCool: 0xbcd2de, radiusM: 0.026, riseMps: 0.14, swirlMps: 0.34, windPull: 0.9, opacity: 0.11 },
     { density: 0.9, kind: 'foam', colorWarm: 0xffffff, colorCool: 0xcfe2ea, radiusM: 0.055, fallMps: -0.08, windPull: 0.97, flutterMps: 0.9, spinRadiansPerSecond: 1.3, opacity: 0.15 },
     0.35, 24, 12, 5,
   ),
   // Dry outdoor range: hard-sun dust off the berms, seed fluff and grit on the gusts.
   'test1': arena(
     'test1', 'range-dust-and-dry-grit',
-    { density: 0.75, colorWarm: 0xf2e0b4, colorCool: 0xd4c8a8, radiusM: 0.016, riseMps: 0.06, swirlMps: 0.24, windPull: 0.75, opacity: 0.1 },
-    { density: 0.45, kind: 'seed', colorWarm: 0xe8d8a8, colorCool: 0xb8a988, radiusM: 0.04, fallMps: 0.3, windPull: 0.85, flutterMps: 0.6, spinRadiansPerSecond: 1.6, opacity: 0.11 },
+    { density: 0.75, colorWarm: 0xf2e0b4, colorCool: 0xd4c8a8, radiusM: 0.026, riseMps: 0.06, swirlMps: 0.24, windPull: 0.75, opacity: 0.11 },
+    { density: 0.45, kind: 'seed', colorWarm: 0xe8d8a8, colorCool: 0xb8a988, radiusM: 0.055, fallMps: 0.3, windPull: 0.85, flutterMps: 0.6, spinRadiansPerSecond: 1.6, opacity: 0.15 },
     0.5, 20, 12, 4,
   ),
   // Golden-hour estate: pollen glinting over the pool, soft garden dust.
   'test2': arena(
     'test2', 'garden-pollen-and-soft-dust',
-    { density: 0.7, colorWarm: 0xffedc0, colorCool: 0xdcd8b8, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.15, windPull: 0.5, opacity: 0.09 },
-    { density: 0.5, kind: 'seed', colorWarm: 0xf6e6b8, colorCool: 0xc8c49c, radiusM: 0.045, fallMps: 0.24, windPull: 0.7, flutterMps: 0.55, spinRadiansPerSecond: 1.4, opacity: 0.12 },
+    { density: 0.7, colorWarm: 0xffedc0, colorCool: 0xdcd8b8, radiusM: 0.026, riseMps: 0.05, swirlMps: 0.15, windPull: 0.5, opacity: 0.11 },
+    { density: 0.5, kind: 'seed', colorWarm: 0xf6e6b8, colorCool: 0xc8c49c, radiusM: 0.055, fallMps: 0.24, windPull: 0.7, flutterMps: 0.55, spinRadiansPerSecond: 1.4, opacity: 0.15 },
     0.6, 21, 13, 4,
   ),
   // MAP3 (PREVIEW): stone dust off the paving and dry seed blowing in off the
@@ -280,8 +285,8 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
   // is built to make a shaft, and this is the layer that has to be in it.
   'map3': arena(
     'map3', 'stone-dust-and-scrub-seed',
-    { density: 0.7, colorWarm: 0xe8e0cc, colorCool: 0xc4c6c0, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.2, windPull: 0.7, opacity: 0.09 },
-    { density: 0.4, kind: 'seed', colorWarm: 0xe0d6b0, colorCool: 0xb4b09c, radiusM: 0.042, fallMps: 0.28, windPull: 0.8, flutterMps: 0.58, spinRadiansPerSecond: 1.5, opacity: 0.1 },
+    { density: 0.7, colorWarm: 0xe8e0cc, colorCool: 0xc4c6c0, radiusM: 0.026, riseMps: 0.05, swirlMps: 0.2, windPull: 0.7, opacity: 0.11 },
+    { density: 0.4, kind: 'seed', colorWarm: 0xe0d6b0, colorCool: 0xb4b09c, radiusM: 0.055, fallMps: 0.28, windPull: 0.8, flutterMps: 0.58, spinRadiansPerSecond: 1.5, opacity: 0.15 },
     0.8, 22, 13, 4,
   ),
   // NUKETOWN2 (PREVIEW, HF-407): road grit off warm asphalt and dry lawn seed
@@ -316,8 +321,8 @@ export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProf
   // 36.7% and a 52 m open lane for the wind to run down.
   'raid2': arena(
     'raid2', 'terrace-pollen-and-pool-haze',
-    { density: 0.7, colorWarm: 0xffeec6, colorCool: 0xd6dcd8, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.17, windPull: 0.6, opacity: 0.09 },
-    { density: 0.5, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.044, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.11 },
+    { density: 0.7, colorWarm: 0xffeec6, colorCool: 0xd6dcd8, radiusM: 0.026, riseMps: 0.05, swirlMps: 0.17, windPull: 0.6, opacity: 0.11 },
+    { density: 0.5, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.055, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.15 },
     0.7, 24, 14, 4,
   ),
 });

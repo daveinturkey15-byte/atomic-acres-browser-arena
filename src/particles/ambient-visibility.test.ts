@@ -74,19 +74,20 @@ describe('ambient air is visible at the reading distance', () => {
   });
 
   /**
-   * MEASURED 2026-09-04, every arena, at the reading distance (px):
+   * MEASURED 2026-09-04 (PASS 94, before the pass 96 fix), motes at the
+   * reading distance (px):
    *
    *   atomic-acres 1.37 | skyline-terminal 1.20 | rustworks-1v1 1.54
    *   gun-range 1.03 | farcrysis 1.29 | high-seas 1.46 | test1 1.37
    *   test2 1.29 | map3 1.29 | raid2 1.29 | nuketown2 2.23
    *
-   * TEN OF ELEVEN ARENAS STILL HAVE SUB-PIXEL MOTES. Only Nuke Town Rebuild is
-   * fixed, because only Nuke Town Rebuild is this lane's. The loop below
-   * therefore holds DRIFT to the floor for every arena — that family already
-   * clears it everywhere — and holds motes only above zero, so it states the
-   * truth instead of either failing ten arenas this lane may not edit or
-   * pretending they pass. The remaining ten are an OPEN item in
-   * `docs/evidence/pass94/quality-gap/REPORT.md`, not a silent exemption.
+   * TEN OF ELEVEN ARENAS HAD SUB-PIXEL MOTES — the open item recorded in
+   * `docs/evidence/pass94/quality-gap/REPORT.md`. Pass 96 (look F2,
+   * HF-486/503) applies the nuketown2 radius/alpha fix to the whole catalog,
+   * so the loop below now holds BOTH ambient families of EVERY arena to the
+   * floor. The roster is derived from `ARENA_PARTICLE_PROFILES` itself: a new
+   * arena cannot ship air that fails this file, and retiring one leaves no
+   * stale row behind.
    */
   it('holds every ambient family of every arena above the floor', () => {
     for (const [arenaId, arena] of Object.entries(ARENA_PARTICLE_PROFILES)) {
@@ -97,7 +98,10 @@ describe('ambient air is visible at the reading distance', () => {
         drift,
         `${arenaId}.drift subtends ${drift.toFixed(2)} px at ${READING_DISTANCE_M} m`,
       ).toBeGreaterThanOrEqual(MINIMUM_SUBTENDED_PX);
-      expect(motes, `${arenaId}.motes subtends ${motes.toFixed(2)} px`).toBeGreaterThan(0);
+      expect(
+        motes,
+        `${arenaId}.motes subtends ${motes.toFixed(2)} px at ${READING_DISTANCE_M} m`,
+      ).toBeGreaterThanOrEqual(MINIMUM_SUBTENDED_PX);
     }
   });
 });
