@@ -9,6 +9,26 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - The `gh-pages` branch is production output only. Never develop on it or publish to it from a feature worktree.
 - `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md` is the canonical contribution and release procedure.
 
+## Three.js source priority (owner HF-481, 2026-09-04)
+
+Before writing Three.js code, look it up in this order: **current Three.js docs**
+(`threejs.org/docs/llms.txt`, `llms-full.txt`; dated local snapshots with hashes in
+`docs/threejs-knowledge/upstream/`) → the **Poimandres docs MCP** `docs.pmnd.rs/api/mcp` for
+R3F/Drei/ecosystem → **current source and examples** (`mrdoob/three.js` including
+`examples/`, `pmndrs/react-three-fiber`, `pmndrs/drei`). Prefer current WebGPU/TSL for new
+work, but check project and browser requirements before replacing stable WebGL. **Installed
+skills give workflow and heuristics; they never override current upstream docs or source** —
+a skill that disagrees with today's Three.js is stale and gets fixed, it does not win. For
+visually ambitious requests, search existing examples FIRST (shaders/TSL, particles,
+post-processing, reflections, transmission/glass, scroll, physics, camera motion, procedural
+geometry, instancing, splats, XR, animation). Check the installed version — `three@0.185.1` —
+before copying an API from HEAD. Validate FPS, draw calls, memory/disposal, mobile and resize.
+When a strong reusable pattern is found, add a concise recipe with the upstream link to
+`docs/threejs-knowledge/recipes/`; never paste upstream code into it (owner HF-472:
+re-implement, never copy or fork). Full rule: AKP
+`rules/threejs-source-priority.dave-gaming-pc.md`, behavioural check
+`threejs_source_priority`, `dave-gaming-pc` only.
+
 ## Pass 65 routing
 
 - Before any Pass 65 work, read `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`, `docs/PASS65_REQUIREMENTS_MATRIX.md`, `docs/PASS65_DECISION_RECEIPTS.json`, `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`, and the relevant sections of `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`; every correction-wave owner must also read `docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`, while release/HITL owners must read `docs/PASS65_OWNER_HITL_CHECKLIST.md`.
