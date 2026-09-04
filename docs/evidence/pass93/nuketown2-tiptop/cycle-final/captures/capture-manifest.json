@@ -1,0 +1,166 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "final",
+  "sha": "263887b6181d14c1f6fc8e70172d256c522eeb2f",
+  "url": "http://127.0.0.1:4281",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-CX1N2v80.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 5000,
+  "samples": 1,
+  "capturedAt": "2026-09-04T05:33:11.714Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-overhead.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-overhead.png"
+          ],
+          "committedFrame": 398,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 428
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-yard.png"
+          ],
+          "committedFrame": 431,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 456
+        },
+        {
+          "cameraId": "nuketown2-south-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-yard.png"
+          ],
+          "committedFrame": 459,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 491
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-street-centre.png"
+          ],
+          "committedFrame": 494,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 524
+        },
+        {
+          "cameraId": "nuketown2-north-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-upper-window.png"
+          ],
+          "committedFrame": 527,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 550
+        },
+        {
+          "cameraId": "nuketown2-south-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-upper-window.png"
+          ],
+          "committedFrame": 553,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 578
+        },
+        {
+          "cameraId": "nuketown2-into-sun-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-into-sun-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-into-sun-street.png"
+          ],
+          "committedFrame": 581,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 610
+        },
+        {
+          "cameraId": "nuketown2-north-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-north-interior.png"
+          ],
+          "committedFrame": 613,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 637
+        },
+        {
+          "cameraId": "nuketown2-south-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-south-interior.png"
+          ],
+          "committedFrame": 640,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 663
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-garage.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-nuketown6\\docs\\evidence\\pass93\\nuketown2-tiptop\\cycle-final\\captures\\nuketown2\\nuketown2-garage.png"
+          ],
+          "committedFrame": 666,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 688
+        }
+      ],
+      "ms": 47456,
+      "errors": []
+    }
+  ]
+}
