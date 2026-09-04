@@ -44,6 +44,19 @@ const OUT_DIR = resolve(arg('--out-dir', 'docs/evidence/pass94/perf-hitl5/bisect
 const PROFILE = arg('--profile', 'none');
 const CPU_ALL = argv.includes('--cpu-all');
 const TOGGLES = arg('--toggles', 'baseline,wear,veg,lawn,vehicles,grime,props,pool,operators,shadows,baseline-again').split(',');
+// HF-491 perf lane 4: the owner's complaint is the whole map, not one camera.
+// `spawn` is the untouched deploy pose (what every earlier lane measured);
+// `street` stands on the road centre-line looking down the 36 m street, which
+// is the pose that actually puts the forged vehicles, both house facades and
+// the full wear set in the frustum. Nuke Town Rebuild is authored axis-aligned
+// and centred, road centre-line at z = 0 (`nuketown2-arena.ts` header), and
+// `teleportPlayer` takes EYE height with forward = (-sin yaw, 0, -cos yaw).
+const POSES = {
+  spawn: null,
+  street: { x: 0, y: 1.7, z: 0, yaw: Math.PI / 2, pitch: 0 },
+};
+const POSE = arg('--pose', 'spawn');
+if (!(POSE in POSES)) throw new Error(`unknown --pose ${POSE} (known: ${Object.keys(POSES).join(',')})`);
 const BOOT_TIMEOUT_MS = 300_000;
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -152,6 +165,16 @@ try {
   }, undefined, { timeout: BOOT_TIMEOUT_MS });
   console.error('[bisect] match active; warming up');
   await page.evaluate(() => { try { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen?.(true); } catch { /* absent */ } });
+  if (POSES[POSE]) {
+    await page.evaluate((pose) => { window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(pose.x, pose.y, pose.z, pose.yaw, pose.pitch); }, POSES[POSE]);
+    await page.waitForTimeout(1_500);
+  }
+  report.pose = { name: POSE, ...(POSES[POSE] ?? {}) };
+  report.poseState = await page.evaluate(() => {
+    const s = window.__ATOMIC_ACRES_DEBUG__.snapshot?.();
+    return s ? { playerPosition: s.playerPosition ?? null, yaw: s.yaw ?? null } : null;
+  });
+  console.error(`[bisect] pose ${POSE} ${JSON.stringify(report.poseState)}`);
   await page.waitForTimeout(WARMUP_SECONDS * 1000);
 
   // Scene census: what is actually in the scene (by material name), so the
@@ -306,6 +329,28 @@ try {
         return `stripped wear graphs from ${stash.length} nuketown2 material(s)`;
       },
       revert: () => { for (const e of window.__BISECT_STASH__ ?? []) { const m = e.m; m.colorNode = e.colorNode; m.roughnessNode = e.roughnessNode; m.opacityNode = e.opacityNode; m.normalNode = e.normalNode; m.metalnessNode = e.metalnessNode; m.needsUpdate = true; } },
+    },
+    // HF-491 perf lane 4: the CDP profile charges ~8.6 ms/frame to `(program)`
+    // - Blink work with no JS frame on the stack, i.e. style/layout/paint.
+    // The HUD root takes five CSS custom-property writes EVERY frame (four
+    // sway + --hud-health), each of which invalidates style for the whole HUD
+    // subtree. `hud-hidden` measures what the HUD subtree's recalc/paint is
+    // worth; `style-writes` no-ops setProperty app-wide and measures what the
+    // per-frame writes themselves cost. Both revert exactly.
+    'hud-hidden': {
+      apply: () => { const hud = document.querySelector('#hud') ?? document.querySelector('[data-surface="hud"]'); if (!hud) return 'no hud root found'; window.__BISECT_STASH__ = { hud, display: hud.style.display }; hud.style.display = 'none'; return `hid ${hud.id || hud.tagName} subtree (${hud.querySelectorAll('*').length} elements)`; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.hud) s.hud.style.display = s.display; },
+    },
+    // Narrower than `style-writes`: no-op ONLY the `--hud-*` registered custom
+    // properties the frame loop writes (four sway values + --hud-health), so
+    // the delta is those writes and nothing else.
+    'hud-var-writes': {
+      apply: () => { const proto = CSSStyleDeclaration.prototype; const original = proto.setProperty; window.__BISECT_STASH__ = { proto, setProperty: original }; proto.setProperty = function (name, ...rest) { if (typeof name === 'string' && name.startsWith('--hud-')) return; return original.call(this, name, ...rest); }; return 'setProperty no-oped for --hud-* only'; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.proto) s.proto.setProperty = s.setProperty; },
+    },
+    'style-writes': {
+      apply: () => { const proto = CSSStyleDeclaration.prototype; window.__BISECT_STASH__ = { proto, setProperty: proto.setProperty }; proto.setProperty = function () {}; return 'CSSStyleDeclaration.setProperty no-oped'; },
+      revert: () => { const s = window.__BISECT_STASH__; if (s?.proto) s.proto.setProperty = s.setProperty; },
     },
     // Strip the wind positionNode from foliage (vertex cost of hedge/tree sway).
     'foliage-wind': {
