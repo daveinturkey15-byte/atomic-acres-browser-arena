@@ -176,6 +176,9 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     sign: createPaintedMetalMaterial('nuketown2-sign', 0xdbd1ba, { roughness: 0.62 }),
     planter: createLawnMaterial('nuketown2-planter', 0x415a33, { variant: 'hedge' }),
 
+    // Chrome-trim exception: the coach waistline is the one intentionally
+    // reflective painted-metal accent, so its 0.25 metalness is pinned here
+    // rather than mistaken for the dielectric factory-paint default.
     busTrim: createPaintedMetalMaterial('nuketown2-coach-trim', 0xa8382c, {
       polygonOffset: -1,
       roughness: 0.48,
