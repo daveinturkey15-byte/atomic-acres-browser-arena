@@ -181,6 +181,17 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     verifier: 'src/rendering/pass64-tsl-scene.test.ts + src/rendering/arena-visual-definition.test.ts',
   }),
   feature({
+    id: 'tsl-ground-projected-environment', title: 'TSL ground-projected horizon backdrop', availability: 'active', owner: 'src/rendering/ground-projected-env.ts',
+    sourceProbes: [
+      { path: 'src/rendering/ground-projected-env.ts', symbol: 'createGroundProjectedEnvMesh' },
+      { path: 'src/rendering/ground-projected-env.ts', symbol: 'applyGroundProjectedEnvState' },
+      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'syncGroundProjectedEnv' },
+    ], pipelineIds: ['pass64.ground-projected-env.tsl.v1'],
+    control: control('setting', ['graphics.groundProjectedEnv'], 'On at every preset on horizon arenas (nuketown2, skyline-terminal); per-arena radius/height uniforms, flat sky elsewhere', 'The toggle writes mesh visibility plus uniform values with no graph rebuild; the projection re-samples the admitted sky, so gameplay authority never sees it.'),
+    budget: 'One BackSide draw call, one equirect fetch per background pixel, no render target and no MRT change.',
+    verifier: 'src/rendering/ground-projected-env.test.ts + src/rendering/pass64-tsl-scene.test.ts',
+  }),
+  feature({
     id: 'material-texture-quality', title: 'Material, texture and anisotropy quality', availability: 'active', owner: 'src/render-profile.ts + src/graphics-refinement.ts',
     sourceProbes: [
       { path: 'src/render-profile.ts', symbol: 'staticMaterialMode' },

@@ -554,6 +554,19 @@
       ]
     },
     {
+      "key": "graphics.groundProjectedEnv",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "atmosphere-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/ground-projected-env.ts",
+          "symbol": "applyGroundProjectedEnvState",
+          "telemetryPath": "settings.graphics.groundProjectedEnv + pass64 ground-projected-env mesh.visible"
+        }
+      ]
+    },
+    {
       "key": "accessibility.reducedMotion",
       "applyMode": "live",
       "authorityAffecting": false
@@ -650,7 +663,8 @@
         "windStrength": 1,
         "lightning": false,
         "wetSurfaces": true,
-        "ambientLife": 0.6
+        "ambientLife": 0.6,
+        "groundProjectedEnv": true
       },
       "effective": {
         "requestedPreset": "performance",
@@ -679,6 +693,7 @@
         "reflectionScale": 0.62,
         "reflectionQuality": "low",
         "environmentIntensity": 0.62,
+        "groundProjectedEnv": true,
         "screenSpace": {
           "bakedIndirect": {
             "tier": "off",
@@ -868,7 +883,8 @@
         "windStrength": 1,
         "lightning": true,
         "wetSurfaces": true,
-        "ambientLife": 1
+        "ambientLife": 1,
+        "groundProjectedEnv": true
       },
       "effective": {
         "requestedPreset": "high",
@@ -897,6 +913,7 @@
         "reflectionScale": 1,
         "reflectionQuality": "high",
         "environmentIntensity": 1,
+        "groundProjectedEnv": true,
         "screenSpace": {
           "bakedIndirect": {
             "tier": "low",
@@ -1086,7 +1103,8 @@
         "windStrength": 1,
         "lightning": true,
         "wetSurfaces": true,
-        "ambientLife": 1.5
+        "ambientLife": 1.5,
+        "groundProjectedEnv": true
       },
       "effective": {
         "requestedPreset": "max",
@@ -1115,6 +1133,7 @@
         "reflectionScale": 1,
         "reflectionQuality": "ultra",
         "environmentIntensity": 1,
+        "groundProjectedEnv": true,
         "screenSpace": {
           "bakedIndirect": {
             "tier": "high",
@@ -1295,6 +1314,11 @@
     {
       "id": "pass64.water.tsl.v1",
       "owner": "src/water-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass64.ground-projected-env.tsl.v1",
+      "owner": "src/rendering/ground-projected-env.ts",
       "status": "verified"
     }
   ],
@@ -1663,6 +1687,40 @@
       },
       "budget": "Fixed-seed grass instance count; one non-reflective perimeter-water plane with three bounded wave bands.",
       "verifier": "src/rendering/pass64-tsl-scene.test.ts + src/rendering/arena-visual-definition.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "tsl-ground-projected-environment",
+      "title": "TSL ground-projected horizon backdrop",
+      "availability": "active",
+      "owner": "src/rendering/ground-projected-env.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/ground-projected-env.ts",
+          "symbol": "createGroundProjectedEnvMesh"
+        },
+        {
+          "path": "src/rendering/ground-projected-env.ts",
+          "symbol": "applyGroundProjectedEnvState"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "syncGroundProjectedEnv"
+        }
+      ],
+      "pipelineIds": [
+        "pass64.ground-projected-env.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.groundProjectedEnv"
+        ],
+        "effectiveValue": "On at every preset on horizon arenas (nuketown2, skyline-terminal); per-arena radius/height uniforms, flat sky elsewhere",
+        "rationale": "The toggle writes mesh visibility plus uniform values with no graph rebuild; the projection re-samples the admitted sky, so gameplay authority never sees it."
+      },
+      "budget": "One BackSide draw call, one equirect fetch per background pixel, no render target and no MRT change.",
+      "verifier": "src/rendering/ground-projected-env.test.ts + src/rendering/pass64-tsl-scene.test.ts",
       "authorityAffecting": false
     },
     {
@@ -2359,11 +2417,11 @@
     }
   ],
   "summary": {
-    "total": 37,
-    "active": 35,
+    "total": 38,
+    "active": 36,
     "unsupported": 2,
-    "adjustable": 28,
+    "adjustable": 29,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "e77fa8b973e65047851163900333d52a29de71bd6682709f9ae04c24870905b9"
+  "inventorySha256": "813edf3c7ee51d5b8b441ad2c4ae1f6b5d0938ff75502831f241a05575fad24c"
 }
