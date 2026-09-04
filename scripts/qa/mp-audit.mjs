@@ -492,7 +492,7 @@ async function runLobby(peers, arena, report, step) {
   for (const role of PEERS) lobbyViews[role] = (await viewOf(peers[role].page).catch(() => null))?.lobby ?? null;
   const lobbyKeys = PEERS.map((role) => JSON.stringify(lobbyViews[role]));
   measure('L-4', 'authoritative-snapshot-agreement', new Set(lobbyKeys).size === 1, { views: lobbyViews });
-  
+
   // Host picks the arena; every peer must follow the authoritative choice.
   await host.page.selectOption('#lobby-arena', arena.id);
   const syncSettled = await Promise.allSettled(PEERS.map((role) => peers[role].page.waitForFunction(
