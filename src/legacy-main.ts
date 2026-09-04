@@ -820,13 +820,11 @@ import {
   shouldAutoSendLoaded,
   waitingRoomGuidance,
 } from './lobby-countdown';
-// HF-504 lobby/room flow — roles, host controls, the guest-side rolling snapshot
-// copy, the host-changed notice. Every decision lives in the module; call sites only here.
+// HF-504 lobby/room flow — roles, host controls, the rolling snapshot copy, the host-changed notice.
 import {
-  authorizeLobbyKick, authorizeRoomClose, guestShouldHonorKick, hostChangedNotice, kickNotice,
-  planLobbyKick, promoteRetained, resolveSeatRole, retainLobbySnapshot, seatRoleHint, seatRoleLabel,
-  type LobbyKickMessage, type LobbyKickReason, type RetainedLobbySnapshot,
-} from './lobby-roles';
+  authorizeLobbyKick, authorizeRoomClose, guestShouldHonorKick, hostChangedNotice, kickNotice, planLobbyKick,
+  promoteRetained, resolveSeatRole, retainLobbySnapshot, seatRoleHint, seatRoleLabel,
+  type LobbyKickMessage, type LobbyKickReason, type RetainedLobbySnapshot, } from './lobby-roles';
 import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
@@ -7243,13 +7241,15 @@ let lastMirrorAccept: { accepted: boolean; reason: string } | null = null;
 function adoptMirroredHostAuthority(checkpoint: HostMatchCheckpoint): void {
   if (network.role !== 'host' || checkpoint.roomCode !== network.roomCode) return;
   if (initializeRecoveredHostLobby(checkpoint)) return;
-  // HF-504 fallback, reached only by a peer whose promotion was ALREADY authorized (mandate,
-  // term fence, roster re-election): the mirror could not be adopted, so keep the room alive
-  // from this peer's rolling snapshot copy instead. Widens an authorized promotion, never mints one.
+  // HF-504 fallback, reached only by a peer whose promotion was ALREADY authorized (mandate, term fence,
+  // roster re-election): the mirror could not be adopted, so keep the room alive from the rolling copy.
   const fallback = promoteRetained(retainedLobbySnapshot, player.id);
   if (fallback.promoted) {
-    privateLobbySnapshot = fallback.snapshot;
+    // fix(verify): broadcastHostLobby rebuilds the snapshot from MODULE state, so assigning privateLobbySnapshot was
+    // overwritten one call later. Carry the revision (guests drop any below the one they hold), config and scores.
+    privateLobbyRevision = fallback.snapshot.revision; privateMatchConfig = fallback.snapshot.config;
     for (const member of fallback.snapshot.members) hostLobbyMembers.set(member.id, member);
+    for (const score of fallback.snapshot.scores) authoritativeScores.set(score.id, score);
     broadcastHostLobby(fallback.snapshot.phase);
     setStatus('Promoted without the mirrored ledger — room continued from the last shared snapshot.', 'warn');
     return;
@@ -7808,7 +7808,7 @@ function resetPrivateLobbyState(): void {
   if (lobbyClockTimer) clearTimeout(lobbyClockTimer);
   lobbyClockTimer = null;
   privateLobbySnapshot = null;
-  privateLobbyRevision = 0;
+  privateLobbyRevision = 0; retainedLobbySnapshot = null; // fix(verify): the rolling copy is room-scoped
   hostSuccessionPublisher = createHostSuccessionPublisher(); // HF-325
   successorHoldings = createSuccessorHoldings();             // HF-325
   privateMatchActiveAtHostTimeMs = null;

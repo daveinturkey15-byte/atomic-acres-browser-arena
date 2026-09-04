@@ -211,3 +211,42 @@ topology (`stage-release-topology.mjs`), just started outside Playwright's own
    property of `isHostAuthorityMessage`, asserted at unit level. No e2e forges
    one from a guest browser; the e2e proves the weaker, still useful claim that
    a guest is never *offered* the control.
+
+---
+
+## 6. VERIFIER ADDENDUM (adversarial pass, 2026-09-04)
+
+Full record: `docs/evidence/pass95/mp-lobby-overhaul/VERIFY.md`. Verdict
+**SHIP-WITH-FIXES**. All four gates above reproduced exactly (TSC=0, 178/178,
+229/229, e2e 1 passed). Two defects were found in the succession fallback and
+fixed on this branch at net zero lines; the ratchet is still 37,396.
+
+### Claim-states corrected
+
+- Section 2's *"every score, the config, the phase and both match-start clocks
+  carry forward untouched"* described `promoteRetained`, not the shipped call
+  site. `broadcastHostLobby` rebuilds the snapshot from module state, so the
+  lane's `privateLobbySnapshot = fallback.snapshot` was dead: the successor
+  broadcast revision 1 (a guest never increments `privateLobbyRevision`) and
+  every follower dropped it via `acceptLobbyState`'s
+  `revision < privateLobbySnapshot.revision` guard, and scores re-minted empty.
+  Fixed. The end-to-end handoff claim is now **DESIGNED**, not VERIFIED, and
+  `activeAtHostTimeMs` / `matchClock` are still not carried by design.
+- `retainedLobbySnapshot` was never reset, so the rolling copy outlived its
+  room and froze permanently once `privateLobbyRevision` restarted at 0 in a
+  new room. Fixed in `resetPrivateLobbyState()`.
+- The unit case named *"a guest cannot forge a migration"* asserts election
+  determinism and two kick refusals; it proves nothing about a promotion
+  message. The property is HF-325's (`isHostSuccessionProtocolMessage`), not
+  new coverage here.
+- `lobbySeats` has no caller outside its own test; the render path uses
+  `resolveSeatRole` directly.
+
+### TODOs carried forward
+
+T1 rebuild + re-run the lobby e2e (the run used the pre-fix `dist/`); T2 the
+three OPEN items above still stand; T3 carry or document the match clocks
+through the fallback; T4 decide whether KICK should render in an `active`
+phase; T5 `hostKickMember`'s bare 75 ms `setTimeout` before
+`disconnectPlayer`; T6 pre-existing `qa:text-integrity` red on a PASS 94
+evidence file (not this lane's).
