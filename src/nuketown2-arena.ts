@@ -15,7 +15,8 @@
  * shipped `atomic-acres` is the only `authoring: 'import'` arena in the game —
  * a 7.3 MB Blender bake plus 1,110 lines of hand-written collision in
  * `src/map.ts`. Nothing here imports a mesh, an image, a font or a LUT. Every
- * wall, vehicle, fence and kerb below is a TypeScript box with a collider.
+ * wall, vehicle, fence and kerb below is TypeScript geometry with a collider;
+ * the turning head is the one authored low polygon solid.
  *
  * THE PROPORTIONS ARE MEASURED OFF THE REFERENCE'S OWN OVERHEADS.
  * `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md` is the authority, and it is
@@ -108,6 +109,8 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { classifyImpactSurface } from './combat-feedback';
+import { createBallisticSurface } from './ballistics';
 import {
   NUKETOWN2_FOREST_ENVELOPE,
   buildNuketownForestSurround,
@@ -141,6 +144,8 @@ import {
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_TURNING_HEAD_KERB_WIDTH,
+  NUKETOWN2_TURNING_HEAD_SEGMENTS,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_UPPER_Y0,
   isNuketown2BayFootprint,
@@ -200,6 +205,8 @@ export {
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
+  NUKETOWN2_TURNING_HEAD_KERB_WIDTH,
+  NUKETOWN2_TURNING_HEAD_SEGMENTS,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_HOUSE_LAYOUT,
@@ -912,6 +919,60 @@ function centred(
 ): THREE.Mesh {
   return box(builder, `nuketown2 ${name}`,
     [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
+}
+
+/** Emit one authored low solid without creating the forbidden 180-degree pair. */
+function centredPolygon(
+  builder: Builder,
+  name: string,
+  position: [number, number, number],
+  radius: number,
+  height: number,
+  segments: number,
+  material: THREE.Material,
+  options: { solid?: boolean; shots?: boolean; cast?: boolean } = {},
+): THREE.Mesh {
+  const worldX = nuketown2HandedX(position[0]);
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments, 1, false), material);
+  mesh.name = `nuketown2 ${name}`;
+  mesh.position.set(worldX, position[1], position[2]);
+  mesh.castShadow = options.cast !== false;
+  mesh.receiveShadow = true;
+  mesh.userData.impactSurface = classifyImpactSurface({
+    name: mesh.name,
+    metalness: material instanceof THREE.MeshStandardMaterial ? material.metalness : undefined,
+  });
+  mesh.userData.nuketown2Solid = options.solid !== false;
+  builder.root.add(mesh);
+
+  const bounds = {
+    minX: worldX - radius,
+    maxX: worldX + radius,
+    minZ: position[2] - radius,
+    maxZ: position[2] + radius,
+    minY: position[1] - height / 2,
+    maxY: position[1] + height / 2,
+  };
+  const solid = options.solid !== false;
+  const shots = options.shots ?? solid;
+  if (shots) {
+    builder.raycastMeshes.push(mesh);
+    const surface = createBallisticSurface(
+      `${builder.root.name}:${builder.ballisticSurfaceSequence}:${mesh.name}`,
+      mesh.name,
+      bounds,
+      { impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface> },
+    );
+    builder.ballisticSurfaceSequence += 1;
+    builder.shotSurfaces.push(surface);
+    mesh.userData.ballisticSurfaceId = surface.id;
+    mesh.userData.ballisticMaterial = surface.material;
+  }
+  if (solid) {
+    builder.colliders.push(bounds);
+    builder.physicsColliders.push(bounds);
+  }
+  return mesh;
 }
 
 /**
@@ -2433,13 +2494,36 @@ export const NUKETOWN2_BUILDING_FOOTPRINTS = Object.freeze([
 
 type Nuketown2PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
 
+type Nuketown2GroundCut = Nuketown2PlanRect | Readonly<{
+  shape: 'circle';
+  centreX: number;
+  centreZ: number;
+  radius: number;
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}>;
+
 function planRectOverlaps(first: Nuketown2PlanRect, second: Nuketown2PlanRect): boolean {
   return Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0) > 1e-4
     && Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0) > 1e-4;
 }
 
+function circleOverlapsPlanRect(circle: Extract<Nuketown2GroundCut, { shape: 'circle' }>, rect: Nuketown2PlanRect): boolean {
+  const nearestX = Math.max(rect.x0, Math.min(circle.centreX, rect.x1));
+  const nearestZ = Math.max(rect.z0, Math.min(circle.centreZ, rect.z1));
+  return (nearestX - circle.centreX) ** 2 + (nearestZ - circle.centreZ) ** 2 < circle.radius ** 2;
+}
+
+function groundCutOverlapsCell(cut: Nuketown2GroundCut, cell: Nuketown2PlanRect): boolean {
+  return 'shape' in cut && cut.shape === 'circle'
+    ? circleOverlapsPlanRect(cut, cell)
+    : planRectOverlaps(cell, cut);
+}
+
 /** Structures and the carriageway own exact ground cut-outs. */
-function allNuketown2GroundCuts(): readonly Nuketown2PlanRect[] {
+function allNuketown2GroundCuts(): readonly Nuketown2GroundCut[] {
   return Object.freeze([
     ...NUKETOWN2_BUILDING_FOOTPRINTS,
     ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => Object.freeze({
@@ -2479,7 +2563,7 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
       const z0 = zCuts[z]!;
       const z1 = zCuts[z + 1]!;
       const cell = { x0, x1, z0, z1 };
-      if (cuts.some((cut) => planRectOverlaps(cell, cut))) continue;
+      if (cuts.some((cut) => groundCutOverlapsCell(cut, cell))) continue;
       centred(builder, `ground tile ${tile}`, [(x0 + x1) / 2, -0.7, (z0 + z1) / 2],
         [x1 - x0, 1.4, z1 - z0], m.ground, { cast: false });
       tile += 1;
@@ -2509,50 +2593,30 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   // MIRROR-SYMMETRIC across z = 0, which is the axis that separates the two
   // teams - so both teams still get an identical road.
   //
-  // The bulb's ASPHALT is its bounding square, not a disc. The circle is drawn
-  // by the KERB ISLANDS below, which fill square-minus-disc - and that is what
-  // the reference has: `nt2025-aerial-boii.jpg` shows a broad pale concrete
-  // kerb apron ringing the asphalt, not a lawn verge meeting it.
-  centred(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
-    [head.radius * 2, 0.12, head.radius * 2], m.asphalt, road);
+  // The bulb is the authored 16 m CIRCULAR paved head. Its ground cut uses the
+  // same circle, so the outdoor slab and lawn cannot survive in its corners.
+  centredPolygon(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
+    head.radius, 0.12, NUKETOWN2_TURNING_HEAD_SEGMENTS, m.asphalt, road);
   centred(builder, 'carriageway stem', [(head.mouthX + head.offMapX) / 2, -0.06, 0],
     [head.offMapX - head.mouthX, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt, road);
 
-  // THE KERB RING, as a banded approximation of the disc. Everything in this
-  // arena is axis-aligned (see the file header: a yawed solid measured 0.11
-  // coverage against its own mesh on map3), so the circle is z-banded and each
-  // band's chord half-width is sampled at the band's own mid-line.
-  //
-  // The band edges are NOT uniform: they are pinned at +/- the stem's own half
-  // width, because that is where the ring has to open. Inside |z| <= 5.3 the
-  // ring is suppressed on the mouth side, so the asphalt runs continuously from
-  // the disc through the square's edge and into the stem - which is the flared
-  // mouth of a real lollipop. Outside it, both sides carry the ring and it
-  // closes round the head.
-  //
-  // Islands are kerb height (0.24 m, under the 0.42 m autostep, exactly as the
-  // straight kerb runs already are), so they read as a kerb and are never a
-  // wall. Bands whose island is thinner than 0.15 m are dropped: at the closed
-  // end's own mid-line the disc is 0.05 m inside the square, which is a body
-  // no player can see and a collider nobody can stand on.
-  const HEAD_BAND_EDGES = [-8, -7, -6.2, -5.3, -3.6, -1.8, 0, 1.8, 3.6, 5.3, 6.2, 7, 8] as const;
-  const ISLAND_MIN_WIDTH = 0.15;
-  let island = 0;
-  for (let index = 0; index < HEAD_BAND_EDGES.length - 1; index += 1) {
-    const z0 = HEAD_BAND_EDGES[index]!;
-    const z1 = HEAD_BAND_EDGES[index + 1]!;
-    const mid = (z0 + z1) / 2;
-    const chordHalf = head.radius * Math.sqrt(Math.max(0, 1 - (mid / head.radius) ** 2));
-    const runs: [number, number][] = [[head.closedX, head.centreX - chordHalf]];
-    // The mouth side only closes where the stem is not passing through.
-    if (Math.abs(mid) > NUKETOWN2_STREET_HALF_WIDTH) runs.push([head.centreX + chordHalf, head.mouthX]);
-    for (const run of runs) {
-      if (run[1] - run[0] < ISLAND_MIN_WIDTH) continue;
-      centred(builder, `carriageway head kerb island ${island}`,
-        [(run[0] + run[1]) / 2, 0.06, (z0 + z1) / 2],
-        [run[1] - run[0], 0.24, z1 - z0], m.kerb, { cast: false });
-      island += 1;
-    }
+  // A 15 cm kerb band closes around the disc as short straight segments. The
+  // polygon resolution and its ring share the authored centre/radius, while the
+  // stem kerbs meet the ring at the tangent mouth. Every segment is a low solid.
+  const kerbRadius = head.radius + NUKETOWN2_TURNING_HEAD_KERB_WIDTH / 2;
+  const segmentAngle = (Math.PI * 2) / NUKETOWN2_TURNING_HEAD_SEGMENTS;
+  const chord = 2 * head.radius * Math.sin(segmentAngle / 2);
+  for (let index = 0; index < NUKETOWN2_TURNING_HEAD_SEGMENTS; index += 1) {
+    const angle = (index + 0.5) * segmentAngle;
+    const authoredX = head.centreX + Math.cos(angle) * kerbRadius;
+    const authoredZ = Math.sin(angle) * kerbRadius;
+    const isMouthFillet = Math.abs(authoredZ) < NUKETOWN2_STREET_HALF_WIDTH + 0.5
+      && authoredX > head.centreX;
+    const segmentWidth = isMouthFillet ? NUKETOWN2_TURNING_HEAD_KERB_WIDTH * 0.9
+      : NUKETOWN2_TURNING_HEAD_KERB_WIDTH;
+    centred(builder, `carriageway head kerb segment ${index}`,
+      [authoredX, 0.06, authoredZ], [chord, 0.24, segmentWidth], m.kerb,
+      { cast: false, rotation: [0, angle - Math.PI / 2, 0] });
   }
 
   // The stem's own kerbs, one per side, from the bulb's mouth to the map edge.
@@ -3020,6 +3084,11 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       return { ...piece, x0, x1 };
     }),
     keepOuts: builder.colliders.slice(groundColliderCount),
+    keepOutCircles: [{
+      centreX: nuketown2HandedX(NUKETOWN2_CUL_DE_SAC.centreX),
+      centreZ: 0,
+      radius: NUKETOWN2_CUL_DE_SAC.radius,
+    }],
   });
   builder.root.userData.nuketown2LawnStats = lawn.stats;
   // legacy-main drives this through `updateArenaArt`, the same one uniform

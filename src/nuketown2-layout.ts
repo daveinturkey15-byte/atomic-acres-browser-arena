@@ -119,8 +119,12 @@ export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -18, maxX: 18, minZ: -42, 
  */
 export const NUKETOWN2_STREET_HALF_WIDTH = 5.3;
 
-/** Radius of the open turning head. Half its bounding square, too. */
+/** Radius of the authored turning head; its diameter is 16 m. */
 export const NUKETOWN2_TURNING_HEAD_HALF = 8;
+/** The authored polygon resolution for the circular BO2-2025 turning head. */
+export const NUKETOWN2_TURNING_HEAD_SEGMENTS = 20;
+/** Width of the low, segmented kerb ring outside the paved disc. */
+export const NUKETOWN2_TURNING_HEAD_KERB_WIDTH = 0.15;
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -172,7 +176,7 @@ export const NUKETOWN2_TURNING_HEAD_HALF = 8;
 export const NUKETOWN2_CUL_DE_SAC = Object.freeze({
   /** Authored x of the bulb's centre. */
   centreX: -8.5,
-  /** Bulb radius, and half its bounding square. */
+  /** Bulb radius; the x0..x1/z0..z1 fields below retain only its bounds. */
   radius: NUKETOWN2_TURNING_HEAD_HALF,
   /** Authored x where the bulb's bounding square ends and the stem begins. */
   mouthX: -8.5 + NUKETOWN2_TURNING_HEAD_HALF,
@@ -262,19 +266,15 @@ export const NUKETOWN2_BAY_RUNS = Object.freeze([
 ]);
 
 /**
- * Plan union that owns the carriageway floor. The ground builder cuts these
- * exact rectangles before emitting the real road slabs, so visual geometry and
- * the coplanar-pair instrument share one source of truth.
+ * Plan union that owns the carriageway floor. Rectangles and the circle below
+ * are cut before emitting the real road slabs, so visual geometry and the
+ * coplanar-pair instrument share one source of truth.
  *
- * TWO RECTANGLES STILL, AND DELIBERATELY. The bulb is a DISC, but its ground
- * cut is its bounding SQUARE: the four corners between the disc and the square
- * are the reference's own wide concrete kerb apron (clearly visible in
- * `nt2025-aerial-boii.jpg`), which `street()` lays as kerb-height islands over
- * the same asphalt slab. Cutting the disc out band by band instead would
- * multiply the ground tiler's grid - it builds one tile per (x-cut, z-cut) cell
- * - for a boundary no player ever stands on the far side of.
+ * The turning-head entry is a CIRCLE, not its former bounding square. The ground
+ * tiler intersects each cell with that circle, preserving the authored 16 m
+ * diameter while allowing the four corner pockets to remain ground/verge.
  *
- * SIX RECTANGLES SINCE HF-491, and the four new ones are the roadside bays.
+ * SIX CARRIAGEWAY ENTRIES SINCE HF-491, and the four new ones are the roadside bays.
  * They are carriageway FOOTPRINTS and not verge dressing for three reasons
  * that all matter: this union is what `buildNuketown2Ground()` cuts, so a bay
  * is a real hole in the lawn table rather than a decal stacked on top of it
@@ -287,6 +287,7 @@ export const NUKETOWN2_BAY_RUNS = Object.freeze([
 export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
   Object.freeze({
     id: 'street' as const,
+    shape: 'rect' as const,
     x0: NUKETOWN2_CUL_DE_SAC.mouthX,
     x1: NUKETOWN2_CUL_DE_SAC.offMapX,
     z0: -NUKETOWN2_STREET_HALF_WIDTH,
@@ -294,6 +295,10 @@ export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
   }),
   Object.freeze({
     id: 'turning-head' as const,
+    shape: 'circle' as const,
+    centreX: NUKETOWN2_CUL_DE_SAC.centreX,
+    centreZ: 0,
+    radius: NUKETOWN2_CUL_DE_SAC.radius,
     x0: NUKETOWN2_CUL_DE_SAC.closedX,
     x1: NUKETOWN2_CUL_DE_SAC.mouthX,
     z0: -NUKETOWN2_TURNING_HEAD_HALF,
@@ -305,6 +310,7 @@ export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
   ...NUKETOWN2_BAY_RUNS.flatMap((run) => {
     const north = {
       id: `bay ${run.id} north`,
+      shape: 'rect' as const,
       x0: run.x0,
       x1: run.x1,
       z0: -(NUKETOWN2_STREET_HALF_WIDTH + NUKETOWN2_BAY_DEPTH),

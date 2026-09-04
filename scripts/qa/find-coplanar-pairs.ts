@@ -104,8 +104,12 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
     if (mesh.userData.collisionOnly === true) { collisionOnlySlopes.push(label); return; }
     if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; skippedNames.push(`${label} (rotated)`); return; }
     const geometry = mesh.geometry as THREE.BoxGeometry;
-    if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
-    const p = geometry.parameters;
+    const p = geometry.parameters as { width?: number; height?: number; depth?: number } | undefined;
+    if (p?.width === undefined || p.height === undefined || p.depth === undefined) {
+      skipped += 1;
+      skippedNames.push(`${label} (non-box)`);
+      return;
+    }
     mesh.getWorldPosition(world);
     boxes.push({
       name: mesh.name,

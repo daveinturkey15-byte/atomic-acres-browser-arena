@@ -205,6 +205,12 @@ export type NuketownGroundDressingPiece = Readonly<{
   paired?: boolean;
 }>;
 
+export type NuketownLawnKeepOutCircle = Readonly<{
+  centreX: number;
+  centreZ: number;
+  radius: number;
+}>;
+
 /**
  * The rebuild's lawn REGIONS: every `material: 'lawn'` rectangle in the plan,
  * plus the 180-degree partner the arena's own `pair()` emits for each of them.
@@ -256,6 +262,7 @@ export function buildNuketownRebuildLawnField(
   options: Readonly<{
     dressing: readonly NuketownGroundDressingPiece[];
     keepOuts: readonly Box2[];
+    keepOutCircles?: readonly NuketownLawnKeepOutCircle[];
     reduced?: boolean;
   }>,
 ): InstancedGrassField {
@@ -263,6 +270,7 @@ export function buildNuketownRebuildLawnField(
   const compatRoute = typeof document !== 'undefined'
     && document.documentElement?.dataset.renderBackend === 'webgl2';
   const keepOuts = options.keepOuts;
+  const keepOutCircles = options.keepOutCircles ?? [];
   const field = buildInstancedGrassField({
     name: 'nuketown2-lawn',
     // A different stream from the shipped map's, so the two maps do not carry
@@ -286,6 +294,8 @@ export function buildNuketownRebuildLawnField(
       && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
       && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
       && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+    )) && !keepOutCircles.some((circle) => (
+      (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
     )),
     material: {
       color: 0x5e9e41,
