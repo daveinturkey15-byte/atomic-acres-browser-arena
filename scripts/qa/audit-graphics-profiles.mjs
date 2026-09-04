@@ -1,4 +1,18 @@
 #!/usr/bin/env node
+// Audits one graphics profile on one arena in a headless WebGPU browser: cold admission time, in-combat pipeline compiles, presented-frame pacing, and VRAM delta, written as one JSON row.
+// Usage: node scripts/qa/audit-graphics-profiles.mjs --url http://localhost:41977 --preset high --arena atomic-acres --out artifacts/graphics-audit
+//   --url <url>             app base URL (default: http://localhost:41977)
+//   --preset <name>         graphics profile to audit (default: high)
+//   --arena <id>            arena id (default: atomic-acres)
+//   --out <dir>             output directory (default: artifacts/graphics-audit)
+//   --width <px>            viewport width (default: 2560)
+//   --height <px>           viewport height (default: 1440)
+//   --sample-ms <ms>        steady-state sample window (default: 14000)
+//   --warmup-ms <ms>        warmup before the sample window (default: 4000)
+//   --boot-timeout-ms <ms>  boot/admission timeout (default: 180000)
+//   env GFX_AUDIT_ALLOW_BUSY_GPU  allow the run with ComfyUI work queued on the GPU (default: unset; set to '1' to allow)
+// Writes: <out>/<preset>-<arena>.json (directory created if missing); JSON summary also printed to stdout
+// Exits: 0 = success; 2 = refused to start because ComfyUI has work queued and GFX_AUDIT_ALLOW_BUSY_GPU is not '1'
 // ===========================================================================
 // HF-414 / HF-418 — the graphics-profile cost audit.
 //
