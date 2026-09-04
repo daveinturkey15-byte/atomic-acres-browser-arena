@@ -1464,9 +1464,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
         bal.outboardZ + bal.postSize / 2],
       [bal.postSize, bal.deckTop - bal.slabThickness, bal.postSize], m.trim);
   }
-  // Rails: the outboard run and two returns. 1.1 m over the deck, so it breaks
-  // a crouched line (over LOW_COVER) and a standing player shoots across it
-  // (under the 1.65 m standing eye). The doorway's own width stays clear.
+  // Rails, 1.1 m over the deck: over LOW_COVER so they break a crouched line,
+  // under the 1.65 m standing eye so a standing player shoots across them.
+  // The doorway is in the wall, so no rail crosses it.
   pair(builder, 'balcony rail outboard',
     [bal.centreX, bal.deckTop + bal.railHeight / 2, bal.outboardZ + bal.railThickness / 2],
     [bal.width, bal.railHeight, bal.railThickness], m.trim);
@@ -1480,8 +1480,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [bal.centreX + (bal.width - bal.railThickness) / 2,
       bal.deckTop + bal.railHeight / 2, balDeckZ],
     [bal.railThickness, bal.railHeight, bal.projection], m.trim);
-  const stairOpeningZ0 = yardStairOuterZ;
-  const balconyNewelDepth = stairOpeningZ0 - bal.outboardZ;
+  const balconyNewelDepth = yardStairOuterZ - bal.outboardZ;
   pair(builder, 'balcony rail newel',
     [bal.centreX - (bal.width - bal.railThickness) / 2,
       bal.deckTop + bal.railHeight / 2, bal.outboardZ + balconyNewelDepth / 2],
@@ -1498,7 +1497,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const yardRampMaterial = new THREE.MeshBasicMaterial({ visible: false });
   yardRampMaterial.name = 'nuketown2-yard-stair-collision-authority';
   const yardRampLength = Math.hypot(yardStair.rampRun, yardStair.rampRise);
-  const yardRampCentreX = (yardStair.topX + YARD_STAIR_OVERLAP + yardStair.footX - YARD_STAIR_OVERLAP) / 2;
+  // The slab overlaps the deck and the lawn equally, so the overlaps cancel
+  // and its centre is simply the midpoint of the flight.
+  const yardRampCentreX = (yardStair.topX + yardStair.footX) / 2;
   const yardRampCentreY = yardStair.rampRise / 2
     - Math.cos(yardStair.rampAngleRadians) * yardStair.rampThickness / 2;
   // The flight runs along x, so its slab is pitched about Z - and unlike the
