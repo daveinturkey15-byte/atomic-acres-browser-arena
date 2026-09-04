@@ -1999,3 +1999,8 @@ assets and textures and lighting need to be tip top, raid can come next"
   running) finish; the rooflines Opus lane told to commit WIP and stop, its
   remainder re-routed to Codex/Luna. Everything else runs on Luna, Gemini,
   GLM and Muse Spark. HITL 5b integration goes to Luna.
+- 18:40 **Sound-design lane** (sound-design @ caeed824, four commits, 221
+  tests): every synthesised category revoiced (weapons, movement, impacts,
+  world, drone/rotor Doppler, UI stingers, music), shared delay/allpass reverb,
+  combat music ducking, master limiter, deterministic offline peak/RMS gates.
+  Muse review queued; goes into HITL 5b if it clears — needs the owner's ears.
