@@ -53,6 +53,8 @@ const label = arg('--label', 'hf499');
 const outDir = resolve(REPO_ROOT, arg('--out', OUT_DIR));
 const renderer = arg('--renderer', 'webgpu');
 const renderProfile = arg('--render', 'performance');
+const TSX_CLI = resolve(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs');
+const ARENA_ROSTER_SCRIPT = resolve(REPO_ROOT, 'scripts/qa/mp-lab/arena-roster.mts');
 
 for (const port of Object.values(PORTS)) {
   if (port < 4230 || port > 4232) throw new Error(`invalid QA port ${port}`);
@@ -101,6 +103,21 @@ let browsers = [];
 let peers = {};
 let hardStopTimer = null;
 let stopping = false;
+const stairGeometryCache = new Map();
+
+function arenaStairGeometry(arena, team) {
+  const key = `${arena}:${team}`;
+  if (stairGeometryCache.has(key)) return stairGeometryCache.get(key);
+  const result = spawnSync(process.execPath, [TSX_CLI, ARENA_ROSTER_SCRIPT, '--stair', arena, String(team)], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  if (result.status !== 0) throw new Error(`arena stair geometry failed: ${result.stderr || result.stdout}`);
+  const geometry = JSON.parse(result.stdout.trim().split('\n').pop());
+  stairGeometryCache.set(key, geometry);
+  return geometry;
+}
 
 function noteFailure(scope, error) {
   const text = String(error?.stack ?? error?.message ?? error).slice(0, 1_000);
@@ -185,13 +202,16 @@ async function sampleReplication(playStart) {
 async function scenarioStairFire(role) {
   const peer = peers[role];
   const before = await viewOf(peer.page);
-  const staged = await peer.page.evaluate(() => {
-    const debug = window.__ATOMIC_ACRES_DEBUG__;
-    if (typeof debug?.stageHouseRamp !== 'function') return null;
-    return debug.stageHouseRamp('interior');
+  const team = await peer.page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const value = snapshot?.player?.team ?? snapshot?.privateMatch?.members?.find((member) => member.id === snapshot?.player?.id)?.team;
+    return value === 1 ? 1 : 0;
   });
-  if (!staged) return { ok: false, staged: false, reason: 'interior house stair staging unavailable' };
-  const bodyPosition = staged.foot.map((value, index) => value + ((staged.top[index] - value) * 0.5));
+  const stair = arenaStairGeometry(arenaId, team);
+  if (!stair) return { ok: false, staged: false, reason: `no authored stair geometry for ${arenaId}` };
+  const eyeOffset = Number(before?.players?.[before.selfId]?.position?.[1]) - stair.foot[1];
+  const bodyPosition = stair.foot.map((value, index) => value + ((stair.top[index] - value) * 0.5));
+  bodyPosition[1] += eyeOffset;
   const placed = await peer.page.evaluate(({ bodyPosition, uphill }) => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     if (typeof debug?.teleportPlayer !== 'function') return { ok: false, reason: 'debug teleport unavailable' };
@@ -220,7 +240,7 @@ async function scenarioStairFire(role) {
       staged: true,
       placed,
       reason: 'host did not observe the arena stair body position',
-      stairAnchors: { foot: staged.foot, top: staged.top, uphill: staged.uphill },
+      stairAnchors: { foot: stair.foot, top: stair.top, uphill: stair.uphill },
       bodyPosition,
       hostPosition,
       hostPositionErrorM,
@@ -243,8 +263,10 @@ async function scenarioStairFire(role) {
     staged: true,
     placed,
     fired,
-    stairAnchors: { foot: staged.foot, top: staged.top, uphill: staged.uphill },
+    stairAnchors: { foot: stair.foot, top: stair.top, uphill: stair.uphill },
     bodyPosition,
+    team,
+    houseId: stair.houseId,
     hostPosition,
     hostPositionErrorM,
     weapon: after?.players?.[after.selfId]?.weapon ?? null,
@@ -320,9 +342,19 @@ async function damageAfterRejoin() {
 }
 
 async function scoreboardAtEnd() {
-  const views = await peerViews();
-  const canonical = (view) => Object.entries(view?.players ?? {}).map(([id, player]) => [id, player.score]).sort(([a], [b]) => a.localeCompare(b));
-  for (const role of PEERS) bundle.scoreboard[role] = canonical(views[role]);
+  const canonical = async (role) => peers[role].page.evaluate(() => {
+    const scores = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.scores ?? [];
+    return scores.map((score) => [score.id, {
+      kills: score.kills,
+      deaths: score.deaths,
+      damageDealt: score.damageDealt,
+      damageTaken: score.damageTaken,
+      ...(score.rangeScore === undefined ? {} : { rangeScore: score.rangeScore }),
+      ...(score.rangeHits === undefined ? {} : { rangeHits: score.rangeHits }),
+      ...(score.rangeShots === undefined ? {} : { rangeShots: score.rangeShots }),
+    }]).sort(([a], [b]) => a.localeCompare(b));
+  });
+  for (const role of PEERS) bundle.scoreboard[role] = await canonical(role).catch(() => []);
   const encoded = PEERS.map((role) => JSON.stringify(bundle.scoreboard[role]));
   bundle.scoreboard.agreement = encoded.every((value) => value === encoded[0]) && encoded[0] !== '[]' && !encoded.some((value) => value.includes('null'));
 }

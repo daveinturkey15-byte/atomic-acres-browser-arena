@@ -20,9 +20,9 @@ test('soak hard stop remains under the five-minute browser fence and starts afte
 });
 
 test('stair probe uses returned arena anchors and preserves fire evidence', () => {
-  assert.match(source, /stageHouseRamp\('interior'\)/);
-  assert.match(source, /staged\.foot/);
-  assert.match(source, /staged\.top/);
+  assert.match(source, /arenaStairGeometry\(arenaId, team\)/);
+  assert.match(source, /stair\.foot/);
+  assert.match(source, /stair\.top/);
   assert.match(source, /debug\.teleportPlayer\(bodyPosition\[0\], bodyPosition\[1\], bodyPosition\[2\]/);
   assert.match(source, /stairFireResult/);
 });
@@ -31,4 +31,6 @@ test('scoreboard is sampled after an explicit RTT propagation wait', () => {
   const wait = source.indexOf('await sleep(DAMAGE_RTT_MS);');
   const sample = source.indexOf('await scoreboardAtEnd();');
   assert.ok(wait >= 0 && sample > wait);
+  assert.match(source, /damageDealt: score\.damageDealt/);
+  assert.match(source, /damageTaken: score\.damageTaken/);
 });
