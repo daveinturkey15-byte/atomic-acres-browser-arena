@@ -1,3 +1,18 @@
+// What: Objective legibility/layout audit of whatever is on screen — reports
+//   visible text below 9px computed size, horizontal page overflow, and
+//   devicePixelRatio.
+// Usage: not a runnable CLI — there is no node/tsx command for it. It is a
+//   browser-context ES module: Playwright serializes auditLegibility for
+//   page.evaluate() (capture-visual-review.mjs), and the cross-browser probe
+//   page imports it as a plain ES module. (`node
+//   scripts/qa/hud-legibility-audit.mjs` parses but does nothing.)
+// Flags/env: none — the file reads no process.argv, process.env, or --flags.
+// Writes: nothing — the exported function only returns { belowNinePx,
+//   pageOverflowX, devicePixelRatio } to its caller; it creates no files or
+//   directories.
+// Exit codes: none — no process.exit(); the code runs in a page context, not a
+//   process.
+
 // Objective legibility + layout audit of whatever is currently on screen.
 //
 // Lifted verbatim out of capture-visual-review.mjs so that the cross-browser
