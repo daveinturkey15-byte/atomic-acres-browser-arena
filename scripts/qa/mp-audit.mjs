@@ -69,7 +69,12 @@ const BOOT_TIMEOUT_MS = 180_000;
 const ROOM_TIMEOUT_MS = 45_000;
 const JOIN_TIMEOUT_MS = 60_000;
 const SYNC_TIMEOUT_MS = 160_000;
-const DEPLOY_TIMEOUT_MS = 120_000;
+// THREE peers compile effect shaders concurrently on one GPU, which the
+// two-sided harnesses never had to budget for: a baseline run caught guestA at
+// 95% "compiling effect shaders, ETA 7s" when the two-peer 120 s budget fired.
+// This is a harness budget, not a product threshold - deploy correctness is
+// still asserted, just given time proportional to the peer count.
+const DEPLOY_TIMEOUT_MS = Number(arg('--deploy-timeout-ms', '300000'));
 // One RTT plus scheduling slack. A host-authoritative acknowledgement that has
 // not landed within this window is a defect, not slow networking: the impaired
 // run adds at most EVENT_DELAY_MS + EVENT_JITTER_MS each way.
@@ -381,14 +386,24 @@ async function main() {
     for (const role of PEERS) {
       if (!peers[role]) continue;
       report.scenarios[`${role}-errors`] = peers[role].errors;
-      await peers[role].context.close().catch(() => {});
     }
-    for (const browser of browsers) await browser.close().catch(() => {});
+    // Evidence first. A page still compiling shaders can hang close() for
+    // minutes, and the first baseline run was lost exactly that way: the
+    // findings existed in memory and never reached disk.
+    await writeFile(join(OUT_DIR, `${LABEL}-audit.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    const closeWithin = (what, task) => Promise.race([
+      task.catch(() => {}),
+      sleep(15_000).then(() => console.log(`[mp-audit] ${what} did not close within 15 s; abandoning it`)),
+    ]);
+    for (const role of PEERS) {
+      if (!peers[role]) continue;
+      await closeWithin(`${role} context`, peers[role].context.close());
+    }
+    for (const [index, browser] of browsers.entries()) await closeWithin(`browser ${index}`, browser.close());
     peerServer?.kill();
     server?.close();
   }
 
-  await writeFile(join(OUT_DIR, `${LABEL}-audit.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   printSummary(report);
   return report.completed ? 0 : 1;
 }
@@ -622,10 +637,29 @@ async function scenarioPickup(guest, host, role) {
   result.weaponBefore = before.players[selfId].weapon;
   const mark = await markOf(guest);
 
+  // spawnDeathDrop stages a drop from `victim: player.id` - i.e. the guest's
+  // OWN primary. Picking your own identical full-reserve weapon back up is a
+  // no-op the game refuses on purpose (death-drops.ts consumeDeathDropWeapon),
+  // so staging it naively measures the refusal, not the owner's defect. Give
+  // the guest a different primary first, drop that, then equip something else,
+  // so the F-press is a genuine cross-weapon pickup.
   const spawned = await guest.page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     if (typeof debug?.spawnDeathDrop !== 'function') return { ok: false, reason: 'spawnDeathDrop missing' };
-    try { debug.spawnDeathDrop(0); return { ok: true }; } catch (error) { return { ok: false, reason: String(error?.message ?? error) }; }
+    if (typeof debug?.equipWeapon !== 'function') return { ok: false, reason: 'equipWeapon missing' };
+    const held = debug.snapshot().player.primaryWeapon;
+    const alternative = ['carbine', 'smg', 'ak-alpha', 'm14-ebr'].find((weapon) => weapon !== held);
+    if (!alternative) return { ok: false, reason: 'no alternative primary in the probe list' };
+    try {
+      // Drop the ALTERNATIVE, then return to the original, so the ground weapon
+      // differs from the one in hand and a real pickup can resolve.
+      debug.equipWeapon(alternative);
+      const dropId = debug.spawnDeathDrop(0);
+      debug.equipWeapon(held);
+      return { ok: Boolean(dropId), dropId: dropId ?? null, staged: alternative, holding: held };
+    } catch (error) {
+      return { ok: false, reason: String(error?.message ?? error) };
+    }
   });
   result.spawned = spawned;
   if (!spawned.ok) {

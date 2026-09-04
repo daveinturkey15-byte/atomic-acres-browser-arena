@@ -933,7 +933,9 @@ export class ArenaNetwork {
     let bytes = 0;
     try { bytes = JSON.stringify(message)?.length ?? 0; } catch { bytes = -1; }
     const carried = message as unknown as Record<string, unknown>;
-    const subject = carried.playerId ?? carried.id ?? carried.targetId ?? carried.shooterId ?? null;
+    // Most of the protocol names its author `by` (lobby-ready, reload-intent,
+    // pickup, shot); a few carry the subject as `playerId`/`victim`/`target`.
+    const subject = carried.by ?? carried.playerId ?? carried.victim ?? carried.targetId ?? carried.id ?? null;
     trace.push({
       atMs: performance.now(),
       direction,
