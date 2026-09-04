@@ -167,7 +167,8 @@ export function mergeForgedPlacements(
       geometry.computeBoundingBox();
       if (geometry.boundingBox) bounds.union(geometry.boundingBox);
       const material = child.material as THREE.Material;
-      const bucketLabel = child.name.split(' ').pop() ?? material.name;
+      const bucketLabel = child.userData.forgeBucket as string | undefined;
+      if (bucketLabel === undefined) throw new Error(`Forged mesh is missing its material bucket: ${child.name}`);
       if (bucketLabel === 'paint' && geometry.boundingBox) {
         skinBounds.union(geometry.boundingBox);
         hasPaintBody = true;
@@ -356,6 +357,7 @@ export function buildForgedWheelSet(
     mesh.castShadow = bucket === 'tyre';
     mesh.receiveShadow = true;
     mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
     group.add(mesh);
     drawCalls += 1;
     triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
@@ -519,6 +521,7 @@ export function buildForgedVehicle(
     mesh.castShadow = bucket === 'paint' || bucket === 'tyre';
     mesh.receiveShadow = bucket !== 'groove';
     mesh.userData.presentationOnly = true;
+    mesh.userData.forgeBucket = bucket;
     if (bucket === 'glass') mesh.renderOrder = 3;
     group.add(mesh);
     drawCalls += 1;
