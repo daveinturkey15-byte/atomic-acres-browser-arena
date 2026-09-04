@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+// Captures below-deck floor-support evidence for the High Seas (Hijacked) service deck: teleports a webgl2 solo player to fixed stations, screenshots the rendered frames, and reports a PASS/FAIL/UNMEASURED floor verdict.
+//
+// Usage: node scripts/qa/capture-below-deck.mjs [--url <url>] [--out <dir>]
+//   --url <url>    Base URL of the running app (default: http://127.0.0.1:41876)
+//   --out <dir>    Screenshot output directory, resolved against cwd (default: artifacts/pass76/below-deck)
+// Writes: <out>/below-deck-<station-id>.png (one screenshot per station) and a JSON verdict report on stdout.
+// Exit codes: always 0 (no process.exit calls); the PASS/FAIL/UNMEASURED verdict is in the stdout JSON, not the exit code.
+//
 // Below-deck evidence for the High Seas (Hijacked) service deck.
 //
 // The owner's report was "the inside of the boat underneath is all water".
