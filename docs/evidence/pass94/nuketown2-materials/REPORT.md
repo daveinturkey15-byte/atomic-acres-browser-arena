@@ -168,7 +168,9 @@ ladder scuffs - is present but quiet next to the course structure.
 
 ## 5. Gates
 
-Quoted from the runs.
+Quoted from the runs. The last commit that changes any source is `32105cdf`;
+everything after it is this document and the captured frames, so the `tsc` and
+`vitest` results below are the final source state.
 
 ```
 $ npx tsc --noEmit
@@ -218,7 +220,8 @@ $ PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.s
   1 passed (53.7s)
 ```
 
-**Stock-flags boot (`npm run qa:stock-boot`), installed Chrome, no unsafe flags:**
+**Stock-flags boot (`npm run qa:stock-boot`), installed Chrome, no unsafe flags** -
+run at head `d3c925ab`:
 
 ```
   ok 1 launch arguments carry none of the flags that mask Tint lowering bugs (12ms)
@@ -228,7 +231,11 @@ $ PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.s
   4 passed (2.6m)
 ```
 
-**Review captures**, both sides, native WebGPU in installed headless Chrome:
+**Review captures**, native WebGPU in installed headless Chrome, at the FINAL
+head `32105cdf` (and, for the before/after pair, at base `40e8081e`). A capture
+run deploys the arena and parks on every authored review camera, so 17/17 shots
+at the final head is itself a boot-and-render receipt for the material state
+this branch ships:
 
 ```
 [viewpoint-capture] backend=webgpu adapter={"vendor":"nvidia","architecture":"blackwell"}
@@ -318,3 +325,26 @@ prevents the exposure a photograph needs. What did change is narrower and
 answerable: surfaces that were one flat value now have structure at the size the
 real thing has it, and blockwork, lap siding, deck boards, poured slabs and worn
 lane markings each read as their own material rather than as a coloured box.
+
+---
+
+## 8. OPEN, continued
+
+8. **The boot smoke and stock-boot were not re-run at the final head.** They ran
+   green at `d3c925ab`; the three commits after it change shader TERMS only -
+   two smoothstep edge values on the siding lap, one base hex on the fence, and
+   three thresholds plus one constant on the lawn - and introduce no new node
+   type, uniform or material. The 17/17 native-WebGPU capture run AT `32105cdf`
+   covers boot and render for that exact state, but it does not assert "zero
+   console errors", which is what the smoke adds.
+
+   The re-run could not be performed: the shared `node_modules` tree these
+   worktrees junction into (`aa-claude-chopper/node_modules`) lost `@playwright`
+   and `.bin` part-way through this lane, mid-session, while another agent was
+   working on this machine. `vitest`, `tsc` and `vite` still resolve; `npx
+   playwright test` now returns `unknown command 'test'` because npx falls back
+   to the deprecated standalone package. Repairing a dependency tree that
+   another agent is actively using is not this lane's call, so it is recorded
+   here rather than fixed. **The integrator should re-run both gates at the
+   merge head.**
+
