@@ -95,10 +95,10 @@ describe('private match lobby', () => {
     expect(balanceLobbyTeams(members)).toEqual(balanced);
   });
 
-  it('lets a ready host start alone or with hosted bots while still requiring every connected human ready', () => {
+  it('requires a second connected human, or a hosted bot, before start', () => {
     expect(canHostStart(snapshot())).toBe(true);
     expect(canHostStart(snapshot({ members: members.map((member, index) => index === 2 ? { ...member, ready: false } : member) }))).toBe(false);
-    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(true);
+    expect(canHostStart(snapshot({ members: [members[0]] }))).toBe(false);
     expect(canHostStart(snapshot({
       members: [{ ...members[0], ready: false }],
       config: { ...DEFAULT_PRIVATE_MATCH_CONFIG, hostedBotCount: 4 },
@@ -109,12 +109,13 @@ describe('private match lobby', () => {
     }))).toBe(true);
     expect(canHostStart(snapshot({ members: [] }))).toBe(false);
     expect(canHostStart(snapshot({ phase: 'active' }))).toBe(false);
+    expect(canHostStart(snapshot({ members: [{ ...members[0], ready: true }, { ...members[1], connected: false }] }))).toBe(false);
   });
 
-  it('treats Start Match as the host ready commit without weakening guest readiness', () => {
+  it('requires the host readiness bit to agree with every connected guest', () => {
     expect(canHostCommitStart(snapshot({
       members: members.map((member) => member.id === 'host' ? { ...member, ready: false } : member),
-    }))).toBe(true);
+    }))).toBe(false);
     expect(canHostCommitStart(snapshot({
       members: members.map((member) => member.id === 'host' || member.id === 'b'
         ? { ...member, ready: false }

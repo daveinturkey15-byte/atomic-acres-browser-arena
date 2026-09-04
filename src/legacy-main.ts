@@ -1281,6 +1281,8 @@ type RemotePlayer = {
   lastFeedbackAt: number;
   /** Authenticated replacement may restart its document-local snapshot sequence. */
   awaitingReplacementState: boolean;
+  /** Guest presentation is withheld until a host-authenticated state arrives. */
+  authoritativeReady: boolean;
 };
 
 type AdmittedRemoteShot = {
@@ -8242,14 +8244,19 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   };
 }
 
-function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): void {
+function broadcastHostLobby(
+  phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting',
+  options: Readonly<{ revisionBump?: boolean; render?: boolean }> = {},
+): void {
   if (network.role !== 'host') return;
+  const revisionBump = options.revisionBump ?? true;
+  const render = options.render ?? true;
   const localMember = hostLobbyMembers.get(player.id);
   if (localMember) {
     player.team = localMember.team;
     element<HTMLSelectElement>('#team').value = String(localMember.team);
   }
-  privateLobbyRevision += 1;
+  if (revisionBump) privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
   if (privateLobbySnapshot.testBayDoor && selectedArena.id === 'gun-range' && matchState.phase === 'active') {
     // hostSnapshot advances the canonical door to the reliable envelope's
@@ -8267,7 +8274,7 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   // HF-325: the mandate is elected from the roster revision that just shipped,
   // so it must go out AFTER the lobby-state that guests will recompute from.
   publishHostSuccessionMandate();
-  renderPrivateLobby();
+  if (render) renderPrivateLobby();
   renderTextChat();
 }
 
@@ -9765,10 +9772,16 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // epoch. A reconnecting client must finish beginPrivateMatch() before any
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
-    broadcastHostLobby(currentPhase);
+    // Admission validation may have awaited token hashing while the match
+    // crossed countdown -> active. Publish the phase that is authoritative at
+    // commit time; reusing the entry phase would regress every peer's lobby.
+    const phaseAtCommit: LobbySnapshot['phase'] = gameStarted || matchState.phase === 'active'
+      ? 'active'
+      : privateLobbySnapshot?.phase ?? currentPhase;
+    broadcastHostLobby(phaseAtCommit);
     if (gameStarted) sendKillstreakStateToPlayer(message.playerId, performance.now(), true);
     sendTextChatHistory(message.playerId);
-    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
+    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && phaseAtCommit !== 'waiting') {
       network.sendToPlayer(message.playerId, {
         type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
         activeAtEpochMs: privateMatchActiveAtEpochMs, hostSentTimeMs: performance.now(),
@@ -10432,9 +10445,6 @@ function hostStartPrivateMatch(): void {
   }
   const hostMember = hostLobbyMembers.get(player.id);
   if (!hostMember?.connected) return;
-  if (!hostMember.ready) {
-    hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
-  }
   const current = hostSnapshot('waiting');
   if (!canHostStart(current, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
@@ -10547,11 +10557,19 @@ function applyReplicatedGunRangeDummyState(entries: LobbySnapshot['testDummies']
 
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
-  if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  const previousSnapshot = privateLobbySnapshot;
+  const authorityChanged = previousSnapshot !== null && message.snapshot.hostId !== previousSnapshot.hostId;
+  // A promoted successor resumes from the carried mirror, whose revision can
+  // legitimately be below the dead host's last observed revision. The host
+  // identity is the succession fence; a same-host lower revision remains stale.
+  if (previousSnapshot && message.snapshot.revision < previousSnapshot.revision && !authorityChanged) return;
   if (message.snapshot.matchClock && gunRangeMatchClockState
     && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
-  const previousSnapshot = privateLobbySnapshot;
-  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
+  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision || authorityChanged;
+  const shouldRender = previousSnapshot === null
+    || message.snapshot.revision > previousSnapshot.revision
+    || previousSnapshot.phase !== message.snapshot.phase
+    || authorityChanged;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
     lobbyRevision: message.snapshot.revision,
@@ -10609,7 +10627,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   }
   if (endingFromHost) endTimedMatchFromAuthority(performance.now());
   else if (gameStarted) projectActiveGunRangeMatchClock(performance.now());
-  renderPrivateLobby();
+  if (shouldRender) renderPrivateLobby();
   renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
@@ -10803,7 +10821,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     return true;
   }
   if (message.type === 'lobby-start') {
-    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId
+      && message.revision >= (privateLobbySnapshot?.revision ?? 0)
+      && !processedNonces.has(message.nonce)) {
+      processedNonces.add(message.nonce);
       if (message.revision > (privateLobbySnapshot?.revision ?? 0) && lobbyAuthoritySupersedesActiveAdmission({
         arenaId: privateLobbySnapshot?.config.arenaId ?? selectedArena.id,
         lobbyRevision: message.revision,
@@ -10824,6 +10845,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         activeAtEpochMs: message.activeAtEpochMs,
       };
       if (!gameStarted) void beginPrivateMatch('client', message.activeAtHostTimeMs, message.activeAtEpochMs, message.hostSentTimeMs);
+      trimNonceSet();
     }
     return true;
   }
@@ -10893,7 +10915,13 @@ function handleLobbyMessage(message: GameMessage): boolean {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
         guestSentMonoMs: message.guestSentMonoMs, hostReceivedMonoMs, hostSentMonoMs, nonce: randomNonce(),
       });
-      if (member && message.reportedRttMs !== null) broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+      // RTT is telemetry, not a lobby-authority mutation. Ship the updated
+      // ping in the same revision without rebuilding every roster row; doing
+      // otherwise made the revision fence advance every two seconds and made
+      // a focused lobby dropdown impossible to use.
+      if (member && message.reportedRttMs !== null) {
+        broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting', { revisionBump: false, render: false });
+      }
     }
     return true;
   }
@@ -10961,23 +10989,33 @@ function renderPrivateLobby(): void {
   element<HTMLButtonElement>('#host').disabled = true;
   element<HTMLButtonElement>('#join').disabled = true;
   const snapshot = privateLobbySnapshot;
-  const members = snapshot?.members ?? (network.role === 'host' ? [...hostLobbyMembers.values()] : []);
+  // Every visible lobby field is a projection of the last accepted
+  // authoritative snapshot. A guest has no legitimate local roster/config
+  // fallback while JOIN is in flight; showing one fabricated from local state
+  // made READY look actionable even though the host had not admitted it.
+  const members = snapshot?.members ?? [];
+  const config = snapshot?.config ?? null;
   const connectedCount = members.filter((member) => member.connected).length;
-  const capacity = snapshot?.config.capacity ?? privateMatchConfig.capacity;
-  element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
+  const capacity = config?.capacity ?? null;
+  element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity ?? '—'}`;
   // The hosted 5-4-3-2-1: the phase carries the host's shared epoch, so every
   // client counts the same five seconds from one authoritative instant. Re-render
   // on a short local tick while the phase lasts; it stops itself otherwise.
-  const countdownRemainS = snapshot?.phase === 'countdown' && snapshot.activeAtEpochMs !== null
-    ? Math.max(1, Math.min(5, Math.ceil((snapshot.activeAtEpochMs - Date.now()) / 1000)))
+  const countdownDeadlineMonoMs = snapshot?.phase === 'countdown' && snapshot.activeAtHostTimeMs !== null
+    ? network.role === 'client'
+      ? hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs, performance.now(), snapshot.snapshotHostTimeMs)
+      : snapshot.activeAtHostTimeMs
+    : null;
+  const countdownRemainS = countdownDeadlineMonoMs !== null
+    ? Math.max(0, Math.ceil((countdownDeadlineMonoMs - performance.now()) / 1000))
     : null;
   element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active'
     ? 'MATCH IN PROGRESS'
     : countdownRemainS !== null ? `DEPLOYING IN ${countdownRemainS}` : 'WAITING ROOM';
   if (countdownRemainS !== null) scheduleLobbyCountdownRefresh();
-  const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
+  const hostControls = network.role === 'host' && snapshot?.phase === 'waiting' && config !== null;
   const arenaInput = element<HTMLSelectElement>('#lobby-arena');
-  arenaInput.value = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+  arenaInput.value = config?.arenaId ?? '';
   arenaInput.disabled = !hostControls;
   const modeInput = element<HTMLSelectElement>('#lobby-mode');
   const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
@@ -10985,15 +11023,15 @@ function renderPrivateLobby(): void {
   const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
   const dominationOption = modeInput.querySelector<HTMLOptionElement>('option[value="domination"]');
   if (dominationOption) {
-    const lobbyArena = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
+    const lobbyArena = config?.arenaId ?? null;
     dominationOption.disabled = lobbyArena !== 'test2';
     dominationOption.textContent = lobbyArena === 'test2' ? 'DOMINATION' : 'DOMINATION (TEST2)';
   }
-  modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
-  capacityInput.value = String(capacity);
-  botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
-  balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
-  const rangeLobby = (snapshot?.config.arenaId ?? privateMatchConfig.arenaId) === 'gun-range';
+  modeInput.value = config?.mode ?? '';
+  capacityInput.value = capacity === null ? '' : String(capacity);
+  botInput.value = config === null ? '' : String(config.hostedBotCount);
+  balanceInput.checked = config?.autoBalance ?? false;
+  const rangeLobby = config?.arenaId === 'gun-range';
   modeInput.disabled = !hostControls || rangeLobby;
   capacityInput.disabled = !hostControls;
   botInput.disabled = !hostControls || rangeLobby;
@@ -11003,39 +11041,37 @@ function renderPrivateLobby(): void {
   // read the host's chosen limits before ready-up and cannot edit them.
   const timeLimitInput = element<HTMLSelectElement>('#lobby-time-limit');
   const killLimitInput = element<HTMLSelectElement>('#lobby-kill-limit');
-  timeLimitInput.value = String(snapshot?.config.durationMs ?? privateMatchConfig.durationMs);
-  killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
+  timeLimitInput.value = config === null ? '' : String(config.durationMs);
+  killLimitInput.value = config?.scoreLimit === null || config === null ? '' : String(config.scoreLimit);
   timeLimitInput.disabled = !hostControls || rangeLobby;
   killLimitInput.disabled = !hostControls || rangeLobby;
   // LIGHTING: the same mirror for the host's TIME OF DAY choice. A guest reads
   // it and cannot edit it, exactly like the two limits above, because two peers
   // on different hours are arguing about a different match.
   const timeOfDayInput = element<HTMLSelectElement>('#lobby-time-of-day');
-  timeOfDayInput.value = (snapshot?.config.timeOfDay ?? privateMatchConfig.timeOfDay) ?? DEFAULT_LIGHTING_TIME_CHOICE;
+  timeOfDayInput.value = config?.timeOfDay ?? '';
   // Gun Range is indoors and Map 3 is preview-pinned: both resolve to the
   // authored hour whatever is chosen, so the control is disabled rather than
   // offering a choice that provably does nothing.
   timeOfDayInput.disabled = !hostControls || arenaDaylightProfile(arenaSelection(
-    (snapshot?.config.arenaId ?? privateMatchConfig.arenaId),
+    config?.arenaId ?? selectedArena.id,
   ).id).pinned;
   const localMember = members.find((member) => member.id === player.id);
   // HF-328: squad identity is prescribed, so the free name input and colour picker
   // no longer exist in the lobby markup. Project the canonical identity into the
   // read-only label instead.
   const squadLabel = element<HTMLElement>('#lobby-squad-label');
-  const localSquad = sanitizeSquadPresentation(
-    localMember?.squadName ?? localSquadName,
-    localMember?.squadColor ?? localSquadColor,
-    localMember?.team ?? player.team,
-  );
-  squadLabel.textContent = localSquad.name;
-  squadLabel.style.setProperty('--lobby-squad-color', localSquad.color);
+  const localSquad = localMember
+    ? sanitizeSquadPresentation(localMember.squadName, localMember.squadColor, localMember.team)
+    : null;
+  squadLabel.textContent = localSquad?.name ?? 'AWAITING AUTHORITY';
+  squadLabel.style.setProperty('--lobby-squad-color', localSquad?.color ?? '#6b7478');
   // HF-328: with identity prescribed there is no input change event to replicate on,
   // so replicate when the assigned identity actually changes - and only then, so the
   // lobby refresh does not spam the event lane every tick.
-  const squadKey = `${localSquad.name}:${localSquad.color}`;
-  if (squadKey !== lastCommittedSquadKey) {
-    lastCommittedSquadKey = squadKey;
+  const squadKey = localSquad ? `${localSquad.name}:${localSquad.color}` : null;
+  if (localSquad && squadKey !== lastCommittedSquadKey) {
+    lastCommittedSquadKey = squadKey!;
     localSquadName = localSquad.name;
     localSquadColor = localSquad.color;
     commitLocalSquadPresentation();
@@ -11043,20 +11079,20 @@ function renderPrivateLobby(): void {
   // HF-328: a prescribed identity has nothing to disable; dim it when disconnected
   // so the lobby still reads the member's connection state.
   squadLabel.dataset.connected = localMember?.connected ? 'true' : 'false';
-  const lobbyArenaSynchronized = !snapshot
-    || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
+  const lobbyArenaSynchronized = snapshot !== null
+    && arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   trackLobbyArenaSyncDeadline(lobbyArenaSynchronized, snapshot?.config.arenaId ?? null);
   // HF-504: an authoritative roster that does not contain this player cannot
   // leave READY ✓ on screen. Falling back to the stale local value kept a guest
   // the host had dropped (grace expired, rejoin denied, room closed) rendering
   // a ready state the host no longer holds, and the owner then reads the lobby
   // as "guest and host disagree". With no snapshot there is no authority to
-  // read, so the local value legitimately stands.
-  localLobbyReady = snapshot ? localMember?.ready ?? false : localLobbyReady;
+  // read, so no snapshot means no ready state.
+  localLobbyReady = localMember?.ready ?? false;
   const ready = element<HTMLButtonElement>('#lobby-ready');
   ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
   ready.classList.toggle('primary', localLobbyReady);
-  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
+  ready.disabled = !localMember?.connected || snapshot?.phase !== 'waiting' || !lobbyArenaSynchronized;
   const start = element<HTMLButtonElement>('#lobby-start');
   start.hidden = network.role !== 'host';
   // HF-323: disable START control while a guest admission is in flight or connection is pending
@@ -11068,7 +11104,7 @@ function renderPrivateLobby(): void {
     ? 'Close this room and create a fresh code; the old room cannot be reclaimed.'
     : 'Only the host can invalidate the room and create a fresh code.';
   const teamInput = element<HTMLSelectElement>('#team');
-  teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
+  teamInput.disabled = snapshot?.phase !== 'waiting' || config?.mode === 'ffa';
   // HF-328: the SWAP SIDES affordance must mirror the host's exact legality
   // check (team-prescription.teamSwapRefusal) so a player only sees a live
   // button when the request would be accepted. Before this wiring the button
@@ -11077,7 +11113,7 @@ function renderPrivateLobby(): void {
   const localConnected = localMember?.connected ?? false;
   const requestedSwapTeam: Team = (localMember?.team ?? player.team) === 0 ? 1 : 0;
   const swapRefusal = localConnected
-    ? teamSwapRefusal(members, player.id, requestedSwapTeam, snapshot?.phase ?? 'waiting', snapshot?.config.mode ?? privateMatchConfig.mode)
+    ? teamSwapRefusal(members, player.id, requestedSwapTeam, snapshot?.phase ?? 'waiting', config?.mode ?? 'ffa')
     : 'not-connected';
   swapSides.disabled = !localConnected || swapRefusal !== null;
   swapSides.title = swapRefusal === null
@@ -11087,10 +11123,10 @@ function renderPrivateLobby(): void {
   const renderedMembers = members.map((member) => {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
     const quality = latencyQuality(ping);
-    const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
-    const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
+    const role = member.id === snapshot?.hostId ? 'HOST' : 'PEER';
+    const team = config?.mode === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
     const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
-    const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
+    const handicapControl = member.id === player.id && snapshot?.phase === 'waiting'
       ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
       : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
     return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
@@ -11100,8 +11136,10 @@ function renderPrivateLobby(): void {
     ? '<div class="lobby-player disconnected"><span><strong>PLAYER JOINING...</strong></span></div>'
     : '';
   roster.innerHTML = (renderedMembers + pendingRow) || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
-  const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
+  const isFfa = config?.mode === 'ffa';
+  element<HTMLElement>('#lobby-guidance').textContent = snapshot === null
+    ? 'Waiting for the host to admit this connection…'
+    : !lobbyArenaSynchronized
     ? lobbyArenaSyncFailed
       ? `Arena sync failed twice for ${arenaSelection(snapshot!.config.arenaId).displayName}. LEAVE the lobby and rejoin - the room stays open.`
       : `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
@@ -12437,6 +12475,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     feedbackReordered: 0,
     lastFeedbackAt: Number.NEGATIVE_INFINITY,
     awaitingReplacementState: false,
+    authoritativeReady: network.role !== 'client',
   };
 }
 
@@ -13765,6 +13804,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.awaitingReplacementState = false;
+      if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;
       remote.root.visible = admittedIncoming.hp > 0;
       if (network.role === 'host') {
         retainedRemoteAuthorities.set(admittedIncoming.id, Object.freeze({
@@ -27681,6 +27721,13 @@ function updateRemotes(dt: number, now: number): void {
       // channel with no authenticated messages.
       if (activeGuestIds?.has(id)) continue;
       removeRemote(id, 'timed out');
+      continue;
+    }
+    if (network.role === 'client' && !remote.authoritativeReady) {
+      // A host's join envelope identifies the actor but is not a pose
+      // admission. Keeping its seed off-scene avoids a visible spawn-default
+      // teleport while the first authoritative state is in flight.
+      remote.root.visible = false;
       continue;
     }
     const rendered = remote.interpolation.sample(hostNow, interpolationDelayState.delayMs);

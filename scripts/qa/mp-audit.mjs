@@ -261,6 +261,7 @@ const viewOf = (page) => page.evaluate(() => {
       deaths: null,
       position: (remote.authoritativePosition ?? remote.position ?? []).map(round),
       seq: remote.seq ?? null,
+      authoritativeReady: remote.authoritativeReady ?? true,
       snapshotAgeMs: round(remote.snapshotAgeMs),
       score: scoreOf(remote.id),
     };
@@ -496,7 +497,10 @@ async function runLobby(peers, arena, report, step) {
   }
   step('arena-synced', lobby.arenaSync);
 
-  // READY: guest A only. START must stay disabled while guest B is unready.
+  // READY: host and guest A only. START must stay disabled while guest B is
+  // unready, and the host's READY bit must be the same authority used by the
+  // commit path (L-3).
+  await host.page.click('#lobby-ready');
   await guestA.page.click('#lobby-ready');
   await sleep(ACK_BUDGET_MS);
   const partial = await host.page.evaluate(() => {
@@ -567,6 +571,10 @@ async function runStateDiff(peers, report, step) {
           report.stateDiff.divergences.push({ second, playerId, peer: role, field: 'presence', host: 'present', peerValue: 'absent' });
           continue;
         }
+        // A guest-side remote is not comparable until its first state-lane
+        // admission. The object may exist from the join envelope, but its
+        // seed pose is deliberately withheld from presentation.
+        if (guestPlayer.authoritativeReady === false) continue;
         for (const field of FIELDS) {
           // A guest's view of a REMOTE carries no kills/deaths (they are not in
           // the replicated snapshot), so only compare what the peer actually
