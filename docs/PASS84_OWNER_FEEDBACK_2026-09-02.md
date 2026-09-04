@@ -2016,3 +2016,11 @@ assets and textures and lighting need to be tip top, raid can come next"
   retries, so failed-attempt pipelines are counted; in-match creation 0.
   Codex/Luna perf lane 3 launched on the three remaining items (HF-493: no
   Opus/Fable until the reset).
+
+## HF-494 — owner 2026-09-04 19:00: "9% opus usage left — use it only to orchestrate Muse Spark 1.3 and the other harnesses/models on this PC; careful with the 1h30 to the Claude reset"
+
+- Applied: the orchestrator spends Claude tokens only on routing; all
+  building/reviewing runs on Codex/Luna (perf 3, roofs, vehicles, clustered,
+  review fixes, HITL 5b), Muse Spark (reviews, image audits), Gemini (reference
+  critic on HITL 5 captures), GLM (thin-metal TODOs). The HITL 5 Fable
+  integrator finishes its last four gate jobs and is not re-poked.
