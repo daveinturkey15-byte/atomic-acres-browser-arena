@@ -574,6 +574,7 @@ import {
   type CameraShakeSource,
   type CameraShakeState,
 } from './camera-shake';
+import { NukeEventPresentation, NUKE_EVENT_CAMERA_FAR_M } from './nuke-event';
 import {
   createKillConfirmPulseState,
   sampleKillConfirmPulse,
@@ -4205,8 +4206,7 @@ function lightingConditionTint(hex: number, tint: readonly [number, number, numb
 function conditionedFogBaseColorHex(): number {
   const authored = activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor;
   const writes = activeLightingConditions;
-  if (!writes || lightingConditionsAreIdentity(writes)) return authored;
-  return lightingConditionTint(authored, writes.fogTint).getHex();
+  if (!writes || lightingConditionsAreIdentity(writes)) lightingConditionScratchColor.setHex(authored); else lightingConditionTint(authored, writes.fogTint); lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * nukeEvent.fogTintR); lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * nukeEvent.fogTintG); lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * nukeEvent.fogTintB); return lightingConditionScratchColor.getHex();
 }
 
 function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
@@ -4285,7 +4285,7 @@ function applyLightingConditionUniforms(force = false): void {
   // and compared first. In `fixed`/`random` steady state this function costs four
   // comparisons and returns.
   const skyStep = Math.round(lightingConditionsSkyDarken * 256);
-  const clockStep = choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0;
+  const clockStep = (choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0) + nukeEvent.lightingStep;
   if (!force
     && choice === lightingConditionsGateChoice
     && skyStep === lightingConditionsGateSkyStep
@@ -4335,7 +4335,7 @@ function applyLightingConditionUniforms(force = false): void {
   // would silently discard it the next time weather nudged the gate open, so the
   // hour's lift composes ON TOP of whichever exposure actually owns the frame.
   const ownedExposure = activeArenaReviewExposure ?? baseline.exposure;
-  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale));
+  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale * nukeEvent.exposureScale));
 }
 
 /** Telemetry for the QA probes and the debug panel. Read-only. */
@@ -6540,7 +6540,7 @@ let lastTaserJitterAtHostTimeMs = Number.NEGATIVE_INFINITY;
 // replacing it. Both feed the same camera; trauma supplies the weight and
 // falloff an explosion should have, the spring keeps the existing per-impulse
 // feel that other systems already tune against.
-let cameraShakeTrauma = createCameraShakeTrauma(0, 0x5eed);
+let cameraShakeTrauma = createCameraShakeTrauma(0, 0x5eed); const nukeEvent = new NukeEventPresentation(scene, { backend: renderRuntime.backend, sunDirection: activeLighting.sunPosition, onDetonation: (_triggerAtHostTimeMs, seed) => { cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, { source: 'nuke', now: performance.now(), seed, strength: 1 }); } });
 let killConfirmPulseState: KillConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
 // HF-370: HUD impact response — the #hud element itself kicks, rolls and
 // flashes on damage and blasts. Fed at the damage-taken and grenade-explosion
@@ -17645,7 +17645,7 @@ async function startGame(
     phaseStartedAt: performance.now(),
     endsAt: Number.POSITIVE_INFINITY,
     winner: null,
-  };
+  }; nukeEvent.resetForMatch();
   markMatchAdmission('bot-spawn');
   if (mode === 'solo') {
     await spawnBots();
@@ -27692,7 +27692,7 @@ function updateMatchState(now: number): void {
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
-    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' };
+    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' }; nukeEvent.triggerFromMatchEnd(selectedArena.id, { phase: privateLobbySnapshot?.phase ?? matchState.phase, snapshotHostTimeMs: privateLobbySnapshot?.snapshotHostTimeMs ?? matchState.endsAt });
     recordCompletedMatch();
     if (network.role !== 'client') {
       killstreakRuntime.endMatch();
@@ -29801,7 +29801,7 @@ function syncAtomicHouseStructuralPresentation(): void {
 
 function setArenaPresentationVisibility(): void {
   const atomicVisible = selectedArena.id === 'atomic-acres';
-  const rustworksVisible = selectedArena.id === 'rustworks-1v1';
+  const rustworksVisible = selectedArena.id === 'rustworks-1v1'; nukeEvent.setArenaActive(selectedArena.id === 'nuketown2');
   const atomicQualityPrimary = atomicVisible && atomicQualityHousePresentationActive();
   arena.root.visible = arena.id === 'atomic-acres'
     ? !atomicQualityPrimary
@@ -29814,7 +29814,7 @@ function setArenaPresentationVisibility(): void {
   if (neighbourhoodLifeRoot) neighbourhoodLifeRoot.visible = atomicVisible;
   // Shared surrounding oceans need a long view frustum so water, not void,
   // meets the horizon. The authoring registry is the single ownership gate.
-  const desiredFarPlane = sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
+  const desiredFarPlane = selectedArena.id === 'nuketown2' ? NUKE_EVENT_CAMERA_FAR_M : sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
   if (camera.far !== desiredFarPlane) {
     camera.far = desiredFarPlane;
     camera.updateProjectionMatrix();
@@ -29844,7 +29844,7 @@ function applyArenaLightingForSelection(): void {
     liveGraphicsProfile,
     selectedArena.id,
   );
-  const lighting = activeLighting;
+  const lighting = activeLighting; nukeEvent.setSunDirection(lighting.sunPosition[0], lighting.sunPosition[1], lighting.sunPosition[2]);
   const definition = activeArenaVisualDefinition?.id === selectedArena.id ? activeArenaVisualDefinition : null;
   renderRuntime.setExposure(effectiveGraphicsExposure(definition?.colorPipeline.exposure ?? lighting.exposure));
   renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: shadowMapTypeForFilter(graphicsRuntime.shadowFilter) });
@@ -31537,7 +31537,7 @@ function frame(now: number, scheduleNext = true): void {
       synchronizeGunRangeTestBayDoorWorld(doorState, true);
       flushGunRangeTestBayDoorBroadcast();
     }
-    atmosphereSystem?.update(visualNow / 1_000);
+    atmosphereSystem?.update(visualNow / 1_000); nukeEvent.update(debugCaptureFixedVisualTimeMs ?? currentHostTimeMs());
     // HF-371: weather is a pure function of (arena, match seed, elapsed), so
     // every peer derives the same sky without a byte of network traffic.
     const weatherElapsedSeconds = gameStarted && matchState.phase === 'active'
@@ -32611,7 +32611,7 @@ const debugWindow = window as Window & {
     sampleWeather: () => Record<string, unknown>;
     // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
     sampleLightingConditions: () => Record<string, unknown>;
-    setLightingTimeChoice: (choice: string) => Record<string, unknown>;
+    setLightingTimeChoice: (choice: string) => Record<string, unknown>; triggerNukeEvent: (matchEndHostTimeMs?: number) => Record<string, unknown>;
     /** LIGHTING: move weather live, unforced, to falsify the uniform-write gate. */
     setWeatherOverride: (state: string | null) => Record<string, unknown>;
     /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
@@ -33864,7 +33864,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     lightingTimeChoiceOverride = choice;
     applyLightingConditionUniforms(true);
     return { accepted: true, ...lightingConditionsTelemetry() };
-  },
+  }, triggerNukeEvent: (matchEndHostTimeMs = currentHostTimeMs()) => ({ accepted: nukeEvent.debugTrigger(matchEndHostTimeMs), ...nukeEvent.telemetry() }),
   // LIGHTING: move the weather with NO forced apply, so the next ordinary frame
   // decides for itself whether a uniform write is owed. This is the falsifier
   // for the gate defect: before the writes-gate fix, a weather change at a fixed
@@ -37199,7 +37199,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ])],
       ['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)],
       ['nuke-overdrive-bolts', () => Promise.all([
-        prewarmNukePresentation(),
+        prewarmNukePresentation(), nukeEvent.prewarm(renderRuntime, camera, scene),
         prewarmOverdrivePresentation(),
         prewarmExplosiveBoltPresentation(sceneGeneration),
         timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),
@@ -37304,7 +37304,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     ]);
     setBootstrapStage('prewarming-nuke');
     profileArenaTransition('prewarm-nuke');
-    await prewarmNukePresentation();
+    await prewarmNukePresentation(); await nukeEvent.prewarm(renderRuntime, camera, scene);
     setBootstrapStage('prewarming-overdrive');
     profileArenaTransition('prewarm-overdrive');
     await prewarmOverdrivePresentation();
