@@ -49,8 +49,9 @@ The clustered node's work is bounded by the configured grid and list size:
   Nuke Town budget ceiling of 54. Material families remain the existing scene
   vocabulary and do not gain one graph literal per light.
 
-At 2560x1440 this is 80 x 45 x 24 = 86,400 cluster work items and a worst-case
-4,147,200 candidate light checks before depth/list rejection. That is a shader
+At 2560x1440 this is 80 x 45 x 24 = 86,400 cluster work items and 86,400 x 48
+cluster-build candidate slots before depth/list rejection; the per-fragment loop
+is bounded at 24 point-light evaluations. That is a shader
 operation estimate, not an FPS or millisecond claim. No GPU measurement was
 performed because the owner's GPU is reserved for ComfyUI.
 

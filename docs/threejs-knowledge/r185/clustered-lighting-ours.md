@@ -27,7 +27,8 @@ updates existing light intensities with `duskLocalLightFade()`.
 The node's bounded shader shape is the reason the cost is fixed: screen tiles
 and Z slices have a fixed dispatch, and a fragment evaluates no more than the
 per-tile list capacity. At 2560x1440 the grid is 80 x 45 x 24 = 86,400 cluster
-items; the worst-case fragment loop is 24 point-light evaluations. This is a
+items; cluster-build candidate slots are bounded at 86,400 x 48 and the worst-case
+fragment loop is 24 point-light evaluations. This is a
 source-level estimate, not a measured GPU result.
 
 Claim state: **VERIFIED** source/API selection, data derivation, limits,
