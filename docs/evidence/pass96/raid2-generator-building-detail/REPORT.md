@@ -134,3 +134,8 @@ No finding was closed by deleting an assertion or hiding geometry: the stale
 falsifier caught the union-box regression mid-lane and now audits per
 instance, and every census change is opt-in strengthening (more boxes
 checked, none removed).
+
+## Luna review TODOs
+
+- TODO: obtain native-WebGPU captures in both supported profiles and review the stretched unit-box UV treatment on long instanced string courses before merge; this re-review was intentionally no-browser/no-GPU.
+- TODO: record a quiet-machine frame-time/draw receipt for the 54 glass draws plus five instanced trim draws; the current cost statement is source-derived.
