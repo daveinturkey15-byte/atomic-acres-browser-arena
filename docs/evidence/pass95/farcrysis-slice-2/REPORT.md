@@ -80,3 +80,16 @@ npx vitest run src/farcrysis-material-vocabulary.test.ts src/farcrysis-webgpu-pi
 npx tsx scripts/qa/find-coplanar-pairs.ts
 git status -sb
 ```
+
+## Luna review TODOs
+
+- TODO: resolve the standing material rule before shipment. The new boulder
+  tint is carried by cloned geometry vertex-color attributes, not explicit
+  uniforms; either use the repository-approved uniform route or obtain a
+  written exception tied to this exact consolidation.
+- TODO: rerun the complete named gate set from a stable, uncontended worktree;
+  this review's typecheck and expanded Vitest runs exceeded their bounded
+  windows under machine contention. No product failure is inferred from the
+  timeouts.
+- TODO: capture exact-SHA WebGPU boulder parity/frame evidence when the
+  no-browser/no-GPU review restriction is lifted.
