@@ -69,9 +69,9 @@ walkable CLI → === raid2: 0 fall-through floor(s)
 
 ```
 layout metrics → eyeClusterCount: 34 (ratchet holds, zero headroom still zero spent)
-  wallM2Per100M2Accessible: 15.56 (band 10 ceiling 17.0)
-coplanar instrument (raid2) → boxes=350 · pairs≤0.03 m: 145 · FINDINGS: 19 · FENCED: 0 · BENIGN: 126
-  (all 19 pre-existing base-arena flush tops, none slice-2; slice-2 dressing contributes 0 — §7)
+  wallM2Per100M2Accessible: 15.55 (band 10 ceiling 17.0)
+coplanar instrument (raid2) → boxes=350 · pairs≤0.03 m: 126 · FINDINGS: 0 · FENCED: 0 · BENIGN: 126
+  (second fix round §8 seated/stepped every meeting top; slice-2 dressing contributes 0)
 reachability → OK — every patrol point is reachable from the spawn table.
 ```
 
@@ -157,3 +157,36 @@ pair, with this instrument as the ratchet. Slice-2 dressing stays at 0.
 
 **Still OPEN (unchanged):** 5 m + 40 m cell judgesets and MP arena-sync
 re-measure before visual/HITL acceptance (§5 items 1, 3).
+
+## 8. Second fix round (2026-09-04) — Luna review 2 disposition
+
+**Claim-states.** `VERIFIED` = ran or read in this session, quoted below.
+`OPEN` = unknown, named as unknown. No test, threshold, gate or instrument
+was changed in this round (`git diff --stat` is `src/raid2-arena.ts` only).
+
+1. **Review 2 item 1 (prior gate blocker) — VERIFIED still green.** No action
+   needed: `npx --no-install tsc --noEmit --pretty false` → `TSC_EXIT=0`;
+   the exact six-file vitest invocation →
+   `Test Files 6 passed (6) / Tests 194 passed (194)`; general
+   `npx tsx scripts/qa/find-coplanar-pairs.ts` → exit 0,
+   `boxes=239 · pairs≤0.03m: 66 · FINDINGS: 0 · FENCED: 33 · BENIGN: 33`.
+2. **Review 2 item 2 (19-pair raid2 fence) — VERIFIED each pair, fixed
+   geometrically, fence now green.** Every FINDING row was read against
+   `src/raid2-arena.ts` and each class got a geometry fix, never a gate edit:
+   pavilion walls (4) and pool-bar walls (3) seat at `UPPER_SOFFIT` (3.16 m)
+   under their stone roof slabs; wing colonnade piers (3) seat at
+   `UPPER_SOFFIT` under the stucco floor slabs; pergola piers (2) abut the
+   house north face exactly (`z1 -19.9 → -20`, was a 0.1 m interpenetration);
+   the drive fountain plinth carries a +0.05 m cap (1.95 m, still hard cover)
+   proud of the four planter tops it deliberately overlaps (one mass kept for
+   band 8); garage bay pier 7 carries a +0.05 m cap (3.45 m) proud of the
+   carport block it overlaps. Result:
+   `boxes=350 · pairs≤0.03m: 126 · FINDINGS: 0 · FENCED: 0 · BENIGN: 126`,
+   exit 0. Regression check: `eyeClusterCount` 34 (ratchet holds),
+   `wallM2Per100M2Accessible` 15.55 (ceiling 17.0), reachability
+   `OK — every patrol point is reachable`, dead-band test passes (no solid
+   top moved into 0.9–1.8 m). The §7 TODO is therefore closed, not deferred.
+3. **Review 2 item 3 (visual judgesets + MP arena-sync re-measure) — still
+   OPEN, not fixable in this box.** No browser/GPU in this session per task
+   constraints (same boundary Luna cites); how the cells LOOK and the MP
+   re-measure stay with the visual/HITL lane (§5 items 1, 3). Nothing claimed.
