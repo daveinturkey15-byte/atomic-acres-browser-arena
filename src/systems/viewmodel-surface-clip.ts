@@ -393,3 +393,11 @@ export function viewmodelMuzzleInsideSurfaceClip(
       + plane.constant < 0
   ));
 }
+
+export function viewmodelMuzzleFireBlockReason(
+  muzzle: Point3 | null,
+  planes: readonly Pick<ViewmodelSurfacePlane, 'normal' | 'constant'>[],
+): 'viewmodel-muzzle-unavailable' | 'viewmodel-muzzle-clip' | null {
+  if (muzzle === null) return 'viewmodel-muzzle-unavailable';
+  return viewmodelMuzzleInsideSurfaceClip(muzzle, planes) ? 'viewmodel-muzzle-clip' : null;
+}
