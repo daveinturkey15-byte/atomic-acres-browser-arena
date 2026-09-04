@@ -106,11 +106,11 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'test2-garden-occlusion',
     'test2-into-sun-terrace',
   ]),
-  // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild's seven
-  // authored cameras, landed in the SAME commit as the arena module, because
-  // the note at the top of this file records what happens otherwise - Test1 and
-  // Test2 had authored review cameras for a day and a half that no stage of
-  // this instrument had ever seen.
+  // NUKETOWN2 (owner 2026-09-02, HF-407): the Nuke Town Rebuild's authored
+  // cameras, landed in the SAME commit as the arena module, because the note
+  // at the top of this file records what happens otherwise - Test1 and Test2
+  // had authored review cameras for a day and a half that no stage of this
+  // instrument had ever seen.
   nuketown2: Object.freeze([
     'nuketown2-overhead',
     'nuketown2-north-yard',
@@ -134,6 +134,18 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'nuketown2-vehicle-far',
     'nuketown2-coach-elevation',
     'nuketown2-truck-cab-near',
+    // PASS 94 TECHNIQUES close-range evidence for props and grime. These are
+    // kept in the same roster so the normal capture/diff instrument cannot
+    // silently skip the new visual claims.
+    'nuketown2-appliance-bank-north-close',
+    'nuketown2-appliance-bank-south-close',
+    'nuketown2-glasshouse-north-close',
+    'nuketown2-garden-pod-north-close',
+    'nuketown2-sand-pit-north-close',
+    'nuketown2-driveway-apron-close',
+    'nuketown2-border-path-close',
+    'nuketown2-perimeter-wall-long-close',
+    'nuketown2-perimeter-wall-end-close',
   ]),
   // RAID2 (Lane AQ, HF-408): the Raid layout rethink. Ten cameras rather than
   // the usual four because this arena's whole claim is about ten specific

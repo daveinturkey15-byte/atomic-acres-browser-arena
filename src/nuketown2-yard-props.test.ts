@@ -13,7 +13,7 @@
  */
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildNuketown2 } from './nuketown2-arena';
+import { NUKETOWN2_GROUND_DRESSING, buildNuketown2 } from './nuketown2-arena';
 import { NUKETOWN2_SPAWN_LAYOUT } from './nuketown2-arena';
 import {
   NUKETOWN2_APPLIANCE_BANK,
@@ -48,6 +48,35 @@ describe('Nuke Town Rebuild yard props', () => {
     const split = table.filter((entry) => Array.isArray(entry.material));
     expect(split.map((entry) => entry.name)).toEqual(['lawn appliance bank hob deck']);
     materials.dispose();
+  });
+
+  it('keeps the appliance bank on the authored front-lawn zone, outside the road', () => {
+    const lawn = NUKETOWN2_GROUND_DRESSING.find((piece) => piece.id === 'street lawn west');
+    expect(lawn).toBeDefined();
+    const bank = NUKETOWN2_APPLIANCE_BANK;
+    expect(bank.x - bank.width / 2).toBeGreaterThanOrEqual(lawn!.x0);
+    expect(bank.x + bank.width / 2).toBeLessThanOrEqual(lawn!.x1);
+    expect(bank.z - bank.depth / 2).toBeGreaterThanOrEqual(lawn!.z0);
+    expect(bank.z + bank.depth / 2).toBeLessThanOrEqual(lawn!.z1);
+    // The lawn zone borders the turning head at z = -8; the bank's footprint
+    // ends exactly at that boundary and never enters the carriageway.
+    expect(bank.z + bank.depth / 2).toBe(-8);
+  });
+
+  it('binds the red hob to the authored north house side and blue to south', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const materialName = (name: string): string => {
+      const mesh = map.root.getObjectByName(name) as THREE.Mesh | undefined;
+      expect(mesh, name).toBeDefined();
+      return (mesh!.material as THREE.Material).name;
+    };
+    expect(materialName('nuketown2 north lawn appliance bank hob deck')).toBe('nuketown2-appliance-hob-red');
+    expect(materialName('nuketown2 south lawn appliance bank hob deck')).toBe('nuketown2-appliance-hob-blue');
+    // The pushed accuracy lane's HF-477 constants make north the orange house
+    // and south the cream/white house; the side binding above keeps the
+    // reference's red-on-orange / blue-on-white relationship when integrated.
+    expect(materialName('nuketown2 north house wall west')).toContain('north');
+    expect(materialName('nuketown2 south house wall west')).toContain('south');
   });
 
   it('makes only the silhouette tier solid, and that tier carries the collider', () => {
