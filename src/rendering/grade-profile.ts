@@ -89,6 +89,14 @@ export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
   // the difference between intersecting real geometry and marching a depth
   // buffer. Nothing here is hardware ray tracing — no browser exposes one.
   'raytraced-reflection-refraction-add',
+  // HF-481 — aerial perspective. It sits with the reflection adds and before
+  // the bloom, and for a related reason: haze is volume in FRONT of the
+  // surface, so the occlusion multiply must not darken it (air between the
+  // camera and a shadowed wall is lit whether or not the wall is), and a bright
+  // hazy far field really does bloom. It is the inscattering half of the
+  // transmittance equation and only that half — added, never mixed — so it can
+  // wash a distant silhouette's contrast but can never delete the silhouette.
+  'aerial-perspective-inscatter-add',
   'depth-guarded-bloom-add',
   'godrays-volumetric-shaft-add',
   'depth-of-field-bokeh',
@@ -101,6 +109,9 @@ export const OPTIONAL_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze([
   'ssgi-screen-space-bounce-add',
   'ssr-screen-space-reflection-add',
   'raytraced-reflection-refraction-add',
+  // Optional in exactly one way: the WebGL2 compatibility route runs no linear
+  // composite at all. No graphics tier and no arena can remove it.
+  'aerial-perspective-inscatter-add',
   'godrays-volumetric-shaft-add',
   'depth-of-field-bokeh',
 ]);

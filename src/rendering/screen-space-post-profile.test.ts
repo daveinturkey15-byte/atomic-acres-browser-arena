@@ -29,6 +29,7 @@ import {
 const HIGH_SELECTION = {
   bakedIndirect: 'off',
   volumetricLightShafts: 'high',
+  volumetricQuality: 'high',
   screenSpaceReflections: 'high',
   screenSpaceGi: 'high',
   depthOfField: true,

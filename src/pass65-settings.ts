@@ -493,6 +493,9 @@ export function resolveGraphicsRuntime(
       // texture fetches per pixel and differ only in bake time.
       bakedIndirect: settings.bakedIndirect,
       volumetricLightShafts: settings.volumetricLightShafts,
+      // HF-481. Aerial perspective rides the atmosphere setting that already
+      // exists rather than a new control; this is its only runtime wiring.
+      volumetricQuality: settings.volumetricQuality,
       screenSpaceReflections: settings.screenSpaceReflections,
       screenSpaceGi: settings.screenSpaceGi,
       depthOfField: settings.depthOfField,
