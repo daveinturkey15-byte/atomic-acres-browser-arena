@@ -12,15 +12,25 @@
  * authored footprints and colliders are never touched: every piece here is
  * presentation-first (`solid: false`), glazing alone is `shots: true` with the
  * glass ballistic rating (the same rating the shipped C3 office window and the
- * court hoop boards carry), and everything else is `shots: false` so the
- * existing `batchPresentationOnlyBoxes(builder.root, 'raid2-presentation')`
- * pass merges each presentation class toward one draw per class.
+ * court hoop boards carry), and everything else is `shots: false`.
  *
- * WHY NOT INSTANCEDMESH. The parity census (`collectMeshes`) measures
- * `Box3.setFromObject`, which does not expand instance matrices, so an
- * instanced field would audit as a 1 m box at the origin and flag as a
- * walk-through prop. Individual `box()` meshes audit exactly, batch exactly,
- * and raycast exactly — the boring option that every existing gate understands.
+ * INSTANCED PER CLASS (brief: one draw per class). The five presentation
+ * classes (mullion, sill ledge, string course, downpipe, AC unit) are each
+ * emitted as a single `THREE.InstancedMesh` over a unit box — five draws
+ * total for all presentation trim, whatever the instance count. Glazing stays
+ * one `box()` mesh per pane because a merged or instanced pane field cannot
+ * carry per-pane `ballisticSurfaceId` shot surfaces (shipped C3/hoop
+ * precedent). Instance transforms are axis-aligned position+scale (sizes
+ * encode orientation), composed deterministically in face order.
+ *
+ * WHY THE CENSUS STILL SEES EVERY INSTANCE. The parity audit
+ * (`collectMeshes`) recovers exact per-instance boxes for meshes flagged
+ * `userData.perInstanceAudit` (r185 `InstancedMesh.computeBoundingBox`
+ * expands every instance matrix, and `Box3.setFromObject` consumes it), so
+ * each trim instance audits exactly as an individual mesh would. Per-instance
+ * names, buildings, centres and sizes ride in `userData.facadeInstances` for
+ * the suite. The flag is opt-in: no other arena's instanced meshes change
+ * audit behaviour.
  *
  * PARITY SHAPE (measured against scripts/qa/collider-visual-parity-core.ts):
  * - Walk-through census needs height >= 0.9 AND min-footprint >= 0.35. Glazing
@@ -46,15 +56,22 @@
  * OFF SWITCH. Reuses the canonical `geometryDetail` control (applyMode
  * arena-reload, runtimeConsumer arena-stream): `reduced` maps to level
  * 'reduced', which emits nothing. See `raid2FacadeDetailLevelForGeometryDetail`.
- * The arena calls this module with the default ('full'); threading the live
- * setting through legacy-main's arena construction is left OPEN this lane to
- * respect the legacy-main size ratchet (the file sits exactly at its ceiling).
+ * `buildRaid2` threads the live setting through (arena-reload re-evaluates the
+ * module, so the boot-time value is current); the generator default stays
+ * 'full' for tests and tools.
+ *
+ * UV NOTE. Instanced trim shares one unit-box geometry, so the per-mesh
+ * `worldTiled` UV rescale cannot apply per instance; trim carries 0..1 box
+ * UVs, stretched on long string-course spans. The trim materials are forged
+ * near-flat tints, and glazing — the only large glass piece — keeps its tiled
+ * UVs via `box()`.
  *
  * COST. Generation runs once inside `buildRaid2` (arena stream, never combat):
- * ~350 `box()` calls worst case, all shared materials, no new pipeline, no
- * per-frame allocation afterwards — static meshes only. Steady-state GPU cost
- * is two extra merged batches plus the rated glazing panes (bounded by the
- * per-building ceilings below); all trim is `cast: false`.
+ * ~54 `box()` calls for glazing plus five `InstancedMesh` allocations; no new
+ * pipeline, no new material, no per-frame allocation afterwards — static
+ * meshes only. Steady-state GPU cost is five instanced draws plus the rated
+ * glazing panes (bounded by the per-building ceilings below); all trim is
+ * `cast: false`.
  */
 
 import * as THREE from 'three';
@@ -82,7 +99,7 @@ export function isRaid2FacadeDetailEnabled(level: Raid2FacadeDetailLevel): boole
 /** Name prefix for every mesh this generator authors. */
 export const RAID2_FACADE_DETAIL_PREFIX = 'raid2 facade detail' as const;
 
-/** Detail classes, one draw per presentation class after the shared batcher. */
+/** Detail classes: one InstancedMesh draw per presentation class; glazing stays per-pane. */
 export type Raid2FacadeDetailClass =
   | 'windowGlass'
   | 'mullion'
@@ -222,46 +239,116 @@ function rect(
   return worldTiled(box(builder, name, centre, size, material, options), size);
 }
 
-const presentation = { solid: false, shots: false, cast: false } as const;
 const glazing = { solid: false, shots: true, ballisticMaterial: 'glass', cast: false } as const;
+/**
+ * One trim placement: the per-instance record for an InstancedMesh class mesh.
+ * Names keep the exact pre-instancing scheme (`${prefix} ${building} ${face}
+ * … ${class-token}`) so audits and the suite see identical identities.
+ */
+ export type Raid2FacadePlacement = {
+   readonly name: string;
+   readonly building: string;
+   readonly centre: readonly [number, number, number];
+   readonly size: readonly [number, number, number];
+ };
 
-function emitWindow(
-  builder: Builder,
-  mats: Raid2FacadeMaterials,
-  face: FacadeFace,
-  centreAlong: number,
-  bayIndex: number,
-  counts: Raid2FacadeCounts,
-): void {
-  const tag = `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} bay${bayIndex}`;
-  const outwardOffset = (proud: number): number => face.plane + face.outward * proud;
-  if (face.axis === 'x') {
-    rect(builder, `${tag} pane`, [centreAlong, (GLASS_Y0 + GLASS_Y1) / 2, outwardOffset(0)],
-      [GLASS_W, GLASS_Y1 - GLASS_Y0, GLASS_T], mats.glass, { ...glazing });
-    for (const side of [-1, 0, 1]) {
-      rect(builder, `${tag} mullion ${side}`, [centreAlong + (side * GLASS_W) / 3, (MULLION_Y0 + MULLION_Y1) / 2, outwardOffset(0.02)],
-        [0.07, MULLION_Y1 - MULLION_Y0, 0.08], mats.stone, { ...presentation });
-    }
-    rect(builder, `${tag} transom`, [centreAlong, 1.635, outwardOffset(0.02)],
-      [GLASS_W, 0.07, 0.08], mats.stone, { ...presentation });
-    rect(builder, `${tag} sill`, [centreAlong, (LEDGE_Y0 + LEDGE_Y1) / 2, outwardOffset(0.06)],
-      [GLASS_W + 0.24, LEDGE_Y1 - LEDGE_Y0, 0.18], mats.stone, { ...presentation });
-  } else {
-    rect(builder, `${tag} pane`, [outwardOffset(0), (GLASS_Y0 + GLASS_Y1) / 2, centreAlong],
-      [GLASS_T, GLASS_Y1 - GLASS_Y0, GLASS_W], mats.glass, { ...glazing });
-    for (const side of [-1, 0, 1]) {
-      rect(builder, `${tag} mullion ${side}`, [outwardOffset(0.02), (MULLION_Y0 + MULLION_Y1) / 2, centreAlong + (side * GLASS_W) / 3],
-        [0.08, MULLION_Y1 - MULLION_Y0, 0.07], mats.stone, { ...presentation });
-    }
-    rect(builder, `${tag} transom`, [outwardOffset(0.02), 1.635, centreAlong],
-      [0.08, 0.07, GLASS_W], mats.stone, { ...presentation });
-    rect(builder, `${tag} sill`, [outwardOffset(0.06), (LEDGE_Y0 + LEDGE_Y1) / 2, centreAlong],
-      [0.18, LEDGE_Y1 - LEDGE_Y0, GLASS_W + 0.24], mats.stone, { ...presentation });
-  }
-  counts.windowGlass += 1;
-  counts.mullion += 4;
-  counts.sillLedge += 1;
-}
+ type PresentationClass = Exclude<Raid2FacadeDetailClass, 'windowGlass'>;
+
+ const PRESENTATION_CLASSES: readonly PresentationClass[] = Object.freeze([
+   'mullion',
+   'sillLedge',
+   'stringCourse',
+   'downpipe',
+   'acUnit',
+ ] as const);
+
+
+ /**
+  * Emit one InstancedMesh per presentation class over a unit box (one draw per
+  * class). Transforms are position+scale only — all placements are
+  * axis-aligned with orientation baked into the size. `perInstanceAudit` opts
+  * the mesh into per-instance census expansion; `facadeInstances` carries the
+  * per-instance identities for the suite. No `presentationBatchCandidate`: the
+  * shared merge batcher only takes individual meshes.
+  */
+ function emitInstancedClass(
+   builder: Builder,
+   cls: PresentationClass,
+   material: THREE.Material,
+   placements: readonly Raid2FacadePlacement[],
+ ): void {
+   if (placements.length === 0) return;
+   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, placements.length);
+   mesh.name = `${RAID2_FACADE_DETAIL_PREFIX} ${cls} instanced`;
+   const matrix = new THREE.Matrix4();
+   const position = new THREE.Vector3();
+   const quaternion = new THREE.Quaternion();
+   const scale = new THREE.Vector3();
+   placements.forEach((placement, index) => {
+     position.set(placement.centre[0], placement.centre[1], placement.centre[2]);
+     scale.set(placement.size[0], placement.size[1], placement.size[2]);
+     quaternion.identity();
+     matrix.compose(position, quaternion, scale);
+     mesh.setMatrixAt(index, matrix);
+   });
+   mesh.instanceMatrix.needsUpdate = true;
+   mesh.computeBoundingBox();
+   mesh.computeBoundingSphere();
+   mesh.castShadow = false;
+   mesh.receiveShadow = true;
+   mesh.userData.presentationOnly = true;
+   mesh.userData.perInstanceAudit = true;
+   mesh.userData.facadeClass = cls;
+   mesh.userData.facadeInstances = placements.map((placement) => ({ ...placement }));
+   builder.root.add(mesh);
+ }
+
+ function emitWindow(
+   builder: Builder,
+   mats: Raid2FacadeMaterials,
+   face: FacadeFace,
+   centreAlong: number,
+   bayIndex: number,
+   trim: Record<PresentationClass, Raid2FacadePlacement[]>,
+   counts: Raid2FacadeCounts,
+ ): void {
+   const tag = `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} bay${bayIndex}`;
+   const outwardOffset = (proud: number): number => face.plane + face.outward * proud;
+   const place = (
+     cls: PresentationClass,
+     token: string,
+     centre: [number, number, number],
+     size: [number, number, number],
+   ): void => {
+     trim[cls].push({ name: `${tag} ${token}`, building: face.building, centre, size });
+   };
+   if (face.axis === 'x') {
+     rect(builder, `${tag} pane`, [centreAlong, (GLASS_Y0 + GLASS_Y1) / 2, outwardOffset(0)],
+       [GLASS_W, GLASS_Y1 - GLASS_Y0, GLASS_T], mats.glass, { ...glazing });
+     for (const side of [-1, 0, 1]) {
+       place('mullion', `mullion ${side}`, [centreAlong + (side * GLASS_W) / 3, (MULLION_Y0 + MULLION_Y1) / 2, outwardOffset(0.02)],
+         [0.07, MULLION_Y1 - MULLION_Y0, 0.08]);
+     }
+     place('mullion', 'transom', [centreAlong, 1.635, outwardOffset(0.02)],
+       [GLASS_W, 0.07, 0.08]);
+     place('sillLedge', 'sill', [centreAlong, (LEDGE_Y0 + LEDGE_Y1) / 2, outwardOffset(0.06)],
+       [GLASS_W + 0.24, LEDGE_Y1 - LEDGE_Y0, 0.18]);
+   } else {
+     rect(builder, `${tag} pane`, [outwardOffset(0), (GLASS_Y0 + GLASS_Y1) / 2, centreAlong],
+       [GLASS_T, GLASS_Y1 - GLASS_Y0, GLASS_W], mats.glass, { ...glazing });
+     for (const side of [-1, 0, 1]) {
+       place('mullion', `mullion ${side}`, [outwardOffset(0.02), (MULLION_Y0 + MULLION_Y1) / 2, centreAlong + (side * GLASS_W) / 3],
+         [0.08, MULLION_Y1 - MULLION_Y0, 0.07]);
+     }
+     place('mullion', 'transom', [outwardOffset(0.02), 1.635, centreAlong],
+       [0.08, 0.07, GLASS_W]);
+     place('sillLedge', 'sill', [outwardOffset(0.06), (LEDGE_Y0 + LEDGE_Y1) / 2, centreAlong],
+       [0.18, LEDGE_Y1 - LEDGE_Y0, GLASS_W + 0.24]);
+   }
+   counts.windowGlass += 1;
+   counts.mullion += 4;
+   counts.sillLedge += 1;
+ }
 
 /**
  * Generate facade detail for every authored face. Presentation-only: the only
@@ -283,7 +370,10 @@ export function generateRaid2FacadeDetail(
     (perBuilding[building] ??= {
       windowGlass: 0, mullion: 0, sillLedge: 0, stringCourse: 0, downpipe: 0, acUnit: 0,
     });
-
+  /** Presentation trim placements per class; emitted as one InstancedMesh each. */
+  const trim: Record<PresentationClass, Raid2FacadePlacement[]> = {
+    mullion: [], sillLedge: [], stringCourse: [], downpipe: [], acUnit: [],
+  };
   for (const face of FACES) {
     const budget = budgetOf(face.building);
     const faceLen = face.to - face.from;
@@ -294,19 +384,19 @@ export function generateRaid2FacadeDetail(
       if (budget.stringCourse < RAID2_FACADE_CEILINGS.stringCourse) {
         const mid = (start + end) / 2;
         const sizeLen = len;
-        if (face.axis === 'x') {
-          rect(builder, `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} stringcourse ${start.toFixed(1)}`,
-            [mid, (STRING_Y0 + STRING_Y1) / 2, face.plane + face.outward * 0.0],
-            [sizeLen, STRING_Y1 - STRING_Y0, 0.14], mats.stucco, { ...presentation });
-        } else {
-          rect(builder, `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} stringcourse ${start.toFixed(1)}`,
-            [face.plane + face.outward * 0.0, (STRING_Y0 + STRING_Y1) / 2, mid],
-            [0.14, STRING_Y1 - STRING_Y0, sizeLen], mats.stucco, { ...presentation });
-        }
+        const centre: [number, number, number] = face.axis === 'x'
+          ? [mid, (STRING_Y0 + STRING_Y1) / 2, face.plane + face.outward * 0.0]
+          : [face.plane + face.outward * 0.0, (STRING_Y0 + STRING_Y1) / 2, mid];
+        const size: [number, number, number] = face.axis === 'x'
+          ? [sizeLen, STRING_Y1 - STRING_Y0, 0.14]
+          : [0.14, STRING_Y1 - STRING_Y0, sizeLen];
+        trim.stringCourse.push({
+          name: `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} stringcourse ${start.toFixed(1)}`,
+          building: face.building, centre, size,
+        });
         budget.stringCourse += 1;
         counts.stringCourse += 1;
       }
-      // Window bays on faces long enough to read as a grid.
       if (faceLen >= MIN_BAY_FACE_LEN && len >= 2.0) {
         const bays = Math.min(
           MAX_BAYS_PER_INTERVAL,
@@ -318,7 +408,7 @@ export function generateRaid2FacadeDetail(
           if (budget.sillLedge >= RAID2_FACADE_CEILINGS.sillLedge) break;
           const centre = start + (len * (bay + 0.5)) / bays;
           const before: Raid2FacadeCounts = { ...counts };
-          emitWindow(builder, mats, face, centre, bay, counts);
+          emitWindow(builder, mats, face, centre, bay, trim, counts);
           budget.windowGlass += counts.windowGlass - before.windowGlass;
           budget.mullion += counts.mullion - before.mullion;
           budget.sillLedge += counts.sillLedge - before.sillLedge;
@@ -328,15 +418,13 @@ export function generateRaid2FacadeDetail(
     // Downpipes at the face ends (thin, excluded from both censuses on size).
     if (faceLen >= MIN_BAY_FACE_LEN && budget.downpipe + 2 <= RAID2_FACADE_CEILINGS.downpipe) {
       for (const end of [face.from + 0.4, face.to - 0.4]) {
-        if (face.axis === 'x') {
-          rect(builder, `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} downpipe ${end.toFixed(1)}`,
-            [end, DOWNPIPE_TOP / 2, face.plane + face.outward * 0.09],
-            [0.12, DOWNPIPE_TOP, 0.12], mats.stone, { ...presentation });
-        } else {
-          rect(builder, `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} downpipe ${end.toFixed(1)}`,
-            [face.plane + face.outward * 0.09, DOWNPIPE_TOP / 2, end],
-            [0.12, DOWNPIPE_TOP, 0.12], mats.stone, { ...presentation });
-        }
+        const centre: [number, number, number] = face.axis === 'x'
+          ? [end, DOWNPIPE_TOP / 2, face.plane + face.outward * 0.09]
+          : [face.plane + face.outward * 0.09, DOWNPIPE_TOP / 2, end];
+        trim.downpipe.push({
+          name: `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} downpipe ${end.toFixed(1)}`,
+          building: face.building, centre, size: [0.12, DOWNPIPE_TOP, 0.12],
+        });
         budget.downpipe += 1;
         counts.downpipe += 1;
       }
@@ -355,11 +443,18 @@ export function generateRaid2FacadeDetail(
     if (solids.length === 0) continue;
     const [start, end] = solids[Math.floor(rng() * solids.length)]!;
     const centre = start + 1.0 + rng() * (end - start - 2.0);
-    rect(builder, `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} acunit`,
-      [centre, (AC_Y0 + AC_Y1) / 2, face.plane + face.outward * 0.24],
-      [0.7, AC_Y1 - AC_Y0, 0.45], mats.stone, { ...presentation });
+    trim.acUnit.push({
+      name: `${RAID2_FACADE_DETAIL_PREFIX} ${face.building} ${face.face} acunit`,
+      building: face.building,
+      centre: [centre, (AC_Y0 + AC_Y1) / 2, face.plane + face.outward * 0.24],
+      size: [0.7, AC_Y1 - AC_Y0, 0.45],
+    });
     budget.acUnit += 1;
     counts.acUnit += 1;
+  }
+  // One draw per presentation class: a single InstancedMesh over a unit box.
+  for (const cls of PRESENTATION_CLASSES) {
+    emitInstancedClass(builder, cls, cls === 'stringCourse' ? mats.stucco : mats.stone, trim[cls]);
   }
 
   return counts;

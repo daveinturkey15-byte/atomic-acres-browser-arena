@@ -29,12 +29,20 @@ non-authoritative trim grouped by material role, arena owns footprint/collider).
 - Materials are the arena's forged families (`raid2-art.ts` via
   `raid2Materials()`), never new: palette color stays the uniform tint
   (fidelity band 22 subject unchanged), per-instance variation does not exist.
-- Batching reuses the existing `batchPresentationOnlyBoxes` (one draw per
-  presentation class) instead of upstream's grouped geometry; glazing stays
-  individually `shots: true` / `ballisticMaterial: 'glass'` because a merged
-  field cannot carry per-pane shot surfaces (shipped C3/hoop precedent).
-- `InstancedMesh` deliberately NOT used: the parity census measures
-  `Box3.setFromObject`, which ignores instance matrices.
+- One `InstancedMesh` per presentation class over a unit box (position+scale
+  instances, orientation baked into size) instead of upstream's grouped
+  geometry — five draws for all trim. Glazing stays individually `shots: true`
+  / `ballisticMaterial: 'glass'` because an instanced pane field cannot carry
+  per-pane shot surfaces (shipped C3/hoop precedent).
+- `InstancedMesh` census handling (Luna review correction): r185
+  `Box3.expandByObject` DOES consume `InstancedMesh.boundingBox`, which
+  `computeBoundingBox()` expands over every instance matrix — the earlier
+  "ignores instance matrices" rationale was wrong. Opted-in meshes
+  (`userData.perInstanceAudit`) audit per instance in `collectMeshes`, the
+  facade suite, and the fidelity `meshBoxes` census; union boxes never audit
+  trim. Always `computeBoundingBox()` + `computeBoundingSphere()` after
+  `setMatrixAt`, and never set `presentationBatchCandidate` on an instanced
+  mesh (the merge batcher only takes individual meshes).
 - Parity/coplanar shaped by measurement, not hope: classes sized out of the
   walk-through census (thin/short) and the ballistic census (all but glass);
   tops kept > 0.03 m off every existing raid2 top and off each other where

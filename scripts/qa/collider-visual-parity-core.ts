@@ -282,15 +282,50 @@ export function collectMeshes(scene: THREE.Scene, nanOut?: string[]): MeshEntry[
       return;
     }
     if (!Number.isFinite(box.min.x) || box.isEmpty()) return;
+    const name = object.name || `(unnamed ${object.type})`;
+    const path = objectPath(object);
+    const presentationOnly = object.userData.presentationOnly === true;
+    const vertices = object.geometry.attributes?.position?.count ?? 0;
+    const ballisticSurfaceId = typeof object.userData.ballisticSurfaceId === 'string' ? object.userData.ballisticSurfaceId : null;
+    const dynamicTarget = typeof object.userData.targetId === 'string' || typeof object.userData.hitZone === 'string';
+    // Opt-in per-instance expansion (raid2 facade trim): an InstancedMesh
+    // flagged `perInstanceAudit` audits each instance as its own exact box —
+    // the same box an individual mesh would have produced — instead of one
+    // estate-scale union box that no size rule can read. Unflagged instanced
+    // meshes keep the legacy union behaviour; no other arena changes audit.
+    if (object instanceof THREE.InstancedMesh && object.userData.perInstanceAudit === true) {
+      const geometry = object.geometry;
+      if (geometry.boundingBox === null) geometry.computeBoundingBox();
+      const base = geometry.boundingBox;
+      if (base !== null) {
+        const instance = new THREE.Matrix4();
+        for (let index = 0; index < object.count; index += 1) {
+          object.getMatrixAt(index, instance);
+          const instanceBox = base.clone().applyMatrix4(instance).applyMatrix4(object.matrixWorld);
+          if (!Number.isFinite(instanceBox.min.x + instanceBox.max.x)) continue;
+          meshes.push({
+            name: `${name}[${index}]`,
+            path,
+            box: instanceBox,
+            presentationOnly,
+            instanced: true,
+            vertices,
+            ballisticSurfaceId,
+            dynamicTarget,
+          });
+        }
+      }
+      return;
+    }
     meshes.push({
-      name: object.name || `(unnamed ${object.type})`,
-      path: objectPath(object),
+      name,
+      path,
       box,
-      presentationOnly: object.userData.presentationOnly === true,
+      presentationOnly,
       instanced: object instanceof THREE.InstancedMesh,
-      vertices: object.geometry.attributes?.position?.count ?? 0,
-      ballisticSurfaceId: typeof object.userData.ballisticSurfaceId === 'string' ? object.userData.ballisticSurfaceId : null,
-      dynamicTarget: typeof object.userData.targetId === 'string' || typeof object.userData.hitZone === 'string',
+      vertices,
+      ballisticSurfaceId,
+      dynamicTarget,
     });
   });
   return meshes;

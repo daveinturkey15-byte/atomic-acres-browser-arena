@@ -53,6 +53,23 @@ const meshBoxes: Array<{ name: string; box: THREE.Box3 }> = (() => {
   arena.root.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if (!(mesh as unknown as { isMesh?: boolean }).isMesh || !mesh.geometry) return;
+    // Opted-in InstancedMesh (raid2 facade trim) audits per instance: the
+    // union box of a class field spans the estate and would false-positive
+    // column probes, while per-instance boxes are exactly the pre-instancing authored boxes. No other instanced mesh changes shape here.
+    if ((mesh as unknown as { isInstancedMesh?: boolean }).isInstancedMesh === true
+      && mesh.userData.perInstanceAudit === true) {
+      const instanced = mesh as unknown as THREE.InstancedMesh;
+      const unit = new THREE.Box3(new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5));
+      const instance = new THREE.Matrix4();
+      for (let index = 0; index < instanced.count; index += 1) {
+        instanced.getMatrixAt(index, instance);
+        out.push({
+          name: `${mesh.name}[${index}]`,
+          box: unit.clone().applyMatrix4(instance).applyMatrix4(mesh.matrixWorld),
+        });
+      }
+      return;
+    }
     out.push({ name: mesh.name, box: new THREE.Box3().setFromObject(mesh) });
   });
   return out;
