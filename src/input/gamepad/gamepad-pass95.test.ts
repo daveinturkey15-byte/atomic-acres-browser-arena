@@ -249,8 +249,10 @@ describe('PASS 95 poll reuses buffers (no per-frame allocation)', () => {
       actionValue: number[];
       scratchSamples: unknown[];
       samplePool: unknown[];
+      pollEvent: unknown;
     };
     const { actionHeld, actionWas, actionValue, scratchSamples } = internal;
+    const pollEvent = internal.pollEvent;
     const sampleZero = internal.samplePool[0];
     for (let i = 0; i < 1000; i += 1) {
       const frame = tick();
@@ -265,6 +267,7 @@ describe('PASS 95 poll reuses buffers (no per-frame allocation)', () => {
       expect(frame.pressed).toBe(pressedFn);
       expect(frame.released).toBe(releasedFn);
       expect(frame.value).toBe(valueFn);
+      expect(internal.pollEvent).toBe(pollEvent);
     }
     expect(internal.actionHeld).toBe(actionHeld);
     expect(internal.actionWas).toBe(actionWas);

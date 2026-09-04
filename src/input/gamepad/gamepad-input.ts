@@ -126,6 +126,7 @@ const ACTIVITY_DEADZONE = 0.18;
 /** Shared empties so missing pad arrays never allocate a per-poll `[]`. */
 const EMPTY_AXES: readonly number[] = Object.freeze([]);
 const EMPTY_BUTTONS: readonly GamepadButtonLike[] = Object.freeze([]);
+const EMPTY_GAMEPADS: readonly (GamepadLike | null)[] = Object.freeze([]);
 /** Standard mapping: 17 buttons (0-16), 4 axes. Buffers cover index 31 (MAX_BUTTON_INDEX). */
 const MAX_PREALLOC_BUTTONS = 32;
 const MAX_PREALLOC_PADS = 8;
@@ -210,6 +211,8 @@ export class GamepadInputRuntime {
   private readonly now: () => number;
   private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null;
   private readonly getGamepads: () => readonly (GamepadLike | null)[];
+  /** Reused reducer event; a stable poll must not allocate an event object. */
+  private readonly pollEvent: { type: 'poll'; pads: HotplugPadSample[]; at: number };
   private readonly schemeListeners = new Set<(scheme: InputScheme, layout: PadLayout | null) => void>();
   private readonly padListeners = new Set<(connected: boolean, layout: PadLayout | null) => void>();
   private captureBaseline: boolean[] | null = null;
@@ -238,6 +241,7 @@ export class GamepadInputRuntime {
     for (let s = 0; s < MAX_PREALLOC_PADS; s += 1) {
       this.samplePool.push({ index: -1, id: '', connected: false, active: false });
     }
+    this.pollEvent = { type: 'poll', pads: this.scratchSamples, at: 0 };
     this.liveFrame = {
       connected: true,
       layout: null,
@@ -289,9 +293,9 @@ export class GamepadInputRuntime {
 
   private safeGamepads(): readonly (GamepadLike | null)[] {
     try {
-      return this.getGamepads() ?? [];
+      return this.getGamepads() ?? EMPTY_GAMEPADS;
     } catch {
-      return [];
+      return EMPTY_GAMEPADS;
     }
   }
 
@@ -346,7 +350,9 @@ export class GamepadInputRuntime {
 
   private reconcile(at: number): readonly (GamepadLike | null)[] {
     const pads = this.safeGamepads();
-    this.applyHotplug(reduceHotplug(this.hotplug, { type: 'poll', pads: this.samplePads(pads), at }), pads);
+    this.pollEvent.pads = this.samplePads(pads);
+    this.pollEvent.at = at;
+    this.applyHotplug(reduceHotplug(this.hotplug, this.pollEvent), pads);
     return pads;
   }
 

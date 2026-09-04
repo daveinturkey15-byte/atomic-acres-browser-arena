@@ -196,3 +196,11 @@ Intentional contract change (not a weakened gate): retaining a
 `GamepadFrame` reference across polls now observes latest values instead of
 a snapshot. No in-repo caller retains frames across polls; the new tests pin
 both the reuse and the copy-to-retain pattern.
+
+## Review 2 TODOs
+
+- TODO (owner evidence): run a real Bluetooth/mobile pad capture and headed
+  Options/menu review when the no-browser/no-GPU restriction is lifted.
+- TODO (environment): obtain a completed `npx tsc --noEmit` result from a
+  stable, uncontended worktree; this review's post-fix typecheck exceeded 180 s
+  without diagnostics. Focused Vitest gates are independently green.
