@@ -12,9 +12,11 @@ import { canonicalSha256 } from './canonical-state';
 import { isStateTrafficMessage } from './protocol';
 import {
   createAndAttachThinMetalPerforationRuntime,
+  disposeThinMetalPerforationRuntime,
   rollbackThinMetalPerforationRuntime,
 } from './thin-metal-perforation-runtime';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
+import { buildNuketown2 } from './nuketown2-arena';
 import {
   THIN_METAL_MAX_HOLES_PER_ARENA,
   THIN_METAL_MAX_HOLES_PER_PANEL,
@@ -333,5 +335,57 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
       expect(mesh.instanceMatrix.count).toBeLessThanOrEqual(THIN_METAL_MAX_HOLES_PER_ARENA);
     }
     authority.dispose();
+  });
+  it('dispose returns the nuketown2 presentation GPU inventory to baseline (F-06)', () => {
+    const scene = new THREE.Scene();
+    const arena = buildNuketown2(scene);
+    // Cold GPU inventory of the built arena. Geometry/material/texture counts
+    // are the unit-test proxy for compiled programs (one distinct material is
+    // one program family), snapshot() taken before and after the full
+    // create-and-dispose lifecycle the arena switch performs.
+    const snapshot = (): { meshes: number; geometries: number; materials: number; textures: number } => {
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>();
+      let meshes = 0;
+      scene.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        meshes += 1;
+        geometries.add(node.geometry);
+        const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
+        for (const material of nodeMaterials) {
+          materials.add(material);
+          if (material instanceof THREE.MeshStandardMaterial && material.map) textures.add(material.map);
+        }
+      });
+      return { meshes, geometries: geometries.size, materials: materials.size, textures: textures.size };
+    };
+    const baseline = snapshot();
+    const runtime = createAndAttachThinMetalPerforationRuntime(arena, 4, true, scene)!;
+    const created = snapshot();
+    // The cold presentation adds exactly the rim pair, the disc pair and the
+    // torn-edge stencil: two meshes, two geometries, two materials, one texture.
+    expect(created.meshes - baseline.meshes).toBe(2);
+    expect(created.geometries - baseline.geometries).toBe(2);
+    expect(created.materials - baseline.materials).toBe(2);
+    expect(created.textures - baseline.textures).toBe(1);
+    const resources = new Set<THREE.BufferGeometry | THREE.Material | THREE.Texture>();
+    runtime.authority.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      resources.add(node.geometry);
+      const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of nodeMaterials) {
+        resources.add(material);
+        if (material instanceof THREE.MeshStandardMaterial && material.map) resources.add(material.map);
+      }
+    });
+    expect(resources.size).toBe(5);
+    const disposals = [...resources].map((resource) => vi.spyOn(resource, 'dispose'));
+    // The exact arena-switch retirement lifecycle: remove the root, then
+    // dispose the authority - every created GPU resource released exactly once.
+    runtime.authority.root.removeFromParent();
+    disposeThinMetalPerforationRuntime(runtime);
+    expect(disposals.every((spy) => spy.mock.calls.length === 1)).toBe(true);
+    expect(snapshot()).toEqual(baseline);
   });
 });
