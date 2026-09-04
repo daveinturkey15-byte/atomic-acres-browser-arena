@@ -1,3 +1,8 @@
+// Captures full-page QA screenshots of the release menu and live solo gameplay, then prints the debug snapshot state.
+// Usage: node scripts/qa/capture-release.mjs
+// Env: QA_BASE_URL — base URL to QA (default: http://127.0.0.1:4180/)
+// Writes: test-results/release-menu-full.png, test-results/release-gameplay-full.png
+// Exit codes: 0 success; 1 set via process.exitCode when console/page errors are captured
 import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
