@@ -24,7 +24,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, linearSwatch, wallUv } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { clamp, float, fract, max, mix, smoothstep } =
@@ -79,7 +79,7 @@ export function createGlassMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uv = wallUv();
+  const uv = boxUv();
   const wear = buildWear(spec, uv);
 
   // Rain streaks run down the pane: narrow along the run, long down Y. The

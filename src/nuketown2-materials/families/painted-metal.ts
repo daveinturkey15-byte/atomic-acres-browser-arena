@@ -22,7 +22,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, linearSwatch, wallUv } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { abs, clamp, float, fract, max, mix, positionWorld, smoothstep } =
@@ -74,7 +74,9 @@ export function createPaintedMetalMaterial(
   }
 
   const p = positionWorld;
-  const uv = wallUv();
+  // This family dresses door leaves (vertical) and bins, mailboxes and
+  // signage (boxes), so the wear field is authored for both.
+  const uv = boxUv();
   const wear = buildWear(spec, uv);
 
   // --- Panel joints and stampings -----------------------------------------

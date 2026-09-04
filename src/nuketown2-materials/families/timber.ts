@@ -18,7 +18,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, linearSwatch, wallUv } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 
@@ -59,7 +59,10 @@ export function createTimberMaterial(
   mat.color.setHex(baseSrgb);
 
   const p = positionWorld;
-  const uv = wallUv();
+  // Deck boards lie flat and fence pickets stand up, so the wear field has
+  // to work on both orientations; the board structure below still reads its
+  // own explicit world axes.
+  const uv = boxUv();
   const wear = buildWear(spec, uv);
 
   const vertical = variant === 'fence';
