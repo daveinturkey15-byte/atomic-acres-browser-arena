@@ -435,6 +435,8 @@ const matchAdmissionProfile = (page) => page.evaluate(() => {
   return {
     arenaId: profile.arenaId, mode: profile.mode, durationMs: profile.durationMs,
     steps: (profile.steps ?? []).map((step) => [step.name, step.durationMs]),
+    ...(profile.achievedWaitMs !== undefined ? { achievedWaitMs: profile.achievedWaitMs } : {}),
+    ...(profile.exitReason !== undefined ? { exitReason: profile.exitReason } : {}),
   };
 });
 

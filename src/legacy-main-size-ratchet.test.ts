@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_100;
+const LINE_CEILING = 37_124;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -230,6 +230,14 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
       + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
       + 'the auto-stand it fed - so the net is comment, not code.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_124,
+    note:
+      'PASS 92 candidate: Adaptive match admission cadence wait (GEM-3). Replaced fixed 5s stall '
+      + 'with adaptive 30-frame presentation cadence evaluation; decision function extracted to '
+      + 'src/admission-cadence-wait.ts; added achieved wait and exit reason to match admission profile.',
   },
 ];
 

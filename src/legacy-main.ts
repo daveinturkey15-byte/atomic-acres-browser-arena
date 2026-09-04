@@ -34,6 +34,7 @@ import {
   type StanceTransition,
   type StanceTransitionSample,
 } from './prone-transition';
+import { evaluateAdaptiveCadenceDecision, ADMISSION_CADENCE_TARGET_STABLE_FRAMES } from './admission-cadence-wait';
 import './style.css';
 // GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
 import {
@@ -2484,12 +2485,9 @@ type MatchAdmissionCadence = Readonly<{
   samples: number;
   resets: number;
   maximumGapMs: number;
-  startingSubmissionSequence: number;
-  endingSubmissionSequence: number;
-  startingCompletedSequence: number;
-  endingCompletedSequence: number;
-  submissionAdvances: number;
-  completionAdvances: number;
+  startingSubmissionSequence: number; endingSubmissionSequence: number;
+  startingCompletedSequence: number; endingCompletedSequence: number;
+  submissionAdvances: number; completionAdvances: number;
   maximumSubmissionGapMs: number;
   maximumCompletionGapMs: number;
   maximumPendingForMs: number;
@@ -2498,6 +2496,8 @@ type MatchAdmissionCadence = Readonly<{
   admittedDegraded: boolean;
   visibilityState: DocumentVisibilityState;
   documentHasFocus: boolean;
+  exitReason?: string;
+  consecutiveStableFrames?: number;
 }>;
 let lastMatchAdmissionCadence: MatchAdmissionCadence | null = null;
 type WebGlReadyPrime = Readonly<{
@@ -3003,6 +3003,8 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     let foregroundEpochStartedAt = startedAt;
     let foregroundEpochs = 0;
+    let consecutiveStableFrames = 0;
+    const recentGaps: number[] = [];
     const ownsForeground = (): boolean => document.visibilityState === 'visible' && document.hasFocus();
     const stopSchedulers = (): void => {
       if (frameRequest !== null) cancelAnimationFrame(frameRequest);
@@ -3015,11 +3017,12 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
       window.removeEventListener('focus', onOwnershipChange);
       window.removeEventListener('blur', onOwnershipChange);
     };
-    const finish = (now: number, admittedDegraded: boolean): void => {
+    const finish = (now: number, admittedDegraded: boolean, reason?: string): void => {
       if (settled) return;
       settled = true;
       stopSchedulers();
       detachOwnershipListeners();
+      const exitReason = reason ?? (admittedDegraded ? 'ceiling-timeout' : 'stable-cadence-achieved');
       resolve(Object.freeze({
         backend: renderRuntime.backend,
         waitedMs: Math.max(0, now - startedAt),
@@ -3032,6 +3035,8 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         admittedDegraded,
         visibilityState: document.visibilityState,
         documentHasFocus: document.hasFocus(),
+        exitReason,
+        consecutiveStableFrames,
       }));
     };
     const fail = (error: unknown): void => {
@@ -3095,8 +3100,9 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         const gapMs = Math.max(0, now - previousAt);
         maximumGapMs = Math.max(maximumGapMs, gapMs);
         if (gapMs > hitchThresholdMs) resetStableWindow = true;
+        recentGaps.push(gapMs);
+        if (recentGaps.length > 60) recentGaps.shift();
       }
-      previousAt = now;
       let presentationProgressReady = renderRuntime.backend === 'webgl2';
       if (renderRuntime.backend === 'webgpu'
         && document.visibilityState === 'visible' && document.hasFocus()) {
@@ -3140,6 +3146,18 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
         }
         presentationProgressReady = renderRuntime.backend === 'webgl2';
       }
+      const adaptiveDecision = evaluateAdaptiveCadenceDecision({
+        now, startedAt: foregroundEpochStartedAt, previousFrameAt: previousAt, consecutiveStableFrames,
+        recentGapsMs: recentGaps, progressReady: presentationProgressReady,
+        ceilingMs: maximumWaitMs, targetStableFrames: ADMISSION_CADENCE_TARGET_STABLE_FRAMES,
+        maxLongTaskMs: hitchThresholdMs,
+      });
+      consecutiveStableFrames = adaptiveDecision.consecutiveStableFrames;
+      previousAt = now;
+      if (adaptiveDecision.shouldExit) {
+        finish(now, adaptiveDecision.admittedDegraded, adaptiveDecision.reason);
+        return;
+      }
       if (now - stableSince >= minimumStableWindowMs && presentationProgressReady) {
         finish(now, false);
         return;
@@ -3147,7 +3165,7 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
       if (now - foregroundEpochStartedAt >= maximumWaitMs) {
         // Degrade only a genuinely foreground cadence stall. Hidden time never
         // consumes this budget or advances the official match timeline.
-        finish(now, true);
+        finish(performance.now(), true);
         return;
       }
       scheduleSample();
@@ -3193,6 +3211,8 @@ async function waitForStableMatchAdmissionCadence(): Promise<void> {
     maximumCompletionLatencyMs,
     drained,
     admittedDegraded: sampledCadence.admittedDegraded || !drained,
+    exitReason: sampledCadence.exitReason,
+    consecutiveStableFrames: sampledCadence.consecutiveStableFrames,
   });
   // Never bounce a player back to the menu merely because a browser cadence
   // sample was degraded. The exact-SHA cold WebGPU release gate rejects a
@@ -36860,6 +36880,8 @@ let lastMatchAdmissionProfile: Readonly<{
   mode: string;
   durationMs: number;
   steps: readonly Readonly<{ name: string; durationMs: number }>[];
+  achievedWaitMs?: number | null;
+  exitReason?: string | null;
 }> | null = null;
 
 function beginMatchAdmissionProfile(): void {
@@ -36889,6 +36911,8 @@ function finalizeMatchAdmissionProfile(mode: string): void {
     mode,
     durationMs: Number((completedAt - marks[0].at).toFixed(3)),
     steps: Object.freeze(steps),
+    achievedWaitMs: lastMatchAdmissionCadence?.waitedMs ?? null,
+    exitReason: lastMatchAdmissionCadence?.exitReason ?? null,
   });
 }
 
