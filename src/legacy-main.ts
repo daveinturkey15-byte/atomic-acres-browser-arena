@@ -587,6 +587,7 @@ import {
 } from './kill-confirm-pulse';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
+import { VolumeFirePresentationPool } from './volume-fire-presentation';
 import { GrassSystem } from './grass-system';
 import {
   advanceRangeScore,
@@ -4979,6 +4980,11 @@ applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(graphicsEffectsBudg
 const tracerPool = new TracerPool(scene);
 const grenadeExplosionPresentation = new GrenadeExplosionPresentation(scene);
 const supportExplosionPresentation = new SupportExplosionPresentation(scene, reducedRenderMode);
+// HF-490: bounded volumetric fire (authored barrel boxes + one nuke-fireball slot). Scene-global like the
+// explosion pools, so the exact ScenePass precompile covers its one pipeline; tiers arrive via graphicsRuntime.
+const volumeFirePresentation = new VolumeFirePresentationPool(scene);
+volumeFirePresentation.applyVolumeFireTier(graphicsRuntime.volumeFire);
+volumeFirePresentation.syncArena(selectedArena.id);
 const deathDropPresentationPool = new DeathDropPresentationPool(
   scene,
   MAX_DEATH_DROPS,
@@ -25692,6 +25698,8 @@ function detonateNuke(sequence: NukeSequence): void {
   const afterAudio = performance.now();
   sequence.shockwave.visible = true;
   sequence.shockwave.scale.setScalar(0.1);
+  // HF-490: bounded volumetric fireball on the reserved slot; the NukeSequence clock owns its lifetime.
+  volumeFirePresentation.spawnNukeFireball([0, 1.5, 0], 7, 9, sequence.detonateAt, sequence.finishedAt);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.hidden = false;
   flash.style.opacity = '1';
@@ -25776,6 +25784,7 @@ function updateNuke(now: number): void {
   flash.hidden = true;
   flash.style.opacity = '0';
   nukeSequence = null;
+  volumeFirePresentation.releaseNukeFireball();
 }
 
 const triPassMissileBodyGeometry = new THREE.CylinderGeometry(0.14, 0.18, 2.4, 10);
@@ -26712,6 +26721,7 @@ function updateRemoteSupportPresentations(now: number): void {
 function updateFieldSupport(dt: number, now: number): void {
   supportExplosionFrameSerial += 1;
   supportExplosionPresentation.update(now);
+  volumeFirePresentation.update(now);
   if (tacticalMapOpen && now - lastStrikeMapDrawAt >= 100) drawStrikeMap(now);
   if (yardhawk) {
     if (now >= yardhawk.expiresAt) {
@@ -26837,6 +26847,7 @@ function clearFieldSupport(): void {
   for (const effect of remoteSupportPresentations) for (const { root } of effect.roots) disposeSupportRoot(root);
   remoteSupportPresentations.length = 0;
   supportExplosionPresentation.clear();
+  volumeFirePresentation.clear();
   if (nukeSequence) nukeSequence = null;
   nukeShockwave.visible = false;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
@@ -28800,6 +28811,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
     maximumAnisotropy,
   );
   smokeVolumePresentationPool.setQualityScale(live.smokeScale);
+  volumeFirePresentation.applyVolumeFireTier(live.volumeFire);
   grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
   atmosphereSystem?.setProfile(desiredProfile);
   waterSystem.configure(selectedArena.id, desiredProfile);
@@ -29928,6 +29940,7 @@ async function performArenaSelection(
     // HF-371: the air is part of the arena. Swap it with the audio so nothing
     // from the retired map hangs in the new one.
     hfParticleRuntime.setArena(selectedArena.id);
+    volumeFirePresentation.syncArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     setBootstrapStage('waiting-for-authored-textures');
     profileArenaTransition('visual-definition');
@@ -30176,6 +30189,7 @@ async function performArenaSelection(
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     hfParticleRuntime.setArena(selectedArena.id);
+    volumeFirePresentation.syncArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     if (!hadPreparedArena) {
       arenaVisualReceipt = null;
@@ -37052,6 +37066,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ['explosions', () => Promise.all([
         grenadeExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
         supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration),
+        volumeFirePresentation.prewarm(renderRuntime, camera, sceneGeneration),
       ])],
       ['death-drops-glass', () => Promise.all([
         deathDropPresentationPool.prewarm(renderRuntime, camera, player.weapon),
@@ -37156,6 +37171,8 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     setBootstrapStage('prewarming-support-explosion');
     profileArenaTransition('prewarm-support-explosion');
     await supportExplosionPresentation.prewarm(renderRuntime, camera, sceneGeneration);
+    // HF-490: same explosion family, same stage — one shared fire pipeline joins the support prewarm.
+    await volumeFirePresentation.prewarm(renderRuntime, camera, sceneGeneration);
     setBootstrapStage('prewarming-death-drops');
     profileArenaTransition('prewarm-death-drops');
     await Promise.all([

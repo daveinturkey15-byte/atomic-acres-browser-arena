@@ -128,6 +128,8 @@ export type GraphicsRuntime = Readonly<{
    */
   screenSpace: ScreenSpacePostRuntime;
   volumetricScale: number;
+  /** Bounded volume-fire stage tier: 'off' hides authored barrel fire and the nuke fireball. */
+  volumeFire: AdvancedGraphicsValues['volumeFire'];
   maximumAnisotropy: GraphicsSettings['anisotropy'];
   particleScale: number;
   decalScale: number;
@@ -443,6 +445,7 @@ export function resolveGraphicsRuntime(
       // rather than merely turned down.
       screenSpace: SCREEN_SPACE_POST_DISABLED,
       volumetricScale: 0.4,
+      volumeFire: settings.volumeFire,
       maximumAnisotropy: 1,
       particleScale: 0.4,
       decalScale: 0.4,
@@ -509,6 +512,7 @@ export function resolveGraphicsRuntime(
       rayTracing: settings.rayTracing,
     }, { shadowsEnabled: settings.shadows === 'high' }),
     volumetricScale: qualityScale(settings.volumetricQuality),
+    volumeFire: settings.volumeFire,
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),
     decalScale: qualityScale(settings.decalQuality),

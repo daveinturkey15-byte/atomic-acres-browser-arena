@@ -329,6 +329,20 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
     budget: 'At most one half-or-lower resolution godray target plus one bilateral blur target; both dispose with the arena pipeline. Adaptive pressure drops the march resolution, step count and additive gain.',
     verifier: 'src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts',
   }),
+  // HF-490. Same rule as the PASS 89 note below: the `graphics.volumeFire`
+  // control a player can move gets a row here rather than relaxing the
+  // completeness check.
+  feature({
+    id: 'volume-fire', title: 'Bounded volumetric fire (authored boxes + nuke fireball)', availability: 'active', owner: 'src/volume-fire-presentation.ts + src/legacy-main.ts (nuke lane)',
+    sourceProbes: [
+      { path: 'src/volume-fire-presentation.ts', symbol: 'export class VolumeFirePresentationPool' },
+      { path: 'src/legacy-main.ts', symbol: 'volumeFirePresentation.spawnNukeFireball' },
+    ],
+    pipelineIds: [],
+    control: control('setting', ['graphics.volumeFire'], 'Off, Low or High bounded fire boxes; Off hides the stage entirely', 'The boxes are presentation-only dressing over authored clutter: they own no collider, no damage and no authority, and every per-emitter value is a uniform so all five pool slots share one compiled pipeline. Tiers rescale intensity through a uniform write, so switching tiers never rebuilds a pipeline.'),
+    budget: 'One shared BoxGeometry and one material factory; exactly one compiled pipeline warmed at menu time; at most 4 authored boxes per arena plus 1 reserved nuke slot; a fixed 20-step march with zero per-frame allocations and zero lights.',
+    verifier: 'src/volume-fire-presentation.test.ts',
+  }),
   // The word "path-traced" is deliberately absent: obligation 3 of the honesty
   // gate in the test beside this file forbids ANY row claiming path tracing,
   // without exception, and an offline solve is still a row. The description

@@ -171,7 +171,7 @@ it is the default), which made PERFORMANCE below it read as a step *up*.
 
 ## 2. The control sets, in rendering terms
 
-All 40 controls, per profile. The "what it does" column is the rendering
+All 41 controls, per profile. The "what it does" column is the rendering
 meaning, not the label.
 
 **RETIRED COLUMN (HF-438).** The RAY TRACED column below is the historical
@@ -201,6 +201,7 @@ unchanged; only the presets' control sets moved.
 | `environmentIntensity` | IBL multiplier | 1 | 1 | 1 | 1 | 1 |
 | `volumetricQuality` | Mist/fog density scale (0.5 / 0.8 / 1.0) | low | high | high | high | ultra |
 | `volumetricLightShafts` | Per-pixel raymarch of the sun shadow map | off | **off** | low (24 steps, gain 0.14) | low | high (48 steps, gain 0.22) |
+| `volumeFire` (HF-490) | Bounded 20-step fire boxes: authored barrel fire + nuke fireball | off | off | low | low | high |
 | `smokeQuality` | Smoke capacity scale (gameplay-visible; parity-bound) | low | high | high | high | ultra |
 | `particleQuality` | Particle capacity ceiling | low | high | high | high | ultra |
 | `anisotropy` | Max anisotropic sampler taps | 4 | 8 | 8 | 16 | 16 |
@@ -226,19 +227,28 @@ unchanged; only the presets' control sets moved.
 **Control-set fingerprints** (FNV-1a over the key-sorted control set; pinned by
 `src/graphics-profile-contract.test.ts`, which fails if a preset changes and
 this document does not):
-
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `445a9754` |
-| `balanced` | `0753ee34` |
-| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
-| `max` (HF-438 full tier) | `03ee2e10` |
+| `performance` | `935f10c1` |
+| `balanced` | `642291dd` |
+| `high` (QUALITY, HF-438 light tier) | `692ef633` |
+| `max` (HF-438 full tier) | `db4143c6` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
 > changed because the fold moved real values into those presets; `performance`
 > and `balanced` are untouched. The retired `raytraced` row and the pre-fold
 > `max` row are kept as historical record only — they pin nothing.
+> **Volume-fire re-fingerprint (HF-490).** Every hash changed at this lane's
+> integration, and not because a measured value moved: the lane added ONE new
+> control, `volumeFire`, to the control set, so every preset's key-sorted
+> fingerprint is new. The tiers are `performance` off, `balanced` off, `high`
+> (QUALITY) low, `max` high; BALANCED stays off because a 20-step raymarch is
+> exactly the per-frame structure that rung refuses. Section 3's frame times
+> were captured before this control existed and no figure there is rewritten
+> from it: the stage is one precompiled pipeline over at most five small boxes
+> (see the defended estimate in `src/volume-fire-presentation.ts`), and the
+> off switch is a visibility gate, not a removed structure.
 > **PASS 89 re-fingerprint (historical).** Every hash changed at the PASS 89
 > integration, and not because a measured value moved: Lane AL added ONE new
 > control, `bakedIndirect`, to the control set, so every preset's key-sorted
@@ -556,7 +566,7 @@ never reached, and nine unit tests passed over the top of it for weeks).
 | Strength | Count | Controls |
 |---|---|---|
 | **Live, fail-closed observation of the running scene** | 1 | `environmentIntensity` |
-| **Source grep only** — proves the consumer EXISTS, not that it RAN | 39 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife` |
+| **Source grep only** — proves the consumer EXISTS, not that it RAN | 40 | `renderScale`, `adaptiveResolution`, `targetFps`, `frameRateLimit`, `antiAliasing`, `geometryDetail`, `shadows`, `shadowResolution`, `shadowUpdateMode`, `shadowFilter`, `indirectLighting`, `ambientOcclusion`, `screenSpaceReflections`, `screenSpaceGi`, `rayTracing`, `reflectionQuality`, `volumetricQuality`, `volumetricLightShafts`, `volumeFire`, `smokeQuality`, `particleQuality`, `anisotropy`, `decalQuality`, `bloomQuality`, `exposure`, `toneMapping`, `filmicProfile`, `sharpness`, `filmGrain`, `vignette`, `depthOfField`, `depthOfFieldStrength`, `motionBlur`, `spatialUpscaling`, `weatherIntensity`, `rainDensity`, `windStrength`, `lightning`, `wetSurfaces`, `ambientLife` |
 
 This lane did **not** fix the verifiers (out of scope — the brief asks for the
 list, not the repair). The list above is that report. The highest-value
@@ -655,7 +665,7 @@ Raw: `docs/evidence/pass87/graphics-profiles/webgpu-adapter.json`.
   the decision that has to be argued when they do, and its control-set hash is
   the tripwire: the moment a lighting default changes,
   `graphics-profile-contract.test.ts` fails until this document is re-measured.
-- **OPEN:** 39 of 40 controls are grep-verified only (§4).
+- **OPEN:** 40 of 41 controls are grep-verified only (§4).
 - **OPEN (capture coverage, narrower than measurement coverage):** the
   side-by-side review-camera captures in §3 cover **one arena of the three
   measured, and one of the eight selectable** — `atomic-acres`, 2 authored

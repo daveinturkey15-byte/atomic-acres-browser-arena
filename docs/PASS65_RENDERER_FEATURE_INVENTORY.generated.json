@@ -281,6 +281,19 @@
       ]
     },
     {
+      "key": "graphics.volumeFire",
+      "applyMode": "live",
+      "authorityAffecting": false,
+      "runtimeConsumer": "atmosphere-runtime",
+      "runtimeEvidence": [
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "volumeFirePresentation.applyVolumeFireTier",
+          "telemetryPath": "settings.graphics.volumeFire + volume fire presentation telemetry"
+        }
+      ]
+    },
+    {
       "key": "graphics.smokeQuality",
       "applyMode": "live",
       "authorityAffecting": false,
@@ -630,6 +643,7 @@
         "environmentIntensity": 1,
         "volumetricQuality": "low",
         "volumetricLightShafts": "off",
+        "volumeFire": "off",
         "smokeQuality": "low",
         "particleQuality": "low",
         "anisotropy": 4,
@@ -772,6 +786,7 @@
           }
         },
         "volumetricScale": 0.5,
+        "volumeFire": "off",
         "maximumAnisotropy": 4,
         "particleScale": 0.5,
         "decalScale": 0.5,
@@ -848,6 +863,7 @@
         "environmentIntensity": 1,
         "volumetricQuality": "high",
         "volumetricLightShafts": "low",
+        "volumeFire": "low",
         "smokeQuality": "high",
         "particleQuality": "high",
         "anisotropy": 8,
@@ -990,6 +1006,7 @@
           }
         },
         "volumetricScale": 0.8,
+        "volumeFire": "low",
         "maximumAnisotropy": 8,
         "particleScale": 0.8,
         "decalScale": 0.8,
@@ -1066,6 +1083,7 @@
         "environmentIntensity": 1,
         "volumetricQuality": "ultra",
         "volumetricLightShafts": "high",
+        "volumeFire": "high",
         "smokeQuality": "ultra",
         "particleQuality": "ultra",
         "anisotropy": 16,
@@ -1208,6 +1226,7 @@
           }
         },
         "volumetricScale": 1,
+        "volumeFire": "high",
         "maximumAnisotropy": 16,
         "particleScale": 1,
         "decalScale": 1,
@@ -2102,6 +2121,34 @@
       "authorityAffecting": false
     },
     {
+      "id": "volume-fire",
+      "title": "Bounded volumetric fire (authored boxes + nuke fireball)",
+      "availability": "active",
+      "owner": "src/volume-fire-presentation.ts + src/legacy-main.ts (nuke lane)",
+      "sourceProbes": [
+        {
+          "path": "src/volume-fire-presentation.ts",
+          "symbol": "export class VolumeFirePresentationPool"
+        },
+        {
+          "path": "src/legacy-main.ts",
+          "symbol": "volumeFirePresentation.spawnNukeFireball"
+        }
+      ],
+      "pipelineIds": [],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.volumeFire"
+        ],
+        "effectiveValue": "Off, Low or High bounded fire boxes; Off hides the stage entirely",
+        "rationale": "The boxes are presentation-only dressing over authored clutter: they own no collider, no damage and no authority, and every per-emitter value is a uniform so all five pool slots share one compiled pipeline. Tiers rescale intensity through a uniform write, so switching tiers never rebuilds a pipeline."
+      },
+      "budget": "One shared BoxGeometry and one material factory; exactly one compiled pipeline warmed at menu time; at most 4 authored boxes per arena plus 1 reserved nuke slot; a fixed 20-step march with zero per-frame allocations and zero lights.",
+      "verifier": "src/volume-fire-presentation.test.ts",
+      "authorityAffecting": false
+    },
+    {
       "id": "baked-indirect-light",
       "title": "Baked indirect light (offline SH-L1 irradiance probe volume)",
       "availability": "active",
@@ -2359,11 +2406,11 @@
     }
   ],
   "summary": {
-    "total": 37,
-    "active": 35,
+    "total": 38,
+    "active": 36,
     "unsupported": 2,
-    "adjustable": 28,
+    "adjustable": 29,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "e77fa8b973e65047851163900333d52a29de71bd6682709f9ae04c24870905b9"
+  "inventorySha256": "4167a48a7925d9cca8a14c7a2e0b1e0bb4779be3e94f1f689aa57576b0f387ad"
 }

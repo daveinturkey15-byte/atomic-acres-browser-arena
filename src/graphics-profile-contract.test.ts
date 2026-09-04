@@ -45,14 +45,17 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: '445a9754',
-  balanced: '0753ee34',
+  performance: '935f10c1',
+  balanced: '642291dd',
   // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
   // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
   // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
   // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
-  high: '430da2ad',
-  max: '03ee2e10',
+  // HF-490 (volume fire): adds the volumeFire control (off/off/low/high).
+  // Re-fingerprinted with graphicsControlSetHashes(); the only preset whose
+  // picture changes below Quality is none — off is off.
+  high: '692ef633',
+  max: 'db4143c6',
 });
 
 describe('HF-418 graphics ladder', () => {
