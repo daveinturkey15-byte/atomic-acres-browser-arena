@@ -138,6 +138,32 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-north-interior', [-1.25, 1.7, -19.5], [-1.25, 1.6, -12.0], 'geometry', 1.08),
     camera('nuketown2-south-interior', [1.25, 1.7, 19.5], [1.25, 1.6, 12.0], 'geometry', 1.08),
     camera('nuketown2-garage', [6.75, 1.7, -20.5], [6.75, 1.5, -14.0], 'geometry', 1.08),
+    // VEHICLE REVIEW SET (HF-462 / HF-472, the lofted street bodies).
+    //
+    // Three distances, because a vehicle fails differently at each: a faceted
+    // arch or a swirling wheel face only shows up close, wrong proportions
+    // only show at a distance, and a silhouette that reads as a crate shows
+    // from across the map. Every station is a place a PLAYER CAN STAND and was
+    // checked clear of every collider before it was written down.
+    //
+    // ~4 m, front three-quarter of the head car: the arch cut, the shut lines,
+    // the wheel cover's concavity and the glass over its lining, at the range
+    // a player actually walks past a parked car.
+    camera('nuketown2-vehicle-near', [9.0, 1.55, -3.6], [5.4, 1.0, -1.0], 'geometry', 1.08),
+    // ~8 m across the turning head: the coach's nose and waistline with the
+    // head car behind it, so the two bodies are judged against each other.
+    camera('nuketown2-vehicle-mid', [1.2, 1.7, -6.4], [-5.4, 1.5, -2.65], 'geometry', 1.08),
+    // ~16 m from the west end: coach, truck and head car in one frame. If any
+    // of them reads as a box from here, the loft bought nothing.
+    camera('nuketown2-vehicle-far', [-16.0, 2.2, -6.0], [2.0, 1.6, 0.6], 'geometry', 1.08),
+    // TRUE SIDE ELEVATION of the coach at 12 m, square to its flank. This is
+    // the frame proportions are measured on IN PIXELS - front overhang,
+    // wheelbase, glass band height - because a three-quarter view cannot be
+    // measured and an opinion about proportion is not evidence.
+    camera('nuketown2-coach-elevation', [-6.4, 1.6, 9.4], [-6.4, 1.5, -2.65], 'geometry', 1.08),
+    // The truck cab's front three-quarter at ~4 m: the cab-over rake, its
+    // screen cut from the loft, and the steel wheels under the cargo box.
+    camera('nuketown2-truck-cab-near', [12.0, 1.6, 0.4], [7.6, 1.5, 2.4], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',
