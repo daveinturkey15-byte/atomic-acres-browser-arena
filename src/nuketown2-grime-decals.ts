@@ -93,6 +93,21 @@ export type Nuketown2Decal = Readonly<{
   material: THREE.Material;
 }>;
 
+/**
+ * Separate overlapping ground families by 1 mm. The shared -3 polygon-offset
+ * tier fences each family against the surface below, but it cannot order two
+ * transparent films that occupy the same plane. The lifts stay inside the
+ * existing 0.03 m audit window and are presentation-only.
+ */
+const GRIME_FAMILY_LIFT_M: Readonly<Record<Nuketown2Decal['family'], number>> = Object.freeze({
+  tyre: 0,
+  oil: 0.001,
+  crack: 0.002,
+  court: 0.003,
+  stones: 0.004,
+  'wall-grime': 0,
+});
+
 // ---------------------------------------------------------------------------
 // Materials
 // ---------------------------------------------------------------------------
@@ -317,7 +332,7 @@ export function nuketown2GrimeDecals(m: Nuketown2GrimeMaterials): readonly Nuket
   ): void => {
     out.push(Object.freeze({
       name, family,
-      position: [x, GRIME_Y, z] as const,
+      position: [x, GRIME_Y + GRIME_FAMILY_LIFT_M[family], z] as const,
       size: [w, GRIME_THICKNESS, d] as const,
       material,
     }));

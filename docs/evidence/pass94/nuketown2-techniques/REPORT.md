@@ -382,3 +382,48 @@ is a vast pale sand-cream plain, and it now occupies more of the frame than the
 map does. The avenue draws the eye straight to it. That is the arena ground-slab
 material, it is pre-existing, and it belongs to the materials lane — but it is
 the single highest-value fix visible in these frames and it should be routed.
+
+---
+
+## 6. Codex follow-up - technique OPEN-item closure
+
+This follow-up is based on the checked-out branch after the Muse review, not on
+the review's claims alone.
+
+- **CLOSED - stacked grime films.** `src/nuketown2-grime-decals.ts` now gives
+  each overlapping ground family a deterministic 1 mm lift while retaining the
+  shared -3 polygon-offset tier. `src/nuketown2-grime-decals.test.ts` proves
+  overlapping ground entries do not share a depth, and the existing 0.03 m
+  coplanar-window assertion still passes.
+- **CLOSED - appliance placement rationale.** The current source already
+  records the appliance bank as the west front-lawn placement and distinguishes
+  that zone from the driveway and turning head. `src/nuketown2-yard-props.test.ts`
+  now derives the `street lawn west` zone from `NUKETOWN2_GROUND_DRESSING` and
+  proves the full bank footprint stays inside it and ends at the turning-head
+  boundary without entering the road.
+- **CLOSED - hob/house side binding.** The pushed accuracy lane was checked at
+  `a5fb188e170129e7264084ca8c3556072c2ee6a1`: its HF-477 constants make the
+  north upper house terracotta-orange and the south house cream/white, with red
+  appliances on north/orange and blue on south/white. This techniques branch
+  therefore keeps red north / blue south. The built-arena test now proves the
+  north hob material is red and the south hob material is blue, while also
+  checking that the siding materials remain side-bound.
+- **CLOSED - dead interior water factory.** A branch grep found no caller of
+  `createNuketown2PoolWaterMaterial` in `src/nuketown2-interior-materials.ts`;
+  the live caller is the replacement factory in `src/nuketown2-pool-water.ts`.
+  The dead interior export was removed.
+- **CLOSED mechanically / OPEN visually - close-range review stations.** Nine
+  authored stations were added to `src/rendering/arenas/nuketown2.ts` and the
+  roster-derived `scripts/qa/viewpoint-catalog.mjs`: both appliance banks,
+  glasshouse, garden pod, sand pit, driveway apron, border path, and both wall
+  runs. The catalog coverage checks pass. The requested capture into
+  `close-range/` remains **OPEN**: the mandated 25-poll window never reached
+  zero headless Chrome (queue running/pending stayed 0; GPU free stayed above
+  3,000 MiB; headless Chrome stayed between 4 and 12), so no ambiguous PNGs
+  were written and no visual claim is made about scale, floating or missing
+  faces.
+
+Final follow-up gates: `npx tsc --noEmit` passed; the six lane/focused suites
+passed with 70 tests; the authored-camera roster subset passed; and
+`npx tsx scripts/qa/find-coplanar-pairs.ts` reports HOUSE-INTERIOR 0, STREET 0,
+FINDINGS 0 and UNAUDITED 52.

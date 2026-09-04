@@ -162,6 +162,20 @@ export const definition = createProceduralArenaVisualDefinition({
     // a 60 degree frame, which
     // scripts/qa/nuketown2-handedness-frame.mts measures rather than eyeballs.
     camera('nuketown2-front-porch', [hx(-8.0), 1.9, -4.6], [hx(-1.25), 3.1, -9.7], 'geometry', 1.08),
+    // PASS 94 TECHNIQUES close-range evidence. These cameras are deliberately
+    // authored against the prop/decal coordinates, not added to the gameplay
+    // camera path: each makes one small visual claim legible in a capture.
+    // The appliance pair is captured on both halves because its colour is the
+    // chirality anchor; the remaining solid props are exact rotational pairs.
+    camera('nuketown2-appliance-bank-north-close', [hx(-13.5), 1.55, -6.1], [hx(-10.4), 0.55, -8.4], 'geometry', 1.08),
+    camera('nuketown2-appliance-bank-south-close', [hx(13.5), 1.55, 6.1], [hx(10.4), 0.55, 8.4], 'geometry', 1.08),
+    camera('nuketown2-glasshouse-north-close', [hx(-5.4), 1.4, -29.1], [hx(-2.0), 1.1, -33.2], 'geometry', 1.08),
+    camera('nuketown2-garden-pod-north-close', [hx(12.0), 1.35, -29.4], [hx(8.6), 1.0, -33.6], 'geometry', 1.08),
+    camera('nuketown2-sand-pit-north-close', [hx(17.3), 1.2, -22.5], [hx(14.2), 0.20, -25.6], 'geometry', 1.08),
+    camera('nuketown2-driveway-apron-close', [hx(10.8), 1.45, -10.7], [hx(6.75), 0.026, -12.1], 'geometry', 1.08),
+    camera('nuketown2-border-path-close', [4.5, 1.35, -37.6], [0, 0.026, -39.0], 'geometry', 1.08),
+    camera('nuketown2-perimeter-wall-long-close', [4.2, 1.45, -40.55], [0, 1.0, -41.588], 'geometry', 1.08),
+    camera('nuketown2-perimeter-wall-end-close', [hx(-16.5), 1.45, -30.5], [hx(-17.588), 1.0, -29.0], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',

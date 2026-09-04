@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 94",
+  "feedbackReceivedAt": "2026-09-04T15:35:00Z",
+  "status": "candidate",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "Nuke Town ground grime families have distinct visual depth",
+      "expected": "Overlapping transparent driveway, border-path and yard grime families are vertically separated while remaining inside the existing audited ground-film window.",
+      "falsifier": "Two overlapping ground families share one y depth, or the family lift moves a film outside the 0.03 m audit window.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-grime-decals.test.ts",
+          "command": "npx vitest run src/nuketown2-grime-decals.test.ts",
+          "note": "The focused test proves overlapping ground families are separated and the existing offset/window assertions pass."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Yard props remain on the authored front and back lawn zones",
+      "expected": "The appliance bank stays in the derived west front-lawn zone, ends at the turning-head boundary without entering the road, and all solid yard props retain their existing paired authority.",
+      "falsifier": "The appliance footprint leaves the derived lawn zone or enters the carriageway, or a prop loses its exact rotational partner/collider contract.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-yard-props.test.ts",
+          "command": "npx vitest run src/nuketown2-yard-props.test.ts",
+          "note": "The focused suite proves lawn-zone placement, red north/blue south side binding, paired silhouettes and reduced-tier authority."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Hob colours follow the pushed accuracy-lane house sides",
+      "expected": "The accuracy lane's HF-477 constants are respected: north is the orange house and red appliance tops remain on north, while blue tops remain on the south cream/white house.",
+      "falsifier": "The built north hob is not the red material, the built south hob is not the blue material, or the hob pair is detached from the authored house sides.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "origin/contrib/dave-gaming-pc/claude/nuketown2-bo2-accuracy@a5fb188e170129e7264084ca8c3556072c2ee6a1",
+          "command": "git show a5fb188e170129e7264084ca8c3556072c2ee6a1:src/nuketown2-arena.ts",
+          "note": "The pushed branch defines north terracotta-orange/south cream and red/blue appliance materials; the current built-arena test proves the side mapping."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "The obsolete interior water factory is removed",
+      "expected": "The unreferenced createNuketown2PoolWaterMaterial export is absent from src/nuketown2-interior-materials.ts, while the live pool-water module remains the caller target.",
+      "falsifier": "The obsolete export remains, or the live arena pool caller resolves to the removed interior module.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "src/nuketown2-interior-materials.ts",
+          "command": "rg -n \"createNuketown2PoolWaterMaterial\" src/nuketown2-interior-materials.ts src/nuketown2-pool-water.ts src/nuketown2-arena.ts",
+          "note": "The old interior definition is absent; the only live definition/call are the replacement pool module and arena."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "Close-range prop and grime review stations are authored and catalogued",
+      "expected": "The live Nuke Town visual definition and roster-derived viewpoint catalog cover both appliance banks, the three yard hero props, the driveway apron, border path and both wall-grime runs.",
+      "falsifier": "Any requested close-range station lacks an authored runtime camera or is absent from the catalog coverage test.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/arena-viewpoint-regression.test.mjs",
+          "command": "node --test --test-name-pattern \"arena roster|catalog covers every authored review camera|catalog has no stale entries\" scripts/qa/arena-viewpoint-regression.test.mjs",
+          "note": "The roster-derived camera and catalog checks pass for all newly authored stations."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "Close-range visual inspection waits for a valid owner-machine GPU window",
+      "expected": "The close-range PNG set is captured and inspected only when both ComfyUI queue arrays are empty, GPU free memory is at least 3,000 MiB, and no other headless Chrome is present.",
+      "falsifier": "A capture is made during another headless Chrome workload, below the GPU-free threshold, with a non-empty queue, or without visual inspection.",
+      "acceptance": "visual",
+      "state": "deferred",
+      "evidence": [
+        {
+          "kind": "manual",
+          "ref": "GPU poll 2026-09-04",
+          "command": "curl -s http://127.0.0.1:8188/queue; nvidia-smi; inspect headless Chrome process count",
+          "note": "The required 25 polls kept queue running/pending at 0 and GPU free above 3,000 MiB, but headless Chrome remained 4-12; capture remains OPEN and no PNGs were written."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "The techniques candidate passes its focused mechanical gates",
+      "expected": "TypeScript, lane tests, camera roster checks and coplanar inspection pass without relaxing thresholds, and UNAUDITED remains 52.",
+      "falsifier": "Any required focused gate fails, FINDINGS becomes non-zero, HOUSE-INTERIOR or STREET becomes non-zero, or UNAUDITED grows beyond 52.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "focused-pass94-techniques-gates",
+          "command": "npx tsc --noEmit; npx vitest run src/nuketown2-fidelity.test.ts src/collider-visual-parity-gate.test.ts src/nuketown2-vegetation.test.ts src/nuketown2-pool-water.test.ts src/nuketown2-yard-props.test.ts src/nuketown2-grime-decals.test.ts; npx tsx scripts/qa/find-coplanar-pairs.ts",
+          "note": "70 focused tests passed; coplanar output is HOUSE-INTERIOR 0, STREET 0, FINDINGS 0 and UNAUDITED 52."
+        }
+      ]
+    }
+  ]
+}

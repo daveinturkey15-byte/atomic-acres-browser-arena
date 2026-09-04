@@ -109,6 +109,37 @@ describe('Nuke Town Rebuild grime decals', () => {
     materials.dispose();
   });
 
+  it('separates overlapping ground families instead of stacking transparent films at one depth', () => {
+    const { materials, table } = decals();
+    const ground = table.filter((decal) => decal.family !== 'wall-grime');
+    for (let i = 0; i < ground.length; i += 1) {
+      for (let j = i + 1; j < ground.length; j += 1) {
+        const first = ground[i]!;
+        const second = ground[j]!;
+        const overlapX = Math.min(
+          first.position[0] + first.size[0] / 2,
+          second.position[0] + second.size[0] / 2,
+        ) - Math.max(
+          first.position[0] - first.size[0] / 2,
+          second.position[0] - second.size[0] / 2,
+        );
+        const overlapZ = Math.min(
+          first.position[2] + first.size[2] / 2,
+          second.position[2] + second.size[2] / 2,
+        ) - Math.max(
+          first.position[2] - first.size[2] / 2,
+          second.position[2] - second.size[2] / 2,
+        );
+        if (overlapX <= 1e-4 || overlapZ <= 1e-4) continue;
+        expect(
+          Math.abs(first.position[1] - second.position[1]),
+          `${first.name} and ${second.name} share a ground depth`,
+        ).toBeGreaterThan(0.0009);
+      }
+    }
+    materials.dispose();
+  });
+
   it('sits inside the 0.03 m coplanar window on purpose, not above it', () => {
     const { materials, table } = decals();
     for (const decal of table) {
