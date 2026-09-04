@@ -81,3 +81,13 @@ upstream lookup needed, no recipe written. Measurement: the gates above
 - `src/legacy-main.ts` (+85/−4) — import, wait-state, broadcast arming,
   timeout force-start, 1/s tick rebroadcast, auto loaded/ready, START
   unlock, guidance override, pinned countdown rendering.
+
+## Luna review follow-ups
+
+- TODO (owner evidence): run the HF-403 two-client host/guest flow and verify
+  the same countdown timestamp, timeout unlock, late-join delivery, and guest
+  rejection against live transport. Static host-authority and timestamp wiring
+  are verified here; no browser or network was run by this review.
+- TODO (owner evidence): capture the countdown HUD and auto-READY transition
+  in the real lobby. Unit and source-contract gates pass, but rendered/browser
+  behavior remains unclaimed under the review constraint.
