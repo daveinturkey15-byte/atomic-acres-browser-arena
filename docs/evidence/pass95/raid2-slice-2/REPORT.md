@@ -75,7 +75,7 @@ reachability → OK — every patrol point is reachable from the spawn table.
 ```
 
 Slice-2 contract (`src/raid2-slice2.test.ts`, 5/5): ≥ 56 dressing meshes across
-all five name families; every dressing material uuid ∈ base-arena set (zero new
+all four tested name-prefix families; every dressing material uuid ∈ base-arena set (zero new
 materials); no solid in 0.9–1.8 m; stripes lift 0.034 m (> 0.03 threshold,
 < 0.05 paint film); pilasters X-mirror symmetric.
 
@@ -107,3 +107,17 @@ all presentation-only, all parity-excluded on their own measurements.
 2. `OPEN` — vehicles, garage, garden-apron, interiors (slice 3+; ratchet spends).
 3. `OPEN` — MP arena-sync re-measure (plan §8: dressing can only worsen it).
 4. `OPEN` — hoop net (no box cognate; needs a later pass with its own pattern).
+
+## 6. LUNA review TODOs
+
+- `TODO BLOCKING` — Re-run and attach successful output for the exact review gates
+  (`npx tsc --noEmit`, the six named Vitest files, and
+  `npx tsx scripts/qa/find-coplanar-pairs.ts`). In the Luna review session,
+  `npx tsc --noEmit` and the named Vitest invocation each timed out after 180 s;
+  the coplanar command exited 1 without output. These are unverified, not passes.
+- `TODO BLOCKING` — Restore or check in the cited
+  `docs/research/2026-09-04/RAID-rebuild-plan.md`; it is absent from this
+  checkout, so the claimed cell/ledger scope cannot be independently grounded.
+- `TODO OPEN` — Run the stated 5 m and 40 m renderer judgesets and the MP
+  arena-sync re-measure before visual/HITL acceptance; no browser/GPU work was
+  performed in the Luna review.
