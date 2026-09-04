@@ -147,6 +147,7 @@ import {
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_HOUSE_WIDTH,
+  NUKETOWN2_LAMP_POST_LAYOUT,
   NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
@@ -3029,6 +3030,14 @@ function street(builder: Builder, m: Nuketown2Materials): void {
  * to a front door is not a walk across a blank apron.
  */
 function verge(builder: Builder, m: Nuketown2Materials): void {
+  // Fixed presentation-only lamp posts. The clustered-light catalog reads the
+  // same anchors, while pair() keeps both residential halves identical.
+  for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
+    pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.trim,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+  }
   // ---- HF-477: THE FURNITURE LINE, AND WHY IT IS A LINE ---------------------
   // Every prop here is emitted through `pair()`, so a prop at authored
   // (x, -b) puts its partner at (-x, +b). With the lollipop that is a hard

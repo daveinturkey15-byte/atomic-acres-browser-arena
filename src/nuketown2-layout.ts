@@ -385,6 +385,12 @@ export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
   Object.freeze({ id: 'south', team: 1 as const, x: -NUKETOWN2_HOUSE_CENTRE_X, z: -(HOUSE_FRONT_Z - HOUSE_DEPTH / 2), facing: -1 as const }),
 ]);
 
+/** Street-lamp bodies are authored once on the north verge and paired by the arena. */
+export const NUKETOWN2_LAMP_POST_LAYOUT = Object.freeze([
+  Object.freeze({ id: 'west', x: -12, z: -NUKETOWN2_STREET_HALF_WIDTH - 0.9, poleHeight: 4.2, fixtureY: 4.35 }),
+  Object.freeze({ id: 'east', x: -4, z: -NUKETOWN2_STREET_HALF_WIDTH - 0.9, poleHeight: 4.2, fixtureY: 4.35 }),
+]);
+
 /**
  * Authored-frame poses for the two HF-465 review stations. The offsets are
  * measured from the north house's own layout anchors; the visual definition
@@ -613,3 +619,6 @@ export const NUKETOWN2_STREET_CARS = Object.freeze({
    */
   classic: Object.freeze({ x: 5.0, z: -0.6, length: 4.4, width: 1.9 }),
 });
+
+/** The civilian head car anchor shared by the light catalog and review tooling. */
+export const NUKETOWN2_HEAD_CAR = Object.freeze({ x: 4.5, z: -0.8, headlightX: 2.22, headlightZ: 0.70 });

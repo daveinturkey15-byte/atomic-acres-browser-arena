@@ -19,6 +19,7 @@ import {
   browserPresentationIsVisible,
   waitForVisibleBrowserPreparation,
 } from '../browser-preparation-scheduler';
+import { createNuketown2ClusteredLighting } from './clustered-lights';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -1284,6 +1285,7 @@ export class WebGpuRenderRuntime {
     samples: number;
     requireWebGPU: boolean;
     gradeProfileId?: GradeProfileId;
+    clusteredLightingEnabled?: boolean;
   }>): Promise<WebGpuRenderRuntime> {
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
     if (!gpu) throw await diagnosedWebGpuFailure('WebGPU was required, but navigator.gpu is unavailable');
@@ -1342,6 +1344,11 @@ export class WebGpuRenderRuntime {
       powerPreference: 'high-performance',
       device,
     });
+    // RenderLists capture this manager during init(); it is a cold-session
+    // topology choice, never an in-combat manager replacement.
+    if (parameters.clusteredLightingEnabled === true) {
+      renderer.lighting = createNuketown2ClusteredLighting();
+    }
     await renderer.init();
     const backend = renderer.backend as WebGpuBackendShape;
     if (parameters.requireWebGPU && backend.isWebGPUBackend !== true) {

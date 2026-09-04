@@ -119,6 +119,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
+import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -1924,7 +1925,7 @@ let liveGraphicsAppliedAt = 0;
  */
 const rendererConstructionGraphics = Object.freeze({
   profile: renderProfile,
-  antialiasSamples: graphicsRuntime.antialiasSamples,
+  antialiasSamples: graphicsRuntime.antialiasSamples, clusteredLighting: pass65Settings.graphics.clusteredLighting,
   ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
   ambientOcclusionDenoise: graphicsRuntime.ambientOcclusion.denoise,
   screenSpaceTopology: screenSpaceTopologyKey(graphicsRuntime.screenSpace),
@@ -1971,7 +1972,7 @@ let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
       canvas,
       antialias: graphicsRuntime.antialiasSamples > 0,
       samples: Math.max(1, graphicsRuntime.antialiasSamples),
-      requireWebGPU: true,
+      requireWebGPU: true, clusteredLightingEnabled: pass65Settings.graphics.clusteredLighting,
     });
   } catch (webGpuError) {
     appendClientRuntimeLog({
@@ -3385,11 +3386,12 @@ function buildSky(): void {
   fillLight.position.set(...activeLighting.fillPosition);
   fillLight.castShadow = false;
   scene.add(fillLight);
+  nuketown2ClusteredLightRig = createNuketown2LocalLights(scene, pass65Settings.graphics.clusteredLighting);
 }
 let hemisphereLight: THREE.HemisphereLight;
 let ambientLight: THREE.AmbientLight;
 let sunLight: THREE.DirectionalLight;
-let fillLight: THREE.DirectionalLight;
+let fillLight: THREE.DirectionalLight; let nuketown2ClusteredLightRig: Nuketown2ClusteredLightRig | null = null;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
@@ -4280,11 +4282,7 @@ function reaimConditionedSun(writes: LightingConditionWrites): void {
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
-/**
- * The ONE place time of day reaches the renderer. Every statement below is an
- * assignment into an existing light, an existing fog instance or the exposure
- * uniform. No light is created, destroyed, parented or unparented.
- */
+/** Time-of-day writes existing global/local light data and never changes topology. */
 function applyLightingConditionUniforms(force = false): void {
   const baseline = lightingConditionBaseline;
   if (!baseline || baseline.arenaId !== selectedArena.id) return;
@@ -4340,7 +4338,11 @@ function applyLightingConditionUniforms(force = false): void {
     fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
   }
-  if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(conditionedFogBaseColorHex()), pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
+  nuketown2ClusteredLightRig?.applyLighting(selectedArena.id, writes.hour);
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.color.setHex(conditionedFogBaseColorHex());
+    pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
+  }
   // A deterministic review camera owns the exposure while it is set -- that is
   // the capture contract every viewpoint baseline in the repo rests on -- and it
   // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
@@ -4365,7 +4367,7 @@ function lightingConditionsTelemetry(): Record<string, unknown> {
     identity: writes ? lightingConditionsAreIdentity(writes) : true,
     sunReaims: lightingConditionsSunReaims,
     uniformWrites: lightingConditionsUniformWrites,
-    resolves: lightingConditionsResolves,
+    resolves: lightingConditionsResolves, clusteredLights: nuketown2ClusteredLightRig?.telemetry() ?? null,
   };
 }
 // LIGHTING: ==== end time-of-day conditions ====================================
@@ -29059,7 +29061,7 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   );
   const desiredConfig = resolveActiveGraphicsConfig(live, desiredProfile, queryRenderProfile);
   const staged: string[] = [];
-  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing');
+  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing'); if (pass65Settings.graphics.clusteredLighting !== rendererConstructionGraphics.clusteredLighting) staged.push('clusteredLighting');
   if (desiredConfig.representation !== rendererConstructionGraphics.representation) staged.push('geometryDetail');
   if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled
     || live.ambientOcclusion.denoise !== rendererConstructionGraphics.ambientOcclusionDenoise) {

@@ -58,6 +58,8 @@ export type AdvancedGraphicsValues = Readonly<{
   shadowUpdateMode: ShadowUpdateMode;
   shadowFilter: ShadowFilterMode;
   indirectLighting: LightingTier;
+  /** Fixed-budget Nuke Town practical lights; changing this rebuilds the renderer. */
+  clusteredLighting: boolean;
   /**
    * HF-418 - offline path-traced irradiance probes, sampled per pixel. The one
    * lighting control whose per-frame cost is the same at every tier: the tier
@@ -281,6 +283,11 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     description: 'Scales arena hemisphere and ambient bounce approximations without inventing path tracing.',
     kind: 'select', options: selectOptions(['off', 'OFF'], ['low', 'LOW'], ['high', 'HIGH']),
     applyMode: 'live', runtimeConsumer: 'arena-lighting',
+  }),
+  control({
+    key: 'clusteredLighting', id: 'graphics-clustered-lighting', category: 'lighting', label: 'Nuke Town practical lights',
+    description: 'Fixed-budget porch, window, garage, street, appliance and vehicle lights. Up to 48 arena lights and 24 per screen tile; disable to restore the standard light path.',
+    kind: 'toggle', applyMode: 'pipeline-rebuild', runtimeConsumer: 'arena-lighting',
   }),
   // HF-418 / Lane AL. THE ONE CONTROL IN THIS CATEGORY THAT IS ALMOST FREE.
   // Everything else here is a per-frame march whose tier is a cost; this is a
@@ -583,6 +590,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   shadowUpdateMode: runtimeEvidence('src/legacy-main.ts', "activeRenderConfig.shadowMode === 'dynamic'", 'render.shadowMode + render.shadowAutoUpdate'),
   shadowFilter: runtimeEvidence('src/legacy-main.ts', 'shadowMapTypeForFilter', 'settings.graphics.shadowFilter + documentElement.dataset.webglShadowSampler'),
   indirectLighting: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.indirectLightScale', 'settings.graphics.indirectLightScale + render.lighting'),
+  clusteredLighting: runtimeEvidence('src/rendering/clustered-lights.ts', 'NUKETOWN2_CLUSTERED_LIGHTING_SETTINGS', 'settings.graphics.clusteredLighting + lightingConditions.clusteredLights'),
   ambientOcclusion: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'ao(sceneDepth, sceneNormal, camera)', 'render.atomicSignal.advancedGraphics.ambientOcclusion'),
   // The stronger claim, and it is earned: `publishBakedIndirectReceipt` writes
   // the BOUND volume's grid, digest, occluder count and LIVE gain onto
@@ -737,7 +745,10 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   performance: Object.freeze({
     renderScale: 0.75, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'off', geometryDetail: 'reduced', shadows: 'off', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'low', bakedIndirect: 'off', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'low',
+    // HF-490: the fixed 48-light/24-per-tile bound and cold precompile keep this
+    // bounded topology deterministic even on the lowest named preset.
+    clusteredLighting: true, bakedIndirect: 'off', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'low',
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
@@ -847,7 +858,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   balanced: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'smaa', geometryDetail: 'full', shadows: 'high', shadowResolution: 'medium', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'off',
+    shadowFilter: 'auto', indirectLighting: 'high', clusteredLighting: true, bakedIndirect: 'low', ambientOcclusion: 'off',
     screenSpaceReflections: 'off', screenSpaceGi: 'off', rayTracing: 'off', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -886,7 +897,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   high: Object.freeze({
     renderScale: 1, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'static',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'low', ambientOcclusion: 'high',
+    shadowFilter: 'auto', indirectLighting: 'high', clusteredLighting: true, bakedIndirect: 'low', ambientOcclusion: 'high',
     screenSpaceReflections: 'low', screenSpaceGi: 'off', rayTracing: 'reflections', reflectionQuality: 'high',
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
@@ -939,7 +950,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     // 1.15x supersample, and it is the one control with no enforced bound.
     renderScale: 1.15, adaptiveResolution: true, targetFps: 240, frameRateLimit: 0,
     antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high', shadowResolution: 'high', shadowUpdateMode: 'dynamic',
-    shadowFilter: 'auto', indirectLighting: 'high', bakedIndirect: 'high', ambientOcclusion: 'ultra',
+    shadowFilter: 'auto', indirectLighting: 'high', clusteredLighting: true, bakedIndirect: 'high', ambientOcclusion: 'ultra',
     screenSpaceReflections: 'high', screenSpaceGi: 'high', rayTracing: 'reflections', reflectionQuality: 'ultra',
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
