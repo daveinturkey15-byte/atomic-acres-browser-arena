@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { getConsoleFunction, setConsoleFunction } from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
+import { installTintSwizzleShim } from '../webgpu-tint-swizzle-shim';
 import {
   installFilmicGradeChain,
   type FilmicGradeChainHandle,
@@ -1284,6 +1285,11 @@ export class WebGpuRenderRuntime {
     requireWebGPU: boolean;
     gradeProfileId?: GradeProfileId;
   }>): Promise<WebGpuRenderRuntime> {
+    // Chrome 153 Tint chained-swizzle workaround (PASS 93): wrap navigator.gpu
+    // on the device-creation path itself, so no caller of this runtime can
+    // request a device before the shim is in place. Idempotent - legacy-main
+    // installs it earlier for its telemetry stamp and this is a no-op then.
+    installTintSwizzleShim();
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
     if (!gpu) throw await diagnosedWebGpuFailure('WebGPU was required, but navigator.gpu is unavailable');
     // Owner 2026-08-31: he could not launch the game at all in his everyday
