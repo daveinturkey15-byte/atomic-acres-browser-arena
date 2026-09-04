@@ -105,3 +105,10 @@ No arena file touched: breakable-pane ids, colliders, ballistics unchanged.
 - `mat.type = 'MeshStandardMaterial'` kept on the physical material: the
   WebGL2 `shaderIDs` compat guard every family carries. Both glazing roles
   carry the same string, so the sharing key is unaffected.
+
+## Review TODOs
+
+- TODO (release/HITL): capture the south roof deck and coach-band review
+  cameras on the permitted headed WebGPU route and verify that physical
+  transmission reads correctly without obscuring the unchanged breakable
+  window and ballistic contracts. No browser or GPU was run in this review.
