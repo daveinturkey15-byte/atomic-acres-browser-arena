@@ -24,9 +24,9 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
-import { bindNuketown2WearUniforms, NUKETOWN2_UNIFORMS } from '../material-uniforms';
+import { createNuketown2Uniforms, type Nuketown2Uniforms } from '../material-uniforms';
 
 const { clamp, float, fract, max, mix, smoothstep } =
   TSL as unknown as Record<string, any>;
@@ -57,25 +57,21 @@ export interface GlassOptions {
   readonly transparent?: boolean;
 }
 
-let glassGraph: { colorNode: any; roughnessNode: any } | null = null;
-
-function sharedGlassGraph(): { colorNode: any; roughnessNode: any } {
-  if (glassGraph) return glassGraph;
+function sharedGlassGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   const spec = glassSpec('nuketown2-glass-shared', 0x2b3d47);
   const uv = boxUv();
-  const wear = buildWear(spec, uv);
+  const wear = buildWear(spec, uv, undefined, uniforms);
   const streak = smoothstep(
     float(0.62),
     float(0.92),
     fract(uv.x.mul(float(9.0)).add(wear.soilMask.mul(float(1.7)))),
   ).mul(smoothstep(float(0.15), float(0.85), wear.soilMask));
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
-  const body = NUKETOWN2_UNIFORMS.baseColor.mul(wear.albedoMul);
-  glassGraph = {
+  const body = uniforms.baseColor.mul(wear.albedoMul);
+  return {
     colorNode: mix(body, body.mul(float(1.55)), grime.mul(float(0.35))),
     roughnessNode: clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35)),
   };
-  return glassGraph;
 }
 
 export function createGlassMaterial(
@@ -95,9 +91,9 @@ export function createGlassMaterial(
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
-  bindNuketown2WearUniforms(mat, spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
   if (!transparent) {
-    const shared = sharedGlassGraph();
+    const shared = sharedGlassGraph(uniforms);
     mat.colorNode = shared.colorNode;
     mat.roughnessNode = shared.roughnessNode;
     return mat;
@@ -109,7 +105,7 @@ export function createGlassMaterial(
   }
 
   const uv = boxUv();
-  const wear = buildWear(spec, uv);
+  const wear = buildWear(spec, uv, undefined, uniforms);
 
   // Rain streaks run down the pane: narrow along the run, long down Y. The
   // phase is displaced by the metre-scale field so they are not a comb.
@@ -124,7 +120,7 @@ export function createGlassMaterial(
   // soiling field rather than invented from a world constant.
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
 
-  const body = linearSwatch(baseSrgb).mul(wear.albedoMul);
+  const body = uniforms.baseColor.mul(wear.albedoMul);
   mat.colorNode = mix(body, body.mul(float(1.55)), grime.mul(float(0.35)));
   mat.roughnessNode = clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35));
   // Dirt makes glass less transparent. This is the term that stops the grime

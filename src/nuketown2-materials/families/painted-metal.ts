@@ -24,7 +24,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
-import { bindNuketown2WearUniforms, NUKETOWN2_UNIFORMS, setNuketown2FamilyUniform } from '../material-uniforms';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, clamp, float, fract, max, mix, positionWorld, smoothstep } =
   TSL as unknown as Record<string, any>;
@@ -56,14 +56,11 @@ export interface PaintedMetalOptions {
   readonly metalness?: number;
 }
 
-let paintedMetalGraph: { colorNode: any; roughnessNode: any } | null = null;
-
-function sharedPaintedMetalGraph(): { colorNode: any; roughnessNode: any } {
-  if (paintedMetalGraph) return paintedMetalGraph;
+function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   const spec = paintedMetalSpec('nuketown2-painted-metal-shared', 0xaebdc1);
   const p = positionWorld;
-  const wear = buildWear(spec, boxUv());
-  const panelled = NUKETOWN2_UNIFORMS.paintedPanelled;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const panelled = uniforms.paintedPanelled;
   const panelV = p.y.div(float(DOOR_PANEL_M));
   const within = fract(panelV);
   const panelShade = max(
@@ -76,16 +73,15 @@ function sharedPaintedMetalGraph(): { colorNode: any; roughnessNode: any } {
   const primer = linearSwatch(0x9c968c);
   const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
   const weep = smoothstep(float(0.35), float(0.0), p.y).mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
-  const paint = NUKETOWN2_UNIFORMS.baseColor.mul(wear.albedoMul);
+  const paint = uniforms.baseColor.mul(wear.albedoMul);
   const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
   const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
-  paintedMetalGraph = {
+  return {
     colorNode: mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4))),
     roughnessNode: clamp(wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))), float(0.15), float(1.0)),
   };
-  return paintedMetalGraph;
 }
 
 export function createPaintedMetalMaterial(
@@ -106,9 +102,9 @@ export function createPaintedMetalMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  bindNuketown2WearUniforms(mat, spec, baseSrgb);
-  setNuketown2FamilyUniform(mat, 'nuketown2PaintedPanelled', options.panelled === true ? 1 : 0);
-  const shared = sharedPaintedMetalGraph();
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  setNuketown2FamilyUniform(uniforms, 'paintedPanelled', options.panelled === true ? 1 : 0);
+  const shared = sharedPaintedMetalGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   return mat;

@@ -27,7 +27,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { buildWear, wallUv } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
-import { bindNuketown2WearUniforms, NUKETOWN2_UNIFORMS, setNuketown2FamilyUniform } from '../material-uniforms';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, float, floor, fract, max, mix, positionWorld, smoothstep, vec3 } =
   TSL as unknown as Record<string, any>;
@@ -58,14 +58,11 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
   });
 }
 
-let sidingGraph: { colorNode: any; roughnessNode: any } | null = null;
-
-function sharedSidingGraph(): { colorNode: any; roughnessNode: any } {
-  if (sidingGraph) return sidingGraph;
+function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   const spec = sidingSpec('nuketown2-siding-shared', 0x46809f);
   const p = positionWorld;
   const uv = wallUv();
-  const wear = buildWear(spec, uv);
+  const wear = buildWear(spec, uv, undefined, uniforms);
   const courseV = p.y.div(float(SIDING_COURSE_M));
   const courseIdx = floor(courseV);
   const withinCourse = fract(courseV);
@@ -79,22 +76,21 @@ function sharedSidingGraph(): { colorNode: any; roughnessNode: any } {
   const jointRun = uv.x.add(courseIdx.mul(float(1.15))).div(float(SIDING_BOARD_RUN_M));
   const joint = smoothstep(float(0.0012), float(0.0), abs(fract(jointRun).sub(float(0.5))).mul(float(SIDING_BOARD_RUN_M)));
   const isUpper = smoothstep(
-    NUKETOWN2_UNIFORMS.sidingWainscotTop.sub(float(0.004)),
-    NUKETOWN2_UNIFORMS.sidingWainscotTop.add(float(0.004)),
+    uniforms.sidingWainscotTop.sub(float(0.004)),
+    uniforms.sidingWainscotTop.add(float(0.004)),
     p.y,
   );
-  const wainscotBase = mix(NUKETOWN2_UNIFORMS.sidingWainscotColor, NUKETOWN2_UNIFORMS.baseColor, isUpper);
-  const base = (NUKETOWN2_UNIFORMS.sidingWainscot as any).greaterThan(float(0.5)).select(wainscotBase, NUKETOWN2_UNIFORMS.baseColor);
+  const wainscotBase = mix(uniforms.sidingWainscotColor, uniforms.baseColor, isUpper);
+  const base = (uniforms.sidingWainscot as any).greaterThan(float(0.5)).select(wainscotBase, uniforms.baseColor);
   const sunFade = smoothstep(float(1.2), float(5.2), p.y).mul(float(0.09));
   const splash = smoothstep(float(0.55), float(0.02), p.y).mul(float(0.16));
   const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash));
   const shadowed = mix(painted, painted.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
   const lit = mix(shadowed, shadowed.mul(float(1.12)), topCatch.mul(float(0.6)));
-  sidingGraph = {
+  return {
     colorNode: mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5))),
     roughnessNode: wear.roughness.add(dripShadow.mul(float(0.06))).add(splash.mul(float(0.10))).sub(sunFade.mul(float(0.30))),
   };
-  return sidingGraph;
 }
 
 /**
@@ -115,14 +111,14 @@ export function createSidingMaterial(
   // evaluates the node graph still gets the right house.
   mat.color.setHex(baseSrgb);
 
-  bindNuketown2WearUniforms(mat, spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
   const sharedWainscotHex = options.wainscotSrgb;
   const breakY = options.wainscotTopY ?? 2.76;
   const snapped = Math.round(breakY / SIDING_COURSE_M) * SIDING_COURSE_M;
-  setNuketown2FamilyUniform(mat, 'nuketown2SidingWainscot', sharedWainscotHex === undefined ? 0 : 1);
-  setNuketown2FamilyUniform(mat, 'nuketown2SidingWainscotColor', new THREE.Color(sharedWainscotHex ?? baseSrgb));
-  setNuketown2FamilyUniform(mat, 'nuketown2SidingWainscotTop', snapped);
-  const shared = sharedSidingGraph();
+  setNuketown2FamilyUniform(uniforms, 'sidingWainscot', sharedWainscotHex === undefined ? 0 : 1);
+  setNuketown2FamilyUniform(uniforms, 'sidingWainscotColor', new THREE.Color().setHex(sharedWainscotHex ?? baseSrgb, THREE.SRGBColorSpace));
+  setNuketown2FamilyUniform(uniforms, 'sidingWainscotTop', snapped);
+  const shared = sharedSidingGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   return mat;

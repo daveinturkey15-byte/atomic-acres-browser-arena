@@ -1,70 +1,87 @@
 import * as THREE from 'three';
-import { materialReference } from 'three/tsl';
+import { uniform } from 'three/tsl';
 import { readDistance, scaleResolvable } from './spec';
 import type { Nuketown2MaterialSpec } from './spec';
 
-/** Stable r185 material-reference nodes. Values are read from the rendered
- * material, so one node graph can serve every authored instance. */
-export const NUKETOWN2_UNIFORMS = Object.freeze({
-  baseColor: materialReference('nuketown2BaseColor', 'color'),
-  soilColor: materialReference('nuketown2SoilColor', 'color'),
-  backdrop: materialReference('nuketown2WearBackdrop', 'float'),
-  grainEnabled: materialReference('nuketown2WearGrainEnabled', 'float'),
-  scuffEnabled: materialReference('nuketown2WearScuffEnabled', 'float'),
-  grainFrequency: materialReference('nuketown2WearGrainFrequency', 'float'),
-  scuffFrequency: materialReference('nuketown2WearScuffFrequency', 'float'),
-  trafficFrequency: materialReference('nuketown2WearTrafficFrequency', 'float'),
-  grainAlbedo: materialReference('nuketown2WearGrainAlbedo', 'float'),
-  scuffAlbedo: materialReference('nuketown2WearScuffAlbedo', 'float'),
-  trafficAlbedo: materialReference('nuketown2WearTrafficAlbedo', 'float'),
-  grainRoughness: materialReference('nuketown2WearGrainRoughness', 'float'),
-  scuffRoughness: materialReference('nuketown2WearScuffRoughness', 'float'),
-  trafficRoughness: materialReference('nuketown2WearTrafficRoughness', 'float'),
-  soil: materialReference('nuketown2WearSoil', 'float'),
-  baseRoughness: materialReference('nuketown2WearBaseRoughness', 'float'),
-  concreteVariant: materialReference('nuketown2ConcreteVariant', 'float'),
-  concreteFootY: materialReference('nuketown2ConcreteFootY', 'float'),
-  lawnVariant: materialReference('nuketown2LawnVariant', 'float'),
-  paintedPanelled: materialReference('nuketown2PaintedPanelled', 'float'),
-  timberVariant: materialReference('nuketown2TimberVariant', 'float'),
-  sidingWainscot: materialReference('nuketown2SidingWainscot', 'float'),
-  sidingWainscotColor: materialReference('nuketown2SidingWainscotColor', 'color'),
-  sidingWainscotTop: materialReference('nuketown2SidingWainscotTop', 'float'),
-  asphaltMarking: materialReference('nuketown2AsphaltMarking', 'float'),
-}) as any;
-
-type UniformMaterial = THREE.Material & Record<string, unknown>;
-
-function setMaterialValue(material: THREE.Material, name: string, value: unknown): void {
-  (material as UniformMaterial)[name] = value;
+/**
+ * Per-material values kept out of the shared family graph topology. These are
+ * ordinary TSL uniforms, rather than custom material references: renderer
+ * shadow/depth clones do not copy arbitrary custom properties, while a uniform
+ * belongs to the material graph that owns it.
+ */
+export interface Nuketown2Uniforms {
+  readonly baseColor: any;
+  readonly soilColor: any;
+  readonly backdrop: any;
+  readonly grainEnabled: any;
+  readonly scuffEnabled: any;
+  readonly grainFrequency: any;
+  readonly scuffFrequency: any;
+  readonly trafficFrequency: any;
+  readonly grainAlbedo: any;
+  readonly scuffAlbedo: any;
+  readonly trafficAlbedo: any;
+  readonly grainRoughness: any;
+  readonly scuffRoughness: any;
+  readonly trafficRoughness: any;
+  readonly soil: any;
+  readonly baseRoughness: any;
+  readonly concreteVariant: any;
+  readonly concreteFootY: any;
+  readonly lawnVariant: any;
+  readonly paintedPanelled: any;
+  readonly timberVariant: any;
+  readonly sidingWainscot: any;
+  readonly sidingWainscotColor: any;
+  readonly sidingWainscotTop: any;
+  readonly asphaltMarking: any;
 }
 
-/** Bind the spec data without changing the shared wear graph identity. */
-export function bindNuketown2WearUniforms(
-  material: THREE.Material,
+function color(hex: number): THREE.Color {
+  return new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
+}
+
+/** Build one uniform set for one material instance with a shared topology. */
+export function createNuketown2Uniforms(
   spec: Nuketown2MaterialSpec,
   baseSrgb: number,
   soilSrgb = 0x6b5741,
-): void {
+): Nuketown2Uniforms {
   const readM = spec.readDistanceM ?? 0.5;
-  setMaterialValue(material, 'nuketown2BaseColor', new THREE.Color(baseSrgb));
-  setMaterialValue(material, 'nuketown2SoilColor', new THREE.Color(soilSrgb));
-  setMaterialValue(material, 'nuketown2WearBackdrop', readDistance(spec) >= 30 ? 1 : 0);
-  setMaterialValue(material, 'nuketown2WearGrainEnabled', scaleResolvable(spec.grain.sizeM, readM) ? 1 : 0);
-  setMaterialValue(material, 'nuketown2WearScuffEnabled', scaleResolvable(spec.scuff.sizeM, readM) ? 1 : 0);
-  setMaterialValue(material, 'nuketown2WearGrainFrequency', 1 / spec.grain.sizeM);
-  setMaterialValue(material, 'nuketown2WearScuffFrequency', 1 / spec.scuff.sizeM);
-  setMaterialValue(material, 'nuketown2WearTrafficFrequency', 1 / spec.traffic.sizeM);
-  setMaterialValue(material, 'nuketown2WearGrainAlbedo', spec.grain.albedo);
-  setMaterialValue(material, 'nuketown2WearScuffAlbedo', spec.scuff.albedo);
-  setMaterialValue(material, 'nuketown2WearTrafficAlbedo', spec.traffic.albedo);
-  setMaterialValue(material, 'nuketown2WearGrainRoughness', spec.grain.roughness);
-  setMaterialValue(material, 'nuketown2WearScuffRoughness', spec.scuff.roughness);
-  setMaterialValue(material, 'nuketown2WearTrafficRoughness', spec.traffic.roughness);
-  setMaterialValue(material, 'nuketown2WearSoil', spec.soil);
-  setMaterialValue(material, 'nuketown2WearBaseRoughness', spec.roughness);
+  return {
+    baseColor: uniform(color(baseSrgb)),
+    soilColor: uniform(color(soilSrgb)),
+    backdrop: uniform(readDistance(spec) >= 30 ? 1 : 0),
+    grainEnabled: uniform(scaleResolvable(spec.grain.sizeM, readM) ? 1 : 0),
+    scuffEnabled: uniform(scaleResolvable(spec.scuff.sizeM, readM) ? 1 : 0),
+    grainFrequency: uniform(1 / spec.grain.sizeM),
+    scuffFrequency: uniform(1 / spec.scuff.sizeM),
+    trafficFrequency: uniform(1 / spec.traffic.sizeM),
+    grainAlbedo: uniform(spec.grain.albedo),
+    scuffAlbedo: uniform(spec.scuff.albedo),
+    trafficAlbedo: uniform(spec.traffic.albedo),
+    grainRoughness: uniform(spec.grain.roughness),
+    scuffRoughness: uniform(spec.scuff.roughness),
+    trafficRoughness: uniform(spec.traffic.roughness),
+    soil: uniform(spec.soil),
+    baseRoughness: uniform(spec.roughness),
+    concreteVariant: uniform(0),
+    concreteFootY: uniform(0),
+    lawnVariant: uniform(0),
+    paintedPanelled: uniform(0),
+    timberVariant: uniform(0),
+    sidingWainscot: uniform(0),
+    sidingWainscotColor: uniform(color(baseSrgb)),
+    sidingWainscotTop: uniform(2.76),
+    asphaltMarking: uniform(0),
+  };
 }
 
-export function setNuketown2FamilyUniform(material: THREE.Material, name: string, value: unknown): void {
-  setMaterialValue(material, name, value);
+/** Set a family discriminator without changing the node graph shape. */
+export function setNuketown2FamilyUniform(
+  uniforms: Nuketown2Uniforms,
+  name: keyof Nuketown2Uniforms,
+  value: unknown,
+): void {
+  uniforms[name].value = value;
 }

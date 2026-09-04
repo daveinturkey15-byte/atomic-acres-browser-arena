@@ -33,7 +33,7 @@ import * as TSL from 'three/tsl';
 import { boxUv, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
-import { bindNuketown2WearUniforms, NUKETOWN2_UNIFORMS, setNuketown2FamilyUniform } from '../material-uniforms';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
 const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -69,14 +69,11 @@ export interface ConcreteOptions {
   readonly dampFootY?: number;
 }
 
-let concreteGraph: { colorNode: any; roughnessNode: any } | null = null;
-
-function sharedConcreteGraph(): { colorNode: any; roughnessNode: any } {
-  if (concreteGraph) return concreteGraph;
+function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
   const p = positionWorld;
-  const wear = buildWear(spec, boxUv());
-  const variant = NUKETOWN2_UNIFORMS.concreteVariant as any;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const variant = uniforms.concreteVariant as any;
   const isBlock = variant.greaterThan(float(1.5));
   const isApron = variant.lessThan(float(0.5));
   const run = p.x.add(p.z);
@@ -97,18 +94,18 @@ function sharedConcreteGraph(): { colorNode: any; roughnessNode: any } {
   )).sub(float(0.5)).mul(float(0.09));
   const blockUnit = hash2(vec2(floor(stretcherU), courseIdx)).sub(float(0.5)).mul(float(0.11));
   const unit = isBlock.select(blockUnit, slabUnit);
-  const footY = NUKETOWN2_UNIFORMS.concreteFootY;
+  const footY = uniforms.concreteFootY;
   const apronDamp = smoothstep(float(0.75), float(0.0), wear.soilMask.mul(float(1.6)));
   const verticalDamp = smoothstep(footY.add(float(0.24)), footY.add(float(0.02)), p.y);
   const damp = isApron.select(apronDamp, verticalDamp);
   const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
     .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
   const spall = isApron.select(float(0), blockSpall);
-  const base = NUKETOWN2_UNIFORMS.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);
-  concreteGraph = {
+  return {
     colorNode: mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7))),
     roughnessNode: clamp(
       wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
@@ -116,7 +113,6 @@ function sharedConcreteGraph(): { colorNode: any; roughnessNode: any } {
       float(1.0),
     ),
   };
-  return concreteGraph;
 }
 
 export function createConcreteMaterial(
@@ -136,10 +132,10 @@ export function createConcreteMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  bindNuketown2WearUniforms(mat, spec, baseSrgb);
-  setNuketown2FamilyUniform(mat, 'nuketown2ConcreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
-  setNuketown2FamilyUniform(mat, 'nuketown2ConcreteFootY', options.dampFootY ?? 0.0);
-  const shared = sharedConcreteGraph();
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  setNuketown2FamilyUniform(uniforms, 'concreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
+  setNuketown2FamilyUniform(uniforms, 'concreteFootY', options.dampFootY ?? 0.0);
+  const shared = sharedConcreteGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   return mat;

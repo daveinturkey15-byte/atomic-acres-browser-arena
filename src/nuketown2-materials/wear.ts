@@ -25,7 +25,7 @@ import {
   assertSpec,
   readDistance,
 } from './spec';
-import { NUKETOWN2_UNIFORMS } from './material-uniforms';
+import { createNuketown2Uniforms, type Nuketown2Uniforms } from './material-uniforms';
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
 const {
@@ -135,7 +135,7 @@ export function isBackdrop(spec: Nuketown2MaterialSpec): boolean {
  * ones at incommensurable periods is a smooth irregular mottle, which is what
  * a scrub plain looks like from 55 m.
  */
-export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
+export function backdropWear(spec: Nuketown2MaterialSpec, uniforms = createNuketown2Uniforms(spec, spec.baseSrgb)): WearNodes {
   void spec;
   const p = positionWorld;
   const wave = (ax: number, az: number, periodM: number): any =>
@@ -147,12 +147,12 @@ export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
 
   const soilMask = smoothstep(float(-0.45), float(0.55), field);
   const albedoMul = clamp(
-    float(1).add(field.mul(NUKETOWN2_UNIFORMS.trafficAlbedo)).sub(soilMask.mul(NUKETOWN2_UNIFORMS.soil)),
+    float(1).add(field.mul(uniforms.trafficAlbedo)).sub(soilMask.mul(uniforms.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
-    float(1).add(NUKETOWN2_UNIFORMS.trafficAlbedo),
+    float(1).add(uniforms.trafficAlbedo),
   );
   const roughness = clamp(
-    NUKETOWN2_UNIFORMS.baseRoughness.add(field.mul(NUKETOWN2_UNIFORMS.trafficRoughness)),
+    uniforms.baseRoughness.add(field.mul(uniforms.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
@@ -164,7 +164,12 @@ export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
  * @param uv     a 2D surface coordinate IN METRES (x/z for a ground plane, run/height for a wall)
  * @param soilUv optional separate metre-scale coordinate for the soiling field; defaults to `uv`
  */
-export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv): WearNodes {
+export function buildWear(
+  spec: Nuketown2MaterialSpec,
+  uv: any,
+  soilUv: any = uv,
+  uniforms: Nuketown2Uniforms = createNuketown2Uniforms(spec, spec.baseSrgb),
+): WearNodes {
   assertSpec(spec);
 
   // A BACKDROP - a surface only ever read from tens of metres - gets an
@@ -190,13 +195,13 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
   // lawn variants no longer create separate program identities. The enabled
   // values are zero for the backdrop; its branch remains analytically cheap
   // and, critically, the old hashed lattice is not reintroduced.
-  const grain = signedNoise(uv, NUKETOWN2_UNIFORMS.grainFrequency as any, 1)
+  const grain = signedNoise(uv, uniforms.grainFrequency as any, 1)
     .mul(detailFalloff(0.8, 3.0))
-    .mul(NUKETOWN2_UNIFORMS.grainEnabled);
-  const scuff = signedNoise(uv, NUKETOWN2_UNIFORMS.scuffFrequency as any, 2)
+    .mul(uniforms.grainEnabled);
+  const scuff = signedNoise(uv, uniforms.scuffFrequency as any, 2)
     .mul(detailFalloff(4.0, 18.0))
-    .mul(NUKETOWN2_UNIFORMS.scuffEnabled);
-  const traffic = signedNoise(soilUv, NUKETOWN2_UNIFORMS.trafficFrequency as any, 3);
+    .mul(uniforms.scuffEnabled);
+  const traffic = signedNoise(soilUv, uniforms.trafficFrequency as any, 3);
 
   // Soiling is one-sided: dirt subtracts. Thresholded so it has a shape (a
   // wash line, a lane) instead of being a uniform grey veil, which is the
@@ -205,28 +210,28 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
 
   const albedoMul = clamp(
     float(1)
-      .add(grain.mul(NUKETOWN2_UNIFORMS.grainAlbedo))
-      .add(scuff.mul(NUKETOWN2_UNIFORMS.scuffAlbedo))
-      .add(traffic.mul(NUKETOWN2_UNIFORMS.trafficAlbedo))
-      .sub(soilMask.mul(NUKETOWN2_UNIFORMS.soil)),
+      .add(grain.mul(uniforms.grainAlbedo))
+      .add(scuff.mul(uniforms.scuffAlbedo))
+      .add(traffic.mul(uniforms.trafficAlbedo))
+      .sub(soilMask.mul(uniforms.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
     float(1)
-      .add(NUKETOWN2_UNIFORMS.grainAlbedo)
-      .add(NUKETOWN2_UNIFORMS.scuffAlbedo)
-      .add(NUKETOWN2_UNIFORMS.trafficAlbedo),
+      .add(uniforms.grainAlbedo)
+      .add(uniforms.scuffAlbedo)
+      .add(uniforms.trafficAlbedo),
   );
 
   const roughness = clamp(
-    NUKETOWN2_UNIFORMS.baseRoughness
-      .add(grain.mul(NUKETOWN2_UNIFORMS.grainRoughness))
-      .add(scuff.mul(NUKETOWN2_UNIFORMS.scuffRoughness))
-      .add(traffic.mul(NUKETOWN2_UNIFORMS.trafficRoughness)),
+    uniforms.baseRoughness
+      .add(grain.mul(uniforms.grainRoughness))
+      .add(scuff.mul(uniforms.scuffRoughness))
+      .add(traffic.mul(uniforms.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
 
-  const backdrop = backdropWear(spec);
-  const useBackdrop = (NUKETOWN2_UNIFORMS.backdrop as any).greaterThan(float(0.5));
+  const backdrop = backdropWear(spec, uniforms);
+  const useBackdrop = (uniforms.backdrop as any).greaterThan(float(0.5));
   return {
     albedoMul: useBackdrop.select(backdrop.albedoMul, albedoMul),
     roughness: useBackdrop.select(backdrop.roughness, roughness),
