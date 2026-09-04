@@ -117,6 +117,8 @@ export type ThinMetalPanelPlacement = Readonly<{
 }>;
 
 export type ThinMetalPanelState = Readonly<{
+  arenaId: ShedArenaId;
+  matchEpoch: number;
   panelId: string;
   hits: number;
   holes: readonly BallisticAperture[];
@@ -288,7 +290,9 @@ function panelCoordinatesQ(
 
 function isPanelState(value: unknown): value is ThinMetalPanelState {
   if (!isRecord(value)
-    || !exactKeys(value, ['panelId', 'hits', 'holes'])
+    || !exactKeys(value, ['arenaId', 'matchEpoch', 'panelId', 'hits', 'holes'])
+    || !isArenaId(value.arenaId)
+    || !boundedInteger(value.matchEpoch, 1)
     || typeof value.panelId !== 'string' || value.panelId.length === 0 || value.panelId.length > 160
     || !boundedInteger(value.hits, 0, 1_000_000)
     || !Array.isArray(value.holes)
@@ -499,7 +503,13 @@ export class ThinMetalPerforationAuthority {
     for (const placement of placements) {
       const panel: RuntimePanel = {
         placement,
-        state: Object.freeze({ panelId: placement.id, hits: 0, holes: Object.freeze([]) }),
+        state: Object.freeze({
+          arenaId,
+          matchEpoch,
+          panelId: placement.id,
+          hits: 0,
+          holes: Object.freeze([]),
+        }),
       };
       this.panels.set(placement.id, panel);
       this.panelsBySurfaceId.set(placement.surfaceId, panel);
@@ -622,11 +632,16 @@ export class ThinMetalPerforationAuthority {
     if (value.arenaId !== this.arenaId || value.matchEpoch !== this.matchEpoch) return false;
     if (value.revision <= this.lastAppliedRevision) return false;
     const known = new Set(this.panels.keys());
-    if (!value.panels.every((state) => known.has(state.panelId))) return false;
+    if (value.panels.length !== this.panels.size
+      || !value.panels.every((state) => known.has(state.panelId)
+        && state.arenaId === this.arenaId
+        && state.matchEpoch === this.matchEpoch)) return false;
     this.revision = value.revision;
     for (const state of value.panels) {
       const panel = this.panels.get(state.panelId)!;
       panel.state = Object.freeze({
+        arenaId: this.arenaId,
+        matchEpoch: this.matchEpoch,
         panelId: state.panelId,
         hits: state.hits,
         holes: Object.freeze([...state.holes]),
@@ -646,7 +661,13 @@ export class ThinMetalPerforationAuthority {
     this.lastAppliedRevision = -1;
     this.nextHoleId = 0;
     for (const panel of this.panels.values()) {
-      panel.state = Object.freeze({ panelId: panel.placement.id, hits: 0, holes: Object.freeze([]) });
+      panel.state = Object.freeze({
+        arenaId: this.arenaId,
+        matchEpoch: this.matchEpoch,
+        panelId: panel.placement.id,
+        hits: 0,
+        holes: Object.freeze([]),
+      });
     }
     this.presentation.sync([...this.panels.values()].map((entry) => entry.placement), this.panelStates());
   }

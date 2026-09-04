@@ -8,6 +8,7 @@ import {
   type BallisticTrace,
 } from './ballistics';
 import { WEAPONS } from './gameplay';
+import { canonicalSha256 } from './canonical-state';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 import {
   THIN_METAL_MAX_HOLES_PER_ARENA,
@@ -208,6 +209,34 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     expect(guest.apertureQuery(surface, point)).toBe(true);
     expect(guest.applyAuthoritativeEnvelope(oldEnvelope)).toBe(false);
     expect(guest.apertureQuery(surface, point)).toBe(true);
+  });
+
+  it('rejects subset panels and panel states from another match', () => {
+    const surfaces = [bladeSurface('a:1'), bladeSurface('a:2')];
+    const placements = thinMetalPanelPlacements(
+      [{ surfaceName: 'verge street name blade', hitsToOpen: 3 }],
+      surfaces,
+    );
+    const host = new ThinMetalPerforationAuthority('nuketown2', 4, placements, true);
+    const guest = new ThinMetalPerforationAuthority('nuketown2', 4, placements, false);
+    const envelope = host.stateEnvelope();
+    const rehash = (panels: readonly typeof envelope.panels[number][]) => ({
+      ...envelope,
+      panels,
+      hash: canonicalSha256({
+        schemaVersion: envelope.schemaVersion,
+        arenaId: envelope.arenaId,
+        matchEpoch: envelope.matchEpoch,
+        revision: envelope.revision,
+        panels: [...panels].sort((left, right) => left.panelId.localeCompare(right.panelId)),
+      }),
+    });
+    const subset = rehash([envelope.panels[0]!]);
+    expect(isThinMetalPerforationEnvelope(subset)).toBe(true);
+    expect(guest.applyAuthoritativeEnvelope(subset)).toBe(false);
+    const wrongMatch = rehash(envelope.panels.map((state) => ({ ...state, arenaId: 'gun-range' as const })));
+    expect(isThinMetalPerforationEnvelope(wrongMatch)).toBe(true);
+    expect(guest.applyAuthoritativeEnvelope(wrongMatch)).toBe(false);
   });
 
   it('requires sub-threshold and non-penetrating hits to be ignored', () => {
