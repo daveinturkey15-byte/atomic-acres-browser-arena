@@ -151,6 +151,16 @@ export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
 ]);
 
 /**
+ * Street-lamp bodies are authored once on the north verge and emitted by the
+ * arena's `pair()` helper. Keeping these anchors beside the footprint means the
+ * practical-light catalog can read the same positions without a second table.
+ */
+export const NUKETOWN2_LAMP_POST_LAYOUT = Object.freeze([
+  Object.freeze({ id: 'west', x: -12, z: -NUKETOWN2_STREET_HALF_WIDTH - 0.9, poleHeight: 4.2, fixtureY: 4.35 }),
+  Object.freeze({ id: 'east', x: -4, z: -NUKETOWN2_STREET_HALF_WIDTH - 0.9, poleHeight: 4.2, fixtureY: 4.35 }),
+]);
+
+/**
  * The two upper rooms the rare weapon belongs in. Published descriptions of the
  * reference all reach the same conclusion about it: the front-facing upstairs
  * window is the strongest position on the map, because it holds the whole
@@ -254,3 +264,6 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
   x: -COACH_OFFSET_ALONG,
   z: NUKETOWN2_CENTRAL_TRUCK.z - COACH_OFFSET_ACROSS,
 });
+
+/** The civilian head car, shared by the vehicle dressing and light catalog. */
+export const NUKETOWN2_HEAD_CAR = Object.freeze({ x: 4.5, z: -0.8, headlightX: 2.22, headlightZ: 0.70 });

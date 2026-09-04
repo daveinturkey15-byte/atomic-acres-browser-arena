@@ -229,10 +229,10 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `445a9754` |
-| `balanced` | `0753ee34` |
-| `high` (QUALITY, HF-438 light tier) | `430da2ad` |
-| `max` (HF-438 full tier) | `03ee2e10` |
+| `performance` | `8b9050cb` |
+| `balanced` | `09c22d33` |
+| `high` (QUALITY, HF-438 light tier) | `7ca68dea` |
+| `max` (HF-438 full tier) | `2ec0fa43` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above

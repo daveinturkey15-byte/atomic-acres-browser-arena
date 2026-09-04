@@ -108,6 +108,8 @@ import {
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HEAD_CAR,
+  NUKETOWN2_LAMP_POST_LAYOUT,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
@@ -165,6 +167,8 @@ export {
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HEAD_CAR,
+  NUKETOWN2_LAMP_POST_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
 } from './nuketown2-layout';
 
@@ -1619,7 +1623,7 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // across it, this body keeps the longest clear centre-line run at 19.8 m
   // inside the 21.2 m band - and it is still the coach's counterweight, which
   // is the other property nuketown2-fidelity.test.ts measures.
-  const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
+  const HEAD_CAR: readonly [number, number] = [NUKETOWN2_HEAD_CAR.x, NUKETOWN2_HEAD_CAR.z];
   streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
   streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
   // Head car bumpers, sloped windows, and separate wheels with hubcaps:
@@ -1836,6 +1840,14 @@ function street(builder: Builder, m: Nuketown2Materials): void {
  * to a front door is not a walk across a blank apron.
  */
 function verge(builder: Builder, m: Nuketown2Materials): void {
+  // Fixed presentation-only lamp posts. The light catalog reads these same
+  // anchors, while pair() keeps both residential halves identical.
+  for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
+    pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+    pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.trim,
+      { solid: false, shots: false, cast: false, presentationOnly: true });
+  }
   // Letterbox at the end of each drive: the reference's own kerb prop.
   pair(builder, 'verge mailbox post', [GARAGE_X1 + 0.6, 0.6, KERB_Z - 1.2], [0.16, 1.2, 0.16], m.trim);
   pair(builder, 'verge mailbox', [GARAGE_X1 + 0.6, 1.35, KERB_Z - 1.2], [0.32, 0.3, 0.5], m.sign);
