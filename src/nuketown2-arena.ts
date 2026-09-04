@@ -126,6 +126,7 @@ import {
   NUKETOWN2_GROUND_FLOOR_T,
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
+  NUKETOWN2_HANDEDNESS,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
@@ -437,28 +438,6 @@ const HOUSE_CENTRE_X = NUKETOWN2_HOUSE_LAYOUT[0]!.x;
 const GARAGE_CENTRE_X = (GARAGE_X0 + GARAGE_X1) / 2;
 
 /**
- * Every opening a player walks through, ONCE, so the builder and the gate
- * cannot describe different doors. `span` is the axis the opening's width is
- * measured along, `centre` is its middle on that axis, and `at` is the CENTRE
- * PLANE of the leaf it is cut in - not the room line, because a probe on the
- * room line stands on the wall's outer face and measures nothing.
- */
-export const NUKETOWN2_DOORWAYS = Object.freeze([
-  Object.freeze({ id: 'house front door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_FRONT_Z - WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
-  Object.freeze({ id: 'house back door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y }),
-  Object.freeze({ id: 'house internal door', span: 'x' as const, centre: -2.7, at: HOUSE_MID_Z, width: DOOR_WIDTH, headY: GROUND_H }),
-  Object.freeze({ id: 'house garage link', span: 'z' as const, centre: -18.7, at: HOUSE_X1 - WALL_T / 2, width: DOOR_WIDTH, headY: GROUND_H - 0.4 }),
-  Object.freeze({ id: 'garage vehicle door', span: 'x' as const, centre: GARAGE_CENTRE_X, at: GARAGE_FRONT_Z - WALL_T / 2, width: 3.5, headY: 2.6 }),
-  Object.freeze({ id: 'garage rear door', span: 'x' as const, centre: GARAGE_CENTRE_X - 0.55, at: GARAGE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: 2.6 }),
-]);
-
-/** The [low, high] run a doorway occupies on its own span axis. */
-function doorRun(id: string): [number, number] {
-  const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
-  return [door.centre - door.width / 2, door.centre + door.width / 2];
-}
-
-/**
  * HF-435: EVERY window, ONCE - spans, sill tops and whether it carries a
  * ground-floor glass pane - so the builder and the gate cannot describe
  * different windows. Spans run along x; both houses use them (the south house
@@ -472,6 +451,212 @@ const FRONT_WINDOW_A: [number, number] = [-5.6, -3.6];
 const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
 const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
 const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
+/**
+ * THE REAR BALCONY, ITS EXTERIOR FLIGHT, THE FRONT LEDGE AND THE PORCH CANOPY
+ * - HF-465, and R4 section 5, which is the highest-value row on that lane's
+ * list because it is the owner's own words AND it is stated first-party rather
+ * than inferred from pixels.
+ *
+ * What the reference has, in three parts: an upper-floor rear balcony
+ * overlooking the back yard with an EXTERIOR STAIRCASE down to the back lawn
+ * (the second of the map's three routes upstairs); a small ledge protruding
+ * just under the second-storey window on the street side; and the front window
+ * as a real ENTRY, climbed from outside off objects. No source gives a
+ * dimension, so every number below is DERIVED from this arena's own figures,
+ * and the derivation - not the number - is the contract.
+ *
+ * The figures it is derived from, all already in this file: house width 11,
+ * depth 13, UPPER_Y0 3.3, ROOF_Y0 6.2, HOUSE_BACK_Z -23, wall 0.3; standing
+ * capsule 1.82, radius 0.38, autostep 0.42, jump apex 0.82 - so 1.24 m is the
+ * most a player takes in one move, which is the ceiling every step of the
+ * front climb chain is held under.
+ */
+const BALCONY_WIDTH = 4.4;             // 0.40 W: two capsules abreast plus a rail either side
+const BALCONY_PROJECTION = 2.0;        // 0.18 W: 2.6 capsule diameters, so it is a route and not a Juliet
+const BALCONY_SLAB_T = 0.2;            // soffit at 3.1, clear of a standing player below
+const BALCONY_RAIL_H = 1.1;            // above LOW_COVER 0.95, under the 1.65 standing eye
+const BALCONY_RAIL_T = 0.12;
+const BALCONY_POST = 0.16;
+/**
+ * WHERE ALONG THE HOUSE, AND WHY IT IS NOT R4'S NUMBER.
+ *
+ * R4 section 5.1 puts the deck 2.9-3.0 m toward the NON-GARAGE end (authored
+ * centre about -4.25) and states its own falsifier in the same paragraph: the
+ * existing upper back window run must not overlap it. It does. BACK_UPPER_WINDOW
+ * occupies the authored run [-5.75, -3.25], which is exactly where that deck's
+ * 1.8 m door would be cut, and that window is a shipped feature carrying
+ * breakable glass (HF-435, HF-464) - so the NEW body yields, not the old one.
+ *
+ * The binding constraint is the DECK, not the door. Authored so that only the
+ * doorway cleared the window, the deck's own outboard RAIL RETURN stood 0.25 m
+ * off the window's centre line, inside the reach of the drop-out probe: the
+ * upper back window stopped being an exit, and the existing HF-435 gate caught
+ * it on the first run. So the deck is centred in the wall the window leaves -
+ * between the window's far edge and the house's garage-end corner:
+ *
+ *   BALCONY_CENTRE_X = (BACK_UPPER_WINDOW[1] + HOUSE_X1) / 2
+ *
+ * which puts the whole balcony clear of the window's opening, leaves 1.3 m of
+ * deck either side of the doorway, keeps the deck inside the house's own width
+ * (span [-1.7, 2.7] against a house of [-6.75, 4.25]), and still runs the
+ * exterior flight off the NON-garage end into the open side yard - R4's real
+ * constraint, since a flight off the other end would cross the garage rear
+ * door's threshold and block a route the door gate walks.
+ *
+ * That keeps the deck inside the house's own width (span [-4.25, 0.15] against
+ * a house of [-6.75, 4.25]) and still puts the exterior flight in the OPEN
+ * side yard at the non-garage end, which is R4's real constraint: a flight off
+ * the other end would run across the garage rear door's threshold and block a
+ * route the door gate walks.
+ */
+const BALCONY_CENTRE_X = (BACK_UPPER_WINDOW[1] + HOUSE_X1) / 2;
+const BALCONY_X0 = BALCONY_CENTRE_X - BALCONY_WIDTH / 2;
+const BALCONY_Z_OUTBOARD = HOUSE_BACK_Z - BALCONY_PROJECTION;
+
+export const NUKETOWN2_BALCONY = Object.freeze({
+  centreX: BALCONY_CENTRE_X,
+  width: BALCONY_WIDTH,
+  projection: BALCONY_PROJECTION,
+  /** Flush with the upper floor, so you walk OUT level rather than step down. */
+  deckTop: NUKETOWN2_UPPER_Y0,
+  slabThickness: BALCONY_SLAB_T,
+  railHeight: BALCONY_RAIL_H,
+  railThickness: BALCONY_RAIL_T,
+  postSize: BALCONY_POST,
+  outboardZ: BALCONY_Z_OUTBOARD,
+});
+
+/**
+ * THE EXTERIOR FLIGHT, balcony to back lawn. It reuses the interior stair's
+ * proven shape - a riser inside the 0.42 autostep, a going over Rapier's 0.22
+ * minimum width, and one collision-only rotated slab owning movement while the
+ * treads stay presentation - so it is walkable by construction and the
+ * existing probe pattern covers it.
+ *
+ * 11 risers of exactly 0.30 span the 3.30 m to the upper floor. It runs
+ * PARALLEL to the back wall, off the deck's outboard (non-garage) end, in the
+ * 1.4 m strip immediately inside the deck's own outboard edge, so nothing is
+ * ever over it - STAIR_MAX_FEET_UNDER_CEILING cannot apply and the HF-432
+ * wedging failure cannot recur - and the middle of the yard stays open. A
+ * perpendicular flight would drive a 3.3 m ramp 4.2 m into the yard and cut
+ * the spawn's own sightlines.
+ */
+const YARD_STAIR_RISERS = 11;
+const YARD_STAIR_GOING = 0.42;
+const YARD_STAIR_WIDTH = 1.4;
+const YARD_STAIR_RUN = YARD_STAIR_GOING * (YARD_STAIR_RISERS - 1);
+const YARD_STAIR_OVERLAP = 0.12;
+const YARD_STAIR_TOP_X = BALCONY_X0;
+const YARD_STAIR_FOOT_X = BALCONY_X0 - YARD_STAIR_RUN;
+const YARD_STAIR_RAMP_RISE = NUKETOWN2_UPPER_Y0;
+const YARD_STAIR_RAMP_RUN = YARD_STAIR_RUN + 2 * YARD_STAIR_OVERLAP;
+const YARD_STAIR_RAMP_ANGLE = Math.atan2(YARD_STAIR_RAMP_RISE, YARD_STAIR_RAMP_RUN);
+const YARD_STAIR_RAMP_T = 0.16;
+/**
+ * WHICH 1.4 m OF THE DECK'S 2.0 m DEPTH THE FLIGHT OCCUPIES: the half against
+ * the house, not the outboard half. Run against the outboard edge the flight
+ * lands ON the |z| = 25 spawn line - three of each team's six spawns sit on it
+ * - and a player would have spawned under a 1.1 m ramp. Hugging the wall
+ * leaves 0.6 m between the flight and that line, more than a standing radius,
+ * and the deck's own end face is still the top landing.
+ */
+const YARD_STAIR_Z = HOUSE_BACK_Z - YARD_STAIR_WIDTH / 2;
+
+export const NUKETOWN2_YARD_STAIR = Object.freeze({
+  width: YARD_STAIR_WIDTH,
+  riser: NUKETOWN2_UPPER_Y0 / YARD_STAIR_RISERS,
+  going: YARD_STAIR_GOING,
+  risers: YARD_STAIR_RISERS,
+  topX: YARD_STAIR_TOP_X,
+  footX: YARD_STAIR_FOOT_X,
+  centreZ: YARD_STAIR_Z,
+  rampAngleRadians: YARD_STAIR_RAMP_ANGLE,
+  rampRise: YARD_STAIR_RAMP_RISE,
+  rampRun: YARD_STAIR_RAMP_RUN,
+  rampThickness: YARD_STAIR_RAMP_T,
+});
+
+/**
+ * THE FRONT CLIMB CHAIN - R4 section 5.3. The ledge exists so the front window
+ * becomes a TWO-WAY opening, which is what the reference has and what makes
+ * the power position contestable instead of a sniper's box.
+ *
+ * Every step is inside the 1.24 m one-move ceiling AND stands directly over
+ * the one below it in plan, which is the half R4's height table does not state
+ * and a probe would otherwise fail on:
+ *
+ *   ground -> verge front hedge 0.95 -> porch canopy 2.15 -> window ledge 3.30
+ *          -> upper window sill top 4.20
+ *   gaps      0.95              1.20              1.15             0.90
+ *
+ * The hedge already exists (verge front hedge, top LOW_COVER); the canopy is
+ * authored 4.0 m wide so it overlaps the hedge's own x run, and the ledge is
+ * authored inside the canopy's footprint.
+ */
+const PORCH_CANOPY_TOP = 2.15;
+const PORCH_CANOPY_T = 0.18;
+const PORCH_CANOPY_WIDTH = 4.0;
+const PORCH_CANOPY_PROJECTION = 1.8;
+const PORCH_CANOPY_POST = 0.12;
+/**
+ * The balcony door's clear head. Set by leaving a 0.4 m header under the roof
+ * deck rather than by copying DOOR_HEAD_Y: the upper storey is 2.9 m, so a
+ * 0.4 m lintel gives 2.5 m of head - comfortably over the map's derived 2.4 m
+ * band (capsule 1.82 + autostep up-cast 0.42 + 0.16) that every other opening
+ * on this arena is held to.
+ */
+const BALCONY_DOOR_HEAD_Y = UPPER_H - 0.4;
+const WINDOW_LEDGE_TOP = NUKETOWN2_UPPER_Y0;
+const WINDOW_LEDGE_T = 0.2;
+const WINDOW_LEDGE_PROJECTION = 0.5;
+
+export const NUKETOWN2_PORCH_CANOPY = Object.freeze({
+  top: PORCH_CANOPY_TOP,
+  thickness: PORCH_CANOPY_T,
+  width: PORCH_CANOPY_WIDTH,
+  projection: PORCH_CANOPY_PROJECTION,
+  postSize: PORCH_CANOPY_POST,
+  centreX: HOUSE_CENTRE_X,
+});
+
+export const NUKETOWN2_WINDOW_LEDGE = Object.freeze({
+  top: WINDOW_LEDGE_TOP,
+  thickness: WINDOW_LEDGE_T,
+  projection: WINDOW_LEDGE_PROJECTION,
+  /** The upper window's own width plus 0.3 m of nosing either side. */
+  width: (UPPER_WINDOW[1] - UPPER_WINDOW[0]) + 0.6,
+  centreX: (UPPER_WINDOW[0] + UPPER_WINDOW[1]) / 2,
+});
+
+
+/**
+ * Every opening a player walks through, ONCE, so the builder and the gate
+ * cannot describe different doors. `span` is the axis the opening's width is
+ * measured along, `centre` is its middle on that axis, and `at` is the CENTRE
+ * PLANE of the leaf it is cut in - not the room line, because a probe on the
+ * room line stands on the wall's outer face and measures nothing.
+ */
+export const NUKETOWN2_DOORWAYS = Object.freeze([
+  Object.freeze({ id: 'house front door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_FRONT_Z - WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y, floorY: 0 }),
+  Object.freeze({ id: 'house back door', span: 'x' as const, centre: HOUSE_CENTRE_X, at: HOUSE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: DOOR_HEAD_Y, floorY: 0 }),
+  Object.freeze({ id: 'house internal door', span: 'x' as const, centre: -2.7, at: HOUSE_MID_Z, width: DOOR_WIDTH, headY: GROUND_H, floorY: 0 }),
+  Object.freeze({ id: 'house garage link', span: 'z' as const, centre: -18.7, at: HOUSE_X1 - WALL_T / 2, width: DOOR_WIDTH, headY: GROUND_H - 0.4, floorY: 0 }),
+  Object.freeze({ id: 'garage vehicle door', span: 'x' as const, centre: GARAGE_CENTRE_X, at: GARAGE_FRONT_Z - WALL_T / 2, width: 3.5, headY: 2.6, floorY: 0 }),
+  Object.freeze({ id: 'garage rear door', span: 'x' as const, centre: GARAGE_CENTRE_X - 0.55, at: GARAGE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: 2.6, floorY: 0 }),
+  // HF-465 / R4 section 5.1: the door onto the rear balcony. The FIRST doorway
+  // on this map that is not on the ground floor, which is why every row now
+  // carries `floorY` - the gate measures head and shoulder from the floor the
+  // door actually stands on, and reading 0 for this one would have measured
+  // the ground-floor back door's lintel instead.
+  Object.freeze({ id: 'house balcony door', span: 'x' as const, centre: BALCONY_CENTRE_X, at: HOUSE_BACK_Z + WALL_T / 2, width: DOOR_WIDTH, headY: BALCONY_DOOR_HEAD_Y, floorY: NUKETOWN2_UPPER_Y0 }),
+]);
+
+/** The [low, high] run a doorway occupies on its own span axis. */
+function doorRun(id: string): [number, number] {
+  const door = NUKETOWN2_DOORWAYS.find((entry) => entry.id === id)!;
+  return [door.centre - door.width / 2, door.centre + door.width / 2];
+}
+
 export const NUKETOWN2_WINDOWS = Object.freeze([
   Object.freeze({ id: 'ground front west', pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
   Object.freeze({ id: 'ground front east', pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
@@ -1114,10 +1299,24 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house back string course', [cx, GROUND_H, -23.03], [HOUSE_WIDTH + 0.08, 0.10, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
-  [[HOUSE_X0 + WALL_T, BACK_UPPER_WINDOW[0]], [BACK_UPPER_WINDOW[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
+  // HF-465: the upper back wall now carries the window AND the balcony door,
+  // so it is three piers rather than two. Order matters - the doorway is cut
+  // before the deck is built, or the pier runs do not split correctly.
+  const BALCONY_DOOR = doorRun('house balcony door');
+  [
+    [HOUSE_X0 + WALL_T, BACK_UPPER_WINDOW[0]],
+    [BACK_UPPER_WINDOW[1], BALCONY_DOOR[0]],
+    [BALCONY_DOOR[1], HOUSE_X1 - WALL_T],
+  ].forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], siding);
   });
+  // The door's head band: the 0.4 m header between its clear head and the
+  // roof deck's underside.
+  pair(builder, 'house balcony door lintel',
+    [(BALCONY_DOOR[0] + BALCONY_DOOR[1]) / 2,
+      UPPER_Y0 + (BALCONY_DOOR_HEAD_Y + UPPER_H) / 2, zBack],
+    [BALCONY_DOOR[1] - BALCONY_DOOR[0], UPPER_H - BALCONY_DOOR_HEAD_Y, WALL_T], m.trim);
   // HF-435: sill stays at 0.9 m, the old head band goes - same reason as the
   // upper front window: the opening has to be tall enough for a capsule to
   // cross, and the roof deck is the head.
@@ -1241,6 +1440,134 @@ function house(builder: Builder, m: Nuketown2Materials): void {
         [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
     });
   }
+
+  // ---- HF-465: THE REAR BALCONY --------------------------------------------
+  // Owner, PASS 94: the houses are missing their balconies. See
+  // NUKETOWN2_BALCONY above for every number's derivation. Built through
+  // pair() so both houses get it and the 180-degree partner gate stays green
+  // by construction, and named so the floating-geometry gate's existing
+  // vocabulary already explains it - deck, rail, lintel, sill, porch - rather
+  // than widening that regex to fit a name.
+  const bal = NUKETOWN2_BALCONY;
+  const balDeckZ = HOUSE_BACK_Z - bal.projection / 2;
+  /** The outboard edge of the flight's own 1.4 m strip; see NUKETOWN2_YARD_STAIR. */
+  const yardStairOuterZ = NUKETOWN2_YARD_STAIR.centreZ - NUKETOWN2_YARD_STAIR.width / 2;
+  pair(builder, 'balcony deck',
+    [bal.centreX, bal.deckTop - bal.slabThickness / 2, balDeckZ],
+    [bal.width, bal.slabThickness, bal.projection], m.interiorFloor);
+  // Two posts, lawn to soffit, at the outboard corners: architecturally right
+  // for a deck AND the honest answer to "is this body floating".
+  for (const [index, side] of [-1, 1].entries()) {
+    pair(builder, `balcony post ${index}`,
+      [bal.centreX + side * (bal.width - bal.postSize) / 2,
+        (bal.deckTop - bal.slabThickness) / 2,
+        bal.outboardZ + bal.postSize / 2],
+      [bal.postSize, bal.deckTop - bal.slabThickness, bal.postSize], m.trim);
+  }
+  // Rails: the outboard run and two returns. 1.1 m over the deck, so it breaks
+  // a crouched line (over LOW_COVER) and a standing player shoots across it
+  // (under the 1.65 m standing eye). The doorway's own width stays clear.
+  pair(builder, 'balcony rail outboard',
+    [bal.centreX, bal.deckTop + bal.railHeight / 2, bal.outboardZ + bal.railThickness / 2],
+    [bal.width, bal.railHeight, bal.railThickness], m.trim);
+  // The return at the far end runs the deck's whole depth. The one at the
+  // flight's end does NOT: authored full, it stood 1.1 m tall across the top
+  // of the exterior flight and the no-jump walk probe stalled 0.4 m short of
+  // the deck - a staircase arriving at a railing. A deck's stair opening has
+  // no rail across it, so this end keeps only the 0.6 m of return the flight
+  // does not occupy, which is the newel beside the opening.
+  pair(builder, 'balcony rail return far',
+    [bal.centreX + (bal.width - bal.railThickness) / 2,
+      bal.deckTop + bal.railHeight / 2, balDeckZ],
+    [bal.railThickness, bal.railHeight, bal.projection], m.trim);
+  const stairOpeningZ0 = yardStairOuterZ;
+  const balconyNewelDepth = stairOpeningZ0 - bal.outboardZ;
+  pair(builder, 'balcony rail newel',
+    [bal.centreX - (bal.width - bal.railThickness) / 2,
+      bal.deckTop + bal.railHeight / 2, bal.outboardZ + balconyNewelDepth / 2],
+    [bal.railThickness, bal.railHeight, balconyNewelDepth], m.trim);
+  pair(builder, 'balcony rail cap',
+    [bal.centreX, bal.deckTop + bal.railHeight - 0.05, bal.outboardZ + bal.railThickness / 2],
+    [bal.width + 0.08, 0.10, bal.railThickness + 0.06], m.trim,
+    { solid: false, shots: false, cast: true });
+
+  // ---- the exterior flight, balcony -> back lawn ---------------------------
+  // Same construction as the interior stair: presentation treads, and ONE
+  // collision-only rotated slab that owns movement for the whole flight.
+  const yardStair = NUKETOWN2_YARD_STAIR;
+  const yardRampMaterial = new THREE.MeshBasicMaterial({ visible: false });
+  yardRampMaterial.name = 'nuketown2-yard-stair-collision-authority';
+  const yardRampLength = Math.hypot(yardStair.rampRun, yardStair.rampRise);
+  const yardRampCentreX = (yardStair.topX + YARD_STAIR_OVERLAP + yardStair.footX - YARD_STAIR_OVERLAP) / 2;
+  const yardRampCentreY = yardStair.rampRise / 2
+    - Math.cos(yardStair.rampAngleRadians) * yardStair.rampThickness / 2;
+  // The flight runs along x, so its slab is pitched about Z - and unlike the
+  // interior ramp's pitch about X, a reflection in x DOES negate a rotation
+  // about z (M R_z(t) M = R_z(-t) for M = diag(-1, 1, 1)). Hence the explicit
+  // handedness factor: without it the mirrored flight would rise the wrong way
+  // and the walk probe below would fail on a ramp that looked correct.
+  const yardRampPitch = NUKETOWN2_HANDEDNESS * yardStair.rampAngleRadians;
+  const northYardRamp = box(builder, 'nuketown2 north yard stair ramp',
+    [nuketown2HandedX(yardRampCentreX), yardRampCentreY, yardStair.centreZ],
+    [yardRampLength, yardStair.rampThickness, yardStair.width], yardRampMaterial,
+    { rotation: [0, 0, yardRampPitch] });
+  const southYardRamp = box(builder, 'nuketown2 south yard stair ramp',
+    [-nuketown2HandedX(yardRampCentreX), yardRampCentreY, -yardStair.centreZ],
+    [yardRampLength, yardStair.rampThickness, yardStair.width], yardRampMaterial,
+    { rotation: [0, 0, -yardRampPitch] });
+  northYardRamp.userData.collisionOnly = true;
+  southYardRamp.userData.collisionOnly = true;
+  // As with the interior ramp: the lightweight axis-aligned `colliders`
+  // channel would describe this pitched slab as a solid block, so the exact
+  // rotated OBBs are kept in physicsColliders (the live authority) only.
+  const yardRampBounds = new Set(builder.physicsColliders.slice(-2));
+  builder.colliders = builder.colliders.filter((bounds) => !yardRampBounds.has(bounds));
+  for (let i = 0; i < yardStair.risers - 1; i += 1) {
+    const treadTop = bal.deckTop - yardStair.riser * (i + 1);
+    pair(builder, `yard stair ${i}`,
+      [yardStair.topX - yardStair.going * (i + 0.5), treadTop - 0.08 / 2, yardStair.centreZ],
+      [yardStair.going, 0.08, yardStair.width], m.trim,
+      { solid: false, shots: false, cast: true });
+  }
+
+  // ---- HF-465: the front ledge and the porch canopy ------------------------
+  // The two rungs that make the upper front window a two-way opening. Heights
+  // and plan overlaps are derived in NUKETOWN2_PORCH_CANOPY /
+  // NUKETOWN2_WINDOW_LEDGE; the gate re-derives the chain rather than
+  // restating it.
+  const canopy = NUKETOWN2_PORCH_CANOPY;
+  const canopyZ = HOUSE_FRONT_Z + canopy.projection / 2;
+  // TWO WINGS AND A RAISED HEAD BAY, and the split is not decoration.
+  // Authored as one 2.15 m slab the canopy's soffit sat at 1.97 m over the
+  // front DOOR's own approach - under the 2.24 m (capsule + autostep up-cast)
+  // this map holds every opening to - and the new front-chain gate caught it.
+  // The bay over the doorway is therefore lifted until its soffit is the
+  // door's own head band, which is what a porch gable looks like anyway; the
+  // wings stay at 2.15 because they are the rung the climb chain uses.
+  const canopyDoor = doorRun('house front door');
+  for (const [index, run] of ([
+    [canopy.centreX - canopy.width / 2, canopyDoor[0]],
+    [canopyDoor[1], canopy.centreX + canopy.width / 2],
+  ] as const).entries()) {
+    pair(builder, `porch canopy wing ${index}`,
+      [(run[0] + run[1]) / 2, canopy.top - canopy.thickness / 2, canopyZ],
+      [run[1] - run[0], canopy.thickness, canopy.projection], m.trim);
+  }
+  pair(builder, 'porch canopy head',
+    [(canopyDoor[0] + canopyDoor[1]) / 2, DOOR_HEAD_Y + canopy.thickness / 2, canopyZ],
+    [canopyDoor[1] - canopyDoor[0], canopy.thickness, canopy.projection], m.trim);
+  // Posts clear of BOTH the front door's own span and the hedge's plan run, so
+  // neither the door walk nor the hedge is interpenetrated.
+  for (const [index, side] of [-1, 1].entries()) {
+    pair(builder, `porch canopy post ${index}`,
+      [canopy.centreX + side * 1.35, (canopy.top - canopy.thickness) / 2,
+        HOUSE_FRONT_Z + canopy.projection - canopy.postSize / 2],
+      [canopy.postSize, canopy.top - canopy.thickness, canopy.postSize], m.trim);
+  }
+  const ledge = NUKETOWN2_WINDOW_LEDGE;
+  pair(builder, 'window ledge sill',
+    [ledge.centreX, ledge.top - ledge.thickness / 2, HOUSE_FRONT_Z + ledge.projection / 2],
+    [ledge.width, ledge.thickness, ledge.projection], m.trim);
 
   // One waist-high body per ground room, so a room is a fight and not a box.
   pair(builder, 'house front room counter', [-4.8, LOW_COVER / 2, HOUSE_FRONT_Z - 2.8], [3.2, LOW_COVER, 1.0], m.interior);
