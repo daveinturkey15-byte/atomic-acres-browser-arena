@@ -30,17 +30,28 @@
 //     audited through its hidden SOURCE node instead — the same geometry, the
 //     same transform, and the same material object the batch reuses — so every
 //     row names a real authored piece, and nothing is counted twice.
+// PASS 96 (all-arenas lane, HF-486/503 follow-on): the instrument now takes
+// `--arena <id>` (repeatable) and `--all` (the full ARENA_IDS roster, derived
+// from the arena catalog - never a hardcoded list). The HOUSE-INTERIOR and
+// STREET classes are AUTHORED-footprint classes: their tables exist only for
+// nuketown2, so on any other arena they are structurally absent and read 0
+// rather than being silently excused. With no arena flags the script measures
+// exactly what it always measured - nuketown2 - so the pass-94 acceptance gate
+// command is unchanged.
 
 import * as THREE from 'three';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import {
-  buildNuketown2,
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
 } from '../../src/nuketown2-arena';
 import { nuketown2HandedSpan } from '../../src/nuketown2-layout';
+import { ARENA_IDS, isArenaId, type ArenaId } from '../../src/arena-identity';
+import { ARENA_BUILDERS } from '../../src/spawn-layout-constraints';
+import { prepareMap3 } from '../../src/map3-arena';
+import { pathToFileURL } from 'node:url';
 
 const NEAR_METERS = 0.03;
 
@@ -71,9 +82,9 @@ function materialNameOf(mesh: THREE.Mesh): string {
   return material.name || material.type;
 }
 
-function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]; collisionOnlySlopes: string[] } {
+function collectBoxes(arenaId: ArenaId): { boxes: Box[]; skipped: number; skippedNames: string[]; collisionOnlySlopes: string[] } {
   const scene = new THREE.Scene();
-  const map = buildNuketown2(scene);
+  const map = ARENA_BUILDERS[arenaId](scene);
   const boxes: Box[] = [];
   let skipped = 0;
   const skippedNames: string[] = [];
@@ -101,12 +112,44 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
     if (mesh.userData.sourceMeshes !== undefined) return;
     const label = mesh.name || mesh.type;
     if ((mesh as THREE.InstancedMesh).isInstancedMesh === true) { skipped += 1; skippedNames.push(`${label} (instanced)`); return; }
+    // An INVISIBLE mesh draws no fragments, so it cannot enter a visible
+    // depth race. Authored-invisible geometry - farcrysis boundary walls and
+    // collider proxies (the HF-360 idiom) - is therefore excluded and named,
+    // exactly like every other unauditable class; left unguarded it paired
+    // against visible art as phantom FINDINGS.
+    // EXCEPTION: a retired batch SOURCE is also `visible = false`, but
+    // `batchPresentationOnlyBoxes` hides it and draws the merged batch in its
+    // place, and this instrument's contract is to audit each member THROUGH
+    // that hidden source (same geometry, transform and material the batch
+    // reuses). Those carry `staticBatchRendered` and stay in the audit -
+    // excluding them would silently drop the nuketown2 decal discipline the
+    // pass-94 gate records were measured against.
+    let hidden = false;
+    for (let ancestor: THREE.Object3D | null = mesh; ancestor !== null; ancestor = ancestor.parent) {
+      if (ancestor.visible === false) { hidden = true; break; }
+    }
+    if (hidden && mesh.userData.staticBatchRendered !== true) {
+      skipped += 1;
+      skippedNames.push(`${label} (invisible)`);
+      return;
+    }
     if (mesh.userData.collisionOnly === true) { collisionOnlySlopes.push(label); return; }
     if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; skippedNames.push(`${label} (rotated)`); return; }
     const geometry = mesh.geometry as THREE.BoxGeometry;
     if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
     const p = geometry.parameters;
     mesh.getWorldPosition(world);
+    // A body that measures non-finite (animated/parametric world matrix or
+    // degenerate parameters) cannot be placed. Unguarded, `dy > NEAR_METERS`
+    // is false for NaN, so one NaN box pairs with EVERYTHING and floods the
+    // report with dy=NaN FINDINGS - measured on map3's shoreline and godrays
+    // bodies. Counted and named as UNAUDITED, like the other unmeasurable
+    // classes, so a report total is always a finite measurement.
+    if (!Number.isFinite(world.x + world.y + world.z + p.width + p.height + p.depth)) {
+      skipped += 1;
+      skippedNames.push(`${label} (non-finite)`);
+      return;
+    }
     boxes.push({
       name: mesh.name,
       materialId: materialIdOf(mesh),
@@ -175,17 +218,42 @@ function overlapInsideCarriageway(first: Box, second: Box): boolean {
   ));
 }
 
-function main(): void {
-  const outIndex = process.argv.indexOf('--out');
-  const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
-  const { boxes, skipped, skippedNames, collisionOnlySlopes } = collectBoxes();
+export type CoplanarCounts = Readonly<{
+  pairs: number;
+  findings: number;
+  fenced: number;
+  sameMaterial: number;
+  houseInterior: number;
+  street: number;
+}>;
 
+export type CoplanarScan = Readonly<{
+  boxes: number;
+  skipped: number;
+  skippedNames: readonly string[];
+  collisionOnlySlopes: readonly string[];
+  counts: CoplanarCounts;
+  rows: readonly string[];
+}>;
+
+/**
+ * The full horizontal-top-face audit for one arena, shared by the CLI and the
+ * roster-derived pinning test. `scopeFootprints` gates the two AUTHORED
+ * footprint classes: they exist only where authored footprint tables exist
+ * (nuketown2). On another arena the tables were never written, and reporting
+ * HOUSE-INTERIOR/STREET findings against nothing would be inventing a failure
+ * just as surely as reporting 0 against hidden geometry would be hiding one -
+ * so the classes simply do not fire there.
+ */
+export function scanArena(arenaId: ArenaId): CoplanarScan {
+  const { boxes, skipped, skippedNames, collisionOnlySlopes } = collectBoxes(arenaId);
+  const scopeFootprints = arenaId === 'nuketown2';
   const rows: string[] = [];
   let findings = 0;
   let fenced = 0;
-  let benign = 0;
-  let houseInteriorFindings = 0;
-  let streetFindings = 0;
+  let sameMaterial = 0;
+  let houseInterior = 0;
+  let street = 0;
   for (let a = 0; a < boxes.length; a += 1) {
     for (let b = a + 1; b < boxes.length; b += 1) {
       const first = boxes[a]!;
@@ -195,17 +263,17 @@ function main(): void {
       if (overlapX <= 1e-4 || overlapZ <= 1e-4) continue;
       const gap = Math.abs(first.top - second.top);
       if (gap > NEAR_METERS) continue;
-      const sameMaterial = first.materialId === second.materialId;
+      const matchedMaterial = first.materialId === second.materialId;
       const fencedByOffset = first.polygonOffsetFactor < 0 || second.polygonOffsetFactor < 0;
-      const houseInterior = overlapInsideBuilding(first, second);
-      const street = overlapInsideCarriageway(first, second);
-      const verdict = street ? 'STREET-FINDING '
-        : houseInterior ? 'HOUSE-INTERIOR-FINDING '
-        : fencedByOffset ? 'FENCED  ' : sameMaterial ? 'BENIGN  ' : 'FINDING ';
-      if (street) streetFindings += 1;
-      else if (houseInterior) houseInteriorFindings += 1;
+      const houseInteriorPair = scopeFootprints && overlapInsideBuilding(first, second);
+      const streetPair = scopeFootprints && overlapInsideCarriageway(first, second);
+      const verdict = streetPair ? 'STREET-FINDING '
+        : houseInteriorPair ? 'HOUSE-INTERIOR-FINDING '
+        : fencedByOffset ? 'FENCED  ' : matchedMaterial ? 'BENIGN  ' : 'FINDING ';
+      if (streetPair) street += 1;
+      else if (houseInteriorPair) houseInterior += 1;
       else if (fencedByOffset) fenced += 1;
-      else if (sameMaterial) benign += 1;
+      else if (matchedMaterial) sameMaterial += 1;
       else findings += 1;
       rows.push([
         verdict,
@@ -217,24 +285,102 @@ function main(): void {
     }
   }
   rows.sort();
+  return {
+    boxes: boxes.length,
+    skipped,
+    skippedNames,
+    collisionOnlySlopes,
+    counts: { pairs: rows.length, findings, fenced, sameMaterial, houseInterior, street },
+    rows,
+  };
+}
 
-  const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+function renderReport(arenaId: ArenaId, scan: CoplanarScan, sha: string): string {
+  const { counts } = scan;
+  const scopeNote = arenaId === 'nuketown2' ? [] : [
+    `# HOUSE-INTERIOR and STREET are AUTHORED-footprint classes (nuketown2 tables);`,
+    `# on ${arenaId} they are structurally absent and read 0.`,
+  ];
   const header = [
-    `# nuketown2 coplanar top-face pairs (HF-434 instrument)`,
-    `# HOUSE-INTERIOR pairs<=${NEAR_METERS}m (offsets ignored): ${houseInteriorFindings}`,
-    `# STREET pairs<=${NEAR_METERS}m (offsets ignored): ${streetFindings}`,
-    `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${collisionOnlySlopes.length}`
-      + `${collisionOnlySlopes.length > 0 ? ` - ${collisionOnlySlopes.join(', ')}` : ''}`,
+    `# ${arenaId} coplanar top-face pairs (HF-434 instrument)`,
+    `# HOUSE-INTERIOR pairs<=${NEAR_METERS}m (offsets ignored): ${counts.houseInterior}`,
+    `# STREET pairs<=${NEAR_METERS}m (offsets ignored): ${counts.street}`,
+    ...scopeNote,
+    `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${scan.collisionOnlySlopes.length}`
+      + `${scan.collisionOnlySlopes.length > 0 ? ` - ${scan.collisionOnlySlopes.join(', ')}` : ''}`,
     `# head ${sha} · generated ${new Date().toISOString()}`,
-    `# boxes=${boxes.length} · pairs<=${NEAR_METERS}m: ${rows.length}`
-      + ` · FINDINGS (different materials, no offset): ${findings}`
-      + ` · FENCED (material offset): ${fenced}`
-      + ` · SAME-MATERIAL (benign): ${benign}`,
+    `# boxes=${scan.boxes} · pairs<=${NEAR_METERS}m: ${counts.pairs}`
+      + ` · FINDINGS (different materials, no offset): ${counts.findings}`
+      + ` · FENCED (material offset): ${counts.fenced}`
+      + ` · SAME-MATERIAL (benign): ${counts.sameMaterial}`,
     `# UNAUDITED meshes (instanced / rotated / non-parametric geometry, not covered by`
-      + ` the top-face test above): ${skipped}${skippedNames.length > 0 ? ` - ${skippedNames.join(', ')}` : ''}`,
+      + ` the top-face test above): ${scan.skipped}${scan.skippedNames.length > 0 ? ` - ${scan.skippedNames.join(', ')}` : ''}`,
     '',
   ];
-  const report = [...header, ...rows, ''].join('\n');
+  return [...header, ...scan.rows, ''].join('\n');
+}
+
+function requestedArenas(argv: readonly string[]): ArenaId[] {
+  if (argv.includes('--all')) return [...ARENA_IDS];
+  const arenas: ArenaId[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] !== '--arena') continue;
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error('--arena requires an arena id');
+    }
+    arenas.push(value as ArenaId);
+  }
+  return arenas.length > 0 ? arenas : ['nuketown2'];
+}
+
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  const outIndex = argv.indexOf('--out');
+  const outPath = outIndex >= 0 ? argv[outIndex + 1] : undefined;
+  let requested: ArenaId[];
+  try {
+    requested = requestedArenas(argv);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error(`known arena ids (src/arena-identity.ts): ${ARENA_IDS.join(', ')}`);
+    process.exitCode = 2;
+    return;
+  }
+  const unknown = requested.filter((id) => !isArenaId(id));
+  if (unknown.length > 0) {
+    console.error(`unknown arena id(s): ${unknown.join(', ')}`);
+    console.error(`known arena ids (src/arena-identity.ts): ${ARENA_IDS.join(', ')}`);
+    process.exitCode = 2;
+    return;
+  }
+  // MAP3 (HF-409): the eighth corridor's wasm must be resolved before the
+  // synchronous build; every other arena builds as-is.
+  if (requested.includes('map3')) await prepareMap3();
+
+  const scanByArena: Record<string, CoplanarScan> = {};
+  for (const arenaId of requested) scanByArena[arenaId] = scanArena(arenaId);
+  const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+
+  let findings = 0;
+  let houseInterior = 0;
+  let street = 0;
+  const summary: string[] = [];
+  const sections: string[] = [];
+  for (const arenaId of requested) {
+    const scan = scanByArena[arenaId]!;
+    const counts = scan.counts;
+    findings += counts.findings;
+    houseInterior += counts.houseInterior;
+    street += counts.street;
+    summary.push(
+      `# ${arenaId}: boxes=${scan.boxes} · FINDINGS ${counts.findings} · FENCED ${counts.fenced}`
+        + ` · SAME-MATERIAL ${counts.sameMaterial} · HOUSE-INTERIOR ${counts.houseInterior}`
+        + ` · STREET ${counts.street} · UNAUDITED ${scan.skipped}`,
+    );
+    sections.push(renderReport(arenaId, scan, sha));
+  }
+  const report = sections.length === 1 ? sections[0]! : [...summary, '', ...sections].join('\n');
   if (outPath) {
     const out = resolve(outPath);
     mkdirSync(resolve(out, '..'), { recursive: true });
@@ -242,7 +388,11 @@ function main(): void {
     console.log(`written: ${out}`);
   }
   console.log(report);
-  process.exitCode = findings === 0 && houseInteriorFindings === 0 && streetFindings === 0 ? 0 : 1;
+  process.exitCode = findings === 0 && houseInterior === 0 && street === 0 ? 0 : 1;
 }
 
-main();
+// Run only when invoked as the CLI. The roster-derived pinning test imports
+// scanArena and must not trigger a full sweep on import.
+const invokedDirectly = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (invokedDirectly) void main();

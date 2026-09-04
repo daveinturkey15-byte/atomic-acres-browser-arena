@@ -158,6 +158,15 @@ const UPPER_SLAB = 0.24;
 const UPPER_SOFFIT = UPPER_FLOOR_Y - UPPER_SLAB;
 /** Single-storey wall height, and the height of any wall carrying a floor above. */
 const WALL_TOP = UPPER_FLOOR_Y;
+/**
+ * Coplanar-surface clearance (HF-434 instrument, pass 96 all-arenas sweep).
+ * Two solids whose TOP faces sit within 0.03 m and overlap in plan race for
+ * the same depth samples. Where a pier, post or wall top lands flush with the
+ * deck or slab it meets, the supported member now stops this far short - past
+ * the instrument's 0.03 m window and buried inside the other solid, the same
+ * resolution the farcrysis art tower's rails already use where they lap.
+ */
+const COPLANAR_CLEARANCE = 0.04;
 /** Wall thickness. One number, so walls meet exactly at every corner. */
 const WALL_T = 0.8;
 /** Upper-room walls: hard cover measured from the +3.40 floor, not from grade. */
@@ -457,11 +466,11 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // N5 hot tub pavilion. Sited at z -35..-30.5 rather than mid-lane on purpose:
   // it breaks the 70 m band that would otherwise run along the north strip
   // WITHOUT touching the lane line at z ~ -28.
-  wallAlongX('raid2 pavilion north', -20, -15, -35, -34.2, WALL_TOP, []);
-  wallAlongZ('raid2 pavilion west', -20, -19.2, -35, -30.5, WALL_TOP, []);
-  wallAlongZ('raid2 pavilion east', -15.8, -15, -35, -30.5, WALL_TOP, []);
+  wallAlongX('raid2 pavilion north', -20, -15, -35, -34.2, WALL_TOP - COPLANAR_CLEARANCE, []);
+  wallAlongZ('raid2 pavilion west', -20, -19.2, -35, -30.5, WALL_TOP - COPLANAR_CLEARANCE, []);
+  wallAlongZ('raid2 pavilion east', -15.8, -15, -35, -30.5, WALL_TOP - COPLANAR_CLEARANCE, []);
   // One 2 m mouth, facing the pool.
-  wallAlongX('raid2 pavilion south', -20, -15, -31.3, -30.5, WALL_TOP, [[-18.5, -16.5]]);
+  wallAlongX('raid2 pavilion south', -20, -15, -31.3, -30.5, WALL_TOP - COPLANAR_CLEARANCE, [[-18.5, -16.5]]);
   roofSlab('raid2 pavilion roof', -20, -15, -35, -30.5);
 
   // N3 pool. A solid basin slab with a presentation water sheet over it; the
@@ -476,17 +485,17 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   }
   // Two entry step pairs, SW and NE, each riser under the autostep so the basin
   // is a route and not a pit.
-  rect('raid2 pool step sw lower', -12.6, -9.6, -0.28, -0.28 + 0.28, -26.4, -25.2, m.stone, { cast: false });
-  rect('raid2 pool step ne lower', 9.6, 12.6, -0.28, -0.28 + 0.28, -32.8, -31.6, m.stone, { cast: false });
+  rect('raid2 pool step sw lower', -12.6, -9.6, -0.28, -0.28 + 0.28 + COPLANAR_CLEARANCE, -26.4, -25.2, m.stone, { cast: false });
+  rect('raid2 pool step ne lower', 9.6, 12.6, -0.28, -0.28 + 0.28 + COPLANAR_CLEARANCE, -32.8, -31.6, m.stone, { cast: false });
 
   // Pool bar block at the water's north-east shoulder. Second breaker for the
   // north strip; single storey, no roof access.
   // ONE mouth, in the east wall, so every segment of the bar stays joined to
   // every other: a block with mouths in two faces is two wall masses, and this
   // rebuild is counting masses.
-  wallAlongZ('raid2 pool bar west', 4, 4.8, -36, -32, WALL_TOP, []);
-  wallAlongZ('raid2 pool bar east', 9.2, 10, -36, -32, WALL_TOP, [[-36, -33.2]]);
-  wallAlongX('raid2 pool bar south', 4, 10, -32.8, -32, WALL_TOP, []);
+  wallAlongZ('raid2 pool bar west', 4, 4.8, -36, -32, WALL_TOP - COPLANAR_CLEARANCE, []);
+  wallAlongZ('raid2 pool bar east', 9.2, 10, -36, -32, WALL_TOP - COPLANAR_CLEARANCE, [[-36, -33.2]]);
+  wallAlongX('raid2 pool bar south', 4, 10, -32.8, -32, WALL_TOP - COPLANAR_CLEARANCE, []);
   roofSlab('raid2 pool bar roof', 4, 10, -36, -32);
 
   // N4 pool deck: the walk between the water and the house. Two pergola piers
@@ -495,7 +504,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // Footed AGAINST the house's north face rather than free in the deck: they
   // break exactly the same lines and cost the map two fewer wall masses.
   for (const x of [-2, 8]) {
-    rect(`raid2 pergola pier ${x}`, x - 0.6, x + 0.6, 0, WALL_TOP, -21.2, -19.9, m.timber);
+    rect(`raid2 pergola pier ${x}`, x - 0.6, x + 0.6, 0, WALL_TOP - COPLANAR_CLEARANCE, -21.2, -19.9, m.timber);
   }
   rect('raid2 deck planter run', -12, -4, 0, MOUNT, -22.4, -21.4, m.planting);
   rect('raid2 deck planter run east', 12, 17, 0, MOUNT, -22.4, -21.4, m.planting);
@@ -508,7 +517,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongZ('raid2 wing east', 31.2, 32, -34, -28, WALL_TOP, []);
   wallAlongX('raid2 wing spine', 18, 32, -28.8, -28, WALL_TOP, [[22, 27]]);
   for (const x of [19.6, 25, 30.4]) {
-    rect(`raid2 wing colonnade pier ${x}`, x - 0.7, x + 0.7, 0, WALL_TOP, -24.7, -23.3, m.stone);
+    rect(`raid2 wing colonnade pier ${x}`, x - 0.7, x + 0.7, 0, WALL_TOP - COPLANAR_CLEARANCE, -24.7, -23.3, m.stone);
   }
   // NO GLAZED RETURN HERE, and the reason is measured rather than aesthetic.
   //
@@ -730,7 +739,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // solid block: the island must be circumnavigable or the drive lane becomes a
   // pure crossfire with nowhere to break the line.
   rect('raid2 drive island kerb', -7, 3, 0, 0.3, 10, 20, m.stone, { cast: false });
-  rect('raid2 drive fountain plinth', -2, 2, 0, HARD_COVER, 12, 16, m.stone);
+  rect('raid2 drive fountain plinth', -2, 2, 0, HARD_COVER - COPLANAR_CLEARANCE, 12, 16, m.stone);
   // The four planters ABUT the plinth, so the island is one mass you walk
   // around rather than five obstacles you thread between. Circumnavigable is
   // the property that matters and it is unchanged; five separate pieces in the
@@ -769,7 +778,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongZ('raid2 garage back', 49.2, 50, -16, 12, WALL_TOP, []);
   floorSlab('raid2 garage roof', 40, 50, -10, 6);
   for (const z of [-9, -1, 7]) {
-    rect(`raid2 garage bay pier ${z}`, 33.4, 34.6, 0, WALL_TOP, z - 0.6, z + 0.6, m.stone);
+    rect(`raid2 garage bay pier ${z}`, 33.4, 34.6, 0, WALL_TOP - COPLANAR_CLEARANCE, z - 0.6, z + 0.6, m.stone);
   }
   for (const [z0, z1] of [[-13, -6], [-3, 4], [7, 10]] as const) {
     rect(`raid2 garage kerb ${z0}`, 36.2, 37, 0, 0.4, z0, z1, m.stone, { cast: false });
