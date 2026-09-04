@@ -1418,3 +1418,36 @@ assets and textures and lighting need to be tip top, raid can come next"
   drone speed, right-click taser (3 charges, 1 s stun, blue crackle), FPS.
 - **Not in it yet:** spawn distribution (Luna, running) and the two load-time
   branches (need the browser tripwire probe).
+
+## HF-460..466 — owner 2026-09-04 10:30 after playing HITL candidate 2 ("gameplay is feeling great now")
+
+- **HF-460 (Qwen handoffs):** "you can't be injecting thousands of context;
+  just a bit, the tools it needs, be very specific" → done (contextWindow 61440,
+  --no-skills --no-lsp, one file per call, exact edit spec).
+- **HF-461 (P1 accuracy):** "maybe the garages are on the wrong side, almost
+  like you've created the mirror of the map" → verify Nuke Town Rebuild's
+  orientation against the real BO2 Nuketown (house/garage sides, which house
+  is which colour from the spawn's point of view); fix if mirrored.
+- **HF-462 (assets):** vehicles read as code-made; owner shared
+  https://x.com/prasenx/status/2095537643182563778 (Astra: AI-driven Blender
+  asset generation) and asks for the same result WITHOUT Blender — a
+  code-native asset forge (procedural, higher fidelity, lower poly, cheaper),
+  or a Blender-like tool of our own if needed; start with code. Ingest the
+  thread into the technique register; first targets: coach, truck, cars.
+- **HF-463 (P1):** "still Z tearing in the middle of the street" → road
+  markings/centre dashes vs carriageway; fix with the same geometric rule as
+  the interiors (no coplanar surfaces, not offsets).
+- **HF-464 (P1):** "the windows upstairs need to be breakable" → breakable
+  glass on the upper-floor windows (the shipped house-glass mechanism).
+- **HF-465 (P1):** "we're missing some balconies if you check the actual map
+  layout and architecture of the original Black Ops 2 Nuketown" → research
+  the real architecture (balconies/porches/decks) and add them.
+- **HF-466 (directive):** "hide the original Nuketown now and accelerate on
+  making Nuke Town really good" → park the original arena (selectable: false,
+  like Farcrysis), keep gates deriving rosters; Nuke Town Rebuild becomes the
+  focus arena.
+- **HF-467 (P1 ballistics):** "glass or blocks have no penetration; metal and
+  glass should be shot through, glass breaks; thin metal (the shed) should get
+  a hole with no collision after" → per-material penetration classes (glass
+  breakable + pass-through, thin metal perforates and loses collision at the
+  hole, concrete/brick stop), using the destructible-shed machinery.
