@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// One-off diagnostic: probe why live farcrysis vegetation materials carry no texture maps on WebGPU.
+// Usage: node scripts/qa/diag-farcrysis-vege-materials.mjs
+// Flags/env: none read (no process.argv or process.env access); target URL http://127.0.0.1:41914 with query params release=latest renderer=webgpu render=quality seed=diag previewTime=0 is hardcoded.
+// Writes: stderr only (console.error backend line, scene-report JSON, pageErrors); no files or directories.
+// Exit codes: no explicit process.exit calls; 0 on success, 1 on unhandled rejection (Playwright launch/wait timeout).
 // One-off diagnostic: why do live farcrysis vege materials carry no maps on WebGPU?
 import { chromium } from '@playwright/test';
 
