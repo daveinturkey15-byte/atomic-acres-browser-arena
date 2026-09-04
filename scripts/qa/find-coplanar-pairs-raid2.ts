@@ -73,6 +73,11 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
     const geometry = mesh.geometry as THREE.BoxGeometry;
     if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
     const p = geometry.parameters;
+    if (![p.width, p.height, p.depth].every((value) => Number.isFinite(value))) {
+      skipped += 1;
+      skippedNames.push(`${label} (non-box)`);
+      return;
+    }
     mesh.getWorldPosition(world);
     boxes.push({
       name: mesh.name,
