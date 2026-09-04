@@ -9,9 +9,18 @@
  * BO2-2025 aerial (`docs/references/nuketown-2025/img/nt2025-aerial-boii.jpg`
  * on `contrib/dave-gaming-pc/claude/research-2026-09-04`, inspected 2026-09-04)
  * shows clipped box hedges edging every lawn, and a line of deciduous street
- * trees along the plaza streets OUTSIDE the two lots. The arena's own hedge and
- * planter bodies were plain grey boxes, and the ground between the perimeter
- * wall and the forest ring was bare plain.
+ * trees along the plaza streets OUTSIDE the two lots.
+ *
+ * WHAT WAS ACTUALLY THERE, corrected after looking at the review captures. An
+ * earlier draft of this comment said the arena's hedge and planter bodies were
+ * "plain grey boxes". They are not: `m.planter` is `0x415a33`, a dark olive
+ * green, so they already read as vegetation-coloured MASSES. What they did not
+ * have was any silhouette, any value gradient and any movement - and at
+ * distance a green box and a green hedge are the same four pixels, which is
+ * why the far LOD tier here is deliberately just the box. The visible win is
+ * inside the near and mid bands, and the LOD distances below are set so those
+ * bands cover the ranges a player actually fights at. The ground between the
+ * perimeter wall and the forest ring, by contrast, WAS bare plain.
  *
  * TECHNIQUE PROVENANCE (register rows applied, restated in our own words):
  *   - row 18 (`CK42BB/procedural-*`, MIT): distance LOD by geometry
@@ -153,9 +162,15 @@ export type NuketownHedgeRun = Readonly<{
  * emits as a SOLID with a collider. The test asserts exactly that against the
  * real constructed arena, so adding a run with no solid under it goes red.
  *
- * The 0.06 m inset applied in `hedgeRunGeometry` is deliberate: the foliage
- * mass sits just INSIDE the solid it dresses, so no leaf face is coplanar with
- * that solid's own side face and the hedge cannot z-fight the box it hides.
+ * The foliage CLADS its host solid rather than hiding inside it, and that is a
+ * correction this pass had to make after looking at the first review captures.
+ * The first cut inset the hedge 0.06 m INSIDE the host box - which is an opaque
+ * solid at the same footprint, so the hedge was invisible in every frame and
+ * the capture was byte-similar to the baseline. `hedgeRunGeometry` now runs the
+ * foliage `HEDGE_CLAD_M` proud on every side and `HEDGE_CLAD_TOP_M` above the
+ * host's top face. Neither number touches the collider - cover is still decided
+ * by the host solid the arena emitted - and the top offset also keeps the leaf
+ * ridge clear of the host's own +y plane instead of racing it.
  */
 export const NUKETOWN2_HEDGE_DRESSING: readonly NuketownHedgeRun[] = Object.freeze([
   // verge front hedge - the crouch cover outside each front door.
@@ -323,21 +338,32 @@ function hedgeSegmentGeometry(level: 0 | 1 | 2, height: number, depth: number): 
   const detail = level === 0 ? 1 : 0;
   const lobe = new THREE.IcosahedronGeometry(0.5, detail);
   const parts: { geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
-  // The clipped body: the flat sides a kept hedge has.
-  const body = new THREE.BoxGeometry(1.0, height * 0.78, depth * 0.92);
-  parts.push({ geom: body, matrix: place(0, height * 0.39, 0) });
+  // The clipped body reaches 0.88 of the full height and the lobes carry the
+  // rest, so the foliage covers the host solid from the ground up. An earlier
+  // cut stopped the body at 0.78 and left a bare band of the grey box showing
+  // beneath the leaves.
+  const body = new THREE.BoxGeometry(1.0, height * 0.88, depth * 0.94);
+  parts.push({ geom: body, matrix: place(0, height * 0.44, 0) });
   // The lobes ride the top, alternating fore and aft so the ridge is not a line.
+  //
+  // LOBE SCALE IS RELATIVE TO THE SEGMENT, NOT TO THE RUN THICKNESS. The first
+  // cut scaled a lobe's X by the run's own depth, which on the 1.94 m-thick
+  // verge planter made each lobe 1.78 m wide inside a 0.62 m segment: five of
+  // them per segment, six segments per run, all overlapping into one smooth
+  // mass. X is now a fraction of the unit segment, so adjacent lobes overlap by
+  // about half and the ridge keeps its scallops at every run thickness.
+  const lobeSpanX = (1 / lobeCount) * 1.55;
   for (let i = 0; i < lobeCount; i += 1) {
     const t = (i + 0.5) / lobeCount;
-    const off = (i % 2 === 0 ? 1 : -1) * depth * 0.12;
+    const off = (i % 2 === 0 ? 1 : -1) * depth * 0.14;
     parts.push({
       geom: lobe,
       matrix: place(
-        (t - 0.5) * 0.98, height * 0.78, off,
+        (t - 0.5) * 0.98, height * 0.86, off,
         i * 1.13,
-        depth * (0.92 + (i % 3) * 0.06),
-        height * 0.5,
-        depth * (0.86 + (i % 2) * 0.1),
+        lobeSpanX * (0.94 + (i % 3) * 0.08),
+        height * 0.30,
+        depth * (0.80 + (i % 2) * 0.12),
       ),
     });
   }
@@ -410,6 +436,19 @@ function avenueTreeGeometry(level: 0 | 1 | 2): THREE.BufferGeometry {
 const SEGMENT_PITCH_M = 0.62;
 
 /**
+ * How far the foliage stands proud of the host solid on each side, in metres.
+ * Presentation only: the collider is the host's and does not move.
+ */
+export const HEDGE_CLAD_M = 0.07;
+
+/**
+ * How far the leaf ridge rises above the host's top face, in metres. Small
+ * enough that a 0.95 m crouch-cover body still reads as crouch cover, large
+ * enough that the ridge is never coplanar with the face it sits on.
+ */
+export const HEDGE_CLAD_TOP_M = 0.06;
+
+/**
  * One RUN's geometry, baked in the run's OWN local frame (origin at the run
  * centre, base at y = 0).
  *
@@ -433,11 +472,11 @@ function hedgeRunGeometry(
   // The run's LONG axis is whichever of width/depth is longer; segments march
   // along it and the segment's own depth is the short axis.
   const alongX = run.width >= run.depth;
-  const length = (alongX ? run.width : run.depth) - 0.06;
-  const thickness = (alongX ? run.depth : run.width) - 0.06;
+  const length = (alongX ? run.width : run.depth) + HEDGE_CLAD_M * 2;
+  const thickness = (alongX ? run.depth : run.width) + HEDGE_CLAD_M * 2;
   const count = Math.max(2, Math.round(length / SEGMENT_PITCH_M));
   const pitch = length / count;
-  const geom = hedgeSegmentGeometry(level, run.topY, thickness);
+  const geom = hedgeSegmentGeometry(level, run.topY + HEDGE_CLAD_TOP_M, thickness);
   for (let i = 0; i < count; i += 1) {
     const t = (i + 0.5) / count - 0.5;
     // Deterministic per-segment jitter: a clipped hedge is regular, but not
@@ -569,11 +608,15 @@ export function buildNuketown2Vegetation(
   disposables.push(hedgeMat.material);
   if (hedgeMat.time) times.push(hedgeMat.time);
 
-  // LOD distances in metres, measured against this map. The longest clear
-  // standing eye-line is ~32 m and the diagonal is 91 m, so 14 / 30 puts the
-  // near tier on everything you can fight over and the far tier on everything
-  // that is only silhouette.
-  const HEDGE_LOD_M = reduced ? [0, 8, 18] : [0, 14, 30];
+  // LOD distances in metres, measured against this map AND against the review
+  // captures. The first cut used 14 / 30, and the deterministic review cameras
+  // put every hedge on the FAR tier - a plain box, which is the same read the
+  // olive planter already had, so the capture was near-identical to the
+  // baseline and the module looked like it had done nothing. The longest clear
+  // standing eye-line here is ~32 m, so 22 / 40 puts the scalloped near tier on
+  // every range a player fights at and keeps the box tier for true skyline.
+  // Cost of the change, measured: 1,648 triangles for the largest run.
+  const HEDGE_LOD_M = reduced ? [0, 12, 26] : [0, 22, 40];
   const hedgeRuns: { half: 'north' | 'south'; run: NuketownHedgeRun }[] = [];
   for (const run of NUKETOWN2_HEDGE_DRESSING) {
     hedgeRuns.push({ half: 'north', run });

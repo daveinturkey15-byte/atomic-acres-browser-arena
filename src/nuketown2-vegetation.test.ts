@@ -21,6 +21,8 @@ import { buildNuketown2 } from './nuketown2-arena';
 import { NUKETOWN2_BOUNDS, nuketown2HandedX } from './nuketown2-layout';
 import {
   AVENUE_MAX_RADIAL_M,
+  HEDGE_CLAD_M,
+  HEDGE_CLAD_TOP_M,
   AVENUE_RECT_MARGIN_M,
   AVENUE_TREE_BUDGET,
   HEDGE_SPECIES,
@@ -131,6 +133,34 @@ describe('Nuke Town Rebuild vegetation', () => {
       // genuinely straddles the origin may sit there, and none of these do.
       expect(lod.position.lengthSq(), `${lod.name} sits at the arena origin`).toBeGreaterThan(1);
     }
+    vegetation.dispose();
+  });
+
+  it('CLADS its host solid instead of hiding inside it', () => {
+    // The regression this exists for: the first cut inset the foliage 0.06 m
+    // inside an opaque host box, so the hedge rendered nowhere and the review
+    // capture was byte-similar to the baseline. Cladding is the fix, and the
+    // numbers are asserted so a future "tidy" cannot quietly re-inset them.
+    expect(HEDGE_CLAD_M).toBeGreaterThan(0);
+    expect(HEDGE_CLAD_TOP_M).toBeGreaterThan(0.03);
+    // ...and it stays DRESSING: a hedge that reads much taller than the cover
+    // it sits on is a cover lie, so the ridge may not rise more than 0.1 m.
+    expect(HEDGE_CLAD_TOP_M).toBeLessThanOrEqual(0.1);
+    const parent = new THREE.Group();
+    const vegetation = buildNuketown2Vegetation(parent);
+    const lod = vegetation.group.children.find(
+      (node) => node.name === 'nuketown2-hedges-north-verge-front-hedge',
+    ) as THREE.LOD;
+    const run = NUKETOWN2_HEDGE_DRESSING.find((entry) => entry.id === 'verge front hedge')!;
+    const near = lod.levels[0]!.object as THREE.Mesh;
+    near.geometry.computeBoundingBox();
+    const box = near.geometry.boundingBox!;
+    // Wider than the host on the long axis, and taller than its top face.
+    expect(box.max.x - box.min.x).toBeGreaterThan(run.width);
+    expect(box.max.z - box.min.z).toBeGreaterThan(run.depth);
+    expect(box.max.y).toBeGreaterThan(run.topY);
+    // But not by much - this is cladding, not a new body.
+    expect(box.max.y).toBeLessThan(run.topY + 0.2);
     vegetation.dispose();
   });
 
