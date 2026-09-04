@@ -2140,3 +2140,7 @@ assets and textures and lighting need to be tip top, raid can come next"
 - **Claim state:** `BLOCKED`; the publisher, build-last gate, Pages topology and live
   smoke remain unrun until the red HF-477 gate is repaired and rerun without weakening
   its timeout or assertions.
+
+## HF-502 - owner 2026-09-04 21:30: 'Claude reset so you can go ham again, with opus and fable agents, this pass and overnight'
+
+- Opus lanes launched: nuketown2 geometry reconciliation (bays + turning head + rooflines/stairs + z-fight into one branch), gameplay feel (sticky stairs, movement/combat bands, killstreak tuning), perf lane 4 (PASS 93 frame-time parity). Luna keeps the release (PASS 94, third run), the multiplayer lanes, HITL 6 and reviews; Muse builders (paused during the cut) resume after publish; overnight plan follows HITL 6.
