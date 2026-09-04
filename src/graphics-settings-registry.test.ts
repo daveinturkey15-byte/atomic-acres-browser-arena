@@ -41,7 +41,7 @@ const SCREEN_SPACE_KEYS = [
   // table that is not read is worse than no table - it told the owner MAX gets
   // no baked bounce while MAX shipped 'high'.
   'bakedIndirect',
-  'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'spatialUpscaling',
+  'depthOfField', 'depthOfFieldStrength', 'motionBlur', 'taaResolve', 'spatialUpscaling',
 ] as const;
 
 describe('Advanced Graphics canonical registry', () => {
@@ -213,7 +213,7 @@ describe('Advanced Graphics canonical registry', () => {
         bakedIndirect: 'off',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
-        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: false, spatialUpscaling: 'off',
       },
       // HF-418 BALANCED. It takes NOTHING from the screen-space stack: every
       // member of this family is either a new render-target attachment (SSR),
@@ -235,7 +235,7 @@ describe('Advanced Graphics canonical registry', () => {
         bakedIndirect: 'low',
         volumetricLightShafts: 'off', screenSpaceReflections: 'off', screenSpaceGi: 'off',
         rayTracing: 'off',
-        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: false, spatialUpscaling: 'off',
       },
       high: {
         // QUALITY, the auto-selected default. LOW baked bounce: measured at
@@ -246,7 +246,7 @@ describe('Advanced Graphics canonical registry', () => {
         bakedIndirect: 'low',
         volumetricLightShafts: 'low', screenSpaceReflections: 'low', screenSpaceGi: 'off',
         rayTracing: 'reflections',
-        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
+        depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: true, spatialUpscaling: 'off',
       },
       max: {
         bakedIndirect: 'high',
@@ -256,7 +256,7 @@ describe('Advanced Graphics canonical registry', () => {
         // (ultra AO, ultra PMREM, high SSGI). The audit counts the added
         // pipelines at admission; the tripwire requires zero in combat.
         rayTracing: 'reflections',
-        depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
+        depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, taaResolve: true, spatialUpscaling: 'off',
       },
     } as const;
     // A preset with no row here would be silently unpinned, which is exactly
@@ -300,6 +300,7 @@ describe('Advanced Graphics canonical registry', () => {
         depthOfField: preset.depthOfField,
         depthOfFieldStrength: preset.depthOfFieldStrength,
         motionBlur: preset.motionBlur,
+        taaResolve: preset.taaResolve,
         spatialUpscaling: preset.spatialUpscaling,
         rayTracing: preset.rayTracing,
       }, { shadowsEnabled: preset.shadows === 'high' });
@@ -325,7 +326,7 @@ describe('Advanced Graphics canonical registry', () => {
       volumetricQuality: 'high',
       depthOfField: GRAPHICS_PRESET_VALUES.max.depthOfField,
       depthOfFieldStrength: GRAPHICS_PRESET_VALUES.max.depthOfFieldStrength,
-      motionBlur: 0, spatialUpscaling: 'off', rayTracing: 'off',
+      motionBlur: 0, taaResolve: false, spatialUpscaling: 'off', rayTracing: 'off',
     }, { shadowsEnabled: true });
     expect(maxRuntime.depthOfField.enabled).toBe(true);
     expect(DEPTH_OF_FIELD_MIDFIELD_MAXIMUM_BLUR_PX).toBeGreaterThan(0);

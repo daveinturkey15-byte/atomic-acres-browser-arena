@@ -45,14 +45,14 @@ const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
  * what the player was told it renders, and the doc row has to be re-measured.
  */
 const PINNED_CONTROL_SET_HASHES = Object.freeze({
-  performance: '445a9754',
-  balanced: '0753ee34',
+  performance: 'e38ede29',
+  balanced: '9d461537',
   // HF-438 fold (PASS 92): QUALITY carries the trace at the light tier
   // (rayTracing reflections, AO high); MAX at the full tier. Re-fingerprinted
   // with graphicsControlSetHashes() at the fold, per the tripwire procedure,
   // and re-measured in docs/GRAPHICS_PROFILES_2026-09-03.md.
-  high: '430da2ad',
-  max: '03ee2e10',
+  high: '2f8b5453',
+  max: 'b71a9c4e',
 });
 
 describe('HF-418 graphics ladder', () => {
@@ -210,6 +210,8 @@ describe('HF-418 graphics ladder', () => {
     expect(balanced.ambientOcclusion).toBe('off');
     expect(balanced.depthOfField).toBe(false);
     expect(balanced.motionBlur).toBe(0);
+    expect(balanced.taaResolve).toBe(false);
+    expect(quality.taaResolve).toBe(true);
     expect(balanced.rayTracing).toBe('off');
     expect(balanced.spatialUpscaling).toBe('off');
     // Strictly above PERFORMANCE on the two controls that make it look poor.
