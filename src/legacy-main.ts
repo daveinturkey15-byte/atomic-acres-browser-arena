@@ -19274,6 +19274,12 @@ function switchWeapon(index: number): void {
     weaponView.setWeapon(id);
     audio.weaponSwitch();
   };
+  // A missed rehearsal is fail-closed during active combat. Calling
+  // `prepareBrowserWeapon` here would enter the WebGPU prewarmer, whose exact
+  // path submits `compileAndRender`; that is an in-combat pipeline creation.
+  // Safe windows rehearse through the branch below, while a combat switch waits
+  // for the next already-owned preparation window.
+  if (rehearsalDecision?.rehearsal === 'synchronous-before-switch') return;
   if (rehearsalDecision && rehearsalDecision.rehearsal !== 'none') {
     if (pendingWeaponSwitchRehearsal) return;
     const generation = weaponRehearsalGeneration;

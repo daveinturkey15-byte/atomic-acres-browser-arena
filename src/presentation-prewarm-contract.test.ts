@@ -766,6 +766,11 @@ describe('presentation prewarm startup contract', () => {
     expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = false;');
     expect(preparedSwitchExercise).toContain('weaponView.suppressForSniperScope(true);');
     expect(preparedSwitchExercise).toContain('sniperScopeOverlay.hidden = true;');
+    const switchWeapon = source.slice(
+      source.indexOf('function switchWeapon('),
+      source.indexOf('\nfunction reload(', source.indexOf('function switchWeapon(')),
+    );
+    expect(switchWeapon).toContain("if (rehearsalDecision?.rehearsal === 'synchronous-before-switch') return;");
     const dmrThermalExerciseStart = preparedSwitchExercise.indexOf('} else if (exercisesDmrThermal) {');
     const dmrThermalExercise = preparedSwitchExercise.slice(
       dmrThermalExerciseStart,

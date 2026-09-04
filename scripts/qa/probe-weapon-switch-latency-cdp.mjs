@@ -10,8 +10,10 @@
 // Only the weapons a player can actually hold on this arena — loadout primary,
 // loadout sidearm and the arena's pickup-only specials — are rehearsed before
 // the first live frame; the rest are deferred to a safe window (menu, respawn,
-// pre-match countdown) and, if one is ever reached in combat before its safe
-// window ran, `switchWeapon` awaits `prepareBrowserWeapon` BEFORE it commits.
+// pre-match countdown). If one is ever reached in combat before its safe
+// window ran, `switchWeapon` fails closed rather than invoking the WebGPU
+// prewarmer; the probe must report the missed commit instead of permitting a
+// combat-time pipeline compile.
 //
 // That await is the whole risk of the change. A switch that used to be one
 // synchronous assignment would become a promise round trip, and the player
@@ -21,9 +23,8 @@
 //
 //   1. Is the synchronous cost of a real in-combat switch still ~0 ms?
 //   2. Does the switch COMMIT on the next frame, not several frames later?
-//   3. Is the deferred set actually unreachable from `switchWeapon`, i.e. is
-//      the synchronous-rehearsal branch dead code in normal play rather than
-//      something a player trips into?
+//   3. Is the deferred set actually unreachable from `switchWeapon`, with any
+//      unexpected reach failing closed rather than compiling during combat?
 //
 // (3) is the one that decides whether (1) and (2) generalise. `switchWeapon`
 // can only ever select the loadout primary, the loadout sidearm or the

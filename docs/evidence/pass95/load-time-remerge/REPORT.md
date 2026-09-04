@@ -138,3 +138,14 @@ That is `[OPEN]`, not a pass.
 2. In-combat pipeline count 1 (pre-existing first-death transparent) needs its
    own lane — not this one.
 3. Full `npx vitest run` not executed here; targeted gates only.
+
+## LUNA review TODOs
+
+- TODO [FIXED][LUNA] The re-landed synchronous combat-switch fallback called
+  `prepareBrowserWeapon`, which reaches the injected WebGPU prewarmer and
+  `compileAndRender`. The review added a fail-closed guard in `switchWeapon`
+  plus a source-contract regression; safe-window rehearsal remains unchanged.
+- TODO [OPEN][LUNA] Re-capture the admission, switch and 75-second pipeline
+  probes on the exact post-fix head when a browser/GPU window is authorized.
+  The source trace is now fail-closed, but this review intentionally did not
+  run headed or hardware evidence.
