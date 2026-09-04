@@ -114,6 +114,16 @@ Total: 173 tests green, 0 weakened, 0 skipped.
    no GPU work in this lane, per brief).
 6. Recipe: `docs/threejs-knowledge/r185/ssr-temporal-denoise-ours.md`.
 
+## Luna review TODOs
+
+- TODO: obtain the required native-WebGPU capture with moving enemies and
+  reflective surfaces in both supported graphics profiles; this review was
+  intentionally no-browser/no-GPU.
+- TODO: record the real cold-session pipeline/target timing and steady-state
+  copy cost; the current 0.35 ms figure is a defended estimate only.
+- TODO: validate the velocity sign and SSR target ordering in a headed runtime;
+  the CPU reference and source contract are not a visual proof of reprojection.
+
 ## Per-frame cost estimate (defended)
 
 At 1440p, SSR high (0.75 scale): ~8 texture taps/pixel in the already-bound

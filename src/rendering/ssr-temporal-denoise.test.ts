@@ -145,6 +145,7 @@ describe('SSR temporal-denoise history buffer', () => {
     expect(history.isValid()).toBe(false);
     expect(copies).toHaveLength(1);
     const second = history.refresh(renderer, source);
+    expect(second).toBe(first);
     expect(second).toEqual({ copied: true, valid: true, targetCount: 1 });
     expect(history.isValid()).toBe(true);
     expect(history.texture()).not.toBeNull();

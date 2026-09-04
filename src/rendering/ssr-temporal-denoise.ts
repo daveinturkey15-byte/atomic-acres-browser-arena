@@ -284,13 +284,6 @@ export type SsrTemporalDenoiseHistory = Readonly<{
   dispose(): void;
 }>;
 
-function sourceSize(source: SsrDenoiseHistorySource): { width: number; height: number } | null {
-  const width = Math.floor(source.image?.width ?? NaN);
-  const height = Math.floor(source.image?.height ?? NaN);
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) return null;
-  return { width, height };
-}
-
 /**
  * Creates the history manager. With `initialSize` the single target is
  * allocated eagerly (1x1 at graph build, resized on the first refresh) so the
@@ -311,6 +304,10 @@ export function createSsrTemporalDenoiseHistory(
   }
   let framesSincePrime = 0;
   let valid = false;
+  // Reused by refresh() so the pre-frame hook remains allocation-free after
+  // the target is established. The readonly public type prevents callers from
+  // mutating the record; only this closure updates it.
+  const refreshResult = { copied: false, valid: false, targetCount: 0 };
 
   return Object.freeze({
     targetCount(): number {
@@ -323,15 +320,21 @@ export function createSsrTemporalDenoiseHistory(
       return target?.texture ?? null;
     },
     refresh(renderer: SsrDenoiseCopyRenderer, source: SsrDenoiseHistorySource): SsrDenoiseRefreshResult {
-      const size = sourceSize(source);
-      if (size === null) return Object.freeze({ copied: false, valid: false, targetCount: target === null ? 0 : 1 });
+      const width = Math.floor(source.image?.width ?? NaN);
+      const height = Math.floor(source.image?.height ?? NaN);
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+        refreshResult.copied = false;
+        refreshResult.valid = false;
+        refreshResult.targetCount = target === null ? 0 : 1;
+        return refreshResult;
+      }
       if (target === null) {
-        target = new RenderTarget(size.width, size.height, { depthBuffer: false, type: HalfFloatType });
+        target = new RenderTarget(width, height, { depthBuffer: false, type: HalfFloatType });
         target.texture.name = 'SsrTemporalDenoise.history';
         framesSincePrime = 0;
         valid = false;
-      } else if (target.width !== size.width || target.height !== size.height) {
-        target.setSize(size.width, size.height);
+      } else if (target.width !== width || target.height !== height) {
+        target.setSize(width, height);
         framesSincePrime = 0;
         valid = false;
       }
@@ -341,7 +344,10 @@ export function createSsrTemporalDenoiseHistory(
       // sample: on the priming refresh the target is written but reports
       // invalid, so the blend weight is exactly 0 (the old path).
       if (framesSincePrime >= 2) valid = true;
-      return Object.freeze({ copied: true, valid: valid && target !== null, targetCount: 1 });
+      refreshResult.copied = true;
+      refreshResult.valid = valid && target !== null;
+      refreshResult.targetCount = 1;
+      return refreshResult;
     },
     invalidate(): void {
       framesSincePrime = 0;
