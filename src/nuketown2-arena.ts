@@ -119,6 +119,7 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
@@ -183,6 +184,7 @@ import {
  * every existing importer of this file is unchanged.
  */
 export {
+  NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_BOUNDS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
@@ -1138,12 +1140,11 @@ function nuketown2Materials(): Nuketown2Materials {
   //
   // The RED is the coach's own 0xa8382c - already measured in this file and
   // already the reference's red - rather than a second invented red. The BLUE
-  // is 0x46809f, the value that used to paint the north HOUSE: FINDINGS shows
-  // that saturated blue is a BO7-era read of a house and not a BO2-2025 one,
-  // so it is not deleted, it is demoted to the prop the reference does paint
-  // blue.
+  // is the techniques lane's deep 0x2f5f92 hob blue: FINDINGS shows that
+  // BO2-2025's white lawn carries blue appliance tops, while saturated blue
+  // house siding is a BO7-era read and not a BO2-2025 house colour.
   const applianceRed = standard(0xa8382c, 0.42, 0.18);
-  const applianceBlue = standard(0x46809f, 0.42, 0.18);
+  const applianceBlue = standard(NUKETOWN2_APPLIANCE_BLUE, 0.42, 0.18);
   const fence = createNuketown2FenceMaterial();
   return Object.freeze({
     // Beyond the fence. Keyed to the mountain backdrop's own foothill foot
