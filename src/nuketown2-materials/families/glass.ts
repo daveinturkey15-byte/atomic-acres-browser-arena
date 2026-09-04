@@ -26,6 +26,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
+import { bindNuketown2WearUniforms, NUKETOWN2_UNIFORMS } from '../material-uniforms';
 
 const { clamp, float, fract, max, mix, smoothstep } =
   TSL as unknown as Record<string, any>;
@@ -56,6 +57,27 @@ export interface GlassOptions {
   readonly transparent?: boolean;
 }
 
+let glassGraph: { colorNode: any; roughnessNode: any } | null = null;
+
+function sharedGlassGraph(): { colorNode: any; roughnessNode: any } {
+  if (glassGraph) return glassGraph;
+  const spec = glassSpec('nuketown2-glass-shared', 0x2b3d47);
+  const uv = boxUv();
+  const wear = buildWear(spec, uv);
+  const streak = smoothstep(
+    float(0.62),
+    float(0.92),
+    fract(uv.x.mul(float(9.0)).add(wear.soilMask.mul(float(1.7)))),
+  ).mul(smoothstep(float(0.15), float(0.85), wear.soilMask));
+  const grime = max(streak, wear.soilMask.mul(float(0.55)));
+  const body = NUKETOWN2_UNIFORMS.baseColor.mul(wear.albedoMul);
+  glassGraph = {
+    colorNode: mix(body, body.mul(float(1.55)), grime.mul(float(0.35))),
+    roughnessNode: clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35)),
+  };
+  return glassGraph;
+}
+
 export function createGlassMaterial(
   name: string,
   baseSrgb: number,
@@ -73,6 +95,13 @@ export function createGlassMaterial(
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
+  bindNuketown2WearUniforms(mat, spec, baseSrgb);
+  if (!transparent) {
+    const shared = sharedGlassGraph();
+    mat.colorNode = shared.colorNode;
+    mat.roughnessNode = shared.roughnessNode;
+    return mat;
+  }
   if (options.polygonOffset !== undefined) {
     mat.polygonOffset = true;
     mat.polygonOffsetFactor = options.polygonOffset;

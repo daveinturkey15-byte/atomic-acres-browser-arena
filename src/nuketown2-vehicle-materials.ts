@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
+import { materialReference } from 'three/tsl';
 import { lutFbm } from './nuketown2-materials/noise-lut';
 
 const {
@@ -25,6 +26,54 @@ const {
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
+
+/**
+ * Coach and truck paint use the same world-space flake family.  Keep the
+ * authored swatch, roughness and flake recipe in material properties so the
+ * two bodies bind one node topology instead of compiling one pipeline each.
+ */
+const VEHICLE_PAINT_UNIFORMS = Object.freeze({
+  baseColor: materialReference('nuketown2VehiclePaintBaseColor', 'color'),
+  roughness: materialReference('nuketown2VehiclePaintRoughness', 'float'),
+  flakeFrequency: materialReference('nuketown2VehiclePaintFlakeFrequency', 'float'),
+  flakeStrength: materialReference('nuketown2VehiclePaintFlakeStrength', 'float'),
+});
+
+function bindVehiclePaintUniforms(
+  material: MeshStandardNodeMaterial,
+  color: THREE.Color,
+  roughness: number,
+  flakeFrequency: number,
+  flakeStrength: number,
+): void {
+  const slots = material as unknown as Record<string, unknown>;
+  slots.nuketown2VehiclePaintBaseColor = color;
+  slots.nuketown2VehiclePaintRoughness = roughness;
+  slots.nuketown2VehiclePaintFlakeFrequency = flakeFrequency;
+  slots.nuketown2VehiclePaintFlakeStrength = flakeStrength;
+}
+
+function createSharedVehiclePaintMaterial(
+  name: string,
+  color: THREE.Color,
+  roughness: number,
+  metalness: number,
+  flakeFrequency: number,
+  flakeStrength: number,
+): MeshStandardNodeMaterial {
+  const mat = new MeshStandardNodeMaterial({ roughness, metalness });
+  mat.name = name;
+  mat.type = 'MeshStandardMaterial';
+  bindVehiclePaintUniforms(mat, color, roughness, flakeFrequency, flakeStrength);
+  const p = positionWorld;
+  const flake = lutFbm(vec2(
+    p.x.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
+    p.y.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
+  ), 1).sub(float(0.5)).mul(VEHICLE_PAINT_UNIFORMS.flakeStrength);
+  mat.colorNode = (VEHICLE_PAINT_UNIFORMS.baseColor as any).add(flake);
+  mat.roughnessNode = VEHICLE_PAINT_UNIFORMS.roughness;
+  return mat;
+}
 
 /**
  * Procedural metallic car paint material.
@@ -57,39 +106,14 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
  * Retro coach cream body material.
  */
 export function createNuketown2CoachMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
-    roughness: 0.32,
-    metalness: 0.38,
-  });
-  mat.name = 'nuketown2-coach-shell';
-  mat.type = 'MeshStandardMaterial';
-
-  const p = positionWorld;
-  const flake = lutFbm(vec2(p.x.mul(24.0), p.y.mul(24.0)), 1).sub(float(0.5)).mul(float(0.02));
-  // Cream body: linear ~ [0.82, 0.76, 0.64]
-  mat.colorNode = vec3(0.82, 0.76, 0.64).add(flake);
-  mat.roughnessNode = float(0.32);
-
-  return mat;
+  return createSharedVehiclePaintMaterial('nuketown2-coach-shell', new THREE.Color(0.82, 0.76, 0.64), 0.32, 0.38, 24, 0.02);
 }
 
 /**
  * Truck cab painted metal material.
  */
 export function createNuketown2TruckCabMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
-    roughness: 0.38,
-    metalness: 0.45,
-  });
-  mat.name = 'nuketown2-truck-cab';
-  mat.type = 'MeshStandardMaterial';
-
-  const p = positionWorld;
-  const flake = lutFbm(vec2(p.x.mul(20.0), p.y.mul(20.0)), 1).sub(float(0.5)).mul(float(0.025));
-  mat.colorNode = vec3(0.74, 0.72, 0.66).add(flake);
-  mat.roughnessNode = float(0.38);
-
-  return mat;
+  return createSharedVehiclePaintMaterial('nuketown2-truck-cab', new THREE.Color(0.74, 0.72, 0.66), 0.38, 0.45, 20, 0.025);
 }
 
 /**

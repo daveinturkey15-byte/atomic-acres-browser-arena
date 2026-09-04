@@ -24,8 +24,8 @@ import {
   type Nuketown2MaterialSpec,
   assertSpec,
   readDistance,
-  scaleResolvable,
 } from './spec';
+import { NUKETOWN2_UNIFORMS } from './material-uniforms';
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
 const {
@@ -83,7 +83,8 @@ export const NOISE_TILE_CELLS = NOISE_LUT_CELLS;
  * the term that carries the big shapes never repeats in view.
  */
 export function signedNoise(uv: any, featureSizeM: number, octaves: 1 | 2 | 3 = 2): any {
-  return lutFbm(uv.mul(float(1 / featureSizeM)), octaves).sub(float(0.5)).mul(float(2));
+  const frequency = typeof featureSizeM === 'number' ? float(1 / featureSizeM) : featureSizeM;
+  return lutFbm(uv.mul(frequency), octaves).sub(float(0.5)).mul(float(2));
 }
 
 /**
@@ -135,6 +136,7 @@ export function isBackdrop(spec: Nuketown2MaterialSpec): boolean {
  * a scrub plain looks like from 55 m.
  */
 export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
+  void spec;
   const p = positionWorld;
   const wave = (ax: number, az: number, periodM: number): any =>
     sin(p.x.mul(float((ax * 2 * Math.PI) / periodM)).add(p.z.mul(float((az * 2 * Math.PI) / periodM))));
@@ -145,12 +147,12 @@ export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
 
   const soilMask = smoothstep(float(-0.45), float(0.55), field);
   const albedoMul = clamp(
-    float(1).add(field.mul(float(spec.traffic.albedo))).sub(soilMask.mul(float(spec.soil))),
+    float(1).add(field.mul(NUKETOWN2_UNIFORMS.trafficAlbedo)).sub(soilMask.mul(NUKETOWN2_UNIFORMS.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
-    float(1 + spec.traffic.albedo),
+    float(1).add(NUKETOWN2_UNIFORMS.trafficAlbedo),
   );
   const roughness = clamp(
-    float(spec.roughness).add(field.mul(float(spec.traffic.roughness))),
+    NUKETOWN2_UNIFORMS.baseRoughness.add(field.mul(NUKETOWN2_UNIFORMS.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
@@ -183,32 +185,18 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
   // is simply beyond what this route will complete, and no octave count fixes
   // that. Three sines over the same surface cost nine instructions and read
   // the same from 55 m.
-  if (isBackdrop(spec)) return backdropWear(spec);
-
-  // Only the scales this surface's own read distance can resolve are
-  // evaluated. A term the frame cannot show is not authored detail, it is
-  // per-fragment arithmetic over the surface's whole projected area - and on
-  // the 220 m scrub plain that arithmetic was a measured 12-second stall.
-  const readM = readDistance(spec);
-  const zero = float(0);
-
-  // 0.5 - 1.5 mm. Paint tooth, aggregate grit, timber fibre. One octave: at
-  // this size a second octave is below a nanometre of feature and costs a
-  // texture fetch's worth of ALU for nothing.
-  const grain = scaleResolvable(spec.grain.sizeM, readM)
-    ? signedNoise(uv, spec.grain.sizeM, 1).mul(detailFalloff(0.8, 3.0))
-    : zero;
-
-  // 20 - 80 mm. Scuffs, chips, heel marks. Two octaves so the marks have
-  // edges rather than being blobs.
-  const scuff = scaleResolvable(spec.scuff.sizeM, readM)
-    ? signedNoise(uv, spec.scuff.sizeM, 2).mul(detailFalloff(4.0, 18.0))
-    : zero;
-
-  // 0.5 - 3 m. The term that does the actual work in a wide frame: traffic,
-  // rain wash, sun fade. Three octaves, no falloff - it is metres wide, and
-  // it is resolvable from anywhere on the map.
-  const traffic = signedNoise(soilUv, spec.traffic.sizeM, 3);
+  // The backdrop and surface paths share one node topology. A material
+  // reference selects the authored backdrop projection at render time, so
+  // lawn variants no longer create separate program identities. The enabled
+  // values are zero for the backdrop; its branch remains analytically cheap
+  // and, critically, the old hashed lattice is not reintroduced.
+  const grain = signedNoise(uv, NUKETOWN2_UNIFORMS.grainFrequency as any, 1)
+    .mul(detailFalloff(0.8, 3.0))
+    .mul(NUKETOWN2_UNIFORMS.grainEnabled);
+  const scuff = signedNoise(uv, NUKETOWN2_UNIFORMS.scuffFrequency as any, 2)
+    .mul(detailFalloff(4.0, 18.0))
+    .mul(NUKETOWN2_UNIFORMS.scuffEnabled);
+  const traffic = signedNoise(soilUv, NUKETOWN2_UNIFORMS.trafficFrequency as any, 3);
 
   // Soiling is one-sided: dirt subtracts. Thresholded so it has a shape (a
   // wash line, a lane) instead of being a uniform grey veil, which is the
@@ -217,24 +205,35 @@ export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv
 
   const albedoMul = clamp(
     float(1)
-      .add(grain.mul(float(spec.grain.albedo)))
-      .add(scuff.mul(float(spec.scuff.albedo)))
-      .add(traffic.mul(float(spec.traffic.albedo)))
-      .sub(soilMask.mul(float(spec.soil))),
+      .add(grain.mul(NUKETOWN2_UNIFORMS.grainAlbedo))
+      .add(scuff.mul(NUKETOWN2_UNIFORMS.scuffAlbedo))
+      .add(traffic.mul(NUKETOWN2_UNIFORMS.trafficAlbedo))
+      .sub(soilMask.mul(NUKETOWN2_UNIFORMS.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
-    float(1 + spec.grain.albedo + spec.scuff.albedo + spec.traffic.albedo),
+    float(1)
+      .add(NUKETOWN2_UNIFORMS.grainAlbedo)
+      .add(NUKETOWN2_UNIFORMS.scuffAlbedo)
+      .add(NUKETOWN2_UNIFORMS.trafficAlbedo),
   );
 
   const roughness = clamp(
-    float(spec.roughness)
-      .add(grain.mul(float(spec.grain.roughness)))
-      .add(scuff.mul(float(spec.scuff.roughness)))
-      .add(traffic.mul(float(spec.traffic.roughness))),
+    NUKETOWN2_UNIFORMS.baseRoughness
+      .add(grain.mul(NUKETOWN2_UNIFORMS.grainRoughness))
+      .add(scuff.mul(NUKETOWN2_UNIFORMS.scuffRoughness))
+      .add(traffic.mul(NUKETOWN2_UNIFORMS.trafficRoughness)),
     float(0.03),
     float(1.0),
   );
 
-  return { albedoMul, roughness, soilMask, grain, scuff };
+  const backdrop = backdropWear(spec);
+  const useBackdrop = (NUKETOWN2_UNIFORMS.backdrop as any).greaterThan(float(0.5));
+  return {
+    albedoMul: useBackdrop.select(backdrop.albedoMul, albedoMul),
+    roughness: useBackdrop.select(backdrop.roughness, roughness),
+    soilMask: useBackdrop.select(backdrop.soilMask, soilMask),
+    grain: useBackdrop.select(backdrop.grain, grain),
+    scuff: useBackdrop.select(backdrop.scuff, scuff),
+  };
 }
 
 /**
