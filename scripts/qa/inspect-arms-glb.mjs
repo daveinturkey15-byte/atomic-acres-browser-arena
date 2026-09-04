@@ -1,3 +1,9 @@
+// Inspect a first-person arms GLB: print name, parent, translation, quaternion length and scale determinant for arm/wrist/knife nodes.
+// Usage: node scripts/qa/inspect-arms-glb.mjs [glbPath]
+// Args: [glbPath] (process.argv[2]) — path of the GLB to inspect (default: <repo-root>/public/assets/original/models/operators/pass65-first-person-arms-lod0.glb)
+// Env: none read
+// Writes: nothing (stdout only)
+// Exit: 0 on success; no explicit process.exit calls (non-zero on uncaught error)
 // Inspect the first-person arms GLB bone layout to determine true L/R orientation.
 // Prints node name + translation for arm/wrist/knife nodes. Run:
 //   node scripts/qa/inspect-arms-glb.mjs
