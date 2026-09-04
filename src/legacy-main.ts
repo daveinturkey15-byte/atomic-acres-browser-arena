@@ -507,7 +507,7 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
-import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices, freezeStaticArenaMatrices } from './static-matrix-freeze';
 import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
 import { installTintSwizzleShim } from './webgpu-tint-swizzle-shim';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
@@ -16300,10 +16300,7 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
       entry.root.visible = false;
       entry.root.position.set(0, 0, 0);
       entry.root.rotation.set(0, 0, 0);
-      if (!entry.inUse) {
-        deepFreezeSubtreeMatrices(entry.root);
-        entry.root.updateMatrixWorld(true);
-      }
+      if (!entry.inUse) deepFreezeSubtreeMatrices(entry.root);
     }
   };
 }
@@ -16451,7 +16448,6 @@ function disposeCorpsePresentation(root: THREE.Group): void {
   resetOperator(root);
   hideCorpseHeldWeapon(root);
   deepFreezeSubtreeMatrices(root);
-  root.updateMatrixWorld(true);
   pooled.inUse = false;
 }
 
@@ -30200,6 +30196,7 @@ async function performArenaSelection(
     profileArenaTransition('presentation-batching');
     setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
+    arena.root.userData.staticMatricesFrozen = freezeStaticArenaMatrices(arena.root); // HF-491: batched arena is static from here on
     setArenaPresentationVisibility();
     const collisionRouteAuthority = currentAtomicCollisionRouteAuthority();
     if (collisionRouteAuthority) {

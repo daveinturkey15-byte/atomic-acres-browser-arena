@@ -46,3 +46,52 @@ export function deepUnfreezeSubtreeMatrices(root: THREE.Object3D): void {
   // renders its world matrices.
   root.updateMatrixWorld(true);
 }
+
+/**
+ * HF-491 (perf lane HITL 5): stop the per-frame recompose for the parts of a
+ * mounted arena that provably never move, WITHOUT the walk-skip override.
+ *
+ * What qualifies, and why each is safe:
+ *   - meshes `batchStaticMeshes` hid (`userData.staticBatchRendered`): never
+ *     rendered again, and their world matrices are read only by raycast /
+ *     collision references that were baked from the same transform;
+ *   - the `*-render-batches` groups it produced: world-space geometry under an
+ *     identity transform by construction;
+ *   - `THREE.LOD` subtrees: the LOD object stands where the thing it draws
+ *     stands and the levels are baked in its local frame (vegetation).
+ * Subtrees flagged `userData.dynamic` are left alone entirely, as are
+ * nodes that are already frozen. Nothing here installs a walk skip - the
+ * routine walk still visits every node, so a later forced refresh
+ * (`updateMatrixWorld(true)`) sees a correct, once-composed local matrix.
+ *
+ * Measured on Nuke Town Rebuild (HITL 4 head): the arena root was 965 of the
+ * scene's 3,029 auto-updating nodes and one full-scene `updateMatrixWorld()`
+ * cost 0.9 ms in-page; three's renderer and the shadow / post passes walk it
+ * more than once a frame.
+ */
+export function freezeStaticArenaMatrices(root: THREE.Object3D): number {
+  let frozen = 0;
+  const freezeLeaf = (node: THREE.Object3D): void => {
+    if (!node.matrixAutoUpdate) return;
+    node.updateMatrix();
+    node.matrixAutoUpdate = false;
+    frozen += 1;
+  };
+  const freezeSubtree = (node: THREE.Object3D): void => {
+    node.traverse(freezeLeaf);
+  };
+  const visit = (node: THREE.Object3D): void => {
+    if (node.userData.dynamic === true) return;
+    if ((node as THREE.LOD).isLOD === true || /-render-batches$/.test(node.name)) {
+      freezeSubtree(node);
+      return;
+    }
+    if ((node as THREE.Mesh).isMesh === true && node.userData.staticBatchRendered === true) {
+      freezeLeaf(node);
+      return;
+    }
+    for (const child of node.children) visit(child);
+  };
+  visit(root);
+  return frozen;
+}
