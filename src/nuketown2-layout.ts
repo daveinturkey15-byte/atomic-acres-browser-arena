@@ -202,6 +202,40 @@ export const NUKETOWN2_HOUSE_LAYOUT = Object.freeze([
 ]);
 
 /**
+ * Authored-frame poses for the two HF-465 review stations. The offsets are
+ * measured from the north house's own layout anchors; the visual definition
+ * applies NUKETOWN2_HANDEDNESS exactly once when it emits world X values.
+ * Keeping the poses here makes a house/layout change move the review stations
+ * with the geometry instead of leaving a mirrored literal behind.
+ */
+export const NUKETOWN2_REVIEW_CAMERA_ANCHORS = Object.freeze({
+  northBalcony: Object.freeze({
+    position: [
+      NUKETOWN2_HOUSE_LAYOUT[0].x - 8.25,
+      1.75,
+      NUKETOWN2_HOUSE_FRONT_Z - NUKETOWN2_HOUSE_DEPTH - 4.5,
+    ] as const,
+    target: [
+      NUKETOWN2_HOUSE_LAYOUT[0].x - 1.75,
+      NUKETOWN2_UPPER_Y0 + 0.1,
+      NUKETOWN2_HOUSE_FRONT_Z - NUKETOWN2_HOUSE_DEPTH - 1,
+    ] as const,
+  }),
+  frontPorch: Object.freeze({
+    position: [
+      NUKETOWN2_HOUSE_LAYOUT[0].x - 6.75,
+      1.9,
+      NUKETOWN2_HOUSE_FRONT_Z + 5.4,
+    ] as const,
+    target: [
+      NUKETOWN2_HOUSE_LAYOUT[0].x,
+      NUKETOWN2_UPPER_Y0 - 0.2,
+      NUKETOWN2_HOUSE_FRONT_Z + 0.3,
+    ] as const,
+  }),
+});
+
+/**
  * The two upper rooms the rare weapon belongs in. Published descriptions of the
  * reference all reach the same conclusion about it: the front-facing upstairs
  * window is the strongest position on the map, because it holds the whole

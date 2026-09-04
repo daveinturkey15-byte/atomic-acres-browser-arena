@@ -1,5 +1,8 @@
 import { buildNuketown2 } from '../../nuketown2-arena';
-import { nuketown2HandedX as hx } from '../../nuketown2-layout';
+import {
+  NUKETOWN2_REVIEW_CAMERA_ANCHORS,
+  nuketown2HandedX as hx,
+} from '../../nuketown2-layout';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
@@ -160,14 +163,32 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-garage', [hx(6.75), 1.7, -20.5], [hx(6.75), 1.5, -14.0], 'geometry', 1.08),
     // HF-473: the rear balcony, its exterior flight and the upper back door,
     // from the yard at the flight's foot.
-    camera('nuketown2-north-balcony', [hx(-9.5), 1.75, -27.5], [hx(-3.0), 3.4, -24.0], 'geometry', 1.08),
+    // HF-465: the rear balcony, exterior flight and upper back door. These
+    // poses are derived from the shared layout; hx() applies handedness once.
+    camera('nuketown2-north-balcony', [
+      hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[1],
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[2],
+    ], [
+      hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.target[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.target[1],
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.target[2],
+    ], 'geometry', 1.08),
     // ...and the front climb chain: hedge, porch canopy, window ledge, upper
     // front window, in one frame off the verge.
     // Stood back on the carriageway rather than on the verge: from the verge
     // the hedge - the chain's first rung - sat 40 degrees off aim and out of
     // a 60 degree frame, which
     // scripts/qa/nuketown2-handedness-frame.mts measures rather than eyeballs.
-    camera('nuketown2-front-porch', [hx(-8.0), 1.9, -4.6], [hx(-1.25), 3.1, -9.7], 'geometry', 1.08),
+    camera('nuketown2-front-porch', [
+      hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.position[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.position[1],
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.position[2],
+    ], [
+      hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.target[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.target[1],
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.target[2],
+    ], 'geometry', 1.08),
     // PASS 94 integration: the five vehicle stations below were authored on the
     // UNMIRRORED map, before HF-473. Every body they frame is placed through
     // `centred`/`streetVehicle`, which mirror x, so each eye and target x is
