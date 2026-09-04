@@ -2149,3 +2149,7 @@ assets and textures and lighting need to be tip top, raid can come next"
 
 - 'Use a bunch of Muse Spark contributor 1.3, Gemini, Z.ai etc, some Lunas, no local Qwen, some Claudes and Fables; get all the nice things, nice graphics and the skills/techniques I sent in; make it a really nice experience; awake at 6 to check; get the other build live asap.'
 - Applied: overnight plan updated (docs/pass84-lanes/OVERNIGHT-2026-09-04-PLAN.md); HITL 6 publishes as PASS 95 as soon as the full gates + qa:mp-soak are green (PASS 94 stays the backup channel per HF-400) unless the owner asks to play-test first; Muse builder pool extended with graphics lanes (SSR denoise, volume fire, generator-building detail, albedo variation, transmission glass, arena ambient air), Opus on the two hardest look items (albedo variation pass, SH-L2 irradiance volume), Fable on the blind A/B critic harness + TAA/CSM evaluation after HITL 6; Gemini/Muse critics on every candidate; 06:00 candidate 7 + morning report.
+
+## HF-504 - owner 2026-09-04 21:50: 'ensure you are properly debugging multiplayer - some issues are months old: lobby, guest/host, desync, cannot reload or pick up guns'
+
+- Routed to an Opus multiplayer audit lane (trace-based, host + two guests: lobby flow, host/guest roles, join/rejoin, reload, weapon pickup, swap, damage credit, respawn, scoreboard; defect ledger with root causes; mechanical fixes; coordinates with the two Luna multiplayer lanes). Backlog snapshot for prioritisation: docs/pass84-lanes/BACKLOG-2026-09-04.md.
