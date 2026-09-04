@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// Diagnostic: reproduces the host-vs-guest firing smoke finding (guest fires 30->24 while the host's real-mouse trigger shows no ammo drop / no fireBlock entry).
+// Usage: node scripts/qa/diagnose-host-fire.mjs
+// Flags/env: none — the script reads no process.argv entries and no process.env variables.
+// Writes: no files or directories; prints JSON probe reports to stdout and temporarily spawns the local peer.js server (127.0.0.1:9337).
+// Exit codes: no process.exit() calls — 0 on normal completion; non-zero via unhandled rejection if the peer server never becomes ready or a Playwright step times out.
+
 // Focused diagnostic for the smoke finding: guest fires (30->24) while the
 // HOST's real-mouse trigger produced no ammo drop and no fireBlock entry.
 // Reads textChat.triggerHeld live so we can tell INPUT-PATH failure (trigger
