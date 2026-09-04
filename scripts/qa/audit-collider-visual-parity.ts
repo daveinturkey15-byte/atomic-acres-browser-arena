@@ -11,6 +11,7 @@
 //   1 = unexplained collider(s) found
 //   2 = the audit itself failed for an arena (construction threw)
 //   3 = --gate-walkthrough and walk-through mesh(es) found
+//   4 = an authored mesh has a NaN world box (invisible in the engine)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ALL_ARENA_IDS, runColliderVisualParityAudit } from './collider-visual-parity-core';
@@ -40,16 +41,23 @@ async function main(): Promise<void> {
     }
     const invisible = result.invisibleColliders ?? [];
     const walkThrough = result.walkThroughMeshes ?? [];
+    const nanBounded = result.nanBoundedMeshes ?? [];
     console.log(`\n=== ${result.id}: ${invisible.length} invisible collider(s), ${walkThrough.length} walk-through mesh(es)`
       + ` [${result.colliderCount} colliders, ${result.boundaryColliders} boundary,`
       + ` ${result.runtimeReplacedStaticColliders} runtime-replaced statics, ${result.visibleMeshes} visible meshes]`);
+    for (const name of nanBounded) console.log(`  NaN-BOUNDED MESH ${JSON.stringify(name)}`);
     for (const finding of invisible) console.log(`  INVISIBLE COLLIDER ${JSON.stringify(finding)}`);
     for (const finding of walkThrough) console.log(`  WALK-THROUGH MESH ${JSON.stringify(finding)}`);
     const exclusions = Object.entries(result.excludedByRuleCounts ?? {});
     if (exclusions.length > 0) {
       console.log(`  rule-excluded substantial meshes: ${exclusions.map(([reason, count]) => `${reason}=${count}`).join(', ')}`);
     }
-    if (!REPORT_ONLY && invisible.length > 0) exitCode = 1;
+    // A NaN-bounded authored mesh is invisible in the engine and was, until
+    // this gate existed, dropped from the census without a word. It fails the
+    // run outright, and it does so BEFORE the invisible-collider check so the
+    // exit code names the defect that hides every other one.
+    if (!REPORT_ONLY && nanBounded.length > 0) exitCode = 4;
+    if (!REPORT_ONLY && invisible.length > 0 && exitCode === 0) exitCode = 1;
     if (!REPORT_ONLY && GATE_WALKTHROUGH && walkThrough.length > 0 && exitCode === 0) exitCode = 3;
   }
 

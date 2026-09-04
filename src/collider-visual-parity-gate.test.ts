@@ -110,6 +110,21 @@ describe('collider/visual parity gate (all six arenas)', () => {
     }
   }, 120_000);
 
+  it('authors NO mesh with a NaN world box (an invisible mesh the census used to swallow)', async () => {
+    // The defect this closes is measured, not imagined: the raid2 detail branch
+    // imported six module-private constants, got `undefined + number = NaN`
+    // under esbuild (which does no type check), and shipped 25 dressing meshes
+    // - court lines, both hoop assemblies, the sculpture, the cornices - at NaN
+    // world matrices. `Box3.setFromObject` returned NaN for every one of them
+    // and the census dropped them silently, so the arena's headline detail work
+    // did not exist at its authored positions while every audit stayed green.
+    // A NaN box has no legitimate cause, so it fails here by name.
+    const results = await audit();
+    for (const result of results) {
+      expect(result.nanBoundedMeshes ?? [], `${result.id}: meshes with a NaN world box`).toEqual([]);
+    }
+  }, 120_000);
+
   it('explains EVERY movement collider with a visible mesh (zero invisible colliders)', async () => {
     const results = await audit();
     for (const result of results) {

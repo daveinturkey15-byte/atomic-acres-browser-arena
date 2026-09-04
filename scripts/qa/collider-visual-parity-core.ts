@@ -189,6 +189,17 @@ export type ArenaAuditResult = {
   visibleMeshes?: number;
   invisibleColliders?: Array<Record<string, unknown>>;
   walkThroughMeshes?: Array<Record<string, unknown>>;
+  /**
+   * Authored meshes whose world-space `Box3` is NaN. They are INVISIBLE in the
+   * engine and, before this field existed, they were silently dropped by the
+   * census below - so an arena could author its headline dressing, ship it at
+   * NaN, and audit green with the meshes simply absent. That is not a
+   * hypothetical: the raid2 detail branch lost 25 authored meshes exactly this
+   * way (docs/raid-rebuild/GLM_PRECHECK_2026-09-03.md sections 4-5). A NaN box
+   * is always an authoring defect, never a legitimate state, so it is a
+   * FAILURE with the offending names listed rather than a silent exclusion.
+   */
+  nanBoundedMeshes?: string[];
   excludedByRuleCounts?: Record<string, number>;
   /** Direction C: authored shot-surface roster stats (material / classification). */
   shotSurfaceStats?: {
@@ -252,13 +263,24 @@ function objectPath(object: THREE.Object3D): string {
   return parts.join('/');
 }
 
-export function collectMeshes(scene: THREE.Scene): MeshEntry[] {
+export function collectMeshes(scene: THREE.Scene, nanOut?: string[]): MeshEntry[] {
   scene.updateMatrixWorld(true);
   const meshes: MeshEntry[] = [];
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     if (!visibleChain(object)) return;
     const box = new THREE.Box3().setFromObject(object);
+    // A NaN world box means the mesh was positioned from an undefined constant
+    // (the classic `undefined + number` under esbuild, which does no type
+    // check). Report it by name instead of dropping it: an authored mesh that
+    // exists nowhere is a defect the census must SHOW, not absorb. `isEmpty()`
+    // stays a silent skip - an InstancedMesh with zero live instances is a
+    // legitimate state and carries no NaN.
+    if (Number.isNaN(box.min.x) || Number.isNaN(box.min.y) || Number.isNaN(box.min.z)
+      || Number.isNaN(box.max.x) || Number.isNaN(box.max.y) || Number.isNaN(box.max.z)) {
+      nanOut?.push(objectPath(object) || object.name || `(unnamed ${object.type})`);
+      return;
+    }
     if (!Number.isFinite(box.min.x) || box.isEmpty()) return;
     meshes.push({
       name: object.name || `(unnamed ${object.type})`,
@@ -392,7 +414,8 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     return { id, error: String((error as Error)?.stack ?? error).slice(0, 600) };
   }
   const colliders = collectColliders(map as ArenaMap);
-  const meshes = collectMeshes(scene);
+  const nanBoundedMeshes: string[] = [];
+  const meshes = collectMeshes(scene, nanBoundedMeshes);
   const bounds = map.bounds;
 
   // Runtime-replaced statics are counted, never flagged (see header).
@@ -630,6 +653,7 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     boundaryColliders,
     runtimeReplacedStaticColliders,
     visibleMeshes: meshes.length,
+    nanBoundedMeshes,
     invisibleColliders,
     walkThroughMeshes,
     excludedByRuleCounts,
