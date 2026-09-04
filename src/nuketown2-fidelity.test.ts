@@ -41,6 +41,9 @@ import {
   nuketown2HandedX as hx,
 } from './nuketown2-layout';
 import {
+  NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
+} from './nuketown2-roofs';
+import {
   OVERDRIVE_POSITION,
   claimOverdrive,
   createOverdriveState,
@@ -1743,6 +1746,12 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle truck wheel 2',
     ];
 
+    // ---- HF-472: THE SHOW-HOME ROOF FORMS -------------------------------
+    // The houses remain a rotational layout pair, but the reference's two
+    // show homes deliberately have different roof identities. The exact body
+    // names come from `nuketown2-roofs.ts`, so this exception cannot drift from
+    // the one-sided emitters without failing this gate.
+
     // ---- HF-477: THE CARRIAGEWAY, AND WHY IT IS A SECOND EXCEPTION ---------
     // The lollipop breaks the 180-degree property for the ROAD, and it has to:
     // `docs/references/nuketown-2025/FINDINGS.md` Q4 VERIFIES one circular
@@ -1867,14 +1876,17 @@ describe('Nuke Town Rebuild fidelity', () => {
       ...EXPECTED_ASYMMETRIC,
       ...EXPECTED_ASYMMETRIC_CARRIAGEWAY,
       ...EXPECTED_ASYMMETRIC_BEYOND_BOUNDS,
+      ...NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
     ].sort());
     // Every one of them is a street vehicle, a carriageway body or a
     // beyond-bounds body by NAME as well as by list, so no list can be grown
     // with a wall by renaming it.
     const carriageway = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_CARRIAGEWAY.includes(mesh.name));
     const beyondBounds = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_BEYOND_BOUNDS.includes(mesh.name));
+    const roofs = asymmetric.filter((mesh) => NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES.includes(mesh.name));
     const vehicles = asymmetric.filter((mesh) => (
-      !carriageway.includes(mesh) && !beyondBounds.includes(mesh) && !groundTiles.includes(mesh)
+      !carriageway.includes(mesh) && !beyondBounds.includes(mesh)
+      && !roofs.includes(mesh) && !groundTiles.includes(mesh)
     ));
     for (const mesh of vehicles) {
       expect(mesh.name.startsWith('nuketown2 street-vehicle '), mesh.name).toBe(true);
@@ -1884,6 +1896,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     for (const mesh of beyondBounds) {
       expect(mesh.name.startsWith('nuketown2 beyond-bounds '), mesh.name).toBe(true);
+    }
+    for (const mesh of roofs) {
+      expect(NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES.includes(mesh.name), mesh.name).toBe(true);
     }
 
     // ---- WHAT THE CARRIAGEWAY EXCEPTION PAYS ------------------------------

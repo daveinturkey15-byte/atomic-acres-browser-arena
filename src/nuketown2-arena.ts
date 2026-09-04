@@ -178,6 +178,7 @@ import {
   createNuketown2TruckCabMaterial,
   createNuketown2VehicleGlassMaterial,
 } from './nuketown2-vehicle-materials';
+import { buildNuketown2Rooflines, type Nuketown2RoofMaterials } from './nuketown2-roofs';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -3002,6 +3003,11 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   cars(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
+  buildNuketown2Rooflines(builder, {
+    roof: m.roof,
+    roofGlazing: m.roofGlazing,
+    timber: m.fence,
+  } satisfies Nuketown2RoofMaterials);
 
   // ---- HF-426 JOB 3: the shipped map's LAWN, on this map's own rectangles --
   // Built HERE, after every prop, because `builder.colliders` is the keep-out
