@@ -17,12 +17,12 @@ const context: LocalReloadContext = { localConnectionEpoch: epoch, currentLifeId
 
 const pendingStart = (overrides: Partial<Parameters<typeof createPendingReload>[0]> = {}) =>
   createPendingReload({
-    connectionEpoch: epoch, lifeId: 4, weapon: 'm4a1', actionSequence: 0,
+    connectionEpoch: epoch, lifeId: 4, requestId: 'reload-request-start-0', weapon: 'm4a1', actionSequence: 0,
     nowMs: 1_000, expectedCompletionMs: 3_400, ...overrides,
   });
 
 const result = (overrides: Partial<LocalReloadResultInput> = {}): LocalReloadResultInput => ({
-  connectionEpoch: epoch, lifeId: 4, actionSequence: 0, weapon: 'm4a1',
+  connectionEpoch: epoch, lifeId: 4, actionSequence: 0, requestId: 'reload-request-start-0', weapon: 'm4a1',
   status: 'committed', reason: 'committed', ...overrides,
 });
 
@@ -30,7 +30,8 @@ describe('local reload authority pending lifecycle', () => {
   it('creates a frozen pending with the start sequence and no cancel in flight', () => {
     const pending = pendingStart();
     expect(pending).toEqual({
-      connectionEpoch: epoch, lifeId: 4, startSequence: 0, cancelSequence: null,
+      connectionEpoch: epoch, lifeId: 4, requestId: 'reload-request-start-0', startSequence: 0, cancelSequence: null,
+      cancelRequestId: null,
       weapon: 'm4a1', requestedAtMs: 1_000, expectedCompletionMs: 3_400,
     });
     expect(Object.isFrozen(pending)).toBe(true);
@@ -38,13 +39,13 @@ describe('local reload authority pending lifecycle', () => {
 
   it('registers a cancel exactly once without mutating the original pending', () => {
     const pending = pendingStart();
-    const cancelling = cancelRequested(pending, 1);
+    const cancelling = cancelRequested(pending, 1, 'reload-request-cancel-1');
     expect(cancelling).not.toBeNull();
     expect(cancelling?.cancelSequence).toBe(1);
     expect(cancelling?.startSequence).toBe(0);
     expect(pending.cancelSequence).toBeNull();
     // One-shot: a second cancel intent must not be sent (legacy sendLocalReloadCancel guard).
-    expect(cancelRequested(cancelling!, 2)).toBeNull();
+    expect(cancelRequested(cancelling!, 2, 'reload-request-cancel-2')).toBeNull();
   });
 });
 
@@ -80,10 +81,10 @@ describe('applyReloadResult matched transitions', () => {
   });
 
   it('clears on a cancelled result matching the cancel sequence', () => {
-    const cancelling = cancelRequested(pendingStart(), 1)!;
+    const cancelling = cancelRequested(pendingStart(), 1, 'reload-request-cancel-1')!;
     const outcome = applyReloadResult(
       cancelling,
-      result({ actionSequence: 1, status: 'cancelled', reason: 'cancelled' }),
+      result({ actionSequence: 1, requestId: 'reload-request-cancel-1', status: 'cancelled', reason: 'cancelled' }),
       context,
     );
     expect(outcome.action).toBe('clear-and-apply-projection');
@@ -115,14 +116,14 @@ describe('applyReloadResult matched transitions', () => {
   it('accepts a committed start that raced an in-flight cancel (committed-start special case)', () => {
     // HF-315(b): the host committed before our cancel intent arrived. The commit at
     // the start sequence is authoritative; the cancel will bounce as no-pending-reload.
-    const cancelling = cancelRequested(pendingStart(), 1)!;
+    const cancelling = cancelRequested(pendingStart(), 1, 'reload-request-cancel-1')!;
     const outcome = applyReloadResult(cancelling, result({ actionSequence: 0 }), context);
     expect(outcome.action).toBe('clear-and-apply-projection');
     expect(outcome.pending).toBeNull();
   });
 
   it('ignores a non-committed result at the start sequence while a cancel is in flight', () => {
-    const cancelling = cancelRequested(pendingStart(), 1)!;
+    const cancelling = cancelRequested(pendingStart(), 1, 'reload-request-cancel-1')!;
     const started = applyReloadResult(
       cancelling,
       result({ actionSequence: 0, status: 'started', reason: 'accepted' }),
