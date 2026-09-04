@@ -237,6 +237,28 @@
           "note": "70 focused tests passed; coplanar output is HOUSE-INTERIOR 0, STREET 0, FINDINGS 0 and UNAUDITED 52."
         }
       ]
+    },
+    {
+      "id": "R14",
+      "summary": "HF-500 keeps in-match chat above the play-critical HUD lane",
+      "expected": "Game chat sits above the weapon/ammo cluster, outside the crosshair band and minimap at 1080p, 1440p and mobile widths; it is a readable one-line pointer-inert strip when unfocused and opens only from the explicit Enter key.",
+      "falsifier": "Any supported viewport overlaps chat with ammo, the crosshair band or minimap, or a closed game chat panel captures pointer input or opens from a play-area click.",
+      "acceptance": "mechanical",
+      "state": "implemented",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/hud-chat-layout.test.ts",
+          "command": "npx vitest run src/hud-chat-layout.test.ts src/text-chat-ui.test.ts src/room-chat-presentation.test.ts",
+          "note": "The pure layout contract checks 1920x1080, 2560x1440 and 390x844 rectangles; the CSS/source assertions pin pointer-inert collapse and explicit Enter opening."
+        },
+        {
+          "kind": "browser",
+          "ref": "docs/evidence/pass94/hud-chat/hud-chat-1440p.png",
+          "command": "PASS73_NATIVE_WEBGPU=1 QA_PREVIEW_PORT=4196 npx playwright test --project=chromium --grep HF-500",
+          "note": "Single permitted installed-Chrome native-WebGPU capture at 1440p measured the final geometry and pointer state; it exposed a closed-height residual that the final static CSS contract repairs. No second browser run was made."
+        }
+      ]
     }
   ]
 }
