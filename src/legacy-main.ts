@@ -691,7 +691,7 @@ import {
   type DeathDrop,
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
-import { ArenaNetwork } from './network';
+import { ArenaNetwork, type QaMessageTrace } from './network';
 import {
   MatchAdmissionCoordinator,
   isMatchAdmissionSuperseded,
@@ -1188,6 +1188,7 @@ import {
   StateMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
+  LobbyClosedReason,
   TriggerStateMessage,
   WEAPON_IDS,
   WeaponId,
@@ -10827,6 +10828,33 @@ function handleLobbyMessage(message: GameMessage): boolean {
     }
     return true;
   }
+  // HF-504: the host's farewell reaches the network layer (which stops the
+  // 90 s reconnect grind, network.ts noteValidHostMessage) but never reached
+  // the APP, so nothing told the lobby UI. A guest whose host closed the room
+  // kept a roster on screen listing the dead host as connected and ready, with
+  // a READY button that hit neither branch of the click handler because the
+  // role had already fallen back to 'offline'. That is the owner's "in lobby,
+  // guest/host" report in its most literal form: a lobby that is over and
+  // still looks live. The teardown is the one the sibling rejection already
+  // performs - clear the authoritative snapshot, re-render from it, and say so.
+  if (message.type === 'lobby-closed') {
+    if (network.role === 'client') {
+      const closureLabels: Record<LobbyClosedReason, string> = {
+        'host-reset': 'The host reset the lobby. Open a fresh invite to rejoin.',
+        'host-superseded': 'Another host took over this room code. Open a fresh invite to rejoin.',
+      };
+      setStatus(closureLabels[message.reason], 'warn');
+      invalidateMatchAdmission(`Host closed the lobby: ${message.reason}`);
+      clientWorldRepairAdmission = null;
+      pendingClientReconnectWorldRepairConnectionEpoch = null;
+      privateLobbySnapshot = null;
+      localLobbyReady = false;
+      renderPrivateLobby();
+      resetTextChat();
+      syncArenaSelectionUi();
+    }
+    return true;
+  }
   if (message.type === 'lobby-reject') {
     const labels = {
       'room-full': 'Room is full.',
@@ -11019,7 +11047,13 @@ function renderPrivateLobby(): void {
   const lobbyArenaSynchronized = !snapshot
     || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
   trackLobbyArenaSyncDeadline(lobbyArenaSynchronized, snapshot?.config.arenaId ?? null);
-  localLobbyReady = localMember?.ready ?? localLobbyReady;
+  // HF-504: an authoritative roster that does not contain this player cannot
+  // leave READY ✓ on screen. Falling back to the stale local value kept a guest
+  // the host had dropped (grace expired, rejoin denied, room closed) rendering
+  // a ready state the host no longer holds, and the owner then reads the lobby
+  // as "guest and host disagree". With no snapshot there is no authority to
+  // read, so the local value legitimately stands.
+  localLobbyReady = snapshot ? localMember?.ready ?? false : localLobbyReady;
   const ready = element<HTMLButtonElement>('#lobby-ready');
   ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
   ready.classList.toggle('primary', localLobbyReady);
@@ -15466,6 +15500,12 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   player.reserve[result.inventory.primary] = result.inventory.reserve;
   player.weapon = result.inventory.primary;
   player.switchingUntil = now + 360;
+  // HF-504: same stale-cadence gate as switchWeapon - nextShotAt still holds the
+  // DROPPED weapon's deadline, so a gun picked up right after firing a slow one
+  // refuses to fire for the rest of that slow interval. This is the literal
+  // "randomly cant shoot ... after picked one up" report, and it is silent: the
+  // only trace is a `rate-of-fire` fireBlock counter.
+  player.nextShotAt = 0;
   weaponView.setWeapon(player.weapon);
   audio.weaponSwitch();
   const pickup: PickupMessage = {
@@ -15686,6 +15726,26 @@ function acceptLocalPickupResult(message: PickupResultMessage): void {
   if (message.status === 'rejected') {
     if (pending) restorePendingLocalPickup(pending);
     pendingLocalPickup = null;
+    // HF-504: the host attaches its canonical drop record to EVERY reply,
+    // including rejections, and the guest used to throw the rejection copy away
+    // - `applyCanonicalPickupDrop` was reached only on the accepted path. The
+    // guest therefore restored its own stale drop verbatim, so the very state
+    // that caused the rejection (wrong weapon, wrong position, a drop the host
+    // has already removed) was reinstated and the next F-press failed the same
+    // way, forever. That is the owner's "cannot pick up guns": a drop that is
+    // permanently poisoned on the guest and repairable only by dying.
+    // Adopting the host's record on rejection is the whole repair.
+    applyCanonicalPickupDrop(message, performance.now());
+    // The optimistic "<WEAPON> PICKED UP" line was already printed locally
+    // before the host ever saw the claim, so a silent revert reads as the gun
+    // vanishing. Say what actually happened.
+    addFeed('PICKUP DENIED', 'coral');
+    recordMatchDiagnostic('weapon-pickup', 'rejected', {
+      actorId: player.id,
+      weaponOrEffect: message.combatInventory.primary.weapon,
+      position: player.position.toArray(),
+      reason: message.reason,
+    });
     return;
   }
   applyLocalCombatInventoryProjection(message.combatInventory, true);
@@ -17377,6 +17437,18 @@ function respawn(
   if (startsNewLife) {
     clearExpiredLocalReloadAuthority();
     pendingLocalPickup = null;
+    // HF-504: the host rebuilds its per-guest reload authority on EVERY life
+    // change (createGuestReloadAuthorityState, lastActionSequence = -1) and then
+    // demands actionSequence === lastActionSequence + 1. This allocator was reset
+    // only on network reset, guest-resume and startGame - never on respawn. So
+    // after a guest's first death, having reloaded N times, it kept sending N
+    // while the host expected 0, and every intent was rejected 'action-sequence'
+    // for the rest of the match. The reject path stores the UNCHANGED state, so
+    // the host's expectation stayed at -1 and the guest could never resynchronise:
+    // reload was bricked from the first death onward. That is the owner's
+    // "cannot reload". The sequence is a per-life handshake counter, so a new
+    // life is exactly when it must restart.
+    localReloadActionSequence.reset();
   }
   clearGameplayInput();
   player.stance = 'stand';
@@ -19354,6 +19426,16 @@ function switchWeapon(index: number): void {
   syncLocalTriggerAuthority(triggerHeld);
   player.switchingUntil = performance.now() + 360;
   player.sustainedShots = 0;
+  // HF-504: nextShotAt is a deadline expressed in the PREVIOUS weapon's cadence.
+  // Carrying it across a swap makes the new weapon refuse to fire for the
+  // remainder of the old weapon's interval - m14-ebr (46 rpm) to a pistol is
+  // ~944 ms of dead trigger, silent apart from a `rate-of-fire` fireBlock
+  // counter. Four other weapon-granting paths already clear it (gun-range
+  // armory, timed-map acquire, crimson flamethrower, the QA hook); the two real
+  // gameplay paths did not, which is the owner's "sometimes randomly cant shoot
+  // ... after picked one up". The new weapon's own cadence is applied by the
+  // switch delay below, so zeroing here removes a stale gate, never a real one.
+  player.nextShotAt = 0;
   weaponView.setWeapon(id);
   audio.weaponSwitch();
 }
@@ -32913,6 +32995,8 @@ const debugWindow = window as Window & {
     grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
+    /** HF-504: QA-only multiplayer message trace (see network.ts qaMessageTrace). */
+    sampleMessageTrace: () => QaMessageTrace;
     endMatch: () => void;
     rematch: () => void;
     returnToMainMenu: () => void;
@@ -36817,6 +36901,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return interactWithRailgunPickup();
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
+  // HF-504: the audit driver reads this on every peer to diff who sent and who
+  // received each message. Read-only; the trace ring is opened by URL fence.
+  sampleMessageTrace: () => network.qaMessageTrace(),
   endMatch: () => {
     endTimedMatchFromAuthority(performance.now());
   },
