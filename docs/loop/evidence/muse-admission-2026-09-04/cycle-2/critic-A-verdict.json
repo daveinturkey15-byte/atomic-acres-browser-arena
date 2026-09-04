@@ -1,0 +1,112 @@
+{
+  "criticId": "A",
+  "route": "omp-muse",
+  "valid": true,
+  "invalidReason": null,
+  "expectedProbe": "UATX",
+  "answeredProbe": "UATX",
+  "total": 35,
+  "rowsBelowGate": [
+    "geometry-match",
+    "proportion",
+    "material-read",
+    "lighting-match"
+  ],
+  "errors": [],
+  "warnings": [],
+  "meta": {
+    "elapsedMs": 65176,
+    "exitCode": 0,
+    "failureMarker": null,
+    "model": "meta-contributor/muse-spark-1.3",
+    "images": 2,
+    "timedOut": false
+  },
+  "response": {
+    "contract": "reference-critic-v1",
+    "subject": "chopper-gunner-cockpit-1080",
+    "cycle": 2,
+    "criticId": "A",
+    "sawImages": {
+      "answer": "UATX"
+    },
+    "rows": [
+      {
+        "row": "geometry-match",
+        "weight": 25,
+        "score": 7,
+        "regions": [
+          "r1c0",
+          "r1c2",
+          "r2c2"
+        ],
+        "finding": "Capture adds tall converging side-frame beams forming a full trapezoid in r1c0/r1c2/r2c2 that are absent in the reference where the cockpit stops as a low bottom rail, consistent with edgeIoU 0.30-0.64 there.",
+        "referenceEvidence": "reference lower half r1c0 through r2c2 shows open trees above a low dark horizontal rail with no diagonal side pillars",
+        "captureEvidence": "capture r1c0 through r2c2 shows bright diagonal beams from bottom corners converging to upper-middle framing the whole view",
+        "severity": "P1",
+        "boundedCorrection": "Remove the diagonal side-frame beams and retain only the bottom dashboard rail assembly, changing nothing else."
+      },
+      {
+        "row": "proportion",
+        "weight": 25,
+        "score": 8,
+        "regions": [
+          "r2c0",
+          "r2c1",
+          "r2c2"
+        ],
+        "finding": "Cockpit height occupies roughly double the frame fraction in capture versus a thin bottom band in reference, consistent with measured edgeIoU 0.4034, 0.4474, 0.3031 in r2c0/r2c1/r2c2.",
+        "referenceEvidence": "reference r2c0-r2c2 dashboard band occupies bottom ~25% with rail near bottom third line",
+        "captureEvidence": "capture r2c0-r2c2 dashboard plus converging sides occupy bottom ~45% with top edge near mid-frame",
+        "severity": "P1",
+        "boundedCorrection": "Lower the dashboard top edge to the reference bottom-band height with a horizontal rail, changing nothing else."
+      },
+      {
+        "row": "material-read",
+        "weight": 25,
+        "score": 11,
+        "regions": [
+          "r2c0",
+          "r2c1",
+          "r2c2"
+        ],
+        "finding": "Dashboard in r2c0-r2c2 reads as bright emissive translucent mint in capture versus dark opaque matte olive in reference at this gameplay distance.",
+        "referenceEvidence": "reference r2c1 dashboard panel and tabs read as dark matte opaque olive with small flat color tabs",
+        "captureEvidence": "capture r2c1 dashboard panel and tabs read as light glossy emissive white-mint with glowing tabs",
+        "severity": "P1",
+        "boundedCorrection": "Replace cockpit dashboard and tab materials with opaque non-emissive dark matte material, changing nothing else."
+      },
+      {
+        "row": "lighting-match",
+        "weight": 25,
+        "score": 9,
+        "regions": [
+          "r2c1",
+          "r2c2",
+          "r1c2"
+        ],
+        "finding": "Value hierarchy inverts in r2c1/r2c2 where the cockpit interior is brightest with bloom in capture while the reference cockpit is darkest with sky brightest, consistent with valueEMD 0.19-0.36 in r2.",
+        "referenceEvidence": "reference r2 sky brightest, cockpit interior in shadow with deep contact shadow under rail",
+        "captureEvidence": "capture r2 cockpit frame and dashboard bloom as brightest plane, washing trees behind rail",
+        "severity": "P1",
+        "boundedCorrection": "Disable emissive intensity and bloom contribution on cockpit frame and dashboard to restore sky-brightest hierarchy, changing nothing else."
+      }
+    ],
+    "largestGap": {
+      "row": "geometry-match",
+      "regions": [
+        "r1c0",
+        "r1c2",
+        "r2c2"
+      ],
+      "rootCauseClass": "implementation"
+    },
+    "contractConflict": null,
+    "decision": "refine-code",
+    "notMatchable": [
+      "Absolute sRGB values of sunset sky and HUD text, S1 is not usable for absolute colour calibration",
+      "Print-distance material micro-detail and foliage shape, gameplay-distance frame is not usable for material-class judgement at print distance",
+      "Colour-temperature agreement between images, both come from the same renderer so it is not evidence art direction is right"
+    ]
+  }
+}

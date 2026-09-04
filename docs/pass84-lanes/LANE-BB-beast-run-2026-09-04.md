@@ -245,11 +245,16 @@ an exhausted route.
 | Alibaba token plan / Qwen Max | secondary builder and visual critic | weekly token plan; `[CLAIMED]` fresh at handoff | 20 calls: 10 builder + 10 critic |
 | Z.ai / GLM Flash | late builder fallback | 5-hour window; `[CLAIMED]` reset 05:04 local | 2 calls after reset only |
 | Codex / Luna | skeptic every third cycle and final contract adjudication | OpenAI plan; `[VERIFIED]` model policy is Luna only, `xhigh` | 4 calls: cycles 3, 6, 9, plus one final adjudication |
+| Meta OMP / Muse Spark 1.3 | visual critic only; never a builder | contributor tier; `[VERIFIED]` admitted by the four-row probe receipt on 2026-09-04; Meta trains on contributor traffic, owner-accepted | 1 call/cycle, 10 total |
 | local Qwen 27B | mechanical gap work only | unlimited local; sleeps about 45 seconds after its last request; holds about 13.8 GB VRAM while awake | no critic calls; one bench ladder rerun plus bounded gap jobs |
 
 The 02:50 Google time is an estimate derived from the stated five-hour window,
 not an entitlement. The orchestrator must use the provider's actual response
 as the claim state. A quota error consumes no retry loop and is recorded once.
+
+Muse is a critic-only contributor-tier route. Meta trains on contributor traffic;
+Dave explicitly accepts that data caveat for this cheap visual-critic trial.
+The route gets at most one call per cycle and never enters the builder pool.
 
 ## Cadence and stop conditions
 

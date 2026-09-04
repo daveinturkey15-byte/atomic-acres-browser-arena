@@ -48,9 +48,10 @@ export async function loadAdapter(name, options = {}) {
     case 'fixture': return assertAdapter((await import('./fixture.mjs')).createFixtureAdapter(options));
     case 'qwen-local': return assertAdapter((await import('./qwen-local.mjs')).createQwenLocalAdapter(options));
     case 'omp-gemini': return assertAdapter((await import('./omp-gemini.mjs')).createOmpGeminiAdapter(options));
+    case 'omp-muse': return assertAdapter((await import('./omp-muse.mjs')).createOmpMuseAdapter(options));
     case 'codex': return assertAdapter((await import('./codex.mjs')).createCodexAdapter(options));
-    default: throw new RangeError(`unknown adapter "${name}" (fixture | qwen-local | omp-gemini | codex)`);
+    default: throw new RangeError(`unknown adapter "${name}" (fixture | qwen-local | omp-gemini | omp-muse | codex)`);
   }
 }
 
-export const ADAPTER_NAMES = Object.freeze(['fixture', 'qwen-local', 'omp-gemini', 'codex']);
+export const ADAPTER_NAMES = Object.freeze(['fixture', 'qwen-local', 'omp-gemini', 'omp-muse', 'codex']);

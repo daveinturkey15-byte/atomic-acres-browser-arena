@@ -1,0 +1,14 @@
+{
+  "trial": "owner-directed Muse visual critic trial",
+  "subject": "nuketown-2025",
+  "versionTag": "BO2-2025",
+  "referenceManifest": "C:\\Users\\david\\projects\\aa-claude-research\\docs\\references\\nuketown-2025\\manifest.json",
+  "referenceManifestSha256": "74fbdad10abf24257c43cf43ab0f276de79d81eecdcf069b7f38a5b5ac945059",
+  "findings": "C:\\Users\\david\\projects\\aa-claude-research\\docs\\references\\nuketown-2025\\FINDINGS.md",
+  "findingsSha256": "2f4b2f2ddaa274c07dd7f69ed30e5c79b2b49a7cf46bd832d4864f1c07d5d7d8",
+  "referenceImage": "C:\\Users\\david\\projects\\aa-claude-research\\docs\\references\\nuketown-2025\\img\\nt2025-street-boii.jpg",
+  "referenceImageSha256": "cba85d16337fce8629b31e3f03dd0946a0de1ffbc34c8890b4d9624f06d3dc82",
+  "captureImage": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate\\nuketown2\\nuketown2-north-yard.png",
+  "captureImageSha256": "4c04ba096c191df907ee4061a3b6c0afe4bbccb33dc846a6f70094e409ac62a9",
+  "provenanceCaveat": "The supplied BO2-2025 image is a first-party commercial reference. This owner-directed trial records it as reference data only; it is not a shipped asset or a checked-in runner target manifest."
+}

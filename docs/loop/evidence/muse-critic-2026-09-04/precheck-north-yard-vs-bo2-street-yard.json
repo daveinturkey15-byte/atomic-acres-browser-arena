@@ -1,0 +1,169 @@
+{
+  "contract": "reference-precheck-v1",
+  "honestLimit": "Relative, cross-cycle numbers for one reference/capture pair. A reference and a render do not share a camera, so an absolute value here is not a fidelity score. Use for direction of travel, region localisation and plateau detection only.",
+  "analysis": {
+    "width": 640,
+    "height": 360,
+    "fit": "fill"
+  },
+  "reference": {
+    "path": "C:\\Users\\david\\projects\\aa-claude-research\\docs\\references\\nuketown-2025\\img\\nt2025-street-boii.jpg",
+    "sha256": "cba85d16337fce8629b31e3f03dd0946a0de1ffbc34c8890b4d9624f06d3dc82",
+    "native": {
+      "width": 640,
+      "height": 345,
+      "format": "jpeg"
+    }
+  },
+  "capture": {
+    "path": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate\\nuketown2\\nuketown2-north-yard.png",
+    "sha256": "4c04ba096c191df907ee4061a3b6c0afe4bbccb33dc846a6f70094e409ac62a9",
+    "native": {
+      "width": 1280,
+      "height": 720,
+      "format": "png"
+    }
+  },
+  "aspectMismatch": 0.0417,
+  "global": {
+    "ssim": 0.245,
+    "edgeIoU": 0.0566,
+    "valueEMD": 0.1672,
+    "silhouetteIoU": null
+  },
+  "regions": [
+    {
+      "id": "r0c0",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.486,
+      "edgeIoU": 0.0254,
+      "valueEMD": 0.1331,
+      "silhouetteIoU": null,
+      "disagreement": 0.6681
+    },
+    {
+      "id": "r0c1",
+      "rect": {
+        "x": 213,
+        "y": 0,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.4322,
+      "edgeIoU": 0.0283,
+      "valueEMD": 0.1176,
+      "silhouetteIoU": null,
+      "disagreement": 0.6797
+    },
+    {
+      "id": "r0c2",
+      "rect": {
+        "x": 426,
+        "y": 0,
+        "w": 214,
+        "h": 120
+      },
+      "ssim": 0.5144,
+      "edgeIoU": 0.0256,
+      "valueEMD": 0.1402,
+      "silhouetteIoU": null,
+      "disagreement": 0.6609
+    },
+    {
+      "id": "r1c0",
+      "rect": {
+        "x": 0,
+        "y": 120,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.0627,
+      "edgeIoU": 0.063,
+      "valueEMD": 0.3415,
+      "silhouetteIoU": null,
+      "disagreement": 0.818
+    },
+    {
+      "id": "r1c1",
+      "rect": {
+        "x": 213,
+        "y": 120,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.0959,
+      "edgeIoU": 0.088,
+      "valueEMD": 0.1437,
+      "silhouetteIoU": null,
+      "disagreement": 0.756
+    },
+    {
+      "id": "r1c2",
+      "rect": {
+        "x": 426,
+        "y": 120,
+        "w": 214,
+        "h": 120
+      },
+      "ssim": 0.0754,
+      "edgeIoU": 0.1189,
+      "valueEMD": 0.2299,
+      "silhouetteIoU": null,
+      "disagreement": 0.7639
+    },
+    {
+      "id": "r2c0",
+      "rect": {
+        "x": 0,
+        "y": 240,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.0729,
+      "edgeIoU": 0.1037,
+      "valueEMD": 0.3951,
+      "silhouetteIoU": null,
+      "disagreement": 0.8053
+    },
+    {
+      "id": "r2c1",
+      "rect": {
+        "x": 213,
+        "y": 240,
+        "w": 213,
+        "h": 120
+      },
+      "ssim": 0.1398,
+      "edgeIoU": 0.0791,
+      "valueEMD": 0.3194,
+      "silhouetteIoU": null,
+      "disagreement": 0.7824
+    },
+    {
+      "id": "r2c2",
+      "rect": {
+        "x": 426,
+        "y": 240,
+        "w": 214,
+        "h": 120
+      },
+      "ssim": 0.3152,
+      "edgeIoU": 0.0218,
+      "valueEMD": 0.054,
+      "silhouetteIoU": null,
+      "disagreement": 0.7053
+    }
+  ],
+  "worstRegion": {
+    "id": "r1c0",
+    "disagreement": 0.818,
+    "edgeIoU": 0.063,
+    "ssim": 0.0627
+  },
+  "compositePath": "C:\\Users\\david\\projects\\aa-claude-i3\\docs\\loop\\evidence\\muse-critic-2026-09-04\\composite-north-yard-vs-bo2-street-yard.png"
+}

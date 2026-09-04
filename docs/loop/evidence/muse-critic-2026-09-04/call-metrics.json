@@ -1,0 +1,13 @@
+{
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3",
+  "calls": [
+    {
+      "kind": "critic",
+      "elapsedMs": 58712,
+      "costVisible": false,
+      "cost": null,
+      "note": "Runner adapter metadata; no usage/cost record was visible in OMP text-mode output."
+    }
+  ]
+}

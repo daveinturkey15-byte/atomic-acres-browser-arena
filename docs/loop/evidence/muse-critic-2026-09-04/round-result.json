@@ -1,0 +1,178 @@
+{
+  "event": {
+    "event": "cycle-complete",
+    "contract": "reference-loop-v1",
+    "subject": "nuketown-2025",
+    "cycle": 1,
+    "adapter": "omp-muse",
+    "pair": "north-yard-vs-bo2-street-yard",
+    "precheck": {
+      "ssim": 0.245,
+      "edgeIoU": 0.0566,
+      "valueEMD": 0.1672,
+      "worstRegion": "r1c0",
+      "worstRegionDisagreement": 0.818,
+      "aspectMismatch": 0.0417
+    },
+    "critics": [
+      {
+        "id": "A",
+        "valid": true,
+        "invalidReason": null,
+        "total": 35,
+        "rowsBelowGate": [
+          "geometry-match",
+          "proportion",
+          "material-read",
+          "lighting-match"
+        ],
+        "largestGap": "geometry-match",
+        "expectedProbe": "EAYA",
+        "answeredProbe": "EAYA",
+        "contractConflict": null,
+        "route": "omp-muse",
+        "elapsedMs": 58712,
+        "routeDetail": null,
+        "schemaErrors": null
+      }
+    ],
+    "validCritics": 1,
+    "meanTotal": 35,
+    "deltaFromPrev": null,
+    "largestGapRow": "geometry-match",
+    "largestGapRegions": [
+      "r1c1",
+      "r1c2"
+    ],
+    "allRowsPassGate": false,
+    "overClaimingCritics": [],
+    "evidenceDir": "C:\\Users\\david\\projects\\aa-claude-i3\\docs\\loop\\evidence\\muse-critic-2026-09-04"
+  },
+  "critic": {
+    "criticId": "A",
+    "valid": true,
+    "invalidReason": null,
+    "errors": [],
+    "warnings": [],
+    "total": 35,
+    "rowsBelowGate": [
+      "geometry-match",
+      "proportion",
+      "material-read",
+      "lighting-match"
+    ],
+    "largestGap": {
+      "row": "geometry-match",
+      "regions": [
+        "r1c1",
+        "r1c2"
+      ],
+      "rootCauseClass": "implementation"
+    },
+    "contractConflict": null,
+    "notMatchable": [
+      "exact colour temperature and absolute scale are not matchable per reference limits and were not scored",
+      "commercial reference JPEG compression, camera intrinsics and framing differences versus renderer camera",
+      "distant city skyline, mountains and red pylon backdrop outside arena bounds"
+    ],
+    "decision": "refine-code",
+    "route": "omp-muse",
+    "meta": {
+      "elapsedMs": 58712,
+      "exitCode": 0,
+      "failureMarker": null,
+      "model": "meta-contributor/muse-spark-1.3",
+      "images": 2,
+      "timedOut": false
+    },
+    "expectedProbe": "EAYA",
+    "answeredProbe": "EAYA",
+    "response": {
+      "contract": "reference-critic-v1",
+      "subject": "nuketown-2025",
+      "cycle": 1,
+      "criticId": "A",
+      "sawImages": {
+        "answer": "EAYA"
+      },
+      "rows": [
+        {
+          "row": "geometry-match",
+          "weight": 25,
+          "score": 6,
+          "regions": [
+            "r1c1",
+            "r1c2",
+            "r0c1"
+          ],
+          "finding": "In r1c1-r1c2 the reference barrel-vault garage wing and sweeping butterfly roof are missing and replaced by a flat slab box, disagreeing in structure not grade.",
+          "referenceEvidence": "center-right reference shows cream garage box with three dark barrel vaults and pale butterfly roof sweep with solar panels over orange upper wall",
+          "captureEvidence": "center capture r1c1-r1c2 shows flat dark slab rim on blue box with no vaults and no roof sweep",
+          "severity": "P1",
+          "boundedCorrection": "Add three barrel-vault garage-wing volumes over garage end using existing procedural TSL construction only, change nothing else."
+        },
+        {
+          "row": "proportion",
+          "weight": 25,
+          "score": 7,
+          "regions": [
+            "r1c0",
+            "r1c1",
+            "r2c1"
+          ],
+          "finding": "In r1c0-r1c1 the exterior stair run to deck height and circular patio diameter ratio disagrees, stair reads short steep and floating versus long grounded flight to patio.",
+          "referenceEvidence": "left-center reference shows long wooden stair from railed upper deck down to large circular concrete patio at lawn",
+          "captureEvidence": "center capture shows short floating white treads with no stringer landing on small stacked square plinth, no circular patio",
+          "severity": "P1",
+          "boundedCorrection": "Extend exterior stair run to grade and enlarge landing to circular-patio proportion in code-built geometry only, change nothing else."
+        },
+        {
+          "row": "material-read",
+          "weight": 25,
+          "score": 12,
+          "regions": [
+            "r1c1",
+            "r2c0",
+            "r2c1"
+          ],
+          "finding": "In r1c1 the upper wall reads as strongly striped cladding and in r2c0-r2c1 lawn reads as coarse tufts, versus smooth show-home render and mown lawn at same distance.",
+          "referenceEvidence": "reference upper wall reads as smooth terracotta band and lawn reads as flat mown green with stepping stones",
+          "captureEvidence": "capture blue wall shows heavy horizontal siding lines and lawn shows large isolated grass sprites on flat ground",
+          "severity": "P2",
+          "boundedCorrection": "Reduce wall siding bump scale to smooth painted-panel read using existing procedural material, change no hues and nothing else."
+        },
+        {
+          "row": "lighting-match",
+          "weight": 25,
+          "score": 10,
+          "regions": [
+            "r0c1",
+            "r1c0",
+            "r2c1"
+          ],
+          "finding": "In r0c1-r2c1 the brightest-plane order and contact shadow disagree, reference roof is brightest with soft under-deck shadow while capture wall is dark with harsh diagonal lawn split.",
+          "referenceEvidence": "reference brightest plane is pale roof sweep with gentle shadow in recessed undercroft and even lawn value",
+          "captureEvidence": "capture house side in deep shadow in r1c1 with diagonal hard shadow splitting lawn in r2c1 and flat overcast sky in r0c1",
+          "severity": "P2",
+          "boundedCorrection": "Raise key-light elevation to make roof plane brightest and soften lawn shadow split with no colour-grade change, change nothing else."
+        }
+      ],
+      "largestGap": {
+        "row": "geometry-match",
+        "regions": [
+          "r1c1",
+          "r1c2"
+        ],
+        "rootCauseClass": "implementation"
+      },
+      "contractConflict": null,
+      "decision": "refine-code",
+      "notMatchable": [
+        "exact colour temperature and absolute scale are not matchable per reference limits and were not scored",
+        "commercial reference JPEG compression, camera intrinsics and framing differences versus renderer camera",
+        "distant city skyline, mountains and red pylon backdrop outside arena bounds"
+      ]
+    },
+    "rawPath": "C:\\Users\\david\\projects\\aa-claude-i3\\docs\\loop\\evidence\\muse-critic-2026-09-04\\capture-critic-A-stamped.png"
+  }
+}

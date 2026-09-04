@@ -53,9 +53,9 @@ scripts/loop/
   critic-prompt.mjs     builds the critic message, stamps the probe
   journal.mjs           JSONL journal + the mechanical stop rules
   run-loop.mjs          the runner, contract reference-loop-v1
-  adapters/             one interface, four routes: fixture, qwen-local, omp-gemini, codex
+  adapters/             one interface, five routes: fixture, qwen-local, omp-gemini, omp-muse, codex
   fixtures/dry-run/     recorded critics, including two that MUST be refused
-  *.test.mjs            node --test, 75 tests, no network and no GPU
+  *.test.mjs            node --test, 90 tests including the Muse adapter, no network and no GPU
 
 docs/references/<subject>/manifest.json   committed: provenance + measurements
 artifacts/loop/<subject>/journal.jsonl    append-only journal (artifacts/ is gitignored)
@@ -76,6 +76,10 @@ node scripts/loop/run-loop.mjs --subject chopper-gunner-cockpit-1080 --dry-run \
 # One real cycle
 node scripts/loop/run-loop.mjs --subject chopper-gunner-cockpit-1080 \
   --critic-adapter omp-gemini --critics A
+
+# One real Muse Spark critic round through OMP
+node scripts/loop/run-loop.mjs --subject chopper-gunner-cockpit-1080 \
+  --critic-adapter omp-muse --critics A --no-preflight
 
 # Tier 0 on its own
 node scripts/loop/precheck.mjs --reference <img> --capture <img> \
@@ -247,6 +251,7 @@ failure markers, because **exit 0 is not success**.
 | `fixture` | **VERIFIED.** Dry run: full plumbing, no quota, no GPU. Includes fixtures that must be refused. |
 | `omp-gemini` | **VERIFIED as a critic route, after four fixes.** Final cycle: expected probe `WNHA`, answered `WNHA`, valid, **37/100**, all four rows below gate, largest gap `geometry-match` at `r1c1`, 24.7 s. |
 | `qwen-local` | **VERIFIED as reachable and multimodal; NOT admitted as a critic.** It read a probe correctly in isolation (`WWQQ`) but inside a full four-row critic task it answered `H4A` against `WNHA` — including a character not in the alphabet. Correctly refused. Free and quota-less, so it stays as the pre-critic triage route (is the frame black, did the arena load). |
+| `omp-muse` | **VERIFIED as an admitted critic route on 2026-09-04.** OMP `meta-contributor/muse-spark-1.3` answered the four-row task with the exact probe (`UATX` on the committed pair; `EAYA` on the owner-directed BO2-2025 trial), valid schema, and 65.2 s / 58.7 s elapsed respectively. The trial scores are evidence, not a release decision. Contributor-tier training use is an owner-accepted caveat. |
 | `codex` | Registered `kind: 'text'` and **rationed**: contract conflicts and final pre-review only. It gets no images, and asking for one returns an error rather than prose that reads like a visual judgement. |
 
 ### Four fixes the OMP route needed, each one a trap for the next lane

@@ -10,7 +10,7 @@
 
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { probeToken, probeBlocks } from './probe.mjs';
+import { probeToken, probeBlocks, PROBE_ALPHABET } from './probe.mjs';
 import { stampProbe } from './image.mjs';
 import { criticTargetSources, criticCaveats } from './reference-set.mjs';
 import { CRITIC_CONTRACT, ROWS, ROW_WEIGHT, ROW_GATE_SCORE, ROOT_CAUSE_CLASSES, DECISIONS } from './critic-schema.mjs';
@@ -84,7 +84,7 @@ export function criticInstruction({ manifest, subject, cycle, criticId, referenc
   const lines = [];
   lines.push('FIRST INSTRUCTION, before anything else.');
   lines.push('The CAPTURE image has a small white box in its bottom-right corner containing four large black characters, drawn in a blocky pixel ' +
-    'font. The characters are from this set only: A C D E F G H J K M N P Q R T U V W X Y 3 4 6 7. Read them and report them as sawImages.answer. ' +
+    `font. The characters are from this set only: ${PROBE_ALPHABET.split('').join(' ')}. Read them and report them as sawImages.answer. ` +
     'If you cannot see that white box, set sawImages.answer to "NONE". Do not guess a plausible code: a wrong code makes this round invalid, which ' +
     'is the correct outcome when you did not receive pixels, and is far better than a fabricated score.');
   lines.push('');

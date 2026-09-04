@@ -157,7 +157,7 @@
     "visualCriticQuorum": {
       "minimumValidCritics": 2,
       "consecutiveExitCycles": 2,
-      "visualSeats": ["gemini", "alibaba-qwen-max"],
+      "visualSeats": ["gemini", "alibaba-qwen-max", "meta-muse-spark"],
       "lunaCountsTowardVisualQuorum": false
     },
     "runnerStopRules": {
@@ -175,7 +175,7 @@
       "one-bounded-builder-change-under-module-hook-discipline",
       "frozen-twelve-station-capture-with-probe-receipt",
       "mechanical-perceptual-precheck",
-      "Gemini-and-Alibaba-visual-critic-round",
+      "Gemini-Alibaba-and-Muse-visual-critic-round",
       "Luna-skeptic-on-every-third-cycle",
       "both-profile-regression-and-journal-stop-evaluation"
     ],
@@ -255,6 +255,27 @@
         "countsTowardVisualQuorum": true
       },
       {
+        "seat": "meta-muse-spark",
+        "adapter": "omp-muse",
+        "provider": "meta-contributor",
+        "model": "meta-contributor/muse-spark-1.3",
+        "kind": "vision",
+        "input": "reference-paired-images-and-station-metadata",
+        "output": "four-row-critic-schema",
+        "roles": ["visual-critic"],
+        "budget": {
+          "maxCallsPerCycle": 1,
+          "maxTotalCalls": 10
+        },
+        "availability": {
+          "window": "contributor-tier",
+          "probeBeforeUse": true,
+          "noQuotaRetryLoop": true,
+          "dataCaveat": "Meta trains on contributor traffic; owner-accepted."
+        },
+        "countsTowardVisualQuorum": true
+      },
+      {
         "seat": "luna",
         "adapter": "codex",
         "model": "gpt-5.6-luna",
@@ -267,7 +288,7 @@
         "headlessNotifyOverride": "-c notify=[]"
       }
     ],
-    "runnerLimitation": "The current CLI/API loads one adapter for a run and the Codex adapter cannot receive images. The orchestrator must keep Gemini and Alibaba as separate visual seats and treat Luna as text-only; do not claim that --critics A,B,C alone provides three heterogeneous visual routes."
+    "runnerLimitation": "The current CLI/API loads one adapter for a run and the Codex adapter cannot receive images. The orchestrator must keep Gemini, Alibaba and Muse as separate visual seats and treat Luna as text-only; do not claim that --critics A,B,C alone provides three heterogeneous visual routes."
   },
   "localQwen": {
     "route": "qwen-local-8090/qwen38-27b-iq3xxs",
