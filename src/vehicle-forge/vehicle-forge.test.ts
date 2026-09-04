@@ -331,7 +331,7 @@ describe('vehicle-forge proportions', () => {
 });
 
 describe('vehicle-forge assembly', () => {
-  it('merges a whole vehicle into at most eight draw calls', () => {
+  it('merges a whole vehicle into at most nine draw calls', () => {
     const materials = createForgeMaterialSet(0xb8442f, 'test-paint');
     const built = buildForgedVehicle(
       SEDAN_SPEC,
