@@ -61,7 +61,7 @@ const FAMILIES: ReadonlyArray<{
   readonly roughness: readonly [number, number];
   readonly metalness: readonly [number, number];
 }> = [
-  { family: 'siding', spec: sidingSpec('gate-siding', 0x46809f), roughness: [0.55, 0.90], metalness: [0, 0.05] },
+  { family: 'siding', spec: sidingSpec('gate-siding', 0x9f6147), roughness: [0.55, 0.90], metalness: [0, 0.05] },
   { family: 'roof', spec: roofSpec('gate-roof'), roughness: [0.80, 1.00], metalness: [0, 0.05] },
   { family: 'asphalt', spec: asphaltSpec('gate-asphalt'), roughness: [0.85, 1.00], metalness: [0, 0.05] },
   { family: 'asphalt-marking', spec: markingSpec('gate-marking'), roughness: [0.75, 1.00], metalness: [0, 0.05] },
@@ -152,7 +152,7 @@ describe('nuketown2 materials — per-family physical authoring', () => {
   it('decodes sRGB swatches to linear once, not twice', () => {
     // The trap: `new THREE.Color(hex).r` is ALREADY linear, so a generator
     // that decodes it again ships a near-black surface. These two must agree.
-    for (const hex of [0x46809f, 0xf4be36, 0x8b8879, 0x496438]) {
+    for (const hex of [0x9f6147, 0xeae3cf, 0x8b8879, 0x496438]) {
       const [r, g, b] = linearRgb(hex);
       const viaThree = new THREE.Color(hex);
       expect(r).toBeCloseTo(viaThree.r, 4);
@@ -236,10 +236,10 @@ describe('nuketown2 material registry', () => {
     }
   });
 
-  it('keeps the two houses on the base hexes the fidelity gate pins', () => {
+  it('keeps the HF-477 terracotta-orange and white/cream house pins', () => {
     const registry = createNuketown2MaterialRegistry();
-    expect(registry.sidingA.color.getHex()).toBe(0x46809f);
-    expect(registry.sidingB.color.getHex()).toBe(0xf4be36);
+    expect(registry.sidingA.color.getHex()).toBe(0x9f6147);
+    expect(registry.sidingB.color.getHex()).toBe(0xeae3cf);
   });
 
   it('keeps the coach glazing band a dielectric', () => {

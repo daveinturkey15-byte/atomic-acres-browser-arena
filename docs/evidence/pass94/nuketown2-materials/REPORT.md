@@ -271,13 +271,10 @@ tightened once during the lane, never loosened.
    which is authored at 0x515642, an olive. Whoever owns
    `nuketown-mountain-backdrop.ts` should look at that frame: the map currently
    sits on a beach.
-3. **The reference houses are orange-over-cream and white/cream, not blue and
-   yellow.** `docs/references/nuketown-2025/FINDINGS.md` is unambiguous and the
-   `nt2025-aerial-boii.jpg` capture confirms it. `nuketown2-fidelity.test.ts`
-   pins 0x46809f and 0xf4be36, so this lane did not touch the base hexes; the
-   siding family already accepts a two-tone `wainscot` break snapped to a real
-   course, so the storey-banded orange-over-cream house is one call away
-   whenever the accuracy lane owns that decision.
+3. **FIXED in this review pass: the reference houses are terracotta-orange over
+   cream and white/cream, not blue and yellow.** HF-477 pins `0x9f6147` for the
+   north upper siding and `0xeae3cf` for the shared cream/south house; the
+   existing siding wainscot hook now applies the cream ground-storey break.
 4. **The driveway aprons in the reference are mottled tan flagstones**, not the
    grey poured slabs the arena builds. That is a paving-type decision belonging
    to the geometry/accuracy lane, not a material treatment, so it was left alone
@@ -347,4 +344,3 @@ lane markings each read as their own material rather than as a coloured box.
    another agent is actively using is not this lane's call, so it is recorded
    here rather than fixed. **The integrator should re-run both gates at the
    merge head.**
-

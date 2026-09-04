@@ -887,7 +887,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
-  it('pins distinct blue and yellow house siding and excludes debug marker cubes', () => {
+  it('pins the HF-477 terracotta-orange and white/cream house siding and excludes debug marker cubes', () => {
     const map = buildNuketown2(new THREE.Scene());
     const north = map.root.getObjectByName('nuketown2 north house wall west') as THREE.Mesh | undefined;
     const south = map.root.getObjectByName('nuketown2 south house wall west') as THREE.Mesh | undefined;
@@ -901,8 +901,8 @@ describe('Nuke Town Rebuild fidelity', () => {
     };
     const northColour = colourOf(north!);
     const southColour = colourOf(south!);
-    expect(northColour.getHex(), 'north house keeps the blue base').toBe(0x46809f);
-    expect(southColour.getHex(), 'south house keeps the yellow base').toBe(0xf4be36);
+    expect(northColour.getHex(), 'north house keeps the terracotta-orange base').toBe(0x9f6147);
+    expect(southColour.getHex(), 'south house keeps the white/cream base').toBe(0xeae3cf);
     expect(northColour.equals(southColour), 'house siding bases must differ').toBe(false);
     const rgbDistance = Math.hypot(
       northColour.r - southColour.r,

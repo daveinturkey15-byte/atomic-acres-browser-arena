@@ -850,8 +850,9 @@ function pair(
   size: [number, number, number],
   /**
    * One material for both halves, or `[north, south]` for the two that differ
-   * by COLOUR ALONE. HF-426 Job 3: the reference's playable houses are blue,
-   * yellow and orange - not one repeated shell - and the two houses here are
+   * by COLOUR ALONE. HF-477: the reference's playable houses are
+   * terracotta-orange-over-cream and white/cream - not one repeated shell -
+   * and the two houses here are
    * the map's primary landmark, so a player who breaks into an upper room can
    * tell whose room it is from the siding. Geometry stays identical, which is
    * what the fidelity gate's 180-degree partner test measures (size + position,
@@ -929,9 +930,9 @@ type Nuketown2Materials = Readonly<{
   driveDecal: THREE.Material;
   /** HF-434: the garage floor - drive's paint at the -1 decal tier. */
   garageFloor: THREE.Material;
-  /** North house board siding - the reference's BLUE house. */
+  /** North house board siding - the reference's terracotta-orange house. */
   sidingA: THREE.Material;
-  /** South house board siding - the reference's YELLOW house. */
+  /** South house board siding - the reference's white/cream house. */
   sidingB: THREE.Material;
   /** Both garage wings - the reference's ORANGE. */
   garageSiding: THREE.Material;
@@ -1087,8 +1088,8 @@ function nuketown2Materials(): Nuketown2Materials {
     garageFloor,
     warmLight,
     coldLight,
-    // The BLUE house: siding-aqua's luminance (119.8) and roughness (0.76)
-    // with the hue carried to the reference's blue (measured 117.9).
+    // HF-477: the registry carries the terracotta-orange-over-cream north house
+    // and the white/cream south house; geometry remains the shared pair.
     sidingA: forged.sidingA,
     sidingB: forged.sidingB,
     // The ORANGE wing: siding-coral, unchanged.
@@ -1145,7 +1146,8 @@ function nuketown2Materials(): Nuketown2Materials {
  * are that if you can actually shoot through them.
  */
 function house(builder: Builder, m: Nuketown2Materials): void {
-  // HF-426 Job 3: blue north, yellow south. Same wall in the same place; only
+  // HF-477: terracotta-orange-over-cream north, white/cream south. Same wall
+  // in the same place; only
   // the paint differs, so the 180-degree partner gate is untouched.
   const siding = [m.sidingA, m.sidingB] as const;
   const zFront = HOUSE_FRONT_Z - WALL_T / 2;      // wall centre, front face on the front line

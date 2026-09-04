@@ -150,10 +150,14 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     trimDecal: createMarkingMaterial(),
     block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block' }),
 
-    // The two houses keep the base hexes the fidelity gate pins; what changed
-    // is everything on top of them.
-    sidingA: createSidingMaterial(0x46809f, 'nuketown2-siding-north-blue'),
-    sidingB: createSidingMaterial(0xf4be36, 'nuketown2-siding-south-yellow'),
+    // HF-477: BO2-2025 shows terracotta-orange over cream on the north house,
+    // and a white/cream south house. The orange material keeps its cream
+    // wainscot at the ground-storey line; the south house is cream throughout.
+    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-north-orange', {
+      wainscotSrgb: 0xeae3cf,
+      wainscotTopY: 3.0,
+    }),
+    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-south-cream'),
     roof: createRoofMaterial(),
 
     // A sectional door is PAINTED STEEL, not chrome. It was shipping at
