@@ -27692,7 +27692,7 @@ function updateMatchState(now: number): void {
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
-    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' }; nukeEvent.triggerFromMatchEnd(selectedArena.id, { phase: privateLobbySnapshot?.phase ?? matchState.phase, snapshotHostTimeMs: privateLobbySnapshot?.snapshotHostTimeMs ?? matchState.endsAt });
+    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' }; nukeEvent.triggerFromMatchEnd(selectedArena.id, privateLobbySnapshot ? { phase: privateLobbySnapshot.phase, snapshotHostTimeMs: privateLobbySnapshot.snapshotHostTimeMs } : gameMode === 'solo' ? { phase: matchState.phase, snapshotHostTimeMs: matchState.endsAt } : null);
     recordCompletedMatch();
     if (network.role !== 'client') {
       killstreakRuntime.endMatch();

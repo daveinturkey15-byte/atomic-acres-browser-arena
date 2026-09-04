@@ -84,6 +84,12 @@ describe('HF-490 Nuke Town event timeline', () => {
     expect(moduleSource).not.toContain('WebGLRenderTarget');
   });
 
+  it('does not synthesize a multiplayer trigger timestamp from a guest clock', () => {
+    expect(legacySource).toContain("privateLobbySnapshot ? { phase: privateLobbySnapshot.phase, snapshotHostTimeMs: privateLobbySnapshot.snapshotHostTimeMs } : gameMode === 'solo'");
+    expect(legacySource).toContain(': null);');
+    expect(legacySource).not.toContain('privateLobbySnapshot?.snapshotHostTimeMs ?? matchState.endsAt');
+  });
+
   it('uses uniforms for per-instance volume/ring values and allocates no live update objects', () => {
     expect(moduleSource).toContain('uniform(new THREE.Vector3())');
     expect(moduleSource).toContain("uniformInstance = 'background-origin-extents-mode'");
