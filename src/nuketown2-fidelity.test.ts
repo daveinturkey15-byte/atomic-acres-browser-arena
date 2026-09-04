@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { auditNuketown2Coplanar } from './nuketown2-coplanar-audit';
 import { isBlocked } from './collision';
 import { deriveGlassDynamicColliders } from './glass-collider-bounds';
 import { FALL_DAMAGE_SAFE_SPEED, computeFallDamage, movementProfile } from './gameplay';
@@ -2675,5 +2676,23 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     ]) {
       expect(names.some((n) => n.includes(kept)), `"${kept}" is load-bearing and must stay`).toBe(true);
     }
+  });
+
+  it('pins the HF-497 SAME-MATERIAL-VISIBLE coplanar class at zero', () => {
+    // The HF-434 instrument dismissed same-material coplanar pairs as benign;
+    // HF-497 rules that a pair whose bodies BOTH render and whose race region
+    // can draw at a player-visible pixel is a FINDING, fixed by a depth tier or
+    // an offset - never by hiding geometry. `auditNuketown2Coplanar` is the
+    // EXACT core `scripts/qa/find-coplanar-pairs.ts` reports from, so this pin
+    // and the instrument cannot drift apart. The classification is derived
+    // from the built roster (materials, presentation flags, box volumes), not
+    // from a name list, so every other arena inherits the same rule with its
+    // own geometry.
+    const audit = auditNuketown2Coplanar();
+    const visible = audit.rows
+      .filter((row) => row.verdict === 'same-material-visible')
+      .map((row) => `${row.first.name} x ${row.second.name}`);
+    expect(visible, `SAME-MATERIAL-VISIBLE coplanar pairs:\n${visible.join('\n')}`)
+      .toHaveLength(0);
   });
 });

@@ -19,222 +19,82 @@
 //     owner can see.
 //   - Classes. A pair whose two materials are the SAME OBJECT renders identical
 //     fragments from identical +y faces under identical lighting: a depth race
-//     between them cannot produce a visible artifact, so it is reported as
-//     SAME-MATERIAL (benign), never as a finding. A pair with DIFFERENT
-//     materials is a FINDING unless the surface that draws on top carries a
-//     polygonOffset (factor < 0), which pins the race deterministically at
-//     every range on both the WebGPU and WebGL2 backends — the same tiering
-//     HF-346 shipped on the Skyline apron. The pass target is zero FINDINGS.
+//     between them cannot produce a visible artifact, so it was reported as
+//     SAME-MATERIAL (benign). HF-497 tightens exactly that class: when BOTH
+//     bodies are rendered (neither carries `userData.presentationOnly`) and the
+//     race region can actually draw — neither face buried inside the upper body
+//     or an opaque third body, plan overlap at least MIN_RACE_AREA_M2 — the
+//     pair is a FINDING (`SAME-VISIBLE`), because a same-material coplanar
+//     pair still races when both surfaces draw to a player-visible pixel. The
+//     scan/classify core lives in `src/nuketown2-coplanar-audit.ts` and is
+//     shared with the vitest pin, so the instrument and the gate cannot drift.
+//   - A pair with DIFFERENT materials is a FINDING unless the surface that
+//     draws on top carries a polygonOffset (factor < 0), which pins the race
+//     deterministically at every range on both the WebGPU and WebGL2 backends
+//     — the same tiering HF-346 shipped on the Skyline apron. The pass target
+//     is zero FINDINGS and zero SAME-VISIBLE findings.
 //   - Presentation decals are batched by `batchPresentationOnlyBoxes` into
 //     merged meshes whose member boxes lose their names. Each batch member is
 //     audited through its hidden SOURCE node instead — the same geometry, the
 //     same transform, and the same material object the batch reuses — so every
 //     row names a real authored piece, and nothing is counted twice.
 
-import * as THREE from 'three';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import {
-  buildNuketown2,
-  NUKETOWN2_BUILDING_FOOTPRINTS,
-  NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
-} from '../../src/nuketown2-arena';
-import { nuketown2HandedSpan } from '../../src/nuketown2-layout';
+  COPLANAR_NEAR_METERS,
+  MIN_RACE_AREA_M2,
+  auditNuketown2Coplanar,
+  type CoplanarRow,
+} from '../../src/nuketown2-coplanar-audit';
 
-const NEAR_METERS = 0.03;
-
-type Box = {
-  name: string;
-  materialId: string;
-  materialName: string;
-  polygonOffsetFactor: number;
-  x0: number; x1: number; z0: number; z1: number;
-  top: number;
-};
-
-function offsetFactorOf(mesh: THREE.Mesh): number {
-  const material = mesh.material;
-  if (Array.isArray(material)) return Math.min(...material.map((entry) => (entry.polygonOffsetFactor ?? 0)));
-  return material.polygonOffsetFactor ?? 0;
-}
-
-function materialIdOf(mesh: THREE.Mesh): string {
-  const material = mesh.material;
-  if (Array.isArray(material)) return material.map((entry) => entry.uuid).join('|');
-  return material.uuid;
-}
-
-function materialNameOf(mesh: THREE.Mesh): string {
-  const material = mesh.material as THREE.Material & { name?: string };
-  if (Array.isArray(material)) return material.map((entry) => entry.name || entry.type).join('|');
-  return material.name || material.type;
-}
-
-function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]; collisionOnlySlopes: string[] } {
-  const scene = new THREE.Scene();
-  const map = buildNuketown2(scene);
-  const boxes: Box[] = [];
-  let skipped = 0;
-  const skippedNames: string[] = [];
-  const collisionOnlySlopes: string[] = [];
-  // REVIEW FIX (Opus, PASS 92): TRAVERSE, do not iterate the direct children.
-  // The arena root also carries three art GROUPS - the instanced lawn field,
-  // the forest ring and the mountain backdrop - and iterating `children` walked
-  // straight past all sixteen of their meshes WITHOUT COUNTING THEM, so the
-  // report's own "skipped: 0" line claimed a complete audit it had not done.
-  // They are still not auditable here (instanced or non-parametric geometry
-  // rather than authored axis-aligned boxes), but they are now COUNTED and
-  // NAMED, so "0 FINDINGS" is a scoped claim and the unaudited classes are
-  // visible to whoever reads the evidence.
-  map.root.updateMatrixWorld(true);
-  const world = new THREE.Vector3();
-  map.root.traverse((node) => {
-    const mesh = node as THREE.Mesh;
-    if (mesh.isMesh !== true) return;
-    // Batch meshes are skipped: their members are audited through the hidden
-    // source nodes, which carry the names and the exact same material objects.
-    // The test is `sourceMeshes`, the marker `batchPresentationOnlyBoxes` puts
-    // on a MERGED mesh - NOT `presentationOnly`, which the lawn field, the
-    // forest ring and the mountain backdrop also set, and which therefore
-    // dropped all sixteen of their meshes out of the audit with no trace.
-    if (mesh.userData.sourceMeshes !== undefined) return;
-    const label = mesh.name || mesh.type;
-    if ((mesh as THREE.InstancedMesh).isInstancedMesh === true) { skipped += 1; skippedNames.push(`${label} (instanced)`); return; }
-    if (mesh.userData.collisionOnly === true) { collisionOnlySlopes.push(label); return; }
-    if (mesh.rotation.x !== 0 || mesh.rotation.y !== 0 || mesh.rotation.z !== 0) { skipped += 1; skippedNames.push(`${label} (rotated)`); return; }
-    const geometry = mesh.geometry as THREE.BoxGeometry;
-    if (geometry.parameters === undefined) { skipped += 1; skippedNames.push(`${label} (non-box)`); return; }
-    const p = geometry.parameters;
-    mesh.getWorldPosition(world);
-    boxes.push({
-      name: mesh.name,
-      materialId: materialIdOf(mesh),
-      materialName: materialNameOf(mesh),
-      polygonOffsetFactor: offsetFactorOf(mesh),
-      x0: world.x - p.width / 2,
-      x1: world.x + p.width / 2,
-      z0: world.z - p.depth / 2,
-      z1: world.z + p.depth / 2,
-      top: world.y + p.height / 2,
-    });
-  });
-  return { boxes, skipped, skippedNames, collisionOnlySlopes };
-}
-
-type PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
-
-// HF-473: NUKETOWN2_BUILDING_FOOTPRINTS is an AUTHORED table and the boxes
-// collected above are WORLD, so the mirror is applied before the two are
-// compared. Left unconverted, the driveway apron fell inside what this script
-// believed was the house interior and reported two findings against geometry
-// that had not moved relative to anything.
-const WORLD_FOOTPRINTS: readonly PlanRect[] = Object.freeze(
-  NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => {
-    const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
-    return Object.freeze({ x0, x1, z0: footprint.z0, z1: footprint.z1 });
-  }),
-);
-
-const BUILDING_FOOTPRINTS: readonly PlanRect[] = Object.freeze([
-  ...WORLD_FOOTPRINTS,
-  ...WORLD_FOOTPRINTS.map((footprint) => Object.freeze({
-    x0: -footprint.x1,
-    x1: -footprint.x0,
-    z0: -footprint.z1,
-    z1: -footprint.z0,
-  })),
-]);
-
-function overlapInsideBuilding(first: Box, second: Box): boolean {
-  return BUILDING_FOOTPRINTS.some((footprint) => (
-    Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
-    && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
-  ));
-}
-
-/**
- * HF-477. `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` is AUTHORED and the boxes measured
- * above are WORLD, and until the lollipop that difference could not bite: the
- * old carriageway was a full-width street plus a turning head centred on the
- * origin, so it was its own mirror image and the two frames agreed. A
- * cul-de-sac at one end is not, so the rects are put through the same mirror
- * every solid is. Without this the instrument reported nine STREET findings on
- * verge decals that are nowhere near the road - the road it was comparing them
- * against was the reflection of the real one.
- */
-const WORLD_CARRIAGEWAY_FOOTPRINTS = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
-  const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
-  return { ...footprint, x0, x1 };
+const VERDICT_LABEL: Readonly<Record<CoplanarRow['verdict'], string>> = Object.freeze({
+  'street-finding': 'STREET-FINDING ',
+  'house-interior-finding': 'HOUSE-INTERIOR-FINDING ',
+  fenced: 'FENCED  ',
+  'same-material-visible': 'SAME-VISIBLE ',
+  contact: 'CONTACT ',
+  benign: 'BENIGN  ',
+  finding: 'FINDING ',
 });
-
-function overlapInsideCarriageway(first: Box, second: Box): boolean {
-  return WORLD_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
-    Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
-    && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
-  ));
-}
 
 function main(): void {
   const outIndex = process.argv.indexOf('--out');
   const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
-  const { boxes, skipped, skippedNames, collisionOnlySlopes } = collectBoxes();
+  const audit = auditNuketown2Coplanar();
+  const { counts, rows } = audit;
 
-  const rows: string[] = [];
-  let findings = 0;
-  let fenced = 0;
-  let benign = 0;
-  let houseInteriorFindings = 0;
-  let streetFindings = 0;
-  for (let a = 0; a < boxes.length; a += 1) {
-    for (let b = a + 1; b < boxes.length; b += 1) {
-      const first = boxes[a]!;
-      const second = boxes[b]!;
-      const overlapX = Math.min(first.x1, second.x1) - Math.max(first.x0, second.x0);
-      const overlapZ = Math.min(first.z1, second.z1) - Math.max(first.z0, second.z0);
-      if (overlapX <= 1e-4 || overlapZ <= 1e-4) continue;
-      const gap = Math.abs(first.top - second.top);
-      if (gap > NEAR_METERS) continue;
-      const sameMaterial = first.materialId === second.materialId;
-      const fencedByOffset = first.polygonOffsetFactor < 0 || second.polygonOffsetFactor < 0;
-      const houseInterior = overlapInsideBuilding(first, second);
-      const street = overlapInsideCarriageway(first, second);
-      const verdict = street ? 'STREET-FINDING '
-        : houseInterior ? 'HOUSE-INTERIOR-FINDING '
-        : fencedByOffset ? 'FENCED  ' : sameMaterial ? 'BENIGN  ' : 'FINDING ';
-      if (street) streetFindings += 1;
-      else if (houseInterior) houseInteriorFindings += 1;
-      else if (fencedByOffset) fenced += 1;
-      else if (sameMaterial) benign += 1;
-      else findings += 1;
-      rows.push([
-        verdict,
-        `dy=${gap.toFixed(4)}m`,
-        `overlap=${(overlapX * overlapZ).toFixed(1)}m2`,
-        `[${first.name} top=${first.top.toFixed(3)} mat=${first.materialName} offset=${first.polygonOffsetFactor}]`,
-        `[${second.name} top=${second.top.toFixed(3)} mat=${second.materialName} offset=${second.polygonOffsetFactor}]`,
-      ].join(' '));
-    }
-  }
-  rows.sort();
+  const lines = rows.map((row) => [
+    VERDICT_LABEL[row.verdict],
+    `dy=${row.gap.toFixed(4)}m`,
+    `overlap=${row.overlap.toFixed(1)}m2`,
+    `[${row.first.name} top=${row.first.top.toFixed(3)} mat=${row.first.materialName} offset=${row.first.polygonOffsetFactor}]`,
+    `[${row.second.name} top=${row.second.top.toFixed(3)} mat=${row.second.materialName} offset=${row.second.polygonOffsetFactor}]`,
+  ].join(' '));
+  lines.sort();
 
   const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   const header = [
     `# nuketown2 coplanar top-face pairs (HF-434 instrument)`,
-    `# HOUSE-INTERIOR pairs<=${NEAR_METERS}m (offsets ignored): ${houseInteriorFindings}`,
-    `# STREET pairs<=${NEAR_METERS}m (offsets ignored): ${streetFindings}`,
-    `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${collisionOnlySlopes.length}`
-      + `${collisionOnlySlopes.length > 0 ? ` - ${collisionOnlySlopes.join(', ')}` : ''}`,
+    `# HOUSE-INTERIOR pairs<=${COPLANAR_NEAR_METERS}m (offsets ignored): ${counts.houseInteriorFindings}`,
+    `# STREET pairs<=${COPLANAR_NEAR_METERS}m (offsets ignored): ${counts.streetFindings}`,
+    `# HF-497 SAME-MATERIAL-VISIBLE FINDINGS (both rendered, race visible, no offset): ${counts.sameMaterialVisibleFindings}`,
+    `# CONTACT (same-material edge/butt contact under the ${MIN_RACE_AREA_M2} m2 race floor): ${counts.contact}`,
+    `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${audit.collisionOnlySlopes.length}`
+      + `${audit.collisionOnlySlopes.length > 0 ? ` - ${audit.collisionOnlySlopes.join(', ')}` : ''}`,
     `# head ${sha} · generated ${new Date().toISOString()}`,
-    `# boxes=${boxes.length} · pairs<=${NEAR_METERS}m: ${rows.length}`
-      + ` · FINDINGS (different materials, no offset): ${findings}`
-      + ` · FENCED (material offset): ${fenced}`
-      + ` · SAME-MATERIAL (benign): ${benign}`,
+    `# boxes=${audit.boxes.length} · pairs<=${COPLANAR_NEAR_METERS}m: ${counts.pairs}`
+      + ` · FINDINGS (different materials, no offset): ${counts.findings}`
+      + ` · FENCED (material offset): ${counts.fenced}`
+      + ` · SAME-MATERIAL-VISIBLE: ${counts.sameMaterialVisibleFindings}`
+      + ` · CONTACT: ${counts.contact}`
+      + ` · SAME-MATERIAL (benign): ${counts.benign}`,
     `# UNAUDITED meshes (instanced / rotated / non-parametric geometry, not covered by`
-      + ` the top-face test above): ${skipped}${skippedNames.length > 0 ? ` - ${skippedNames.join(', ')}` : ''}`,
+      + ` the top-face test above): ${audit.skipped}${audit.skippedNames.length > 0 ? ` - ${audit.skippedNames.join(', ')}` : ''}`,
     '',
   ];
-  const report = [...header, ...rows, ''].join('\n');
+  const report = [...header, ...lines, ''].join('\n');
   if (outPath) {
     const out = resolve(outPath);
     mkdirSync(resolve(out, '..'), { recursive: true });
@@ -242,7 +102,11 @@ function main(): void {
     console.log(`written: ${out}`);
   }
   console.log(report);
-  process.exitCode = findings === 0 && houseInteriorFindings === 0 && streetFindings === 0 ? 0 : 1;
+  process.exitCode = counts.findings === 0
+    && counts.houseInteriorFindings === 0
+    && counts.streetFindings === 0
+    && counts.sameMaterialVisibleFindings === 0
+    ? 0 : 1;
 }
 
 main();

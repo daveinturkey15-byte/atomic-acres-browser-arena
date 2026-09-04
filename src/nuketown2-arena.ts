@@ -1695,9 +1695,21 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       bal.deckTop + bal.railHeight / 2, bal.outboardZ + balconyNewelDepth / 2],
     [bal.railThickness, bal.railHeight, balconyNewelDepth], m.trim,
     { ballisticMaterial: 'wood' });
+  // HF-497: the cap lies flush on the outboard rail (0.53 m2 of exactly
+  // coplanar top face, street-visible over the whole balcony) with the SAME
+  // trim material, so the instrument's SAME-MATERIAL-VISIBLE class caught the
+  // pair. Give the CAP the arena's -1 decal tier on its own cloned material:
+  // the cap top then wins the race deterministically on both backends, from
+  // every range. Same paint, same geometry - only the depth tie-break moved;
+  // `m.trim` itself stays clean for every other body.
+  const balconyRailCapMaterial = m.trim.clone();
+  balconyRailCapMaterial.name = 'nuketown2-balcony-rail-cap';
+  balconyRailCapMaterial.polygonOffset = true;
+  balconyRailCapMaterial.polygonOffsetFactor = -1;
+  balconyRailCapMaterial.polygonOffsetUnits = -1;
   pair(builder, 'balcony rail cap',
     [bal.centreX, bal.deckTop + bal.railHeight - 0.05, bal.outboardZ + bal.railThickness / 2],
-    [bal.width + 0.08, 0.10, bal.railThickness + 0.06], m.trim,
+    [bal.width + 0.08, 0.10, bal.railThickness + 0.06], balconyRailCapMaterial,
     { solid: false, shots: false, cast: true });
   // ---- HF-477: THE UNDERCROFT UNDER THE DECK -------------------------------
   // FINDINGS Q3, VERIFIED on `nt2025-street-boii.jpg`: the deck sits "over a
@@ -3128,7 +3140,19 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
   pair(builder, 'yard cover wall footing', [5.5, 0.04, HOUSE_BACK_Z - 5.5], [7.30, 0.08, 0.55], m.drive,
     { solid: false, shots: false, cast: false });
-  pair(builder, 'yard butt pad', [-8.5, 0.04, -26], [1.40, 0.08, 1.40], m.drive,
+  // HF-497: the butt pad overlaps the cover crate pad by 0.5 m2 at exactly the
+  // same 0.08 m top, same `drive` material - the instrument's
+  // SAME-MATERIAL-VISIBLE class caught it (lawn level, fully player-visible).
+  // The SMALLER body gets the arena's -1 decal tier on its own cloned
+  // material, so its top wins the shared plane deterministically on both
+  // backends. Same paint, same geometry - only the depth tie-break moved;
+  // `m.drive` itself stays clean for every other pad.
+  const yardButtPadMaterial = m.drive.clone();
+  yardButtPadMaterial.name = 'nuketown2-yard-butt-pad';
+  yardButtPadMaterial.polygonOffset = true;
+  yardButtPadMaterial.polygonOffsetFactor = -1;
+  yardButtPadMaterial.polygonOffsetUnits = -1;
+  pair(builder, 'yard butt pad', [-8.5, 0.04, -26], [1.40, 0.08, 1.40], yardButtPadMaterial,
     { solid: false, shots: false, cast: false });
   pair(builder, 'yard patio table slab', [-14.5, 0.04, -31.5], [2.60, 0.08, 2.60], m.drive,
     { solid: false, shots: false, cast: false });
@@ -3219,7 +3243,19 @@ function perimeter(builder: Builder, m: Nuketown2Materials): void {
   // either frame and the wrong material in a suburb. Same wall, same cover,
   // same collider; only the paint moved.
   pair(builder, 'perimeter wall long', [0, H / 2, NUKETOWN2_BOUNDS.minZ + 0.2], [width, H, 0.4], m.fence);
-  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.25, H / 2, 0], [0.4, H, depth], m.fence);
+  // HF-497: at all four corners the long wall and the end wall are exactly
+  // coplanar solids of the SAME material (0.16 m2 of shared top face per
+  // corner, fully street-visible), so the instrument's SAME-MATERIAL-VISIBLE
+  // class caught them. Give the end wall the arena's -1 decal tier on its own
+  // cloned material: the end top then wins every corner race deterministically
+  // on both backends. Same paint, same geometry - only the depth tie-break
+  // moved; `m.fence` itself stays clean for every other body.
+  const perimeterWallEndMaterial = m.fence.clone();
+  perimeterWallEndMaterial.name = 'nuketown2-perimeter-wall-end';
+  perimeterWallEndMaterial.polygonOffset = true;
+  perimeterWallEndMaterial.polygonOffsetFactor = -1;
+  perimeterWallEndMaterial.polygonOffsetUnits = -1;
+  pair(builder, 'perimeter wall end', [NUKETOWN2_BOUNDS.minX + 0.25, H / 2, 0], [0.4, H, depth], perimeterWallEndMaterial);
 }
 
 // ---------------------------------------------------------------------------
