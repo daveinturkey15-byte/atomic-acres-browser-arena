@@ -1451,3 +1451,17 @@ assets and textures and lighting need to be tip top, raid can come next"
   a hole with no collision after" → per-material penetration classes (glass
   breakable + pass-through, thin metal perforates and loses collision at the
   hole, concrete/brick stop), using the destructible-shed machinery.
+
+## HF-462 correction — 2026-09-04 10:35: the shared post is "morning-diner", not "Astra"
+
+- The X post (prasenx, 2026-09-03) is a Claude-Fable-built, 100 % procedural
+  three.js diner — "all code, nothing was downloaded": textures generated in
+  Workers at boot, two-sun rig with baked probes, HDR post chain, cars and the
+  exterior built from code, made with a modified Matt Shumer gauntlet loop
+  (we carry that method as the `visual-gauntlet-loop` skill). Repo:
+  https://github.com/StarKnightt/morning-diner (docs/PROMPT.md = the verbatim
+  brief, BUILD.md = the 344 KB build log, src/procedural/textures.ts,
+  src/core/materials.ts, src/scene/Lighting.ts, src/scene/Exterior.ts = cars).
+  Cloned read-only to `C:\Users\david\projects\morning-diner-ref` for the
+  asset-forge lane: extract the technique into a skill, then apply it to Nuke
+  Town's vehicles and materials in code — no Blender.
