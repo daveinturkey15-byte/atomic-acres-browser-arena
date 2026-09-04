@@ -36774,6 +36774,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ...retained,
       snapshot: Object.freeze({ ...retained.snapshot, hp: result.state.hp }),
     }));
+    if (result.died && remote) {
+      // The QA damage hook must use the same host-authored death/drop path as
+      // real combat; otherwise a test can prove only HP replication and leaves
+      // pickup authority unmeasured.
+      const death: DeathMessage = {
+        type: 'death', killer: player.id, victim: targetId,
+        cause: { kind: 'gun', weapon: player.weapon }, nonce: randomNonce(),
+      };
+      const canonicalDeath = canonicalDeathMessage(death);
+      network.send(canonicalDeath);
+      processDeath(canonicalDeath);
+    }
     recordAuthoritativeRemoteRegeneration(targetId, result, 'qa-host-ledger-before-small-hit');
     return {
       targetId,

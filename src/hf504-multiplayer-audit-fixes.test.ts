@@ -201,6 +201,16 @@ describe('HF-504 P-6/P-8 death drops are host-authored', () => {
     expect(spawn).toContain('const canonical = message.drop;');
     expect(spawn).toContain('const bounded = canonical ? victim.position : clampPointToBounds');
   });
+
+  it('keeps the QA death scenario on the same canonical host drop path', () => {
+    const start = main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {');
+    const hook = main.slice(start, main.indexOf('\n  earnSupport:', start));
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(hook).toContain('if (result.died && remote)');
+    expect(hook).toContain('const canonicalDeath = canonicalDeathMessage(death);');
+    expect(hook).toContain('network.send(canonicalDeath);');
+    expect(hook).toContain('processDeath(canonicalDeath);');
+  });
 });
 
 describe('HF-504 lobby - a guest must never render authority it no longer holds', () => {

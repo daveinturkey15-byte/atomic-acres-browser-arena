@@ -415,11 +415,21 @@ async function runLobby(peers, arena, report, step) {
   const { host, guestA, guestB } = peers;
   const lobby = { ok: false };
   report.scenarios.lobby = lobby;
+  const measure = (id, caseName, ok, detail = {}) => {
+    report.rowMeasures[id] ??= [];
+    report.rowMeasures[id].push({ case: caseName, ok, ...detail });
+  };
 
   await host.page.click('#host');
   await host.page.waitForFunction(() => (document.querySelector('#room-code')?.textContent ?? '').trim().length > 0, undefined, { timeout: ROOM_TIMEOUT_MS });
   const roomCode = (await host.page.textContent('#room-code')).trim();
   lobby.roomCode = roomCode.length;
+  const hostAlone = await host.page.evaluate(() => ({
+    startDisabled: document.querySelector('#lobby-start')?.disabled ?? null,
+    members: window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [],
+  }));
+  lobby.hostAlone = hostAlone;
+  measure('L-1', 'host-alone', hostAlone.startDisabled === true, { result: hostAlone });
   step('room-open', { codeLength: roomCode.length });
 
   // Guests join one at a time so the second join is observed against a lobby
@@ -478,7 +488,11 @@ async function runLobby(peers, arena, report, step) {
     record('LOBBY-ROSTER-SPLIT', 'high', 'peers disagree about who is in the lobby',
       { disagreeing, views });
   }
-
+  const lobbyViews = {};
+  for (const role of PEERS) lobbyViews[role] = (await viewOf(peers[role].page).catch(() => null))?.lobby ?? null;
+  const lobbyKeys = PEERS.map((role) => JSON.stringify(lobbyViews[role]));
+  measure('L-4', 'authoritative-snapshot-agreement', new Set(lobbyKeys).size === 1, { views: lobbyViews });
+  
   // Host picks the arena; every peer must follow the authoritative choice.
   await host.page.selectOption('#lobby-arena', arena.id);
   const syncSettled = await Promise.allSettled(PEERS.map((role) => peers[role].page.waitForFunction(
@@ -512,6 +526,7 @@ async function runLobby(peers, arena, report, step) {
     record('LOBBY-START-UNREADY', 'high', 'host START enabled while a joined guest had not readied',
       partial);
   }
+  measure('L-3', 'host-and-one-guest-ready', partial.startDisabled === true, { result: partial });
 
   // The host's own view of guest A's ready must match guest A's view of itself.
   const readyViews = {};
@@ -527,9 +542,23 @@ async function runLobby(peers, arena, report, step) {
 
   await guestB.page.click('#lobby-ready');
   await host.page.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: JOIN_TIMEOUT_MS });
+  const steadyRevision = await host.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.revision ?? null);
+  await sleep(2_300);
+  const telemetryRevision = await host.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.revision ?? null);
+  lobby.telemetryRevision = { before: steadyRevision, after: telemetryRevision };
+  measure('L-9', 'telemetry-does-not-advance-revision', steadyRevision !== null && telemetryRevision === steadyRevision, { result: lobby.telemetryRevision });
   step('all-ready');
 
   await host.page.click('#lobby-start');
+  await sleep(250);
+  const countdownTitles = Object.fromEntries(await Promise.all(PEERS.map(async (role) => [
+    role,
+    await peers[role].page.textContent('#private-lobby-title').catch(() => null),
+  ])));
+  lobby.countdownTitles = countdownTitles;
+  const countdownValues = Object.values(countdownTitles).filter((title) => /^DEPLOYING IN [0-5]$/.test(String(title).trim()));
+  measure('L-7', 'host-time-countdown', countdownValues.length === PEERS.length, { result: countdownTitles });
+  measure('L-3', 'all-ready-start-enabled', (await host.page.evaluate(() => document.querySelector('#lobby-start')?.disabled ?? null)) === false, { result: partial });
   const deployed = await Promise.allSettled(PEERS.map((role) => peers[role].page.waitForFunction(
     (arenaId) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -613,6 +642,11 @@ async function runStateDiff(peers, report, step) {
       { field, count, samples: report.stateDiff.divergences.filter((row) => row.field === field).slice(0, 6) });
   }
   if (Object.keys(byField).length === 0) step('state-diff-clean');
+  report.rowMeasures['X-2'] = [{
+    case: 'post-deploy-state-diff',
+    ok: !report.stateDiff.divergences.some((divergence) => divergence.field === 'position'),
+    result: { divergencesByField: byField, samples: report.stateDiff.samples.length },
+  }];
 }
 
 // --- the owner's named scenarios, per guest --------------------------------
@@ -625,6 +659,7 @@ async function runScenarios(peers, report, step) {
     step('scenarios', { peer: role });
 
     results.pickup = await scenarioPickup(guest, host, peers, role);
+    results.autoScavenge = await scenarioAutoScavenge(guest, host, peers, role);
     results.reload = await scenarioReload(guest, host, peers, role);
     results.swap = await scenarioSwap(guest, peers, role);
     results.fireAtHost = await scenarioFire(guest, host, role, 'host');
@@ -636,6 +671,7 @@ async function runScenarios(peers, report, step) {
     results.scoreboard = await scenarioScoreboard(guest, host, role);
     for (const [caseName, scenario] of [
       ['pickup-rejected-claim', results.pickup],
+      ['auto-scavenge-rejected-claim', results.autoScavenge],
       ['pickup-accepted-claim', results.pickupAuthority],
       ['reload-after-respawn', results.reloadAfterRespawn],
     ]) {
@@ -741,6 +777,42 @@ async function scenarioPickup(guest, host, peers, role) {
   // the original weapon is the expected rejected-claim outcome.
   result.restored = result.weaponBefore === result.weaponAfter;
   result.ok = sentPickup && gotResult && result.hostSawClaim && !result.otherSawRawClaim && result.otherSawCorrection && result.restored;
+  return result;
+}
+
+/** P-5: auto-scavenge is optimistic too. A locally discovered drop must record
+ * its prior ammo/grenade projection and restore it when the host rejects the
+ * guest-only drop. */
+async function scenarioAutoScavenge(guest, host, peers, role) {
+  const result = { ok: false, measuredRows: ['P-5'] };
+  const before = await viewOf(guest.page);
+  const selfId = before.selfId;
+  const mark = await markOf(guest);
+  const staged = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const player = debug.snapshot().player;
+    try {
+      debug.setAmmo(player.weapon, 0, 0);
+      const dropId = debug.spawnDeathDrop();
+      return { ok: Boolean(dropId), dropId, weapon: player.weapon };
+    } catch (error) {
+      return { ok: false, reason: String(error?.message ?? error) };
+    }
+  });
+  result.staged = staged;
+  if (!staged.ok) return result;
+  await sleep(ACK_BUDGET_MS + 250);
+  const after = await viewOf(guest.page);
+  const trace = await traceSince(guest, mark);
+  result.trace = trace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.sentPickup = trace.some((entry) => entry.direction === 'out' && entry.type === 'pickup');
+  result.gotResult = trace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.ammoAfter = after.players[selfId]?.ammo ?? null;
+  result.reserveAfter = after.players[selfId]?.reserve ?? null;
+  // The host never saw this guest-local drop, so rejection must leave the
+  // intentionally empty projection intact rather than silently crediting it.
+  result.ok = result.sentPickup && result.gotResult && result.ammoAfter === 0 && result.reserveAfter === 0;
+  if (!result.ok) record(`SCAVENGE-ROLLBACK-${role}`, 'high', 'auto-scavenge did not receive and apply a host correction', result);
   return result;
 }
 
