@@ -1539,3 +1539,22 @@ assets and textures and lighting need to be tip top, raid can come next"
 - **R5 survey:** the shared skills junction had drifted again (this harness
   saw 0 of 163) → relinked 11:18; Skills Hub has zero procedural-texture
   skills and nothing above our TSL contract → ingest nothing, write our own.
+
+## HF-471 — owner 2026-09-04 11:00: control plane, subscriptions, governance (cross-repo)
+
+- Owner will use Codex/ChatGPT (GPT-6 Astra) more this weekend; Claude Code
+  stays the orchestrator (local Qwen, Gemini + Z.ai via OMP, Codex/Luna,
+  Hermes; Muse Spark 1.3 and possibly Grok 4.6 coming). Requirements, recorded
+  in the control-plane repo (`worktrees/foundry-fleet-contract-poc`,
+  `control-plane/provider-plans-notes-2026-09-04.md`): fix the inherited
+  Codex problems with skills and the publish pipeline; wire Codex/ChatGPT into
+  the Obsidian vault, shared skills, AKP rules and the run ledger like Claude
+  and OMP are; the Foundry OS cockpit must report live sessions truthfully
+  (Codex/Luna, OMP Gemini, OMP Z.ai, local Qwen were invisible or mislabelled;
+  "open 6 / live 1" confusion), with provider logos, a much smaller dispatch
+  box, no key-like strings, 5-hour + weekly usage per provider top-right, a
+  fully detailed Models & Plans tab, new tabs for usage over time and a
+  quality/hill-climb dashboard (Karpathy-style auto-research with a
+  self-improving meta layer; research "NVIDIA AVO"), and a daily digest.
+- Dispatch: post-reset Opus lanes CP1–CP5 in that repo; the game lanes
+  continue in parallel.
