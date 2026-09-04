@@ -14,21 +14,23 @@
  * as material and pose evidence, not as an in-game look.
  *
  * Driven by `scripts/pass94/capture-operator-looks.mjs`. Never imported by the
- * game.
+ * game. It lives at the repository ROOT, not under `dev/`, because the operator
+ * asset URLs are relative (`./assets/...`) and only resolve from the same depth
+ * as `index.html`.
  */
 
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 
-import { buildOperator, poseOperator } from '../src/art-kit';
+import { buildOperator, poseOperator } from './src/art-kit';
 import {
   deathRiggedOperator,
   loadOperatorSkinAsset,
   loadRiggedOperatorAsset,
-} from '../src/operator-model';
-import { OPERATOR_LOOK_REGISTRY, resolveOperatorLook } from '../src/operator-skin-look-registry';
-import { setOperatorLookRenderBackend } from '../src/operator-skin-tsl-materials';
-import type { Team } from '../src/protocol';
+} from './src/operator-model';
+import { OPERATOR_LOOK_REGISTRY, resolveOperatorLook } from './src/operator-skin-look-registry';
+import { setOperatorLookRenderBackend } from './src/operator-skin-tsl-materials';
+import type { Team } from './src/protocol';
 
 type Stance = 'stand' | 'crouch' | 'prone';
 

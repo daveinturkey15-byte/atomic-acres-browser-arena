@@ -1,7 +1,7 @@
 /**
  * PASS 94 — headless capture of the operator look and gait sheets.
  *
- * Drives `dev/pass94-operator-looks.html`, which builds operators through the
+ * Drives `pass94-operator-looks.html`, which builds operators through the
  * shipped `buildOperator` / `poseOperator` path. Four sheets:
  *
  *   gaits-procedural.png   one bot in every locomotion and posture state
@@ -83,7 +83,7 @@ try {
   page.on('pageerror', (error) => receipt.consoleErrors.push(`pageerror: ${error.message}`));
 
   for (const sheet of SHEETS) {
-    const url = `http://127.0.0.1:${port}/dev/pass94-operator-looks.html?mode=${sheet.mode}&looks=${sheet.looks}`;
+    const url = `http://127.0.0.1:${port}/pass94-operator-looks.html?mode=${sheet.mode}&looks=${sheet.looks}`;
     process.stdout.write(`\ncapturing ${sheet.name} -> ${url}\n`);
     await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
     await page.waitForSelector('body[data-capture-ready="1"]', { timeout: 180_000 });
