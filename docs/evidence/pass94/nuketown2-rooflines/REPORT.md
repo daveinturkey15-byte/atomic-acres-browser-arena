@@ -1,19 +1,26 @@
-# PASS 94 - nuketown2 rooflines + exterior stairs (WIP handoff)
+# PASS 94 - nuketown2 rooflines + exterior stairs (implemented handoff)
 
-**DONE:** nothing is built yet. The worktree exists, `npm ci` is green, and the lane
-merged the moved base (`6d3e1ad8`: roadside bays, plus `NUKETOWN2_GARAGE_SPAN` /
-`NUKETOWN2_HOUSE_WIDTH` / `NUKETOWN2_HOUSE_CENTRE_X` now in `src/nuketown2-layout.ts`).
-**HALF-DONE:** the design below - every dimension and every gate interaction is derived
-and checked against the gate sources in this worktree - but no line of
-`src/nuketown2-roofs.ts` or `src/nuketown2-arena.ts` is written.
-**NEXT LANE, FIRST:** read section 3 (Gate constraints) before authoring a single body.
-Three of the four obvious ways to build this roof fail a gate that is currently at zero,
-and each failure is silent until `collider-visual-parity-gate` runs.
+**LANDED:** the dimensioned design below is now implemented in this worktree. The first
+feature commit adds `src/nuketown2-roofs.ts`, the House A butterfly and House B capsule
+forms, the table-derived fourth symmetry exception, arena wiring, and focused roof tests.
+The second feature commit adds the 17-riser timber carpentry, updates the fixed-envelope
+stair constants and patio banding, and extends the focused tests. The existing roof decks,
+walkable ramp colliders, balcony, and circular patio location remain in place.
 
-Lane: Claude Opus 5, worktree `C:/Users/david/projects/aa-claude-roofs`, branch
-`contrib/dave-gaming-pc/claude/nuketown2-rooflines`, stopped at the owner budget call
-(usage 80 %). About 35 min of a 60 min box, all of it spent reading the gates rather than
-authoring, because the gates are what decides the shape.
+Claim-state summary:
+
+- **VERIFIED:** all requested source-level geometry and authority checks pass in this
+  worktree; see section 5 for commands and outputs.
+- **VERIFIED:** the active Codex adoption check is trusted, the active power plan is High
+  performance, and the installed `three` version is `0.185.1`.
+- **OPEN:** no browser/GPU visual capture was run, per the direct task boundary, so the
+  capture confirmations in section 4 remain mechanical-review targets rather than HITL
+  visual evidence.
+- **OPEN:** the repository preflight guard rejects this user-supplied `claude` branch when
+  invoked as Codex; the branch was not renamed because the brief pins it explicitly.
+
+Lane: Codex Luna 5.6, worktree `C:/Users/david/projects/aa-claude-roofs`, branch
+`contrib/dave-gaming-pc/claude/nuketown2-rooflines`.
 
 ---
 
@@ -290,8 +297,38 @@ by renaming a wall into it.
 
 ---
 
-## 5. Gates run this lane
+## 5. Landed implementation and evidence
 
-None. The budget call landed before any source change, and the instruction was explicitly
-not to run further gates. The tree is the merged base plus this file, so the base green
-state is unchanged by construction.
+### VERIFIED implementation
+
+- `src/nuketown2-roofs.ts` owns the House A rakes, six solar-panel placements, two
+  eight-band House B capsule volumes, table-derived exception names, and paired timber
+  stair emitters. Roof bodies are `solid: false`; only the two rakes are `shots: true`
+  and they use name-based roof classification with no explicit ballistic material.
+- `src/nuketown2-arena.ts` keeps the flat roof deck, changes the exterior flight to 17
+  risers at `3.3 / 17` and 16 goings at `4.2 / 16`, removes only the old presentation
+  tread loop, keeps both collision-only ramps, and refines the existing patio to 13 bands
+  with `y = 0.00` and thickness `0.12`.
+- `src/nuketown2-fidelity.test.ts` enumerates the fourth symmetry exception directly from
+  the new roof table and keeps the exact asymmetric-set assertion closed to unrelated
+  names.
+
+### VERIFIED gates
+
+- `npx tsc --noEmit` -> exit 0.
+- `npx vitest run src/nuketown2-fidelity.test.ts src/collider-visual-parity-gate.test.ts
+  src/graphics-profile-contract.test.ts src/pipeline-metrics.test.ts
+  src/legacy-main-size-ratchet.test.ts src/nuketown2-roofs.test.ts` -> 6 files, 64/64
+  tests passed.
+- `npx tsx scripts/qa/find-coplanar-pairs.ts` -> `HOUSE-INTERIOR 0`, `STREET 0`,
+  `FINDINGS (different materials, no offset): 0`.
+- `npm run pipeline:preflight -- --machine dave-gaming-pc --harness codex` -> OPEN:
+  lockfile check passed, but the branch guard requires
+  `contrib/dave-gaming-pc/codex/<short-outcome>` and the pinned branch is
+  `contrib/dave-gaming-pc/claude/nuketown2-rooflines`. The exact brief spelling
+  `--harness Codex` also fails earlier because the guard requires a lowercase slug.
+
+### OPEN review targets
+
+The five deterministic capture views in section 4 still require owner visual review when
+the task boundary permits a browser/GPU run. No visual or browser claim is made here.

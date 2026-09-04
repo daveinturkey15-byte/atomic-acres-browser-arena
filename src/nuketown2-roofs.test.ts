@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildNuketown2 } from './nuketown2-arena';
+import { buildNuketown2, NUKETOWN2_YARD_STAIR } from './nuketown2-arena';
 import {
   NUKETOWN2_HOUSE_CENTRE_X,
   NUKETOWN2_HOUSE_DEPTH,
@@ -9,6 +9,7 @@ import {
   NUKETOWN2_UPPER_Y0,
 } from './nuketown2-layout';
 import {
+  NUKETOWN2_EXTERIOR_STAIR,
   NUKETOWN2_ROOF_BODY_TABLE,
   NUKETOWN2_ROOF_PLAN_AREA_BY_SIDE,
   NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
@@ -99,5 +100,36 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
       expect(bounds.min.y, mesh.name).toBeGreaterThanOrEqual(6.5);
     }
     expect(NUKETOWN2_UPPER_Y0).toBe(3.3);
+  });
+
+  it('rebuilds both exterior flights at the fixed 4.2 m envelope', () => {
+    const map = build();
+    const stair = NUKETOWN2_EXTERIOR_STAIR;
+    expect(stair.risers).toBe(17);
+    expect(stair.rise).toBeCloseTo(3.3 / 17, 12);
+    expect(stair.going).toBeCloseTo(4.2 / 16, 12);
+    expect(stair.going * (stair.risers - 1)).toBeCloseTo(4.2, 12);
+    expect(stair.stringerLength).toBeCloseTo(Math.hypot(4.2, 3.3), 12);
+    expect(NUKETOWN2_YARD_STAIR.riser * NUKETOWN2_YARD_STAIR.risers).toBeCloseTo(3.3, 12);
+    expect(NUKETOWN2_YARD_STAIR.going * (NUKETOWN2_YARD_STAIR.risers - 1)).toBeCloseTo(4.2, 12);
+    expect(NUKETOWN2_YARD_STAIR.footX).toBe(-9.4);
+
+    const stairMeshes = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && node.name.includes('exterior stair')
+    ));
+    expect(stairMeshes.filter((mesh) => mesh.name.includes('stringer'))).toHaveLength(4);
+    expect(stairMeshes.filter((mesh) => mesh.name.includes('closed riser'))).toHaveLength(32);
+    expect(stairMeshes.filter((mesh) => mesh.name.includes('tread'))).toHaveLength(32);
+    expect(stairMeshes.filter((mesh) => mesh.name.includes('handrail'))).toHaveLength(2);
+    expect(stairMeshes.filter((mesh) => mesh.name.includes('rail post'))).toHaveLength(4);
+    expect(stairMeshes.every((mesh) => mesh.userData.nuketown2ExteriorStairSolid === false)).toBe(true);
+    expect(stairMeshes.every((mesh) => mesh.userData.nuketown2ExteriorStairWalkable === false)).toBe(true);
+
+    const rampMeshes = map.root.children.filter((node): node is THREE.Mesh => (
+      node instanceof THREE.Mesh && node.name.includes('yard stair ramp')
+    ));
+    expect(rampMeshes).toHaveLength(2);
+    expect(rampMeshes.every((mesh) => mesh.userData.collisionOnly === true)).toBe(true);
+    expect(map.shotSurfaces.filter((surface) => surface.name.includes('exterior stair'))).toHaveLength(6);
   });
 });

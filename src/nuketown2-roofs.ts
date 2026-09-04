@@ -1,10 +1,12 @@
 import type { Material } from 'three';
 import { box, type Builder } from './additional-maps';
 import {
+  NUKETOWN2_HANDEDNESS,
   NUKETOWN2_HOUSE_CENTRE_X,
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_WIDTH,
+  NUKETOWN2_UPPER_Y0,
   nuketown2HandedX,
 } from './nuketown2-layout';
 
@@ -159,6 +161,30 @@ export const NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES: readonly string[] = Object
   NUKETOWN2_ROOF_BODY_TABLE.map((body) => `nuketown2 ${body.side} ${body.name}`),
 );
 
+/** Fixed-envelope carpentry table; the existing collision ramp reads the same run. */
+export const NUKETOWN2_EXTERIOR_STAIR = Object.freeze({
+  width: 1.4,
+  risers: 17,
+  rise: NUKETOWN2_UPPER_Y0 / 17,
+  totalRise: NUKETOWN2_UPPER_Y0,
+  going: 4.2 / 16,
+  run: 4.2,
+  topX: -5.2,
+  footX: -5.2 - 4.2,
+  centreZ: HOUSE_BACK_Z - 0.7,
+  angleRadians: Math.atan2(NUKETOWN2_UPPER_Y0, 4.2),
+  stringerLength: Math.hypot(4.2, NUKETOWN2_UPPER_Y0),
+  stringerHeight: 0.3,
+  stringerDepth: 0.1,
+  treadCount: 16,
+  treadHeight: 0.08,
+  riserDepth: 0.05,
+  handrailHeight: 0.08,
+  railPostHeight: 0.95,
+  railPostSize: 0.1,
+  railOffset: 0.95,
+});
+
 function materialFor(materials: Nuketown2RoofMaterials, role: RoofMaterialRole): Material {
   return role === 'roofGlazing' ? materials.roofGlazing : materials.roof;
 }
@@ -169,7 +195,7 @@ export function northOnly(
   position: readonly [number, number, number],
   size: readonly [number, number, number],
   material: Material,
-  options: BoxOptions,
+  options: BoxOptions = {},
 ): void {
   const mesh = box(builder, `nuketown2 north ${name}`,
     [nuketown2HandedX(position[0]), position[1], position[2]],
@@ -205,5 +231,71 @@ export function buildNuketown2Rooflines(builder: Builder, materials: Nuketown2Ro
     };
     const emit = body.side === 'north' ? northOnly : southOnly;
     emit(builder, body.name, body.position, body.size, materialFor(materials, body.material), options);
+  }
+}
+
+function pairedStairBox(
+  builder: Builder,
+  name: string,
+  position: readonly [number, number, number],
+  size: readonly [number, number, number],
+  material: Material,
+  options: BoxOptions = {},
+): void {
+  const north = box(builder, `nuketown2 north ${name}`,
+    [nuketown2HandedX(position[0]), position[1], position[2]],
+    [size[0], size[1], size[2]], material, options);
+  const southOptions: BoxOptions = options.rotation
+    ? { ...options, rotation: [options.rotation[0], options.rotation[1], -options.rotation[2]] }
+    : options;
+  const south = box(builder, `nuketown2 south ${name}`,
+    [-nuketown2HandedX(position[0]), position[1], -position[2]],
+    [size[0], size[1], size[2]], material, southOptions);
+  for (const mesh of [north, south]) {
+    mesh.userData.nuketown2ExteriorStairBody = true;
+    mesh.userData.nuketown2ExteriorStairSolid = false;
+    mesh.userData.nuketown2ExteriorStairWalkable = false;
+  }
+}
+
+/** Additive timber carpentry; movement remains owned by the two existing ramps. */
+export function buildNuketown2ExteriorStairs(builder: Builder, materials: Nuketown2RoofMaterials): void {
+  const stair = NUKETOWN2_EXTERIOR_STAIR;
+  const stairAngle = NUKETOWN2_HANDEDNESS * stair.angleRadians;
+  const centreX = (stair.topX + stair.footX) / 2;
+  const stringerY = stair.totalRise / 2 - Math.cos(stair.angleRadians) * (0.08 + 0.15);
+  const outboardZ = stair.centreZ - stair.width / 2;
+
+  for (const [index, zOffset] of [-0.65, 0.65].entries()) {
+    pairedStairBox(builder, `exterior stair stringer ${index}`,
+      [centreX, stringerY, stair.centreZ + zOffset],
+      [stair.stringerLength, stair.stringerHeight, stair.stringerDepth], materials.timber,
+      { solid: false, shots: true, ballisticMaterial: 'wood', rotation: [0, 0, stairAngle] });
+  }
+
+  pairedStairBox(builder, 'exterior stair handrail',
+    [centreX, stair.totalRise / 2 + stair.railOffset, outboardZ],
+    [stair.stringerLength, stair.handrailHeight, stair.handrailHeight], materials.timber,
+    { solid: false, shots: true, ballisticMaterial: 'wood', rotation: [0, 0, stairAngle] });
+
+  pairedStairBox(builder, 'exterior stair rail post foot',
+    [stair.footX, stair.railPostHeight / 2, outboardZ],
+    [stair.railPostSize, stair.railPostHeight, stair.railPostSize], materials.timber,
+    { solid: false, shots: false });
+  pairedStairBox(builder, 'exterior stair rail post top',
+    [stair.topX, stair.totalRise + stair.railPostHeight / 2, outboardZ],
+    [stair.railPostSize, stair.railPostHeight, stair.railPostSize], materials.timber,
+    { solid: false, shots: false });
+
+  for (let index = 0; index < stair.treadCount; index += 1) {
+    const treadTop = stair.totalRise - stair.rise * (index + 1);
+    pairedStairBox(builder, `exterior stair closed riser ${index}`,
+      [stair.topX - stair.going * (index + 1), treadTop - stair.rise / 2, stair.centreZ],
+      [stair.riserDepth, stair.rise, stair.width - 0.2], materials.timber,
+      { solid: false, shots: false });
+    pairedStairBox(builder, `exterior stair tread ${index}`,
+      [stair.topX - stair.going * (index + 0.5), treadTop - stair.treadHeight / 2, stair.centreZ],
+      [stair.going, stair.treadHeight, stair.width], materials.timber,
+      { solid: false, shots: false, cast: true });
   }
 }
