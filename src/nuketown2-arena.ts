@@ -113,6 +113,15 @@ import {
   buildNuketownForestSurround,
 } from './nuketown-forest-surround';
 import { buildNuketownRebuildLawnField } from './nuketown-lawn-field';
+import { buildNuketown2Vegetation } from './nuketown2-vegetation';
+import {
+  createNuketown2GrimeMaterials,
+  nuketown2GrimeDecals,
+} from './nuketown2-grime-decals';
+import {
+  createNuketown2YardPropMaterials,
+  nuketown2YardPropSolids,
+} from './nuketown2-yard-props';
 import {
   NUKETOWN2_BACKDROP_ENVELOPE,
   buildNuketownMountainBackdrop,
@@ -150,9 +159,10 @@ import {
   createNuketown2GarageFloorMaterial,
   createNuketown2GarageWallMaterial,
   createNuketown2GlassMaterial,
-  createNuketown2PoolWaterMaterial,
   createNuketown2WoodFloorMaterial,
 } from './nuketown2-interior-materials';
+// PASS 94 lane TECHNIQUES: the pool surface moved to its own module.
+import { createNuketown2PoolWaterMaterial } from './nuketown2-pool-water';
 import {
   createNuketown2FenceMaterial,
   createNuketown2LapSidingMaterial,
@@ -2461,6 +2471,30 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   coach(builder, m);
   cars(builder, m);
 
+  // ---- PASS 94 lane TECHNIQUES: the reference's own hero props ------------
+  // Emitted through `pair()` like every other body, and BEFORE the batcher, so
+  // the presentation tiers merge into the arena's existing presentation batch
+  // and cost no extra draw call. Geometry is an exact rotational pair; the
+  // reference's yard identity is carried by the appliance hob COLOUR alone
+  // (red north / blue south) - see src/nuketown2-yard-props.ts for why.
+  const propMaterials = createNuketown2YardPropMaterials();
+  for (const prop of nuketown2YardPropSolids(propMaterials)) {
+    pair(builder, prop.name, [...prop.position], [...prop.size], prop.material, prop.options);
+  }
+
+  // ---- PASS 94 lane TECHNIQUES: tiered grime -----------------------------
+  // Tyre scuff, oil, slab cracking, court paint, stepping stones and wall
+  // grime. Every ground piece is OUTSIDE the carriageway and outside both
+  // building footprints, where `find-coplanar-pairs.ts` honours a polygon
+  // offset - so each is fenced by the -3 tier the module owns rather than
+  // hidden from the audit. Carriageway skid marks are OPEN, with the reason,
+  // in src/nuketown2-grime-decals.ts.
+  const grimeMaterials = createNuketown2GrimeMaterials();
+  for (const decal of nuketown2GrimeDecals(grimeMaterials)) {
+    pair(builder, decal.name, [...decal.position], [...decal.size], decal.material,
+      { solid: false, shots: false, cast: false });
+  }
+
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
 
   // ---- HF-426 JOB 3: the shipped map's LAWN, on this map's own rectangles --
@@ -2482,9 +2516,25 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     keepOuts: builder.colliders.slice(groundColliderCount),
   });
   builder.root.userData.nuketown2LawnStats = lawn.stats;
+
+  // ---- PASS 94 lane TECHNIQUES: hedges + the avenue ----------------------
+  // Presentation only, and admissible for two separate reasons the module's
+  // own test pins: every hedge run dresses the footprint of a body already
+  // emitted as a collider above, and every avenue tree stands outside the
+  // arena rectangle inflated by AVENUE_RECT_MARGIN_M. No collider, cover read,
+  // sightline or shot surface moves. Built AFTER the presentation batcher for
+  // the same reason the lawn is: LOD/InstancedMesh are not batch candidates.
+  const vegetation = buildNuketown2Vegetation(builder.root);
+  builder.root.userData.nuketown2VegetationStats = vegetation.stats;
+
   // legacy-main drives this through `updateArenaArt`, the same one uniform
   // write per frame the shipped map's lawn takes. The sway itself is GPU-side.
-  builder.root.userData.nuketownLawnWind = (seconds: number) => lawn.advanceWind(seconds);
+  // Both wind consumers ride the ONE existing hook - no new per-frame call
+  // site, no new traversal, and no allocation in the closure.
+  builder.root.userData.nuketownLawnWind = (seconds: number) => {
+    lawn.advanceWind(seconds);
+    vegetation.advanceWind(seconds);
+  };
   // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
   builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
 
