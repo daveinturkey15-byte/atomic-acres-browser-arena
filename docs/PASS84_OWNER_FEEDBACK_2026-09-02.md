@@ -1374,3 +1374,16 @@ assets and textures and lighting need to be tip top, raid can come next"
   the stairs → confirmed: PASS 93 is hotfix-only; Luna's floor/stair fixes and
   the visual polish live on `nuketown2-tiptop`, being made shippable now
   (HITL next, then PASS 94).
+
+## HF-458 — owner 2026-09-04 09:30: killstreak tuning (helicopter, drone swarm, piloted drone taser)
+
+- Helicopter: rockets 6 → **12**; on autopilot it fires only 6, a human pilot
+  can use the extra 6; the AI must actually use its rockets; machine-gun
+  damage **−25 %**.
+- Drone swarm: fire rate **+25 %**, movement speed **+15 %**.
+- Piloted drone: movement speed **+15 %**, fire rate **+25 %**; **right-click =
+  electric taser**: stuns the target (cannot move ~1 s, a flashbang-like but
+  clearly "tasered" effect), **3 taser charges**; fires automatically when the
+  drone is unpiloted and manually when piloted.
+- Lane: `killstreak-tuning` off the PASS 93 head (Luna), unit-tested numbers
+  and stun effect, HITL before publish per HF-455.
