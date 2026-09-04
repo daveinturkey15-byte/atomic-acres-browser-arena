@@ -486,7 +486,7 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
+import { buildMinimapStructuralElements, headingDegrees, minimapLandmarkFootprint, northMarkerPosition, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapElement } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
@@ -6585,7 +6585,7 @@ let minimapRenderCount = 0;
 // within 2 frames of a 60 fps loop.
 const MINIMAP_RENDER_HZ = 30;
 let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
-let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+let minimapLandmarksRendered: Array<{ id: string; kind: string; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
@@ -27881,118 +27881,23 @@ function checkMatchEnd(): void {
   updateMatchState(performance.now());
 }
 
-function drawMinimapLandmark(
-  context: CanvasRenderingContext2D,
-  id: string,
-  kind: MinimapLandmarkKind,
-  footprint: { x: number; y: number; width: number; height: number },
-): void {
-  const { x, y, width, height } = footprint;
-  const inset = Math.max(1.5, Math.min(width, height) * 0.12);
-  context.save();
-  context.lineWidth = 2.5;
-  context.strokeStyle = '#fff1bd';
-  context.fillStyle = id.startsWith('south-') ? 'rgba(255, 118, 95, .66)' : 'rgba(88, 227, 220, .62)';
-
-  if (kind === 'bus') {
-    context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
-    context.strokeStyle = 'rgba(7, 15, 18, .88)';
-    context.beginPath();
-    context.moveTo(x + width * 0.18, y + inset);
-    context.lineTo(x + width * 0.18, y + height - inset);
-    context.moveTo(x + width * 0.82, y + inset);
-    context.lineTo(x + width * 0.82, y + height - inset);
-    context.stroke();
-  } else if (kind === 'cargo-stack') {
-    context.fillStyle = 'rgba(225, 171, 52, .76)';
-    context.fillRect(x, y, width, height);
-    context.strokeRect(x, y, width, height);
-    context.strokeStyle = 'rgba(7, 15, 18, .78)';
-    context.beginPath();
-    context.moveTo(x + width / 3, y); context.lineTo(x + width / 3, y + height);
-    context.moveTo(x + width * 2 / 3, y); context.lineTo(x + width * 2 / 3, y + height);
-    context.moveTo(x, y + height / 2); context.lineTo(x + width, y + height / 2);
-    context.stroke();
-  } else if (kind === 'pipe-stack') {
-    context.fillStyle = 'rgba(173, 186, 188, .72)';
-    const radius = Math.max(2.5, Math.min(width / 6, height / 3.2));
-    const centres: Array<[number, number]> = [
-      [0.22, 0.66], [0.5, 0.66], [0.78, 0.66], [0.36, 0.30], [0.64, 0.30],
-    ];
-    for (const [px, py] of centres) {
-      context.beginPath();
-      context.arc(x + width * px, y + height * py, radius, 0, Math.PI * 2);
-      context.fill();
-      context.stroke();
-    }
-  } else if (kind === 'service-skip') {
-    context.fillStyle = 'rgba(225, 171, 52, .78)';
-    context.beginPath();
-    context.moveTo(x + inset, y);
-    context.lineTo(x + width - inset, y);
-    context.lineTo(x + width, y + height);
-    context.lineTo(x, y + height);
-    context.closePath();
-    context.fill();
-    context.stroke();
-    context.strokeStyle = 'rgba(7, 15, 18, .82)';
-    context.beginPath();
-    context.moveTo(x + inset, y + height * 0.34);
-    context.lineTo(x + width - inset, y + height * 0.34);
-    context.stroke();
-  } else if (kind === 'jetliner') {
-    context.fillStyle = 'rgba(226, 240, 244, .78)';
-    context.beginPath();
-    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-  } else if (kind === 'terminal') {
-    context.fillStyle = 'rgba(56, 178, 165, .62)';
-    context.fillRect(x, y, width, Math.max(3, height));
-    context.strokeRect(x, y, width, Math.max(3, height));
-  } else if (kind === 'fuel') {
-    context.fillStyle = 'rgba(217, 159, 46, .82)';
-    context.beginPath();
-    context.ellipse(x + width / 2, y + height / 2, Math.max(3, width / 2), Math.max(3, height / 2), 0, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-  } else {
-    context.fillStyle = 'rgba(232, 203, 92, .74)';
-    context.fillRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
-    context.strokeRect(x + inset, y + inset, width - inset * 2, height - inset * 2);
-    context.fillStyle = '#10232a';
-    const wheelRadius = Math.max(2.3, Math.min(width, height) * 0.13);
-    for (const wheelX of [x + width * 0.24, x + width * 0.76]) {
-      context.beginPath();
-      context.arc(wheelX, y + height - inset * 0.45, wheelRadius, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-  context.restore();
-}
-
-// HF-399: Nuke Town's static minimap layer (road, houses, cover landmarks),
-// rebuilt only when the arena object or the canvas backing size changes.
+// HF-399/HF-491: static minimap layer, rebuilt only when the arena object or the
+// canvas backing size changes. Semantic admission lives in the pure minimap
+// module; this presenter paints only the resulting macro silhouettes.
 type MinimapStaticLayer = Readonly<{
   arena: ArenaMap;
   width: number;
   height: number;
   /**
-   * INVARIANT THIS CACHE DEPENDS ON: `arena.bounds`, `arena.houses` and
-   * `arena.physicalCover` are authored by the arena builder and never mutated
-   * at runtime (every `physicalCover` push in src/ is build-time). Arena
-   * identity therefore normally settles the cache on its own; these two counts
-   * are the cheap tripwire that catches a future change which grows or shrinks
-   * either list under a stable arena object, since a stale layer would show the
-   * wrong landmarks with no other symptom.
+   * INVARIANT THIS CACHE DEPENDS ON: the arena geometry channels are authored by
+   * the arena builder and never mutated at runtime. The counts are a cheap
+   * tripwire for a stale layer under a stable arena object.
    */
   houseCount: number;
   coverCount: number;
+  surfaceCount: number;
   canvas: HTMLCanvasElement;
-  /** Landmark label anchors in minimap pixel space (before the player transform). */
-  labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
-  landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }>;
+  elements: readonly MinimapElement[];
 }>;
 let minimapStaticLayer: MinimapStaticLayer | null = null;
 
@@ -28005,42 +27910,38 @@ function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMa
     && cached.height === height
     && cached.houseCount === arena.houses.length
     && cached.coverCount === arena.physicalCover.length
+    && cached.surfaceCount === arena.shotSurfaces.length
   ) return cached;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas2D minimap static layer is unavailable');
-  const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
-  const [roadLeft] = point(-10.25, 0);
-  const [roadRight] = point(10.25, 0);
-  context.fillStyle = 'rgba(126, 137, 132, .23)';
-  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
-  context.strokeStyle = 'rgba(244, 196, 79, .42)';
-  context.lineWidth = 2;
-  context.setLineDash([10, 10]);
-  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
-  context.setLineDash([]);
-  for (const house of arena.houses) {
-    const [cx, cy] = point(house.origin.x, house.origin.z);
-    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
-    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
-    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
-    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
-    context.lineWidth = 2;
-    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-  }
-  const labelAnchors: Array<{ label: string; x: number; y: number }> = [];
-  const landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
-  for (const cover of arena.physicalCover) {
-    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-    if (!kind) continue;
-    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-    drawMinimapLandmark(context, cover.id, kind, footprint);
-    const label = minimapLandmarkLabel(kind);
-    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
-    landmarks.push({ id: cover.id, kind, label });
+  const elements = buildMinimapStructuralElements({
+    arenaId: arena.id,
+    bounds,
+    width,
+    height,
+    houses: arena.houses,
+    physicalCover: arena.physicalCover,
+    surfaces: arena.shotSurfaces,
+  });
+  for (const element of elements) {
+    const footprint = minimapLandmarkFootprint(element.bounds, bounds, width, height);
+    const colours = element.className === 'vehicle'
+      ? ['rgba(244, 196, 79, .78)', 'rgba(255, 247, 223, .92)']
+      : element.className === 'road'
+        ? ['rgba(126, 137, 132, .30)', 'rgba(244, 196, 79, .42)']
+        : element.className === 'perimeter'
+          ? ['rgba(170, 113, 72, .30)', 'rgba(221, 164, 111, .72)']
+          : element.className === 'garage'
+            ? ['rgba(255, 164, 95, .32)', 'rgba(255, 196, 120, .78)']
+            : ['rgba(88, 227, 220, .28)', 'rgba(88, 227, 220, .78)'];
+    context.fillStyle = colours[0];
+    context.strokeStyle = colours[1];
+    context.lineWidth = element.className === 'road' ? 1.5 : 2;
+    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   }
   minimapStaticLayer = Object.freeze({
     arena,
@@ -28048,9 +27949,9 @@ function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMa
     height,
     houseCount: arena.houses.length,
     coverCount: arena.physicalCover.length,
+    surfaceCount: arena.shotSurfaces.length,
     canvas,
-    labelAnchors: Object.freeze(labelAnchors),
-    landmarks,
+    elements,
   });
   return minimapStaticLayer;
 }
@@ -28091,54 +27992,15 @@ function updateMinimap(now: number): void {
   context.strokeRect(4, 4, width - 8, height - 8);
 
   const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
-  // HF-399 streamline: one description of the player-up view, shared by the
-  // canvas transform below and by every upright label that has to be mapped
-  // through the same transform in closed form. Previously each landmark branch
-  // recomputed the rotation and the reflection for itself.
-  const labelView = {
-    width,
-    height,
-    playerX: worldPlayerX,
-    playerY: worldPlayerY,
-    rotation: playerUpRotationRadians(player.yaw),
-    scaleX: playerUpScaleX(),
-  };
   context.save();
   context.translate(width / 2, height / 2);
-  context.rotate(labelView.rotation);
-  context.scale(labelView.scaleX, 1);
+  context.rotate(playerUpRotationRadians(player.yaw));
+  context.scale(playerUpScaleX(), 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
-  let renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
-  const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
-  if (selectedArena.id === 'atomic-acres') {
-    // HF-399: the road, the two houses and every cover landmark are fixed for
-    // the life of the arena, so they are painted ONCE into an offscreen layer
-    // in minimap pixel space and composited under the per-frame player
-    // transform with one drawImage. Measured 2026-09-02 (Quality, 60 Hz
-    // minimap, atomic-acres lawn-idle): this function held 4.4% of an inclusive
-    // CPU profile - about 1.1 ms of the measured 26.1 ms frame - dominated by
-    // the landmark path work plus a getTransform()+DOMPoint allocation per
-    // cover per frame. Label anchors are the same points run through the same
-    // transform in closed form (minimapPlayerViewPoint, guarded against a
-    // composed affine reference by src/minimap-player-view-transform.test.ts),
-    // so the labels stay upright exactly as before.
-    const layer = activeMinimapStaticLayer(width, height, bounds);
-    context.drawImage(layer.canvas, 0, 0);
-    for (const anchor of layer.labelAnchors) {
-      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
-      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
-    }
-    renderedLandmarks = layer.landmarks;
-  } else {
-    context.lineWidth = 1.5;
-    context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
-    context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
-    for (const collider of activeWorldColliders()) {
-      const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
-      context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-      context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
-    }
+  const layer = activeMinimapStaticLayer(width, height, bounds);
+  context.drawImage(layer.canvas, 0, 0);
+  if (selectedArena.id !== 'atomic-acres') {
     // Owner 2026-08-30: Domination zones on the minimap - a ringed letter at
     // each zone anchor, coloured by the owning squad, pulsing while contested.
     const dominationMinimap = dominationDisplayState();
@@ -28162,30 +28024,17 @@ function updateMinimap(now: number): void {
         context.fillText(zone.id, zoneX, zoneY + 0.5);
       }
     }
-    for (const cover of arena.physicalCover) {
-      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-      if (!kind) continue;
-      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-      drawMinimapLandmark(context, cover.id, kind, footprint);
-      const label = minimapLandmarkLabel(kind);
-      // HF-399 streamline: the same mapping the atomic-acres branch uses, so no
-      // arena reads back the live canvas matrix and allocates a DOMPoint per
-      // landmark per frame any more. Guarded by
-      // src/minimap-player-view-transform.test.ts.
-      const [labelX, labelY] = minimapPlayerViewPoint(
-        footprint.x + footprint.width / 2,
-        footprint.y + footprint.height / 2,
-        labelView,
-      );
-      landmarkLabels.push({ label, x: labelX, y: labelY - 10 });
-      renderedLandmarks.push({ id: cover.id, kind, label });
-    }
     for (const target of arena.targets) {
       const [x, y] = point(target.root.position.x, target.root.position.z);
       context.fillStyle = target.distanceBand === 'near' ? '#58e3dc' : target.distanceBand === 'mid' ? '#f4c44f' : '#ff765f';
       context.beginPath(); context.arc(x, y, target.active ? 5 : 2.5, 0, Math.PI * 2); context.fill();
     }
   }
+  const renderedLandmarks = layer.elements.map((element) => ({
+    id: element.id,
+    kind: element.className,
+    label: element.className.toUpperCase(),
+  }));
   minimapLandmarksRendered = renderedLandmarks;
   // HF-399 streamline: loop-invariant in both entity loops below (it reads only
   // `now` and `scoutSweepUntil`), and was being re-evaluated once per remote and
@@ -28220,20 +28069,6 @@ function updateMinimap(now: number): void {
     context.fillText('2×', 0, 1);
     context.restore();
     context.textBaseline = 'alphabetic';
-  }
-  context.restore();
-  context.save();
-  context.font = '900 15px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'bottom';
-  context.lineJoin = 'round';
-  context.lineWidth = 4;
-  context.strokeStyle = 'rgba(7, 15, 18, .94)';
-  context.fillStyle = '#fff1bd';
-  for (const label of landmarkLabels) {
-    if (label.x < 18 || label.x > width - 18 || label.y < 22 || label.y > height - 8) continue;
-    context.strokeText(label.label, label.x, label.y);
-    context.fillText(label.label, label.x, label.y);
   }
   context.restore();
   const px = width / 2;
