@@ -20,6 +20,12 @@ type ThinMetalArena = Readonly<{
 export type ThinMetalPerforationRuntime = {
   readonly authority: ThinMetalPerforationAuthority;
   lastBroadcastRevision: number;
+  /**
+   * Prior epoch this runtime's authority was created/reset under. Tracked
+   * here (not borrowed from the destructible shed) so the epoch reset below
+   * never depends on the shed runtime existing.
+   */
+  lastMatchEpoch: number;
 };
 
 export function createThinMetalPerforationRuntime(
@@ -36,6 +42,7 @@ export function createThinMetalPerforationRuntime(
       hostAuthority,
     ),
     lastBroadcastRevision: -1,
+    lastMatchEpoch: matchEpoch,
   };
 }
 
@@ -197,10 +204,12 @@ export function handleThinMetalPerforationMessage(
 export function resetThinMetalPerforationRuntime(
   runtime: ThinMetalPerforationRuntime | null,
   matchEpoch: number,
-  priorEpoch: number,
   hostAuthority: boolean,
 ): void {
   if (!runtime) return;
-  if (matchEpoch > priorEpoch) runtime.authority.reset(matchEpoch);
+  if (matchEpoch > runtime.lastMatchEpoch) {
+    runtime.authority.reset(matchEpoch);
+    runtime.lastMatchEpoch = matchEpoch;
+  }
   runtime.authority.setHostAuthority(hostAuthority);
 }

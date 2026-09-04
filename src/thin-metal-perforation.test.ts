@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
@@ -12,7 +13,9 @@ import { canonicalSha256 } from './canonical-state';
 import { isStateTrafficMessage } from './protocol';
 import {
   createAndAttachThinMetalPerforationRuntime,
+  createThinMetalPerforationRuntime,
   disposeThinMetalPerforationRuntime,
+  resetThinMetalPerforationRuntime,
   rollbackThinMetalPerforationRuntime,
 } from './thin-metal-perforation-runtime';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
@@ -387,5 +390,46 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     disposeThinMetalPerforationRuntime(runtime);
     expect(disposals.every((spy) => spy.mock.calls.length === 1)).toBe(true);
     expect(snapshot()).toEqual(baseline);
+  });
+  it('resets against its own prior epoch with no shed runtime present (F-08)', () => {
+    const placements = thinMetalPanelPlacements(
+      [{ surfaceName: 'verge street name blade', hitsToOpen: 3 }],
+      [bladeSurface('own-epoch:1')],
+    );
+    const runtime = createThinMetalPerforationRuntime({ id: 'nuketown2', thinMetalPanels: placements }, 4, true)!;
+    const surface = bladeSurface('own-epoch:1');
+    const point = { x: 7.7, y: 2.7, z: -0.45 };
+    for (let index = 0; index < 3; index += 1) hitAt(runtime.authority, surface, point);
+    expect(runtime.authority.apertureQuery(surface, point)).toBe(true);
+    // No shed runtime exists anywhere in this scenario: the epoch guard reads
+    // the thin-metal runtime's own prior epoch, so the new match still lands.
+    resetThinMetalPerforationRuntime(runtime, 5, true);
+    expect(runtime.authority.apertureQuery(surface, point)).toBe(false);
+    expect(runtime.authority.panelStates()[0]!.hits).toBe(0);
+    expect(runtime.authority.stateEnvelope().matchEpoch).toBe(5);
+    // A repeat call at the same epoch must not re-reset (the authority throws
+    // on a non-advancing epoch); host authority still updates.
+    expect(() => resetThinMetalPerforationRuntime(runtime, 5, false)).not.toThrow();
+    expect(runtime.authority.hasHostAuthority()).toBe(false);
+    // An epoch regression is a no-op on the tracked prior epoch, not a throw.
+    expect(() => resetThinMetalPerforationRuntime(runtime, 4, false)).not.toThrow();
+    expect(runtime.authority.stateEnvelope().matchEpoch).toBe(5);
+  });
+
+  it('keeps the legacy-main thin-metal reset outside the shed guard (F-08)', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const hoisted = "resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, mode !== 'client');";
+    const call = source.indexOf(hoisted);
+    expect(call).toBeGreaterThanOrEqual(0);
+    // The shed-derived priorEpoch form is gone.
+    expect(source).not.toContain('resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, priorEpoch');
+    // The call sits before the shed guard; the guard body resets only the shed.
+    const guard = source.indexOf('if (interactiveWorldRuntime) {', call);
+    expect(guard).toBeGreaterThan(call);
+    const guardEnd = source.indexOf('resetBreakableWindows();', guard);
+    expect(guardEnd).toBeGreaterThan(guard);
+    const guardBody = source.slice(guard, guardEnd);
+    expect(guardBody).not.toContain('ThinMetalPerforation');
+    expect(guardBody).toContain('interactiveWorldRuntime.reset(interactiveWorldMatchEpoch)');
   });
 });

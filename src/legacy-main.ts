@@ -17453,9 +17453,9 @@ async function startGame(
   lastFlashDispatch = null;
   interactiveWorldTick = 0;
   lastInteractiveWorldBroadcastRevision = -1;
+  resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, mode !== 'client');
   if (interactiveWorldRuntime) {
     const priorEpoch = interactiveWorldRuntime.telemetry().matchEpoch;
-    resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, priorEpoch, mode !== 'client');
     if (interactiveWorldMatchEpoch > priorEpoch) interactiveWorldRuntime.reset(interactiveWorldMatchEpoch);
     else if (interactiveWorldMatchEpoch < priorEpoch) {
       throw new Error(`Interactive-world match epoch regressed (${interactiveWorldMatchEpoch} < ${priorEpoch})`);
