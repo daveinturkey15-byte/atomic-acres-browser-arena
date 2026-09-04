@@ -87,3 +87,15 @@ field cannot carry per-pane shot surfaces; same as shipped C3/hoop glazing),
 bounded by the glass ceilings (54 total). (2) No `InstancedMesh`: the parity
 census measures `Box3.setFromObject`, which does not expand instance
 matrices — instancing would audit as a 1 m box at the origin and flag.
+
+## Review TODOs
+
+- TODO (blocking): implement the brief's per-class instanced presentation path
+  with an acceptance census that expands instance transforms, while retaining
+  the per-pane ballistic surface contract for glazing.
+- TODO (blocking): thread the canonical `geometryDetail` value into the raid2
+  construction path so `reduced` actually suppresses this stage at runtime;
+  the current generator-level test alone is not an effective settings switch.
+- TODO (blocking): rerun the complete named lane gate with a completed
+  `npx tsc --noEmit` result before any ship verdict; the independent review
+  invocation timed out without a compiler result.
