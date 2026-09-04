@@ -1,6 +1,7 @@
 import type { Box2 } from './collision';
 import type { ShedArenaId, ShedPlacement } from './destructible-world';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
+import { NUKETOWN2_HANDEDNESS, nuketown2HandedX } from './nuketown2-layout';
 
 export const PASS65_SHED_ELIGIBILITY = Object.freeze([
   Object.freeze({ arenaId: 'atomic-acres' as const, zone: 'whole-arena' as const, minimumSheds: 2 }),
@@ -52,13 +53,23 @@ export const PASS65_SHED_PLACEMENTS: readonly ShedPlacement[] = Object.freeze([
   // in x and z, yaw turned by pi - which is the same involution every solid in
   // src/nuketown2-arena.ts is emitted through, so the sheds cannot be the one
   // asymmetric thing on a map whose whole fairness argument is that rotation.
+  // HF-473: these two are WORLD positions on a map whose authored layout is
+  // mirrored on x by NUKETOWN2_HANDEDNESS, so they read the same constant the
+  // arena does. Left as literals they would have landed 1.1 m from a mirrored
+  // spawn point, which is inside the registry's own 5.5 m spawn clearance.
+  // A reflection in x also negates a yaw about y, so the two yaws swap with
+  // the two x's - `R_y(-t) = M R_y(t) M` for the mirror M = diag(-1, 1, 1).
   Object.freeze({
     id: 'nuketown2-shed-north-yard', definitionId: FIELD_SHED_DEFINITION.id,
-    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: -14, y: 0, z: -24.5 }, yaw: Math.PI / 2,
+    arenaId: 'nuketown2', zone: 'whole-arena',
+    position: { x: nuketown2HandedX(-14), y: 0, z: -24.5 },
+    yaw: NUKETOWN2_HANDEDNESS * (Math.PI / 2),
   }),
   Object.freeze({
     id: 'nuketown2-shed-south-yard', definitionId: FIELD_SHED_DEFINITION.id,
-    arenaId: 'nuketown2', zone: 'whole-arena', position: { x: 14, y: 0, z: 24.5 }, yaw: -Math.PI / 2,
+    arenaId: 'nuketown2', zone: 'whole-arena',
+    position: { x: nuketown2HandedX(14), y: 0, z: 24.5 },
+    yaw: NUKETOWN2_HANDEDNESS * (-Math.PI / 2),
   }),
 ]);
 

@@ -72,6 +72,27 @@
  * `./nuketown2-layout`, so the weapons layer can read it without closing a
  * require cycle through `protocol.ts`) and `TRUCK_ROOF_STEPS` below.
  *
+ * TWO FRAMES, AND WHICH EXPORT IS IN WHICH (HF-473, owner 2026-09-04).
+ * Every number written in this file is in the AUTHORED frame - the frame the
+ * HF-426 re-proportioning was measured in, where the north house's garage is
+ * on the +x end of its house. The WORLD is that frame mirrored on x by
+ * `NUKETOWN2_HANDEDNESS` (see `./nuketown2-layout` for why, and for the owner
+ * observation that settled it). The mirror is applied in exactly four places -
+ * `pair()`, `centred()`, `streetVehicle()` and the two stair-ramp `box()`
+ * calls - which are the only paths from an authored number to a solid, so a
+ * half-mirror is structurally impossible rather than merely tested for.
+ *
+ *   AUTHORED exports (the gate converts with `nuketown2HandedX`, which is
+ *   where the handedness has to be proved anyway): NUKETOWN2_DOORWAYS,
+ *   NUKETOWN2_WINDOWS, NUKETOWN2_HOUSE_STAIR, NUKETOWN2_STAIRWELL,
+ *   NUKETOWN2_SECTION, NUKETOWN2_BUILDING_FOOTPRINTS,
+ *   NUKETOWN2_GROUND_DRESSING, NUKETOWN2_BALCONY, NUKETOWN2_YARD_STAIR,
+ *   NUKETOWN2_WINDOW_LEDGE, NUKETOWN2_PORCH_CANOPY, NUKETOWN2_HOUSE_LAYOUT,
+ *   NUKETOWN2_CENTRAL_TRUCK, NUKETOWN2_STREET_COACH.
+ *   WORLD exports (production code reads them and cannot be asked to convert):
+ *   NUKETOWN2_SPAWN_LAYOUT, NUKETOWN2_RARE_GUN_SITES, and every field of the
+ *   `ArenaMap` `buildNuketown2()` returns.
+ *
  * NOTHING IS YAWED. `box()` records a solid as extents-plus-yaw while the
  * collider/visual parity audit compares a collider rectangle against each mesh's
  * world AABB; those agree exactly at zero yaw and diverge badly otherwise (see
@@ -113,6 +134,8 @@ import {
   NUKETOWN2_STREET_LENGTH,
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_UPPER_Y0,
+  nuketown2HandedSpan,
+  nuketown2HandedX,
 } from './nuketown2-layout';
 import {
   createNuketown2AsphaltMaterial,
@@ -166,6 +189,7 @@ export {
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_HOUSE_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
+  NUKETOWN2_HANDEDNESS,
 } from './nuketown2-layout';
 
 /** The ratio base. Every "0.nnn L" in this file is a fraction of this. */
@@ -549,10 +573,22 @@ const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.
  *
  * Team 1 stays the exact 180-degree negation of team 0, in order.
  */
-export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
+const SPAWN_LAYOUT_AUTHORED: readonly (readonly (readonly [number, number])[])[] = Object.freeze([
   Object.freeze([[13, -24] as const, [-5, -25] as const, [1, -25] as const, [7, -25] as const, [-10, -29] as const, [14, -31] as const]),
   Object.freeze([[-13, 24] as const, [5, 25] as const, [-1, 25] as const, [-7, 25] as const, [10, 29] as const, [-14, 31] as const]),
 ]);
+
+/**
+ * WORLD frame (HF-473): the authored table above, mirrored on x. Exported in
+ * the world frame because `spawnRecord` hands these straight to the runtime -
+ * a spawn table left in the authored frame would stand each team in the other
+ * half's cover.
+ */
+export const NUKETOWN2_SPAWN_LAYOUT: readonly (readonly (readonly [number, number])[])[] = Object.freeze(
+  SPAWN_LAYOUT_AUTHORED.map((team) => Object.freeze(
+    team.map(([x, z]) => Object.freeze([nuketown2HandedX(x), z]) as unknown as readonly [number, number]),
+  )),
+);
 
 // ---------------------------------------------------------------------------
 // Builder plumbing
@@ -610,8 +646,13 @@ function pair(
   const southOptions = options.breakableWindowId
     ? { ...options, breakableWindowId: `${options.breakableWindowId}:south` }
     : options;
-  box(builder, `nuketown2 north ${name}`, position, size, north, northOptions);
-  box(builder, `nuketown2 south ${name}`, [-position[0], position[1], -position[2]], size, south, southOptions);
+  // TWO FRAMES (HF-473). `position` is AUTHORED; the world is the authored
+  // frame mirrored by NUKETOWN2_HANDEDNESS on x. Applying it here, once, is
+  // the whole mirror: a half-mirror is impossible because there is no second
+  // path from an authored number to a solid.
+  const worldX = nuketown2HandedX(position[0]);
+  box(builder, `nuketown2 north ${name}`, [worldX, position[1], position[2]], size, north, northOptions);
+  box(builder, `nuketown2 south ${name}`, [-worldX, position[1], -position[2]], size, south, southOptions);
 }
 
 /** A body already centred on the origin axis it would be rotated about. */
@@ -623,7 +664,8 @@ function centred(
   material: THREE.Material,
   options: BoxOptions = {},
 ): THREE.Mesh {
-  return box(builder, `nuketown2 ${name}`, position, size, material, options);
+  return box(builder, `nuketown2 ${name}`,
+    [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
 }
 
 /**
@@ -642,7 +684,8 @@ function streetVehicle(
   material: THREE.Material,
   options: BoxOptions = {},
 ): THREE.Mesh {
-  const mesh = box(builder, `nuketown2 street-vehicle ${name}`, position, size, material, options);
+  const mesh = box(builder, `nuketown2 street-vehicle ${name}`,
+    [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
   if (options.presentationOnly) {
     mesh.userData.presentationOnly = true;
   }
@@ -1127,12 +1170,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const rampMaterial = new THREE.MeshBasicMaterial({ visible: false });
   rampMaterial.name = 'nuketown2-house-stair-collision-authority';
   const rampRotation: [number, number, number] = [-STAIR_RAMP_ANGLE, 0, 0];
+  // Same two frames as `pair()`. A reflection in x commutes with a rotation
+  // about x, so the ramp's pitch is unchanged by the mirror.
+  const rampWorldX = nuketown2HandedX(STAIR_CX);
   const northRamp = box(builder, 'nuketown2 north house stair ramp',
-    [STAIR_CX, rampCentreY, (STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
+    [rampWorldX, rampCentreY, (STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
     [STAIR_W, STAIR_RAMP_THICKNESS, rampLength], rampMaterial,
     { rotation: rampRotation });
   const southRamp = box(builder, 'nuketown2 south house stair ramp',
-    [-STAIR_CX, rampCentreY, -(STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
+    [-rampWorldX, rampCentreY, -(STAIR_RAMP_START_Z + STAIR_RAMP_END_Z) / 2],
     [STAIR_W, STAIR_RAMP_THICKNESS, rampLength], rampMaterial,
     { rotation: [STAIR_RAMP_ANGLE, 0, 0] });
   northRamp.userData.collisionOnly = true;
@@ -2104,7 +2150,13 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   // the field is InstancedMesh, which that batcher does not take, and a Group
   // is not a candidate for it either.
   const lawn = buildNuketownRebuildLawnField(builder.root, {
-    dressing: NUKETOWN2_GROUND_DRESSING,
+    // NUKETOWN2_GROUND_DRESSING is AUTHORED (the gate compares it against the
+    // authored building footprints); the lawn field draws in the world, so the
+    // mirror is applied here, at the one call site (HF-473).
+    dressing: NUKETOWN2_GROUND_DRESSING.map((piece) => {
+      const [x0, x1] = nuketown2HandedSpan(piece.x0, piece.x1);
+      return { ...piece, x0, x1 };
+    }),
     keepOuts: builder.colliders.slice(groundColliderCount),
   });
   builder.root.userData.nuketown2LawnStats = lawn.stats;
@@ -2131,6 +2183,8 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
 
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const c = NUKETOWN2_STREET_COACH;
+  const truckWorldX = nuketown2HandedSpan(-t.boxLength / 2, t.cabX + t.cabLength / 2);
+  const coachWorldX = nuketown2HandedSpan(c.x - c.length / 2, c.x + c.length / 2);
 
   return {
     id: 'nuketown2',
@@ -2156,7 +2210,8 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       [-10, -30], [10, 30],
       [10, -30], [-10, 30],
       [0, -39], [0, 39],
-    ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
+      // Authored x, mirrored to the world frame like every other solid (HF-473).
+    ].map(([x, z]) => new THREE.Vector3(nuketown2HandedX(x!), 0, z!)),
     targets: [],
     houses: [],
     breakableWindows: builder.breakableWindows ?? [],
@@ -2164,7 +2219,8 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       {
         id: 'nuketown2-central-truck',
         bounds: {
-          minX: -t.boxLength / 2, maxX: t.cabX + t.cabLength / 2,
+          // The authored x interval, mirrored and re-sorted (HF-473).
+          minX: truckWorldX[0], maxX: truckWorldX[1],
           minZ: t.z - t.width / 2, maxZ: t.z + t.width / 2,
           minY: 0, maxY: t.roofY,
         },
@@ -2174,7 +2230,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
       {
         id: 'nuketown2-street-coach',
         bounds: {
-          minX: c.x - c.length / 2, maxX: c.x + c.length / 2,
+          minX: coachWorldX[0], maxX: coachWorldX[1],
           minZ: c.z - c.width / 2, maxZ: c.z + c.width / 2,
           minY: 0, maxY: c.height,
         },

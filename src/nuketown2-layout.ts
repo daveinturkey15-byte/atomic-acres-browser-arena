@@ -34,6 +34,57 @@
  * (3,016 → 3,024 m², +0.3 %) so this is a re-proportioning and not a resize.
  */
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * HANDEDNESS — HF-473 (owner, 2026-09-04 11:15 BST).
+ *
+ * "when I play Black Ops 2 on Steam the garage is always on the RIGHT of the
+ *  house from behind it, whereas here both garages are on the LEFT."
+ *
+ * R4 (`docs/research/2026-09-04/R4-bo2-nuketown-accuracy.md` §3) had already
+ * reached the structural half of this: the reference map is 180-degree
+ * ROTATIONALLY symmetric, and so is ours, so both houses necessarily agree with
+ * each other about which end their garage is on — but nothing in the arena said
+ * WHICH end, and R4 had to leave that OPEN because no source it could open
+ * states it. The owner played the reference and settled it.
+ *
+ * The correction is therefore a MIRROR of the whole authored layout across the
+ * street axis, NOT a rotation. A rotation is what the map already has (it is
+ * what `pair()` emits) and applying another one changes nothing; only a
+ * reflection changes chirality. Because every solid in this arena is
+ * axis-aligned, that reflection is exactly `x -> -x`, applied once, at the
+ * emitters — see the "TWO FRAMES" note at the top of `nuketown2-arena.ts`.
+ *
+ *   +1  the AUTHORED frame: the north house's garage is on the +x
+ *       (cul-de-sac) end of its house, which reads as garage-on-the-LEFT from
+ *       that house's own back yard. This is what shipped through PASS 93 and
+ *       what the owner rejected.
+ *   -1  the mirror of it: garage-on-the-RIGHT from each house's back yard,
+ *       which is what the reference does.
+ *
+ * CLAIM-STATE: VERIFIED against the owner's own play session on 2026-09-04
+ * (HF-473), not against a pixel. FALSIFIER: stand in either back yard in the
+ * reference, look at that house, and see the garage on the LEFT — then this is
+ * `1` again, and every handed feature follows it in one edit because nothing
+ * downstream hard-codes a side. `nuketown2-fidelity.test.ts` proves that:
+ * "puts each garage on the RIGHT of its own house, seen from that house's back
+ * yard" measures the cross product on the BUILT geometry, and the minimap
+ * projection is checked to agree with the world.
+ */
+export const NUKETOWN2_HANDEDNESS: 1 | -1 = -1;
+
+/** Authored x -> world x. The whole mirror is this one multiplication. */
+export function nuketown2HandedX(x: number): number {
+  return x * NUKETOWN2_HANDEDNESS;
+}
+
+/** Authored [x0, x1] -> world [x0, x1], re-sorted so x0 <= x1 still holds. */
+export function nuketown2HandedSpan(x0: number, x1: number): readonly [number, number] {
+  const a = x0 * NUKETOWN2_HANDEDNESS;
+  const b = x1 * NUKETOWN2_HANDEDNESS;
+  return a <= b ? [a, b] as const : [b, a] as const;
+}
+
 /** The ratio base for every number in this file and in the reference schematic. */
 export const NUKETOWN2_STREET_LENGTH = 36;
 
@@ -177,7 +228,10 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
   // window the reference's analyses call its strongest position, 0.7 m above the
   // upper floor slab. 3.9 m of the 6.5 m half-depth, so it is at the window
   // rather than in the middle of the room.
-  position: Object.freeze([house.x, UPPER_Y0 + 0.7, house.z + house.facing * 3.9] as const),
+  // World frame: the authored x is mirrored by NUKETOWN2_HANDEDNESS (HF-473),
+  // because railgun-authority.ts spawns the weapon at this exact point and a
+  // site left in the authored frame would put it in the far upper room.
+  position: Object.freeze([nuketown2HandedX(house.x), UPPER_Y0 + 0.7, house.z + house.facing * 3.9] as const),
 })));
 
 /**

@@ -1,4 +1,5 @@
 import { buildNuketown2 } from '../../nuketown2-arena';
+import { nuketown2HandedX as hx } from '../../nuketown2-layout';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
@@ -108,36 +109,55 @@ export const definition = createProceduralArenaVisualDefinition({
     // sees them. It reads through ~98 m of air to the far corner and therefore
     // through real aerial perspective; that is the approved fog curve doing
     // its job on a station no player ever stands on, not haze on a sightline.
-    camera('nuketown2-overhead', [-15, 46, -30], [0, 2, 6], 'overview', 1.08),
-    // Team 0's spawn yard, stood where a player actually spawns (-12, -30),
-    // looking at the back of their own house: porch step, back door, yard cover
-    // and the fence behind.
-    camera('nuketown2-north-yard', [-12, 1.75, -30], [-2, 1.5, -22], 'geometry', 1.08),
+    camera('nuketown2-overhead', [hx(-15), 46, -30], [hx(0), 2, 6], 'overview', 1.08),
+    // Team 0's spawn yard, stood ON an actual spawn point (authored (-10, -29),
+    // the fifth of team 0's six) and looking at the back of its own house:
+    // porch step, back door, yard cover and the fence behind.
+    //
+    // HF-473 RE-AIMED. Every x here is the AUTHORED x put through the
+    // handedness mirror, so a flip of NUKETOWN2_HANDEDNESS moves the review
+    // stations with the map instead of leaving them looking at the wrong half.
+    // The aim point is the house's own centre line rather than an eyeballed
+    // offset, because this frame is now the evidence for "the garage is on the
+    // RIGHT of the house from behind it": with the camera on the spawn and the
+    // house centre dead ahead, the garage wing has to appear on the right of
+    // frame, and if it does not, HF-473 is not fixed.
+    camera('nuketown2-north-yard', [hx(-10), 1.75, -29], [hx(-1.25), 1.5, -21.5], 'geometry', 1.08),
     // Team 1's yard, the exact 180-degree partner. If these two frames are not
     // rotations of each other, the arena's rotational symmetry is broken and
     // one team has something the other does not.
-    camera('nuketown2-south-yard', [12, 1.75, 30], [2, 1.5, 22], 'geometry', 1.08),
+    camera('nuketown2-south-yard', [hx(10), 1.75, 29], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
     // Along the street centre-line, from the west end of the road into the
     // truck's open cargo box. The bulkhead at x = +3.17 should close the far
     // half of this frame; that is the property the fidelity test measures
     // numerically as the street-centre run, and this is what it looks like.
-    camera('nuketown2-street-centre', [-15, 1.7, 0], [17, 1.6, 0.4], 'geometry', 1.08),
+    camera('nuketown2-street-centre', [hx(-15), 1.7, 0], [hx(17), 1.6, 0.4], 'geometry', 1.08),
     // The reference's strongest position: the north upper front window at
     // (-1.25, 4.5, -12.6), looking across the turning head at the south house's
     // driveway. Interior looking out through a real opening, so it is also the
     // map's hardest light-occlusion frame.
-    camera('nuketown2-north-upper-window', [-1.25, 4.5, -12.6], [4, 2.6, 10], 'light-occlusion', 1.08),
+    camera('nuketown2-north-upper-window', [hx(-1.25), 4.5, -12.6], [hx(4), 2.6, 10], 'light-occlusion', 1.08),
     // Its rotational partner, from the south upper room.
-    camera('nuketown2-south-upper-window', [1.25, 4.5, 12.6], [-4, 2.6, -10], 'geometry', 1.08),
+    camera('nuketown2-south-upper-window', [hx(1.25), 4.5, 12.6], [hx(-4), 2.6, -10], 'geometry', 1.08),
     // Into-sun probe. Bears (-0.853, +0.522) - the key's own XZ bearing - from
     // the east verge, so the sun disc, the backlit coach roof rim and the long
     // shadows running toward the viewer are all in one frame. Nothing above
     // reviews any of them.
+    // NOT mirrored, deliberately: this station exists to bear (-0.853, +0.522),
+    // the key light's own XZ bearing, and the key does not move with the map's
+    // handedness. Under the 180-degree symmetry both verges are the same place
+    // to stand, so the frame keeps its subject (HF-473).
     camera('nuketown2-into-sun-street', [14, 1.85, -9], [-11.6, 4.2, 6.7], 'light-occlusion', 1.08),
     // Fixed judgeset interior stations (HF-440 Lane BA):
-    camera('nuketown2-north-interior', [-1.25, 1.7, -19.5], [-1.25, 1.6, -12.0], 'geometry', 1.08),
-    camera('nuketown2-south-interior', [1.25, 1.7, 19.5], [1.25, 1.6, 12.0], 'geometry', 1.08),
-    camera('nuketown2-garage', [6.75, 1.7, -20.5], [6.75, 1.5, -14.0], 'geometry', 1.08),
+    camera('nuketown2-north-interior', [hx(-1.25), 1.7, -19.5], [hx(-1.25), 1.6, -12.0], 'geometry', 1.08),
+    camera('nuketown2-south-interior', [hx(1.25), 1.7, 19.5], [hx(1.25), 1.6, 12.0], 'geometry', 1.08),
+    camera('nuketown2-garage', [hx(6.75), 1.7, -20.5], [hx(6.75), 1.5, -14.0], 'geometry', 1.08),
+    // HF-473: the rear balcony, its exterior flight and the upper back door,
+    // from the yard at the flight's foot.
+    camera('nuketown2-north-balcony', [hx(-9.5), 1.75, -27.5], [hx(-3.0), 3.4, -24.0], 'geometry', 1.08),
+    // ...and the front climb chain: hedge, porch canopy, window ledge, upper
+    // front window, in one frame off the verge.
+    camera('nuketown2-front-porch', [hx(-5.0), 1.75, -6.4], [hx(-1.25), 3.2, -9.8], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',

@@ -40,6 +40,7 @@ import {
   NUKETOWN2_BUILDING_FOOTPRINTS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
 } from '../../src/nuketown2-arena';
+import { nuketown2HandedSpan } from '../../src/nuketown2-layout';
 
 const NEAR_METERS = 0.03;
 
@@ -123,9 +124,21 @@ function collectBoxes(): { boxes: Box[]; skipped: number; skippedNames: string[]
 
 type PlanRect = Readonly<{ x0: number; x1: number; z0: number; z1: number }>;
 
+// HF-473: NUKETOWN2_BUILDING_FOOTPRINTS is an AUTHORED table and the boxes
+// collected above are WORLD, so the mirror is applied before the two are
+// compared. Left unconverted, the driveway apron fell inside what this script
+// believed was the house interior and reported two findings against geometry
+// that had not moved relative to anything.
+const WORLD_FOOTPRINTS: readonly PlanRect[] = Object.freeze(
+  NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => {
+    const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
+    return Object.freeze({ x0, x1, z0: footprint.z0, z1: footprint.z1 });
+  }),
+);
+
 const BUILDING_FOOTPRINTS: readonly PlanRect[] = Object.freeze([
-  ...NUKETOWN2_BUILDING_FOOTPRINTS,
-  ...NUKETOWN2_BUILDING_FOOTPRINTS.map((footprint) => Object.freeze({
+  ...WORLD_FOOTPRINTS,
+  ...WORLD_FOOTPRINTS.map((footprint) => Object.freeze({
     x0: -footprint.x1,
     x1: -footprint.x0,
     z0: -footprint.z1,
