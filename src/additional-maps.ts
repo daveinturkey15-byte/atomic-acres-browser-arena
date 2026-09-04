@@ -3983,7 +3983,7 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       ],
       // PASS 94 integration: the spawn-distribution lane (HF-456) added the
       // seventh and eighth point at x = -12 and 12, which sat 4.00 m from the
-      // authored -16/-8 and 8/16 - inside src/additional-maps.test.ts' 6 m
+      // authored -18/-6 and 6/18 - inside src/additional-maps.test.ts' 6 m
       // Skyline separation floor, which is stricter than the 3 m repo-wide one.
       // The eight points are RE-SPACED along the same line rather than the
       // floor being lowered: -24/-16/-10/-4/4/10/16/24 gives gaps of
