@@ -2004,3 +2004,15 @@ assets and textures and lighting need to be tip top, raid can come next"
   world, drone/rotor Doppler, UI stingers, music), shared delay/allpass reverb,
   combat music ducking, master limiter, deterministic offline peak/RMS gates.
   Muse review queued; goes into HITL 5b if it clears — needs the owner's ears.
+- 18:45 **Perf fix lane** (perf-hitl5 @ 0123a427): arena static matrix freeze
+  (scene auto nodes 3,029 → 2,206) and one shared CPU-generated noise LUT for
+  every wear graph (generated, not loaded); vegetation measured and left
+  (shadows are static on HIGH). Target (JS ≤ 10 ms/frame) NOT met; the +709
+  nodes are the Rebuild's hidden batch-source meshes, not the operator-look
+  clones. Remaining, by measured size: viewmodel arm IK walking a 906-node
+  camera subtree (~1.2 ms), the dormant 4,233-node killstreak pool walked every
+  frame, 50 wear graphs = 50 pipelines (~0.5–1.9 ms). Pipeline-count mystery
+  explained: the static-serve route trips the 12 s first-submission fence and
+  retries, so failed-attempt pipelines are counted; in-match creation 0.
+  Codex/Luna perf lane 3 launched on the three remaining items (HF-493: no
+  Opus/Fable until the reset).
