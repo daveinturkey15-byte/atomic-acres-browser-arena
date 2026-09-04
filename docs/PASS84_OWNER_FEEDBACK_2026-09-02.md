@@ -2184,3 +2184,8 @@ assets and textures and lighting need to be tip top, raid can come next"
 ## HF-507 - owner 2026-09-04 22:15: 'headless poll to each provider website every 20 minutes, keep the sessions live, show 5-hour and weekly resets; get that build out in parallel; no new pass needed soon - keep working till 6 am, then I test'
 
 - Luna lane 'provider-usage-web-poller' launched: per-provider persistent browser profiles (owner logs in once, headed; polling headless every 20 min via a scheduled task), readings into the shared store with source/age/reset countdowns on the NOW page, needs-login badges, never touches credentials. Overnight lanes resumed at full parallelism (Muse builders, GLM sweep, the Opus workflow from cache); PASS 94 attempt 3 continues but no longer holds anything back; the 06:00 candidate is the owner's test build.
+
+## Night schedule 22:35
+
+- PASS 94 attempt 3 cancelled by the orchestrator (HF-507: no pass before 06:00; machine at 100 % CPU from the overnight lanes). The candidate branch keeps the Pass 94 roll at 465ae6b7; PASS 95 publishes after the owner's 06:00 test.
+- HITL 6 (Luna) launches as soon as the desync lane lands (mp-bugs c457aaab already in: reload ack, respawn loadout reset, stair muzzle admission; gameplay-feel ed5c1353: sticky stairs root-caused to snap-to-ground never running - fixed in the controller). Candidate 7 (Luna) at 05:00 over every reviewed overnight branch, captures + Gemini critic, morning report. Luna verdicts so far on Muse lanes: windows/lobby/yard-props/load-time/gamepad SHIP-WITH-FIXES; horizon/farcrysis/raid2 DO-NOT-SHIP - fix jobs queued to Muse with the reviews as spec.
