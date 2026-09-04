@@ -59,6 +59,21 @@ export function lawnSpec(
     scuff: { sizeM: 0.060, albedo: 0.070, roughness: 0.05 },
     traffic: { sizeM: 2.4, albedo: open ? 0.085 : 0.060, roughness: 0.05 },
     soil: open ? 0.110 : 0.080,
+    // Turf is the family with the most honest macro field: a lawn really is a
+    // patchwork at 3-4 m - shade, drainage, where the sprinkler reaches - and
+    // it varies in hue as much as in value, which is why the spread is wide.
+    // 0.20 m is a clump, the coarsest micro scale here, chosen because turf
+    // read at 3 m must not dissolve into a per-pixel fizz.
+    variation: {
+      macro: { sizeM: 3.4, albedo: 0.045, roughness: 0.03 },
+      micro: { sizeM: 0.20, albedo: 0.030, roughness: 0.03 },
+      tintSpread: 0.030,
+      normalDegrees: 0,
+      edgeWear: 0,
+      soilRoughness: 0.05,
+      polishRoughness: 0.03,
+    },
+
     ...(readDistanceM === undefined ? {} : { readDistanceM }),
     ...(polygonOffset === undefined ? {} : { polygonOffset }),
   });
@@ -87,7 +102,7 @@ function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const cellX = floor(p.x.div(float(MOWER_CELL_M)));
   const cellZ = floor(p.z.div(float(MOWER_CELL_M)));
   const parity = fract(cellX.add(cellZ).mul(float(0.5))).mul(float(2));
-  const striped = uniforms.baseColor.mul(wear.albedoMul)
+  const striped = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint)
     .mul(float(0.950).add(isTurf.select(parity.mul(float(0.100)), float(0))));
   const thin = smoothstep(float(0.42), float(0.78), wear.soilMask);
   const bare = smoothstep(float(0.76), float(0.93), wear.soilMask);

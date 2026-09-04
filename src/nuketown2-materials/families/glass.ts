@@ -43,6 +43,19 @@ export function glassSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec
     scuff: { sizeM: 0.030, albedo: 0.050, roughness: 0.05 },
     traffic: { sizeM: 1.2, albedo: 0.060, roughness: 0.04 },
     soil: 0.075,
+    // Glass gets the FLOOR of every band and nothing more. A pane's variation is
+    // the room behind it and the grime on it, both of which this family already
+    // models; macro tonal drift in the glass itself would read as a defect.
+    variation: {
+      macro: { sizeM: 2.0, albedo: 0.020, roughness: 0.02 },
+      micro: { sizeM: 0.08, albedo: 0.015, roughness: 0.02 },
+      tintSpread: 0.010,
+      normalDegrees: 0,
+      edgeWear: 0,
+      soilRoughness: 0.05,
+      polishRoughness: 0.02,
+    },
+
   });
 }
 
@@ -70,7 +83,7 @@ function sharedGlassGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughn
     fract(uv.x.mul(float(9.0)).add(wear.soilMask.mul(float(1.7)))),
   ).mul(smoothstep(float(0.15), float(0.85), wear.soilMask));
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
-  const body = uniforms.baseColor.mul(wear.albedoMul);
+  const body = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint);
   glassGraph = {
     colorNode: mix(body, body.mul(float(1.55)), grime.mul(float(0.35))),
     roughnessNode: clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35)),
@@ -124,7 +137,7 @@ export function createGlassMaterial(
   // soiling field rather than invented from a world constant.
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
 
-  const body = uniforms.baseColor.mul(wear.albedoMul);
+  const body = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint);
   mat.colorNode = mix(body, body.mul(float(1.55)), grime.mul(float(0.35)));
   mat.roughnessNode = clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35));
   // Dirt makes glass less transparent. This is the term that stops the grime
