@@ -1847,3 +1847,68 @@ nvidia/blackwell with zero page or console errors; draw calls 356 -> 391
 Not merged into this branch and owed at integration: `nuketown2-ballistics`,
 `vehicle-forge`, `spawn-distribution`. Re-run the coplanar instrument after the
 `vehicle-forge` merge in particular.
+
+## HF-476 — owner 2026-09-04 12:58: "nuketown in black ops 2 is what we need, not a diff one"
+
+- Reference target is Black Ops 2's **Nuketown 2025** only. Other Nuketowns
+  (BO1 original, Cold War '84, Nukehouse, BO6/BO7) are secondary evidence,
+  admissible only for features shown identical in BO2 Nuketown 2025, and
+  every reference and finding must be labelled with its game version. The
+  balcony spec from R4 (inherited from '84/original) must be re-checked
+  against BO2 Nuketown 2025 images before it ships.
+
+## HF-477 — BO2 Nuketown 2025 reference facts, 2026-09-04 13:20 (Opus, 20 version-tagged images, `research-2026-09-04` docs/references/nuketown-2025/)
+
+- **Garage RIGHT from each own backyard spawn — VERIFIED (BO2-2025)**, same
+  for both teams (180° pair); a global mirror flips both, so the gate must be
+  the right/left cross-product form, not "towards the cul-de-sac".
+- **House colours — the yellow/blue premise is BO1, not BO2-2025.** In 2025
+  the houses are **terracotta-orange over cream** and **white/cream modernist
+  with pale blue-grey glazing**. Current branch pins blue 0x46809f / yellow
+  0xf4be36 → both wrong; exact hex OPEN (no calibrated source). Chirality
+  anchors: RED three-unit appliance bank on the orange lawn, BLUE on the white
+  lawn; yards differ (glasshouse/carport vs garden-pod/sand-pit/shuffleboard).
+- **Rear deck + wooden exterior stair — VERIFIED on both houses**, at the end
+  OPPOSITE the garage on the yard side, over an undercroft with a circular
+  patio at the stair foot. Porch = a wide cantilevered eave, not a canopy on
+  posts. Under-window front ledge OPEN.
+- **Overhead — VERIFIED:** lollipop cul-de-sac: ONE circular turning head at
+  one end with a stem running off-map (ours has a centred 16 m head and two
+  blank ends); a THIRD house beyond the head with its own drive and a red
+  car; tour coach on the orange house's side, box truck + dark saloon on the
+  white house's side, both nosed down the stem; a green classic car in the
+  stem. No bomb shelter in 2025. Mailboxes OPEN.
+- Next Nuke Town lane (after the PASS 94 candidate HITL): "BO2-2025 accuracy
+  pass 2" — colours, deck/stair placement, eave, lollipop head + stem + third
+  house, vehicle placement, lawn appliance banks, cross-product gate.
+
+## HF-478 — 2026-09-04 13:35: afternoon wave (six Opus lanes) and the beast-run plan
+
+- Owner: "when is the next HITL... then scheduling a beast run? why are you not
+  orchestrating more now we have usage resets". Launched six parallel Opus
+  lanes: BO2-2025 accuracy pass 2 (colours orange/white, deck opposite the
+  garage, eave porch, lollipop head + stem + third house, vehicle placement,
+  lawn appliance-bank anchors), Nuke Town materials depth (photoreal
+  procedural library at true scale), lighting/atmosphere (three times of day,
+  physical exposure with a combat floor, baked indirect), Raid rebuild slice 1,
+  Farcrysis rework slice 1 (parked), load-time verification (both admission
+  branches merged and proven with the tripwire probe).
+- Beast run (tonight): the reference-grounded loop runner drives Gemini/GLM/
+  Alibaba builders and reference-comparing critics on the Rebuild for hours
+  (probe-token receipts, journaled scores, plateau rule), local Qwen on
+  mechanical tasks with the GPU-yield rule, Opus verification at ~06:00; each
+  cycle's candidate is a HITL for the owner in the morning.
+
+## HF-479 — owner 2026-09-04 13:45: apply the shared three.js techniques; animation + skins from image/local video
+
+- "can we be using some of the cool three.js techniques from the threads I
+  shared... get it really nice? and find a way to use image and H3 local video
+  to get better animations too? players and bots, and better skins?"
+- Launched two Opus lanes: **techniques** (register-driven: vegetation LOD +
+  wind, pool water upgrade, hero props via img2threejs from the BO2-2025
+  references — mailboxes, appliance banks, bins, garden pod, sand-pit,
+  shuffleboard, glasshouse/carport — tiered decals/grime, frame-loop audit
+  with a 15 % draw-call ceiling) and **animation + skins** (capability map
+  honouring the SAM/mocap rule — never mocap where guns are involved — with
+  the licence-safe local routes; slice 1: procedural locomotion/aim layer for
+  players and bots and a TSL operator skin system replacing tint-only skins).
