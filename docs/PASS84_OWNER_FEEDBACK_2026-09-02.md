@@ -1808,3 +1808,30 @@ assets and textures and lighting need to be tip top, raid can come next"
   …) are exactly the accuracy-2, techniques and lighting lanes in flight. This
   number is the hill-climb baseline; HITL 4 gets the same critic (GEM-5) and
   the delta is the first quality event of the loop.
+
+## HF-486 — quality-bar lanes, 2026-09-04 16:35
+
+- **Policy rolled out (HF-481):** AKP `rules/threejs-source-priority.dave-gaming-pc.md`
+  + behavioural check `threejs_source_priority` (machine-scoped); vault note
+  `Dev-Practices/Three.js Source Priority.md`; paragraphs in the Claude, Codex,
+  OMP, dsh and repo adapters; hub Stage 1b "search current examples first";
+  `docs/threejs-knowledge/upstream/` holds the dated Three.js llms.txt and
+  llms-full.txt; Poimandres docs MCP registered for Claude Code and Codex
+  (OMP and dsh have no MCP support — recorded, not claimed).
+- **Links ingested (rows 53–57):** the @threejs share (cosy-japan, zero
+  assets, WebGL2) uses an **SH-L2 irradiance volume** (nine coefficients in a
+  padded 3D texture) — NO coverage in our 164 skills and `light probe` matches
+  nothing in src/; mshumer's Claude-of-Duty (MIT, r180, zero art) carries a
+  23-module deferred stack (CSM, GTAO, SSR, TAA, DOF, LUT, exposure, probes,
+  prepass) and a **blind A/B critic** the store lacks. chrisgpt, rileybrown and
+  the agent-village post are promotional (no repo/method) — recorded as bars.
+- **Visual gap (lane B):** we already run 9 of 11 look techniques (SSR, SSGI,
+  GTAO, god rays, DOF, motion blur, bloom, ACES + CDL grade, baked probes,
+  Whitted trace); missing were aerial perspective (added: additive
+  Rayleigh + Mie stage, no new pipeline) and transmission glass. **The real
+  gap is ~0 % albedo variation on our surfaces**, which makes GTAO/SSR/bloom
+  invisible — the materials lane is the multiplier. Nuke Town's ambient air
+  particles were shipped invisible (1.2 px) and fixed. Branch `nuketown2-look`.
+- **Governance side-effect:** the AKP control digest rotated → audit RED 10
+  (baseline 6): Claude Code re-attested natively; Hermes (blocking), Codex,
+  OMP and Antigravity need their own native re-attest.
