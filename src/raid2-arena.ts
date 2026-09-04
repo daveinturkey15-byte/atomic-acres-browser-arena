@@ -90,6 +90,7 @@ import {
 import type { ArenaMap } from './map';
 import { worldTiled } from './test-maps-art';
 import { raid2ForgedMaterial, raid2ForgedSurfaces } from './raid2-art';
+import { dressRaid2 } from './raid2-dressing';
 import { RAID2_MEASURED } from './raid2-reference';
 import {
   discBands, RAID2_POOL_COPING_DEPTH, RAID2_POOL_WATER, ringSegments, subtractRects,
@@ -990,6 +991,11 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   }
   rect('raid2 garage workbench', 46, 48.4, 0, MOUNT, -6, -2, m.timber);
   rect('raid2 garage crate stack', 46.8, 49.2, 0, HARD_COVER, 4, 6.4, m.timber);
+
+  // Slice 2 dressing (estate cells 1-3): presentation-first, mountable
+  // colliders only, zero new materials. Runs before the presentation batch
+  // so batched members are audited through their source nodes.
+  dressRaid2(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'raid2-presentation');
 
