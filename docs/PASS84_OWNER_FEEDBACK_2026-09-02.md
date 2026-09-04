@@ -1289,3 +1289,21 @@ assets and textures and lighting need to be tip top, raid can come next"
   blocks on exit; the wrappers never wrote their exit markers and the gated
   chain stalled from 22:30 to 05:05. Correction: pass `-c notify=[]` on
   headless runs (applied to the pre-review launcher).
+
+## HF-453 — owner 2026-09-04 06:40: "send me a HITL version to play and review"
+
+- **Handoff claim:** candidate `34e3b38b` on branch `pass93-candidate` = live
+  PASS 92 head (`ce1c8f76` + docs) merged with `nuketown2-tiptop` at `f35dcb06`
+  (43 commits: Luna's P0/P1 fixes + six polish cycles + final pass). Merge was
+  conflict-free (122 files, +6044/−151). Built 06:41 (`dist` in
+  `aa-claude-hitl`), served locally by `vite preview` on
+  `http://127.0.0.1:4300/` (pid 4724). The build still calls itself PASS 92 —
+  the identity is rolled only at the real cut. NOT published.
+- **Out of scope for this candidate:** the two load-time branches
+  (`admission-cadence-wait`, `admission-rehearsal-scope`) — they await the
+  browser tripwire probe. Luna's tip-top pre-review is running in parallel; its
+  verdict and any fix commits land after this candidate was built.
+- **Owner checklist to inspect:** house ground-floor z-fighting gone at any
+  distance and angle; stairs smooth up and down in both houses; upstairs window
+  drop-outs; ground-floor glass; truck open on three sides; kerb-side cover;
+  road/kerb/facade/interior detail and materials; fps with Qwen idle.
