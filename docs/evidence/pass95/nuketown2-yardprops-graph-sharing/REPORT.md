@@ -104,3 +104,15 @@ Counter replicates `nodeGraphSignature`/`materialGraphKey` from
   needed. Whether −9 graphs is enough to revisit that entry needs a measured
   cold-boot on hardware WebGPU (per the reach module's own rule), not available
   here.
+
+## LUNA review TODOs
+
+- TODO [OPEN][LUNA] Run the real cold-session WebGPU boot measurement after this
+  branch is integrated. The structural reach test passes and the existing
+  `nuketown2` authority is unchanged, but that is not a hardware timing proof
+  that the lowered 42-graph set clears the 12 s fence.
+- TODO [OPEN][LUNA] Capture the deterministic yard/interior review cameras on
+  real hardware and compare against the pre-share reference. The source keeps
+  the named roles and base colours, but it replaces bespoke cooker rings,
+  cabinet splits, condensation/rake bands and floor detail with family wear;
+  the visual look-preservation claim therefore remains design evidence only.
