@@ -60,3 +60,7 @@ restored 54-graph budget gate rather than treating an absent file as proof.
 4. A before/after draw census still reports 11 merged vehicle draws, and no
    forged mesh registers as a collider or ballistic surface.
 
+TODO (F2 watch item, larger than this review fix): make the accent material
+optional when no dressing emits an accent at `src/vehicle-forge/build.ts:82-95`
+and remove the unused truck/saloon accent instances at
+`src/nuketown2-arena.ts:2277-2282`.
