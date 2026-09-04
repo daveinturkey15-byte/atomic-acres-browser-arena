@@ -105,11 +105,83 @@ export function generateNoiseLutData(size = NOISE_LUT_SIZE, cells = NOISE_LUT_CE
 }
 
 let shared: THREE.DataTexture | null = null;
+let sharedData: Uint8Array | null = null;
+let sharedMeans: readonly [number, number, number, number] | null = null;
+let sharedSigmas: readonly [number, number, number, number] | null = null;
+
+/** The generated tile's bytes, generated once and reused by the texture and the CPU gates. */
+function lutData(): Uint8Array {
+  if (!sharedData) sharedData = generateNoiseLutData();
+  return sharedData;
+}
+
+/**
+ * The MEASURED mean of each channel over the whole tile, in [0, 1].
+ *
+ * WHY A MEASUREMENT AND NOT 0.5 (HF-503, pass 96). A signed field written as
+ * `sample * 2 - 1` is only zero-mean if the sample's mean is exactly one half,
+ * and this tile's is not: value noise on a finite lattice, folded through
+ * three octaves, quantised to eight bits and - for the ridged channel -
+ * squared, lands a fraction of a per cent off. That fraction IS what the
+ * mean-preservation gate measures, so the variation terms subtract the
+ * measured mean rather than the assumed one, and the arena's authored base
+ * colours stay the MEAN of each surface rather than its ceiling.
+ */
+export function noiseLutChannelMeans(): readonly [number, number, number, number] {
+  if (sharedMeans) return sharedMeans;
+  const data = lutData();
+  const sums = [0, 0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) {
+    sums[0] += data[i];
+    sums[1] += data[i + 1];
+    sums[2] += data[i + 2];
+    sums[3] += data[i + 3];
+  }
+  const texels = data.length / 4;
+  sharedMeans = [
+    sums[0] / texels / 255,
+    sums[1] / texels / 255,
+    sums[2] / texels / 255,
+    sums[3] / texels / 255,
+  ] as const;
+  return sharedMeans;
+}
+
+/**
+ * The MEASURED standard deviation of each channel over the whole tile.
+ *
+ * WHY THIS AND NOT THE HALF-RANGE. fBm is concentrated: three octaves of value
+ * noise almost never reach 0 or 1, so normalising a signed field by its
+ * extremes would leave the authored "6 per cent macro swing" showing about two
+ * per cent across most of a wall - which is the HF-486 finding restated. The
+ * variation terms therefore normalise by TWO SIGMA and clamp, so the authored
+ * number is a real 95th-percentile swing and the gate can measure it.
+ */
+export function noiseLutChannelSigmas(): readonly [number, number, number, number] {
+  if (sharedSigmas) return sharedSigmas;
+  const data = lutData();
+  const means = noiseLutChannelMeans();
+  const sums = [0, 0, 0, 0];
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 4; c += 1) {
+      const d = data[i + c] / 255 - means[c];
+      sums[c] += d * d;
+    }
+  }
+  const texels = data.length / 4;
+  sharedSigmas = [
+    Math.sqrt(sums[0] / texels),
+    Math.sqrt(sums[1] / texels),
+    Math.sqrt(sums[2] / texels),
+    Math.sqrt(sums[3] / texels),
+  ] as const;
+  return sharedSigmas;
+}
 
 /** The one shared tile. Built on first use; never rebuilt. */
 export function noiseLutTexture(): THREE.DataTexture {
   if (shared) return shared;
-  const lut = new THREE.DataTexture(generateNoiseLutData(), NOISE_LUT_SIZE, NOISE_LUT_SIZE, THREE.RGBAFormat);
+  const lut = new THREE.DataTexture(lutData(), NOISE_LUT_SIZE, NOISE_LUT_SIZE, THREE.RGBAFormat);
   lut.name = 'nuketown2-noise-lut';
   lut.colorSpace = THREE.NoColorSpace;
   lut.wrapS = THREE.RepeatWrapping;
@@ -123,9 +195,15 @@ export function noiseLutTexture(): THREE.DataTexture {
   return shared;
 }
 
-/** Test seam: drop the shared tile so a test can prove it is rebuilt lazily. */
+/** Test seam: drop the shared tiles so a test can prove they are rebuilt lazily. */
 export function resetNoiseLutForTests(): void {
   shared = null;
+  sharedData = null;
+  sharedMeans = null;
+  sharedSigmas = null;
+  sharedGradientRms = null;
+  sharedGradient = null;
+  sharedGradientData = null;
 }
 
 /**
@@ -148,4 +226,140 @@ export function lutRidgedFbm(p: any): any {
 /** A lattice-cell coordinate from two scalar nodes, kept here so families do not open a second cast boundary. */
 export function lutUv(x: any, y: any): any {
   return vec2(x, y);
+}
+
+
+/* ------------------------------------------------------------------------ *
+ * The GRADIENT tile (HF-503, pass 96) - the second LUT, generated the same way.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * WHY A SECOND TILE. A surface reads as a surface partly because its NORMAL
+ * moves. Render a wall with a perfectly flat normal and no amount of albedo
+ * detail stops it reading as a painted plane, because the specular lobe and
+ * the ambient occlusion term both stay constant across it - which is exactly
+ * the HF-486 finding that GTAO, SSR and bloom are invisible on our surfaces.
+ *
+ * The perturbation wanted here is the DERIVATIVE of a height field, and a
+ * derivative is either several extra texture fetches per fragment at runtime
+ * or ONE fetch of a tile that already holds it. It is the second one,
+ * generated on the CPU exactly the way the value tile is: nothing is loaded,
+ * decoded, or fetched over the network, and the "loads no texture" gate holds.
+ *
+ *   R = d(height)/du, encoded to [0, 1] about 0.5
+ *   G = d(height)/dv, encoded the same way
+ *   B = the height itself, so a caller wanting a cavity term gets it free
+ *   A = 255 (reserved)
+ *
+ * SIZE. 256 x 256 over 32 lattice cells - half the value tile's resolution,
+ * because a perturbation bounded to a few degrees is a low-frequency signal
+ * and a bigger tile would only cost boot time and cache. The slope is stored
+ * in units of height per lattice cell, saturating at `GRADIENT_LUT_RANGE`;
+ * `noise-lut.test.ts` measures the clipped fraction rather than assuming it.
+ */
+export const GRADIENT_LUT_SIZE = 256;
+export const GRADIENT_LUT_CELLS = 32;
+/** Slope, in height per lattice cell, at which the encoding saturates. */
+export const GRADIENT_LUT_RANGE = 2.0;
+
+/** Fill the gradient tile. Pure, deterministic; runs once. */
+export function generateGradientLutData(size = GRADIENT_LUT_SIZE, cells = GRADIENT_LUT_CELLS): Uint8Array {
+  const height = new Float32Array(size * size);
+  const cellsPerTexel = cells / size;
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      height[y * size + x] = fbm(x * cellsPerTexel, y * cellsPerTexel, cells, 2, false);
+    }
+  }
+  // Central differences ON THE TILE, wrapped - so the gradient tiles exactly
+  // as the height does. Differencing the analytic fBm instead would be no more
+  // accurate at this texel spacing and would cost four evaluations per texel.
+  const data = new Uint8Array(size * size * 4);
+  const perCell = 1 / (2 * cellsPerTexel);
+  const encode = (slope: number): number =>
+    Math.round(Math.min(1, Math.max(0, slope / (2 * GRADIENT_LUT_RANGE) + 0.5)) * 255);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const xm = (x + size - 1) % size;
+      const xp = (x + 1) % size;
+      const ym = (y + size - 1) % size;
+      const yp = (y + 1) % size;
+      const du = (height[y * size + xp] - height[y * size + xm]) * perCell;
+      const dv = (height[yp * size + x] - height[ym * size + x]) * perCell;
+      const i = (y * size + x) * 4;
+      data[i] = encode(du);
+      data[i + 1] = encode(dv);
+      data[i + 2] = Math.round(height[y * size + x] * 255);
+      data[i + 3] = 255;
+    }
+  }
+  return data;
+}
+
+let sharedGradient: THREE.DataTexture | null = null;
+let sharedGradientData: Uint8Array | null = null;
+
+/** The one shared gradient tile. Built on first use; never rebuilt. */
+export function gradientLutTexture(): THREE.DataTexture {
+  if (sharedGradient) return sharedGradient;
+  if (!sharedGradientData) sharedGradientData = generateGradientLutData();
+  const lut = new THREE.DataTexture(sharedGradientData, GRADIENT_LUT_SIZE, GRADIENT_LUT_SIZE, THREE.RGBAFormat);
+  lut.name = 'nuketown2-gradient-lut';
+  lut.colorSpace = THREE.NoColorSpace;
+  lut.wrapS = THREE.RepeatWrapping;
+  lut.wrapT = THREE.RepeatWrapping;
+  lut.magFilter = THREE.LinearFilter;
+  lut.minFilter = THREE.LinearFilter;
+  lut.generateMipmaps = false;
+  lut.flipY = false;
+  lut.needsUpdate = true;
+  sharedGradient = lut;
+  return sharedGradient;
+}
+
+/**
+ * The height field's slope at a lattice-cell coordinate, signed, in height per
+ * cell. ONE texture fetch; two SINGLE swizzles off the same node, never a
+ * chain (webgpu-tint-swizzle-shim.ts, Chrome 153 Tint).
+ */
+export function lutGradient(p: any): any {
+  const sample = texture(gradientLutTexture(), p.mul(float(1 / GRADIENT_LUT_CELLS)));
+  const decode = (channel: any): any => channel.sub(float(0.5)).mul(float(2 * GRADIENT_LUT_RANGE));
+  return vec2(decode(sample.r), decode(sample.g));
+}
+
+/**
+ * One [0, 1] sample of the shared value tile, returned as the NODE so a caller
+ * can take more than one channel off a single fetch.
+ *
+ * This exists so a family that wants a tonal field and a decorrelated tint
+ * field AT THE SAME SCALE pays for one texture fetch rather than two: the
+ * three-octave fBm is `.b` and the ridged field is `.a`, and the two look
+ * nothing like each other because one is folded and the other is not.
+ */
+export function lutSample(p: any): any {
+  return texture(noiseLutTexture(), p.mul(float(1 / NOISE_LUT_CELLS)));
+}
+
+let sharedGradientRms: number | null = null;
+
+/**
+ * RMS gradient magnitude over the gradient tile, in height per lattice cell.
+ *
+ * The normal perturbation divides by this, so a family authors its bump as an
+ * ANGLE in degrees and gets that angle at the typical slope rather than at
+ * whatever magnitude the generator happened to produce.
+ */
+export function gradientLutRms(): number {
+  if (sharedGradientRms !== null) return sharedGradientRms;
+  if (!sharedGradientData) sharedGradientData = generateGradientLutData();
+  const data = sharedGradientData;
+  let sum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const du = (data[i] / 255 - 0.5) * 2 * GRADIENT_LUT_RANGE;
+    const dv = (data[i + 1] / 255 - 0.5) * 2 * GRADIENT_LUT_RANGE;
+    sum += du * du + dv * dv;
+  }
+  sharedGradientRms = Math.sqrt(sum / (data.length / 4));
+  return sharedGradientRms;
 }

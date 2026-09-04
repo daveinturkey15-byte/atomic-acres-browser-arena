@@ -18,26 +18,42 @@
  * material construction. Nothing in this file runs per frame on the CPU.
  */
 import * as TSL from 'three/tsl';
-import { NOISE_LUT_CELLS, lutFbm } from './noise-lut';
+import {
+  NOISE_LUT_CELLS,
+  generateNoiseLutData,
+  gradientLutRms,
+  lutFbm,
+  lutGradient,
+  lutSample,
+  noiseLutChannelMeans,
+  noiseLutChannelSigmas,
+} from './noise-lut';
 import {
   MAX_ALBEDO_DARKENING,
+  MAX_NORMAL_DEGREES,
   type Nuketown2MaterialSpec,
   assertSpec,
   readDistance,
+  scaleResolvable,
+  variationOf,
 } from './spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms } from './material-uniforms';
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
 const {
+  abs,
   cameraPosition,
   clamp,
+  cross,
   float,
   length,
   max,
   mix,
+  normalLocal,
   positionWorld,
   sin,
   smoothstep,
+  transformNormalToView,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -88,6 +104,122 @@ export function signedNoise(uv: any, featureSizeM: number, octaves: 1 | 2 | 3 = 
 }
 
 /**
+ * A ZERO-MEAN signed field from one channel of the shared tile.
+ *
+ * `(sample - measured mean) / (2 * measured sigma)`, clamped to [-1, 1].
+ *
+ * Both halves of that are the point. Subtracting the MEASURED mean - not the
+ * assumed 0.5 - is what makes the arena's authored base colours survive as the
+ * mean of the surface: HF-477 pinned those hexes, and a field whose mean is
+ * 0.503 instead of 0.500 walks every surface a third of a per cent off its pin
+ * for nothing. Dividing by two sigma rather than by the half-range is what
+ * makes the authored per cent a real per cent: three octaves of value noise
+ * almost never reach its extremes, so half-range normalisation would ship a
+ * "6 % macro swing" that shows about 2 % across most of a wall - which is
+ * HF-486's finding restated rather than fixed.
+ */
+function centred(sample: any, channel: 0 | 1 | 2 | 3): any {
+  const mean = noiseLutChannelMeans()[channel]!;
+  const sigma = noiseLutChannelSigmas()[channel]!;
+  const raw = channel === 0 ? sample.r : channel === 1 ? sample.g : channel === 2 ? sample.b : sample.a;
+  return clamp(raw.sub(float(mean)).mul(float(1 / (2 * sigma))), float(-1), float(1));
+}
+
+/**
+ * The two combat-distance scales, the tint they carry, and the normal they
+ * perturb (HF-503, pass 96).
+ *
+ * COST. Two extra texture fetches on the shared tile, and one on the gradient
+ * tile for the families that ask for a normal. No extra pipeline: every knob
+ * is a uniform on the graph the family already shares, so the registry stays
+ * at eight graphs and the arena stays under its measured ceiling.
+ *
+ * The macro luminance and the tint field come off ONE fetch - `.b` is the
+ * three-octave fBm, `.a` is the ridged field, and the two look nothing like
+ * each other, which is exactly what is wanted: a hue that drifts with the
+ * luminance reads as a stain, and a hue that drifts independently reads as
+ * paint mixed on a different day.
+ */
+export interface VariationNodes {
+  /** Hue-stable luminance multiplier about 1. */
+  readonly luminance: any;
+  /** Luminance-preserving warm/cool multiplier about vec3(1). */
+  readonly tint: any;
+  /** Signed macro field, exposed so a family can reuse it instead of inventing a second. */
+  readonly macro: any;
+  /** Signed micro field. */
+  readonly micro: any;
+  /** Roughness offset, before the family adds its own. */
+  readonly roughness: any;
+}
+
+/**
+ * MICRO FALLOFF. A 0.05-0.20 m feature subtends 9.7 px at 20 m and 3.2 px at
+ * 60 m on this arena's camera, so inside the map it never needs to fade. The
+ * pair below exists only so the term does not alias on the 220 m backdrop
+ * slab, whose far edge is past anything else in the scene.
+ */
+const MICRO_FALLOFF_NEAR_M = 55;
+const MICRO_FALLOFF_FAR_M = 110;
+
+export function buildVariation(uniforms: Nuketown2Uniforms, uv: any): VariationNodes {
+  const macroSample = lutSample(uv.mul(uniforms.macroFrequency));
+  const macro = centred(macroSample, 2);
+  const hue = centred(macroSample, 3);
+  const micro = centred(lutSample(uv.mul(uniforms.microFrequency)), 0)
+    .mul(smoothstep(float(MICRO_FALLOFF_FAR_M), float(MICRO_FALLOFF_NEAR_M), length(positionWorld.sub(cameraPosition))));
+
+  const luminance = float(1)
+    .add(macro.mul(uniforms.macroAlbedo))
+    .add(micro.mul(uniforms.microAlbedo));
+
+  // LUMINANCE-PRESERVING warm/cool. Rec. 709 weights R at 0.2126 and B at
+  // 0.0722, so moving them by +t and -t moves luminance by 0.14t; the green
+  // channel takes that back. At the 0.04 tint ceiling the residual is 0.06 %,
+  // an order below the 1 % the mean-preservation gate allows, and it is
+  // ZERO-MEAN anyway because the field it rides on is.
+  const t = hue.mul(uniforms.tintSpread);
+  const tint = vec3(float(1).add(t), float(1).sub(t.mul(float(0.14))), float(1).sub(t));
+
+  const roughness = macro.mul(uniforms.macroRoughness).add(micro.mul(uniforms.microRoughness));
+
+  return { luminance, tint, macro, micro, roughness };
+}
+
+/**
+ * A shading normal perturbed by the gradient tile - bounded so silhouettes
+ * stay flat.
+ *
+ * SILHOUETTES STAY FLAT BY CONSTRUCTION: nothing here moves a vertex, and the
+ * tilt is clamped to `MAX_NORMAL_DEGREES` before it reaches the frame. What it
+ * does move is the specular lobe and the ambient-occlusion response, which is
+ * the HF-486 gap - GTAO and SSR modulate a surface, and a surface whose normal
+ * is constant has nothing for them to modulate.
+ *
+ * SPACE, and this is the trap `farcrysis-water-surface.ts` documents at
+ * length. `NodeMaterial.setupNormal()` consumes `normalNode` as VIEW space
+ * with no transform, so a world-space or tangent-space vector handed to it
+ * tumbles as the player pitches. The frame is therefore built in LOCAL space
+ * off `normalLocal` - the one basis that is both available inside the normal
+ * sub-build and view-independent - and converted once by
+ * `transformNormalToView`. A local frame is also why a handedness error here
+ * could only ever be a static, spatially-correlated tilt: it cannot tumble.
+ */
+export function buildDetailNormal(uniforms: Nuketown2Uniforms, uv: any): any {
+  const slope = lutGradient(uv.mul(uniforms.microFrequency)).mul(float(1 / gradientLutRms()));
+  const limit = float(Math.tan((MAX_NORMAL_DEGREES * Math.PI) / 180));
+  const tilt = clamp(slope.mul(uniforms.normalStrength), limit.negate(), limit);
+  const n = normalLocal.normalize();
+  // Branchless orthogonal basis: pick the axis the normal is least aligned
+  // with, so the cross product never degenerates on an axis-aligned face -
+  // and half this arena is axis-aligned faces.
+  const away = abs(n.z).lessThan(float(0.999)).select(vec3(0, 0, 1), vec3(1, 0, 0));
+  const t1 = cross(n, away).normalize();
+  const t2 = cross(n, t1);
+  return transformNormalToView(n.add(t1.mul(tilt.x)).add(t2.mul(tilt.y)).normalize());
+}
+
+/**
  * The composed wear response for one spec.
  *
  * `albedoMul` multiplies the family's own base/pattern colour. It is clamped
@@ -109,6 +241,12 @@ export interface WearNodes {
   readonly soilMask: any;
   readonly grain: any;
   readonly scuff: any;
+  /** Luminance-preserving warm/cool multiplier. Families multiply it into their base colour. */
+  readonly tint: any;
+  /** Signed macro (1-4 m) field, for a family that wants to key its own structure off it. */
+  readonly macro: any;
+  /** Signed micro (5-20 cm) field. */
+  readonly micro: any;
 }
 
 
@@ -156,7 +294,10 @@ export function backdropWear(spec: Nuketown2MaterialSpec, uniforms = createNuket
     float(0.03),
     float(1.0),
   );
-  return { albedoMul, roughness, soilMask, grain: float(0), scuff: float(0) };
+  return {
+    albedoMul, roughness, soilMask, grain: float(0), scuff: float(0),
+    tint: vec3(1, 1, 1), macro: field, micro: float(0),
+  };
 }
 
 /**
@@ -208,24 +349,45 @@ export function buildWear(
   // "uniform dirt" CG tell.
   const soilMask = smoothstep(float(-0.15), float(0.75), traffic);
 
+  // The two combat-distance scales, folded into the SAME clamp as the three
+  // authored ones. A second clamp downstream in each family would have let the
+  // composition darken past a bound every part of it individually respected,
+  // and the readability ceiling is a property of the composed surface or it is
+  // nothing.
+  const variation = buildVariation(uniforms, uv);
+
   const albedoMul = clamp(
     float(1)
       .add(grain.mul(uniforms.grainAlbedo))
       .add(scuff.mul(uniforms.scuffAlbedo))
       .add(traffic.mul(uniforms.trafficAlbedo))
+      .add(variation.macro.mul(uniforms.macroAlbedo))
+      .add(variation.micro.mul(uniforms.microAlbedo))
       .sub(soilMask.mul(uniforms.soil)),
     float(1 - MAX_ALBEDO_DARKENING),
     float(1)
       .add(uniforms.grainAlbedo)
       .add(uniforms.scuffAlbedo)
-      .add(uniforms.trafficAlbedo),
+      .add(uniforms.trafficAlbedo)
+      .add(uniforms.macroAlbedo)
+      .add(uniforms.microAlbedo),
   );
 
+  // ROUGHNESS CORRELATED WITH THE WEAR, which is the half of this that costs
+  // nothing and is skipped most often. Dirt collects in the recesses and dirt
+  // is rough; the places traffic has polished are smooth. Uncorrelated
+  // roughness noise reads as a second texture fighting the first - the exact
+  // CG tell the three-scale rule exists to remove - whereas roughness that
+  // agrees with the albedo mask reads as one surface with a history.
+  const polished = smoothstep(float(0.45), float(0.95), scuff.mul(float(0.5)).add(float(0.5)));
   const roughness = clamp(
     uniforms.baseRoughness
       .add(grain.mul(uniforms.grainRoughness))
       .add(scuff.mul(uniforms.scuffRoughness))
-      .add(traffic.mul(uniforms.trafficRoughness)),
+      .add(traffic.mul(uniforms.trafficRoughness))
+      .add(variation.roughness)
+      .add(soilMask.mul(uniforms.soilRoughness))
+      .sub(polished.mul(uniforms.polishRoughness)),
     float(0.03),
     float(1.0),
   );
@@ -238,6 +400,109 @@ export function buildWear(
     soilMask: useBackdrop.select(backdrop.soilMask, soilMask),
     grain: useBackdrop.select(backdrop.grain, grain),
     scuff: useBackdrop.select(backdrop.scuff, scuff),
+    // The backdrop keeps the macro scales: a 3.4 m field subtends 200 px at
+    // the 55 m it is read from, and it is the only term out there that stops
+    // 220 m of ground reading as one value. Only the tint is dropped, because
+    // a hue shift at that range is atmosphere's job, not the material's.
+    tint: useBackdrop.select(vec3(1, 1, 1), variation.tint),
+    macro: variation.macro,
+    micro: useBackdrop.select(float(0), variation.micro),
+  };
+}
+
+/**
+ * ONE channel of the shared tile, centred exactly the way `centred()` centres
+ * it in the node graph, summarised over every texel.
+ *
+ * The gate reads THIS rather than restating the arithmetic, which is the same
+ * discipline `spec.ts` already applies to the wear bands: a measurement that
+ * duplicates the formula it is measuring only ever proves the duplicate.
+ */
+export interface FieldStats {
+  readonly mean: number;
+  readonly sigma: number;
+  readonly min: number;
+  readonly max: number;
+  /** Fraction of texels the +-1 clamp actually bit on. */
+  readonly clipped: number;
+}
+
+const fieldStatsCache = new Map<number, FieldStats>();
+
+export function centredFieldStats(channel: 0 | 1 | 2 | 3): FieldStats {
+  const cached = fieldStatsCache.get(channel);
+  if (cached) return cached;
+  const data = generateNoiseLutData();
+  const mean = noiseLutChannelMeans()[channel]!;
+  const sigma = noiseLutChannelSigmas()[channel]!;
+  let sum = 0;
+  let sumSq = 0;
+  let min = Infinity;
+  let max = -Infinity;
+  let clipped = 0;
+  const texels = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    const raw = (data[i + channel]! / 255 - mean) / (2 * sigma);
+    const v = Math.min(1, Math.max(-1, raw));
+    if (v !== raw) clipped += 1;
+    sum += v;
+    sumSq += v * v;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const m = sum / texels;
+  const stats: FieldStats = {
+    mean: m,
+    sigma: Math.sqrt(sumSq / texels - m * m),
+    min,
+    max,
+    clipped: clipped / texels,
+  };
+  fieldStatsCache.set(channel, stats);
+  return stats;
+}
+
+/** What one spec's macro + micro variation actually does to its albedo. */
+export interface VariationStatistics {
+  /** Mean of the luminance multiplier. 1.0 means the authored base colour survives as the mean. */
+  readonly mean: number;
+  /** RMS luminance variation, as a fraction of the base. This is the "2-6 %" number. */
+  readonly rms: number;
+  /** 95 % peak-to-peak luminance swing, as a fraction of the base. */
+  readonly p95Band: number;
+  /** Worst-case peak-to-peak, both fields at their extremes at once. */
+  readonly worstBand: number;
+  /** Peak warm/cool spread actually reachable. */
+  readonly tintPeak: number;
+  /** Peak shading-normal tilt, in degrees, at the tile's RMS slope. */
+  readonly normalDegrees: number;
+}
+
+/**
+ * MEASURED, not asserted.
+ *
+ * The macro and micro fields are sampled at frequencies that differ by more
+ * than an order of magnitude, so over any surface larger than a macro feature
+ * they are independent: the mean and the variance therefore compose exactly,
+ * and only the worst-case band has to assume they align. That assumption is
+ * the conservative one, which is the right direction for a readability bound.
+ */
+export function variationStatistics(spec: Nuketown2MaterialSpec): VariationStatistics {
+  const v = variationOf(spec);
+  const d = readDistance(spec);
+  const a = scaleResolvable(v.macro.sizeM, d) ? v.macro.albedo : 0;
+  const b = scaleResolvable(v.micro.sizeM, d) ? v.micro.albedo : 0;
+  const macro = centredFieldStats(2);
+  const micro = centredFieldStats(0);
+  const hue = centredFieldStats(3);
+  const rms = Math.sqrt((a * macro.sigma) ** 2 + (b * micro.sigma) ** 2);
+  return {
+    mean: 1 + a * macro.mean + b * micro.mean,
+    rms,
+    p95Band: 2 * 1.96 * rms,
+    worstBand: a * (macro.max - macro.min) + b * (micro.max - micro.min),
+    tintPeak: v.tintSpread * Math.max(Math.abs(hue.min), Math.abs(hue.max)),
+    normalDegrees: (Math.atan(Math.tan((v.normalDegrees * Math.PI) / 180)) * 180) / Math.PI,
   };
 }
 

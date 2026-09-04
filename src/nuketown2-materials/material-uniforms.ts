@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { uniform } from 'three/tsl';
-import { readDistance, scaleResolvable } from './spec';
+import { readDistance, scaleResolvable, variationOf } from './spec';
 import type { Nuketown2MaterialSpec } from './spec';
 
 /**
@@ -33,6 +33,17 @@ export interface Nuketown2Uniforms {
   readonly sidingWainscot: any;
   readonly sidingWainscotColor: any;
   readonly sidingWainscotTop: any;
+  readonly macroFrequency: any;
+  readonly macroAlbedo: any;
+  readonly macroRoughness: any;
+  readonly microFrequency: any;
+  readonly microAlbedo: any;
+  readonly microRoughness: any;
+  readonly tintSpread: any;
+  readonly soilRoughness: any;
+  readonly polishRoughness: any;
+  readonly normalStrength: any;
+  readonly edgeWear: any;
   readonly asphaltMarking: any;
   readonly values: Record<string, unknown>;
 }
@@ -64,6 +75,17 @@ const DEFAULTS: Record<string, UniformValue> = {
   sidingWainscot: 0,
   sidingWainscotColor: new THREE.Color(0xffffff),
   sidingWainscotTop: 2.76,
+  macroFrequency: 1,
+  macroAlbedo: 0,
+  macroRoughness: 0,
+  microFrequency: 1,
+  microAlbedo: 0,
+  microRoughness: 0,
+  tintSpread: 0,
+  soilRoughness: 0,
+  polishRoughness: 0,
+  normalStrength: 0,
+  edgeWear: 0,
   asphaltMarking: 0,
 };
 
@@ -103,6 +125,17 @@ const SHARED_NODES = Object.freeze({
   sidingWainscot: materialUniform('sidingWainscot'),
   sidingWainscotColor: materialUniform('sidingWainscotColor'),
   sidingWainscotTop: materialUniform('sidingWainscotTop'),
+  macroFrequency: materialUniform('macroFrequency'),
+  macroAlbedo: materialUniform('macroAlbedo'),
+  macroRoughness: materialUniform('macroRoughness'),
+  microFrequency: materialUniform('microFrequency'),
+  microAlbedo: materialUniform('microAlbedo'),
+  microRoughness: materialUniform('microRoughness'),
+  tintSpread: materialUniform('tintSpread'),
+  soilRoughness: materialUniform('soilRoughness'),
+  polishRoughness: materialUniform('polishRoughness'),
+  normalStrength: materialUniform('normalStrength'),
+  edgeWear: materialUniform('edgeWear'),
   asphaltMarking: materialUniform('asphaltMarking'),
 });
 
@@ -118,6 +151,7 @@ export function createNuketown2Uniforms(
   material?: THREE.Material,
 ): Nuketown2Uniforms {
   const readM = spec.readDistanceM ?? 0.5;
+  const variation = variationOf(spec);
   const values: Record<string, UniformValue> = {
     baseColor: color(baseSrgb),
     soilColor: color(soilSrgb),
@@ -143,6 +177,20 @@ export function createNuketown2Uniforms(
     sidingWainscot: 0,
     sidingWainscotColor: color(baseSrgb),
     sidingWainscotTop: 2.76,
+    macroFrequency: 1 / variation.macro.sizeM,
+    macroAlbedo: scaleResolvable(variation.macro.sizeM, readM) ? variation.macro.albedo : 0,
+    macroRoughness: variation.macro.roughness,
+    microFrequency: 1 / variation.micro.sizeM,
+    microAlbedo: scaleResolvable(variation.micro.sizeM, readM) ? variation.micro.albedo : 0,
+    microRoughness: variation.micro.roughness,
+    tintSpread: variation.tintSpread,
+    soilRoughness: variation.soilRoughness,
+    polishRoughness: variation.polishRoughness,
+    // Authored as an ANGLE, shipped as a slope. `wear.ts` divides the tile's
+    // gradient by its own RMS, so this is the tangent of the tilt the typical
+    // slope produces - not of the steepest one, which nothing would ever hit.
+    normalStrength: Math.tan((variation.normalDegrees * Math.PI) / 180),
+    edgeWear: variation.edgeWear,
     asphaltMarking: 0,
   };
   if (material) material.userData.nuketown2Uniforms = values;

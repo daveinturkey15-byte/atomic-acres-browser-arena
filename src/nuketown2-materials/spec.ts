@@ -66,6 +66,62 @@ export interface WearScale {
   readonly roughness: number;
 }
 
+/**
+ * The two scales this arena was MISSING, and why they are a separate field
+ * rather than more `WearScale` rows (HF-503, pass 96).
+ *
+ * HF-486 measured the quality bar and found the arena already running nine of
+ * eleven look techniques while showing near-zero albedo variation, which is
+ * what makes GTAO, SSR and bloom invisible: those techniques modulate a
+ * surface, and a surface with nothing on it has nothing to modulate. The wear
+ * engine above was not the cause - it is correct - but look at where its three
+ * scales actually live once the distance falloffs are applied:
+ *
+ *   grain    0.5-1.5 mm  gone by  3 m
+ *   scuff    20 -80  mm  gone by 18 m
+ *   traffic  0.5-3   m   never fades
+ *
+ * A player fighting across this map reads walls at 10-30 m. At 20 m the grain
+ * and the scuff are both at zero and the ONLY surviving term is a single
+ * metre-scale field at a six per cent swing. One field is a gradient, not a
+ * texture - and one gradient across a 12 m wall is exactly the "looks like
+ * basic geometry" reading.
+ *
+ * So two scales are added, and both are chosen to SURVIVE combat distance:
+ *
+ *   macro  1-4 m     a 2-6 % hue-stable luminance field: paint batches, damp,
+ *                    sun, the slow tonal drift no real wall is without
+ *   micro  5-20 cm   the mid-scale mottle that keeps a wall from going flat
+ *                    between the macro field's features; 0.12 m subtends
+ *                    9.7 px at 20 m and 3.2 px at 60 m, so it never fades
+ *                    inside this arena
+ *
+ * Neither is a new pipeline: both are uniforms on the family's existing shared
+ * graph, sampled from the same CPU-generated tile the wear engine already
+ * fetches.
+ */
+export interface VariationScales {
+  /** 1-4 m hue-stable luminance field. */
+  readonly macro: WearScale;
+  /** 5-20 cm mid-scale mottle. */
+  readonly micro: WearScale;
+  /**
+   * Peak luminance-PRESERVING warm/cool spread carried on a field decorrelated
+   * from the macro luminance. Paint, concrete and asphalt all vary in hue batch
+   * to batch; tying that hue shift to the luminance field instead would read as
+   * a coloured stain rather than as material.
+   */
+  readonly tintSpread: number;
+  /** Peak normal tilt, in DEGREES, from the gradient tile. 0 disables it. */
+  readonly normalDegrees: number;
+  /** Peak lightening on a chamfer or arris the family already models. 0 disables it. */
+  readonly edgeWear: number;
+  /** Extra roughness in the soiled recesses. Dirt is rough; the clean field is not. */
+  readonly soilRoughness: number;
+  /** Roughness REMOVED where the scuff field says the surface is worn smooth. */
+  readonly polishRoughness: number;
+}
+
 /** One material's authored physical description. */
 export interface Nuketown2MaterialSpec {
   /** Stable material name. These are read by the coplanar instrument, so they never change casually. */
@@ -115,6 +171,8 @@ export interface Nuketown2MaterialSpec {
   readonly readDistanceM?: number;
   /** Optional coplanar tier, preserved verbatim from the shipped arena. */
   readonly polygonOffset?: number;
+  /** The two combat-distance scales and their correlated terms. */
+  readonly variation?: VariationScales;
 }
 
 /**
@@ -158,7 +216,13 @@ export function readDistance(spec: Nuketown2MaterialSpec): number {
 export function albedoWearStep(spec: Nuketown2MaterialSpec): number {
   const d = readDistance(spec);
   const term = (scale: WearScale): number => (scaleResolvable(scale.sizeM, d) ? scale.albedo : 0);
-  return term(spec.grain) + term(spec.scuff) + term(spec.traffic) + spec.soil;
+  const variation = variationOf(spec);
+  // The macro and micro terms are summed HERE rather than clamped separately in
+  // the families, so the combat-readability ceiling below covers the composed
+  // surface. Adding a second clamp downstream would have let the composition
+  // darken past a bound every part of it individually respected.
+  return term(spec.grain) + term(spec.scuff) + term(spec.traffic) + spec.soil
+    + term(variation.macro) + term(variation.micro);
 }
 
 /**
@@ -175,12 +239,55 @@ export function maxDarkening(spec: Nuketown2MaterialSpec): number {
   return albedoWearStep(spec);
 }
 
+/**
+ * The variation a family gets if it declares none.
+ *
+ * Deliberately at the FLOOR of every band. A family that forgets to author its
+ * own still clears the visible-variation gate, and the gate still fails a
+ * family that authors below the floor - the default is a floor, never a
+ * substitute for authoring.
+ */
+export const DEFAULT_VARIATION: VariationScales = Object.freeze({
+  macro: Object.freeze({ sizeM: 2.4, albedo: 0.020, roughness: 0.03 }),
+  micro: Object.freeze({ sizeM: 0.12, albedo: 0.015, roughness: 0.03 }),
+  tintSpread: 0.010,
+  normalDegrees: 0,
+  edgeWear: 0,
+  soilRoughness: 0.04,
+  polishRoughness: 0.03,
+});
+
+/** The variation a spec declares, or the floor. */
+export function variationOf(spec: Nuketown2MaterialSpec): VariationScales {
+  return spec.variation ?? DEFAULT_VARIATION;
+}
+
 /** The authored bands, in metres. Exported so the gates read them rather than restating them. */
 export const WEAR_BANDS = Object.freeze({
   grain: Object.freeze({ minM: 0.0005, maxM: 0.0015 }),
   scuff: Object.freeze({ minM: 0.020, maxM: 0.080 }),
   traffic: Object.freeze({ minM: 0.5, maxM: 3.0 }),
 });
+
+/** The variation bands, in metres, and the swings allowed at each. */
+export const VARIATION_BANDS = Object.freeze({
+  macro: Object.freeze({ minM: 1.0, maxM: 4.0, minAlbedo: 0.020, maxAlbedo: 0.060 }),
+  micro: Object.freeze({ minM: 0.05, maxM: 0.20, minAlbedo: 0.015, maxAlbedo: 0.050 }),
+});
+
+/**
+ * Ceiling on the normal perturbation, in degrees.
+ *
+ * SILHOUETTES STAY FLAT BY CONSTRUCTION - this perturbs shading only, never a
+ * vertex - but a shading normal that tilts far enough still reads as geometry
+ * that is not there, and in a shooter that is a place a player mis-reads cover.
+ * Eight degrees moves the specular lobe and the ambient occlusion term
+ * measurably and moves nothing else.
+ */
+export const MAX_NORMAL_DEGREES = 8;
+
+/** Ceiling on the warm/cool spread. Above this it stops reading as material and starts reading as a stain. */
+export const MAX_TINT_SPREAD = 0.04;
 
 /** Minimum visible albedo wear step. Below this the wear is a number in a file, not a thing in a frame. */
 export const MIN_ALBEDO_WEAR_STEP = 0.10;
@@ -215,6 +322,31 @@ export function assertSpec(spec: Nuketown2MaterialSpec): Nuketown2MaterialSpec {
   }
   if (!(spec.metalness >= 0 && spec.metalness <= 1)) {
     throw new Error(`${spec.name}: metalness ${spec.metalness} out of range`);
+  }
+  const v = variationOf(spec);
+  const scaleBand = (
+    label: 'macro' | 'micro',
+    scale: WearScale,
+    limits: { minM: number; maxM: number; minAlbedo: number; maxAlbedo: number },
+  ): void => {
+    band(label, scale.sizeM, limits.minM, limits.maxM);
+    if (!(scale.albedo >= limits.minAlbedo && scale.albedo <= limits.maxAlbedo)) {
+      throw new Error(
+        `${spec.name}: ${label} albedo ${scale.albedo} is outside the authored band `
+        + `${limits.minAlbedo}..${limits.maxAlbedo}`,
+      );
+    }
+  };
+  scaleBand('macro', v.macro, VARIATION_BANDS.macro);
+  scaleBand('micro', v.micro, VARIATION_BANDS.micro);
+  if (!(v.tintSpread >= 0 && v.tintSpread <= MAX_TINT_SPREAD)) {
+    throw new Error(`${spec.name}: tint spread ${v.tintSpread} exceeds ${MAX_TINT_SPREAD}`);
+  }
+  if (!(v.normalDegrees >= 0 && v.normalDegrees <= MAX_NORMAL_DEGREES)) {
+    throw new Error(`${spec.name}: normal tilt ${v.normalDegrees} deg exceeds ${MAX_NORMAL_DEGREES} deg`);
+  }
+  if (!(v.edgeWear >= 0 && v.edgeWear <= 0.25)) {
+    throw new Error(`${spec.name}: edge wear ${v.edgeWear} out of range`);
   }
   return spec;
 }
