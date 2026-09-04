@@ -1,5 +1,24 @@
 #!/usr/bin/env node
 /**
+ * Usage header (auto-generated).
+ *
+ * Dumps the node tree of a GLB: walks every scene node via @gltf-transform/core
+ * and prints depth, name, parent, local T, world P, and the mesh AABB.
+ *
+ * Usage: node scripts/qa/dump-glb-nodes.mjs <file.glb> [--json out.json] [--grep a,b,c]
+ *
+ * Arguments (read from process.argv; no environment variables are read):
+ *   <file.glb>      path to the GLB file to dump (required; exit 2 when missing)
+ *   --json <path>   path of the JSON file to write (default: not written)
+ *   --grep <a,b,c>  comma-separated case-insensitive substrings filtering node paths and mesh names (default: none)
+ *
+ * Writes: stdout (node table, always); the --json file (only when the flag is given).
+ *
+ * Exit codes:
+ *   0  success
+ *   2  usage error: missing <file.glb> argument
+ */
+/**
  * Node-only GLB node-tree dumper (HF-396).
  *
  * The pass 84 ledger names `scripts/dump-glb-nodes.js` as the instrument for
