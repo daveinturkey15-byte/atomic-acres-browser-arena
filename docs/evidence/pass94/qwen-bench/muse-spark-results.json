@@ -1,0 +1,155 @@
+{
+  "protocol": {
+    "startedAt": "2026-09-04T14:53:16.337Z",
+    "repo": "C:/Users/david/projects/aa-claude-qwen",
+    "localModel": "meta-contributor/muse-spark-1.3",
+    "referenceModel": "alibaba-token-plan/qwen3.8-flash",
+    "localTrials": "T1-T6 x1 low (single-model override)",
+    "referenceTrials": "skipped (single-model override)",
+    "omp": "omp v18.1.1; --no-skills --no-lsp --no-session; max-time 15m",
+    "localSlotPolicy": "poll every 60s, max 900s before terminal blocked"
+  },
+  "results": [
+    {
+      "task": "T1",
+      "trialId": "T1-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 15241,
+      "exitCode": 0,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.43336.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T1-muse-1.txt",
+      "checks": [
+        true,
+        true,
+        true
+      ],
+      "touchedFiles": [],
+      "outOfScope": [],
+      "pass": true
+    },
+    {
+      "task": "T2",
+      "trialId": "T2-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 15171,
+      "exitCode": 0,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.43336.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.64764.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T2-muse-1.txt",
+      "checks": [
+        true
+      ],
+      "touchedFiles": [
+        "T2/stale-comment.ts"
+      ],
+      "outOfScope": [],
+      "pass": true
+    },
+    {
+      "task": "T3",
+      "trialId": "T3-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 12863,
+      "exitCode": 0,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.42276.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.64764.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T3-muse-1.txt",
+      "checks": [
+        true,
+        true,
+        false
+      ],
+      "touchedFiles": [
+        "T3/clamp-percent.test.ts",
+        "T3/clamp-percent.ts"
+      ],
+      "outOfScope": [],
+      "pass": false
+    },
+    {
+      "task": "T4",
+      "trialId": "T4-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 13108,
+      "exitCode": 0,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.42276.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.52264.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T4-muse-1.txt",
+      "checks": [
+        true
+      ],
+      "touchedFiles": [],
+      "outOfScope": [],
+      "pass": true
+    },
+    {
+      "task": "T5",
+      "trialId": "T5-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 1089,
+      "exitCode": 1,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.52264.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.61072.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T5-muse-1.txt",
+      "checks": [
+        true
+      ],
+      "touchedFiles": [],
+      "outOfScope": [],
+      "pass": false
+    },
+    {
+      "task": "T6",
+      "trialId": "T6-muse-1",
+      "model": "meta-contributor/muse-spark-1.3",
+      "thinking": "low",
+      "wallMs": 12641,
+      "exitCode": 0,
+      "marker": true,
+      "tokens": null,
+      "logFiles": [
+        "C:/Users/david/.omp/logs/omp.2026-09-04.45276.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.52264.log",
+        "C:/Users/david/.omp/logs/omp.2026-09-04.61072.log"
+      ],
+      "outputPath": "C:/Users/david/projects/aa-claude-qwen/artifacts/muse-bench/outputs/T6-muse-1.txt",
+      "checks": [
+        true,
+        true,
+        true,
+        false
+      ],
+      "touchedFiles": [
+        "T6/consumer.ts",
+        "T6/usage.ts"
+      ],
+      "outOfScope": [],
+      "pass": false
+    }
+  ]
+}
