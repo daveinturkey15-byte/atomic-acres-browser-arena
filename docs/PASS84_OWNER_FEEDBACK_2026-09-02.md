@@ -2030,3 +2030,16 @@ assets and textures and lighting need to be tip top, raid can come next"
   vehicle-forge-2, nuketown2-turning-head). OMP credential store emptied again
   at 18:33 (second time); restored from backup, gotcha recorded, fresh backup
   taken; GLM-6 (thin-metal follow-ups) and the critic relaunched.
+
+## HF-491 status — HITL 5 delivered, 2026-09-04 19:00
+
+- Candidate 5 @ 3e2fd273 on http://localhost:4300 (pid 1608). Merged: accuracy
+  a1219fe8, look df9cabdc, layout 04d2ef43, bots 535319e1, minimap 10baf2cc,
+  perf 145d33c5, audio 246b2fd2; garage cream, paint lift removed, headless
+  capture launcher. Gates: tsc 0, coplanar 0/0/0, vitest 6070 pass / 1 known
+  timing flake, cold smoke 1.2 m, stock-boot (first cold run timed out once,
+  then 1.7 m), bot probe 4/4 on 6 points, captures 6/6, minimap capture.
+- Spawn-pose numbers: cand 5 51 fps / p50 18.9 / JS 15.5 ms; 4b 45 / 21.3 /
+  17.5; PASS 93 67–79 / 12.3–13.8. Better than 4b, not PASS 93 → perf lane 3
+  (Luna) then HITL 5b (Luna). Known: every forged vehicle renders cream
+  (pre-existing in 4b; falsifier written for 5b). Gemini 63/100.
