@@ -1,0 +1,16 @@
+{
+  "contract": "blind-ab-v1",
+  "station": "nuketown2-street-centre",
+  "probes": "ECHO",
+  "winner": "right",
+  "confidence": 0.7,
+  "why": "RIGHT has the coach parked on the turning head as in the street reference r1c1; LEFT parks it off-axis.",
+  "leftCloser": [],
+  "rightCloser": [
+    "coach placement r1c1"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "massing"
+  }
+}
