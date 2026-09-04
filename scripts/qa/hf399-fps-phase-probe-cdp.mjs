@@ -129,7 +129,7 @@ try {
   await page.addInitScript(() => {
     const state = {
       hooked: false, draws: 0, triangles: 0, instances: 0, passes: 0, computePasses: 0, dispatches: 0, submits: 0,
-      pipelines: 0, computePipelines: 0, shaderModules: 0, frames: [], longTasks: [], running: false,
+      pipelines: 0, computePipelines: 0, shaderModules: 0, pipelineRecords: [], frames: [], longTasks: [], running: false,
     };
     window.__HF399__ = state;
     const install = () => {
@@ -146,8 +146,14 @@ try {
         if (typeof original !== 'function') return;
         proto[name] = function patched(...args) { sink(args); return original.apply(this, args); };
       };
-      wrapCount(device.prototype, 'createRenderPipeline', () => { state.pipelines += 1; });
-      wrapCount(device.prototype, 'createRenderPipelineAsync', () => { state.pipelines += 1; });
+      wrapCount(device.prototype, 'createRenderPipeline', (args) => {
+        state.pipelines += 1;
+        state.pipelineRecords.push({ atMs: Math.round(performance.now()), label: args[0]?.label ?? null, method: 'sync' });
+      });
+      wrapCount(device.prototype, 'createRenderPipelineAsync', (args) => {
+        state.pipelines += 1;
+        state.pipelineRecords.push({ atMs: Math.round(performance.now()), label: args[0]?.label ?? null, method: 'async' });
+      });
       wrapCount(device.prototype, 'createComputePipeline', () => { state.computePipelines += 1; });
       wrapCount(device.prototype, 'createComputePipelineAsync', () => { state.computePipelines += 1; });
       wrapCount(device.prototype, 'createShaderModule', () => { state.shaderModules += 1; });
@@ -228,6 +234,7 @@ try {
       atMs: performance.now(), draws: state.draws, triangles: state.triangles, instances: state.instances, passes: state.passes,
       computePasses: state.computePasses, dispatches: state.dispatches, submits: state.submits, pipelines: state.pipelines,
       computePipelines: state.computePipelines, shaderModules: state.shaderModules,
+      pipelineRecords: state.pipelineRecords.length,
       heap: performance.memory?.usedJSHeapSize ?? null,
     };
     let last = performance.now();
@@ -272,6 +279,7 @@ try {
         shaderModules: state.shaderModules - mark.shaderModules,
         renderPipelinesTotal: state.pipelines,
         shaderModulesTotal: state.shaderModules,
+        pipelineLabels: state.pipelineRecords.slice(mark.pipelineRecords),
       },
       longTasks: { count: state.longTasks.length, totalMs: state.longTasks.reduce((sum, task) => sum + task.durationMs, 0), maxMs: state.longTasks.reduce((max, task) => Math.max(max, task.durationMs), 0) },
       heap: { startBytes: mark.heap, endBytes: heapNow, deltaMbPerMinute: mark.heap !== null && heapNow !== null ? Number((((heapNow - mark.heap) / 1048576) / (elapsedMs / 60_000)).toFixed(2)) : null },

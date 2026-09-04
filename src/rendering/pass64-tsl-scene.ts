@@ -74,6 +74,7 @@ import {
 } from './screen-space-post-profile';
 import {
   censusTaaColdSessionPrecompileReach,
+  precompileTaaVelocityMrtCandidates,
   type TaaColdSessionPrecompileCensus,
 } from './cold-session-precompile-reach';
 // Lane L — per-arena art direction. The scene assembler owns two of its three
@@ -210,7 +211,7 @@ export type Pass64TslSceneSystems = Readonly<{
    * HDR target/MRT used by the live ScenePass. The caller still owns the final
    * forced RenderPipeline submission and completion fence.
    */
-  precompileExactScenePass(root: THREE.Object3D): Promise<void>;
+  precompileExactScenePass(root: THREE.Object3D, velocityRoot?: THREE.Object3D): Promise<void>;
   applyDefinition(definition: ArenaVisualDefinition): Promise<void>;
   /**
    * Generates (or refreshes) the arena's PMREM environment against whatever sky
@@ -1423,7 +1424,7 @@ export function createPass64TslSceneSystems(
       publishActualGraphics();
     },
     compiledPipelineIds,
-    precompileExactScenePass: async (precompileRoot) => {
+    precompileExactScenePass: async (precompileRoot, velocityRoot) => {
       let attachmentRoot = precompileRoot;
       while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
       if (attachmentRoot !== scene) {
@@ -1446,6 +1447,16 @@ export function createPass64TslSceneSystems(
         // against a single-target render context, after the exact ScenePass
         // build has materialised the velocity-MRT graph and its variants.
         await hdr.precompile(renderer, scene);
+        if (constructedScreenSpace.taaResolve.enabled) {
+          // The scene compile selects only the current LOD/visibility branch
+          // for the menu camera. Compile every census-derived geometry/material
+          // identity from the active arena and the Pass 64 atmosphere root so
+          // the first gameplay camera cannot admit a late velocity-MRT path.
+          await precompileTaaVelocityMrtCandidates(renderer, camera, scene, [
+            velocityRoot ?? precompileRoot,
+            root,
+          ]);
+        }
         taaPrecompileCensus = constructedScreenSpace.taaResolve.enabled
           ? censusTaaColdSessionPrecompileReach(scene)
           : null;

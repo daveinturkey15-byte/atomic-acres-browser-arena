@@ -310,14 +310,32 @@ export class TaaResolveNode extends TempNode<'vec4'> {
     const previousRenderTarget = renderer.getRenderTarget();
     const previousMrt = renderer.getMRT();
     renderer.setMRT(null);
-    renderer.setRenderTarget(this.historyWriteTarget);
     QUAD.material = this.resolveMaterial;
+    const originalReadTarget = this.historyReadTarget;
+    const originalWriteTarget = this.historyWriteTarget;
     try {
-      // The resolve quad is intentionally unattached to the gameplay scene.
-      // Compile it explicitly against the same scene cache while admission is
-      // paused; otherwise the first live TAA update creates its pipeline.
-      await renderer.compileAsync(QUAD, QUAD.camera, targetScene);
+      const compileDirection = async (): Promise<void> => {
+        this.historyTextureNode.value = this.historyReadTarget.texture;
+        this.outputTexture.value = this.historyWriteTarget.texture;
+        renderer.setRenderTarget(this.historyWriteTarget);
+        // The resolve quad is intentionally unattached to the gameplay scene.
+        // Compile it explicitly against the same scene cache while admission
+        // is paused; otherwise the first live TAA update creates its pipeline.
+        await renderer.compileAsync(QUAD, QUAD.camera, targetScene);
+      };
+      // Texture UUIDs participate in r185's binding/pipeline cache identity.
+      // Both ping-pong directions are therefore admission variants, even
+      // though they share one NodeMaterial and one WGSL graph.
+      await compileDirection();
+      const completedTarget = this.historyWriteTarget;
+      this.historyWriteTarget = this.historyReadTarget;
+      this.historyReadTarget = completedTarget;
+      await compileDirection();
     } finally {
+      this.historyReadTarget = originalReadTarget;
+      this.historyWriteTarget = originalWriteTarget;
+      this.historyTextureNode.value = this.historyReadTarget.texture;
+      this.outputTexture.value = this.historyWriteTarget.texture;
       renderer.setRenderTarget(previousRenderTarget);
       renderer.setMRT(previousMrt);
     }

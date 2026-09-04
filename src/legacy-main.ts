@@ -30022,7 +30022,7 @@ async function performArenaSelection(
       const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
       if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
         const scenePassPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene, arena.root));
         assertAdmission();
       }
       requestStaticShadowRefresh(true);
@@ -30099,7 +30099,7 @@ async function performArenaSelection(
         // exact HDR/MRT compile, preventing one monolithic first-coverage CPU
         // task. The forced full draw below remains the authoritative geometry,
         // shadow-caster, post-graph and queue-completion proof.
-        await exactScenePass.precompileExactScenePass(scene);
+        await exactScenePass.precompileExactScenePass(scene, presentationRoot);
         assertAdmission();
         // The asynchronous ScenePass compiler may finish after a tab switch.
         // Reacquire foreground ownership at the forced full-coverage draw.

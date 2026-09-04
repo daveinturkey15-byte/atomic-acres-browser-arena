@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
-import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
+import { TAA_RESOLVE_PIPELINE_ID, type TaaPrecompileRenderer } from './taa-resolve';
 
 /**
  * PASS 2 admission census. These are the complete TAA-on reach items found
@@ -22,6 +22,29 @@ export type TaaColdSessionPrecompileCensus = Readonly<{
   velocityMrtMaterialVariants: readonly string[];
 }>;
 
+type TaaVelocityMrtRenderable = THREE.Mesh | THREE.Line | THREE.Points;
+
+function materialVariant(material: THREE.Material): string {
+  const pipelineId = typeof material.userData.tslPipelineId === 'string'
+    ? material.userData.tslPipelineId
+    : material.type;
+  return `${pipelineId}|${material.name || material.type}|v${material.version}|side=${material.side}`;
+}
+
+function geometryVariant(object: TaaVelocityMrtRenderable): string {
+  const geometry = object.geometry;
+  const attributes = Object.entries(geometry.attributes)
+    .map(([name, attribute]) => `${name}:${attribute.itemSize}:${attribute.normalized ? 1 : 0}`)
+    .sort()
+    .join(',');
+  return `${geometry.uuid}|${attributes}|index=${geometry.index?.count ?? 0}|instanced=${(object as THREE.InstancedMesh).isInstancedMesh ? 1 : 0}`;
+}
+
+function isTaaVelocityMrtRenderable(object: THREE.Object3D): object is TaaVelocityMrtRenderable {
+  const candidate = object as THREE.Object3D & { isMesh?: boolean; isLine?: boolean; isPoints?: boolean };
+  return candidate.isMesh === true || candidate.isLine === true || candidate.isPoints === true;
+}
+
 /**
  * Enumerates the material variants present in the exact scene root that is
  * handed to `compileAsync` with the velocity MRT selected. Names, versions and
@@ -30,18 +53,69 @@ export type TaaColdSessionPrecompileCensus = Readonly<{
  */
 export function enumerateTaaVelocityMrtMaterialVariants(root: THREE.Object3D): readonly string[] {
   const variants = new Set<string>();
-  root.traverseVisible((object) => {
-    const mesh = object as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
+  root.traverse((object) => {
+    if (!isTaaVelocityMrtRenderable(object)) return;
+    const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
     for (const material of materials) {
-      const pipelineId = typeof material.userData.tslPipelineId === 'string'
-        ? material.userData.tslPipelineId
-        : material.type;
-      variants.add(`${pipelineId}|${material.name || material.type}|v${material.version}|side=${material.side}`);
+      if (material.visible) variants.add(materialVariant(material));
     }
   });
   return Object.freeze([...variants].sort());
+}
+
+/**
+ * Returns one representative for every geometry/material identity in the
+ * submitted scene, including non-selected LOD levels and renderables hidden
+ * by the menu camera. The identity is derived from the same material fields
+ * used by the census plus the geometry attribute layout that WebGPU includes
+ * in its render-pipeline key; no arena-specific roster is maintained here.
+ */
+export function enumerateTaaVelocityMrtPrecompileCandidates(
+  roots: readonly THREE.Object3D[],
+): readonly Readonly<{ object: TaaVelocityMrtRenderable; variants: readonly string[] }>[] {
+  const candidates = new Map<string, Readonly<{ object: TaaVelocityMrtRenderable; variants: readonly string[] }>>();
+  for (const root of roots) {
+    root.traverse((object) => {
+      if (!isTaaVelocityMrtRenderable(object)) return;
+      const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
+      const variants = materials.filter((material) => material.visible).map(materialVariant).sort();
+      if (variants.length === 0) return;
+      const key = `${geometryVariant(object)}|materials=${variants.join(',')}`;
+      if (!candidates.has(key)) candidates.set(key, Object.freeze({ object, variants: Object.freeze(variants) }));
+    });
+  }
+  return Object.freeze([...candidates.values()].sort((a, b) => (
+    a.variants.join(',').localeCompare(b.variants.join(',')) || a.object.uuid.localeCompare(b.object.uuid)
+  )));
+}
+
+/**
+ * Compiles the census-derived velocity-MRT renderables against the exact
+ * ScenePass target/MRT. `compileAsync(object, ..., targetScene)` intentionally
+ * bypasses parent visibility, so every LOD level can be admitted without
+ * changing the live scene; each object's own visibility/frustum flags are
+ * restored immediately after its compile.
+ */
+export async function precompileTaaVelocityMrtCandidates(
+  renderer: Pick<TaaPrecompileRenderer, 'compileAsync'>,
+  camera: THREE.Camera,
+  targetScene: THREE.Scene,
+  roots: readonly THREE.Object3D[],
+): Promise<number> {
+  const candidates = enumerateTaaVelocityMrtPrecompileCandidates(roots);
+  for (const { object } of candidates) {
+    const previousVisible = object.visible;
+    const previousFrustumCulled = object.frustumCulled;
+    object.visible = true;
+    object.frustumCulled = false;
+    try {
+      await renderer.compileAsync(object, camera, targetScene);
+    } finally {
+      object.visible = previousVisible;
+      object.frustumCulled = previousFrustumCulled;
+    }
+  }
+  return candidates.length;
 }
 
 export function censusTaaColdSessionPrecompileReach(root: THREE.Object3D): TaaColdSessionPrecompileCensus {
