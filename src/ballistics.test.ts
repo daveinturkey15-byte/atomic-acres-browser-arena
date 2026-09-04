@@ -8,6 +8,7 @@ import {
 import {
   BALLISTIC_MATERIAL_CLASS,
   BALLISTIC_MATERIALS,
+  BALLISTIC_STOP_MINIMUM_THICKNESS_METERS,
   ballisticMaterialClass,
   classifyBallisticMaterial,
   createBallisticSurface,
@@ -372,6 +373,60 @@ describe('HF-467 material classes: the owner statement, made mechanical', () => 
         BALLISTIC_MATERIALS[id].entryCost,
         `${id} is class '${klass}' but costs as much to enter as structural cover (${cheapestCover})`,
       ).toBeLessThan(cheapestCover);
+    }
+  });
+
+  it('charges a stop-class minimum depth so thin concrete stops small arms', () => {
+    const thinConcrete = surface('concrete', 5, 0.12);
+    expect(BALLISTIC_STOP_MINIMUM_THICKNESS_METERS).toBeGreaterThan(0.12);
+    for (const weapon of [WEAPONS.pistol, WEAPONS.carbine]) {
+      const trace = traceBallisticPath(origin, direction, 20, weapon.penetration, [thinConcrete]);
+      expect(trace.reachedDistance, weapon.id).toBe(false);
+      expect(trace.stoppedBy?.material, weapon.id).toBe('concrete');
+    }
+  });
+
+  it('keeps stop-class concrete penetrable by a sniper when its budget clears the floor', () => {
+    // The class comment defines stop as priced structural cover, not absolute
+    // immunity. A sniper may still clear the effective toll, just as the
+    // retained rifle-through-brick wallbang does.
+    expect(BALLISTIC_MATERIAL_CLASS.concrete).toBe('stop');
+    expect(BALLISTIC_MATERIAL_CLASS.brick).toBe('stop');
+    const trace = traceBallisticPath(
+      origin, direction, 20, WEAPONS.sniper.penetration, [surface('concrete', 5, 0.12)],
+    );
+    expect(trace.reachedDistance).toBe(true);
+    expect(trace.stoppedBy).toBeUndefined();
+  });
+
+  it('leaves thick concrete on its original physical thickness charge', () => {
+    const thickness = 0.8;
+    const trace = traceBallisticPath(origin, direction, 20, WEAPONS.carbine.penetration, [
+      surface('concrete', 5, thickness),
+    ]);
+    const expectedStopDepth = Math.min(
+      thickness,
+      (weaponPenetrationEnergy(WEAPONS.carbine.penetration) - BALLISTIC_MATERIALS.concrete.entryCost)
+        / BALLISTIC_MATERIALS.concrete.costPerMeter,
+    );
+    expect(trace.reachedDistance).toBe(false);
+    expect(trace.impacts[0]!.thickness).toBeCloseTo(expectedStopDepth, 10);
+  });
+
+  it('does not apply the stop floor to penetrate, perforate, or shatter materials', () => {
+    const profile = {
+      ...WEAPONS.carbine.penetration,
+      energyFalloffStart: 100,
+      energyFalloffEnd: 200,
+    };
+    for (const material of ['wood', 'thin-metal', 'glass'] as const) {
+      const thickness = 0.12;
+      const trace = traceBallisticPath(origin, direction, 20, profile, [surface(material, 5, thickness)]);
+      const resistance = BALLISTIC_MATERIALS[material];
+      const expectedRemaining = weaponPenetrationEnergy(profile)
+        - resistance.entryCost - resistance.costPerMeter * thickness;
+      expect(trace.reachedDistance, material).toBe(true);
+      expect(trace.remainingEnergy, material).toBeCloseTo(expectedRemaining, 10);
     }
   });
 
