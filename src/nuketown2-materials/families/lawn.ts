@@ -73,7 +73,10 @@ export interface LawnOptions {
   readonly soilSrgb?: number;
 }
 
+let lawnGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (lawnGraph) return lawnGraph;
   const spec = lawnSpec('nuketown2-lawn-shared', 0x496438, 'turf');
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
@@ -92,10 +95,11 @@ function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(isHedge.select(float(0.35), float(1.0))));
   const worn = mix(thinned, earth, bare.mul(isHedge.select(float(0.15), float(0.60))));
   const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(isScrub.select(float(0.8), float(0.35)));
-  return {
+  lawnGraph = {
     colorNode: mix(worn, worn.mul(float(1.42)), straw),
     roughnessNode: clamp(wear.roughness.sub(bare.mul(float(0.06))).sub(straw.mul(float(0.04))), float(0.60), float(1.0)),
   };
+  return lawnGraph;
 }
 
 export function createLawnMaterial(
@@ -115,7 +119,7 @@ export function createLawnMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb, options.soilSrgb ?? 0x6b5741);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, options.soilSrgb ?? 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'lawnVariant', variant === 'turf' ? 0 : variant === 'scrub' ? 1 : 2);
   const shared = sharedLawnGraph(uniforms);
   mat.colorNode = shared.colorNode;

@@ -48,7 +48,10 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
   });
 }
 
+let timberGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (timberGraph) return timberGraph;
   const spec = timberSpec('nuketown2-timber-shared', 0x673b24, 'fence');
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
@@ -76,10 +79,11 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
   const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
-  return {
+  timberGraph = {
     colorNode: mix(footed, linearSwatch(0x1a120c), gap),
     roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
   };
+  return timberGraph;
 }
 
 export function createTimberMaterial(
@@ -93,7 +97,7 @@ export function createTimberMaterial(
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'timberVariant', variant === 'fence' ? 0 : variant === 'deck' ? 1 : 2);
   const shared = sharedTimberGraph(uniforms);
   mat.colorNode = shared.colorNode;

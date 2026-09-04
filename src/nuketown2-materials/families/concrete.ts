@@ -69,7 +69,10 @@ export interface ConcreteOptions {
   readonly dampFootY?: number;
 }
 
+let concreteGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (concreteGraph) return concreteGraph;
   const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
@@ -105,7 +108,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);
-  return {
+  concreteGraph = {
     colorNode: mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7))),
     roughnessNode: clamp(
       wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
@@ -113,6 +116,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
       float(1.0),
     ),
   };
+  return concreteGraph;
 }
 
 export function createConcreteMaterial(
@@ -132,7 +136,7 @@ export function createConcreteMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'concreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
   setNuketown2FamilyUniform(uniforms, 'concreteFootY', options.dampFootY ?? 0.0);
   const shared = sharedConcreteGraph(uniforms);

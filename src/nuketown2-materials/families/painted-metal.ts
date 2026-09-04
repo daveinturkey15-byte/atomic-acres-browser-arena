@@ -56,7 +56,10 @@ export interface PaintedMetalOptions {
   readonly metalness?: number;
 }
 
+let paintedMetalGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (paintedMetalGraph) return paintedMetalGraph;
   const spec = paintedMetalSpec('nuketown2-painted-metal-shared', 0xaebdc1);
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
@@ -78,10 +81,11 @@ function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any;
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
   const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
-  return {
+  paintedMetalGraph = {
     colorNode: mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4))),
     roughnessNode: clamp(wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))), float(0.15), float(1.0)),
   };
+  return paintedMetalGraph;
 }
 
 export function createPaintedMetalMaterial(
@@ -102,7 +106,7 @@ export function createPaintedMetalMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'paintedPanelled', options.panelled === true ? 1 : 0);
   const shared = sharedPaintedMetalGraph(uniforms);
   mat.colorNode = shared.colorNode;

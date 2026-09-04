@@ -15,7 +15,6 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { materialReference } from 'three/tsl';
 import { lutFbm } from './nuketown2-materials/noise-lut';
 
 const {
@@ -33,10 +32,22 @@ const {
  * two bodies bind one node topology instead of compiling one pipeline each.
  */
 const VEHICLE_PAINT_UNIFORMS = Object.freeze({
-  baseColor: materialReference('nuketown2VehiclePaintBaseColor', 'color'),
-  roughness: materialReference('nuketown2VehiclePaintRoughness', 'float'),
-  flakeFrequency: materialReference('nuketown2VehiclePaintFlakeFrequency', 'float'),
-  flakeStrength: materialReference('nuketown2VehiclePaintFlakeStrength', 'float'),
+  baseColor: (TSL.uniform(new THREE.Color(0.82, 0.76, 0.64)) as any).onObjectUpdate((frame: any) => {
+    frame.material?.userData?.nuketown2VehiclePaintUniforms &&
+      VEHICLE_PAINT_UNIFORMS.baseColor.value.copy(frame.material.userData.nuketown2VehiclePaintUniforms.baseColor);
+  }),
+  roughness: (TSL.uniform(0.32) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.roughness.value = values.roughness;
+  }),
+  flakeFrequency: (TSL.uniform(24) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.flakeFrequency.value = values.flakeFrequency;
+  }),
+  flakeStrength: (TSL.uniform(0.02) as any).onObjectUpdate((frame: any) => {
+    const values = frame.material?.userData?.nuketown2VehiclePaintUniforms;
+    if (values) VEHICLE_PAINT_UNIFORMS.flakeStrength.value = values.flakeStrength;
+  }),
 });
 
 function bindVehiclePaintUniforms(
@@ -46,12 +57,15 @@ function bindVehiclePaintUniforms(
   flakeFrequency: number,
   flakeStrength: number,
 ): void {
-  const slots = material as unknown as Record<string, unknown>;
-  slots.nuketown2VehiclePaintBaseColor = color;
-  slots.nuketown2VehiclePaintRoughness = roughness;
-  slots.nuketown2VehiclePaintFlakeFrequency = flakeFrequency;
-  slots.nuketown2VehiclePaintFlakeStrength = flakeStrength;
+  material.userData.nuketown2VehiclePaintUniforms = {
+    baseColor: color,
+    roughness,
+    flakeFrequency,
+    flakeStrength,
+  };
 }
+
+let sharedVehiclePaintGraph: { colorNode: any; roughnessNode: any } | null = null;
 
 function createSharedVehiclePaintMaterial(
   name: string,
@@ -65,13 +79,19 @@ function createSharedVehiclePaintMaterial(
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
   bindVehiclePaintUniforms(mat, color, roughness, flakeFrequency, flakeStrength);
-  const p = positionWorld;
-  const flake = lutFbm(vec2(
-    p.x.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
-    p.y.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
-  ), 1).sub(float(0.5)).mul(VEHICLE_PAINT_UNIFORMS.flakeStrength);
-  mat.colorNode = (VEHICLE_PAINT_UNIFORMS.baseColor as any).add(flake);
-  mat.roughnessNode = VEHICLE_PAINT_UNIFORMS.roughness;
+  if (!sharedVehiclePaintGraph) {
+    const p = positionWorld;
+    const flake = lutFbm(vec2(
+      p.x.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
+      p.y.mul(VEHICLE_PAINT_UNIFORMS.flakeFrequency),
+    ), 1).sub(float(0.5)).mul(VEHICLE_PAINT_UNIFORMS.flakeStrength);
+    sharedVehiclePaintGraph = {
+      colorNode: (VEHICLE_PAINT_UNIFORMS.baseColor as any).add(flake),
+      roughnessNode: VEHICLE_PAINT_UNIFORMS.roughness,
+    };
+  }
+  mat.colorNode = sharedVehiclePaintGraph.colorNode;
+  mat.roughnessNode = sharedVehiclePaintGraph.roughnessNode;
   return mat;
 }
 

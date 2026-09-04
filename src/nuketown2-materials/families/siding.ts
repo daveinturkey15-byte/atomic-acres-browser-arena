@@ -58,7 +58,10 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
   });
 }
 
+let sidingGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (sidingGraph) return sidingGraph;
   const spec = sidingSpec('nuketown2-siding-shared', 0x46809f);
   const p = positionWorld;
   const uv = wallUv();
@@ -87,10 +90,11 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash));
   const shadowed = mix(painted, painted.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
   const lit = mix(shadowed, shadowed.mul(float(1.12)), topCatch.mul(float(0.6)));
-  return {
+  sidingGraph = {
     colorNode: mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5))),
     roughnessNode: wear.roughness.add(dripShadow.mul(float(0.06))).add(splash.mul(float(0.10))).sub(sunFade.mul(float(0.30))),
   };
+  return sidingGraph;
 }
 
 /**
@@ -111,7 +115,7 @@ export function createSidingMaterial(
   // evaluates the node graph still gets the right house.
   mat.color.setHex(baseSrgb);
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   const sharedWainscotHex = options.wainscotSrgb;
   const breakY = options.wainscotTopY ?? 2.76;
   const snapped = Math.round(breakY / SIDING_COURSE_M) * SIDING_COURSE_M;

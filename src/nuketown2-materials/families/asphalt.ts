@@ -49,7 +49,10 @@ export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialS
   });
 }
 
+let asphaltGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (asphaltGraph) return asphaltGraph;
   const spec = asphaltSpec('nuketown2-asphalt-shared');
   const p = positionWorld;
   const uv = groundUv();
@@ -80,10 +83,11 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   );
   const markingRoughness = wear.roughness.add(markingWorn.mul(float(0.08)));
   const isMarking = (uniforms.asphaltMarking as any).greaterThan(float(0.5));
-  return {
+  asphaltGraph = {
     colorNode: isMarking.select(markingColor, roadColor),
     roughnessNode: isMarking.select(markingRoughness, roadRoughness),
   };
+  return asphaltGraph;
 }
 
 export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStandardNodeMaterial {
@@ -98,7 +102,7 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
   mat.polygonOffsetFactor = -1;
   mat.polygonOffsetUnits = -1;
 
-  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 0);
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;
@@ -139,7 +143,7 @@ export function createMarkingMaterial(name = 'nuketown2-trim-decal'): MeshStanda
   mat.polygonOffsetFactor = -2;
   mat.polygonOffsetUnits = -2;
 
-  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 1);
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;

@@ -57,7 +57,10 @@ export interface GlassOptions {
   readonly transparent?: boolean;
 }
 
+let glassGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedGlassGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (glassGraph) return glassGraph;
   const spec = glassSpec('nuketown2-glass-shared', 0x2b3d47);
   const uv = boxUv();
   const wear = buildWear(spec, uv, undefined, uniforms);
@@ -68,10 +71,11 @@ function sharedGlassGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughn
   ).mul(smoothstep(float(0.15), float(0.85), wear.soilMask));
   const grime = max(streak, wear.soilMask.mul(float(0.55)));
   const body = uniforms.baseColor.mul(wear.albedoMul);
-  return {
+  glassGraph = {
     colorNode: mix(body, body.mul(float(1.55)), grime.mul(float(0.35))),
     roughnessNode: clamp(wear.roughness.add(grime.mul(float(0.13))), float(0.03), float(0.35)),
   };
+  return glassGraph;
 }
 
 export function createGlassMaterial(
@@ -91,7 +95,7 @@ export function createGlassMaterial(
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   if (!transparent) {
     const shared = sharedGlassGraph(uniforms);
     mat.colorNode = shared.colorNode;

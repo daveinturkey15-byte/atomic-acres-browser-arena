@@ -45,7 +45,10 @@ export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpe
   });
 }
 
+let roofGraph: { colorNode: any; roughnessNode: any } | null = null;
+
 function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+  if (roofGraph) return roofGraph;
   const spec = roofSpec('nuketown2-roof-shared');
   const p = positionWorld;
   const wear = buildWear(spec, vec2(p.x, p.z), undefined, uniforms);
@@ -64,10 +67,11 @@ function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const streakField = fract(p.x.mul(float(1.7)).add(wear.soilMask.mul(float(0.4))));
   const streak = smoothstep(float(0.58), float(0.86), streakField).mul(wear.soilMask);
   const shaded = mix(withLoss, withLoss.mul(float(0.30)), max(buttShadow, keyway));
-  return {
+  roofGraph = {
     colorNode: mix(shaded, shaded.mul(float(0.74)), streak.mul(float(0.5))),
     roughnessNode: wear.roughness.add(granuleLoss.mul(float(-0.12))).sub(buttShadow.mul(float(0.05))),
   };
+  return roofGraph;
 }
 
 export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStandardNodeMaterial {
@@ -77,7 +81,7 @@ export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStanda
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(spec.baseSrgb);
 
-  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb);
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   const shared = sharedRoofGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
