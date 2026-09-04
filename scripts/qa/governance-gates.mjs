@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 /**
+ * Usage header:
+ * - Runs the six read-only governance audits (weapon schema, weapon role distance, particle catalog, sound event inventory, surface impact registry, unreachable modules) directly against the shipped modules and reports each as pass/fail.
+ * Usage: node scripts/qa/governance-gates.mjs   (equivalently: npx tsx scripts/qa/governance-gates.mjs; CI invokes it via `npm run qa:governance`)
+ * Flags/env: none read — the script accepts no arguments, parses no --flags, and consults no process.env variables.
+ * Writes: nothing to disk (no files, no directories); emits one `[GOVERNANCE-GATE] check=<id> result=... key=value` line per check plus a summary line on stdout, and per-check failure details on stderr.
+ * Exit codes: 0 = all six checks pass; 1 = one or more checks fail (set via process.exitCode = 1; the file contains no other process.exit calls).
+ */
+/**
  * governance-gates.mjs — consolidated CI gate for the six orphaned governance
  * and audit layers that were previously enforced only inside their own vitest
  * files. Runs every audit directly against the shipped modules so a silent
