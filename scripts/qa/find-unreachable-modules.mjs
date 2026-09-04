@@ -1,4 +1,17 @@
 #!/usr/bin/env node
+// Reachability sweep over src/ that reports modules production code can no longer
+// reach, walking the real import graph from the index.html entry points.
+//
+// Usage: node scripts/qa/find-unreachable-modules.mjs [--json]
+// --json            (default: off) emit a machine-readable JSON report instead of
+//                   the human-readable tables
+// (no environment variables are read; the sweep root defaults to the current
+// working directory)
+//
+// Writes: nothing (the report goes to stdout).
+// Exit codes: 0 = pass (no unreachable modules and no test-only modules beyond the
+//             allowlist); 1 = fail (any unreachable or unallowlisted test-only
+//             module found).
 // Reachability sweep over src/.
 //
 // Walks the real import graph from the app entry points and reports which
