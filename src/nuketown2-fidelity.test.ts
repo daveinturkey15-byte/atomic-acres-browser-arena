@@ -3041,11 +3041,10 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     // ratchet rather than the old rectangular-head population floor.
     //
     // GEOMETRY-2 MERGE: re-measured 8910 -> 8303 when the turning-head lane met
-    // the candidate line. `keepOuts` is `builder.colliders.slice(...)` — every
-    // collider the arena authors after the ground — so the candidate's hedges,
-    // verge/alley planters and avenue bodies are keep-outs on the same tick they
-    // are built, and 607 blades stop growing through them. The direction is the
-    // one this gate wants: MORE paving and planting covered, never less.
+    // the candidate line. The blade loop uses WORLD_BAYS for paving exclusion;
+    // the field builder's keep-out reconstruction filters the floor-slab band,
+    // so hedges, verge/alley planters and avenue bodies stop blades as authored.
+    // The direction is the one this gate wants: MORE paving and planting covered.
     // VERIFIED mechanically that no lawn REGION was lost — the field still emits
     // the same eleven instanced regions (0,1,2,3,5,6,8,10,11,14,15) it emitted at
     // `3aab05ac`, so the fall is keep-out coverage inside unchanged regions and
