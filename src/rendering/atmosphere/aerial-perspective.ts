@@ -66,7 +66,7 @@
 
 import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
-import { Fn, float, max, min, nodeObject, normalize, screenUV, uniform, vec3, vec4 } from 'three/tsl';
+import { Fn, float, max, min, nodeObject, normalize, screenUV, smoothstep, uniform, vec3, vec4 } from 'three/tsl';
 import type { QualityTier } from '../../graphics-settings-registry';
 
 /** Stage name, matching `LINEAR_SOURCE_STAGE_ORDER`. */
@@ -89,6 +89,20 @@ export const AERIAL_PERSPECTIVE_STAGE = 'aerial-perspective-inscatter-add';
  * to the fog colour at 90 m, and that is a MULTIPLY, which destroys the
  * difference as well as the ratio. This stage is strictly gentler than the fog
  * it sits beside, and it is the one of the two that can be swept.
+ *
+ * HOW IT IS HELD, AND WHERE THAT CHANGED. The first cut of this module held the
+ * ceiling by keeping every tier's WORST case (a white sky, a white sun, the
+ * view straight down the sun vector) under it. That passed every assertion and
+ * moved the frame by 1.0-1.4 mean sRGB codes across the entire PASS 94 capture
+ * set - measured, not estimated. Bounding only the pathological case had
+ * squeezed the representative one to nothing.
+ *
+ * So the ceiling is now held where the baked-indirect probe holds its own: by a
+ * per-channel `min` in the shipped expression. Past roughly the arena's longest
+ * sightline, looking into the sun, the curve DOES want more than the ceiling
+ * and the clamp is what stops it. The two sweeps that remain are the ones a
+ * clamp cannot make true - the duel envelope, and a visibility FLOOR that makes
+ * regressing back to invisible a build failure.
  */
 export const AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER = 0.12;
 
@@ -136,6 +150,29 @@ export type AerialPerspectiveTuning = Readonly<{
   mieAsymmetry: number;
   /** Overall gain. The one knob a tier moves most. */
   gain: number;
+  /**
+   * THE DUEL ENVELOPE, MADE STRUCTURAL.
+   *
+   * Inscatter is faded in with a smoothstep between these two distances, so it
+   * is EXACTLY ZERO inside `nearFadeStartM` and only reaches full strength past
+   * `nearFadeEndM`.
+   *
+   * This exists because the first cut of this module tried to protect a duel
+   * arithmetically, by keeping the whole curve small enough that its 25 m value
+   * was inside the engagement bound. That failed twice over. `1 - exp(-beta d)`
+   * is concave, so its 25 m share can never fall below the linear share
+   * 25/90 = 0.278 whatever beta is — which means a curve strong enough to be
+   * VISIBLE at 90 m is arithmetically forced to put ~28% of that into a duel.
+   * The measured result was the effect being invisible everywhere: 1-2 sRGB
+   * codes of change across the whole capture set.
+   *
+   * An explicit gate breaks the coupling. It is also the honest physics for
+   * what this module is: a FAR-FIELD wash. Air over the first fifteen metres
+   * genuinely contributes almost nothing, and pretending otherwise was what
+   * forced the whole curve down.
+   */
+  nearFadeStartM: number;
+  nearFadeEndM: number;
 }>;
 
 const TIER_TUNING: Readonly<Record<QualityTier, AerialPerspectiveTuning>> = Object.freeze({
@@ -147,7 +184,9 @@ const TIER_TUNING: Readonly<Record<QualityTier, AerialPerspectiveTuning>> = Obje
     rayleighWeight: 0.62,
     mieWeight: 0.38,
     mieAsymmetry: 0.55,
-    gain: 0.07,
+    gain: 0.32,
+    nearFadeStartM: 18,
+    nearFadeEndM: 45,
   }),
   high: Object.freeze({
     betaPerMetre: 0.0038,
@@ -155,7 +194,9 @@ const TIER_TUNING: Readonly<Record<QualityTier, AerialPerspectiveTuning>> = Obje
     rayleighWeight: 0.58,
     mieWeight: 0.42,
     mieAsymmetry: 0.62,
-    gain: 0.1,
+    gain: 0.34,
+    nearFadeStartM: 18,
+    nearFadeEndM: 45,
   }),
   ultra: Object.freeze({
     betaPerMetre: 0.0046,
@@ -163,7 +204,9 @@ const TIER_TUNING: Readonly<Record<QualityTier, AerialPerspectiveTuning>> = Obje
     rayleighWeight: 0.55,
     mieWeight: 0.45,
     mieAsymmetry: 0.68,
-    gain: 0.114,
+    gain: 0.35,
+    nearFadeStartM: 18,
+    nearFadeEndM: 45,
   }),
 });
 
@@ -183,6 +226,8 @@ export const AERIAL_PERSPECTIVE_OFF: AerialPerspectiveTuning = Object.freeze({
   mieWeight: 0,
   mieAsymmetry: 0,
   gain: 0,
+  nearFadeStartM: 0,
+  nearFadeEndM: 1,
 });
 
 export function resolveAerialPerspectiveTuning(tier: QualityTier): AerialPerspectiveTuning {
@@ -199,6 +244,39 @@ export function henyeyGreensteinPhase(cosTheta: number, g: number): number {
   const g2 = g * g;
   const at = (c: number): number => (1 - g2) / Math.pow(Math.max(1e-3, 1 + g2 - 2 * g * c), 1.5);
   return at(cosTheta) / at(0);
+}
+
+/**
+ * THE REPRESENTATIVE SKY AND SUN the visibility floor is stated against: the
+ * Nuke Town Rebuild's authored golden-hour rig, normalised. Bounding only the
+ * WORST case (a white sky and a white sun with the view straight down the sun
+ * vector) is what produced a first cut that satisfied every assertion and
+ * changed the frame by one sRGB code, so the module now bounds from both ends:
+ * the worst case may not exceed the ceiling, and the representative case may
+ * not fall below the floor.
+ */
+export const REPRESENTATIVE_SKY: readonly [number, number, number] =
+  Object.freeze([0.55, 0.62, 0.72]);
+export const REPRESENTATIVE_SUN: readonly [number, number, number] =
+  Object.freeze([1, 0.94, 0.81]);
+
+/**
+ * The floor, in linear scene-referred units, on the representative blue channel
+ * at the reference distance. Against a 0.18 middle grey this is a 22% lift on
+ * the far field, which is the difference between depth you can see and a
+ * measurement you can only take.
+ */
+export const AERIAL_PERSPECTIVE_MINIMUM_FAR_INSCATTER = 0.04;
+
+/** Hermite smoothstep, matching TSL's `smoothstep` exactly. */
+export function smoothstep01(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** The duel-envelope gate: zero inside the near fade, one beyond it. */
+export function nearFieldGate(distanceM: number, tuning: AerialPerspectiveTuning): number {
+  return smoothstep01(tuning.nearFadeStartM, tuning.nearFadeEndM, distanceM);
 }
 
 /**
@@ -235,7 +313,7 @@ export function aerialPerspectiveInscatter(
   tuning: AerialPerspectiveTuning,
 ): readonly [number, number, number] {
   const tau = opticalDepth(distanceM, heightM, tuning);
-  const scattered = 1 - Math.exp(-tau);
+  const scattered = (1 - Math.exp(-tau)) * nearFieldGate(distanceM, tuning);
   const rayleigh = tuning.rayleighWeight * rayleighPhase(cosTheta);
   const mie = tuning.mieWeight * Math.min(4, henyeyGreensteinPhase(cosTheta, tuning.mieAsymmetry));
   const out: [number, number, number] = [0, 0, 0];
@@ -258,31 +336,64 @@ export function aerialPerspectiveInscatter(
  */
 export function worstCaseInscatter(distanceM: number, tuning: AerialPerspectiveTuning): number {
   const tau = opticalDepth(distanceM, 0, tuning);
-  const scattered = 1 - Math.exp(-tau);
+  const scattered = (1 - Math.exp(-tau)) * nearFieldGate(distanceM, tuning);
   const rayleigh = tuning.rayleighWeight * rayleighPhase(1);
   const mie = tuning.mieWeight * Math.min(4, henyeyGreensteinPhase(1, tuning.mieAsymmetry));
   // Blue is the worst channel: its Rayleigh ratio is 1.0 where red's is 0.2.
-  return tuning.gain * scattered * (1 * rayleigh + 1 * mie);
+  // UNCLAMPED on purpose: this is what the curve WANTS to deliver, and the
+  // sweep below uses it to prove the duel envelope holds without leaning on the
+  // clamp. Far out, the clamp is what holds the ceiling, and it says so.
+  return tuning.gain * scattered * (rayleigh + mie);
 }
 
 /**
- * Swept at import time. A tier that can wash a duel is a build error, not a
- * tuning note.
+ * Representative far-field delivery on the blue channel: what the frame
+ * actually receives at the reference distance under the arena's own sky, with
+ * the view across the sun rather than down it.
+ */
+export function representativeFarInscatter(tuning: AerialPerspectiveTuning): number {
+  return aerialPerspectiveInscatter(
+    AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M,
+    0,
+    0,
+    REPRESENTATIVE_SKY,
+    REPRESENTATIVE_SUN,
+    tuning,
+  )[2];
+}
+
+/**
+ * Swept at import time, from BOTH ends.
+ *
+ * A tuning that can wash a duel is a build error. So is a tuning that cannot be
+ * seen — that is not a stylistic opinion, it is the exact failure this module
+ * shipped on its first cut, measured at 1.0-1.4 mean sRGB codes of change
+ * across the whole PASS 94 capture set. A gate that only bounds the top lets an
+ * effect regress to nothing while every test stays green, which is the same
+ * class of bug as the ambient particles that were shipped at 1.2 px.
+ *
+ * The duel bound is proved against the UNCLAMPED worst case, so it does not
+ * lean on the shader clamp. Far out, the clamp IS the mechanism, and it is
+ * stated as such rather than dressed up as a tuning property.
  */
 export function assertAerialPerspectiveCombatSafety(tuning: AerialPerspectiveTuning): void {
-  const far = worstCaseInscatter(AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M, tuning);
-  if (far > AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER) {
-    throw new Error(
-      `HF-481 aerial perspective inscatter ${far.toFixed(4)} at ` +
-        `${AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M} m exceeds ${AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER}`,
-    );
-  }
   const near = worstCaseInscatter(AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M, tuning);
   if (near > AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER) {
     throw new Error(
       `HF-481 aerial perspective inscatter ${near.toFixed(4)} at ` +
         `${AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M} m exceeds ` +
         `${AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER}`,
+    );
+  }
+  // The zero tuning is the compatibility route and is exempt from the floor:
+  // there is no linear composite there for anything to be visible in.
+  if (tuning.gain <= 0) return;
+  const far = representativeFarInscatter(tuning);
+  if (far < AERIAL_PERSPECTIVE_MINIMUM_FAR_INSCATTER) {
+    throw new Error(
+      `HF-481 aerial perspective delivers only ${far.toFixed(4)} at ` +
+        `${AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M} m, below the visibility floor ` +
+        `${AERIAL_PERSPECTIVE_MINIMUM_FAR_INSCATTER}`,
     );
   }
 }
@@ -341,6 +452,8 @@ export function buildAerialPerspectiveNode(
   const aspectRatio = uniform(16 / 9);
 
   const beta = float(tuning.betaPerMetre);
+  const nearFadeStart = float(tuning.nearFadeStartM);
+  const nearFadeEnd = float(tuning.nearFadeEndM);
   const scaleHeight = float(tuning.scaleHeightM);
   const g = tuning.mieAsymmetry;
   const g2 = g * g;
@@ -367,7 +480,11 @@ export function buildAerialPerspectiveNode(
     // more haze than the street it is under.
     const height = max(float(0), worldPosition.y.sub(cameraHeight));
     const tau = beta.mul(viewDepth).mul(height.div(scaleHeight).negate().exp());
-    const scattered = float(1).sub(tau.negate().exp());
+    // The duel-envelope gate. `smoothstep` here is the same Hermite curve
+    // `smoothstep01` evaluates on the CPU, so the swept bound and the shipped
+    // pixel are the same function and not two descriptions of one intent.
+    const gate = smoothstep(nearFadeStart, nearFadeEnd, viewDepth);
+    const scattered = float(1).sub(tau.negate().exp()).mul(gate);
 
     // cos(theta) between the view ray and the direction TO the sun. The ray is
     // the reconstructed view position rotated into world space, which is what

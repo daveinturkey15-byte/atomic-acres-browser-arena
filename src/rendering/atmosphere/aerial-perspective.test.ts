@@ -11,6 +11,7 @@ import {
   AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M,
   AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER,
   AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER,
+  AERIAL_PERSPECTIVE_MINIMUM_FAR_INSCATTER,
   AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M,
   AERIAL_PERSPECTIVE_STAGE,
   AERIAL_PERSPECTIVE_TIERS,
@@ -18,7 +19,9 @@ import {
   aerialPerspectiveInscatter,
   assertAerialPerspectiveCombatSafety,
   henyeyGreensteinPhase,
+  nearFieldGate,
   opticalDepth,
+  representativeFarInscatter,
   rayleighPhase,
   resolveAerialPerspectiveTuning,
   worstCaseInscatter,
@@ -55,16 +58,73 @@ describe('aerial perspective — the combat bound', () => {
     expect(boundShare).toBeGreaterThanOrEqual(linearShare);
   });
 
-  it('sweeps every shipped tier inside both bounds', () => {
+  it('sweeps every shipped tier from both ends', () => {
     for (const tier of AERIAL_PERSPECTIVE_TIERS) {
       const tuning = resolveAerialPerspectiveTuning(tier);
       expect(() => assertAerialPerspectiveCombatSafety(tuning)).not.toThrow();
-      expect(worstCaseInscatter(AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M, tuning)).toBeLessThanOrEqual(
-        AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER,
-      );
+      // The duel bound, proved against the UNCLAMPED want, so it does not lean
+      // on the shader clamp.
       expect(
         worstCaseInscatter(AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M, tuning),
+        `${tier} at ${AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M} m`,
       ).toBeLessThanOrEqual(AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER);
+      // And the floor, so the effect cannot regress to the invisible thing the
+      // first cut of this module actually shipped.
+      expect(representativeFarInscatter(tuning), `${tier} far field`)
+        .toBeGreaterThanOrEqual(AERIAL_PERSPECTIVE_MINIMUM_FAR_INSCATTER);
+    }
+  });
+
+  it('holds the ceiling by CLAMP once the curve wants more than the ceiling', () => {
+    // This is the honest statement of the design. Past roughly the arena's
+    // longest sightline, looking straight down the sun vector, every tier WANTS
+    // more than the ceiling - that is what a strong enough far-field wash costs.
+    // The ceiling is therefore held by the per-channel `min` in the shipped
+    // expression, exactly as the baked-indirect probe holds its own, and the
+    // sweep says so rather than pretending the tuning never reaches it.
+    const ultra = resolveAerialPerspectiveTuning('ultra');
+    expect(worstCaseInscatter(AERIAL_PERSPECTIVE_REFERENCE_DISTANCE_M, ultra))
+      .toBeGreaterThan(AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER);
+    for (const distance of [30, 60, 90, 150, 400]) {
+      const rgb = aerialPerspectiveInscatter(distance, 0, 1, WHITE, WHITE, ultra);
+      for (const channel of rgb) {
+        expect(channel, `ultra at ${distance} m`)
+          .toBeLessThanOrEqual(AERIAL_PERSPECTIVE_MAXIMUM_INSCATTER + 1e-9);
+      }
+    }
+  });
+
+  it('is exactly zero inside the duel envelope, by gate rather than by luck', () => {
+    for (const tier of AERIAL_PERSPECTIVE_TIERS) {
+      const tuning = resolveAerialPerspectiveTuning(tier);
+      expect(nearFieldGate(tuning.nearFadeStartM, tuning)).toBe(0);
+      expect(nearFieldGate(tuning.nearFadeStartM - 5, tuning)).toBe(0);
+      expect(nearFieldGate(tuning.nearFadeEndM, tuning)).toBe(1);
+      // A close-quarters exchange receives literally nothing.
+      const pointBlank = aerialPerspectiveInscatter(12, 0, 1, WHITE, WHITE, tuning);
+      expect(Math.max(...pointBlank)).toBe(0);
+    }
+  });
+
+  it('could not have met the duel bound arithmetically, which is why the gate exists', () => {
+    // 1 - exp(-b d) is concave, so its 25 m value is at least the linear share
+    // 25/90 of its 90 m value for ANY beta. A curve delivering the visibility
+    // floor at 90 m would therefore be forced to put at least 27.8% of it into
+    // a duel if there were no gate - which is more than the whole engagement
+    // allowance. The gate is not a tuning convenience; it is the only structure
+    // that lets this module be visible and duel-safe at the same time.
+    for (const tier of AERIAL_PERSPECTIVE_TIERS) {
+      const tuning = resolveAerialPerspectiveTuning(tier);
+      const gated = worstCaseInscatter(AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M, tuning);
+      const gate = nearFieldGate(AERIAL_PERSPECTIVE_ENGAGEMENT_DISTANCE_M, tuning);
+      const ungated = gated / gate;
+      // WITHOUT the gate, this very tuning breaks the duel bound.
+      expect(ungated, `${tier} ungated at 25 m`)
+        .toBeGreaterThan(AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER);
+      // WITH it, the same tuning is inside, by at least a factor of four.
+      expect(gated, `${tier} gated at 25 m`)
+        .toBeLessThanOrEqual(AERIAL_PERSPECTIVE_MAXIMUM_ENGAGEMENT_INSCATTER);
+      expect(gated).toBeLessThan(ungated * 0.25);
     }
   });
 
