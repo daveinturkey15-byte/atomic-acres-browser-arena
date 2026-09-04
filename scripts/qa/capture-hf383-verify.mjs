@@ -1,3 +1,8 @@
+// Captures street-level WebGPU frames of atomic-acres (Nuke Town) in installed headless Chrome for HF-383 visual verification.
+// Usage: node scripts/qa/capture-hf383-verify.mjs
+// Env: BASE_URL (default: http://127.0.0.1:41911) — preview server origin
+// Writes: artifacts/hf383-verify-frames/ — PNG frames (street-west, street-east, van-east-broadside, van-west-broadside, bus-flank-north, diag-corner-nw)
+// Exit: 0 on success; non-zero on unhandled exception (no explicit process.exit calls)
 // HF-383 verification capture: boots atomic-acres (Nuke Town) on the real
 // WebGPU route in INSTALLED Chrome, HEADLESS (per GAUNTLET-SPEC 2026-08-25
 // correction: installed chrome headless gets a real hardware WebGPU device;
