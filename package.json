@@ -78,6 +78,8 @@
     "qa:private-lobby": "npm run qa:pass66:owned-browser-verifier-contract && node scripts/qa/run-pass66-owned-browser-verifier.mjs private-lobby",
     "qa:rustworks-lobby-sync": "node scripts/qa/verify-rustworks-lobby-sync.mjs",
     "qa:mp-lab": "node scripts/qa/mp-lab/run-host-guest.mjs",
+    "qa:mp-soak:contract": "node --test scripts/qa/mp-soak-assertions.test.mjs",
+    "qa:mp-soak": "npm run qa:mp-soak:contract && npm run build && node scripts/qa/mp-soak-gate.mjs",
     "qa:mp-lab:contract": "node --test tests/e2e/mp-lab-registry-contract.test.mjs tests/e2e/mp-lab-state-admission-contract.test.mjs",
     "qa:mp-lab:perimeter": "node scripts/qa/mp-lab/probe-perimeter-replication.mjs",
     "qa:mp-lab:lobby-watchdog": "node scripts/qa/mp-lab/probe-lobby-sync-watchdog.mjs",
