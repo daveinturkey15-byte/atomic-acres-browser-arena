@@ -30,7 +30,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear } from '../wear';
+import { boxUv, buildDetailNormal, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -58,6 +58,20 @@ export function concreteSpec(name: string, baseSrgb: number, polygonOffset?: num
     scuff: { sizeM: 0.040, albedo: 0.050, roughness: 0.09 },
     traffic: { sizeM: 2.0, albedo: 0.055, roughness: 0.07 },
     soil: 0.090,
+    // 2.4 m is the control-joint spacing, so the tonal field drifts pour by pour
+    // the way a real slab does rather than across the joints that define it.
+    // Concrete is the family where the hue spread has to stay small: cement
+    // varies batch to batch, but it varies in VALUE far more than in hue, and
+    // an over-tinted grey immediately reads as painted.
+    variation: {
+      macro: { sizeM: 2.4, albedo: 0.050, roughness: 0.05 },
+      micro: { sizeM: 0.12, albedo: 0.030, roughness: 0.06 },
+      tintSpread: 0.018,
+      normalDegrees: 4.5,
+      edgeWear: 0.12,
+      soilRoughness: 0.09,
+      polishRoughness: 0.05,
+    },
     ...(polygonOffset === undefined ? {} : { polygonOffset }),
   });
 }
@@ -69,9 +83,9 @@ export interface ConcreteOptions {
   readonly dampFootY?: number;
 }
 
-let concreteGraph: { colorNode: any; roughnessNode: any } | null = null;
+let concreteGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (concreteGraph) return concreteGraph;
   const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
   const p = positionWorld;
@@ -104,17 +118,29 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
     .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
   const spall = isApron.select(float(0), blockSpall);
-  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint).mul(float(1).add(unit));
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);
+  // THE ARRIS, not the joint. A sawn joint is a groove and it darkens; the
+  // chamfered shoulder either side of it is the part that gets kicked, swept
+  // and driven over, and on a kerb it is the nose that every wheel has clipped.
+  // `j * (1 - j) * 4` peaks exactly on that shoulder and is zero both in the
+  // groove and out in the field, which is where a chamfer is.
+  const arris = joint.mul(float(1).sub(joint)).mul(float(4));
+  const spalled = mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7)));
   concreteGraph = {
-    colorNode: mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7))),
+    colorNode: mix(spalled, spalled.mul(float(1).add(uniforms.edgeWear.mul(float(1.6)))), arris),
     roughnessNode: clamp(
-      wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
+      wear.roughness
+        .add(joint.mul(float(0.05)))
+        .sub(damp.mul(float(0.14)))
+        .add(relief.mul(float(0.05)))
+        .sub(arris.mul(uniforms.edgeWear)),
       float(0.25),
       float(1.0),
     ),
+    normalNode: buildDetailNormal(uniforms, boxUv()),
   };
   return concreteGraph;
 }
@@ -142,6 +168,7 @@ export function createConcreteMaterial(
   const shared = sharedConcreteGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 
