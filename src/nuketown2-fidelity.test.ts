@@ -1571,4 +1571,50 @@ describe('Nuke Town Rebuild fidelity', () => {
       physics.dispose();
     }
   }, 60_000);
+  it('dresses the street vehicles with lofted skins WITHOUT moving any authority', () => {
+    // HF-462 / HF-472. `forgedStreetVehicles` adds a presentation-only group
+    // per vehicle and hides the authored boxes those skins cover. Everything
+    // that decides where a player can walk and what a bullet hits is still the
+    // boxes: this asserts it, rather than trusting the diff.
+    const scene = new THREE.Scene();
+    const map = buildNuketown2(scene);
+    const audit = map.root.userData.nuketown2ForgeAudit as {
+      retired: number; mismatches: readonly string[]; drawCalls: number; triangles: number;
+    };
+    // A rename, a new lamp or a deleted wheel changes a match count, and the
+    // arena would silently draw a box INSIDE a lofted body. The audit records
+    // it; this is the gate that reads the record.
+    expect(audit.mismatches, 'superseded-box pattern drift').toEqual([]);
+    expect(audit.retired).toBe(110);
+    expect(audit.drawCalls).toBeGreaterThan(0);
+
+    const superseded: THREE.Mesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.Mesh && node.userData.supersededByVehicleForge === true) superseded.push(node);
+    });
+    expect(superseded.length).toBe(audit.retired);
+    for (const mesh of superseded) {
+      // Hidden, and withdrawn from the batcher - a hidden batch CANDIDATE is
+      // still merged into a visible batch and goes on drawing.
+      expect(mesh.visible, mesh.name).toBe(false);
+      expect(mesh.userData.presentationBatchCandidate, mesh.name).toBe(false);
+      expect(mesh.userData.staticBatchRendered, mesh.name).toBeUndefined();
+    }
+    // The solid ones among them still own their colliders and shot surfaces.
+    const solidSuperseded = superseded.filter((mesh) => typeof mesh.userData.ballisticSurfaceId === 'string');
+    expect(solidSuperseded.length, 'retired solids keep their shot surfaces').toBeGreaterThanOrEqual(9);
+
+    // Not one forged mesh is a parametric box or claims a shot surface, so
+    // neither the enumerated asymmetric set above nor the ballistic roster can
+    // grow by adding art.
+    let forged = 0;
+    map.root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh) || !node.name.startsWith('vehicle-forge ')) return;
+      forged += 1;
+      expect(node.userData.presentationOnly, node.name).toBe(true);
+      expect((node.geometry as THREE.BoxGeometry).parameters, node.name).toBeUndefined();
+      expect(node.userData.ballisticSurfaceId, node.name).toBeUndefined();
+    });
+    expect(forged).toBe(audit.drawCalls);
+  });
 });
