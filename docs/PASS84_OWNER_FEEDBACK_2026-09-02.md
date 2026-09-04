@@ -1835,3 +1835,46 @@ assets and textures and lighting need to be tip top, raid can come next"
 - **Governance side-effect:** the AKP control digest rotated → audit RED 10
   (baseline 6): Claude Code re-attested natively; Hermes (blocking), Codex,
   OMP and Antigravity need their own native re-attest.
+
+## HF-487 — owner 2026-09-04 17:00: "ok send url for hitl one"
+
+- Given `http://localhost:4300/` (HITL 4, head 7733d37b, stock-boot green;
+  known cold-load fence defect on the very first submit, 4b in build).
+
+## HF-488 — owner 2026-09-04 17:03: daily frontier scan (Three.js on X, GitHub, distil or remake)
+
+- Owner: "how often are we checking three js on x.com? can we daily? check top
+  reposted etc inspiration. Figure out how. And GitHub etc. distill or remake …
+  anything else we built to centrally ingest, keeps us ahead of the frontier …
+  keep building more and more impressive visuals and layers and combining them."
+- Honest baseline: today the scan is manual (owner shares links; the hub has
+  57 rows). Action: build a scheduled daily frontier scan feeding the vault
+  `Ingestion/` hub + technique register, under HF-472 (re-implement, never
+  copy) and HF-481 (source priority). X search/timelines need a logged-in
+  session; single posts render logged-out — the job must state what it can
+  reach headlessly and what needs the owner's Chrome session.
+
+## HF-489 — owner 2026-09-04 17:04: version currency ("ensure we are on the latest version … how update and when. Three js and webgpu etc")
+
+- Audit 17:05 (installed → npm latest): three 0.185.1 = latest (r185, 412 dev
+  commits since; r186 not published); @types/three 0.185.0 → 0.185.4;
+  rapier3d-compat 0.19.3 → 0.20.0; vite 8.1.3 → 8.2.2; @playwright/test 1.61.1
+  → 1.62.1; typescript 6.0.3 → 7.0.2 (major); vitest 4.1.9 → 5.0.0 (major);
+  Chrome 153.0.8010.28 installed (Tint chained-swizzle bug shimmed).
+- Policy to write: a version-currency check in the daily scan; upgrades land
+  on their own lane through the full gate set (stock-boot, deploy fence,
+  pipeline tripwire, size ratchet); three.js the week a release lands, majors
+  (TS, vitest) on a deliberate lane, never mid-pass.
+
+## HF-490 — owner 2026-09-04 17:06: two @threejs effects to make ours
+
+- https://x.com/threejs/status/2070082345689067978 = the r185 release
+  showcase (volumetric fire simulation, clustered lighting, GPU-driven compute
+  rasterizer ± IBL, skinning individual instancing, more) — "effects like this
+  … defo need stuff like that part of what we make". We ARE on r185: these are
+  upstream examples to re-implement in our likeness (HF-472/HF-481).
+- https://x.com/threejs/status/2095709861841600557 = nukesimulation.com
+  (3D nuclear detonation: flash, fireball, rising volumetric mushroom cloud,
+  shockwave ring) — "maybe in map background going on etc". Fits Nuke Town's
+  own lore (BO2 Nuketown ends in a detonation): a background/end-of-match nuke
+  event lane. Consent banner on the site was not accepted (owner action).
