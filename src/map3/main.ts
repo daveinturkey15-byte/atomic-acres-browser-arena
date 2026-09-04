@@ -198,7 +198,7 @@ async function main(): Promise<void> {
   // showed. MeshBasicMaterial survives because it is not lit that way, which
   // is why the signs were the only things visible.
   //
-  // The game installs this at legacy-main.ts:1847. This entry bypasses that
+  // The game installs this in legacy-main.ts:1941, so the standalone page
   // bootstrap entirely, so it has to install it itself - the cost of being a
   // standalone page, and worth writing down.
   const shimInstalled = installTintSwizzleShim();
@@ -293,7 +293,7 @@ async function main(): Promise<void> {
   // Ground plane beyond the hub so the world does not end in void.
   const groundMat = new MeshStandardNodeMaterial();
   groundMat.roughness = 1;
-  // Dry scrub, not a flat green: two octaves of tone drift at 12 m and 3 m.
+  // three octaves of tone drift, 12 m down to 3 m, so the paving
   groundMat.colorNode = mix(vec3(0.21, 0.23, 0.17), vec3(0.28, 0.29, 0.22), fbm2(xz(positionWorld, 0.085), 3));
   const groundGeo = new THREE.PlaneGeometry(600, 600);
   groundGeo.rotateX(-Math.PI / 2);
@@ -330,7 +330,7 @@ async function main(): Promise<void> {
 
   const HUB_R = 19;
   corridors.forEach((c, i) => {
-    // Six spokes evenly around the hub, so every corridor mouth is visible
+  // Eight spokes evenly around the hub, so every corridor mouth is visible
     // from the centre and none of them overlap at the rim.
     const angle = (i / corridors.length) * Math.PI * 2;
     const pivot = new THREE.Group();
@@ -378,10 +378,11 @@ async function main(): Promise<void> {
     pitch = Math.max(-1.42, Math.min(1.42, pitch));
   });
   // --- perf bisect ------------------------------------------------------
-  // Never optimise a frame you have not bisected. 1/2/3 isolate a corridor,
-  // 4 drops shadows, 5 drops the canopy (the overdraw suspect), 6 halves the
-  // resolution (separates fragment cost from everything else). Read the fps
-  // and draw count in the HUD after each.
+  // Never optimise a frame you have not bisected. 1-8 isolate a corridor,
+  // 0 shows them all again, O drops shadows, P drops the canopy (the
+  // overdraw suspect), H halves the resolution (separates fragment cost
+  // from everything else). Read the fps and draw count in the HUD after
+  // each.
   const pivots = scene.children.filter((o) => o.type === 'Group');
   let shadowsOn = true;
   let halfRes = false;
