@@ -744,6 +744,16 @@
             "sceneResolutionScale": 1,
             "label": "Off"
           },
+          "aerialPerspective": {
+            "betaPerMetre": 0.0026,
+            "scaleHeightM": 22,
+            "rayleighWeight": 0.62,
+            "mieWeight": 0.38,
+            "mieAsymmetry": 0.55,
+            "gain": 0.32,
+            "nearFadeStartM": 18,
+            "nearFadeEndM": 45
+          },
           "rayTracing": {
             "tier": "off",
             "enabled": false,
@@ -952,6 +962,16 @@
             "sceneResolutionScale": 1,
             "label": "Off"
           },
+          "aerialPerspective": {
+            "betaPerMetre": 0.0038,
+            "scaleHeightM": 18,
+            "rayleighWeight": 0.58,
+            "mieWeight": 0.42,
+            "mieAsymmetry": 0.62,
+            "gain": 0.34,
+            "nearFadeStartM": 18,
+            "nearFadeEndM": 45
+          },
           "rayTracing": {
             "tier": "reflections",
             "enabled": true,
@@ -1159,6 +1179,16 @@
             "enabled": false,
             "sceneResolutionScale": 1,
             "label": "Off"
+          },
+          "aerialPerspective": {
+            "betaPerMetre": 0.0046,
+            "scaleHeightM": 14,
+            "rayleighWeight": 0.55,
+            "mieWeight": 0.45,
+            "mieAsymmetry": 0.68,
+            "gain": 0.35,
+            "nearFadeStartM": 18,
+            "nearFadeEndM": 45
           },
           "rayTracing": {
             "tier": "reflections",

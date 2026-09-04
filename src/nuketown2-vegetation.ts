@@ -173,12 +173,21 @@ export type NuketownHedgeRun = Readonly<{
  * ridge clear of the host's own +y plane instead of racing it.
  */
 export const NUKETOWN2_HEDGE_DRESSING: readonly NuketownHedgeRun[] = Object.freeze([
+  // INTEGRATION (candidate 4b): all three verge rows re-read off
+  // `src/nuketown2-arena.ts` after HF-477 retiled the front verge for the
+  // lollipop. It pulled the hedge 0.8 m toward the house (z = HOUSE_FRONT_Z +
+  // 0.6), moved the furniture line to z = -8.55 and narrowed it to 0.8 m deep,
+  // and re-stationed the kerb planter from x = 10.0 to x = -3.6 - and this
+  // dressing table still carried the old numbers, so three hedge runs were
+  // standing on no collider at all: `nuketown2-vegetation` reported the drift
+  // and the collider/visual parity gate reported the same bodies as twelve
+  // unrated ghost shot surfaces. Same rows, the arena's own coordinates.
   // verge front hedge - the crouch cover outside each front door.
-  Object.freeze({ id: 'verge front hedge', x: -4.7, z: -8.6, width: 3.9, depth: 0.9, topY: 0.95 }),
+  Object.freeze({ id: 'verge front hedge', x: -4.7, z: -9.4, width: 3.9, depth: 0.9, topY: 0.95 }),
   // verge planter - the outer verge body past the garage.
-  Object.freeze({ id: 'verge planter', x: 13.5, z: -7.5, width: 3.6, depth: 2.0, topY: 0.95 }),
+  Object.freeze({ id: 'verge planter', x: 13.5, z: -8.55, width: 3.6, depth: 0.8, topY: 0.95 }),
   // verge kerb planter - the widened-strip body between drive edging and planter.
-  Object.freeze({ id: 'verge kerb planter', x: 10.0, z: -6.05, width: 2.4, depth: 1.1, topY: 0.95 }),
+  Object.freeze({ id: 'verge kerb planter', x: -3.6, z: -8.55, width: 2.4, depth: 0.8, topY: 0.95 }),
   // yard alley planter - the deep-yard flank body, hard against the wall.
   Object.freeze({ id: 'yard alley planter', x: -15.6, z: -33.0, width: 4.0, depth: 2.0, topY: 1.9 }),
 ]);
