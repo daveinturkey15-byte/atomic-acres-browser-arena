@@ -56,6 +56,18 @@ job was touched.
   publish. The failed rows require owner investigation and a later rerun after
   fixes land.
 
+## Release preflight
+
+- **VERIFIED** — `qa:lockfile` passed with the repository's npm 10 lockfile
+  guard.
+- **OPEN** — The prescribed Codex preflight reached the release guard but the
+  guard rejects the documented `--harness Codex` spelling as not lowercase.
+  Retrying with `codex` then rejects this required `contrib/.../claude/...`
+  branch because the guard expects a `contrib/.../codex/...` branch. Using the
+  branch-compatible `claude` value reaches the next guard and reports that this
+  contribution does not contain current `origin/main`. No rebase or unrelated
+  branch merge was performed in this QA lane.
+
 ## Implementation handoff
 
 The required command is wired as `npm run qa:mp-soak`; its contract-only logic
