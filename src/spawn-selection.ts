@@ -42,8 +42,8 @@ export type SpawnSelection = Readonly<{
 }>;
 
 const RECENT_USE_AVOIDANCE_MS = 12_000;
-const FFA_MINIMUM_SPAWN_SEPARATION = 8;
-const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
+export const FFA_MINIMUM_SPAWN_SEPARATION = 8;
+export const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'atomic-acres': 9,
   'rustworks-1v1': 7,
   'gun-range': 8,
@@ -56,8 +56,6 @@ const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
   'nuketown2': 7,
   'raid2': 7,
 });
-
-export { FFA_MINIMUM_SPAWN_SEPARATION };
 
 export function stableSpawnTieBreakSeed(id: string): number {
   let hash = 2_166_136_261;
