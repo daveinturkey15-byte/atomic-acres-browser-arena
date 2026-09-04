@@ -142,13 +142,34 @@ export function decideWeaponSwitchRehearsal(
   });
 }
 
+/**
+ * The deferred warm-up NEVER runs the forced-submission state walk.
+ *
+ * MEASURED DEFECT (PASS 94 load-time lane, `pass74-arena-boot-smoke`): the
+ * first version of this scheduler called `exercisePreparedWebGpuWeaponSwitches`
+ * for the `respawn` and `pre-match-countdown` windows, and every slice threw
+ *
+ *   [deferred weapon rehearsal] Error: Forced WebGPU submission requires an
+ *   idle completion frontier; 1 submission(s) remain
+ *
+ * 38 times into the console on atomic-acres and nuketown2. The state walk is
+ * an ADMISSION instrument: it forces submissions and flushes the queue, which
+ * is only legal while the gameplay frame loop is not presenting. Those two
+ * windows are inside a live match, so the frontier is never idle.
+ *
+ * The fix is not to relax the frontier check - that check is what keeps the
+ * 12 s WebGPU queue fence meaningful. It is to give the deferred path the work
+ * it can legally do: `prepareBrowserWeapon`, the asset/GPU-readiness half,
+ * which is exactly what the `menu` window already used and what the
+ * synchronous pre-switch barrier in `rehearseWeaponBeforeSwitch` uses. The
+ * state walk keeps running inside admission for the weapons a player can
+ * actually hold, where the frame loop is not yet live.
+ */
 export function createDeferredWeaponRehearsalScheduler(input: Readonly<{
   readState: () => WeaponRehearsalState | null;
   writeState: (state: WeaponRehearsalState) => void;
   isPreparing: () => boolean;
-  backend: () => string;
   prepare: (weaponId: WeaponId) => Promise<void>;
-  exercise: (weaponIds: readonly WeaponId[]) => Promise<void>;
   report: (error: unknown) => void;
 }>): (window: WeaponRehearsalWindow) => void {
   let pending: Promise<void> | null = null;
@@ -157,13 +178,10 @@ export function createDeferredWeaponRehearsalScheduler(input: Readonly<{
     if (!state || input.isPreparing() || pending || !isSafeWeaponRehearsalWindow(window)) return;
     const [weaponId] = nextDeferredWeaponRehearsalSlice(state, window);
     if (!weaponId) return;
-    const operation = (window === 'menu' || input.backend() !== 'webgpu'
-      ? input.prepare(weaponId)
-      : input.exercise([weaponId]))
-      .then(() => {
-        const current = input.readState();
-        if (current?.plan === state.plan) input.writeState(markWeaponRehearsed(current, [weaponId]));
-      });
+    const operation = input.prepare(weaponId).then(() => {
+      const current = input.readState();
+      if (current?.plan === state.plan) input.writeState(markWeaponRehearsed(current, [weaponId]));
+    });
     pending = operation;
     void operation.catch(input.report).finally(() => {
       if (pending === operation) pending = null;

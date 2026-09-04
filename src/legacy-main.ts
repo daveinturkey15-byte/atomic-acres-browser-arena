@@ -6079,9 +6079,7 @@ const scheduleDeferredWeaponRehearsal = createDeferredWeaponRehearsalScheduler({
   readState: () => weaponRehearsalState,
   writeState: (state) => { weaponRehearsalState = state; },
   isPreparing: () => matchStartPreparing,
-  backend: () => renderRuntime.backend,
   prepare: (weaponId) => weaponView.prepareBrowserWeapon(weaponId),
-  exercise: (weaponIds) => exercisePreparedWebGpuWeaponSwitchesFor(weaponIds),
   report: (error) => reportRuntimeError('deferred weapon rehearsal', error),
 });
 let activeMatchAdmissionRun: Readonly<{
