@@ -5765,6 +5765,8 @@ const remoteCombatInventoryRevisions = new Map<string, number>();
 const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
 const remoteReloadResultCache = new Map<string, ReloadResultMessage>();
+const remoteReloadResultCacheKeysByPlayer = new Map<string, string[]>();
+const remoteReloadResultCacheLifeByPlayer = new Map<string, number>();
 let localReloadRetryTimer: number | null = null;
 const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
@@ -6290,6 +6292,38 @@ function remoteReloadResultCacheKey(playerId: string, connectionEpoch: string, l
   return `${playerId}:${connectionEpoch}:${lifeId}:${requestId}`;
 }
 
+function clearRemoteReloadResultCache(playerId: string): void {
+  for (const key of remoteReloadResultCacheKeysByPlayer.get(playerId) ?? []) remoteReloadResultCache.delete(key);
+  remoteReloadResultCacheKeysByPlayer.delete(playerId);
+  remoteReloadResultCacheLifeByPlayer.delete(playerId);
+}
+
+function clearAllRemoteReloadResultCache(): void {
+  remoteReloadResultCache.clear();
+  remoteReloadResultCacheKeysByPlayer.clear();
+  remoteReloadResultCacheLifeByPlayer.clear();
+}
+
+function clearRemoteReloadResultCacheOnLifeChange(playerId: string, previousLifeId: number, nextLifeId: number): void {
+  if (previousLifeId !== nextLifeId) clearRemoteReloadResultCache(playerId);
+}
+
+function cacheRemoteReloadResult(result: ReloadResultMessage): void {
+  const playerId = result.forPlayerId;
+  const cachedLifeId = remoteReloadResultCacheLifeByPlayer.get(playerId);
+  if (cachedLifeId !== undefined && cachedLifeId !== result.lifeId) clearRemoteReloadResultCache(playerId);
+  remoteReloadResultCacheLifeByPlayer.set(playerId, result.lifeId);
+  const key = remoteReloadResultCacheKey(playerId, result.connectionEpoch, result.lifeId, result.requestId);
+  const keys = remoteReloadResultCacheKeysByPlayer.get(playerId) ?? [];
+  if (!remoteReloadResultCache.has(key)) keys.push(key);
+  remoteReloadResultCache.set(key, result);
+  while (keys.length > 8) {
+    const evictedKey = keys.shift();
+    if (evictedKey !== undefined) remoteReloadResultCache.delete(evictedKey);
+  }
+  remoteReloadResultCacheKeysByPlayer.set(playerId, keys);
+}
+
 function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number], 'atMs' | 'role'>): void {
   reloadProtocolTrace.push(Object.freeze({ atMs: Math.round(performance.now()), role: network.role, ...input }));
   if (reloadProtocolTrace.length > 128) reloadProtocolTrace.splice(0, reloadProtocolTrace.length - 128);
@@ -6377,7 +6411,7 @@ function sendRemoteReloadResult(
     combatInventory,
     nonce: randomNonce(),
   };
-  remoteReloadResultCache.set(remoteReloadResultCacheKey(playerId, connectionEpoch, remote.continuity, requestId), result);
+  cacheRemoteReloadResult(result);
   recordReloadProtocolTrace({
     direction: 'send', actorId: playerId, requestId, action: 'result', status, reason, actionSequence,
   });
@@ -7911,7 +7945,7 @@ function resetPrivateLobbyState(): void {
   retainedRemoteAuthorities.clear();
   remoteCombatInventories.clear();
   remoteCombatInventoryRevisions.clear();
-  remoteReloadResultCache.clear();
+  clearAllRemoteReloadResultCache();
   for (const timer of remoteReloadTimers.values()) window.clearTimeout(timer);
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
@@ -9105,7 +9139,10 @@ function resetAuthenticatedGuestReplacement(playerId: string): void {
     remote.lastFeedbackAt = Number.NEGATIVE_INFINITY;
     remote.claimEligibleAt = Math.max(remote.claimEligibleAt, now + 1_500);
     const authoritativeLifeId = killstreakRuntime.actorLifeId(playerId);
-    if (authoritativeLifeId !== null) remote.continuity = authoritativeLifeId;
+    if (authoritativeLifeId !== null) {
+      clearRemoteReloadResultCacheOnLifeChange(playerId, remote.continuity, authoritativeLifeId);
+      remote.continuity = authoritativeLifeId;
+    }
   }
   authoritativeShotAdmissions.delete(playerId);
   remoteShotAdmissions.delete(playerId);
@@ -9168,6 +9205,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   const health = advanceRemoteHealthAuthority(priorHealth, now);
   const canonical = canonicalRetainedGuestSnapshot(remote.snapshot, member, score, health);
   remote.snapshot = canonical;
+  clearRemoteReloadResultCacheOnLifeChange(playerId, remote.continuity, actor.lifeId);
   remote.continuity = actor.lifeId;
   remoteHealthAuthorities.set(playerId, health);
   retainedRemoteAuthorities.set(playerId, Object.freeze({
@@ -9573,7 +9611,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
   clearLocalReloadRetryTimer();
-  remoteReloadResultCache.clear();
+  clearAllRemoteReloadResultCache();
   reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
@@ -13447,6 +13485,7 @@ function onNetworkMessage(message: GameMessage): void {
         : incoming;
       remote = createRemote(initialIncoming);
       if (retainedAuthority) {
+        clearRemoteReloadResultCacheOnLifeChange(incoming.id, remote.continuity, retainedAuthority.continuity);
         remote.continuity = retainedAuthority.continuity;
         remote.interpolation.clear();
         remote.interpolation.push({
@@ -13466,6 +13505,7 @@ function onNetworkMessage(message: GameMessage): void {
         // the later `incoming.seq > remote.snapshot.seq` reducer. Adopt this
         // authenticated first observation once so the receiver-ready repair
         // loadout is checked against the life the host actually observed.
+        clearRemoteReloadResultCacheOnLifeChange(incoming.id, remote.continuity, message.continuity);
         remote.continuity = message.continuity;
         remote.positionHistory = remote.positionHistory.map((sample) => ({
           ...sample,
@@ -13699,6 +13739,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote.snapshot = admittedIncoming;
       if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
+      clearRemoteReloadResultCacheOnLifeChange(incoming.id, remote.continuity, admittedContinuity);
       remote.continuity = admittedContinuity;
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
@@ -17726,7 +17767,7 @@ async function startGame(
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
   clearLocalReloadRetryTimer();
-  remoteReloadResultCache.clear();
+  clearAllRemoteReloadResultCache();
   reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
