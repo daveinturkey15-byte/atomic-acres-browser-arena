@@ -142,12 +142,21 @@ describe('Nuke Town Rebuild yard props', () => {
       for (const [spawnX, spawnZ] of team) {
         const spawn = { x: spawnX, z: spawnZ };
         for (const body of bodies) {
-          for (const sign of [1, -1] as const) {
-            // The authored x is mirrored by `pair()`; compare against both
-            // halves, in both handedness signs, so the assertion cannot be
-            // satisfied by an accident of the mirror.
-            const dx = Math.max(0, Math.abs(spawn.x - sign * body.x) - body.width / 2);
-            const dz = Math.max(0, Math.abs(spawn.z - sign * body.z) - body.depth / 2);
+          // `pair()` emits the REAL instances at (-x, z) and (x, -z): the
+          // authored x is handed by `nuketown2HandedX`, then the 180-degree
+          // partner negates both. This used to compare (x, z) and (-x, -z) -
+          // the x-mirror of the arena that actually gets built. The spawn
+          // table is 180-symmetric but NOT x-symmetric, so a prop could pass
+          // this rule and still stand 0.92 m from a spawn in the real yard.
+          // Both of them did: PASS 94 candidate 4 found the glasshouse sitting
+          // ON spawn (2, -34) with this test green. Measuring the instances
+          // the arena builds is the correction; the 3 m threshold is unchanged.
+          const instances = [
+            [-body.x, body.z], [body.x, -body.z],
+          ] as const;
+          for (const [bodyX, bodyZ] of instances) {
+            const dx = Math.max(0, Math.abs(spawn.x - bodyX) - body.width / 2);
+            const dz = Math.max(0, Math.abs(spawn.z - bodyZ) - body.depth / 2);
             expect(Math.hypot(dx, dz)).toBeGreaterThan(3);
           }
         }

@@ -382,3 +382,25 @@ is a vast pale sand-cream plain, and it now occupies more of the frame than the
 map does. The avenue draws the eye straight to it. That is the arena ground-slab
 material, it is pre-existing, and it belongs to the materials lane — but it is
 the single highest-value fix visible in these frames and it should be routed.
+
+---
+
+## Integrator correction, PASS 94 candidate 4 (2026-09-04)
+
+Applied from `docs/evidence/pass94/muse-review/techniques-REVIEW.md` when this lane was
+merged into the candidate.
+
+- **FINDING 1 fixed in code.** Ground decal families are staggered 1 mm apart
+  (`GROUND_FAMILY_TIER` / `groundY()` in `src/nuketown2-grime-decals.ts`), so the
+  same-rect tyre+crack pairs on the drive and the border path no longer share one
+  depth. The deepest family is 7 mm above the plate, still inside the deliberate
+  0.03 m window, so every pair stays SEEN-and-FENCED by the coplanar instrument.
+- **FINDING 2 fixed as a comment.** `NUKETOWN2_APPLIANCE_BANK` now states why it sits
+  at the drive/turning-head edge rather than in the deep yard band with the other
+  three props.
+- **OPEN (carried, not fixed): hob<->house colour mapping.** `src/nuketown2-yard-props.ts:296-298`
+  assigns red NORTH / blue SOUTH. If a later materials or BO2-accuracy decision
+  repoints a house body orange, this tuple needs a one-line swap plus a gate asserting
+  hob<->siding pairing. Not resolvable inside this candidate.
+- **OPEN (carried): section 2.2 describes the WebGPU pool path only**; the WebGL2
+  compatibility path is a flat tint by contract.

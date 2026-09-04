@@ -84,6 +84,22 @@ const GRIME_THICKNESS = 0.006;
 /** Centre y for a ground grime slab, so its top lands at plate + 3 mm. */
 const GRIME_Y = GROUND_PLATE_TOP_Y + GRIME_LIFT - GRIME_THICKNESS / 2;
 
+/**
+ * MUSE FINDING 1 (PASS 94 techniques review): ground families stack on the same
+ * rect - drive tyre scuff and drive slab cracking are the identical 4.8x7.8
+ * footprint, border tyre and border cracking the identical 35.6x5.6 - and a
+ * shared depth with a shared offset tier leaves those transparent layers
+ * fighting each other, which the coplanar instrument cannot see because both
+ * are FENCED. 1 mm per family separates them. The deepest family still lands
+ * 7 mm above the plate, inside the deliberate 0.03 m window above, so every
+ * pair stays SEEN-and-FENCED rather than floating out of the audit.
+ */
+const GROUND_FAMILY_TIER: readonly Nuketown2Decal['family'][] = [
+  'tyre', 'oil', 'crack', 'court', 'stones',
+];
+const groundY = (family: Nuketown2Decal['family']): number =>
+  GRIME_Y + Math.max(0, GROUND_FAMILY_TIER.indexOf(family)) * 0.001;
+
 export type Nuketown2Decal = Readonly<{
   name: string;
   family: 'tyre' | 'oil' | 'crack' | 'court' | 'stones' | 'wall-grime';
@@ -317,7 +333,7 @@ export function nuketown2GrimeDecals(m: Nuketown2GrimeMaterials): readonly Nuket
   ): void => {
     out.push(Object.freeze({
       name, family,
-      position: [x, GRIME_Y, z] as const,
+      position: [x, groundY(family), z] as const,
       size: [w, GRIME_THICKNESS, d] as const,
       material,
     }));

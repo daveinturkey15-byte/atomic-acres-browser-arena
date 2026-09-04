@@ -57,6 +57,11 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
   });
   let adjusted = 0;
   for (const material of materials) {
+    // MUSE F5 (PASS 94 animation+skins review): TSL node materials fail every
+    // instanceof below and are skipped on purpose - the procedural operator skins
+    // carry no emissive fill to scale (see animation-skins REPORT 5.2). A future
+    // brightness tune that expects to reach WebGPU operators must add a node path
+    // here rather than assume this loop covered them.
     if (!(material instanceof THREE.MeshStandardMaterial)
       && !(material instanceof THREE.MeshLambertMaterial)
       && !(material instanceof THREE.MeshPhongMaterial)) continue;
@@ -875,8 +880,15 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   // The visible loadout lives in body space rather than under an animated
   // wrist. That keeps its muzzle authoritative while both arms are solved onto
   // the weapon after the animation mixer has written the current pose.
+  // MUSE F3 (PASS 94 animation+skins review): one body, one sprint. The posture
+  // layer's latched sprint (5.2/4.4 m/s with a ramp) drives lean and aim, so the
+  // weapon socket reads from it too; without that the socket finished dropping at
+  // ~6.8 m/s while the lean had barely started and sprint read as two systems.
+  // The stateless smoothstep stays as the fallback for callers that pose an
+  // operator without running the posture layer.
   const sprint = runtimeState.stance === 'stand'
-    ? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8)
+    ? (runtimeState.lastPosture?.sprint
+      ?? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8))
     : 0;
   const weaponId = String(runtimeState.weaponSocket.children[0]?.userData.weaponId ?? 'carbine');
   const proneMount = PRONE_WEAPON_MOUNT[weaponId] ?? PRONE_WEAPON_MOUNT.carbine;

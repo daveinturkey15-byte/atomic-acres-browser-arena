@@ -58,6 +58,7 @@
  * the right owner, and a second builder would have opted out of it.
  */
 import * as THREE from 'three';
+import type { BallisticMaterialId } from './ballistics';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 
@@ -86,7 +87,11 @@ export type Nuketown2YardPropSolid = Readonly<{
   size: readonly [number, number, number];
   /** One material, or `[north, south]` for the pieces that differ by COLOUR. */
   material: THREE.Material | readonly [THREE.Material, THREE.Material];
-  options: Readonly<{ solid: boolean; shots: boolean; cast: boolean }>;
+  options: Readonly<{
+    solid: boolean; shots: boolean; cast: boolean;
+    /** Explicit ballistic rating; omitted entries are rated by the shared rule. */
+    ballisticMaterial?: BallisticMaterialId;
+  }>;
 }>;
 
 // ---------------------------------------------------------------------------
@@ -228,6 +233,19 @@ export function createNuketown2YardPropMaterials(): Nuketown2YardPropMaterials {
 // ---------------------------------------------------------------------------
 
 const SOLID = Object.freeze({ solid: true, shots: true, cast: true });
+/**
+ * INTEGRATION (PASS 94 candidate 4): the appliance bank cabinet is the only
+ * silhouette here whose name reaches no rule in `classifyBallisticMaterial`
+ * ("glasshouse shell" is glass, "sand pit kerb" is earth, "garden pod shell"
+ * is rated by its own name) - so it landed as `reinforced`/`fallback`, the
+ * classifier's failure sentinel, and `src/ballistics.test.ts` reported two
+ * unshootable surfaces over nuketown2's ceiling of 0. It is rated explicitly
+ * rather than renamed: an enamelled outdoor appliance bank is a metal body you
+ * can shoot through at a cost, which is `structural-metal` (penetrate). It is
+ * deliberately NOT `thin-metal`, because that perforates away the low cover
+ * this waist-high box exists to give.
+ */
+const SOLID_METAL = Object.freeze({ ...SOLID, ballisticMaterial: 'structural-metal' as const });
 const DRESSING = Object.freeze({ solid: false, shots: false, cast: true });
 const FLAT = Object.freeze({ solid: false, shots: false, cast: false });
 
@@ -243,18 +261,42 @@ const FLAT = Object.freeze({ solid: false, shots: false, cast: false });
  * clear in z).
  *
  * GLASSHOUSE and GARDEN POD - the deep yard band (`yard lawn`, z [-36, -23]),
- * placed away from the six spawn points and from the existing yard bodies. The
- * closest spawn to either is 6.1 m, against the spawn table's own 4.5 m
- * minimum spacing rule.
+ * placed away from every spawn point and from the existing yard bodies. See the
+ * integration note on the constants below for the eight-spawn re-placement.
  *
  * SAND PIT and SHUFFLEBOARD - ground-level, in the yard band, on the pattern
  * the aerial shows: both sit out towards the fence with the stepping stones
  * running past them.
  */
+// MUSE FINDING 2 (PASS 94 techniques review): this one is NOT in the deep yard
+// band with the other three. The reference puts the appliance bank against the
+// house at the drive/turning-head edge (drive z [-16, -8]), so it is placed at
+// its reference position, not moved into z [-36, -23] for tidiness. Its z span
+// -8.8..-8.0 sits above the 3 mm drive-decal film, so the overlap is a solid
+// body over a film and never a coplanar pair.
 export const NUKETOWN2_APPLIANCE_BANK = Object.freeze({ x: -10.4, z: -8.4, width: 1.8, depth: 0.8 });
-export const NUKETOWN2_GLASSHOUSE = Object.freeze({ x: -2.0, z: -33.2, width: 3.0, depth: 2.2, height: 2.3 });
-export const NUKETOWN2_GARDEN_POD = Object.freeze({ x: 8.6, z: -33.6, width: 2.3, depth: 2.3, height: 2.05 });
-export const NUKETOWN2_SAND_PIT = Object.freeze({ x: 14.2, z: -25.6, width: 2.4, depth: 1.8, height: 0.3 });
+// INTEGRATION (PASS 94 candidate 4): this lane authored the deep-yard bodies
+// against the SIX-spawn yard. The candidate carries `spawn-distribution`, which
+// spreads EIGHT spawns per team across the same band, and its (2, -34) landed
+// inside the glasshouse shell - a spawn you could not stand up in. The spawn
+// table is gameplay authority and the props are dressing, so the props moved:
+// the glasshouse to the west lawn and the pod a short nudge west, both still in
+// `yard lawn` z [-36, -23], both clear of the pool (4.8, -29.5), the stepping
+// stones and the shuffleboard court. Both were solved against the REAL built
+// instances - `pair()` emits (-x, z) and (x, -z), not (x, z) and (-x, -z) - and
+// and against the destructible-shed footprints (HF-407) the yard also carries.
+// It is held 0.6 m off the yard fence: flush against it, the glasshouse door
+// frame's top face landed at exactly 1.900 m, the fence run's own top, and the
+// coplanar instrument reported two FINDINGS on a zero-area touch.
+// Closest spawn is 3.62 m (glasshouse) and 3.65 m (pod),
+// against the 3 m rule the test below pins and the 1.2 m face rule in
+// src/spawn-layout-quality.test.ts, which the first re-placement tripped. The
+// sand pit moved out to the fence for the same reason: its real south-yard
+// instance sat 0.92 m from spawn (-16, -24), which the old 2-point clearance
+// metric could not see. It is now 3.45 m clear.
+export const NUKETOWN2_GLASSHOUSE = Object.freeze({ x: -7.5, z: -34.2, width: 3.0, depth: 2.2, height: 2.3 });
+export const NUKETOWN2_GARDEN_POD = Object.freeze({ x: 11.2, z: -25.0, width: 2.3, depth: 2.3, height: 2.05 });
+export const NUKETOWN2_SAND_PIT = Object.freeze({ x: 16.2, z: -28.4, width: 2.4, depth: 1.8, height: 0.3 });
 
 /**
  * Every solid and dressing box this module contributes, in the arena's own
@@ -289,7 +331,7 @@ export function nuketown2YardPropSolids(
   // also the whole visible mass, so movement/shot authority and the picture
   // are the same box - the parity property this arena's forging review names.
   push('lawn appliance bank cabinet', 'silhouette',
-    [a.x, LOW_COVER / 2, a.z], [a.width, LOW_COVER, a.depth], m.cabinet, SOLID);
+    [a.x, LOW_COVER / 2, a.z], [a.width, LOW_COVER, a.depth], m.cabinet, SOLID_METAL);
   // STRUCTURE. The hob deck - RED north, BLUE south. This one pair of
   // materials is the entire chirality anchor, and it is colour only: identical
   // geometry, identical position, identical collider.

@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_365;
+const LINE_CEILING = 37_371;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -266,6 +266,20 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + '(spawn selector call sites) = 37_365, which is what wc -l reports here. No line was '
       + 'added to reach this ceiling and the ledger keeps both lane rows so a reviewer can see '
       + 'which feature bought which lines.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_371,
+    note:
+      'PASS 94 candidate 4: +6 for the animation+skins lane, and nothing else. Measured, '
+      + 'not estimated - git diff --numstat of each merged lane against its own merge base '
+      + 'reports src/legacy-main.ts untouched by nuketown2-materials and nuketown2-techniques, '
+      + '4 added / 4 removed (net 0) by nuketown2-lighting, and 6 added / 0 removed by '
+      + 'animation-skins: the posture-layer call sites that feed stance and speed into the '
+      + 'operator director. 37_365 + 0 + 6 = 37_371, which is what wc -l reports here. The '
+      + 'skin registry, the TSL skin materials and the posture solver itself are three new '
+      + 'modules (src/operator-skin-look-registry.ts, src/operator-skin-tsl-materials.ts, '
+      + 'src/operator-posture-layer.ts), not lines in this file.',
   },
 ];
 

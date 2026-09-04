@@ -210,3 +210,26 @@ changed to a rate-limited ramp so it genuinely arrives, and the test was left as
    browser and the same gate was still closed at the end of this lane. `npx tsc --noEmit`, the
    399-test suite, `qa:text-integrity` (2,816 files, ok) and `src/project-map.test.ts` all
    passed; the two browser gates are unrun, not green, and must not be reported as green.
+
+---
+
+## Integrator correction, PASS 94 candidate 4 (2026-09-04)
+
+Applied from `docs/evidence/pass94/muse-review/animation-skins-REVIEW.md` when this
+lane was merged into the candidate. These supersede the rows named below.
+
+- **F4 - the bot-stance rows in section 2 and OPEN 6.1 are WRONG and are hereby
+  retracted.** `legacy-main.ts:8310` / `:14033` do not carry `stance: 'stand'` at this
+  head, and bot stance authority already exists on the base: `src/bot-stance.ts:91-97`
+  (policy), `:105-108` (speed caps), `legacy-main.ts` host sim / replication / guest
+  pose / history. Claim-state RECORDED-superseded-by-base. The posture layer therefore
+  fires for bots today; only genuine policy/difficulty work remains in slice 2.
+- **F1 - section 3 "twelve node graphs for the whole game" is exact only for the
+  unflattened path.** `flattenMaterials === true` nulls `metalnessNode`, so a mixed
+  lobby is 12 graphs and up to 24 programs. The flatten variant is the pre-existing
+  contract, not a regression.
+- **F2 - table 1 separability is a load-enforced proxy plus CPU visual
+  corroboration, not a gameplay-range measurement.** Claim-state ASSUMPTION until a
+  GPU re-capture is pixel-sampled at range. OPEN.
+- **F3 fixed in code** (`src/operator-model.ts`, sprint weapon socket now reads
+  `lastPosture.sprint`); **F5 fixed as a comment** (`src/operator-model.ts:60-62`).
