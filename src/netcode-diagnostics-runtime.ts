@@ -140,6 +140,7 @@ let model = createNetcodeDiagnosticsModel();
 let recorder: NetcodeEvidenceRecorder | null = null;
 let overlay: NetcodeOverlayHandle | null = null;
 let recording = false;
+let cachedHostPeerId = '';
 
 export function netcodeDiagnosticsModel(): NetcodeDiagnosticsModel {
   return model;
@@ -150,14 +151,16 @@ export function netcodeRecordingActive(): boolean {
 }
 
 /**
- * Called when the role or room changes; peers are cleared on a role change.
+ * Called when the role, local identity, or room changes; peer rows are cleared
+ * on any session identity change so a reused room code cannot inherit stale ids.
  * Idempotent and early-outs when nothing moved, because `tickNetcodeDiagnostics`
  * calls it every frame and a per-frame `revision += 1` would defeat the
  * overlay's whole reason for having a revision counter.
  */
 export function setNetcodeSession(role: NetDiagnosticsRole, localPeerId: string, roomCode: string): void {
   if (model.localRole === role && model.localPeerId === localPeerId && model.roomCode === roomCode) return;
-  if (model.localRole !== role) model.peers.clear();
+  model.peers.clear();
+  cachedHostPeerId = '';
   model.localRole = role;
   model.localPeerId = localPeerId;
   model.roomCode = roomCode;
@@ -182,6 +185,7 @@ export function tickNetcodeDiagnostics(
 
 export function forgetNetcodePeer(peerId: string): void {
   forgetPeer(model, peerId);
+  if (cachedHostPeerId === peerId) cachedHostPeerId = '';
 }
 
 /**
@@ -208,6 +212,7 @@ export function observeInbound(message: GameMessage, nowMs: number): void {
   const role = remoteRole();
   if (message.type === 'state' || message.type === 'join') {
     recordInboundSnapshot(model, peerId, messageSeq(message), nowMs, role);
+    if (model.peers.has(peerId) && role === 'host') cachedHostPeerId = peerId;
   }
   // A state-feedback is the host telling a guest it processed its stream: the
   // closest thing this protocol has to an explicit ack, so it is what the
@@ -255,11 +260,16 @@ export function observeOutbound(message: GameMessage, peerId: string, nowMs: num
  * this records nothing, which is honest: we do not yet know who the host is.
  */
 export function observeOutboundToHost(message: GameMessage, nowMs: number): void {
-  for (const peer of model.peers.values()) {
-    if (peer.role !== 'host') continue;
-    observeOutbound(message, peer.peerId, nowMs);
+  if (cachedHostPeerId.length > 0 && model.peers.has(cachedHostPeerId)) {
+    observeOutbound(message, cachedHostPeerId, nowMs);
     return;
   }
+  // The fallback runs only before the first inbound host message or after its
+  // row is forgotten; steady-state sends use the cached id without iteration.
+  const host = [...model.peers.values()].find((peer) => peer.role === 'host');
+  if (!host) return;
+  cachedHostPeerId = host.peerId;
+  observeOutbound(message, cachedHostPeerId, nowMs);
 }
 
 /** RTT in milliseconds, from whatever clock-sync the runtime already keeps. */
@@ -358,6 +368,7 @@ export function resetNetcodeDiagnosticsRuntime(): void {
   recorder?.reset();
   recorder = null;
   recording = false;
+  cachedHostPeerId = '';
   overlay?.destroy();
   overlay = null;
 }

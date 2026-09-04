@@ -35,6 +35,9 @@
 
 export const DEFAULT_SAMPLE_CAPACITY = 64;
 export const REQUEST_OUTCOME_CAPACITY = 5;
+/** The largest supported room has six participants; this bounded margin keeps
+ * hostile or malformed peer ids from turning diagnostics into an unbounded map. */
+export const MAX_DIAGNOSTIC_PEERS = 16;
 
 /**
  * RFC 3550's interarrival-jitter gain. J += (|D| - J)/16 — a first-order filter
@@ -294,9 +297,10 @@ export function peerFor(
   peerId: string,
   role: NetDiagnosticsRole = 'guest',
   capacity = DEFAULT_SAMPLE_CAPACITY,
-): PeerDiagnostics {
+): PeerDiagnostics | null {
   const existing = model.peers.get(peerId);
   if (existing) return existing;
+  if (model.peers.size >= MAX_DIAGNOSTIC_PEERS) return null;
   const created = createPeerDiagnostics(peerId, role, capacity);
   model.peers.set(peerId, created);
   model.revision += 1;
@@ -390,8 +394,9 @@ export function desyncMeter(input: Readonly<{
 // ---------------------------------------------------------------------------
 
 export function recordRttSample(model: NetcodeDiagnosticsModel, peerId: string, sampleMs: number, role?: NetDiagnosticsRole): void {
-  const peer = peerFor(model, peerId, role ?? 'guest');
   if (!Number.isFinite(sampleMs) || sampleMs < 0) return;
+  const peer = peerFor(model, peerId, role ?? 'guest');
+  if (!peer) return;
   const previousSample = peer.rttSamples.length > 0 ? peer.rttSamples.last() : sampleMs;
   peer.jitterMs = nextJitterMs(peer.jitterMs, previousSample, sampleMs);
   peer.rttMs = nextRttMs(peer.rttMs, sampleMs);
@@ -406,6 +411,7 @@ export function recordRttSample(model: NetcodeDiagnosticsModel, peerId: string, 
  */
 export function recordInboundSnapshot(model: NetcodeDiagnosticsModel, peerId: string, seq: number, nowMs: number, role?: NetDiagnosticsRole): void {
   const peer = peerFor(model, peerId, role ?? 'guest');
+  if (!peer) return;
   peer.inboundArrivals.push(nowMs);
   peer.lastInboundAtMs = Number.isFinite(nowMs) ? nowMs : peer.lastInboundAtMs;
   if (Number.isFinite(seq) && seq >= 0) {
@@ -418,6 +424,7 @@ export function recordInboundSnapshot(model: NetcodeDiagnosticsModel, peerId: st
 
 export function recordOutboundSnapshot(model: NetcodeDiagnosticsModel, peerId: string, nowMs: number, role?: NetDiagnosticsRole): void {
   const peer = peerFor(model, peerId, role ?? 'guest');
+  if (!peer) return;
   peer.outboundSends.push(nowMs);
   model.revision += 1;
 }
@@ -425,6 +432,7 @@ export function recordOutboundSnapshot(model: NetcodeDiagnosticsModel, peerId: s
 export function recordAck(model: NetcodeDiagnosticsModel, peerId: string, nowMs: number, role?: NetDiagnosticsRole): void {
   const peer = peerFor(model, peerId, role ?? 'guest');
   if (!Number.isFinite(nowMs)) return;
+  if (!peer) return;
   peer.lastAckAtMs = nowMs;
   peer.everAcked = true;
   model.revision += 1;
@@ -438,6 +446,7 @@ export function recordAck(model: NetcodeDiagnosticsModel, peerId: string, nowMs:
  */
 export function recordPositionDisagreement(model: NetcodeDiagnosticsModel, peerId: string, metres: number, role?: NetDiagnosticsRole): void {
   const peer = peerFor(model, peerId, role ?? 'guest');
+  if (!peer) return;
   peer.disagreementM.push(metres);
   model.revision += 1;
 }
@@ -452,6 +461,7 @@ export function recordRequestOutcome(
   reason = '',
 ): void {
   const peer = peerFor(model, peerId);
+  if (!peer) return;
   peer.requests.record(kind, outcome, nowMs, latencyMs, reason);
   model.revision += 1;
 }

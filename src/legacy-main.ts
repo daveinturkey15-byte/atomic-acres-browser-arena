@@ -925,6 +925,8 @@ import {
   observeDisagreement as observeNetcodeDisagreement,
   observeInbound as observeNetcodeInbound,
   observeRtt as observeNetcodeRtt,
+  forgetNetcodePeer,
+  resetNetcodeDiagnosticsRuntime,
   tickNetcodeDiagnostics,
 } from './netcode-diagnostics-runtime';
 import {
@@ -7778,6 +7780,7 @@ function hidePrivateLobbyPresentation(): void {
 
 function resetPrivateLobbyState(): void {
   invalidateMatchAdmission('Private lobby state reset');
+  resetNetcodeDiagnosticsRuntime();
   hostLobbySessionGeneration += 1;
   if (activeRoomIdentityCode) {
     try { releaseRoomRejoinIdentityLease(activeRoomIdentityCode, localStorage, roomIdentityTabId); } catch { /* Lease expires if storage is unavailable. */ }
@@ -9901,6 +9904,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyConnectionEpochs.delete(playerId);
     authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
+    forgetNetcodePeer(playerId);
     forgetTextChatParticipant(playerId);
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
@@ -16681,6 +16685,7 @@ function processDeath(message: DeathMessage): void {
 }
 
 function removeRemote(id: string, reason: string, allowRejoinReservation = true): void {
+  forgetNetcodePeer(id);
   const remote = remotes.get(id);
   if (!remote) return;
   const retainCombatAuthority = allowRejoinReservation && shouldRetainRemoteCombatAuthority(

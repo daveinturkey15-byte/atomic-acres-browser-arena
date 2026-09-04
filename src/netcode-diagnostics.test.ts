@@ -3,6 +3,7 @@ import {
   DESYNC_ACK_SATURATION_MS,
   DESYNC_POSITION_SATURATION_M,
   JITTER_GAIN,
+  MAX_DIAGNOSTIC_PEERS,
   NumericRing,
   REQUEST_OUTCOME_CAPACITY,
   RequestOutcomeRing,
@@ -207,7 +208,7 @@ describe('model recording', () => {
     recordPositionDisagreement(model, 'guest-1', 1.1);
 
     const peer = peerFor(model, 'guest-1');
-    const summary = summarisePeer(peer, 1_400);
+    const summary = summarisePeer(peer!, 1_400);
     expect(summary.rttMs).toBeGreaterThan(80);
     expect(summary.rttMs).toBeLessThan(120);
     expect(summary.jitterMs).toBeGreaterThan(0);
@@ -223,9 +224,9 @@ describe('model recording', () => {
   it('reports an unacked peer as NaN age rather than pretending it just acked', () => {
     const model = createNetcodeDiagnosticsModel('guest', 'g', 'ROOM');
     const peer = peerFor(model, 'host-1', 'host');
-    expect(Number.isNaN(lastAckAgeMs(peer, 5_000))).toBe(true);
+    expect(Number.isNaN(lastAckAgeMs(peer!, 5_000))).toBe(true);
     recordAck(model, 'host-1', 4_000);
-    expect(lastAckAgeMs(peer, 5_000)).toBe(1_000);
+    expect(lastAckAgeMs(peer!, 5_000)).toBe(1_000);
   });
 
   it('bumps the revision on every mutation so the overlay can skip cheaply', () => {
@@ -248,6 +249,15 @@ describe('model recording', () => {
     expect(forgetPeer(model, 'g1')).toBe(true);
     expect(forgetPeer(model, 'g1')).toBe(false);
     expect(model.peers.size).toBe(0);
+  });
+
+  it('bounds peer rows even when callers present unbounded ids', () => {
+    const model = createNetcodeDiagnosticsModel('host', 'h', 'ROOM');
+    for (let index = 0; index < MAX_DIAGNOSTIC_PEERS + 4; index += 1) {
+      recordInboundSnapshot(model, `forged-${index}`, index, index);
+    }
+    expect(model.peers.size).toBe(MAX_DIAGNOSTIC_PEERS);
+    expect(peerFor(model, 'forged-overflow')).toBeNull();
   });
 });
 
