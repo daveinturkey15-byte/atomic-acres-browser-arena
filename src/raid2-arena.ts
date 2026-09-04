@@ -91,6 +91,7 @@ import type { ArenaMap } from './map';
 import { worldTiled } from './test-maps-art';
 import { raid2ForgedMaterial, raid2ForgedSurfaces } from './raid2-art';
 import { dressRaid2 } from './raid2-dressing';
+import { generateRaid2FacadeDetail } from './raid2-facade-detail';
 import { RAID2_MEASURED } from './raid2-reference';
 import {
   discBands, RAID2_POOL_COPING_DEPTH, RAID2_POOL_WATER, ringSegments, subtractRects,
@@ -996,6 +997,9 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // colliders only, zero new materials. Runs before the presentation batch
   // so batched members are audited through their source nodes.
   dressRaid2(builder, m);
+  // Procedural facade detail (r185 technique #6 in our likeness): derived from
+  // the authored faces above, presentation-only, before the shared batcher.
+  generateRaid2FacadeDetail(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'raid2-presentation');
 
