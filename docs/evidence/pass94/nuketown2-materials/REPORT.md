@@ -344,3 +344,13 @@ lane markings each read as their own material rather than as a coloured box.
    another agent is actively using is not this lane's call, so it is recorded
    here rather than fixed. **The integrator should re-run both gates at the
    merge head.**
+
+## Muse review TODOs
+
+- **TODO (integrator; larger browser verification):** At the final merge head,
+  start the lane's isolated preview and run
+  `PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0 -g nuketown2`,
+  then run `npm run qa:stock-boot` with installed Chrome and no unsafe flags.
+  Retain receipts showing the final SHA and zero console errors; do not merge
+  on the existing capture receipt alone. This remains open here because this
+  repair pass is explicitly browser/build-free.
