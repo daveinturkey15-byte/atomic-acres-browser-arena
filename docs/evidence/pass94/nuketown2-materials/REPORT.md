@@ -288,3 +288,33 @@ tightened once during the lane, never loosened.
    `docs/PASS84_OWNER_FEEDBACK_2026-09-02.md`. Writing to that shared ledger from
    a feature worktree would conflict with every parallel lane, so the row is left
    for the integrator to assign.
+
+---
+
+## 7. The seven review captures
+
+Head `32105cdf`, native WebGPU, installed headless Chrome, 1280x720, fixed
+visual time and seed, HUD hidden. SHA-256:
+
+| Frame | SHA-256 |
+|---|---|
+| [overhead](review-overhead.png) | `04fb4fb585a740f0c9f3b838ce991d014db067360fdd514e868f5d8656902fcd` |
+| [north yard](review-north-yard.png) | `d955d57cd1c3d5f5fd6c1614d03ff263e8bef40daf5ae990ae8138db30d9dcae` |
+| [south yard](review-south-yard.png) | `d6d482b991ef2d22c303c4a33fcf18f6d5e9f3c041378d935c0ba7701eb295e8` |
+| [street centre](review-street-centre.png) | `61733c5023f00a46fadbf2670abc98d0831f2a561d53930ee7f510c3e57d30b2` |
+| [north upper window](review-north-upper-window.png) | `5f7c5c08ae65358dc87d05527d3d2a812c8b5b6f90ac46375767d2504e416b8a` |
+| [south upper window](review-south-upper-window.png) | `45a0d2352d7054d77fa5074d077e32fb4eed060a0d938362bd52c565854069f6` |
+| [into-sun street](review-into-sun-street.png) | `4c5497034e5a6d5da9e1c53894dd32cead0bfb3867182ae9bcffdd4aa5967211` |
+
+The interior and vehicle stations from the same run (garage, balcony, front
+porch, coach elevation) were captured too and reviewed; the garage frame is the
+clearest look at the timber deck boards and the sawn slab joints, both of which
+read as the real thing.
+
+**Would a viewer think it is a photograph?** No, and honestly nothing in this
+lane could make it one - the arena's geometry, lighting rig and grade all sit
+somewhere else, and a competitive shooter's readability bound deliberately
+prevents the exposure a photograph needs. What did change is narrower and
+answerable: surfaces that were one flat value now have structure at the size the
+real thing has it, and blockwork, lap siding, deck boards, poured slabs and worn
+lane markings each read as their own material rather than as a coloured box.
