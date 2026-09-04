@@ -42,6 +42,20 @@ export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpe
     scuff: { sizeM: 0.060, albedo: 0.065, roughness: 0.10 },
     traffic: { sizeM: 2.2, albedo: 0.055, roughness: 0.05 },
     soil: 0.075,
+    // A roof is read from below and across the map, so its macro field is the
+    // widest of the eight: 3.2 m is a bundle's worth of shingle laid on one
+    // afternoon, and 0.18 m is just over one tab. Both survive at 30 m, which
+    // is the range this surface is actually read at. No normal tilt: the
+    // course butt shadow already carries the relief.
+    variation: {
+      macro: { sizeM: 3.2, albedo: 0.050, roughness: 0.04 },
+      micro: { sizeM: 0.18, albedo: 0.035, roughness: 0.05 },
+      tintSpread: 0.022,
+      normalDegrees: 0,
+      edgeWear: 0,
+      soilRoughness: 0.06,
+      polishRoughness: 0.06,
+    },
   });
 }
 
@@ -62,7 +76,7 @@ function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const shingleTone = hash2(vec2(tabIdx, courseIdx)).sub(float(0.5)).mul(float(0.16));
   const granuleLoss = smoothstep(float(0.35), float(0.72), wear.scuff);
   const matAsphalt = linearSwatch(0x2a2b2b);
-  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(shingleTone));
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint).mul(float(1).add(shingleTone));
   const withLoss = mix(base, matAsphalt, granuleLoss.mul(float(0.55)));
   const streakField = fract(p.x.mul(float(1.7)).add(wear.soilMask.mul(float(0.4))));
   const streak = smoothstep(float(0.58), float(0.86), streakField).mul(wear.soilMask);

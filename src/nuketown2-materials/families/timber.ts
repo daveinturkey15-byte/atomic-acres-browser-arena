@@ -45,6 +45,20 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
     scuff: { sizeM: 0.055, albedo: painted ? 0.055 : 0.065, roughness: 0.10 },
     traffic: { sizeM: 1.8, albedo: painted ? 0.060 : 0.075, roughness: 0.08 },
     soil: painted ? 0.075 : 0.085,
+    // Timber varies more in HUE than any other family here - heartwood against
+    // sapwood, one plank's stain against the next - so this carries the widest
+    // warm/cool spread of the eight. 0.10 m is a bay of fence between posts.
+    // No normal tilt: the board relief is already real geometry with a real
+    // gap between pickets, and doubling it in the shading would fight it.
+    variation: {
+      macro: { sizeM: 2.2, albedo: 0.045, roughness: 0.05 },
+      micro: { sizeM: 0.10, albedo: 0.030, roughness: 0.06 },
+      tintSpread: 0.026,
+      normalDegrees: 0,
+      edgeWear: 0.10,
+      soilRoughness: 0.07,
+      polishRoughness: 0.06,
+    },
   });
 }
 
@@ -74,14 +88,23 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
   const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
   const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
-  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
+  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint).mul(float(1).add(boardTone));
   const grained = wood.mul(float(1).sub(latewood.mul(painted.select(float(0.03), float(0.11)))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
   const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
+  // The board's own long arris: the edge every hand, shoulder and mower has
+  // rubbed, silvered further than the face beside it and worn smooth with it.
+  const arris = smoothstep(float(0.84), float(0.99), boardEdge);
+  const edged = mix(footed, footed.mul(float(1).add(uniforms.edgeWear.mul(float(1.8)))), arris);
   timberGraph = {
-    colorNode: mix(footed, linearSwatch(0x1a120c), gap),
-    roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
+    colorNode: mix(edged, linearSwatch(0x1a120c), gap),
+    roughnessNode: clamp(
+      wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08)))
+        .sub(knot.mul(float(0.10))).sub(arris.mul(uniforms.edgeWear)),
+      float(0.25),
+      float(1.0),
+    ),
   };
   return timberGraph;
 }

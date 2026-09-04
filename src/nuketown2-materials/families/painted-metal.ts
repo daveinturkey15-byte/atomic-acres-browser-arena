@@ -45,6 +45,20 @@ export function paintedMetalSpec(name: string, baseSrgb: number): Nuketown2Mater
     scuff: { sizeM: 0.050, albedo: 0.080, roughness: 0.12 },
     traffic: { sizeM: 1.5, albedo: 0.055, roughness: 0.10 },
     soil: 0.070,
+    // 1.8 m is a door leaf, and factory paint really does drift that much across
+    // one: the roller lays down thicker at the middle of a panel than at its
+    // stamped edges. 0.09 m is orange peel at the scale a camera resolves it.
+    // No normal tilt - the panel stamps are the relief, and a bump on top of
+    // a mirror-ish film reads as dirt rather than as texture.
+    variation: {
+      macro: { sizeM: 1.8, albedo: 0.040, roughness: 0.04 },
+      micro: { sizeM: 0.09, albedo: 0.025, roughness: 0.05 },
+      tintSpread: 0.024,
+      normalDegrees: 0,
+      edgeWear: 0.09,
+      soilRoughness: 0.06,
+      polishRoughness: 0.07,
+    },
   });
 }
 
@@ -76,14 +90,23 @@ function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any;
   const primer = linearSwatch(0x9c968c);
   const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
   const weep = smoothstep(float(0.35), float(0.0), p.y).mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
-  const paint = uniforms.baseColor.mul(wear.albedoMul);
+  const paint = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint);
   const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
   const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
+  // The crest of every stamped section: the line a garage door is grabbed by,
+  // reversed into and rubbed past, where the film has thinned to primer sheen.
+  const crest = smoothstep(float(0.88), float(1.0), section).mul(panelled);
+  const lifted = mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4)));
   paintedMetalGraph = {
-    colorNode: mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4))),
-    roughnessNode: clamp(wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))), float(0.15), float(1.0)),
+    colorNode: mix(lifted, lifted.mul(float(1).add(uniforms.edgeWear.mul(float(1.5)))), crest),
+    roughnessNode: clamp(
+      wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30)))
+        .add(weep.mul(float(0.24))).sub(crest.mul(uniforms.edgeWear)),
+      float(0.15),
+      float(1.0),
+    ),
   };
   return paintedMetalGraph;
 }
