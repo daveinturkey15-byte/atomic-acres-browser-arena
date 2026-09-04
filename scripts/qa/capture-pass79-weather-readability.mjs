@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+// Pass 79 weather readability capture: measures how readable a staged enemy stays on a live WebGPU build as weather goes from clear to maximum storm, writing per-state PNGs plus a JSON contrast report.
+//
+// Usage:
+//   node scripts/qa/capture-pass79-weather-readability.mjs [--url <url>] [--arena <id>] [--range <m>] [--out <dir>] [--frames <n>] [--tag <t>] [--states <csv>]
+//
+// Flags (process.argv; all optional):
+//   --url    <url>   App under test URL                            (default http://127.0.0.1:41917)
+//   --arena  <id>    Arena id to load                              (default high-seas)
+//   --range  <m>     Enemy distance, metres                        (default 30)
+//   --out    <dir>   Output directory, created if missing          (default artifacts/pass79/weather)
+//   --frames <n>     Median frames captured per state              (default 5)
+//   --tag    <t>     Filename tag                                  (default run)
+//   --states <csv>   Comma-separated weather states to run         (default clear,light-rain,heavy-rain,storm)
+// Environment variables: none are read.
+//
+// Writes (inside --out): <out>/<tag>-<arena>-<state>-full.png and <out>/<tag>-<arena>-<state>-target.png
+// per state, plus <out>/<tag>-<arena>-readability.json; the per-state summary is also printed to stderr.
+//
+// Exit codes: no process.exit calls; 0 on success (Node default), 1 on uncaught exception.
 // Pass 79 weather lane — prove an enemy stays readable at the HEAVIEST weather
 // this build can show, on REAL hardware WebGPU, by measuring the pixels the
 // enemy actually puts on the screen rather than the numbers we fed the sim.
