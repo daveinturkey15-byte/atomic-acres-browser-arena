@@ -59,6 +59,7 @@ import {
   mx_fractal_noise_float,
   mx_noise_float,
   positionGeometry,
+  positionView,
   saturate,
   sin,
   smoothstep,
@@ -160,8 +161,16 @@ function buildLookGraph(look: OperatorLookDefinition, role: OperatorLookRole) {
   // Weave. A fine, near-isotropic noise at millimetre scale; this is the cue
   // that separates canvas from moulded plastic at close range and it is exactly
   // what a flat colour cannot have.
+  //
+  // It is FADED OUT WITH DISTANCE, and that is not a performance tweak. A 2-4 mm
+  // feature is far below one pixel on an operator seen across an arena, and
+  // procedural noise has no mip chain to fall back on, so at range it would
+  // alias into crawling speckle on a moving body - the most visible artefact
+  // this module could ship. Beyond 9 m the garment is its camouflage and its
+  // wear, which are decimetre-scale and safe.
+  const weaveFade = float(1).sub(smoothstep(float(3), float(9), positionView.length()));
   const weave = mx_noise_float(positionGeometry.mul(1 / cloth.weaveScaleM));
-  albedo = albedo.mul(float(1).add(weave.mul(cloth.weaveDepth)));
+  albedo = albedo.mul(float(1).add(weave.mul(cloth.weaveDepth).mul(weaveFade)));
 
   // Faction trim: a real albedo band across the shoulders and outer arms.
   // Kept on the garment role only so it reads as a patch, not as paint.
