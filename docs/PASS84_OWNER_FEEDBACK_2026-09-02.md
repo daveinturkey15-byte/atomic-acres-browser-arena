@@ -1465,3 +1465,25 @@ assets and textures and lighting need to be tip top, raid can come next"
   Cloned read-only to `C:\Users\david\projects\morning-diner-ref` for the
   asset-forge lane: extract the technique into a skill, then apply it to Nuke
   Town's vehicles and materials in code — no Blender.
+
+## HF-468 — owner 2026-09-04 10:50: "Astra" threads ingested; code-native equivalent wanted
+
+- Read in the pane without login: mattshumer_ 2095609734845927525 ("GPT-6
+  Astra built this Manhattan world in Unreal Engine over a week, street by
+  street"); Stefan_3D_AI 2095720649922871630 (OpenAI launch, 4 Sept 2026:
+  GPT-6 Astra works inside Blender autonomously — gathers reference photos,
+  builds the scene, renders test frames, checks them against the references,
+  fixes what is off, ships to UE5 as a walkable level), 2095720653500695029
+  (Palace of Fine Arts rebuilt from hundreds of photos by render-and-compare),
+  2095720656944115856 (house from a design drawing → UE5; Playco: one greybox →
+  three playable prototypes with ~half the manual fixes).
+- **Owner:** get close to that outside Blender, or use Blender later on a test
+  map ("test map 4"); ideally our own light version that uses WebGPU to the
+  fullest plus our skills.
+- **Assessment:** Astra's loop is the gauntlet loop with two additions we lack:
+  (1) reference gathering (real photos/drawings as the target), (2) a critic
+  that compares renders AGAINST the references, not against a rubric. Our
+  stack can do both in code: first-party reference sets per subject, headless
+  captures, reference-grounded critics (vision models given the reference and
+  the capture side by side), fixes in TSL/three.js. That is the asset-forge
+  lane's design; Blender stays optional for a later test-map experiment.
