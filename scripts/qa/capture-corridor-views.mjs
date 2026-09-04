@@ -1,3 +1,8 @@
+// Captures WebGPU screenshots of the 8 corridor views (plus hub overview) of the local map3 preview at http://localhost:41931/map3.html via headless Chrome, one PNG per camera pose.
+// Usage: node scripts/qa/capture-corridor-views.mjs
+// Flags / environment variables: none (script reads no process.argv flags and no process.env variables)
+// Writes: artifacts/ directory (created if missing) containing 15 files: artifacts/<view-name>.png, one per camera pose (hub-overview, corridor-1-nature, corridor-1-nature-vehicle, corridor-2-maths, corridor-3-grammar, corridor-4-water-mouth, corridor-4-water-shore, corridor-5-weather-spring, corridor-5-weather-storm-downpour, corridor-5-weather-winter-blizzard, corridor-6-volume-godrays-mouth, corridor-6-volume-godrays-inside, corridor-7-physics-jenga-balls, corridor-7-physics-machinery, corridor-8-colosseum-overlook)
+// Exit codes: 0 = success; 1 = any error (uncaught in main)
 import { chromium } from '@playwright/test';
 import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
