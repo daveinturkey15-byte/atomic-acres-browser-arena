@@ -1638,3 +1638,12 @@ assets and textures and lighting need to be tip top, raid can come next"
 - **Integrator launched 12:50:** PASS 94 candidate = PASS 93 + killstreaks +
   spawns + handedness (incl. round 2) + ballistics + vehicle forge; honest
   gates; HITL on :4300.
+
+## HF-476 — owner 2026-09-04 12:58: "nuketown in black ops 2 is what we need, not a diff one"
+
+- Reference target is Black Ops 2's **Nuketown 2025** only. Other Nuketowns
+  (BO1 original, Cold War '84, Nukehouse, BO6/BO7) are secondary evidence,
+  admissible only for features shown identical in BO2 Nuketown 2025, and
+  every reference and finding must be labelled with its game version. The
+  balcony spec from R4 (inherited from '84/original) must be re-checked
+  against BO2 Nuketown 2025 images before it ships.
