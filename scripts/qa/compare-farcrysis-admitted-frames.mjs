@@ -1,4 +1,17 @@
 /**
+ * Signed-luminance comparator for farcrysis boot-probe admission frames (PASS 84 lane C):
+ * per-pair mean signed luminance, %brighter>8 / %darker>8, unsigned >16 continuity figure,
+ * 6x8 tile grid of mean signed luminance, CONTROL pair always first.
+ *
+ * Usage: node scripts/qa/compare-farcrysis-admitted-frames.mjs [a.png:b.png ...]
+ *   positional a.png:b.png (repeatable; read from process.argv[2:]): comparison pairs
+ *     default: none (falls back to the built-in PASS 84 lane-C pair set, CONTROL first)
+ *   env vars: none
+ *   flags: none
+ * Writes: nothing (stdout report only; reads artifacts/qa/farcrysis-load/*.png)
+ * Exit codes: 0 on success; non-zero on unhandled throw (e.g. size mismatch, missing PNG). No explicit process.exit calls.
+ */
+/**
  * compare-farcrysis-admitted-frames.mjs — PASS 84 lane C.
  *
  * Compares the admission frames the farcrysis boot probe captures, with a
