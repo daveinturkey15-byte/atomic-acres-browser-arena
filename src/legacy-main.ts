@@ -13640,6 +13640,9 @@ function onNetworkMessage(message: GameMessage): void {
           hp: authoritativeHealth.hp,
         };
         if (respawned) {
+          // Pickup authorization belongs to the prior life and may not grant
+          // a post-respawn primary change without a fresh host admission.
+          authorizedRemotePickups.delete(incoming.id);
           const grenadeCount = remoteGrenadeAuthorities.get(incoming.id)?.remaining ?? 1;
           resetRemoteCombatInventory(admittedIncoming, grenadeCount);
         }
