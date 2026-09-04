@@ -8,10 +8,10 @@ Worktree: `contrib/dave-gaming-pc/claude/nuke-event`
 
 `src/nuke-event/` adds a presentation-only Nuke Town horizon cloud and a
 deterministic match-end detonation. The background is one 40-step ray-marched
-TSL volume over a distant box. The event reuses that same volume graph for its
-flash/fireball/stem/cap timeline. The ground shockwave is one separate
-alpha-noise TSL ring. No full-screen pass, render target, collider, spawn or
-gameplay authority was added.
+TSL volume over a distant box. The event has a separate material instance and
+per-draw uniforms for its flash/fireball/stem/cap timeline. The ground
+shockwave is one separate alpha-noise TSL ring. No full-screen pass, render
+target, collider, spawn or gameplay authority was added.
 
 The event is active only when the selected arena is `nuketown2`; the persistent
 background mesh remains in the scene but is hidden for every other arena.
@@ -109,3 +109,15 @@ as requested; the gate needs repository-owner reconciliation.
 **OPEN by constraint**: browser menu-lifecycle, multiplayer-lifecycle and
 hardware frame-pacing captures were not run because this task explicitly
 forbade browsers and GPU use.
+
+## Muse Spark review follow-ups
+
+| Finding | State | Exact follow-up |
+|---|---|---|
+| F0: the lane contains a broad out-of-lane deletion/revert relative to `origin/contrib/dave-gaming-pc/claude/pass93-candidate`. | **TODO / OPEN** | At `git diff origin/contrib/dave-gaming-pc/claude/pass93-candidate..HEAD`, rebase onto the current pass93 candidate and restore unrelated tracked paths, including `acceptance/pass-94.json`, `docs/evidence/pass94/candidate4b/**`, `docs/evidence/pass94/nuketown2-accuracy2/**`, `docs/evidence/pass94/quality-gap/**`, `src/nuketown2-pipeline-budget.test.ts`, `src/particles/ambient-visibility.test.ts`, `src/rendering/atmosphere/aerial-perspective.ts`, and `src/rendering/screen-space-post.ts` plus their tests. Re-run the lane diff and retain only nuke-event work before handoff. This is larger than a safe surgical fix. |
+| F1: background and event draws shared mutable volume uniforms/material state. | **VERIFIED / FIXED** | `src/nuke-event/index.ts:171-240,363-374`: use `eventVolumeMaterial` plus distinct event origin/extents/mode/opacity uniforms; `src/nuke-event/nuke-event.test.ts` asserts material isolation. |
+| F2: multiplayer trigger could synthesize a host timestamp from a guest-local fallback. | **VERIFIED / FIXED** | `src/legacy-main.ts:27695`: pass the replicated snapshot only for non-solo play and use the local end timestamp only for solo; `src/nuke-event/nuke-event.test.ts` source-pins the null fallback. |
+| F3: detonation camera shake uses `performance.now()` while the event timeline uses host time. | **TODO / OPEN** | `src/legacy-main.ts:6543` and `src/nuke-event/index.ts:300-316`: base the accepted nuke trauma impulse on the event's host-time domain, or add an explicitly bounded host-to-local receipt conversion and a peer-determinism test. No timing change was made without runtime evidence. |
+| F4: volume/ring meshes disable frustum culling and can ray-march every frame. | **TODO / OPEN** | `src/nuke-event/index.ts:225,235,248`: remove unconditional `frustumCulled = false` and implement a correct bounding/facing visibility gate for the long-horizon boxes and ring; verify draw-call and frame-cost behavior with the required capture. |
+| F5: exposure scale can reach 1.38x without a visual bound. | **TODO / OPEN** | `src/nuke-event/index.ts:320`: cap the exposure contribution at 1.25x only after a native-WebGPU capture and HITL review confirms the bound preserves the intended flash. |
+| F6: the 0.42 ms p50 ray-march estimate is not measured on target hardware. | **TODO / OPEN** | `src/nuke-event/timeline.ts:13-16` and the budget row above: run the exact-SHA native-WebGPU capture at the three review stations, report p50/p95 and frame pacing, and replace the estimate with the receipt-backed result. |
