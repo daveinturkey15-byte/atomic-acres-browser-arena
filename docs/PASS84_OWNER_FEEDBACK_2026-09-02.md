@@ -1703,3 +1703,28 @@ assets and textures and lighting need to be tip top, raid can come next"
   honouring the SAM/mocap rule — never mocap where guns are involved — with
   the licence-safe local routes; slice 1: procedural locomotion/aim layer for
   players and bots and a TSL operator skin system replacing tint-only skins).
+
+## HF-480 — PASS 94 candidate 3 served for HITL, 2026-09-04 14:00
+
+- **Handoff claim:** head `baece3b1` on `pass93-candidate` (worktree
+  `aa-claude-hitl`) = PASS 93 + killstreak tuning + spawn distribution +
+  Nuke Town round 2 + handedness/balconies + ballistics wiring + vehicle
+  forge; four cross-lane defects fixed at cause (Nuke Town spawns re-solved
+  inside |z|<36 with 0 spawn sightlines; forged skins mirrored to match the
+  HF-473 colliders; HF-465 timber rated; Raid spawns re-solved for its
+  x-mirror contract). Served on http://127.0.0.1:4300/ (pid 25516). Still
+  says PASS 93 until the cut. NOT published.
+- **Gates:** tsc 0; 19 named files 400/400; FULL suite 585 files / 5771
+  tests, 0 failed; coplanar 0/0/0; stock-Chrome boot 4/4; nuketown2 smoke
+  52.7 s; HF-390 ballistics PASS; 17/17 review captures — garage on the RIGHT
+  from both backyard spawns (all 16 spawns report RIGHT), balcony + exterior
+  flight + upper back door present, forged vehicles read as vehicles.
+- **RED, deliberately left:** HF-467 material-class probe — a pistol crosses
+  0.12 m concrete kerbs and the road slab (thin `stop` geometry; entry cost
+  2.5 + 7.0/m never reaches a pistol's power). Fix lane: a minimum traversal
+  charge for the `stop` class (thin concrete stops small arms; the intended
+  rifle-through-brick wallbang kept), not a contract restatement.
+- Owner checklist: garage side from your spawn, balconies/stairs, breakable
+  windows and shootable blocks, spawns spread, chopper rockets (6 autopilot /
+  12 piloted, weaker MG), swarm/drone speed, right-click taser, forged
+  vehicles, materials/lighting still basic (lanes running), FPS.
