@@ -7,13 +7,13 @@ import { PASS66_RELEASE_IDENTITY } from './release-identity';
 const here = fileURLToPath(import.meta.url);
 const read = (name: string) => readFileSync(join(here, '..', name), 'utf8');
 
-describe('pass93 build-identity lobby handshake', () => {
-  // Re-pinned to PASS 93 on 2026-09-02 (the pass93 cut). Same strictness: the stamp must
+describe('pass94 build-identity lobby handshake', () => {
+  // Re-pinned to PASS 94 on 2026-09-02 (the pass94 cut). Same strictness: the stamp must
   // name the channel this source publishes to, and it is what the host compares on join.
   it('stamps the running build for the channel this source publishes to', () => {
-    expect(PASS66_RELEASE_IDENTITY.pass).toBe('PASS 93');
-    expect(PASS66_RELEASE_IDENTITY.route).toBe('channels/pass93');
-    expect(PASS66_RELEASE_IDENTITY.runtimeLabel).toBe('PASS 93');
+    expect(PASS66_RELEASE_IDENTITY.pass).toBe('PASS 94');
+    expect(PASS66_RELEASE_IDENTITY.route).toBe('channels/pass94');
+    expect(PASS66_RELEASE_IDENTITY.runtimeLabel).toBe('PASS 94');
   });
 
   it('carries the stamped build id on every lobby join', () => {

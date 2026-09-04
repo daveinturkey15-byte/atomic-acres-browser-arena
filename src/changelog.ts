@@ -3,9 +3,9 @@
  *
  * HF-406 (owner, 2026-09-02, verbatim): "ensure the top right thing is an accurate
  * update of both the current pass number and features ... Currently it says pass 73
- * HITL?!". He was right, and the cause was here: `CHANGELOG[0]` was still `pass73`
+ * "pass 73?!". He was right, and the cause was here: `CHANGELOG[0]` was still `pass73`
  * eleven passes after Pass 73 shipped, so the badge rendered
- * `HITL CANDIDATE · NOT LIVE` (no pass number at all) and the panel behind it opened
+ * an internal candidate label (no pass number at all) and the panel behind it opened
  * on PASS 73. Measured on the live PASS 83 channel on 2026-09-02: the string lives in
  * `channels/pass83/assets/changelog-CgKeduvY.js`, not in index.html.
  *
@@ -67,7 +67,7 @@ export function pass72ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
       ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.'
       : 'Pass 72 is the mechanically gated publication candidate, adding host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.',
     lineage: released
-      // HF-406: no internal review acronym in player-facing copy. "HITL" belongs to the
+      // HF-406: no internal review acronym in player-facing copy. Review terminology belongs to the
       // owner checklist under docs/, never to a rendered release note.
       ? 'Pass 70 remains the exact retained live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; owner review subsequently identified the corrections tracked in Pass 73'
       : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner review follows the protected Pages release',
@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass93ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass94ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 93. */
+const pass93ReleasedAt = '2026-09-04T08:08:44+01:00';
 /** gh-pages publish receipt for PASS 92. */
 const pass92ReleasedAt = '2026-09-03T19:13:03+01:00';
 /** gh-pages publish receipt for PASS 91. */
@@ -144,6 +146,22 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass94',
+    pass: 'PASS 94',
+    title: 'Pass 94 · Nuke Town Rebuild, Map Order & Candidate 5',
+    releasedAt: pass94ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'MENUS', 'GAMEPLAY', 'PERFORMANCE', 'AUDIO']),
+    summary: 'Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish.',
+    highlights: Object.freeze([
+      'Nuke Town Rebuild is first in the map selection; old Raid is retired and Raid 2 preview is near the top.',
+      'The approved candidate 5 carries the Chrome 153 WebGPU fix, killstreak tuning, Nuke Town Rebuild, bot/spawn, minimap, vehicle and audio work.',
+      'Pass 93 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
@@ -839,10 +857,10 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
 
 /**
  * HF-406: the top-right badge. It ALWAYS leads with the pass the running build is,
- * published or not. The previous label was `HITL CANDIDATE · NOT LIVE`, which named no
+ * published or not. The previous label was an internal candidate label, which named no
  * pass at all and put an internal review acronym where the version belongs - the exact
- * surface the owner read as "pass 73 HITL". "HITL" now appears only in the owner
- * checklist under docs/, never in a player-facing surface.
+ * surface the owner read as "pass 73 candidate". Review terminology now appears only in
+ * the owner checklist under docs/, never in a player-facing surface.
  */
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
   if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return `${entry.pass} · RELEASE CANDIDATE`;

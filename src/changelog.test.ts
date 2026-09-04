@@ -13,13 +13,13 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 93 candidate first and freezes every published timestamp behind it', () => {
+  it('keeps the pending Pass 94 candidate first and freezes every published timestamp behind it', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass93');
+    expect(latest.id).toBe('pass94');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 93');
-    expect(latest.summary).toContain('Pass 93');
+    expect(latest.title).toContain('Pass 94');
+    expect(latest.summary).toContain('Pass 94');
     // HF-406: Pass 73 stopped being the current entry on 2026-09-02. Its Pages
     // publication receipt is e138853f ("PASS 73 from 506d6142", 2026-08-21T20:27:27Z),
     // so it is history with a real timestamp, not a candidate that never shipped.
@@ -41,8 +41,10 @@ describe('changelog', () => {
     // HF-406: the badge leads with the pass number the build is stamped with. The old
     // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
     // the owner read as "pass 73 HITL".
-    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 93 · RELEASE CANDIDATE');
-    expect(latest.highlights.join('\n')).toContain('Fix: arenas load again in stock Chrome 1');
+    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 94 · RELEASE CANDIDATE');
+    expect(latest.highlights.join('\n')).toContain('Nuke Town Rebuild is first in the map se');
+    const pass93Highlights = CHANGELOG.find((entry) => entry.id === 'pass93')?.highlights.join('\n') ?? '';
+    expect(pass93Highlights).toContain('Fix: arenas load again in stock Chrome 1');
     const pass92Highlights = CHANGELOG.find((entry) => entry.id === 'pass92')?.highlights.join('\n') ?? '';
     expect(pass92Highlights).toContain('Nuke Town: z-fighting removed, stairs wa');
     const pass91Highlights = CHANGELOG.find((entry) => entry.id === 'pass91')?.highlights.join('\n') ?? '';
