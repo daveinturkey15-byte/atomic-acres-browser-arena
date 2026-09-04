@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { buildRaid2, RAID2_BOUNDS, RAID2_PALETTE, RAID2_UPPER_ROOMS, raid2PaletteLuminance, STAIR_RISERS, STAIR_RUN, STEP } from './raid2-arena';
+import { buildRaid2, RAID2_BOUNDS, RAID2_PALETTE, RAID2_UPPER_ROOMS, raid2PaletteLuminance, STAIR_RISERS, STAIR_RUN, STEP, SUNKEN_CUTS } from './raid2-arena';
+import { RAID2_MEASURED, RAID2_MIRROR_RELATIONS } from './raid2-reference';
+import { RAID2_POOL_WATER } from './raid2-shapes';
 
 import { measureLayout } from '../scripts/qa/raid2-layout-metrics';
 import { AUTOSTEP_M, CELL_M as REACH_CELL_M, measureReachability, STAND_CAPSULE_M } from '../scripts/qa/raid2-reachability';
@@ -37,6 +39,34 @@ const STAIR_TREAD_M = 0.45;
 
 const arena = buildRaid2(new THREE.Scene());
 const metrics = measureLayout('raid2', arena);
+
+/**
+ * Every mesh in the built arena with its world box, so the bands below can ask
+ * geometric questions of the ARENA rather than of a second transcription of
+ * its numbers. Built once; the scene is static.
+ */
+const meshBoxes: Array<{ name: string; box: THREE.Box3 }> = (() => {
+  const out: Array<{ name: string; box: THREE.Box3 }> = [];
+  arena.root.updateMatrixWorld(true);
+  arena.root.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!(mesh as unknown as { isMesh?: boolean }).isMesh || !mesh.geometry) return;
+    out.push({ name: mesh.name, box: new THREE.Box3().setFromObject(mesh) });
+  });
+  return out;
+})();
+
+/** The highest solid top at a ground column, ignoring first-floor mass. */
+function highestGroundTop(x: number, z: number): { name: string; top: number } | null {
+  let best: { name: string; top: number } | null = null;
+  for (const { name, box } of meshBoxes) {
+    if (box.min.x > x || x > box.max.x || box.min.z > z || z > box.max.z) continue;
+    if (box.max.y > 2) continue;
+    if (name.includes('water')) continue;
+    if (!best || box.max.y > best.top) best = { name, top: box.max.y };
+  }
+  return best;
+}
 
 describe('raid2 layout fidelity — the reference proportions', () => {
   it('1. keeps the bounds the reference study derived (100 x 76 m)', () => {
@@ -347,5 +377,102 @@ describe('raid2 spawns', () => {
 
   it('18. never lets one spawn see another', () => {
     expect(report.summary.enemyLosPairs).toBe(0);
+  });
+});
+
+describe('raid2 reference accuracy — the corrections this lane measured', () => {
+  it('24. MIRROR FALSIFIER: three independent sign relations, one of them inside a flank', () => {
+    // HF-461 caught the Nuke Town rebuild very nearly shipped mirrored, and the
+    // lesson was that topology agreeing is not handedness verified: the first
+    // two relations below survive a mirror intact. The THIRD is the one that
+    // catches it, because it is an asymmetry WITHIN a single flank, and it is
+    // measured off the artefact rather than assumed - the spa sits 3.8 m north
+    // of the pool water's own centroid.
+    const garage = meshBoxes.filter(({ name }) => name.startsWith('raid2 garage'));
+    const apron = meshBoxes.filter(({ name }) => name.startsWith('raid2 apron'));
+    expect(garage.length, 'garage meshes exist').toBeGreaterThan(0);
+    const garageX = garage.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).x, 0) / garage.length;
+    const apronX = apron.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).x, 0) / apron.length;
+    expect(garageX > 0, 'garage end is +X').toBe(RAID2_MIRROR_RELATIONS.garageEndIsPositiveX);
+    expect(apronX < 0, 'garden apron end is -X').toBe(true);
+
+    const pool = meshBoxes.filter(({ name }) => name.startsWith('raid2 pool water'));
+    const court = meshBoxes.filter(({ name }) => name.startsWith('raid2 court floor'));
+    const poolZ = pool.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).z, 0) / pool.length;
+    const courtZ = court.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).z, 0) / court.length;
+    expect(poolZ < 0 && courtZ < 0, 'pool and court are -Z').toBe(RAID2_MIRROR_RELATIONS.poolAndCourtAreNegativeZ);
+
+    const spa = meshBoxes.filter(({ name }) => name.startsWith('raid2 spa water'));
+    expect(spa.length, 'the spa exists').toBeGreaterThan(0);
+    const spaX = spa.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).x, 0) / spa.length;
+    const poolX = pool.reduce((sum, { box }) => sum + box.getCenter(new THREE.Vector3()).x, 0) / pool.length;
+    expect(spaX > poolX, 'the spa sits NORTH of the pool centroid, as measured').toBe(true);
+  });
+
+  it('25. BURIAL FALSIFIER: nothing stands at grade inside a sunken footprint', () => {
+    // The defect this closes was invisible to every existing band, because the
+    // metrics are collider-based and a paving slab is under the 0.8 m mountable
+    // ceiling: the arena paved straight over its own pool and its own sunk
+    // sport court, so both were unreachable and unseen while all 24 bands were
+    // green. A column probe is the falsifier, and it runs at the two features
+    // by name as well as across every cut.
+    for (const [x0, x1, z0, z1] of SUNKEN_CUTS) {
+      const hit = highestGroundTop((x0 + x1) / 2, (z0 + z1) / 2);
+      expect(hit, `nothing at all under a cut at (${x0}, ${z0})`).not.toBeNull();
+      expect(hit!.top, `${hit!.name} stands at grade inside the sunken cut at (${x0}, ${z0})`)
+        .toBeLessThan(0.31);
+    }
+    expect(highestGroundTop(0, -29)!.top, 'pool centre is open water, not paving').toBeLessThan(0);
+    expect(highestGroundTop(-27, -28.5)!.top, 'court centre is sunk, not paved over').toBeLessThan(0);
+  });
+
+  it('26. the pool is the measured organic body, not a rectangle', () => {
+    // Reference: 107.0 m2 of water inside a 23.37 x 11.63 m envelope, fill
+    // 0.394 (src/raid2-reference.ts). The arena shipped a 28 x 8 m box at fill
+    // 1.00. The envelope is held to 1.5 m per axis - well inside the
+    // calibration's own 2 m worst residual - and the fill is held under 0.70,
+    // which a rectangle cannot reach by construction.
+    const reference = RAID2_MEASURED.poolEnvelope;
+    const minX = Math.min(...RAID2_POOL_WATER.map(([x0]) => x0));
+    const maxX = Math.max(...RAID2_POOL_WATER.map(([, x1]) => x1));
+    const minZ = Math.min(...RAID2_POOL_WATER.map(([, , z0]) => z0));
+    const maxZ = Math.max(...RAID2_POOL_WATER.map(([, , , z1]) => z1));
+    expect(Math.abs((maxX - minX) - (reference.maxX - reference.minX))).toBeLessThanOrEqual(1.5);
+    expect(Math.abs((maxZ - minZ) - (reference.maxZ - reference.minZ))).toBeLessThanOrEqual(1.5);
+    const water = RAID2_POOL_WATER.reduce((sum, [x0, x1, z0, z1]) => sum + (x1 - x0) * (z1 - z0), 0);
+    const fill = water / ((maxX - minX) * (maxZ - minZ));
+    expect(fill, 'the pool plan is not a filled rectangle').toBeLessThan(0.7);
+    expect(fill, 'nor is it a scattering of puddles').toBeGreaterThan(0.3);
+  });
+
+  it('27. the drive carriageway reads as the measured circle', () => {
+    // Measured 24.5 m across (23.26 m on Z, 25.73 m on X - the fit's published
+    // anisotropy, not an ellipse in the artefact). The arena shipped two
+    // straight kerb runs across an open apron. Every kerb segment must sit on
+    // one circle, which a pair of straight runs cannot.
+    const ring = meshBoxes.filter(({ name }) => name.startsWith('raid2 drive kerb ring'));
+    expect(ring.length, 'the kerb ring exists and skips only the segment the laundry block occupies')
+      .toBe(11);
+    const radii = ring.map(({ box }) => {
+      const centre = box.getCenter(new THREE.Vector3());
+      return Math.hypot(centre.x - -1, centre.z - 14.5);
+    });
+    expect(Math.min(...radii)).toBeGreaterThan(11.5);
+    expect(Math.max(...radii)).toBeLessThan(11.7);
+    expect(Math.abs(2 * 11.6 - RAID2_MEASURED.driveCircle.diameterM),
+      'the built ring is within 1.5 m of the measured carriageway').toBeLessThanOrEqual(1.5);
+  });
+
+  it('28. every riser into the water is walked, never jumped', () => {
+    // The pool only became a real hole in this lane, and a real hole is a trap
+    // unless a bot can walk into it: HF-402’s defect was exactly a kerb no bot
+    // could path. Deck 0 -> ledge -0.19 -> basin -0.55 is 0.19 m then 0.36 m,
+    // both under the 0.42 m autostep.
+    const steps = meshBoxes.filter(({ name }) => /^raid2 pool step /.test(name));
+    expect(steps.length, 'one walked mouth per lobe').toBe(2);
+    for (const { name, box } of steps) {
+      expect(box.max.y, `${name} drop from the deck`).toBeGreaterThanOrEqual(-0.42);
+      expect(box.max.y - -0.55, `${name} drop into the basin`).toBeLessThanOrEqual(0.42);
+    }
   });
 });

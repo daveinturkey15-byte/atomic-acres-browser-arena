@@ -89,6 +89,11 @@ import {
   standard,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { RAID2_MEASURED } from './raid2-reference';
+import {
+  discBands, RAID2_POOL_COPING_DEPTH, RAID2_POOL_WATER, ringSegments, subtractRects,
+  type PlanRect,
+} from './raid2-shapes';
 
 /**
  * 100 x 76 m, deliberately IDENTICAL to the shipped Raid's bounds.
@@ -145,6 +150,37 @@ export const RAID2_UPPER_ROOMS = Object.freeze([
   Object.freeze({ id: 'U3B', label: 'team-0 drive balcony', x0: -24, x1: -12, z0: 9, z1: 10.6 }),
   Object.freeze({ id: 'U4', label: 'gallery upper floor', x0: 14, x1: 30, z0: -4, z1: 8 }),
   Object.freeze({ id: 'U4B', label: 'team-1 drive balcony', x0: 16, x1: 26, z0: 8, z1: 9.6 }),
+]);
+
+/**
+ * Every footprint the paving is CUT under, so that a sunken feature is a real
+ * hole in the ground rather than a box hidden beneath a slab.
+ *
+ * Derived, never typed twice: the pool cuts are the measured water cells grown
+ * by the coping depth, the plunge and spa cuts are their own coping discs, and
+ * the court cut is the court floor's own footprint. Exported so
+ * src/raid2-fidelity.test.ts can assert that NOTHING stands at y 0 inside any
+ * of them - which is the falsifier for the defect this closes.
+ */
+export const SUNKEN_CUTS: readonly PlanRect[] = Object.freeze([
+  ...RAID2_POOL_WATER.map(([x0, x1, z0, z1]): PlanRect => [x0, x1, z0 - 0.5, z1 + 0.5]),
+  // The three coping end caps, which sit outside their cell's X range.
+  [10.3, 10.8, -31.9, -26.5],
+  [-13.4, -12.9, -35.3, -30.8],
+  [-12.5, -12.0, -26.1, -23.5],
+  ...discBands(RAID2_MEASURED.plunge.x, RAID2_MEASURED.plunge.z, RAID2_MEASURED.plunge.diameterM / 2, 5),
+  ...discBands(RAID2_MEASURED.spa.x, RAID2_MEASURED.spa.z + 0.48, RAID2_MEASURED.spa.diameterM / 2 + 0.5, 3),
+  // N1's sport court, sunk 0.35 m and, until this lane, paved straight over.
+  [-34, -20, -34, -23],
+]);
+
+/**
+ * Where the south coping opens for a walked descent into the water. One per
+ * lobe, both facing the deck, both under the 0.42 m autostep at every riser.
+ */
+const POOL_ENTRIES = Object.freeze([
+  Object.freeze({ cell: 0, x0: 6.0, x1: 9.0 }),
+  Object.freeze({ cell: 5, x0: -10.5, x1: -7.5 }),
 ]);
 
 /** First-floor height. Four upper rooms sit here and nothing else is standable above. */
@@ -394,9 +430,30 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // =========================================================================
 
   // Paving follows the blob exactly, so there is no rectangle of "nothing" a
-  // spawn solver can call walkable (the defect HF-402 found on the shipped map).
-  for (const [x0, x1, z0, z1] of RAID2_BLOB) {
-    rect(`raid2 paving ${x0}`, x0, x1, -1, 0, z0, z1, m.travertine, { cast: false });
+  // spawn solver can call walkable (the defect HF-402 found on the shipped map)
+  // - and it is CUT under every sunken feature, which it was not.
+  //
+  // THE DEFECT THIS CLOSES, measured this session with a column probe through
+  // the built arena: at the pool centre the topmost surface was
+  //   `raid2 paving -20`  top  0.00
+  //   `raid2 pool water`  top -0.12
+  //   `raid2 pool basin`  top -0.55
+  // and at the court centre `raid2 paving -36` top 0.00 sat over `raid2 court
+  // floor` top -0.35. The paving slab ran across both footprints at y 0, so the
+  // pool and the sunk sport court - two of the three things this arena's own
+  // art direction calls its identity - were buried and could be neither seen
+  // nor entered. Every judgeset frame from PASS 85 shows a flat paved plane and
+  // no water anywhere, and nothing in the gate list could see it: the metrics
+  // are collider-based and every one of these boxes sits under the 0.8 m
+  // mountable ceiling, so they are all invisible to the sightline instrument.
+  //
+  // The fix is geometric, not an offset - the same rule the Nuke Town interiors
+  // cost two passes to learn (HF-434 -> HF-463): nothing is drawn under a
+  // floor, so the floor is CUT.
+  for (const [slice, [x0, x1, z0, z1]] of RAID2_BLOB.entries()) {
+    for (const [part, [px0, px1, pz0, pz1]] of subtractRects([x0, x1, z0, z1], SUNKEN_CUTS).entries()) {
+      rect(`raid2 paving ${slice}-${part}`, px0, px1, -1, 0, pz0, pz1, m.travertine, { cast: false });
+    }
   }
   // Hillside apron beyond the boundary, so the rim reads as a drop rather than
   // as the edge of a slab. Presentation only; the boundary wall is the authority.
@@ -464,20 +521,89 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongX('raid2 pavilion south', -20, -15, -31.3, -30.5, WALL_TOP, [[-18.5, -16.5]]);
   roofSlab('raid2 pavilion roof', -20, -15, -35, -30.5);
 
-  // N3 pool. A solid basin slab with a presentation water sheet over it; the
-  // coping is a 0.30 m walk-up so nobody is ever trapped in the water.
-  rect('raid2 pool basin', -14, 14, -1.55, POOL_FLOOR_Y, -33, -25, m.poolTile, { cast: false });
-  rect('raid2 pool water', -13.6, 13.6, POOL_FLOOR_Y, -0.12, -32.6, -25.4, m.water,
-    { cast: false, solid: false, shots: false });
-  for (const [x0, x1, z0, z1] of [
-    [-14, 14, -33.4, -33], [-14, 14, -25, -24.6], [-14.4, -14, -33, -25], [14, 14.4, -33, -25],
-  ] as const) {
-    rect(`raid2 pool coping ${x0} ${z0}`, x0, x1, POOL_FLOOR_Y, 0.3, z0, z1, m.stone, { cast: false });
+  // N3 pool. MEASURED, not a rectangle (src/raid2-reference.ts).
+  //
+  // The pool shipped as a 28 x 8 m box filling 100% of its own bounding box.
+  // The reference's water, flood-filled off the first-party artefact at
+  // 30 <= luma <= 62, is 107.0 m2 inside a 23.4 x 11.6 m envelope: fill 0.394.
+  // Read row by row it is a narrow channel at the garage end - 3.3 m across at
+  // its waist - that opens at about X -5 into a broad lobe wrapped around a
+  // round basin, with a round spa on the shoulder of the waist. That shape is
+  // the reason the flank reads as an estate rather than a lap pool, and it is
+  // authored here as six water cells rather than one box.
+  //
+  // NOTHING HERE IS COVER. Every piece is at or under the 0.42 m autostep or is
+  // water, so the pool cannot change a sightline, a mass count or a wall
+  // footprint - which is what makes this correction free under bands 8 and 10.
+  //
+  // THE POOL IS A ROUTE, NOT A PIT, and this is the half of the correction that
+  // the burial was hiding. With the paving cut, the basin floor at -0.55 is
+  // 0.85 m below the top of its own coping - well over the 0.42 m autostep -
+  // so without a deliberate way in, the water becomes ground no bot can enter
+  // and the arena's own reachability gate says so: it failed on the patrol
+  // point at (0, -28) the moment the hole became real. That is HF-402's defect
+  // in miniature and it is fixed the same way, with a walked route rather than
+  // a moved patrol point: two mouths in the south coping, each carrying a
+  // single 0.19 m ledge, so the descent is 0.19 m then 0.36 m and a bot paths
+  // it with no vertical navigation node.
+  for (const [index, cell] of RAID2_POOL_WATER.entries()) {
+    const [x0, x1, z0, z1] = cell;
+    rect(`raid2 pool basin ${index}`, x0, x1, -1.55, POOL_FLOOR_Y, z0, z1, m.poolTile, { cast: false });
+    rect(`raid2 pool water ${index}`, x0, x1, POOL_FLOOR_Y, -0.12, z0, z1, m.water,
+      { cast: false, solid: false, shots: false });
+    const depth = RAID2_POOL_COPING_DEPTH;
+    rect(`raid2 pool coping n ${index}`, x0, x1, -1.55, 0.3, z0 - depth, z0, m.stone, { cast: false });
+    const mouth = POOL_ENTRIES.find((entry) => entry.cell === index);
+    if (!mouth) {
+      rect(`raid2 pool coping s ${index}`, x0, x1, -1.55, 0.3, z1, z1 + depth, m.stone, { cast: false });
+    } else {
+      rect(`raid2 pool coping s ${index}a`, x0, mouth.x0, -1.55, 0.3, z1, z1 + depth, m.stone, { cast: false });
+      rect(`raid2 pool coping s ${index}b`, mouth.x1, x1, -1.55, 0.3, z1, z1 + depth, m.stone, { cast: false });
+      rect(`raid2 pool step ${index}`, mouth.x0, mouth.x1, -1.55, -0.19, z1, z1 + depth, m.stone, { cast: false });
+    }
   }
-  // Two entry step pairs, SW and NE, each riser under the autostep so the basin
-  // is a route and not a pit.
-  rect('raid2 pool step sw lower', -12.6, -9.6, -0.28, -0.28 + 0.28, -26.4, -25.2, m.stone, { cast: false });
-  rect('raid2 pool step ne lower', 9.6, 12.6, -0.28, -0.28 + 0.28, -32.8, -31.6, m.stone, { cast: false });
+  // End caps, only where the water actually ends: the channel's garage end and
+  // the two southern strips. The X jogs BETWEEN cells are deliberately left
+  // uncoped - they are where the reference's own outline steps.
+  rect('raid2 pool coping east cap', 10.3, 10.8, -1.55, 0.3, -31.9, -26.5, m.stone, { cast: false });
+  rect('raid2 pool coping west cap', -13.4, -12.9, -1.55, 0.3, -35.3, -30.8, m.stone, { cast: false });
+  rect('raid2 pool coping west cap 2', -12.5, -12.0, -1.55, 0.3, -26.1, -23.5, m.stone, { cast: false });
+
+  // The round basin inside the southern lobe, 6.53 m across, measured. Its
+  // coping ring is why the reference's flood fill could not enter it, and why
+  // the measured water fill is 0.394 rather than 0.9: it is a hole in the
+  // water, not a bulge in it.
+  const plungeR = RAID2_MEASURED.plunge.diameterM / 2;
+  for (const [index, band] of discBands(RAID2_MEASURED.plunge.x, RAID2_MEASURED.plunge.z, plungeR - 0.5, 5).entries()) {
+    rect(`raid2 pool water plunge ${index}`, band[0], band[1], POOL_FLOOR_Y, -0.12, band[2], band[3], m.water,
+      { cast: false, solid: false, shots: false });
+    rect(`raid2 plunge basin ${index}`, band[0], band[1], -1.55, POOL_FLOOR_Y, band[2], band[3], m.poolTile, { cast: false });
+  }
+  for (const [index, seg] of ringSegments(RAID2_MEASURED.plunge.x, RAID2_MEASURED.plunge.z, plungeR - 0.25, 10, 0.5).entries()) {
+    box(builder, `raid2 plunge coping ${index}`, [seg.x, -0.625, seg.z], [seg.size[0], 1.85, seg.size[1]],
+      m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
+  }
+
+  // The round spa. Measured at (X +1.78, Z -26.08) - 3.8 m NORTH of the pool
+  // water's own centroid, which is the one relation a mirrored build gets wrong
+  // (RAID2_MIRROR_RELATIONS). Held 0.48 m south of the measurement so its
+  // coping is tangent to the channel's instead of interpenetrating it; that is
+  // well inside the calibration's own 2 m residual, and it is recorded here
+  // rather than absorbed into the measurement.
+  const spaX = RAID2_MEASURED.spa.x;
+  const spaZ = RAID2_MEASURED.spa.z + 0.48;
+  const spaR = RAID2_MEASURED.spa.diameterM / 2;
+  for (const [index, band] of discBands(spaX, spaZ, spaR, 3).entries()) {
+    rect(`raid2 spa water ${index}`, band[0], band[1], -0.45, -0.05, band[2], band[3], m.water,
+      { cast: false, solid: false, shots: false });
+    rect(`raid2 spa basin ${index}`, band[0], band[1], -1.0, -0.45, band[2], band[3], m.poolTile, { cast: false });
+  }
+  for (const [index, seg] of ringSegments(spaX, spaZ, spaR + 0.25, 8, 0.5).entries()) {
+    box(builder, `raid2 spa coping ${index}`, [seg.x, -0.15, seg.z], [seg.size[0], 1.7, seg.size[1]],
+      m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
+  }
+
+
 
   // Pool bar block at the water's north-east shoulder. Second breaker for the
   // north strip; single storey, no roof access.
@@ -730,7 +856,33 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // solid block: the island must be circumnavigable or the drive lane becomes a
   // pure crossfire with nowhere to break the line.
   rect('raid2 drive island kerb', -7, 3, 0, 0.3, 10, 20, m.stone, { cast: false });
-  rect('raid2 drive fountain plinth', -2, 2, 0, HARD_COVER, 12, 16, m.stone);
+  // THE PLINTH IS ROUND AND STEPPED, measured at 5.2 m across (the artefact's
+  // bright disc at the island's centre, scanned on both axes: 25.5 px against a
+  // 0.194 / 0.214 m-per-pixel fit). It shipped as a 4 x 4 m square with a
+  // 1.45 m torus on it.
+  //
+  // The lower tier is authored at the measured 5.2 m and stops at 0.42 m - the
+  // autostep - so it is furniture the sightline instrument never sees. The
+  // upper tier carries the hard cover and is deliberately wide enough to still
+  // OVERLAP the four planters beside it: those five pieces are ONE eye-blocking
+  // mass by design, and band 8 has zero headroom, so splitting them into five
+  // is the one thing this correction may not do.
+  for (const [index, band] of discBands(0, 14, 2.6, 5).entries()) {
+    rect(`raid2 drive plinth step ${index}`, band[0], band[1], 0, 0.42, band[2], band[3], m.stone, { cast: false });
+  }
+  for (const [index, band] of discBands(0, 14, 2.2, 5).entries()) {
+    rect(`raid2 drive fountain plinth ${index}`, band[0], band[1], 0.42, HARD_COVER, band[2], band[3], m.stone);
+  }
+  // The ribbon: a tall twisted form on the plinth, replacing a 1.45 m torus
+  // with something the drive lane can actually be read against from the
+  // balconies. It starts ABOVE the 1.70 m standing eye, so it adds no eye
+  // cluster and no blocked sightline; its footprint is inside the plinth's, so
+  // it adds no wall cell either.
+  for (let tier = 0; tier < 4; tier += 1) {
+    box(builder, `raid2 drive ribbon ${tier}`,
+      [0, HARD_COVER + 0.5 + tier * 0.98, 14], [1.05 - tier * 0.14, 0.98, 1.05 - tier * 0.14],
+      m.stone, { rotation: [0, (tier * Math.PI) / 7, 0] });
+  }
   // The four planters ABUT the plinth, so the island is one mass you walk
   // around rather than five obstacles you thread between. Circumnavigable is
   // the property that matters and it is unchanged; five separate pieces in the
@@ -738,10 +890,23 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   for (const [px, pz] of [[-3.6, 12.8], [3.6, 12.8], [-3.6, 15.2], [3.6, 15.2]] as const) {
     rect(`raid2 drive planter ${px} ${pz}`, px - 1.7, px + 1.7, 0, HARD_COVER, pz - 1.0, pz + 1.0, m.planting);
   }
-  // S5 drive approach: open paving with two mountable kerb runs, falling away to
-  // the 1.9 m hillside parapet the boundary generator already placed.
-  rect('raid2 drive kerb west', -18, -12, 0, MOUNT, 21, 21.8, m.stone);
-  rect('raid2 drive kerb east', 8, 14, 0, MOUNT, 21, 21.8, m.stone);
+  // S5 drive approach. THE CARRIAGEWAY IS A CIRCLE, measured at 23.3 m across
+  // Z and 25.7 m across X by radial rays to the outermost bright run; the
+  // 6.6 % difference between the two is this fit's published anisotropy, not an
+  // ellipse in the artefact. It shipped as two straight kerb runs across an
+  // open apron, which is the single most obviously untrue thing on the drive.
+  //
+  // The ring replaces those two runs rather than adding to them: twelve chord
+  // segments, each a rotated box so the kerb a player steps over and the kerb
+  // they see are one object, at 0.30 m - furniture, not cover. The south-west
+  // segment is DROPPED because it runs through the laundry block, which is also
+  // what the artefact shows: the reference's own circle is truncated by the
+  // buildings on that side.
+  for (const [index, seg] of ringSegments(-1, 14.5, 11.6, 12, 0.55).entries()) {
+    if (index === 7) continue;
+    box(builder, `raid2 drive kerb ring ${index}`, [seg.x, 0.15, seg.z], [seg.size[0], 0.3, seg.size[1]],
+      m.stone, { cast: false, rotation: seg.rotation as [number, number, number] | undefined });
+  }
   rect('raid2 drive planting west', -19, -15, 0, MOUNT, 27, 30, m.planting);
   rect('raid2 drive planting east', 11, 15, 0, MOUNT, 27, 30, m.planting);
 
