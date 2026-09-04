@@ -110,8 +110,8 @@ export const definition = createProceduralArenaVisualDefinition({
     // through real aerial perspective; that is the approved fog curve doing
     // its job on a station no player ever stands on, not haze on a sightline.
     camera('nuketown2-overhead', [hx(-15), 46, -30], [hx(0), 2, 6], 'overview', 1.08),
-    // Team 0's spawn yard, stood ON an actual spawn point (authored (-10, -29),
-    // the fifth of team 0's six) and looking at the back of its own house:
+    // Team 0's spawn yard, stood ON an actual spawn point (authored (-12, -31),
+    // the fifth of team 0's eight) and looking at the back of its own house:
     // porch step, back door, yard cover and the fence behind.
     //
     // HF-473 RE-AIMED. Every x here is the AUTHORED x put through the
@@ -122,11 +122,17 @@ export const definition = createProceduralArenaVisualDefinition({
     // RIGHT of the house from behind it": with the camera on the spawn and the
     // house centre dead ahead, the garage wing has to appear on the right of
     // frame, and if it does not, HF-473 is not fixed.
-    camera('nuketown2-north-yard', [hx(-10), 1.75, -29], [hx(-1.25), 1.5, -21.5], 'geometry', 1.08),
+    //
+    // PASS 94 integration RE-SEATED it. The station's whole claim is that it
+    // stands on a spawn, and the spawn table was re-solved when this lane's
+    // fenced-yard band met the spawn lane's eight-point floor - the old
+    // (-10, -29) is not a spawn any more. (-12, -31) is the nearest point in
+    // the new table, 2.8 m away, so the frame is the same frame.
+    camera('nuketown2-north-yard', [hx(-12), 1.75, -31], [hx(-1.25), 1.5, -21.5], 'geometry', 1.08),
     // Team 1's yard, the exact 180-degree partner. If these two frames are not
     // rotations of each other, the arena's rotational symmetry is broken and
     // one team has something the other does not.
-    camera('nuketown2-south-yard', [hx(10), 1.75, 29], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
+    camera('nuketown2-south-yard', [hx(12), 1.75, 31], [hx(1.25), 1.5, 21.5], 'geometry', 1.08),
     // Along the street centre-line, from the west end of the road into the
     // truck's open cargo box. The bulkhead at x = +3.17 should close the far
     // half of this frame; that is the property the fidelity test measures

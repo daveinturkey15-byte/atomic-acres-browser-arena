@@ -24,6 +24,7 @@ import {
   NUKETOWN2_YARD_STAIR,
   buildNuketown2,
 } from './nuketown2-arena';
+import { ARENA_VISUAL_REGISTRY } from './rendering/arena-visual-stream';
 import {
   NUKETOWN2_GROUND_FLOOR_TOP,
   NUKETOWN2_GROUND_STOREY_H,
@@ -617,6 +618,40 @@ describe('Nuke Town Rebuild fidelity', () => {
    * is presentation, and every collider, parity and spawn gate looks only at the
    * boxes. This is the falsifier that class of defect did not have.
    */
+  /**
+   * PASS 94 integration gate. The two back-yard review stations are the frames
+   * HF-473 is judged on, and their whole claim - written in the comment beside
+   * them in src/rendering/arenas/nuketown2.ts - is that the camera STANDS ON A
+   * SPAWN. That claim quietly stopped being true when the spawn table was
+   * re-solved in this integration: authored (-10, -29) is not a spawn any more.
+   * Nothing failed, because nothing checked. This does.
+   */
+  it('stands both back-yard review cameras on an authored spawn, looking at their own house', async () => {
+    const { definition } = await ARENA_VISUAL_REGISTRY.nuketown2();
+    const map = buildNuketown2(new THREE.Scene());
+    for (const [team, id] of [[0, 'nuketown2-north-yard'], [1, 'nuketown2-south-yard']] as const) {
+      const station = definition.reviewCameras.find((entry) => entry.id === id);
+      expect(station, `${id} review camera`).toBeDefined();
+      const [x, , z] = station!.position;
+      const onSpawn = NUKETOWN2_SPAWN_LAYOUT[team]!
+        .some(([sx, sz]) => Math.abs(sx - x) < 1e-6 && Math.abs(sz - z) < 1e-6);
+      expect(
+        onSpawn,
+        `${id} stands at (${x}, ${z}), which is not one of team ${team}'s authored spawns: `
+          + `${JSON.stringify(NUKETOWN2_SPAWN_LAYOUT[team])}. The station's evidence value is that a `
+          + 'player really starts a round there.',
+      ).toBe(true);
+      // ...and it is looking at its own house, which is the other half of the
+      // claim: the garage-on-the-RIGHT frame only means anything aimed here.
+      const house = NUKETOWN2_HOUSE_LAYOUT[team]!;
+      const [tx, , tz] = station!.target;
+      expect(Math.abs(tx - hx(house.x)), `${id} aims off its own house centre line`).toBeLessThan(0.01);
+      expect(Math.sign(tz - z), `${id} looks toward the street`).toBe(house.facing);
+      // The gate that reads the built world, restated at the station itself.
+      expect(isBlocked({ x, y: 1.7, z }, map.colliders, PLAYER_RADIUS), `${id} stands inside geometry`).toBe(false);
+    }
+  });
+
   it('lands every forged vehicle skin on the collider body it dresses, mirrored with it', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
