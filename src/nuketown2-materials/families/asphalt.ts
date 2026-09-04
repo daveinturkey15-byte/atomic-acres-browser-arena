@@ -23,7 +23,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, groundUv, linearSwatch, signedNoise } from '../wear';
+import { buildDetailNormal, buildWear, groundUv, linearSwatch, signedNoise } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { lutFbm, lutRidgedFbm } from '../noise-lut';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -45,13 +45,28 @@ export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialS
     scuff: { sizeM: 0.035, albedo: 0.050, roughness: 0.08 },
     traffic: { sizeM: 2.6, albedo: 0.060, roughness: 0.10 },
     soil: 0.080,
+    // 3.6 m is one paving lane, which is the width a road actually varies over:
+    // each lane is a different day's mix and reads a different value. The hue
+    // spread is the smallest of any family - bitumen greys out as it ages and
+    // a road that varies in hue reads as a painted plane. 5 degrees of tilt is
+    // the coarse-aggregate texture, and it is what finally gives the road
+    // something for GTAO and the sun's grazing specular to bite on.
+    variation: {
+      macro: { sizeM: 3.6, albedo: 0.055, roughness: 0.06 },
+      micro: { sizeM: 0.16, albedo: 0.035, roughness: 0.07 },
+      tintSpread: 0.014,
+      normalDegrees: 5.0,
+      edgeWear: 0,
+      soilRoughness: 0.07,
+      polishRoughness: 0.09,
+    },
     polygonOffset: -1,
   });
 }
 
-let asphaltGraph: { colorNode: any; roughnessNode: any } | null = null;
+let asphaltGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (asphaltGraph) return asphaltGraph;
   const spec = asphaltSpec('nuketown2-asphalt-shared');
   const p = positionWorld;
@@ -69,7 +84,7 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
     smoothstep(float(0.55), float(0.0), abs(p.z.add(float(1.6)))),
   );
   const channel = smoothstep(float(CARRIAGEWAY_HALF_M - 0.7), float(CARRIAGEWAY_HALF_M), abs(p.z));
-  const road = uniforms.baseColor.mul(wear.albedoMul);
+  const road = uniforms.baseColor.mul(wear.albedoMul).mul(wear.tint);
   const patched = mix(road, linearSwatch(0x2b2c2d).mul(wear.albedoMul), patch);
   const polished = patched.mul(float(1).add(wheel.mul(float(0.17))));
   const stained = polished.mul(float(1).sub(channel.mul(float(0.13))));
@@ -86,6 +101,10 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   asphaltGraph = {
     colorNode: isMarking.select(markingColor, roadColor),
     roughnessNode: isMarking.select(markingRoughness, roadRoughness),
+    // Shared by the road and the marking. The marking's `normalDegrees` is 0,
+    // so its uniform makes this the untilted normal - the same node, a
+    // different value, which is the whole reason the two share one pipeline.
+    normalNode: buildDetailNormal(uniforms, uv),
   };
   return asphaltGraph;
 }
@@ -107,6 +126,7 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 
@@ -129,6 +149,19 @@ export function markingSpec(name = 'nuketown2-trim-decal'): Nuketown2MaterialSpe
     scuff: { sizeM: 0.050, albedo: 0.070, roughness: 0.10 },
     traffic: { sizeM: 1.4, albedo: 0.075, roughness: 0.08 },
     soil: 0.110,
+    // A marking is a metre-scale object, so its macro field is authored at the
+    // dash pitch rather than the lane width. It takes NO normal perturbation:
+    // it is a coplanar decal at tier -2, and a tilted shading normal on a
+    // surface that is winning a depth race by 2 units is asking for trouble.
+    variation: {
+      macro: { sizeM: 1.6, albedo: 0.045, roughness: 0.05 },
+      micro: { sizeM: 0.10, albedo: 0.030, roughness: 0.06 },
+      tintSpread: 0.012,
+      normalDegrees: 0,
+      edgeWear: 0,
+      soilRoughness: 0.08,
+      polishRoughness: 0.10,
+    },
     polygonOffset: -2,
   });
 }
@@ -148,6 +181,7 @@ export function createMarkingMaterial(name = 'nuketown2-trim-decal'): MeshStanda
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 
