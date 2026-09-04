@@ -493,7 +493,7 @@ import {
   type ArenaSelection,
 } from './map-selection';
 import { activeMinimapColliderLayer, activeMinimapCoverLayer } from './minimap-static-layers';
-import { buildMinimapStructuralElements, headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapElement, type MinimapLandmarkKind } from './minimap';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';

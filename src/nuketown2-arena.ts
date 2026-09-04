@@ -232,6 +232,8 @@ export {
   NUKETOWN2_TURNING_HEAD_HALF,
   NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_HEAD_CAR,
+  NUKETOWN2_LAMP_POST_LAYOUT,
   NUKETOWN2_RARE_GUN_SITES,
   NUKETOWN2_HANDEDNESS,
   isNuketown2BayFootprint,
@@ -745,10 +747,10 @@ function doorRun(id: string): [number, number] {
 }
 
 export const NUKETOWN2_WINDOWS = Object.freeze([
-  Object.freeze({ id: 'ground front west', pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
-  Object.freeze({ id: 'ground front east', pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
-  Object.freeze({ id: 'upper front', pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
-  Object.freeze({ id: 'upper back', pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'ground front west', face: 'front' as const, pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'ground front east', face: 'front' as const, pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'upper front', face: 'front' as const, pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'upper back', face: 'back' as const, pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
 ]);
 
 /**
@@ -2435,8 +2437,8 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
   // Hoisted constant (vehicle-forge lane): the box and its forged skin must not
   // hold two copies of this coordinate. Its HF-432 item 4 derivation now lives
   // on NUKETOWN2_DRIVEWAY_CAR itself.
-  const cx = NUKETOWN2_DRIVEWAY_CAR[0];
-  const cz = NUKETOWN2_DRIVEWAY_CAR[1];
+  const cx = NUKETOWN2_DRIVEWAY_CAR.x;
+  const cz = NUKETOWN2_DRIVEWAY_CAR.z;
   // HF-467: the driveway cars carry no `street-vehicle` name prefix, so BOTH
   // halves fell through to `reinforced` - a hatchback that stops a sniper.
   // Body `vehicle`, windscreen `glass`, matching the head car.
@@ -2482,14 +2484,14 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
  * are hoisted the same way, in `NUKETOWN2_STREET_CARS` (nuketown2-layout.ts),
  * because the reference is the authority on where they park.
  */
-const NUKETOWN2_DRIVEWAY_CAR: readonly [number, number] = Object.freeze([
-  (GARAGE_X0 + GARAGE_X1) / 2 + 0.5,   // 7.25, centred on the door
+export const NUKETOWN2_DRIVEWAY_CAR = Object.freeze({
+  x: (GARAGE_X0 + GARAGE_X1) / 2 + 0.5,   // 7.25, centred on the door
   // HF-432 item 4: 3.4 m put the body 1.05 m clear of the garage door's own
   // reveal, which is 0.29 m of centring for a 0.76 m capsule - a door you can
   // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
   // own apron (the dressing runs to z = -8) rather than out on the kerb.
-  GARAGE_FRONT_Z + 4.6,
-]) as readonly [number, number];
+  z: GARAGE_FRONT_Z + 4.6,
+});
 
 /**
  * Every authored box the lofted skins take over the PRESENTATION of, with the
@@ -2684,7 +2686,7 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   // The two driveway cars point at the road, and the south one is the exact
   // 180-degree partner of the north one - the same involution `pair` applies
   // to their boxes, so the two skins stay as symmetric as the two colliders.
-  const [carX, carZ] = NUKETOWN2_DRIVEWAY_CAR;
+  const { x: carX, z: carZ } = NUKETOWN2_DRIVEWAY_CAR;
   placements.push({
     built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
     x: carX,
