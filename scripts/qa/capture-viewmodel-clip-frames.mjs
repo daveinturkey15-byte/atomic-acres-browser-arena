@@ -1,3 +1,11 @@
+// Captures one headless-Chromium screenshot per worst-measured viewmodel-penetration pose plus a control pose, to pixel-grade viewmodel surface clipping.
+// Usage: node scripts/qa/capture-viewmodel-clip-frames.mjs [--out <dir>] [--label <label>] [--url <url>]
+//   --out          output directory for the screenshots (default: docs/assets/viewmodel-surface-clip-2026-08-31)
+//   --label        filename prefix for the PNGs (default: run)
+//   --url          page to load before capture (default: $QA_BASE_URL, else http://127.0.0.1:41933/)
+//   QA_BASE_URL    env: base URL used as the --url default (default: unset, falls back to http://127.0.0.1:41933/)
+// Writes: <out>/ (created if missing) plus <out>/<label>-<pose>.png per pose; prints a JSON penetration report to stdout.
+// Exit codes: 0 on success; no process.exit calls, so failures surface as unhandled-throw non-zero exits.
 // Captures the FRAME at the worst measured penetration poses, so the fix is
 // graded on pixels and not only on geometry.
 //
