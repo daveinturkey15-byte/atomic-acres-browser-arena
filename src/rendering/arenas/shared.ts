@@ -63,9 +63,10 @@ export function camera(
   target: readonly [number, number, number],
   purpose: ArenaReviewCamera['purpose'],
   exposure: number,
+  far = 190,
 ): ArenaReviewCamera {
   return Object.freeze({
-    id, position, target, fov: 70, near: FIRST_PERSON_CAMERA_NEAR_METERS, far: 190,
+    id, position, target, fov: 70, near: FIRST_PERSON_CAMERA_NEAR_METERS, far,
     fixedTimeMs: 63_000, seed: 6401, exposure, hud: 'hidden', purpose,
   });
 }

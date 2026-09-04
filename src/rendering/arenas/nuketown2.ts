@@ -3,6 +3,7 @@ import {
   NUKETOWN2_REVIEW_CAMERA_ANCHORS,
   nuketown2HandedX as hx,
 } from '../../nuketown2-layout';
+import { NUKE_EVENT_CAMERA_FAR_M } from '../../nuke-event';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
 
@@ -203,6 +204,20 @@ export const definition = createProceduralArenaVisualDefinition({
       NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.target[1],
       NUKETOWN2_REVIEW_CAMERA_ANCHORS.frontPorch.target[2],
     ], 'geometry', 1.08),
+    // HF-490: fixed nuke-event evidence stations. The horizon cloud sits 680 m
+    // down the +Z street view, outside the perimeter and visible from the
+    // street plus both balcony sightlines. These are presentation cameras only.
+    camera('nuketown2-nuke-street', [hx(0), 2.4, -3.0], [hx(0), 112, 680], 'overview', 1.08, NUKE_EVENT_CAMERA_FAR_M),
+    camera('nuketown2-nuke-north-balcony', [
+      hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[1],
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[2],
+    ], [0, 112, 680], 'overview', 1.08, NUKE_EVENT_CAMERA_FAR_M),
+    camera('nuketown2-nuke-south-balcony', [
+      -hx(NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[0]),
+      NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[1],
+      -NUKETOWN2_REVIEW_CAMERA_ANCHORS.northBalcony.position[2],
+    ], [0, 112, 680], 'overview', 1.08, NUKE_EVENT_CAMERA_FAR_M),
     // PASS 94 integration: the five vehicle stations below were authored on the
     // UNMIRRORED map, before HF-473. Every body they frame is placed through
     // `centred`/`streetVehicle`, which mirror x, so each eye and target x is
