@@ -403,3 +403,146 @@ VERIFIED: `npx tsc --noEmit` passed after the final source change. VERIFIED: `np
 VERIFIED: Commits `285b28a9`, `9dd2c270`, `af1fce7d`, `93844d52`, `4e8cb9c8`, and `47605e1d` use explicit paths, the `perf(hitl5):` prefix, the required Codex trailer, and were pushed to `origin/contrib/dave-gaming-pc/claude/perf-hitl5`. OPEN: the branch is not a production publication and no `:4300` or release deployment was performed.
 
 OPEN: The required `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` rerun passed `qa:lockfile` but the contribution guard refused the handoff because this worktree contains 41 untracked evidence paths. I did not sweep or delete those unrelated artifacts; the tracked branch head is clean and pushed. AKP adoption `check` was VERIFIED as trusted, and the filtered `audit` emitted no Codex FAIL/AMBER row.
+
+## Perf lane 4 (Claude Opus 5 high, HF-491): where the frame time actually is
+
+Worktree `C:/Users/david/projects/aa-claude-perf`, branch
+`contrib/dave-gaming-pc/claude/perf-hitl5`, cut from `978da7e6` (lane 3 head
+plus the Muse review). Target: PASS 93 parity on nuketown2 - p50 <= 14 ms and
+JS busy <= 10 ms/frame at the spawn pose AND one street pose - without
+deleting features. Same harness, extended.
+
+**Method.** `scripts/qa/perf-hitl5-bisect-cdp.mjs`, headless installed Chrome,
+real WebGPU device, 2560x1440, HIGH, Solo, bots frozen, `dist` served locally,
+one browser at a time. Two new capabilities this lane:
+
+- `--pose spawn|street`. Every earlier lane measured only the deploy pose.
+  `street` teleports to the road centre-line looking down the 36 m street
+  (`teleportPlayer(0, 1.7, 0, PI/2, 0)`; Nuke Town Rebuild is authored
+  axis-aligned and centred, road centre-line at z = 0), which is the pose that
+  puts the forged vehicles, both facades and the full wear set in the frustum.
+- `hud-hidden`, `style-writes` and `hud-var-writes` rungs. The CDP profile
+  charges a third of the frame to `(program)` - Blink work with no JS frame on
+  the stack, i.e. style / layout / paint - and no earlier rung could see inside
+  it. All three revert exactly.
+
+**Deviation, recorded.** The brief assigned port 4188. At 21:31 it was held by
+a LIVE peer lane (`aa-claude-hitl`'s `vite preview`, PID 62084 - the same
+worktree that also serves :4300, with a `tsc --noEmit` running in it). Killing
+a working peer's server is a worse collision than changing port, so every run
+below used **4288** (verified free, outside the 4187/4189 release band; :4300
+was never touched).
+
+### Top five JS costs per frame, BEFORE (ms/frame, CDP self time, profiler on)
+
+`bisect/lane4-pre-spawn-nuketown2.json` (GPU 5 % / 1.9 GB) and
+`bisect/lane4-pre-street-nuketown2.json` (GPU 1 % / 2.0 GB).
+
+| # | cost | spawn | street | detail |
+|---|---|---:|---:|---|
+| 1 | **Blink style recalc from the per-frame `--hud-*` writes** | **7.2** | **8.2** | measured as the `(program)` delta of the `hud-var-writes` rung; total `(program)` was 8.62 / 7.12 |
+| 2 | three matrix passes | 4.44 | 3.23 | `_renderScene` 1.88 / 1.62, viewmodel arm IK 1.15 / 0.72, `getWorldPosition` 0.55 / 0.35, gameplay 0.52 / 0.44 |
+| 3 | WebGPU node-material per-object update | ~3.5 | ~2.2 | `_renderObjectDirect` 0.89 / 0.60, `updateByType` 0.59 / 0.36, `update` 0.57 / 0.38, `_update` 0.33, `updateForRender` 0.27 / 0.21, `updateNumber` 0.24, `getCacheKey` 0.15 |
+| 4 | `updateMinimap` (`tDe`) | 0.87 | 0.65 | the largest single APPLICATION function in both profiles |
+| 5 | GPU submit path | ~1.16 | ~1.0 | `writeBuffer` 0.56 / 0.39, `submit` 0.24 / 0.28, `beginRenderPass` 0.19, `_draw` 0.17 |
+
+Checked and cleared as non-offenders: **GC churn** (`(garbage collector)` 0.09
+ms/frame at both poses - there is no allocation problem), **physics**
+(`collision` 0.23 / 0.19), **bot AI** and **audio scheduling** (absent from the
+top 25). Baselines: spawn fps 39.2 / p50 28.4 / p95 45.6 / JS busy 19.20;
+street fps 54.3 / p50 18.0 / p95 32.6 / JS busy 13.73; draws 169 / 115.
+
+### The finding: the HUD's five custom-property writes are the biggest cost
+
+One session, spawn pose, every toggle reverted between rungs
+(`bisect/lane4-diag-spawn-nuketown2.json`):
+
+| rung | fps | p50 | p95 | JS busy | `(program)` |
+|---|---:|---:|---:|---:|---:|
+| baseline | 30.5 | 30.9 | 48.1 | 25.28 | **12.82** |
+| `hud-hidden` (245-element HUD subtree `display:none`) | 46.2 | 21.1 | 33.9 | 20.12 | **4.01** |
+| `style-writes` (`setProperty` no-oped app-wide) | 48.9 | 19.5 | 32.2 | 18.66 | **4.84** |
+| `wear` (50 nuketown2 node materials to flat PBR) | 38.6 | 24.1 | 38.3 | 17.44 | 11.61 |
+
+And on two later builds, with the no-op narrowed to `--hud-*` ONLY:
+
+| run | rung | p50 | JS busy | `(program)` |
+|---|---|---:|---:|---:|
+| `lane4-minimap-spawn` | baseline | 31.1 | 27.00 | 13.18 |
+| `lane4-minimap-spawn` | `hud-var-writes` | **17.5** | 23.42 | **5.97** |
+| `lane4-post-spawn` | baseline | 25.5 | 19.62 | 8.98 |
+| `lane4-post-spawn` | `hud-var-writes` | **20.0** | 18.21 | **3.57** |
+| `lane4-post-street` | baseline | 39.6 | 32.08 | 14.27 |
+| `lane4-post-street` | `hud-var-writes` | **24.1** | 23.97 | **6.06** |
+| `lane4-final-spawn` (post-hoist build) | baseline | 21.1 | 16.39 | 7.75 |
+| `lane4-final-spawn` (post-hoist build) | `hud-var-writes` | **16.6** | 15.71 | **3.00** |
+
+Cause: `--hud-sway-x`, `--hud-sway-y`, `--hud-breathe`, `--hud-gait` and
+`--hud-health` are REGISTERED custom properties (`@property` in
+`src/ui/pass77-instrument-hud.css:97-124`) declared `inherits: true` and
+written on `#hud` every frame by the frame loop. Every write invalidates the
+inherited computed value for all 245 HUD elements. The CSS's own note - "one
+style write per frame on ONE element" (`pass77-instrument-hud.css:725`) - is
+the assumption that is wrong: on one element, but into 245 recalculations.
+
+This is larger than the wear graphs, larger than the whole matrix pass, and
+larger than everything the three previous lanes moved put together. It is also
+consistent with atomic-acres regressing less than nuketown2 in the original
+A/B: it is an engine-wide cost that shows worst where the frame is longest.
+
+### Fixes shipped
+
+| fix | commit | evidence |
+|---|---|---|
+| Muse F1: `presentImpacts()` refreshes the live roots it activates, so a render between it and the next `sync()` cannot draw a shell / flash / ember at its pooled rest transform under lane 3's walk-skip | `d16e580f` | VERIFIED (unit): killstreak, viewmodel, collider-parity and fidelity gates green. Correctness, not perf. |
+| Minimap: the non-atomic-acres branch composites a revision-keyed collider layer and an arena-keyed cover layer instead of repainting two rect calls per world collider and one landmark + label per cover at 30 Hz | `2ffed772`, hoisted in `04dab166` | VERIFIED: `updateMinimap` was 0.87 (spawn) / 0.65 (street) ms/frame of self time before and is **absent from the top-25 self-time list at both poses** on every post-fix run. |
+| HUD writes go through a per-target dirty flag, so a byte-identical `--hud-*` rewrite does not invalidate style | `a1e00eca` | VERIFIED (unit): `pass77-hud-sway`, `hud-sway-release-wiring`, `surface-registry` green. NOT a win at either measured pose - see claim states. |
+| Harness: `--pose`, `hud-hidden`, `style-writes`, `hud-var-writes` | `e4b611bb` | the three tables above |
+
+Cache keys, draw order and the size ratchet: the collider layer is keyed on the
+array identity `activeWorldColliders()` already returns from its revision-keyed
+cache (a break, a door or a collapse repaints it once); the cover layer on
+arena identity plus the same cover-count tripwire the existing static layer
+documents; both repaint into a retained canvas, so the gun range's
+identity-changing dummy colliders cost today's work plus one `drawImage` and
+never a per-frame canvas allocation. Order is preserved exactly - colliders,
+live Domination zones, cover landmarks, live targets - which is why it is two
+layers rather than one. `legacy-main.ts` is **37,369 lines**, three UNDER where
+lane 3 left it: the ratchet ceiling (37,371) was not raised, the new code was
+hoisted into `src/minimap-static-layers.ts`.
+
+### Claim states
+
+- VERIFIED: the top-five attribution at both poses, from the two pre-fix CDP
+  profiles named above.
+- VERIFIED: the `--hud-*` writes are the single largest cost in this frame.
+  Three independent probes, in three separate sessions on three separate
+  builds, agree: hiding the HUD subtree, no-oping `setProperty` app-wide, and
+  no-oping it for `--hud-*` only all collapse `(program)` from 12.8-14.3 to
+  3.6-6.1 ms/frame and move p50 by 5.5-15.5 ms. GPU load differed across those
+  sessions (1 % to 77 %), which is why only within-session deltas are claimed.
+- VERIFIED: `updateMinimap`'s self time is gone from the profile at both poses.
+- VERIFIED (gates): `npx tsc --noEmit`; `npm run build`; the named Vitest set;
+  in-combat pipeline creation `pipes+0` on every rung of every run at both
+  poses; the 12 s first-submission fence was not widened and did not fail.
+- ASSUMPTION (stated, not proven): the HUD dirty flag does not recover the
+  measured cost at either pose, because `--hud-breathe` is a continuous
+  respiration sine that changes every frame at three decimals. It bounds only
+  the released / paused / unchanged-value cases. Falsifier: a `hud-var-writes`
+  rung whose `(program)` delta is near zero with the writes still live.
+- **NOT ACHIEVED: PASS 93 parity.** Neither p50 <= 14 ms nor JS busy <= 10
+  ms/frame was reached at either pose. This lane found and proved the cause; it
+  did not ship the fix for it.
+- OPEN, and this is the next lane's whole job: change the five `@property`
+  declarations to `inherits: false` and write them on the roughly ten cluster
+  elements that actually carry the `translate:` / `rotate:` rule
+  (`pass77-instrument-hud.css`, the selector list ending `#hud #pause-hint`,
+  plus `#hud #health-fill` for `--hud-health`), so a per-frame write
+  invalidates about ten elements instead of 245. That is a HUD-contract
+  change: it needs `src/ui/surface-registry.test.ts`,
+  `tests/e2e/pass64-hud-menu.spec.ts` and a visual pass over the desktop /
+  ultrawide / narrow / live-HUD artifacts, which is why it was not attempted
+  inside this time box rather than half-verified.
+- OPEN (unchanged from lane 3): the WebGPU node-material per-object update
+  (offender 3 above, about 3.5 ms/frame at the spawn pose) is the second
+  largest cost after the HUD and is untouched by graph sharing.
