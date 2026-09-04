@@ -30300,11 +30300,7 @@ async function performArenaSelection(
     lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
-    thinMetalPerforationRuntime = rollbackThinMetalPerforationRuntime(
-      previousThinMetalPerforationRuntime,
-      nextThinMetalPerforationRuntime,
-      scene,
-    );
+    thinMetalPerforationRuntime = rollbackThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime, scene);
     gameplayArenaPrepared = hadPreparedArena;
     document.documentElement.dataset.gameplayArena = hadPreparedArena
       ? previousArena.id
