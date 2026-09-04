@@ -218,6 +218,32 @@ other. Taking 20 forces a textual conflict the integrator has to resolve.
 the constant: `src/network-lifecycle.test.ts`,
 `src/combat/weapon-catalog.test.ts`, `src/combat/legacy-weapon-adapter.test.ts`.
 
+### PASS 95 verify — CORRECTION, and the reasoning above is confirmed
+
+The "unpushed" statement is **stale**. `contrib/dave-gaming-pc/claude/mp-bugs-hf498`
+**is on origin**, at `2b0c304e` (`docs(pass94): Muse review - multiplayer bugs
+lane (HF-498)`, committed 2026-09-04 22:25:05, six minutes before this lane's
+first fix commit). `git ls-remote origin` resolves it.
+
+The lane's *reasoning* survives the correction and is now measured rather than
+predicted:
+
+- `git show 2b0c304e:src/protocol.ts` has
+  `export const MULTIPLAYER_PROTOCOL_VERSION = 19`. The two lanes took **19 and
+  20 — disjoint**. The auto-merge-into-one-number hazard did not occur.
+- The admission check is strict equality, not an N-1 tolerance window:
+  `initialLobbyJoinHasProtocolMismatch` returns `true` for
+  `MULTIPLAYER_PROTOCOL_VERSION - 1` (`src/network-lifecycle.test.ts:662-663`)
+  and `isGameMessage` rejects `- 1` (`src/protocol.test.ts:162` and five more).
+  So a v19 build and a v20 build **reject each other**. Skipping 19 does not
+  open a window that admits the HF-498 schema.
+
+**Corrected integrator instruction.** No renumbering is required. Merge HF-498
+first, then this lane, and resolve every conflict to **20** — the constant in
+`src/protocol.ts` plus the three pins named above (HF-498 pins 19 in the same
+three files, so each one conflicts textually, which is exactly the intended
+effect). Both lanes share the base `3e2fd273`.
+
 ## Still OPEN
 
 1. The headless race does not yet decide a winner: the driver needs a real
@@ -240,3 +266,51 @@ the constant: `src/network-lifecycle.test.ts`,
 7. WAN behaviour is unmeasured. The retry schedule (700 ms resend, 1,500 ms
    revert) is tuned against the pre-existing deadline, not against a measured
    round-trip distribution on a real link.
+
+## TODO — raised by the PASS 95 adversarial verify
+
+See `VERIFY.md` beside this file for the full verdict and evidence.
+
+8. **TODO (blocking, unlisted regression): an occluded NEAREST drop suppresses a
+   reachable second one.** `visibleDeathDropWeaponPickup` asks
+   `selectDeathDropWeaponPickup` for the single nearest eligible drop and *then*
+   sight-tests that one result, returning `null` if it is blocked. There is no
+   fallback to the next-nearest. `selectDeathDropWeaponPickup` →
+   `nearestDeathDrop` returns one drop, so with two guns inside
+   `DEATH_DROP_INTERACTION_RANGE` (2.35 m, `MAX_DEATH_DROPS` is 12 and drops
+   cluster where fights happen) — the nearer one behind a wall, the farther one
+   in the open — the player now gets **no prompt and a dead F key**, for a
+   pickup the host would have accepted. Before this lane the near gun was
+   wrongly offered; after it, the legitimate gun is wrongly withheld. In a lane
+   whose subject is "cannot pick up guns", this converts one wrong answer into
+   another. The fix is to sight-filter the candidate set *before* selecting the
+   nearest, but the naive form runs a collider trace per drop on a path that
+   executes twice per frame, so it needs a range pre-filter and a test — not a
+   hasty edit from a verifier. Falsifier for the current code: two drops in
+   range, the nearer occluded, and a prompt still offered for the farther.
+9. **TODO: the sight gate is unvalidated against real drop placement.** The
+   trace convention is genuinely identical to the shipped
+   `acceptTimedMapWeaponClaim` gate — body-origin (`player.position` /
+   `remote.snapshot`, *not* an eye point; `camera.position.y` adds the stance
+   eye offset at `legacy-main.ts:27406`) to `drop + 0.25`. But that shipped gate
+   only ever traces to **curated, authored pickup pedestals**, whereas a death
+   drop comes to rest wherever a player fell — flush against a wall, on stairs,
+   in a doorway. A near-floor-to-near-floor segment ending 0.25 m above a gun
+   that is touching a collider is materially more likely to false-block than the
+   pedestal case, and a false block here *prevents* a pickup. The e2e that would
+   have caught this never reached a spawned drop (item 1). Prose fixed: the
+   header comment on `deathDropSightBlocked` said "eye-to-gun"; it is
+   body-origin, and now says so.
+10. **DONE (PASS 95 verify): per-frame allocation on the HUD path.**
+    `deathDropSightBlocked` did `dropPosition.clone().add(new THREE.Vector3(...))`
+    and `visibleDeathDropWeaponPickup` allocated a third `THREE.Vector3`.
+    `updateFInteractionPrompt` reaches `fInteractionCandidates` **twice per
+    frame** (`advanceFInteractionPress` and `selectedFInteraction`), so that was
+    six `THREE.Vector3` per frame for as long as any ground weapon was in reach.
+    Both are module scratch vectors now; no semantic change.
+11. **TODO (low): the sight trace runs even for requests already doomed.** In
+    `acceptRemotePickup` the `sightBlocked` field is evaluated eagerly inside the
+    object literal, so a full `activeWorldColliders()` scan happens before the
+    bounds and sender-drift guards get a chance to reject. The *reported* guard
+    order is still correct (the evaluator's order decides the reason, and a test
+    pins it); this is wasted work on a guest-floodable path, not a wrong answer.

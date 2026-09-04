@@ -15323,14 +15323,27 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
 }
 
 /**
- * HF-504: the host traces eye-to-gun against the authoritative world colliders
- * before it hands a ground weapon over, exactly as the timed-map-weapon claim
- * has always done. Range alone let a gun be taken through a wall. The same
- * predicate feeds the local prompt, so `PICK UP` is never shown for a request
- * the host would answer 'line-of-sight'.
+ * HF-504: the host traces body-origin-to-gun against the authoritative world
+ * colliders before it hands a ground weapon over, exactly as the
+ * timed-map-weapon claim has always done (`acceptTimedMapWeaponClaim` traces
+ * from the replicated snapshot position to `pickup + 0.25`, NOT from an eye
+ * point — `player.position` is the body origin and `camera.position.y` adds
+ * the stance eye offset on top of it). Range alone let a gun be taken through
+ * a wall. The same predicate feeds the local prompt, so `PICK UP` is never
+ * shown for a request the host would answer 'line-of-sight'.
+ *
+ * PASS 95 verify: the two vectors are module scratch, not per-call
+ * allocations. This runs on the HUD path — `updateFInteractionPrompt` reaches
+ * `fInteractionCandidates` twice per frame (once via `advanceFInteractionPress`
+ * and once via `selectedFInteraction`), so a `clone()` here was three
+ * `THREE.Vector3` per call and six per frame for as long as a ground weapon
+ * was in reach.
  */
+const deathDropSightTargetScratch = new THREE.Vector3();
+const deathDropSightDropScratch = new THREE.Vector3();
+
 function deathDropSightBlocked(from: THREE.Vector3, dropPosition: THREE.Vector3): boolean {
-  const target = dropPosition.clone().add(new THREE.Vector3(0, 0.25, 0));
+  const target = deathDropSightTargetScratch.set(dropPosition.x, dropPosition.y + 0.25, dropPosition.z);
   return activeWorldColliders().some((box) => segmentIntersectsBox(from, target, box));
 }
 
@@ -15345,7 +15358,7 @@ function visibleDeathDropWeaponPickup(now: number, expectedTargetId?: string): D
     expectedTargetId,
   );
   if (!drop) return null;
-  const position = new THREE.Vector3(drop.position.x, drop.position.y, drop.position.z);
+  const position = deathDropSightDropScratch.set(drop.position.x, drop.position.y, drop.position.z);
   return deathDropSightBlocked(player.position, position) ? null : drop;
 }
 
