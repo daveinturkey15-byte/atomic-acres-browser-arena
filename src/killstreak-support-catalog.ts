@@ -1,3 +1,15 @@
+import {
+  CHOPPER_GUN_DAMAGE_AFTER,
+  CHOPPER_GUN_DAMAGE_MULTIPLIER,
+  CHOPPER_GUN_MINIMUM_DAMAGE_AFTER,
+  DRONE_SWARM_FIRE_RATE_MULTIPLIER,
+  DRONE_SWARM_SPEED_MULTIPLIER,
+  PILOTED_DRONE_FIRE_RATE_MULTIPLIER,
+  PILOTED_DRONE_SPEED_MULTIPLIER,
+  cadenceForFireRateMultiplier,
+  speedForMultiplier,
+} from './killstreak-tuning';
+
 /** Frozen inspected baseline; variants derive exact multipliers from this row. */
 export const DRONE_GUN_PROFILE_ID = 'drone-gun-inspected-baseline-v1' as const;
 export const PILOTED_DRONE_GUN_PROFILE_ID = 'piloted-drone-gun-half-baseline-v1' as const;
@@ -41,19 +53,44 @@ export const DRONE_GUN_PROFILE: DroneGunProfile = Object.freeze({
   criticalHits: false,
 });
 
-function scaledDroneGunProfile(id: DroneGunProfileId, multiplier: number): DroneGunProfile {
+/**
+ * HF-458 added the second axis. Before this row both variants were pure damage
+ * scalings of one baseline and shared its cadence; the owner asked for +25%
+ * fire rate on BOTH drone variants, so a variant now derives its cadence from
+ * the same baseline as well. `fireRateMultiplier` of 1 reproduces the previous
+ * behaviour exactly, which is what keeps `DRONE_GUN_PROFILE` the single
+ * inspected source rather than three independently authored guns.
+ */
+function scaledDroneGunProfile(
+  id: DroneGunProfileId,
+  multiplier: number,
+  fireRateMultiplier: number,
+): DroneGunProfile {
+  const cadenceMs = cadenceForFireRateMultiplier(DRONE_GUN_PROFILE.cadenceMs, fireRateMultiplier);
   return Object.freeze({
     ...DRONE_GUN_PROFILE,
     id,
     damage: DRONE_GUN_PROFILE.damage * multiplier,
     minimumDamage: DRONE_GUN_PROFILE.minimumDamage * multiplier,
+    cadenceMs,
+    rpm: 60_000 / cadenceMs,
   });
 }
 
 /** Exact user-approved combat variants; all non-damage behavior stays baseline-identical. */
-export const PILOTED_DRONE_GUN_PROFILE = scaledDroneGunProfile(PILOTED_DRONE_GUN_PROFILE_ID, 0.5);
+export const PILOTED_DRONE_GUN_PROFILE = scaledDroneGunProfile(
+  PILOTED_DRONE_GUN_PROFILE_ID,
+  0.5,
+  // HF-458 item 3: Piloted Drone "fire rate +25%".
+  PILOTED_DRONE_FIRE_RATE_MULTIPLIER,
+);
 // Pass 66.1 owner balance: swarm per-shot damage shaved by a third (3x -> 2x baseline).
-export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PROFILE_ID, 2);
+export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(
+  DRONE_SWARM_GUN_PROFILE_ID,
+  2,
+  // HF-458 item 2: Drone Swarm "fire rate +25%".
+  DRONE_SWARM_FIRE_RATE_MULTIPLIER,
+);
 
 /**
  * Swarm coordination is an activation-level pressure budget, not a second gun
@@ -62,16 +99,28 @@ export const DRONE_SWARM_GUN_PROFILE = scaledDroneGunProfile(DRONE_SWARM_GUN_PRO
  * time. This preserves visible, meaningful per-hit damage without turning 24
  * simultaneous barrels into an unavoidable one-frame kill.
  */
-export const DRONE_SWARM_FIRE_LANE_INTERVAL_MS = 460;
+export const DRONE_SWARM_FIRE_LANE_INTERVAL_MS_BEFORE = 460;
+/**
+ * HF-458 item 2. The lane, not the gun, is the swarm's real rate limiter - a
+ * 24-drone formation fires one barrel at a time - so "fire rate +25%" has to
+ * move BOTH or the owner would feel no change at all.
+ */
+export const DRONE_SWARM_FIRE_LANE_INTERVAL_MS = cadenceForFireRateMultiplier(
+  DRONE_SWARM_FIRE_LANE_INTERVAL_MS_BEFORE,
+  DRONE_SWARM_FIRE_RATE_MULTIPLIER,
+);
 
 export const CHOPPER_GUN_PROFILE = Object.freeze({
   // Owner 2026-08-29: "its damage doesnt seem to work" - measured at 10/shell
   // a bot took ~11 shells (~3s of sustained aimed fire) to kill, which reads
   // as broken. Retuned to the reference feel: ~3 shells to drop a full-health
   // hostile, cadence tightened to keep the heavy-thump rhythm.
-  id: 'chopper-gun-standard-v2',
-  damage: 34,
-  minimumDamage: 22,
+  // HF-458 item 1 (owner 2026-09-02): "machine-gun damage -25%". v2's 34/22
+  // stays recorded in killstreak-tuning.ts as the value this scales.
+  id: 'chopper-gun-standard-v3-hf458',
+  damage: CHOPPER_GUN_DAMAGE_AFTER,
+  minimumDamage: CHOPPER_GUN_MINIMUM_DAMAGE_AFTER,
+  damageMultiplierFromV2: CHOPPER_GUN_DAMAGE_MULTIPLIER,
   falloffStartM: 28,
   maximumRangeM: 78,
   cadenceMs: 240,
@@ -127,6 +176,13 @@ export type StandaloneDroneController = 'ai' | 'owner-player';
 
 export const DRONE_PRESENTATION_FAMILY_ID = 'hunter-drone-visual-family-v1' as const;
 
+/** HF-458 item 3: Piloted Drone "movement speed +15%" from the frozen 3 m/s. */
+export const PILOTED_DRONE_MANUAL_SPEED_MPS_BEFORE = 3;
+export const PILOTED_DRONE_MANUAL_SPEED_MPS = speedForMultiplier(
+  PILOTED_DRONE_MANUAL_SPEED_MPS_BEFORE,
+  PILOTED_DRONE_SPEED_MULTIPLIER,
+);
+
 /**
  * Shared deployment and movement policy for both drone variants. Spawn origin
  * is authority, not presentation: callers cannot relocate either variant by
@@ -138,12 +194,22 @@ export const DRONE_DEPLOYMENT_POLICY = Object.freeze({
   spawnOrigin: 'deterministic-valid-centre-map-volume',
   minimumSpawnSeparationM: 1.15,
   maximumAdmissionProbesPerUnit: 36,
-  manualHorizontalSpeedMps: 3,
-  manualVerticalSpeedMps: 3,
+  // HF-458 items 2 and 3: Piloted Drone and Drone Swarm "movement speed +15%".
+  // The autonomous standalone speed stays exactly the manual speed times its
+  // frozen 2x multiplier, so raising manual raises both coherently.
+  manualHorizontalSpeedMps: PILOTED_DRONE_MANUAL_SPEED_MPS,
+  manualVerticalSpeedMps: PILOTED_DRONE_MANUAL_SPEED_MPS,
   autonomousStandaloneSpeedMultiplier: 2,
-  autonomousStandaloneSpeedMps: 6,
-  swarmIngressSpeedMps: 22,
-  swarmPatrolSpeedMps: 7,
+  autonomousStandaloneSpeedMps: PILOTED_DRONE_MANUAL_SPEED_MPS * 2,
+  swarmIngressSpeedMps: speedForMultiplier(22, DRONE_SWARM_SPEED_MULTIPLIER),
+  swarmPatrolSpeedMps: speedForMultiplier(7, DRONE_SWARM_SPEED_MULTIPLIER),
+  /**
+   * HF-458: the swarm's engagement approach was an unnamed literal 8 inside
+   * `advanceDrone`. A movement-speed request that missed it would have left
+   * the swarm closing on its target at the old speed, which is most of the
+   * movement an owner actually sees.
+   */
+  swarmEngagementApproachSpeedMps: speedForMultiplier(8, DRONE_SWARM_SPEED_MULTIPLIER),
 } as const);
 
 export type DroneSupportDefinition = Readonly<{

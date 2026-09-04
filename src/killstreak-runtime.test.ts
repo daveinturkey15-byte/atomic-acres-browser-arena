@@ -452,6 +452,8 @@ describe('host killstreak runtime', () => {
       // HF-334: host killstreak result object includes careWeaponGrantEvents
       // (care-package weapon grants, e.g. the 10% flamethrower reward).
       careWeaponGrantEvents: [],
+      // HF-458: and taserStunEvents (Piloted Drone taser hits).
+      taserStunEvents: [],
     });
     expect(runtime.endMatch()).toEqual([]);
   });
@@ -1118,6 +1120,8 @@ describe('host killstreak runtime', () => {
       // HF-334: host killstreak result object includes careWeaponGrantEvents
       // (care-package weapon grants, e.g. the 10% flamethrower reward).
       careWeaponGrantEvents: [],
+      // HF-458: and taserStunEvents (Piloted Drone taser hits).
+      taserStunEvents: [],
     });
     expect(runtime.snapshotFor('owner', 2_000).revision).toBe(beforeInvalid);
   });

@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_100;
+const LINE_CEILING = 37_335;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -230,6 +230,20 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
       + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
       + 'the auto-stand it fed - so the net is comment, not code.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_335,
+    note:
+      'PASS 94 HF-458 (owner 2026-09-02): the Piloted Drone taser. +235 lines for the victim '
+      + 'side of a new host-authored status effect - authority/consumer state, the apply and '
+      + 'dispatch pair, the guest-side handler, the movement/jump gate in updatePhysics, the '
+      + 'bot stun hold in updateBots, the electric-blue overlay update, the RMB request and '
+      + 'its HUD counter, plus the QA hooks. Every DECISION is outside this file: the charge, '
+      + 'cooldown, targeting and movement rules are in src/taser-stun.ts, the wire message in '
+      + 'src/taser-protocol.ts and every tuned number in src/killstreak-tuning.ts. What lands '
+      + 'here is the wiring those modules cannot do for themselves, mirroring the flashbang '
+      + 'path line for line so the two status effects cannot drift apart.',
   },
 ];
 

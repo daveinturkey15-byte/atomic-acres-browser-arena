@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKillstreakLoadout } from './killstreak-catalog';
 import {
   CHOPPER_GUN_PROFILE,
+  supportGunDamageAtDistance,
   CHOPPER_GUNNER_RAY_POLICY,
 } from './killstreak-support-catalog';
 import {
@@ -224,7 +225,10 @@ describe('HF-135 authoritative Chopper Gunner fire ray', () => {
     expect(result.damageEvents[0]).toMatchObject({
       targetId: victim.id,
       source: 'chopper',
-      damage: CHOPPER_GUN_PROFILE.damage * 0.5,
+      // HF-458 moved the profile to a fractional 25.5 (-25%), so "exactly
+      // half" now means half of the ADMITTED shell the shared oracle rounds -
+      // which is what the runtime halves - not half of the raw profile field.
+      damage: supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 18) * 0.5,
     });
     vecClose(result.damageEvents[0]!.endpoint, ray.origin.map(
       (value, index) => value + ray.direction[index]! * 17,
