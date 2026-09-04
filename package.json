@@ -207,6 +207,7 @@
     "verify:publish-sibling-drift": "node --test scripts/orchestration/publish-sibling-drift.test.mjs",
     "verify:benchmark": "node scripts/release/verify-benchmark-record.mjs",
     "qa:release-identity": "node scripts/qa/verify-built-release-identity.mjs",
+    "qa:stock-boot": "playwright test tests/e2e/pass93-stock-flags-boot.spec.ts --project=chromium --workers=1 --retries=0",
     "qa:release-topology": "node scripts/qa/verify-release-topology-browser.mjs",
     "deploy": "npm run build && gh-pages -d dist --add",
     "deploy:ci": "gh-pages -d dist",

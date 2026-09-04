@@ -1256,3 +1256,134 @@ assets and textures and lighting need to be tip top, raid can come next"
   geometry atm, but nicely playable so thats good" → the ingested skills are
   already the builder's brief; the prompt now forbids flat single-colour
   surfaces anywhere a critic camera can see.
+
+## HF-452 — overnight results, 2026-09-04 05:05
+
+- **Nuke Town tip-top branch** (`nuketown2-tiptop`, head e1ce30f1, 28 commits
+  over PASS 92): round 1 cycles 1–3 (Gemini; road/kerbs/aprons, facade recess,
+  street furniture, interiors + lighting, glazed windows, siding/shingle/fence
+  materials, vehicle detail, pool, breakable-glass/bot-LOS attempt) with critic
+  scores per cycle; round-1 FINAL never ran (GLM and Gemini both hit their
+  quotas 21:12–21:50). **Luna x-high fixed the owner's P0/P1 (HF-448/449):**
+  interior slabs +0.08 m with the ground, lawn and dressing cut out of every
+  house/garage footprint (new house-interior coplanar class = 0, old FINDINGS
+  0, UNAUDITED unchanged at 16), and one collision-only ramp per stair flight
+  (probes up/down, max 1 ungrounded frame, parity gate green). Capture OPEN
+  (GPU < 3 GB while Qwen was awake). Round 2 (cycles 4–6 + final) starts on
+  Gemini after its quota reset; Luna pre-review of the whole branch follows.
+- **Load time:** Luna's skeptic review of `admission-cadence-wait` →
+  SHIP-WITH-FIXES, three hardening commits landed (fail-closed switch probe,
+  insufficient-history coverage). Luna also implemented the second lever on
+  `admission-rehearsal-scope` (new `src/weapon-rehearsal-scheduler.ts`; only
+  held weapons + arena roster rehearsed at admission, the rest deferred to safe
+  windows with a synchronous fallback before an unrehearsed combat switch;
+  legacy-main +88 lines). Both need the morning browser tripwire probe.
+- **Codex:** native AKP re-attestation done (receipt
+  `dave-gaming-pc--codex.json`, trust amber → check PASS, pushed 90863bc).
+- **Qwen:** 4 real deliverables (export finder, gotcha drafts, morning-report
+  skeleton, one comment fix); Luna's experiment diagnosed the empty runs
+  (open-ended multi-file tasks overflow the 65k context → compaction loop) and
+  recommends single-file exact-spec prompts with `--thinking low`.
+- **Gotcha (Codex):** every `codex exec` job hung after printing its done line
+  because config.toml's `notify` hook (`codex-computer-use.exe turn-ended`)
+  blocks on exit; the wrappers never wrote their exit markers and the gated
+  chain stalled from 22:30 to 05:05. Correction: pass `-c notify=[]` on
+  headless runs (applied to the pre-review launcher).
+
+## HF-453 — owner 2026-09-04 06:40: "send me a HITL version to play and review"
+
+- **Handoff claim:** candidate `34e3b38b` on branch `pass93-candidate` = live
+  PASS 92 head (`ce1c8f76` + docs) merged with `nuketown2-tiptop` at `f35dcb06`
+  (43 commits: Luna's P0/P1 fixes + six polish cycles + final pass). Merge was
+  conflict-free (122 files, +6044/−151). Built 06:41 (`dist` in
+  `aa-claude-hitl`), served locally by `vite preview` on
+  `http://127.0.0.1:4300/` (pid 4724). The build still calls itself PASS 92 —
+  the identity is rolled only at the real cut. NOT published.
+- **Out of scope for this candidate:** the two load-time branches
+  (`admission-cadence-wait`, `admission-rehearsal-scope`) — they await the
+  browser tripwire probe. Luna's tip-top pre-review is running in parallel; its
+  verdict and any fix commits land after this candidate was built.
+- **Owner checklist to inspect:** house ground-floor z-fighting gone at any
+  distance and angle; stairs smooth up and down in both houses; upstairs window
+  drop-outs; ground-floor glass; truck open on three sides; kerb-side cover;
+  road/kerb/facade/interior detail and materials; fps with Qwen idle.
+
+## HF-454 — owner 2026-09-04 06:50–07:15: "it is not stable, i cant even launch nuke town rebuild" / "pass 92 on the web doesn't work either" / "pass 91 doesn't work either, get all this sorted"
+
+- **Root cause (VERIFIED 07:19, orchestrator):** in the owner's installed Chrome
+  153.0.8010.12 with STOCK flags, the real visitor path (menu → Nuke Town
+  Rebuild card → DEPLOY) never reaches a live frame on the live PASS 92 and on
+  the local candidate, default and quality profiles alike. Console:
+  `Render pipeline creation failed (renderPipeline_RenderPipeline_25): An error
+  occurred while generating Tint IR — swizzle view instruction still has usages
+  after lowering` → invalid command buffer → `[Nuke Town Rebuild map selection
+  failed] WebGPU queue completion failed`, repeating every ~2 s. With
+  `--enable-unsafe-webgpu` the same builds boot on default/quality/max — every
+  QA smoke passes that flag, which is why all gates were green (the exact trap
+  recorded in the Chrome 153 Tint gotcha of 2026-08-30). The existing WGSL
+  swizzle shim misses this pipeline's shader. Not a GPU-memory, driver or
+  Chrome-update issue: GPU had 14 GB free, driver unchanged, the pending Chrome
+  153.0.8010.28 update is not yet active (new_chrome.exe staged, running
+  build is .12), no Chrome crashes since 08-31. Edge 152 and headless Chromium
+  load the menu fine; the failure is at arena pipeline creation.
+- **Evidence:** `docs/evidence/pass93/chrome153-live-repro/` (stock-flag probe
+  JSON per profile against the live URL, plus the probe script). Luna's
+  three-profile visitor reproduction with the unsafe flag (PASS on all three)
+  is in `aa-claude-hitl/docs/evidence/pass93/hitl-repro/`.
+- **Action:** one Opus agent (owner-authorised) is producing a hotfix on
+  `pass93-chrome153-hotfix` off the live head: extend the shim, install it
+  before the first pipeline, add an honest stock-flags boot spec to the cut
+  ritual. The Nuke Town tip-top branch (Luna verdict DO-NOT-SHIP: identical
+  siding on both houses, stray marker cubes) waits behind the hotfix.
+
+## PASS 93 publish record — 2026-09-04 08:10 BST (hotfix)
+
+- **Published** by `scripts/orchestration/publish_pass93.py` (exit 0) from head
+  `1aad84ab` (roll `2dcc3214` on the HF-454 hotfix merge `9e1e0344`; Opus
+  follow-up `1aad84ab` keeps device-feature negotiation observable). gh-pages
+  channels exactly `['pass92', 'pass93']` (pass91 retired per HF-400); root
+  chooser generation `2ff646727518`.
+- **Content:** PASS 92 + the Chrome 153 hotfix only: the WGSL swizzle rewrite
+  now composes every chained swizzle (`.xyz.xy`, `.xyz.z`, `(mat4*vec4).xyz.y`
+  in the ray-traced post composite that Nuke Town Rebuild deploys with) and is
+  installed on the negotiated device before the first pipeline; new honest
+  gate `npm run qa:stock-boot` (installed Chrome, no unsafe flag, real menu →
+  Solo for nuketown2 + atomic-acres). The Nuke Town tip-top branch is NOT in
+  this pass.
+- **Gates at the cut:** tsc 0; release tests 83/83; plan test 9/9; full suite
+  578 files / 5662 tests; identity guard OK; freshness clean; boot smoke 13/13
+  (8.0 min); stock-flags boot 4/4 (nuketown2 55 s, atomic-acres 1.1 min).
+- **Cut environment:** run in `aa-claude-hotfix` because `aa-omp-pass84`'s
+  shared node_modules was half-reinstalled by an elevated Codex run and cannot
+  be repaired unelevated (EPERM on the rolldown binding); the integration
+  branch is checked out in `aa-claude-hotfix` until the owner repairs it.
+
+## HF-455..457 — owner 2026-09-04 08:25 after playing PASS 93
+
+- **HF-455 (standing rule):** "It would be good to get a human in the loop
+  preview before you publish it that's been debugged" → every future pass gets
+  a local HITL build (stock-Chrome gate green first) and the owner's play
+  before publication. PASS 93 was the hotfix exception.
+- **HF-456 (P1, all maps):** "on the Nuke Town map the bot spawns seem to just
+  spawn in 1 or two places; all maps need better spawns for both players and
+  bots, that's a big thing to fix" → spawn-distribution lane: audit every
+  registered arena's player and bot spawn sets and the selection logic; spread
+  spawns (farthest-from-threat, recent-use avoidance, team-side aware), add
+  points where an arena has too few, keep the spawn audits green.
+- **HF-457:** "there's still wild z-fighting on the floor in the houses" and
+  the stairs → confirmed: PASS 93 is hotfix-only; Luna's floor/stair fixes and
+  the visual polish live on `nuketown2-tiptop`, being made shippable now
+  (HITL next, then PASS 94).
+
+## HF-458 — owner 2026-09-04 09:30: killstreak tuning (helicopter, drone swarm, piloted drone taser)
+
+- Helicopter: rockets 6 → **12**; on autopilot it fires only 6, a human pilot
+  can use the extra 6; the AI must actually use its rockets; machine-gun
+  damage **−25 %**.
+- Drone swarm: fire rate **+25 %**, movement speed **+15 %**.
+- Piloted drone: movement speed **+15 %**, fire rate **+25 %**; **right-click =
+  electric taser**: stuns the target (cannot move ~1 s, a flashbang-like but
+  clearly "tasered" effect), **3 taser charges**; fires automatically when the
+  drone is unpiloted and manually when piloted.
+- Lane: `killstreak-tuning` off the PASS 93 head (Luna), unit-tested numbers
+  and stun effect, HITL before publish per HF-455.

@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass92ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass93ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 92. */
+const pass92ReleasedAt = '2026-09-03T19:13:03+01:00';
 /** gh-pages publish receipt for PASS 91. */
 const pass91ReleasedAt = '2026-09-03T15:47:27+01:00';
 /** gh-pages publish receipt for PASS 90. */
@@ -142,6 +144,22 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass93',
+    pass: 'PASS 93',
+    title: 'Pass 93 · Chrome 153 Hotfix — Arenas Load Again In Stock Chrome',
+    releasedAt: pass93ReleasedAt,
+    areas: Object.freeze(['GRAPHICS', 'ARENAS']),
+    summary: 'Pass 93 is a hotfix: in stock Chrome 153 the shader compiler rejected one render pipeline the moment Nuke Town Rebuild (and any arena using the folded ray-traced post pass) was selected, so the arena never loaded. The WGSL swizzle rewrite now covers every chained swizzle and installs before the first pipeline; a stock-flags boot check in the installed Chrome joins the release gates.',
+    highlights: Object.freeze([
+      'Fix: arenas load again in stock Chrome 153 (chained-swizzle shader rewrite now complete, installed before the first pipeline)',
+      'Gate: honest stock-flags boot check in the installed Chrome added to the cut ritual',
+      'Pass 92 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
