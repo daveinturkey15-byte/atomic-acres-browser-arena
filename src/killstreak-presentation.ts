@@ -4086,6 +4086,12 @@ export class KillstreakPresentation {
         }
       }
     }
+    // Muse F1 (HF-491): the pool ROOT is a static traversal boundary
+    // (`freezeMatrixWorldWalk`), so the renderer's walk no longer descends
+    // into these newly activated shells/flashes/embers. `presentImpacts` is
+    // the one activation site outside `sync()`, so it must refresh the live
+    // roots itself or the effect draws one frame at its pooled rest pose.
+    this.updateLiveWorldMatrices();
   }
 
   entityRoot(id: string): THREE.Group | null {
