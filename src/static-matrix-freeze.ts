@@ -20,6 +20,19 @@ import * as THREE from 'three';
  * with one forced refresh when it returns to service. */
 function skipUpdateMatrixWorldWhileFrozen(this: THREE.Object3D): void {}
 
+/**
+ * Mark a presentation container as a static traversal boundary. The
+ * container stays in the scene graph, but the renderer's normal matrix walk
+ * does not descend into its dormant children. Owners of live children refresh
+ * those roots explicitly with updateWorldMatrix().
+ */
+export function freezeMatrixWorldWalk(root: THREE.Object3D): void {
+  if (root.matrixAutoUpdate) root.updateMatrix();
+  root.matrixAutoUpdate = false;
+  root.matrixWorldAutoUpdate = false;
+  root.updateMatrixWorld = skipUpdateMatrixWorldWhileFrozen;
+}
+
 /** Compose every node's current local transform once, then stop the
  * per-frame recompose AND the routine walk for the whole subtree. */
 export function deepFreezeSubtreeMatrices(root: THREE.Object3D): void {
@@ -32,6 +45,7 @@ export function deepFreezeSubtreeMatrices(root: THREE.Object3D): void {
   // gated (pass65-weapon-runtime-behavior) to never walk inactive rigs.
   // deepUnfreezeSubtreeMatrices does the one catch-up refresh instead.
   root.updateMatrixWorld = skipUpdateMatrixWorldWhileFrozen;
+  root.matrixWorldAutoUpdate = false;
 }
 
 /** Restore normal per-frame matrix dynamics for the whole subtree. */
@@ -41,6 +55,7 @@ export function deepUnfreezeSubtreeMatrices(root: THREE.Object3D): void {
   }
   root.traverse((node) => {
     node.matrixAutoUpdate = true;
+    node.matrixWorldAutoUpdate = true;
   });
   // Catch the subtree up after the frozen blackout before anything reads or
   // renders its world matrices.

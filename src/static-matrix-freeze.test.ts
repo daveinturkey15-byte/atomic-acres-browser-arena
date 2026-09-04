@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 
-import { freezeStaticArenaMatrices } from './static-matrix-freeze';
+import { freezeMatrixWorldWalk, freezeStaticArenaMatrices } from './static-matrix-freeze';
 
 function mesh(name: string): THREE.Mesh {
   const node = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
@@ -81,5 +81,33 @@ describe('freezeStaticArenaMatrices', () => {
 
     // Idempotent: a second pass finds nothing left to freeze.
     expect(freezeStaticArenaMatrices(root)).toBe(0);
+  });
+});
+
+describe('freezeMatrixWorldWalk', () => {
+  it('turns a dormant presentation root into an explicit-update boundary', () => {
+    const scene = new THREE.Scene();
+    const boundary = new THREE.Group();
+    const child = mesh('live-child');
+    boundary.position.set(2, 0, 0);
+    child.position.set(0, 0, 3);
+    boundary.add(child);
+    scene.add(boundary);
+
+    scene.updateMatrixWorld(true);
+    const before = child.getWorldPosition(new THREE.Vector3()).toArray();
+    freezeMatrixWorldWalk(boundary);
+    boundary.position.x = 9;
+    scene.updateMatrixWorld(true);
+
+    expect(boundary.matrixAutoUpdate).toBe(false);
+    expect(boundary.matrixWorldAutoUpdate).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(boundary, 'updateMatrixWorld')).toBe(true);
+    expect(child.getWorldPosition(new THREE.Vector3()).toArray()).toEqual(before);
+
+    // The owning presentation may still refresh a live child explicitly.
+    boundary.matrixWorld.copy(new THREE.Matrix4().makeTranslation(9, 0, 0));
+    child.updateWorldMatrix(false, false, true);
+    expect(child.getWorldPosition(new THREE.Vector3()).toArray()).toEqual([9, 0, 3]);
   });
 });
