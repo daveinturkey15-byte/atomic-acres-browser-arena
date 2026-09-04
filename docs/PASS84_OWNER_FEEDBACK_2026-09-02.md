@@ -1770,3 +1770,17 @@ assets and textures and lighting need to be tip top, raid can come next"
   whole-candidate skeptic review (reads today's entire diff in one context),
   and a Luna job adding Muse as a reference critic in the loop runner (receipt
   admission test, one real round, beast-run critic route if admitted).
+
+## HF-483 — owner 2026-09-04 15:45: "Muse Spark 1.3 is so cheap — get 2-3 workers going consistently"
+
+- Link shared: https://x.com/alexandr_wang/status/2095328657241956576 (to
+  ingest through the hub).
+- Built a standing **Muse Spark worker pool**: three workers polling a job
+  queue (scratchpad muse-queue/{pending,running,done}; each job is a prompt
+  file; a worker claims by atomic move, runs it through OMP as
+  meta-contributor/muse-spark-1.3 with thinking high, no skills/LSP, 90-minute
+  cap, logs per job, DONE marker; STOP file halts the pool). Seeded: skeptic
+  review of the techniques branch, skeptic review of the animation/skins
+  branch, and the six-task capability ladder run on Muse itself (adds a
+  --model option to the harness). New lane results get a review job each;
+  reference-critic rounds run through the loop runner tonight.
