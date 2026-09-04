@@ -44,10 +44,10 @@ export const FARCRYSIS_COVER_MIN = 14;
  */
 export const FARCRYSIS_SPAWNS_XZ: Readonly<Record<0 | 1, ReadonlyArray<readonly [number, number]>>> = Object.freeze({
   0: Object.freeze([
-    [-36, -22], [-8, -26], [-26, -8], [-26, -34], [-20, -20], [-32, -14],
+    [-36, -22], [-8, -26], [-26, -8], [-26, -34], [-20, -20], [-32, -14], [-34, -32], [-28, -26],
   ] as ReadonlyArray<readonly [number, number]>),
   1: Object.freeze([
-    [26, 34], [32, 2], [2, 46], [44, 18], [24, 18], [16, 42],
+    [26, 34], [32, 2], [2, 46], [44, 18], [24, 18], [16, 42], [34, 32], [28, 26],
   ] as ReadonlyArray<readonly [number, number]>),
 });
 

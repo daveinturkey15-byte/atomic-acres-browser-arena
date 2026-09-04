@@ -2600,7 +2600,7 @@ function spawnRecord(): Record<Team, THREE.Vector3[]> {
   // exact match, while staying outboard (the pair moves 2 m, not into
   // mid-ship) and keeping every same-team pair at least 6 m apart.
   const stern = [
-    [-9, 34], [-9, 40], [-3, 40.2], [3, 40.2], [9, 40], [9, 34],
+    [-9, 34], [-9, 40], [-3, 40.2], [3, 40.2], [9, 40], [9, 34], [0, 27], [-9, 27],
   ] as const;
   const bow = stern.map(([x, z]) => [-x, -z] as const);
   const create = (entries: readonly (readonly [number, number])[]): THREE.Vector3[] => entries.map(

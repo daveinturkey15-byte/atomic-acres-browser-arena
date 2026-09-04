@@ -1,7 +1,7 @@
 // Lane R (PASS 85): proposes a farcrysis spawn table that passes the HF-402
 // constraint set, and measures the authored one against it.
 //
-//   npx tsx scripts/qa/solve-farcrysis-spawns.ts [--out artifacts/.../spawns.json]
+//   npx tsx scripts/qa/solve-farcrysis-spawns.ts [--out artifacts/.../spawns.json] [--wanted 8]
 //
 // Why farcrysis needs its own solver rather than
 // `scripts/qa/solve-spawn-layouts.ts` (Lane D's, unchanged here):
@@ -79,7 +79,7 @@ const OUT = arg('--out');
 /** Comfortably above the gate's 3 m floor, as Lane D's solver uses. */
 const MIN_PAIR = 6;
 /** Points wanted per team. The gate's minimum is 4. */
-const WANTED = 6;
+const WANTED = Math.max(1, Number(arg('--wanted') ?? '6'));
 /**
  * Dry land only. A spawn whose ground is at or below the water line puts the
  * player in the wade shelf on the respawn frame; 1.2 m of freeboard keeps the

@@ -506,8 +506,8 @@ export function buildTest1(scene: THREE.Scene): ArenaMap {
     // symmetric in x, so they also map onto each other under the z mirror the
     // geometry is built on. Two spawns per team sit inside the covered shed.
     spawns: spawnRecord(
-      [[-20, -20.8], [-11.5, -20.8], [-2.6, -20], [2.6, -20], [11.5, -20.8], [20, -20.8]],
-      [[20, 20.8], [11.5, 20.8], [2.6, 20], [-2.6, 20], [-11.5, 20.8], [-20, 20.8]],
+      [[-20, -20.8], [-11.5, -20.8], [-2.6, -20], [2.6, -20], [11.5, -20.8], [20, -20.8], [-7.5, -20.8], [7.5, -20.8]],
+      [[20, 20.8], [11.5, 20.8], [2.6, 20], [-2.6, 20], [-11.5, 20.8], [-20, 20.8], [7.5, 20.8], [-7.5, 20.8]],
     ),
     patrolPoints: [
       [-19, -14], [-19, 0], [-19, 14], [-24, -6], [-24, 6], [0, -12],
@@ -1175,8 +1175,8 @@ export function buildTest2(scene: THREE.Scene): ArenaMap {
     // - so team 1's back band is the interior east of the courtyard until
     // that geometry gets its doors. Pinned by src/spawn-layout-quality.test.ts.
     spawns: spawnRecord(
-      [[-46, 0], [-30, -34], [-32, 19], [-32, -15], [-30, 2], [-38, -25]],
-      [[22, 1], [24, -24], [24, 22], [26, -11], [30, 10], [22, 13]],
+      [[-46, 0], [-30, -34], [-32, 19], [-32, -15], [-30, 2], [-38, -25], [-39, 8], [-41, -9]],
+      [[22, 1], [24, -24], [24, 22], [26, -11], [30, 10], [22, 13], [22, -17], [24, 7]],
     ),
     // Ten at grade and FOUR on the +3.40 m floors. The old comment kept every
     // anchor at grade because the only raised surface was a 0.70 m deck a bot

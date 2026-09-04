@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_100;
+const LINE_CEILING = 37_130;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -230,6 +230,16 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       + 'here is the latch clear when the requested stance is crouch, beside the prone one it '
       + 'copies. TWO LINES WERE DELETED at the same time - the validSprintDirection read and '
       + 'the auto-stand it fed - so the net is comment, not code.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_130,
+    note:
+      'PASS 94 spawn distribution (HF-456): the shared selector call sites now pass the '
+      + 'full valid tables and a twelve-second cross-actor spawn-use history, while retaining '
+      + 'team-side preference and the existing threat/death/occupancy safety inputs. The '
+      + 'measured +30 lines are the minimal runtime wiring; selection logic lives in '
+      + 'src/spawn-selection.ts rather than growing this legacy module further.',
   },
 ];
 

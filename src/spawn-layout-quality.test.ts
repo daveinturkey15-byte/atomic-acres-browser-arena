@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { ARENA_SELECTIONS } from './map-selection';
+import { ARENA_SELECTIONS, type ArenaId } from './map-selection';
 import { validArenaSpawnPoint } from './spawn-safety';
 import {
   ARENA_BUILDERS,
@@ -36,11 +36,10 @@ const BUILDERS = ARENA_BUILDERS;
  * player and bot spawns nicely spread and balanced everywhere alwys need a good
  * rule".
  *
- * The selection RULE was never the problem - `scoreSpawnCandidates` is one pure
- * function shared by players and bots, and it already avoids line of sight,
- * nearby enemies, recent deaths and occupied points. The problem is that a rule
- * can only choose among the points a map authors, and most maps authored a
- * corner blob rather than a spawn front. Measured before this gate existed:
+ * The old selection rule was shared by players and bots, but it only saw one
+ * side's table in team modes and had no recent-use history across actors. A
+ * rule can also only choose among the points a map authors, and most maps
+ * authored a corner blob rather than a spawn front. Measured before this gate:
  *
  *     atomic-acres  12 points, 43.0 m of spread   <- the map the owner says is fine
  *     test2 (Raid)   6 points,  4 x 10 m box, min pair 2.83 m, one point invalid
@@ -51,7 +50,7 @@ const BUILDERS = ARENA_BUILDERS;
  * because it is the one the owner is happy with.
  */
 
-/** Nuke Town is the standard: every other playable arena is measured against it. */
+/** Nuke Town is the standard: every other registered arena is measured against it. */
 const MINIMUM_SPAWNS_PER_TEAM = 4;
 /**
  * Two spawns closer than this are one spawn for grenade purposes.
@@ -64,17 +63,51 @@ const MINIMUM_PAIR_SEPARATION_M = 3;
 /** A team's points must span at least this much of the arena's longer axis. */
 const MINIMUM_SPREAD_FRACTION = 0.18;
 
-const PLAYABLE = ARENA_SELECTIONS.filter((arena) => arena.selectable !== false);
+const REGISTERED = ARENA_SELECTIONS;
+
+const SPAWN_LAYOUT_FLOORS: Readonly<Record<ArenaId, Readonly<{
+  minPointsPerTeam: number;
+  minSpreadFraction: number;
+  minMeanNearestNeighbourM: number;
+}>>> = Object.freeze({
+  'atomic-acres': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 3.5 },
+  'skyline-terminal': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 4.5 },
+  'rustworks-1v1': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 6 },
+  'gun-range': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 3.5 },
+  'farcrysis': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 8 },
+  'high-seas': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 5 },
+  'test1': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 4.5 },
+  'test2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 6 },
+  'map3': { minPointsPerTeam: 5, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 8 },
+  'nuketown2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
+  'raid2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
+});
 
 function distance(a: SpawnPoint, b: SpawnPoint): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
-describe('authored spawn layouts, on every playable arena', () => {
-  for (const selection of PLAYABLE) {
+describe('authored spawn layouts, on every registered arena', () => {
+  for (const selection of REGISTERED) {
     describe(selection.displayName, () => {
       const arena = BUILDERS[selection.id]!(new THREE.Scene());
       const teams = [arena.spawns[0] ?? [], arena.spawns[1] ?? []] as const;
+
+      it('pins a per-arena count, axis span, and mean nearest-neighbour floor', () => {
+        const floor = SPAWN_LAYOUT_FLOORS[selection.id];
+        const longestAxis = Math.max(arena.bounds.maxX - arena.bounds.minX, arena.bounds.maxZ - arena.bounds.minZ);
+        for (const [team, points] of teams.entries()) {
+          const nearest = points.map((point, index) => Math.min(...points
+            .filter((_, otherIndex) => otherIndex !== index)
+            .map((other) => distance(point, other))));
+          const meanNearest = nearest.reduce((sum, value) => sum + value, 0) / nearest.length;
+          const spanX = Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x));
+          const spanZ = Math.max(...points.map((point) => point.z)) - Math.min(...points.map((point) => point.z));
+          expect(points.length, `${selection.id} team ${team} count`).toBeGreaterThanOrEqual(floor.minPointsPerTeam);
+          expect(Math.max(spanX, spanZ) / longestAxis, `${selection.id} team ${team} spread`).toBeGreaterThanOrEqual(floor.minSpreadFraction);
+          expect(meanNearest, `${selection.id} team ${team} mean nearest-neighbour`).toBeGreaterThanOrEqual(floor.minMeanNearestNeighbourM);
+        }
+      });
 
       it('authors enough spawn points per team to spread a full lobby', () => {
         for (const [team, points] of teams.entries()) {
@@ -154,13 +187,13 @@ describe('authored spawn layouts, on every playable arena', () => {
  *     test2 (Raid)   team 0: 5/6 no floor, 6/6 no autostep route to the enemy
  *                    team 1: 4/6 no floor, 6/6 no route (the two with a floor
  *                            sit in a garage only a jump leaves)
- *     every other selectable arena: 12/12 or 24/24 on every rule below
+ *     every other registered arena: 12/12 or 24/24 on every rule below
  *
  * The rules and their thresholds live in src/spawn-layout-constraints.ts and
  * are calibrated on Nuke Town. The roster is derived from ARENA_SELECTIONS.
  */
 describe('HF-402: every authored spawn is inside the map, on a floor, with a route, cover, and no enemy spawn in sight', () => {
-  for (const selection of PLAYABLE) {
+  for (const selection of REGISTERED) {
     describe(selection.displayName, () => {
       const arena = BUILDERS[selection.id](new THREE.Scene());
       const report = measureSpawnLayout(selection.id, arena);
@@ -260,8 +293,8 @@ describe('HF-402: the free-for-all exemption matches what the runtime does', () 
     expect(legacyMain).toContain('modeInput.disabled = !hostControls || rangeLobby;');
   });
 
-  it('exempts nothing else: every selectable TEAM arena is held to team separation', () => {
-    for (const selection of PLAYABLE) {
+  it('exempts nothing else: every registered TEAM arena is held to team separation', () => {
+    for (const selection of REGISTERED) {
       // MAP3 (HF-409, owner 2026-09-02 16:55: "it's not about combat, it's a
       // mode you can explore"): an EXPLORE arena has no opposing side, so there
       // is no second table for its spawns to be separated FROM and the rule is
@@ -287,14 +320,14 @@ describe('HF-402: the free-for-all exemption matches what the runtime does', () 
     }
   });
 
-  it('holds every selectable arena to a declared kind, and keeps exactly one explore arena', () => {
+  it('holds every registered arena to a declared kind, and keeps exactly one explore arena', () => {
     // The kind is a required field, so tsc already forces a new arena to answer
     // the question. This pins the ANSWER SET so that flipping an existing team
     // arena to explore - which would silently drop it out of the rule above -
     // is a deliberate edit to this line.
-    for (const selection of PLAYABLE) {
+    for (const selection of REGISTERED) {
       expect(['team', 'explore'], `${selection.id} has no declared kind`).toContain(selection.kind);
     }
-    expect(PLAYABLE.filter((selection) => selection.kind === 'explore').map((selection) => selection.id)).toEqual(['map3']);
+    expect(REGISTERED.filter((selection) => selection.kind === 'explore').map((selection) => selection.id)).toEqual(['map3']);
   });
 });
