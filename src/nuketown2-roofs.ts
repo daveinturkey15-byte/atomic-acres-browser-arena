@@ -15,12 +15,13 @@ type BoxOptions = Parameters<typeof box>[5];
 export type Nuketown2RoofMaterials = Readonly<{
   roof: Material;
   roofGlazing: Material;
+  solarPanel: Material;
   timber: Material;
 }>;
 
 type RoofSide = 'north' | 'south';
 type RoofBodyKind = 'rake' | 'solar-panel' | 'capsule-band';
-type RoofMaterialRole = 'roof' | 'roofGlazing';
+type RoofMaterialRole = 'roof' | 'roofGlazing' | 'solarPanel';
 
 export type Nuketown2RoofBodySpec = Readonly<{
   id: string;
@@ -120,7 +121,7 @@ const solarPanelSpecs: readonly Nuketown2RoofBodySpec[] = Object.freeze(
         position: [x, y, z] as const,
         size: NUKETOWN2_SOLAR_PANEL.size,
         rotation: [ROOF_PITCH_RADIANS, 0, 0] as const,
-        material: 'roof' as const,
+        material: 'solarPanel' as const,
         solid: false as const,
         shots: false,
         planArea: NUKETOWN2_SOLAR_PANEL.size[0] * NUKETOWN2_SOLAR_PANEL.size[2],
@@ -186,7 +187,9 @@ export const NUKETOWN2_EXTERIOR_STAIR = Object.freeze({
 });
 
 function materialFor(materials: Nuketown2RoofMaterials, role: RoofMaterialRole): Material {
-  return role === 'roofGlazing' ? materials.roofGlazing : materials.roof;
+  if (role === 'roofGlazing') return materials.roofGlazing;
+  if (role === 'solarPanel') return materials.solarPanel;
+  return materials.roof;
 }
 
 export function northOnly(

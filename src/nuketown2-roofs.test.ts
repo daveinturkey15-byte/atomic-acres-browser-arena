@@ -73,6 +73,7 @@ describe('Nuke Town rooflines and exterior stair source tables', () => {
     expect(panels).toHaveLength(6);
     expect(capsules).toHaveLength(16);
     expect(panels.every((body) => body.side === 'north')).toBe(true);
+    expect(panels.every((body) => body.material === 'solarPanel')).toBe(true);
     expect(capsules.every((body) => body.side === 'south')).toBe(true);
     expect(panels.every((body) => body.size.join(',') === NUKETOWN2_SOLAR_PANEL.size.join(','))).toBe(true);
     expect(capsules.filter((body) => body.material === 'roofGlazing')).toHaveLength(4);

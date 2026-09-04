@@ -3006,11 +3006,13 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   buildNuketown2Rooflines(builder, {
     roof: m.roof,
     roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
     timber: m.fence,
   } satisfies Nuketown2RoofMaterials);
   buildNuketown2ExteriorStairs(builder, {
     roof: m.roof,
     roofGlazing: m.roofGlazing,
+    solarPanel: m.coachGlass,
     timber: m.fence,
   } satisfies Nuketown2RoofMaterials);
 
