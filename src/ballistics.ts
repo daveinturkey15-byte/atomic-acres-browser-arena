@@ -139,6 +139,9 @@ export const BALLISTIC_MATERIAL_CLASS: Readonly<Record<BallisticMaterialId, Ball
   reinforced: 'stop',
 });
 
+/** Minimum material depth charged for one stop-class ballistic hit. */
+export const BALLISTIC_STOP_MINIMUM_THICKNESS_METERS = 0.6;
+
 export function ballisticMaterialClass(material: BallisticMaterialId): BallisticMaterialClass {
   return BALLISTIC_MATERIAL_CLASS[material];
 }
@@ -415,7 +418,10 @@ export function traceBallisticPath(
     energy *= priorRetention > 0 ? entryRetention / priorRetention : 0;
     const thickness = Math.max(0, interval.exitDistance - interval.entryDistance);
     const resistance = BALLISTIC_MATERIALS[interval.surface.material];
-    const traversalCost = resistance.entryCost + resistance.costPerMeter * thickness;
+    const chargedThickness = ballisticMaterialClass(interval.surface.material) === 'stop'
+      ? Math.max(thickness, BALLISTIC_STOP_MINIMUM_THICKNESS_METERS)
+      : thickness;
+    const traversalCost = resistance.entryCost + resistance.costPerMeter * chargedThickness;
     const exceedsSurfaceLimit = penetratedSurfaces >= profile.maxPenetratedSurfaces;
     if (exceedsSurfaceLimit || energy <= traversalCost + 1e-8) {
       const afterEntry = Math.max(0, energy - resistance.entryCost);
