@@ -16,6 +16,7 @@ const generatedDialogSources = [
   readFileSync(new URL('./release-history-dialog.ts', import.meta.url), 'utf8'),
 ].join('\n');
 const rendererSources = `${mainSource}\n${generatedDialogSources}`;
+const diagnosticsOverlaySource = readFileSync(new URL('../netcode-diagnostics-overlay.ts', import.meta.url), 'utf8');
 const tacticalCssSource = readFileSync(new URL('./tactical-ui.css', import.meta.url), 'utf8');
 
 function cssHexToken(name: string): string {
@@ -46,7 +47,11 @@ describe('Pass 64 typed UI surface contract', () => {
     expect(new Set(rootIds).size).toBe(rootIds.length);
     for (const surface of UI_SURFACE_INVENTORY) {
       expect(['main-shell', 'match-hud']).toContain(surface.renderer);
-      expect(rendererSources.match(new RegExp(`id=["']${surface.rootElementId}["']`, 'g')) ?? []).toHaveLength(1);
+      if (surface.kind === 'diagnostics-overlay') {
+        expect(diagnosticsOverlaySource).toContain('element.id = NETCODE_OVERLAY_ELEMENT_ID');
+      } else {
+        expect(rendererSources.match(new RegExp(`id=["']${surface.rootElementId}["']`, 'g')) ?? []).toHaveLength(1);
+      }
     }
   });
 
@@ -81,6 +86,23 @@ describe('Pass 64 typed UI surface contract', () => {
     });
     expect(mainSource).toContain("element<HTMLElement>('#railgun-thermal')");
     expect(tacticalCssSource).toContain('#railgun-thermal');
+  });
+
+  it('registers the dynamic netcode diagnostics overlay with its non-interactive contract', () => {
+    expect(UI_SURFACE_INVENTORY.find(({ id }) => id === 'netcode-diagnostics-overlay')).toEqual({
+      id: 'netcode-diagnostics-overlay',
+      rootElementId: 'netcode-diagnostics-overlay',
+      renderer: 'match-hud',
+      critical: false,
+      kind: 'diagnostics-overlay',
+      toggleCode: 'F3',
+      zIndex: 70,
+      pointerEvents: 'none',
+    });
+    expect(diagnosticsOverlaySource).toContain("export const NETCODE_OVERLAY_ELEMENT_ID = 'netcode-diagnostics-overlay'");
+    expect(diagnosticsOverlaySource).toContain("export const NETCODE_OVERLAY_TOGGLE_CODE = 'F3'");
+    expect(diagnosticsOverlaySource).toContain("'z-index:70'");
+    expect(diagnosticsOverlaySource).toContain("'pointer-events:none'");
   });
 
   it('registers the M14 smoke-only thermal scope as a critical rendered and styled HUD surface', () => {

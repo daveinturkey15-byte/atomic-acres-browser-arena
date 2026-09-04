@@ -1,10 +1,15 @@
 export type UiRenderer = 'main-shell' | 'match-hud';
+export type UiSurfaceKind = 'static' | 'dynamic' | 'diagnostics-overlay';
 
 export type UiSurfaceDefinition = Readonly<{
   id: string;
   rootElementId: string;
   renderer: UiRenderer;
   critical: boolean;
+  kind?: UiSurfaceKind;
+  toggleCode?: string;
+  zIndex?: number;
+  pointerEvents?: 'auto' | 'none';
 }>;
 
 export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freeze([
@@ -33,6 +38,16 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
   { id: 'project-map', rootElementId: 'project-map-panel', renderer: 'main-shell', critical: false },
   { id: 'targeting-map', rootElementId: 'strike-map-overlay', renderer: 'match-hud', critical: true },
   { id: 'match-hud', rootElementId: 'hud', renderer: 'match-hud', critical: true },
+  {
+    id: 'netcode-diagnostics-overlay',
+    rootElementId: 'netcode-diagnostics-overlay',
+    renderer: 'match-hud',
+    critical: false,
+    kind: 'diagnostics-overlay',
+    toggleCode: 'F3',
+    zIndex: 70,
+    pointerEvents: 'none',
+  },
   { id: 'damage-direction', rootElementId: 'damage-direction', renderer: 'match-hud', critical: true },
   { id: 'nuke-warning', rootElementId: 'nuke-warning', renderer: 'match-hud', critical: true },
   { id: 'refresh-warning', rootElementId: 'refresh-warning', renderer: 'match-hud', critical: false },
@@ -105,6 +120,10 @@ export const UI_MOBILE_REVIEW_VIEWPORTS = Object.freeze([
 
 export function assertUiSurfaceInventory(root: ParentNode): void {
   for (const surface of UI_SURFACE_INVENTORY) {
+    // Diagnostics is deliberately lazy: F3 creates the hidden overlay on first
+    // use, so the initial shell assertion must validate its source contract
+    // rather than force a DOM node and defeat the lazy/off-switch behavior.
+    if (surface.kind === 'diagnostics-overlay') continue;
     if (!root.querySelector(`#${surface.rootElementId}`)) {
       throw new Error(`Missing UI surface ${surface.id} (#${surface.rootElementId})`);
     }

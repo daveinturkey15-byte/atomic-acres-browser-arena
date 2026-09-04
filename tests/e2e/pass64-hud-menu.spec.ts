@@ -615,6 +615,19 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await ready(page);
     await startDeterministicSolo(page);
 
+    await page.keyboard.press('F3');
+    await expect(page.locator('#netcode-diagnostics-overlay')).toBeVisible();
+    await expect.poll(async () => page.locator('#netcode-diagnostics-overlay').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        pointerEvents: style.pointerEvents,
+        zIndex: style.zIndex,
+        fontPx: Number.parseFloat(style.fontSize),
+      };
+    })).toEqual({ pointerEvents: 'none', zIndex: '70', fontPx: 12 });
+    await page.keyboard.press('F3');
+    await expect(page.locator('#netcode-diagnostics-overlay')).toBeHidden();
+
     for (const selector of ['#hud', '#matchbar', '#crosshair', '#minimap', '#health-block', '#weapon-block', '#equipment-block', '#support-block']) {
       await expect(page.locator(selector)).toBeVisible();
     }
