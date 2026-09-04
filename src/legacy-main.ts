@@ -690,6 +690,16 @@ import {
   selectDeathDropWeaponPickup,
   type DeathDrop,
 } from './death-drops';
+import {
+  createPickupResolutionLedger,
+  deathDropPayload,
+  evaluatePickupGeometry,
+  forgetPlayerPickupResolutions,
+  pickupRequestKey,
+  recallPickupResolution,
+  rememberPickupResolution,
+  stepPendingPickup,
+} from './weapon-pickup-authority';
 import { DeathDropPresentationPool } from './death-drop-presentation';
 import { ArenaNetwork } from './network';
 import {
@@ -5943,8 +5953,13 @@ type PendingLocalPickup = Readonly<{
   priorSwitchingUntil: number;
   priorDrop: DeathDrop;
   sentAt: number;
+  /** The exact request, kept so a resend reuses the SAME nonce and the host replays. */
+  request: PickupMessage;
+  resentAt: number | null;
 }>;
 let pendingLocalPickup: PendingLocalPickup | null = null;
+/** HF-504: host-side (playerId, nonce) -> verdict, so a repeat replays rather than rejects. */
+const hostPickupResolutions = createPickupResolutionLedger();
 let applyingLocalReloadAuthority = false;
 let localConnectionEpoch: string = crypto.randomUUID();
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
@@ -15070,6 +15085,9 @@ function clearDeathDrops(): void {
   for (const entity of deathDrops) disposeDeathDrop(entity);
   deathDrops.length = 0;
   authorizedRemotePickups.clear();
+  // Every drop id these verdicts referred to has just ceased to exist; replaying
+  // one into the next round would answer for a gun that is no longer there.
+  hostPickupResolutions.clear();
   renderPickupInteractionPrompt(element<HTMLElement>('#pickup-prompt'), null);
 }
 
@@ -15097,12 +15115,22 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
   const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
   victim.position.set(bounded.x, bounded.y, bounded.z);
   const spec = WEAPONS[victim.weapon];
+  // HF-504: the ground weapon carries the victim's REMAINING ammunition where
+  // the host holds that peer's canonical ledger, instead of the invented
+  // half-magazine/quarter-reserve fraction. Bots have no ledger, so they keep
+  // the historical fraction (deathDropPayload).
+  const victimInventory = remoteCombatInventories.get(message.victim);
+  const ordinaryVictimWeapon = ORDINARY_WEAPON_IDS.find((weapon) => weapon === victim.weapon);
+  const carried = victimInventory && ordinaryVictimWeapon
+    ? { ammo: victimInventory.ammo[ordinaryVictimWeapon], reserve: victimInventory.reserve[ordinaryVictimWeapon] }
+    : null;
+  const payload = deathDropPayload(spec, carried);
   const drop = createDeathDrop(
     id,
     victim.weapon,
     victim.position,
-    Math.max(1, Math.ceil(spec.mag * 0.5)),
-    Math.max(1, Math.ceil(spec.reserve * 0.25)),
+    payload.ammo,
+    payload.reserve,
     now,
   );
   if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
@@ -15294,9 +15322,21 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
   return true;
 }
 
-function interactWithDeathDrop(now = performance.now(), expectedTargetId?: string): boolean {
-  if (!player.alive || matchState.phase !== 'active') return false;
-  if (network.role === 'client' && pendingLocalPickup) return false;
+/**
+ * HF-504: the host traces eye-to-gun against the authoritative world colliders
+ * before it hands a ground weapon over, exactly as the timed-map-weapon claim
+ * has always done. Range alone let a gun be taken through a wall. The same
+ * predicate feeds the local prompt, so `PICK UP` is never shown for a request
+ * the host would answer 'line-of-sight'.
+ */
+function deathDropSightBlocked(from: THREE.Vector3, dropPosition: THREE.Vector3): boolean {
+  const target = dropPosition.clone().add(new THREE.Vector3(0, 0.25, 0));
+  return activeWorldColliders().some((box) => segmentIntersectsBox(from, target, box));
+}
+
+/** The single local eligibility used by BOTH the F prompt and the F action. */
+function visibleDeathDropWeaponPickup(now: number, expectedTargetId?: string): DeathDrop | null {
+  if (network.role === 'client' && pendingLocalPickup) return null;
   const drop = selectDeathDropWeaponPickup(
     deathDrops.map((entity) => entity.drop),
     player.position,
@@ -15304,6 +15344,14 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
     now,
     expectedTargetId,
   );
+  if (!drop) return null;
+  const position = new THREE.Vector3(drop.position.x, drop.position.y, drop.position.z);
+  return deathDropSightBlocked(player.position, position) ? null : drop;
+}
+
+function interactWithDeathDrop(now = performance.now(), expectedTargetId?: string): boolean {
+  if (!player.alive || matchState.phase !== 'active') return false;
+  const drop = visibleDeathDropWeaponPickup(now, expectedTargetId);
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
@@ -15356,6 +15404,8 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
       priorSwitchingUntil,
       priorDrop,
       sentAt: now,
+      request: pickup,
+      resentAt: null,
     });
   }
   network.send(pickup);
@@ -15469,8 +15519,10 @@ function sendRemotePickupResult(
   reason: PickupResultMessage['reason'],
   drop: DeathDrop | undefined,
   now: number,
-): void {
-  if (network.role !== 'host') return;
+  storedDrop?: PickupResultDropRecord | 'removed',
+): PickupResultDropRecord | 'removed' {
+  const record = storedDrop ?? pickupResultDropRecord(drop, now);
+  if (network.role !== 'host') return record;
   const result: PickupResultMessage = {
     type: 'pickup-result',
     protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
@@ -15480,10 +15532,11 @@ function sendRemotePickupResult(
     status,
     reason,
     combatInventory: remotePickupCombatInventoryProjection(message.by),
-    drop: pickupResultDropRecord(drop, now),
+    drop: record,
     nonce: message.nonce,
   };
   network.sendToPlayer(message.by, result);
+  return record;
 }
 
 function rejectRemotePickup(
@@ -15493,7 +15546,10 @@ function rejectRemotePickup(
   now: number,
 ): void {
   processedNonces.add(message.nonce);
-  sendRemotePickupResult(message, 'rejected', reason, drop, now);
+  const record = sendRemotePickupResult(message, 'rejected', reason, drop, now);
+  rememberPickupResolution(hostPickupResolutions, pickupRequestKey(message.by, message.nonce), {
+    status: 'rejected', reason, drop: record, resolvedAt: now,
+  });
   recordMatchDiagnostic('weapon-pickup', 'rejected', {
     actorId: message.by,
     weaponOrEffect: message.weapon,
@@ -15564,9 +15620,29 @@ function acceptLocalPickupResult(message: PickupResultMessage): void {
   renderFieldKitSelection();
 }
 
+/**
+ * HF-504: one lost datagram used to cost the pickup outright - the guest sent
+ * once and reverted after 1,500 ms. It now RESENDS the identical request (same
+ * nonce, so the host replays instead of re-executing) at 700 ms and only
+ * reverts at the unchanged 1,500 ms deadline. The revert threshold is not
+ * relaxed; a retry is inserted before it.
+ */
 function expirePendingLocalPickup(now: number): void {
   const pending = pendingLocalPickup;
-  if (network.role !== 'client' || !pending || now - pending.sentAt <= 1_500) return;
+  if (network.role !== 'client' || !pending) return;
+  const step = stepPendingPickup({ sentAt: pending.sentAt, resentAt: pending.resentAt }, now);
+  if (step === 'wait') return;
+  if (step === 'resend') {
+    pendingLocalPickup = Object.freeze({ ...pending, resentAt: now });
+    network.send(pending.request);
+    recordMatchDiagnostic('weapon-pickup', 'observed', {
+      actorId: player.id,
+      weaponOrEffect: pending.request.weapon,
+      reason: 'pickup-result-resend',
+      modifiers: [`nonce:${pending.request.nonce}`],
+    });
+    return;
+  }
   restorePendingLocalPickup(pending);
   pendingLocalPickup = null;
   recordMatchDiagnostic('weapon-pickup', 'rejected', {
@@ -15578,6 +15654,19 @@ function expirePendingLocalPickup(now: number): void {
 
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
   if (message.by === player.id) return;
+  // HF-504 idempotency. A repeat of a request this host ALREADY resolved is
+  // answered with the same verdict and the host's CURRENT canonical inventory,
+  // never re-executed and never turned into a rejection. That is what makes a
+  // lost ack cost one round trip instead of the gun: the guest resends the same
+  // nonce, the host replays 'accepted', and the guest confirms the swap it had
+  // already applied optimistically. A replayed rejection is equally load-bearing
+  // - it stops a retry from becoming a second successful pick of one drop.
+  const requestKey = pickupRequestKey(message.by, message.nonce);
+  const replay = recallPickupResolution(hostPickupResolutions, requestKey, now);
+  if (replay) {
+    sendRemotePickupResult(message, replay.status, replay.reason, undefined, now, replay.drop);
+    return;
+  }
   if (processedNonces.has(message.nonce)) {
     const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
     rejectRemotePickup(message, 'duplicate', entity?.drop, now);
@@ -15601,21 +15690,27 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
   const horizontalDropDistance = Math.hypot(position.x - dropPosition.x, position.z - dropPosition.z);
-  const validDropDistance = message.mode === 'scavenge'
-    ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
-    : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
   const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
   const expectedGrenadeGranted = message.mode === 'scavenge' && grenadeAuthority?.remaining === 0 ? 1 : 0;
-  if (!pointInsideBounds(position, arena.bounds, 0.44)) {
-    rejectRemotePickup(message, 'out-of-bounds', entity.drop, now);
-    return;
-  }
-  if (position.distanceTo(senderPosition) > 2.8) {
-    rejectRemotePickup(message, 'sender-distance', entity.drop, now);
-    return;
-  }
-  if (!validDropDistance) {
-    rejectRemotePickup(message, 'drop-distance', entity.drop, now);
+  // HF-504: the same spatial admission the local prompt uses, decided in one
+  // tested place (src/weapon-pickup-authority.ts) so the HUD can never offer a
+  // pickup this host would refuse. The tolerances are the pre-existing numbers,
+  // moved rather than widened; 'line-of-sight' is the one added guard, and it
+  // applies to weapon pickups only - a scavenge is a contact action performed
+  // standing on the corpse.
+  const geometryReason = evaluatePickupGeometry({
+    mode: message.mode,
+    senderDistanceM: position.distanceTo(senderPosition),
+    dropDistanceM: position.distanceTo(dropPosition),
+    dropHorizontalDistanceM: horizontalDropDistance,
+    dropVerticalDistanceM: Math.abs(position.y - dropPosition.y),
+    insideBounds: pointInsideBounds(position, arena.bounds, 0.44),
+    sightBlocked: message.mode === 'weapon' && deathDropSightBlocked(position, dropPosition),
+    weaponRangeM: DEATH_DROP_INTERACTION_RANGE,
+    scavengeRangeM: DEATH_DROP_SCAVENGE_RANGE,
+  });
+  if (geometryReason) {
+    rejectRemotePickup(message, geometryReason, entity.drop, now);
     return;
   }
   if (message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)) {
@@ -15714,7 +15809,13 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
     setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
   }
   processedNonces.add(message.nonce);
-  sendRemotePickupResult(message, 'accepted', 'accepted', entity.drop, now);
+  const acceptedRecord = sendRemotePickupResult(message, 'accepted', 'accepted', entity.drop, now);
+  // The verdict is remembered BEFORE the entity is torn down, with the same
+  // ground-state delta the guest was just sent, so a replay of this request
+  // reproduces it exactly even after the drop object is gone.
+  rememberPickupResolution(hostPickupResolutions, requestKey, {
+    status: 'accepted', reason: 'accepted', drop: acceptedRecord, resolvedAt: now,
+  });
   if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
   else removeDeathDrop(entity);
   trimNonceSet();
@@ -16696,6 +16797,10 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
   remotes.delete(id);
+  // HF-504: a departed peer's pickup verdicts can never be replayed again, and
+  // a rejoin issues a fresh connection epoch, so the ledger is scoped down with
+  // the peer rather than left to age out.
+  forgetPlayerPickupResolutions(hostPickupResolutions, id);
   verifiedRemoteKills.delete(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
@@ -23670,12 +23775,7 @@ function fInteractionCandidates(now = performance.now()): readonly InteractionCa
   const railgun = !testBayWeapon && !timedWeapon && railgunPickupNearby();
   const station = nearbyGunRangeWeaponStation();
   const drop = !testBayWeapon && !timedWeapon && !railgun && !station
-    ? selectDeathDropWeaponPickup(
-      deathDrops.map((entity) => entity.drop),
-      player.position,
-      player.primaryWeapon,
-      now,
-    )
+    ? visibleDeathDropWeaponPickup(now)
     : null;
   if (testBayWeapon) candidates.push({
     kind: 'test-bay-weapon',

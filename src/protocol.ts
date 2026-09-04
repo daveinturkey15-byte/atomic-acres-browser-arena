@@ -86,7 +86,7 @@ import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstrea
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 18;
+export const MULTIPLAYER_PROTOCOL_VERSION = 20;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -374,8 +374,8 @@ export type PickupMessage = {
  * reserved for accepted results; each rejection names the exact failed guard so
  * a guest can revert its optimistic swap instead of silently diverging. */
 export type PickupResultReason = 'accepted' | 'duplicate' | 'unknown-sender' | 'unknown-drop'
-  | 'weapon-mismatch' | 'out-of-bounds' | 'sender-distance' | 'drop-distance' | 'expired'
-  | 'payload-consumed' | 'grenade-state' | 'grenade-grant' | 'no-inventory'
+  | 'weapon-mismatch' | 'out-of-bounds' | 'sender-distance' | 'drop-distance' | 'line-of-sight'
+  | 'expired' | 'payload-consumed' | 'grenade-state' | 'grenade-grant' | 'no-inventory'
   | 'nothing-to-scavenge' | 'not-consumable';
 /** Host-canonical record of what remains on the ground after the transaction. */
 export type PickupResultDropRecord = Readonly<{
@@ -762,7 +762,7 @@ function isNormalizedDirection(value: unknown): value is [number, number, number
 
 const pickupResultReasons = new Set<PickupResultReason>([
   'accepted', 'duplicate', 'unknown-sender', 'unknown-drop', 'weapon-mismatch', 'out-of-bounds',
-  'sender-distance', 'drop-distance', 'expired', 'payload-consumed', 'grenade-state',
+  'sender-distance', 'drop-distance', 'line-of-sight', 'expired', 'payload-consumed', 'grenade-state',
   'grenade-grant', 'no-inventory', 'nothing-to-scavenge', 'not-consumable',
 ]);
 

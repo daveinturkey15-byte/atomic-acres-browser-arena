@@ -220,7 +220,18 @@ export function consumeDeathDropWeapon(
     inventory: {
       primary: drop.weapon,
       ammo: Math.min(spec.mag, Math.max(1, finiteRound(drop.ammo))),
-      reserve: 0,
+      // Owner requirement (HF-504, "cannot reload or pick up guns"): the gun on
+      // the ground brings ITS REMAINING RESERVE with it. Until PASS 95 this was
+      // a hard `0`, so every picked-up weapon arrived with one magazine and no
+      // reserve and the first reload after a pickup was impossible - the drop
+      // was created with `ceil(spec.reserve * 0.25)` rounds (spawnDeathDrop)
+      // and every one of them was discarded at the moment of transfer.
+      // Nothing is duplicated: the drop does not keep this reserve, it is
+      // overwritten below with the magazine and reserve of the gun you handed
+      // over. A drop whose ammunition payload was already scavenged has no
+      // reserve left to give, which is why this reads the payload predicate
+      // rather than the raw field.
+      reserve: deathDropAmmoAvailable(drop, now) ? Math.min(spec.reserve, finiteRound(drop.reserve)) : 0,
     },
     // Owner requirement: the gun you swapped out (with its magazine and reserve)
     // goes INTO this drop instead of being deleted, and the consumed flags are

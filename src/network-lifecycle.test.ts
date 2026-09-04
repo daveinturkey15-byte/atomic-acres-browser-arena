@@ -664,8 +664,15 @@ describe('guest event connection lifecycle', () => {
     expect(initialLobbyJoinHasProtocolMismatch({ type: 'chat-submit', protocolVersion: predecessorVersion })).toBe(false);
   });
 
-  it('rejects a v17 peer before it can mix with the required v18 support-shot schema', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+  it('rejects a v17 peer before it can mix with the required support-shot schema', () => {
+    // The pin moves with every wire change. It was 18 before PASS 95. This lane
+    // added the 'line-of-sight' pickup-result reason
+    // (src/weapon-pickup-authority.ts) and took 20, NOT 19: the concurrent
+    // HF-498 reload lane (contrib/dave-gaming-pc/claude/mp-bugs-hf498) also
+    // bumps 18 -> 19 with a different wire change, and two lanes both landing
+    // "19" would auto-merge into one number describing two incompatible
+    // schemas. Taking 20 forces the integrator to resolve the ordering.
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(20);
     const currentSupportResult = {
       type: 'killstreak-damage-result' as const,
       by: 'host',
