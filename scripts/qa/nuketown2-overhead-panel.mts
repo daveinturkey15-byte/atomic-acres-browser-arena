@@ -61,7 +61,7 @@ const GLYPHS: ReadonlyArray<readonly [RegExp, string]> = Object.freeze([
   [/\bgarage /u, 'G'],
   [/street-vehicle truck/u, 'T'],
   [/street-vehicle coach/u, 'C'],
-  [/street-vehicle head car/u, 'c'],
+  [/street-vehicle stem (saloon|classic)/u, 'c'],
   [/\b(car|verge|yard|path|street)\b/u, 'o'],
 ]);
 

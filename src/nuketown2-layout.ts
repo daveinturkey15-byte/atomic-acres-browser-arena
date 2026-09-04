@@ -119,26 +119,94 @@ export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -18, maxX: 18, minZ: -42, 
  */
 export const NUKETOWN2_STREET_HALF_WIDTH = 5.3;
 
-/** Half-width of the open turning head at the centre of the carriageway. */
+/** Radius of the open turning head. Half its bounding square, too. */
 export const NUKETOWN2_TURNING_HEAD_HALF = 8;
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE LOLLIPOP - HF-477, and the biggest structural correction since HF-426's
+ * aspect.
+ *
+ * WHAT SHIPPED THROUGH PASS 93. A through-street the full 36 m of the map with
+ * a SQUARE 16 x 16 m turning head CENTRED on it, so the road had two identical
+ * blank ends and no cul-de-sac at all. That shape came from
+ * `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md` section 3, which is measured
+ * off two minimaps and reads the head as an inboard widening.
+ *
+ * WHAT THE REFERENCE HAS. `docs/references/nuketown-2025/FINDINGS.md` Q4,
+ * VERIFIED on `nt2025-aerial-boii.jpg` (BO2-2025): a LOLLIPOP - one CIRCULAR
+ * kerbed turning head at one end, and a straight STEM running off the map at
+ * the other. The BO2 minimap draws the same circle with a narrower arm off one
+ * side. "This is not what we build ... It is one head at one end, with a road
+ * leaving at the other."
+ *
+ * WHICH END IS WHICH, DERIVED AND NOT COPIED. FINDINGS Q4 also fixes the
+ * relation between the head and the houses: the ORANGE house's garage wing is
+ * at the end of that house AWAY from the third house and the turning head - the
+ * STEM side - and by the 180-degree pairing the white house's garage is at the
+ * HEAD end. In this file's AUTHORED frame the north house is the orange one
+ * (see `nuketown2-arena.ts`' siding block) and its garage hangs off its +x end.
+ * Therefore, in the AUTHORED frame:
+ *
+ *   authored +x = the STEM, running off the map
+ *   authored -x = the CUL-DE-SAC, its bulb, its fence and the third house
+ *
+ * and because the world is the authored frame mirrored on x by
+ * NUKETOWN2_HANDEDNESS = -1, the WORLD has the cul-de-sac at +x. Nothing below
+ * writes a world number; the mirror is still applied once, at the emitters.
+ *
+ * THE PROPORTIONS. The bulb is the same 16 m across the schematic already
+ * measured, so the head does not change size - only where it is and what shape
+ * it draws. The stem keeps NUKETOWN2_STREET_HALF_WIDTH, and that pair is
+ * checkable against the aerial: measured on `nt2025-aerial-boii.jpg` the stem
+ * carriageway is 425 px against the bulb's 630 px of asphalt = 0.675, and
+ * 10.6 / 16 = 0.6625 - 1.9 % low.
+ *
+ * THE INSET IS AUTHORED, AND FINDINGS OPEN ITEM 5 SAYS WHY IT HAS TO BE. The
+ * BO2 minimap shows the circle inboard of the street's extent; the aerial shows
+ * it terminating the road; both can be true and the exact inset is unmeasured.
+ * Authored at 1.5 m of verge between the bulb's kerb and the map bound, which
+ * is the width the perimeter fence and the third house's frontage need and is
+ * the smallest inset that is not zero. OPEN.
+ */
+export const NUKETOWN2_CUL_DE_SAC = Object.freeze({
+  /** Authored x of the bulb's centre. */
+  centreX: -8.5,
+  /** Bulb radius, and half its bounding square. */
+  radius: NUKETOWN2_TURNING_HEAD_HALF,
+  /** Authored x where the bulb's bounding square ends and the stem begins. */
+  mouthX: -8.5 + NUKETOWN2_TURNING_HEAD_HALF,
+  /** Authored x where the stem leaves the map. */
+  offMapX: NUKETOWN2_BOUNDS.maxX,
+  /** Authored x of the closed end's kerb. */
+  closedX: -8.5 - NUKETOWN2_TURNING_HEAD_HALF,
+});
 
 /**
  * Plan union that owns the carriageway floor. The ground builder cuts these
  * exact rectangles before emitting the real road slabs, so visual geometry and
  * the coplanar-pair instrument share one source of truth.
+ *
+ * TWO RECTANGLES STILL, AND DELIBERATELY. The bulb is a DISC, but its ground
+ * cut is its bounding SQUARE: the four corners between the disc and the square
+ * are the reference's own wide concrete kerb apron (clearly visible in
+ * `nt2025-aerial-boii.jpg`), which `street()` lays as kerb-height islands over
+ * the same asphalt slab. Cutting the disc out band by band instead would
+ * multiply the ground tiler's grid - it builds one tile per (x-cut, z-cut) cell
+ * - for a boundary no player ever stands on the far side of.
  */
 export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
   Object.freeze({
     id: 'street' as const,
-    x0: NUKETOWN2_BOUNDS.minX,
-    x1: NUKETOWN2_BOUNDS.maxX,
+    x0: NUKETOWN2_CUL_DE_SAC.mouthX,
+    x1: NUKETOWN2_CUL_DE_SAC.offMapX,
     z0: -NUKETOWN2_STREET_HALF_WIDTH,
     z1: NUKETOWN2_STREET_HALF_WIDTH,
   }),
   Object.freeze({
     id: 'turning-head' as const,
-    x0: -NUKETOWN2_TURNING_HEAD_HALF,
-    x1: NUKETOWN2_TURNING_HEAD_HALF,
+    x0: NUKETOWN2_CUL_DE_SAC.closedX,
+    x1: NUKETOWN2_CUL_DE_SAC.mouthX,
     z0: -NUKETOWN2_TURNING_HEAD_HALF,
     z1: NUKETOWN2_TURNING_HEAD_HALF,
   }),
@@ -271,13 +339,33 @@ export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
   boxLength: 6.5,
   cabLength: 5.2,
   width: 2.6,
+  /**
+   * HF-477 - THE TRUCK MOVED INTO THE BULB, because the bulb moved.
+   *
+   * Until this pass the cargo box stood at the world origin and `x` did not
+   * exist: the turning head was centred on the map, so "in the head" and "at
+   * x = 0" were the same statement. With the head at the cul-de-sac end
+   * (NUKETOWN2_CUL_DE_SAC) they are not, and the aerial
+   * (`nt2025-aerial-boii.jpg`) is unambiguous - the truck stands IN the bulb,
+   * nose pointed down the stem.
+   *
+   * -10.6 is derived, not chosen: the truck is 11.7 m end to end and the bulb
+   * is a 16 m disc, so the only free parameter is how far the nose reaches. At
+   * -10.6 the front bumper lands at authored x = -2.03 and the disc at the
+   * bumper's own |z| = 4.05 reaches -1.60, so the nose stops 0.43 m short of
+   * the kerb line instead of parking over it. Everything else about the truck -
+   * its 0.325 L length split, its z, its deck and roof heights and the 2x core
+   * that rides it - is unchanged, and the core's seat is DERIVED from this
+   * field in `src/overdrive.ts` so it cannot be left behind.
+   */
+  x: -10.6,
   /** 0.0764 L south of the road centre-line; reference 0.076 L. */
   z: 2.75,
   deckY: 0.05,
   roofY: 3.25,
   cabRoofY: 2.9,
-  /** Cab centre along the street: box half plus cab half. */
-  cabX: 6.5 / 2 + 5.2 / 2,
+  /** Cab centre along the street: the box centre plus box half plus cab half. */
+  cabX: -10.6 + 6.5 / 2 + 5.2 / 2,
   /** Height of the 2x-damage core over the cargo-box roof. */
   coreHeightOverRoof: 0.6,
 });
@@ -305,6 +393,40 @@ export const NUKETOWN2_STREET_COACH = Object.freeze({
   height: 3.3,
   offsetAlong: COACH_OFFSET_ALONG,
   offsetAcross: COACH_OFFSET_ACROSS,
-  x: -COACH_OFFSET_ALONG,
+  /**
+   * HF-477 FLIPPED THE SIGN, and the magnitude is untouched. The schematic
+   * measures the coach 0.178 L from the truck's cargo box ALONG the street but
+   * does not say which way, and with a centred turning head there was nothing
+   * to decide it, so HF-426 took -x. `nt2025-aerial-boii.jpg` decides it: the
+   * coach's cream body sits nearer the STEM than the truck's box does, with
+   * its dark nose pointed down it. Authored +x, which is the stem in this
+   * frame, and measured from the truck's own centre rather than from the world
+   * origin because the truck is no longer at it.
+   */
+  x: NUKETOWN2_CENTRAL_TRUCK.x + COACH_OFFSET_ALONG,
   z: NUKETOWN2_CENTRAL_TRUCK.z - COACH_OFFSET_ACROSS,
+});
+
+/**
+ * HF-477 - THE TWO CARS THE REFERENCE PUTS IN THE ROAD, which this arena had
+ * as one aqua saloon parked across the road centre-line at a spot chosen to
+ * hold a fidelity band down (see `coach()`'s "head car" note).
+ *
+ * FINDINGS Q4, VERIFIED on `nt2025-aerial-boii.jpg`:
+ *   - a DARK SALOON tucked right beside the box truck, on the WHITE house's
+ *     side of the road, nosed down the stem with it. That is the truck's own
+ *     side here (`NUKETOWN2_CENTRAL_TRUCK.z` is positive and the south house is
+ *     the white one), so it goes in the stem beside the truck rather than in
+ *     the bulb, where the 11.7 m truck leaves no 4.4 m slot at that z.
+ *   - a GREEN/TEAL CLASSIC CAR out in the STEM, and it is the body that now
+ *     carries `MAX_STREET_CENTRE_RUN_METRES`: it is the only thing parked
+ *     across the road's centre-line, which is exactly the role the head car
+ *     used to play, so the band's derivation moves to it intact rather than
+ *     being loosened.
+ */
+export const NUKETOWN2_STREET_CARS = Object.freeze({
+  /** The dark saloon, beside the truck, nosed down the stem. */
+  saloon: Object.freeze({ x: 2.0, z: 3.2, length: 4.4, width: 1.9 }),
+  /** The green classic, out in the stem across the centre-line. */
+  classic: Object.freeze({ x: 5.0, z: -0.6, length: 4.4, width: 1.9 }),
 });

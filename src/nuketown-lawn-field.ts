@@ -195,6 +195,14 @@ export type NuketownGroundDressingPiece = Readonly<{
   x1: number;
   z0: number;
   z1: number;
+  /**
+   * HF-477. Default true: the arena emits the piece through its own `pair()`,
+   * so the lawn field owes it a 180-degree partner region. `false` means the
+   * arena authored the piece ONCE - the rebuilt front verge is tiled per
+   * z-side because the lollipop cul-de-sac is not a rotational pair of itself -
+   * and inventing a partner here would grow grass across the carriageway.
+   */
+  paired?: boolean;
 }>;
 
 /**
@@ -221,7 +229,8 @@ export function nuketownRebuildLawnRegions(
     const maxZ = Math.max(piece.z0, piece.z1);
     regions.push({ minX, maxX, minZ, maxZ });
     // The rotational partner, the same transform `pair()` applies: (x, z) -> (-x, -z).
-    regions.push({ minX: -maxX, maxX: -minX, minZ: -maxZ, maxZ: -minZ });
+    // Suppressed for pieces the arena authored once - see `paired` above.
+    if (piece.paired !== false) regions.push({ minX: -maxX, maxX: -minX, minZ: -maxZ, maxZ: -minZ });
   }
   return Object.freeze(regions);
 }

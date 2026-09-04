@@ -112,7 +112,7 @@ import {
   NUKETOWN2_FOREST_ENVELOPE,
   buildNuketownForestSurround,
 } from './nuketown-forest-surround';
-import { buildNuketownRebuildLawnField } from './nuketown-lawn-field';
+import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField } from './nuketown-lawn-field';
 import {
   NUKETOWN2_BACKDROP_ENVELOPE,
   buildNuketownMountainBackdrop,
@@ -121,6 +121,7 @@ import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_CUL_DE_SAC,
   NUKETOWN2_FLOOR_T,
   NUKETOWN2_FRONT_VERGE_DEPTH,
   NUKETOWN2_GROUND_FLOOR_T,
@@ -130,6 +131,7 @@ import {
   NUKETOWN2_HOUSE_DEPTH,
   NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_HOUSE_LAYOUT,
+  NUKETOWN2_STREET_CARS,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
@@ -184,6 +186,7 @@ export {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
+  NUKETOWN2_CUL_DE_SAC,
   NUKETOWN2_STREET_COACH,
   NUKETOWN2_STREET_HALF_WIDTH,
   NUKETOWN2_STREET_LENGTH,
@@ -746,7 +749,10 @@ export const NUKETOWN2_SECTION = Object.freeze({
  * claim: the core is taken on the box roof or not at all.
  */
 const TRUCK_ROOF_STEPS: readonly (readonly [number, number, number])[] = Object.freeze([
-  // [tread top, x from, x to] - z is derived from the truck's own position
+  // [tread top, x OFFSET from the cargo box centre, x offset to] - z is
+  // derived from the truck's own position, and HF-477 made x an offset for the
+  // same reason: the box centre used to be the world origin and is not any
+  // more.
   Object.freeze([0.80, 7.0, 8.2] as const),
   Object.freeze([1.75, 5.8, 7.0] as const),
   Object.freeze([2.60, 4.6, 5.8] as const),
@@ -960,6 +966,10 @@ type Nuketown2Materials = Readonly<{
   truckCab: THREE.Material;
   truckBox: THREE.Material;
   carA: THREE.Material;
+  /** The dark saloon beside the truck (FINDINGS Q4). */
+  carSaloon: THREE.Material;
+  /** The green/teal classic out in the stem (FINDINGS Q4). */
+  carClassic: THREE.Material;
   carGlass: THREE.Material;
   /** HF-434: the coach window BANDS - polygonOffset tier -1 over the body. */
   coachGlass: THREE.Material;
@@ -1052,6 +1062,16 @@ function nuketown2Materials(): Nuketown2Materials {
   const truckCab = createNuketown2TruckCabMaterial();
   const truckBox = createNuketown2TruckBoxMaterial();
   const carA = createNuketown2CarPaintMaterial(0x3d6f80, 'nuketown2-car-aqua');
+  // HF-477 - the two road cars the reference actually parks in the street.
+  // Both measured off `nt2025-aerial-boii.jpg` and both stated as FAMILIES,
+  // like the house colours: the frame is hazy and uncalibrated, so the hue is
+  // taken and the chroma is authored at this arena's own car-paint level.
+  // Dark blue saloon (measured a desaturated slate around #5a6b74, lifted to
+  // the navy the un-hazed body reads as) and green/teal classic (measured
+  // around #78807a under the same haze, lifted to the period jade-green the
+  // aerial's own colour-coded props sit at). Exact hexes OPEN.
+  const carSaloon = createNuketown2CarPaintMaterial(0x27394f, 'nuketown2-car-saloon-navy');
+  const carClassic = createNuketown2CarPaintMaterial(0x2f8f77, 'nuketown2-car-classic-jade');
   const carGlass = createNuketown2VehicleGlassMaterial();
   const rubber = createNuketown2TireMaterial();
   const chrome = createNuketown2ChromeMaterial();
@@ -1179,6 +1199,8 @@ function nuketown2Materials(): Nuketown2Materials {
     truckCab,
     truckBox,
     carA,
+    carSaloon,
+    carClassic,
     carGlass,
     coachGlass,
     windowGlass,
@@ -2057,12 +2079,16 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
   const boxHalf = t.boxLength / 2;
   const flank = W / 2 - T / 2;
 
-  // Cab, solid closed cover, on the +x end.
+  // Cab, solid closed cover, on the +x end - which under HF-477 is the end
+  // that faces DOWN THE STEM, so the truck is nosed out of the cul-de-sac
+  // exactly as `nt2025-aerial-boii.jpg` has it. Every x below is now an offset
+  // from `t.x`, the cargo box's own centre; they used to be absolute because
+  // that centre was the world origin.
   streetVehicle(builder, 'truck cab', [t.cabX, t.cabRoofY / 2, t.z], [t.cabLength, t.cabRoofY, W], m.truckCab);
   // Cargo box: deck, bulkhead against the cab, two flanks with a walk-through
   // opening each, and a roof. The -x end is OPEN, which is the rear mouth.
-  streetVehicle(builder, 'truck deck', [0, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
-  streetVehicle(builder, 'truck box bulkhead', [boxHalf - T / 2, (t.deckY + BOX_WALL_TOP) / 2, t.z],
+  streetVehicle(builder, 'truck deck', [t.x, t.deckY - T / 2, t.z], [t.boxLength, T, W], m.truckBox, { cast: false });
+  streetVehicle(builder, 'truck box bulkhead', [t.x + boxHalf - T / 2, (t.deckY + BOX_WALL_TOP) / 2, t.z],
     [T, BOX_WALL_TOP - t.deckY, W], m.truckBox);
   // HF-436, owner after PASS 91: "one of the trucks in the street needs a side
   // entrance so you can go in over the left side, right side, or the end, more
@@ -2078,14 +2104,14 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
     const fz = t.z + side * flank;
     [[-boxHalf, -SIDE_OPENING_HALF], [SIDE_OPENING_HALF, boxHalf - T]].forEach((run, pier) => {
       streetVehicle(builder, `truck box flank ${index} pier ${pier}`,
-        [(run[0] + run[1]) / 2, (t.deckY + BOX_WALL_TOP) / 2, fz],
+        [t.x + (run[0] + run[1]) / 2, (t.deckY + BOX_WALL_TOP) / 2, fz],
         [run[1] - run[0], BOX_WALL_TOP - t.deckY, T], m.truckBox);
     });
     streetVehicle(builder, `truck box flank ${index} header`,
-      [0, (HEADER_Y + BOX_WALL_TOP) / 2, fz],
+      [t.x, (HEADER_Y + BOX_WALL_TOP) / 2, fz],
       [SIDE_OPENING_HALF * 2, BOX_WALL_TOP - HEADER_Y, T], m.truckBox);
   }
-  streetVehicle(builder, 'truck box roof', [0, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
+  streetVehicle(builder, 'truck box roof', [t.x, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
   // Front chrome bumper, grille, headlights, and cab windshield:
   streetVehicle(builder, 'truck bumper front', [t.cabX + t.cabLength / 2 + 0.12, 0.35, t.z],
     [0.22, 0.30, W + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
@@ -2098,13 +2124,13 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
       [t.cabX + t.cabLength / 2 + 0.04, 0.95, t.z + side * (W / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
     streetVehicle(builder, `truck taillight ${side}`,
-      [-boxHalf - 0.04, 0.85, t.z + side * (W / 2 - 0.25)], [0.06, 0.22, 0.16], m.taillight,
+      [t.x - boxHalf - 0.04, 0.85, t.z + side * (W / 2 - 0.25)], [0.06, 0.22, 0.16], m.taillight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
   }
-  streetVehicle(builder, 'truck rear step bar', [-boxHalf - 0.10, 0.45, t.z],
+  streetVehicle(builder, 'truck rear step bar', [t.x - boxHalf - 0.10, 0.45, t.z],
     [0.18, 0.14, W - 0.2], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
   // Wheels: keep the exact 3 expected asymmetric meshes plus decorative hubcaps and arches
-  for (const [index, x] of [-boxHalf + 1.1, boxHalf + 1.0, t.cabX + 1.8].entries()) {
+  for (const [index, x] of [t.x - boxHalf + 1.1, t.x + boxHalf + 1.0, t.cabX + 1.8].entries()) {
     streetVehicle(builder, `truck wheel ${index}`, [x, 0.42, t.z], [0.9, 0.84, W + 0.2], m.rubber,
       { solid: false, shots: false, cast: false });
     for (const side of [-1, 1]) {
@@ -2117,7 +2143,7 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
   // ROOF ACCESS. See TRUCK_ROOF_STEPS: the 2x-damage core rides this roof, and
   // a roof nothing can climb is a feature that does not exist.
   for (const [index, [top, x0, x1]] of TRUCK_ROOF_STEPS.entries()) {
-    streetVehicle(builder, `truck roof step ${index}`, [(x0 + x1) / 2, top / 2, t.z - (W / 2 + 2.45) / 2],
+    streetVehicle(builder, `truck roof step ${index}`, [t.x + (x0 + x1) / 2, top / 2, t.z - (W / 2 + 2.45) / 2],
       [x1 - x0, top, 2.45 - W / 2], m.block);
   }
 }
@@ -2155,11 +2181,11 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   streetVehicle(builder, 'coach front grille', [c.x + c.length / 2 + 0.02, 1.05, c.z],
     [0.06, 0.22, c.width - 0.8], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
   for (const side of [-1, 1]) {
-    // Coach rear faces west (into cul-de-sac entrance): ruby-red taillights
+    // Coach rear faces the cul-de-sac's closed end: ruby-red taillights
     streetVehicle(builder, `coach taillight ${side}`,
       [c.x - c.length / 2 - 0.04, 0.95, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.24, 0.18], m.taillight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
-    // Coach front faces east (toward turning head): illuminated headlights (y=0.98 clears grille top)
+    // Coach front faces down the STEM (HF-477): illuminated headlights (y=0.98 clears grille top)
     streetVehicle(builder, `coach headlight ${side}`,
       [c.x + c.length / 2 + 0.04, 0.98, c.z + side * (c.width / 2 - 0.35)], [0.06, 0.20, 0.20], m.headlight,
       { solid: false, shots: false, cast: false, presentationOnly: true });
@@ -2175,55 +2201,65 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
         [1.16, 0.10, 0.06], m.busShell, { solid: false, shots: false, cast: true, presentationOnly: true });
     }
   }
-  // shows the truck, the coach AND a couple of civilian cars standing in it, so
-  // this body is the reference's own. It is authored here rather than in
-  // `cars()` because it earns its place as the COACH'S COUNTERWEIGHT: the coach
-  // is 9.1 x 2.6 m of hard cover entirely on the north half of the road, and
-  // the truck sits on the centre-line rather than south of it (the 2x core
-  // pins it there), so without this the south half of the carriageway carries
-  // no street body at all and the north team owns the head. Solid, waist-high,
-  // parked against the south kerb.
-  // HF-432 item 5 MOVED IT, and the move is load-bearing twice over. At
-  // (4.5, 4.6) it stood where the truck now does. It goes onto the ROAD
-  // CENTRE-LINE instead, in the gap the reference's own measurements leave
-  // between the two street bodies: the coach is 0.150 L north of the truck and
-  // both are 2.6 m wide, so the reference's pair leaves 2.8 m of open
-  // carriageway straight down z = 0. With the truck no longer straddling that
-  // line, nothing else on this 36 m road breaks it, and the arena's derived
-  // MAX_STREET_CENTRE_RUN_METRES band exists precisely to stop that. Parked
-  // across it, this body keeps the longest clear centre-line run at 19.8 m
-  // inside the 21.2 m band - and it is still the coach's counterweight, which
-  // is the other property nuketown2-fidelity.test.ts measures.
-  const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
-  streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
-  streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
-  // Head car bumpers, sloped windows, and separate wheels with hubcaps:
-  streetVehicle(builder, 'head car bumper front', [HEAD_CAR[0] + 2.25, 0.30, HEAD_CAR[1]],
-    [0.16, 0.22, 1.94], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
-  streetVehicle(builder, 'head car bumper rear', [HEAD_CAR[0] - 2.25, 0.30, HEAD_CAR[1]],
-    [0.16, 0.22, 1.94], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
-  streetVehicle(builder, 'head car windshield', [HEAD_CAR[0] + 0.95, 1.48, HEAD_CAR[1]],
-    [0.25, 0.55, 1.66], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
-  streetVehicle(builder, 'head car rear window', [HEAD_CAR[0] - 1.35, 1.48, HEAD_CAR[1]],
-    [0.25, 0.55, 1.66], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
-  for (const side of [-1, 1]) {
-    streetVehicle(builder, `head car headlight ${side}`,
-      [HEAD_CAR[0] + 2.22, 0.68, HEAD_CAR[1] + side * 0.70], [0.06, 0.16, 0.30], m.headlight,
-      { solid: false, shots: false, cast: false, presentationOnly: true });
-    streetVehicle(builder, `head car taillight ${side}`,
-      [HEAD_CAR[0] - 2.22, 0.68, HEAD_CAR[1] + side * 0.70], [0.06, 0.16, 0.30], m.taillight,
-      { solid: false, shots: false, cast: false, presentationOnly: true });
-  }
-  for (const [index, dx] of [-1.5, 1.5].entries()) {
-    for (const [side, dz] of [-1, 1].entries()) {
-      streetVehicle(builder, `head car wheel ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 0.9],
-        [0.68, 0.68, 0.3], m.rubber, { solid: false, shots: false, cast: false });
-      streetVehicle(builder, `head car hubcap ${index}${side}`, [HEAD_CAR[0] + dx, 0.34, HEAD_CAR[1] + dz * 1.07],
-        [0.34, 0.34, 0.03], m.chrome, { solid: false, shots: false, cast: false, presentationOnly: true });
-      streetVehicle(builder, `head car wheel arch ${index}${side}`, [HEAD_CAR[0] + dx, 0.72, HEAD_CAR[1] + dz * 0.96],
-        [0.88, 0.08, 0.06], m.carA, { solid: false, shots: false, cast: true, presentationOnly: true });
+  // ---- HF-477: THE TWO CARS THE REFERENCE HAS IN THE ROAD ------------------
+  // WHAT THIS REPLACES. One aqua "head car", authored across the road
+  // centre-line at (4.5, -0.8), which existed for two mechanical reasons: to
+  // give the south half of the carriageway a street body (the coach's
+  // counterweight) and to stop the centre-line becoming a 34 m clear lane.
+  // Both reasons survive; the body does not, because
+  // `nt2025-aerial-boii.jpg` shows what is actually parked there.
+  //
+  // FINDINGS Q4, VERIFIED: a DARK SALOON tucked beside the box truck on the
+  // WHITE house's side, and a GREEN/TEAL CLASSIC CAR out in the STEM. The
+  // saloon inherits the counterweight job (it is on the truck's own z side,
+  // which is the south half) and the classic inherits the centre-line job -
+  // it is the only body parked across z = 0, so `MAX_STREET_CENTRE_RUN_METRES`
+  // moves onto it with its derivation intact. Nothing about either band was
+  // relaxed; the body that carries it changed, and the gate says so.
+  //
+  // The saloon is in the STEM and not in the bulb because the bulb has no room
+  // for it: the truck is 11.7 m of a 16 m disc and the 1.25 m of clear road
+  // between its cab flank and the mouth's kerb will not hold a 1.9 m car
+  // without interpenetrating one of them. The reference has both bodies "nosed
+  // down the stem", so parking it in the stem beside the truck's nose is the
+  // same statement.
+  const streetCar = (
+    id: string,
+    seat: { x: number; z: number; length: number; width: number },
+    paint: THREE.Material,
+  ): void => {
+    const half = seat.length / 2;
+    streetVehicle(builder, `${id} body`, [seat.x, 0.72, seat.z], [seat.length, 1.0, seat.width], paint);
+    streetVehicle(builder, `${id} cabin`, [seat.x - 0.2, 1.55, seat.z], [seat.length / 2, 0.66, seat.width - 0.2], m.carGlass);
+    streetVehicle(builder, `${id} bumper front`, [seat.x + half + 0.05, 0.30, seat.z],
+      [0.16, 0.22, seat.width + 0.04], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+    streetVehicle(builder, `${id} bumper rear`, [seat.x - half - 0.05, 0.30, seat.z],
+      [0.16, 0.22, seat.width + 0.04], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
+    streetVehicle(builder, `${id} windshield`, [seat.x + 0.95, 1.48, seat.z],
+      [0.25, 0.55, seat.width - 0.24], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
+    streetVehicle(builder, `${id} rear window`, [seat.x - 1.35, 1.48, seat.z],
+      [0.25, 0.55, seat.width - 0.24], m.carGlass, { solid: false, shots: false, cast: false, presentationOnly: true });
+    for (const side of [-1, 1]) {
+      streetVehicle(builder, `${id} headlight ${side}`,
+        [seat.x + half + 0.02, 0.68, seat.z + side * (seat.width / 2 - 0.25)], [0.06, 0.16, 0.30], m.headlight,
+        { solid: false, shots: false, cast: false, presentationOnly: true });
+      streetVehicle(builder, `${id} taillight ${side}`,
+        [seat.x - half - 0.02, 0.68, seat.z + side * (seat.width / 2 - 0.25)], [0.06, 0.16, 0.30], m.taillight,
+        { solid: false, shots: false, cast: false, presentationOnly: true });
     }
-  }
+    for (const [index, dx] of [-1.5, 1.5].entries()) {
+      for (const [side, dz] of [-1, 1].entries()) {
+        streetVehicle(builder, `${id} wheel ${index}${side}`, [seat.x + dx, 0.34, seat.z + dz * (seat.width / 2 - 0.05)],
+          [0.68, 0.68, 0.3], m.rubber, { solid: false, shots: false, cast: false });
+        streetVehicle(builder, `${id} hubcap ${index}${side}`, [seat.x + dx, 0.34, seat.z + dz * (seat.width / 2 + 0.12)],
+          [0.34, 0.34, 0.03], m.chrome, { solid: false, shots: false, cast: false, presentationOnly: true });
+        streetVehicle(builder, `${id} wheel arch ${index}${side}`, [seat.x + dx, 0.72, seat.z + dz * (seat.width / 2 + 0.01)],
+          [0.88, 0.08, 0.06], paint, { solid: false, shots: false, cast: true, presentationOnly: true });
+      }
+    }
+  };
+  streetCar('stem saloon', NUKETOWN2_STREET_CARS.saloon, m.carSaloon);
+  streetCar('stem classic', NUKETOWN2_STREET_CARS.classic, m.carClassic);
 }
 
 /**
@@ -2278,20 +2314,53 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
  * x = -4, which laid 38.4 m2 of green lawn INSIDE each house's front room, 20 mm
  * proud of the interior floor, and every gate in the repository stayed green.
  */
-export const NUKETOWN2_GROUND_DRESSING = Object.freeze([
-  // Driveway apron: garage door out to the turning head.
-  Object.freeze({ id: 'street driveway', material: 'drive' as const, x0: GARAGE_X0, x1: GARAGE_X1, z0: GARAGE_FRONT_Z, z1: -NUKETOWN2_TURNING_HEAD_HALF }),
-  // Front lawn: the strip between the house front and the turning head.
-  Object.freeze({ id: 'street lawn front', material: 'lawn' as const, x0: HOUSE_X0, x1: HOUSE_X1, z0: HOUSE_FRONT_Z, z1: -NUKETOWN2_TURNING_HEAD_HALF }),
-  // The verge either side of the head, running out to the map edge.
-  Object.freeze({ id: 'street lawn west', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: -NUKETOWN2_TURNING_HEAD_HALF, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
-  Object.freeze({ id: 'street lawn east', material: 'lawn' as const, x0: GARAGE_X1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
-  // HF-440: Infill between turning head (x=8) and east lawn (x=9.25), in front of drive.
-  Object.freeze({ id: 'street lawn turning infill', material: 'lawn' as const, x0: NUKETOWN2_TURNING_HEAD_HALF, x1: GARAGE_X1, z0: -NUKETOWN2_TURNING_HEAD_HALF, z1: KERB_Z }),
+const HEAD = NUKETOWN2_CUL_DE_SAC;
+export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] = Object.freeze([
+  // Driveway apron: garage door out to the kerb. HF-477 ran it the last 2.7 m
+  // to KERB_Z instead of stopping at the old centred head's |z| = 8 edge -
+  // there is no head there any more on the stem side, and the SOUTH house's
+  // partner apron laps 2.7 m of the bulb's own kerb apron, which is what an
+  // apron meeting a cul-de-sac does. Concrete over concrete, tier -1 over the
+  // solid road, so nothing races.
+  // HF-477 split the two aprons apart. They used to be one paired entry
+  // running to |z| = 8, which was both drives' kerb line when the head was
+  // centred. It is not any more: on the STEM side the kerb is at |z| = 5.3, and
+  // on the CUL-DE-SAC side the bulb reaches |z| = 8 - so one paired rectangle
+  // either leaves a 2.7 m lawn gap in front of one garage or paints 13.5 m2 of
+  // apron over the other's road, which the ground-cut gate caught immediately.
+  // Two entries, each meeting its own kerb exactly.
+  Object.freeze({ id: 'street driveway north', material: 'drive' as const, paired: false, x0: GARAGE_X0, x1: GARAGE_X1, z0: GARAGE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'street driveway south', material: 'drive' as const, paired: false, x0: -GARAGE_X1, x1: -GARAGE_X0, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -GARAGE_FRONT_Z }),
   // Back yard lawn: the whole strip between the house back wall and the fence.
   Object.freeze({ id: 'yard lawn', material: 'lawn' as const, x0: NUKETOWN2_BOUNDS.minX, x1: NUKETOWN2_BOUNDS.maxX, z0: YARD_FENCE_Z, z1: HOUSE_BACK_Z }),
   // Border path outside the fence.
   Object.freeze({ id: 'border path', material: 'drive' as const, x0: NUKETOWN2_BOUNDS.minX, x1: NUKETOWN2_BOUNDS.maxX, z0: NUKETOWN2_BOUNDS.minZ, z1: YARD_FENCE_Z }),
+
+  // ---- HF-477: THE FRONT VERGE, TILED PER SIDE ----------------------------
+  // The four entries that used to cover this band (`street lawn front`,
+  // `street lawn west`, `street lawn east`, `street lawn turning infill`) were
+  // written for a road that was a 180-degree pair of itself. The lollipop is
+  // not: at the cul-de-sac end the bulb fills the whole 4.7 m verge band, and
+  // at the stem end none of it does. `pair()` would put each tile's image
+  // where the road is.
+  //
+  // So the verge is tiled EXPLICITLY, once per z-side, as the band between the
+  // house front line and the kerb MINUS the carriageway and MINUS the drive
+  // apron. Nine tiles, no overlaps, complete cover - and the two sides are
+  // exact z-mirrors of each other, which is the symmetry that actually matters
+  // because it is the axis the teams are separated across.
+  // ONE tile, both sides, running the full corridor depth: behind the bulb's
+  // closed kerb there is no carriageway to tile around, and splitting it at
+  // |z| = 5.3 like the stem-side tiles left the strip at |z| < 5.3 bare - which
+  // the region gate caught, because the stem's own 180-degree image lands
+  // exactly there.
+  Object.freeze({ id: 'verge lawn head end', material: 'lawn' as const, paired: false, x0: NUKETOWN2_BOUNDS.minX, x1: HEAD.closedX, z0: HOUSE_FRONT_Z, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn head frontage north', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: HEAD.mouthX, z0: HOUSE_FRONT_Z, z1: -NUKETOWN2_TURNING_HEAD_HALF }),
+  Object.freeze({ id: 'verge lawn stem north 0', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: GARAGE_X0, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn stem north 1', material: 'lawn' as const, paired: false, x0: GARAGE_X1, x1: NUKETOWN2_BOUNDS.maxX, z0: HOUSE_FRONT_Z, z1: KERB_Z }),
+  Object.freeze({ id: 'verge lawn head frontage south 0', material: 'lawn' as const, paired: false, x0: HEAD.closedX, x1: -GARAGE_X1, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn head frontage south 1', material: 'lawn' as const, paired: false, x0: -GARAGE_X0, x1: HEAD.mouthX, z0: NUKETOWN2_TURNING_HEAD_HALF, z1: -HOUSE_FRONT_Z }),
+  Object.freeze({ id: 'verge lawn stem south', material: 'lawn' as const, paired: false, x0: HEAD.mouthX, x1: NUKETOWN2_BOUNDS.maxX, z0: -KERB_Z, z1: -HOUSE_FRONT_Z }),
 ]);
 
 /**
@@ -2372,35 +2441,94 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
  */
 function street(builder: Builder, m: Nuketown2Materials): void {
   const road = { solid: true, shots: true, cast: false } as const;
-  for (const [index, span] of [[NUKETOWN2_BOUNDS.minX, -NUKETOWN2_TURNING_HEAD_HALF], [NUKETOWN2_TURNING_HEAD_HALF, NUKETOWN2_BOUNDS.maxX]].entries()) {
-    centred(builder, `street asphalt ${index}`, [(span[0]! + span[1]!) / 2, -0.06, 0],
-      [span[1]! - span[0]!, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt, road);
+  const head = NUKETOWN2_CUL_DE_SAC;
+  // ---- HF-477: THE LOLLIPOP -------------------------------------------------
+  // Every body below is emitted through `centred()` - ONCE, with no 180-degree
+  // partner - because the reference's road does not have one. See
+  // `NUKETOWN2_CUL_DE_SAC` for which end is which and why, and
+  // `nuketown2-fidelity.test.ts` for the enumerated exception this creates and
+  // the three properties that pay for it. The short version: the carriageway is
+  // asymmetric along x (head at one end, stem at the other) and EXACTLY
+  // MIRROR-SYMMETRIC across z = 0, which is the axis that separates the two
+  // teams - so both teams still get an identical road.
+  //
+  // The bulb's ASPHALT is its bounding square, not a disc. The circle is drawn
+  // by the KERB ISLANDS below, which fill square-minus-disc - and that is what
+  // the reference has: `nt2025-aerial-boii.jpg` shows a broad pale concrete
+  // kerb apron ringing the asphalt, not a lawn verge meeting it.
+  centred(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
+    [head.radius * 2, 0.12, head.radius * 2], m.asphalt, road);
+  centred(builder, 'carriageway stem', [(head.mouthX + head.offMapX) / 2, -0.06, 0],
+    [head.offMapX - head.mouthX, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt, road);
+
+  // THE KERB RING, as a banded approximation of the disc. Everything in this
+  // arena is axis-aligned (see the file header: a yawed solid measured 0.11
+  // coverage against its own mesh on map3), so the circle is z-banded and each
+  // band's chord half-width is sampled at the band's own mid-line.
+  //
+  // The band edges are NOT uniform: they are pinned at +/- the stem's own half
+  // width, because that is where the ring has to open. Inside |z| <= 5.3 the
+  // ring is suppressed on the mouth side, so the asphalt runs continuously from
+  // the disc through the square's edge and into the stem - which is the flared
+  // mouth of a real lollipop. Outside it, both sides carry the ring and it
+  // closes round the head.
+  //
+  // Islands are kerb height (0.24 m, under the 0.42 m autostep, exactly as the
+  // straight kerb runs already are), so they read as a kerb and are never a
+  // wall. Bands whose island is thinner than 0.15 m are dropped: at the closed
+  // end's own mid-line the disc is 0.05 m inside the square, which is a body
+  // no player can see and a collider nobody can stand on.
+  const HEAD_BAND_EDGES = [-8, -7, -6.2, -5.3, -3.6, -1.8, 0, 1.8, 3.6, 5.3, 6.2, 7, 8] as const;
+  const ISLAND_MIN_WIDTH = 0.15;
+  let island = 0;
+  for (let index = 0; index < HEAD_BAND_EDGES.length - 1; index += 1) {
+    const z0 = HEAD_BAND_EDGES[index]!;
+    const z1 = HEAD_BAND_EDGES[index + 1]!;
+    const mid = (z0 + z1) / 2;
+    const chordHalf = head.radius * Math.sqrt(Math.max(0, 1 - (mid / head.radius) ** 2));
+    const runs: [number, number][] = [[head.closedX, head.centreX - chordHalf]];
+    // The mouth side only closes where the stem is not passing through.
+    if (Math.abs(mid) > NUKETOWN2_STREET_HALF_WIDTH) runs.push([head.centreX + chordHalf, head.mouthX]);
+    for (const run of runs) {
+      if (run[1] - run[0] < ISLAND_MIN_WIDTH) continue;
+      centred(builder, `carriageway head kerb island ${island}`,
+        [(run[0] + run[1]) / 2, 0.06, (z0 + z1) / 2],
+        [run[1] - run[0], 0.24, z1 - z0], m.kerb, { cast: false });
+      island += 1;
+    }
   }
-  // The cul-de-sac turning head: the reference's road does not run through, it
-  // opens out. 16 m across, which is 0.44 L against the 0.45 L the minimap's
-  // head measures.
-  centred(builder, 'street turning head', [0, -0.06, 0],
-    [NUKETOWN2_TURNING_HEAD_HALF * 2, 0.12, NUKETOWN2_TURNING_HEAD_HALF * 2], m.asphalt, road);
-  // Kerb: a 0.12 m lip, under the 0.42 m autostep, so it reads without ever
-  // being a wall. Two runs per side, because the turning head interrupts it.
-  for (const [index, span] of [[NUKETOWN2_BOUNDS.minX, -NUKETOWN2_TURNING_HEAD_HALF], [NUKETOWN2_TURNING_HEAD_HALF, NUKETOWN2_BOUNDS.maxX]].entries()) {
-    pair(builder, `street kerb ${index}`, [(span[0]! + span[1]!) / 2, 0.06, KERB_Z + 0.15],
-      [span[1]! - span[0]!, 0.24, 0.3], m.kerb, { cast: false });
+
+  // The stem's own kerbs, one per side, from the bulb's mouth to the map edge.
+  // Same 0.24 m lip and the same 0.3 m tread as before; only the run changed,
+  // because there is one road leaving the head now instead of two.
+  for (const [index, side] of [-1, 1].entries()) {
+    centred(builder, `carriageway stem kerb ${index}`,
+      [(head.mouthX + head.offMapX) / 2, 0.06, side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15)],
+      [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, { cast: false });
   }
-  // Centre line, as dash runs on the approach either side of the head.
-  for (let i = 0; i < 3; i += 1) {
+  // Centre line, down the stem only: a cul-de-sac bulb is not marked.
+  for (let i = 0; i < 4; i += 1) {
     // HF-463: the dash is a real 0.04 m solid raised 0.04 m above the road.
     // The separation is geometric, not a polygon-offset tier, and shots use
     // the road surface rather than the marking.
-    pair(builder, `street dash ${i}`, [-(NUKETOWN2_TURNING_HEAD_HALF + 1.6 + i * 3.2), 0.06, 0],
+    centred(builder, `carriageway stem dash ${i}`, [head.mouthX + 2.2 + i * 3.4, 0.06, 0],
       [2.0, 0.04, 0.16], m.trimDecal, { solid: true, shots: false, cast: false });
   }
   const decal = { solid: false, shots: false, cast: false } as const;
   for (const piece of NUKETOWN2_GROUND_DRESSING) {
-    pair(builder, piece.id, [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2],
-      // HF-434: lawn IS the -2 decal tier (it crosses the -1 turning head);
-      // drive has solid users, so its dressing pieces take the -1 clone.
-      [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0], piece.material === 'lawn' ? m.lawn : m.driveDecal, decal);
+    const position: [number, number, number] = [(piece.x0 + piece.x1) / 2, -0.05, (piece.z0 + piece.z1) / 2];
+    // HF-434: lawn IS the -2 decal tier (it crosses the -1 turning head);
+    // drive has solid users, so its dressing pieces take the -1 clone.
+    const size: [number, number, number] = [piece.x1 - piece.x0, 0.14, piece.z1 - piece.z0];
+    const material = piece.material === 'lawn' ? m.lawn : m.driveDecal;
+    // HF-477: a piece marked `paired: false` is authored ONCE. The front verge
+    // no longer tiles under a 180-degree rotation - the head fills the whole
+    // verge at one end of the map and none of it at the other - so those tiles
+    // are authored per z-side instead, and `pair()` would put each one's image
+    // in the wrong place. Everything else in the table is still an exact
+    // rotational pair and still goes through `pair()`.
+    if (piece.paired === false) centred(builder, piece.id, position, size, material, decal);
+    else pair(builder, piece.id, position, size, material, decal);
   }
 }
 
@@ -2411,73 +2539,84 @@ function street(builder: Builder, m: Nuketown2Materials): void {
  * to a front door is not a walk across a blank apron.
  */
 function verge(builder: Builder, m: Nuketown2Materials): void {
+  // ---- HF-477: THE FURNITURE LINE, AND WHY IT IS A LINE ---------------------
+  // Every prop here is emitted through `pair()`, so a prop at authored
+  // (x, -b) puts its partner at (-x, +b). With the lollipop that is a hard
+  // constraint, not a detail: the bulb occupies authored x in
+  // [closedX, mouthX] at every |z| <= 8, so ANY paired prop with
+  // |z| in [5.3, 8] and x anywhere inside that span lands its own partner in
+  // the middle of the cul-de-sac. Six of this function's bodies did exactly
+  // that on the first build - the low wall, the hydrant, the street bin, the
+  // parcel mailbox, the entry urn and the town sign.
+  //
+  // The rule that falls out of it is simple, and `nuketown2-fidelity.test.ts`
+  // enforces it: a PAIRED verge prop lives at |z| > 8, in the 2 m band between
+  // the bulb's own bounding square and the house front line. So the street
+  // furniture is authored as ONE LINE at VERGE_FURNITURE_Z with a shared depth
+  // budget, which is also how a real verge is dressed - and how the reference
+  // dresses its own front lawns (`nt2025-aerial-boii.jpg`: appliance bank, fan
+  // plants and chain-and-post edging, all on one band).
+  const VERGE_FURNITURE_Z = -8.55;
+  const VERGE_FURNITURE_DEPTH = 0.8;
   // Letterbox at the end of each drive: the reference's own kerb prop.
-  pair(builder, 'verge mailbox post', [GARAGE_X1 + 0.6, 0.6, KERB_Z - 1.2], [0.16, 1.2, 0.16], m.trim);
-  pair(builder, 'verge mailbox', [GARAGE_X1 + 0.6, 1.35, KERB_Z - 1.2], [0.32, 0.3, 0.5], m.sign);
-  // HF-440 Cycle 1 Priority 4: street furniture density (mailboxes, planters, bins, signs, hydrant)
-  pair(builder, 'verge mailbox flag', [GARAGE_X1 + 0.6 + 0.18, 1.42, KERB_Z - 1.2], [0.04, 0.18, 0.08], m.busTrim,
+  pair(builder, 'verge mailbox post', [GARAGE_X1 + 0.6, 0.6, VERGE_FURNITURE_Z], [0.16, 1.2, 0.16], m.trim);
+  pair(builder, 'verge mailbox', [GARAGE_X1 + 0.6, 1.35, VERGE_FURNITURE_Z], [0.32, 0.3, 0.5], m.sign);
+  pair(builder, 'verge mailbox flag', [GARAGE_X1 + 0.78, 1.42, VERGE_FURNITURE_Z], [0.04, 0.18, 0.08], m.busTrim,
     { solid: false, shots: false });
-  // Second residential mailbox on west verge (solid pedestal to ground, non-solid box):
-  pair(builder, 'verge parcel mailbox pedestal', [-6.5, 0.50, KERB_Z - 1.2], [0.32, 1.00, 0.32], m.trim);
-  pair(builder, 'verge parcel mailbox', [-6.5, 1.15, KERB_Z - 1.2], [0.36, 0.30, 0.36], m.sign,
+  // Second residential mailbox, out past the verge planter.
+  pair(builder, 'verge parcel mailbox pedestal', [16.6, 0.50, VERGE_FURNITURE_Z], [0.32, 1.00, 0.32], m.trim);
+  pair(builder, 'verge parcel mailbox', [16.6, 1.15, VERGE_FURNITURE_Z], [0.36, 0.30, 0.36], m.sign,
     { solid: false, shots: true });
 
-  // Curbside wheelie bins waiting for collection at the driveway edge:
-  pair(builder, 'verge wheelie bin 0', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 1.9], [0.52, 1.00, 0.55], m.planter);
-  pair(builder, 'verge wheelie bin 1', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 2.5], [0.52, 1.00, 0.55], m.sign);
-  pair(builder, 'verge wheelie bin lid 0', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 1.9], [0.56, 0.06, 0.59], m.rubber,
+  // Curbside wheelie bins waiting for collection, standing on the drive apron.
+  pair(builder, 'verge wheelie bin 0', [6.6, 0.50, VERGE_FURNITURE_Z], [0.52, 1.00, 0.55], m.planter);
+  pair(builder, 'verge wheelie bin 1', [7.4, 0.50, VERGE_FURNITURE_Z], [0.52, 1.00, 0.55], m.sign);
+  pair(builder, 'verge wheelie bin lid 0', [6.6, 1.03, VERGE_FURNITURE_Z], [0.56, 0.06, 0.59], m.rubber,
     { solid: false, shots: false });
-  pair(builder, 'verge wheelie bin lid 1', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 2.5], [0.56, 0.06, 0.59], m.rubber,
-    { solid: false, shots: false });
-
-  // Public street waste bin on the west verge:
-  pair(builder, 'verge street bin', [-11.6, 0.45, KERB_Z - 0.45], [0.48, 0.90, 0.48], m.sign);
-  pair(builder, 'verge street bin lid', [-11.6, 0.93, KERB_Z - 0.45], [0.52, 0.06, 0.52], m.rubber,
+  pair(builder, 'verge wheelie bin lid 1', [7.4, 1.03, VERGE_FURNITURE_Z], [0.56, 0.06, 0.59], m.rubber,
     { solid: false, shots: false });
 
-  // Fire hydrant at the turning head kerb line:
-  pair(builder, 'verge hydrant body', [-7.4, 0.42, KERB_Z - 0.45], [0.32, 0.84, 0.32], m.busTrim);
-  pair(builder, 'verge hydrant cap', [-7.4, 0.88, KERB_Z - 0.45], [0.22, 0.12, 0.22], m.trim,
-    { solid: false, shots: false });
-  pair(builder, 'verge hydrant nozzles', [-7.4, 0.55, KERB_Z - 0.45], [0.44, 0.12, 0.12], m.sign,
+  // Public street waste bin, at the closed end of the cul-de-sac.
+  pair(builder, 'verge street bin', [-13.9, 0.45, VERGE_FURNITURE_Z], [0.48, 0.90, 0.48], m.sign);
+  pair(builder, 'verge street bin lid', [-13.9, 0.93, VERGE_FURNITURE_Z], [0.52, 0.06, 0.52], m.rubber,
     { solid: false, shots: false });
 
-  // Street name blade and speed limit sign post at turning head corner:
-  pair(builder, 'verge street sign post', [7.6, 1.4, KERB_Z - 0.45], [0.12, 2.8, 0.12], m.trim);
-  pair(builder, 'verge street name blade', [7.6, 2.65, KERB_Z - 0.45], [0.90, 0.22, 0.08], m.sign,
+  // Fire hydrant on the cul-de-sac's own verge.
+  pair(builder, 'verge hydrant body', [-10.5, 0.42, VERGE_FURNITURE_Z], [0.32, 0.84, 0.32], m.busTrim);
+  pair(builder, 'verge hydrant cap', [-10.5, 0.88, VERGE_FURNITURE_Z], [0.22, 0.12, 0.22], m.trim,
+    { solid: false, shots: false });
+  pair(builder, 'verge hydrant nozzles', [-10.5, 0.55, VERGE_FURNITURE_Z], [0.44, 0.12, 0.12], m.sign,
+    { solid: false, shots: false });
+
+  // Street name blade and speed limit sign post, out at the stem end.
+  pair(builder, 'verge street sign post', [8.6, 1.4, VERGE_FURNITURE_Z], [0.12, 2.8, 0.12], m.trim);
+  pair(builder, 'verge street name blade', [8.6, 2.65, VERGE_FURNITURE_Z], [0.90, 0.22, 0.08], m.sign,
     { solid: false, shots: true });
-  pair(builder, 'verge speed limit sign', [7.6, 2.10, KERB_Z - 0.45], [0.45, 0.60, 0.06], m.trim,
+  pair(builder, 'verge speed limit sign', [8.6, 2.10, VERGE_FURNITURE_Z], [0.45, 0.60, 0.06], m.trim,
     { solid: false, shots: true });
-  // it inside the house's own east wall run.
+  // The drive is edged rather than open, so crossing the last few metres to a
+  // front door is not a walk across a blank apron.
   pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb, { cast: false });
   // Hedge along the front of each house's lawn: crouch cover for the last
-  // stride out of the front door. LOW_COVER rather than HARD_COVER, and stopped
-  // 0.60 m short of the front door reveal (0.85 m before HF-432 item 4 widened
-  // that door from 1.4 m to 1.8 m), so it never becomes a wall across either
-  // the doorway or the two ground-floor windows above it.
-  pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 1.4], [3.9, LOW_COVER, 0.9], m.planter);
+  // stride out of the front door, and the FIRST RUNG of the front climb chain
+  // (see NUKETOWN2_PORCH_CANOPY). HF-477 pulled it 0.8 m toward the house, to
+  // z = HOUSE_FRONT_Z + 0.6, so the furniture line above has the outer half of
+  // the band to itself; it is still inside the canopy's plan footprint, which
+  // is the property the chain needs, and now more squarely so.
+  pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 0.6], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
-  pair(builder, 'verge planter', [13.5, LOW_COVER / 2, KERB_Z - 2.2], [3.6, LOW_COVER, 2.0], m.planter);
-  // HF-437 - THE WIDENED STRIP'S COVER. The strip grew 4.1 -> 4.7 m (see
-  // NUKETOWN2_FRONT_VERGE_DEPTH), and the reference dresses exactly this band:
-  // low garden walls and kerb-side planters (schematic 2, S5 street level).
-  // Both are solid and shot-rated by default - movement AND shot authority.
-  // Low wall on the west verge, hard against the widened band, clear of the
-  // kerb (z ends 0.025 m inboard of it) and of the turning-head decal (x ends
-  // 0.1 m short of it): a vaultable waist wall that breaks the kerb-side run.
-  pair(builder, 'verge low wall', [-9.4, LOW_COVER / 2, KERB_Z - 0.35], [2.6, LOW_COVER, 0.35], m.block);
-  // Kerb-side planter on the east verge, in the widened band between the drive
-  // edging and the outer planter (x [8.8, 11.2] leaves 0.5 m to that planter's
-  // x0 = 11.7).
-  pair(builder, 'verge kerb planter', [10.0, LOW_COVER / 2, KERB_Z - 0.75], [2.4, LOW_COVER, 1.1], m.planter);
-  // Additional landscaped front planter box:
-  pair(builder, 'verge front planter', [1.2, 0.25, HOUSE_FRONT_Z + 1.2], [2.2, 0.50, 0.90], m.block);
-  pair(builder, 'verge front planter soil', [1.2, 0.40, HOUSE_FRONT_Z + 1.2], [2.0, 0.08, 0.74], m.planter,
-    { solid: false, shots: false });
-  // Walkway entrance planter urn:
-  pair(builder, 'verge entry planter urn', [-1.8, 0.30, KERB_Z - 1.2], [0.60, 0.60, 0.60], m.block);
-  pair(builder, 'verge entry planter shrub', [-1.8, 0.70, KERB_Z - 1.2], [0.48, 0.35, 0.48], m.planter,
-    { solid: false, shots: false });
+  pair(builder, 'verge planter', [13.5, LOW_COVER / 2, VERGE_FURNITURE_Z], [3.6, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
+  // HF-437 - THE WIDENED STRIP'S COVER, brought onto the line with everything
+  // else. Both are solid and shot-rated by default - movement AND shot
+  // authority - which is what made them cover in the first place.
+  pair(builder, 'verge low wall', [-6.2, LOW_COVER / 2, VERGE_FURNITURE_Z], [2.2, LOW_COVER, 0.35], m.block);
+  // x = -3.6 and not -2.0: the front door's own approach runs out from
+  // authored x = -1.25, and at -2.0 this 2.4 m body reached x = -0.8 and stood
+  // in it. Both the door walk-through probe and the upper front window's
+  // drop-out probe caught it on the first build (the drop landed ON it, 0.95 m
+  // up). At -3.6 it clears the walk line by 1.15 m and still butts the hedge.
+  pair(builder, 'verge kerb planter', [-3.6, LOW_COVER / 2, VERGE_FURNITURE_Z], [2.4, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
+
   // HF-477 - THE FRONT-LAWN APPLIANCE BANK, the map's cheapest chirality
   // anchor. FINDINGS Q4, VERIFIED on `nt2025-aerial-boii.jpg`: each front lawn
   // carries a three-unit cooker bank on a white cabinet, and the tops are
@@ -2487,31 +2626,37 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // reference gives away for the price of dressing, and R4 section 7 item 3
   // wrote it off as interchangeable.
   //
-  // WHERE. Authored on the lawn band between the front hedge (z [-9.05, -8.15])
-  // and the kerb (z = -5.3), clear of both, and along the street clear of the
-  // front door's own approach run so the walk out of the house is untouched.
   // The cabinet is 0.90 m - under LOW_COVER, so it is a body you crouch behind
   // and never a body that shortens a standing eye-line.
   const APPLIANCE_BANK_X = 1.6;
-  const APPLIANCE_BANK_Z = KERB_Z - 2.1;
   const APPLIANCE_TOPS = [m.applianceRed, m.applianceBlue] as const;
-  pair(builder, 'verge appliance cabinet', [APPLIANCE_BANK_X, 0.45, APPLIANCE_BANK_Z],
-    [2.8, 0.90, 0.90], m.trim);
+  pair(builder, 'verge appliance cabinet', [APPLIANCE_BANK_X, 0.45, VERGE_FURNITURE_Z],
+    [2.8, 0.90, VERGE_FURNITURE_DEPTH], m.trim);
   for (const [index, dx] of [-0.9, 0, 0.9].entries()) {
     // The top is sunk 0.02 m INTO the cabinet rather than laid on it: a decal
     // whose underside is exactly the cabinet's top face is a coplanar pair, and
     // this arena's kerbs already solve that the same way.
-    pair(builder, `verge appliance top ${index}`, [APPLIANCE_BANK_X + dx, 0.92, APPLIANCE_BANK_Z],
-      [0.74, 0.08, 0.74], APPLIANCE_TOPS, { solid: false, shots: false, cast: false });
-    pair(builder, `verge appliance dial ${index}`, [APPLIANCE_BANK_X + dx, 0.72, APPLIANCE_BANK_Z + 0.46],
+    pair(builder, `verge appliance top ${index}`, [APPLIANCE_BANK_X + dx, 0.92, VERGE_FURNITURE_Z],
+      [0.68, 0.08, 0.68], APPLIANCE_TOPS, { solid: false, shots: false, cast: false });
+    pair(builder, `verge appliance dial ${index}`, [APPLIANCE_BANK_X + dx, 0.72, VERGE_FURNITURE_Z - 0.42],
       [0.50, 0.10, 0.04], m.chrome, { solid: false, shots: false, cast: false });
   }
-  // The town sign at the far end of each verge: two posts and a board, the one
-  // authored landmark that tells you which end you are looking at.
+  // Entry planter urn, between the appliance bank and the drive.
+  pair(builder, 'verge entry planter urn', [3.8, 0.30, VERGE_FURNITURE_Z], [0.60, 0.60, 0.60], m.block);
+  pair(builder, 'verge entry planter shrub', [3.8, 0.70, VERGE_FURNITURE_Z], [0.48, 0.35, 0.48], m.planter,
+    { solid: false, shots: false });
+  // Landscaped front planter, on the cul-de-sac half of the line.
+  pair(builder, 'verge front planter', [-9.0, 0.25, VERGE_FURNITURE_Z], [2.2, 0.50, VERGE_FURNITURE_DEPTH], m.block);
+  pair(builder, 'verge front planter soil', [-9.0, 0.40, VERGE_FURNITURE_Z], [2.0, 0.08, 0.64], m.planter,
+    { solid: false, shots: false });
+  // The town sign at the closed end of the cul-de-sac: two posts and a board,
+  // the one authored landmark that tells you which end you are looking at -
+  // and under HF-477 the two ends are genuinely different, so it finally has
+  // something to say.
   for (const [index, dx] of [-1.4, 1.4].entries()) {
-    pair(builder, `verge sign post ${index}`, [-14.0 + dx, 1.9, KERB_Z - 2.6], [0.28, 3.8, 0.28], m.trim);
+    pair(builder, `verge sign post ${index}`, [-16.6 + dx, 1.9, VERGE_FURNITURE_Z], [0.28, 3.8, 0.28], m.trim);
   }
-  pair(builder, 'verge sign board', [-14.0, 4.3, KERB_Z - 2.6], [3.6, 1.8, 0.3], m.sign);
+  pair(builder, 'verge sign board', [-16.6, 4.3, VERGE_FURNITURE_Z], [3.6, 1.8, 0.3], m.sign);
 }
 
 /**
@@ -2644,6 +2789,80 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
 }
 
+/**
+ * HF-477 - THE THIRD HOUSE, BEYOND THE TURNING HEAD.
+ *
+ * FINDINGS Q4, VERIFIED on `nt2025-aerial-boii.jpg`: past the fence at the head
+ * end stands "a dark pitched-roof house with big white window bands, its own
+ * driveway and a RED car on it". FINDINGS calls it "the single best chirality
+ * landmark the reference actually has", and that is exactly the job it does
+ * here: it is the one body on this map that says WHICH END you are looking at
+ * from anywhere, without a minimap and without a colour you have to remember.
+ *
+ * IT IS OUT OF PLAY, DELIBERATELY AND STRUCTURALLY. `NUKETOWN2_BOUNDS` stops at
+ * |x| = 18 and the perimeter wall stands just inside that, so there is no
+ * authored footprint left inside the map for a third building - the lane brief
+ * allows exactly this ("out of play if the bounds require"). Every body below
+ * therefore stands ENTIRELY beyond `NUKETOWN2_BOUNDS`, and the fidelity gate
+ * asserts that rather than trusting it: a body in this set that ever reaches
+ * back inside the fence fails the build. It keeps a simple collider anyway, so
+ * a stray round or a chopper cannot pass through a house-shaped hole.
+ *
+ * It is emitted ONCE, with no 180-degree partner, because the reference has one
+ * of it at one end. That is the second enumerated asymmetry this pass creates
+ * and `nuketown2-fidelity.test.ts` pays for it with the out-of-bounds property
+ * above.
+ */
+function thirdHouse(builder: Builder, m: Nuketown2Materials): void {
+  const head = NUKETOWN2_CUL_DE_SAC;
+  // Authored x, beyond the closed end. The near gable stands 1.2 m past the
+  // map bound so nothing is ever inside it, and the block is set on the head's
+  // own centre line across the street so it closes the vista down the stem.
+  const nearX = NUKETOWN2_BOUNDS.minX - 1.2;
+  const width = 8.4;
+  const centreX = nearX - width / 2;
+  const depth = 10.5;
+  const centreZ = -1.0;
+  const eaves = 4.6;
+  const ridge = 6.4;
+  const solid = { cast: true } as const;
+  // Ground block and its dark pitched roof, approximated as two stacked decks
+  // because nothing in this arena is yawed (see the file header).
+  box(builder, 'nuketown2 beyond-bounds third house block',
+    [nuketown2HandedX(centreX), eaves / 2, centreZ], [width, eaves, depth], m.sidingB, solid);
+  box(builder, 'nuketown2 beyond-bounds third house eaves',
+    [nuketown2HandedX(centreX), eaves + 0.2, centreZ], [width + 0.7, 0.4, depth + 0.7], m.roof, solid);
+  box(builder, 'nuketown2 beyond-bounds third house roof',
+    [nuketown2HandedX(centreX), (eaves + 0.4 + ridge) / 2, centreZ],
+    [width * 0.62, ridge - eaves - 0.4, depth * 0.62], m.roof, solid);
+  // The "big white window bands" the reference frame reads at this distance.
+  for (const [index, side] of [-1, 1].entries()) {
+    box(builder, `nuketown2 beyond-bounds third house window band ${index}`,
+      [nuketown2HandedX(nearX + 0.06), 2.9, centreZ + side * depth * 0.22],
+      [0.12, 1.5, depth * 0.3], m.windowGlass, { solid: false, shots: false, cast: false });
+  }
+  // Its own drive, and the RED car standing on it. The drive is a decal at the
+  // same 0.02 m rise every apron on this map uses.
+  // The drive runs BESIDE the house rather than in front of it: in front is
+  // inside the map, and the gate that keeps this whole set out of play caught
+  // the first attempt doing exactly that. Beside it is also what the aerial
+  // shows - the drive is on the flank nearest the turning head.
+  const driveX = nearX - 3.0;
+  const driveZ = centreZ + depth / 2 + 2.2;
+  box(builder, 'nuketown2 beyond-bounds third house drive',
+    [nuketown2HandedX(driveX), -0.05, driveZ], [4.2, 0.14, 3.4], m.driveDecal,
+    { solid: false, shots: false, cast: false });
+  box(builder, 'nuketown2 beyond-bounds third house car body',
+    [nuketown2HandedX(driveX), 0.72, driveZ], [4.4, 1.0, 1.9], m.busTrim, solid);
+  // SOLID, like every other car cabin on this map. Authored non-solid it is a
+  // walkable visual with nothing under it, which the walkable-surface parity
+  // gate reports as a 3.7 m2 fall-through floor - correctly, because the roof
+  // of a car you can stand on has to hold you up.
+  box(builder, 'nuketown2 beyond-bounds third house car cabin',
+    [nuketown2HandedX(driveX - 0.2), 1.55, driveZ], [2.2, 0.66, 1.7], m.carGlass, solid);
+  void head;
+}
+
 /** The perimeter: a 3.2 m wall on all four sides, just inside the bounds. */
 function perimeter(builder: Builder, m: Nuketown2Materials): void {
   const H = 3.2;
@@ -2692,6 +2911,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   verge(builder, m);
   yard(builder, m);
   perimeter(builder, m);
+  thirdHouse(builder, m);
   truck(builder, m);
   coach(builder, m);
   cars(builder, m);
@@ -2740,7 +2960,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
 
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const c = NUKETOWN2_STREET_COACH;
-  const truckWorldX = nuketown2HandedSpan(-t.boxLength / 2, t.cabX + t.cabLength / 2);
+  const truckWorldX = nuketown2HandedSpan(t.x - t.boxLength / 2, t.cabX + t.cabLength / 2);
   const coachWorldX = nuketown2HandedSpan(c.x - c.length / 2, c.x + c.length / 2);
 
   return {
