@@ -86,7 +86,7 @@ import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstrea
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 18;
+export const MULTIPLAYER_PROTOCOL_VERSION = 19;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
@@ -556,6 +556,8 @@ export type ReloadIntentMessage = {
   connectionEpoch: string;
   lifeId: number;
   actionSequence: number;
+  /** Stable across retries; the host uses this as the idempotency key. */
+  requestId: string;
   weapon: OrdinaryWeaponId;
   action: 'start' | 'cancel';
   nonce: number;
@@ -571,6 +573,8 @@ export type ReloadResultMessage = {
   connectionEpoch: string;
   lifeId: number;
   actionSequence: number;
+  /** Echoes the intent key so a retransmitted result is matched exactly. */
+  requestId: string;
   weapon: OrdinaryWeaponId;
   status: 'started' | 'committed' | 'cancelled' | 'rejected';
   reason: ReloadResultReason;
@@ -1193,6 +1197,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
         && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && typeof msg.requestId === 'string' && /^[a-zA-Z0-9_-]{8,160}$/.test(msg.requestId)
         && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
         && (msg.action === 'start' || msg.action === 'cancel')
         && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
@@ -1203,6 +1208,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
         && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && typeof msg.requestId === 'string' && /^[a-zA-Z0-9_-]{8,160}$/.test(msg.requestId)
         && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
         && (msg.status === 'started' || msg.status === 'committed' || msg.status === 'cancelled' || msg.status === 'rejected')
         && (msg.reason === 'accepted' || msg.reason === 'action-sequence' || msg.reason === 'connection-epoch'

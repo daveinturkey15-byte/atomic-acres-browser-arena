@@ -991,7 +991,7 @@ import {
   type ThermalRevealCandidate,
 } from './systems/thermal-reveal-selection';
 import { createSupportFlightWorld } from './systems/support-flight-world';
-import { viewmodelSurfaceClipPlanes } from './systems/viewmodel-surface-clip';
+import { viewmodelMuzzleInsideSurfaceClip, viewmodelSurfaceClipPlanes } from './systems/viewmodel-surface-clip';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -1229,8 +1229,10 @@ import {
   createReloadActionSequenceAllocator,
   isExpired,
   isStale,
+  reloadRequestId,
   type LocalReloadPending,
 } from './local-reload-authority';
+import { authoredRespawnLoadout } from './respawn-loadout-authority';
 import {
   hostLobbyAdmissionAttemptIsCurrent,
   type HostLobbyAdmissionAttempt,
@@ -5763,6 +5765,9 @@ const remoteCombatInventories = new Map<string, GuestCombatInventory>();
 const remoteCombatInventoryRevisions = new Map<string, number>();
 const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
+const remoteReloadResultCache = new Map<string, ReloadResultMessage>();
+let localReloadRetryTimer: number | null = null;
+const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
 const retainedRemoteAuthorities = new Map<string, Readonly<{
   snapshot: PlayerSnapshot;
@@ -6282,6 +6287,55 @@ function resetRemoteCombatInventory(snapshot: PlayerSnapshot, grenades = 1): Gue
   return setRemoteCombatInventory(snapshot.id, inventory);
 }
 
+function remoteReloadResultCacheKey(playerId: string, connectionEpoch: string, lifeId: number, requestId: string): string {
+  return `${playerId}:${connectionEpoch}:${lifeId}:${requestId}`;
+}
+
+function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number], 'atMs' | 'role'>): void {
+  reloadProtocolTrace.push(Object.freeze({ atMs: Math.round(performance.now()), role: network.role, ...input }));
+  if (reloadProtocolTrace.length > 128) reloadProtocolTrace.splice(0, reloadProtocolTrace.length - 128);
+}
+
+function clearLocalReloadRetryTimer(): void {
+  if (localReloadRetryTimer !== null) window.clearTimeout(localReloadRetryTimer); localReloadRetryTimer = null;
+}
+function localReloadIntent(pending: LocalReloadPending, action: 'start' | 'cancel'): ReloadIntentMessage | null {
+  const actionSequence = action === 'cancel' ? pending.cancelSequence : pending.startSequence;
+  const requestId = action === 'cancel' ? pending.cancelRequestId : pending.requestId;
+  if (actionSequence === null || requestId === null) return null;
+  return {
+    type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
+    actionSequence, requestId, weapon: pending.weapon, action, nonce: randomNonce(),
+  };
+}
+
+function scheduleLocalReloadRetry(pending: LocalReloadPending, action: 'start' | 'cancel'): void {
+  clearLocalReloadRetryTimer();
+  if (network.role !== 'client') return;
+  localReloadRetryTimer = window.setTimeout(() => {
+    localReloadRetryTimer = null;
+    const current = pendingLocalReloadAuthority;
+    const currentRequestId = action === 'cancel' ? current?.cancelRequestId : current?.requestId;
+    const requestId = action === 'cancel' ? pending.cancelRequestId : pending.requestId;
+    if (current && currentRequestId === requestId && requestId !== null) sendLocalReloadIntent(current, action);
+  }, 350);
+}
+
+function sendLocalReloadIntent(pending: LocalReloadPending, action: 'start' | 'cancel'): void {
+  if (network.role !== 'client') return;
+  const message = localReloadIntent(pending, action);
+  if (!message) return;
+  recordReloadProtocolTrace({
+    direction: 'send', actorId: player.id, requestId: message.requestId,
+    action: message.action, status: 'requested', reason: 'reliable-retry-lane',
+    actionSequence: message.actionSequence,
+  });
+  // The stable key makes reconnect retransmission safe: the host replays its cached result.
+  network.send(message);
+  scheduleLocalReloadRetry(pending, action);
+}
+
 function clearRemoteReloadAuthority(playerId: string): void {
   const timer = remoteReloadTimers.get(playerId);
   if (timer !== undefined) window.clearTimeout(timer);
@@ -6300,11 +6354,12 @@ function cancelRemoteReloadAuthority(
   if (timer !== undefined) window.clearTimeout(timer);
   remoteReloadTimers.delete(playerId);
   remoteReloadAuthorities.set(playerId, Object.freeze({ ...state, pending: null }));
-  sendRemoteReloadResult(playerId, pending.actionSequence, pending.weapon, 'cancelled', reason, null);
+  sendRemoteReloadResult(playerId, pending.requestId, pending.actionSequence, pending.weapon, 'cancelled', reason, null);
 }
 
 function sendRemoteReloadResult(
   playerId: string,
+  requestId: string,
   actionSequence: number,
   weapon: OrdinaryWeaponId,
   status: ReloadResultMessage['status'],
@@ -6318,11 +6373,15 @@ function sendRemoteReloadResult(
   const result: ReloadResultMessage = {
     type: 'reload-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id, forPlayerId: playerId, connectionEpoch, lifeId: remote.continuity,
-    actionSequence, weapon, status, reason, completesAtHostTimeMs,
+    actionSequence, requestId, weapon, status, reason, completesAtHostTimeMs,
     shotSequenceWatermark: authoritativeShotAdmissions.get(playerId)?.highestShotSeq ?? -1,
     combatInventory,
     nonce: randomNonce(),
   };
+  remoteReloadResultCache.set(remoteReloadResultCacheKey(playerId, connectionEpoch, remote.continuity, requestId), result);
+  recordReloadProtocolTrace({
+    direction: 'send', actorId: playerId, requestId, action: 'result', status, reason, actionSequence,
+  });
   network.sendToPlayer(playerId, result);
 }
 
@@ -6333,6 +6392,15 @@ function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
   const expired = isExpired(pending, now);
   if (!stale && !expired) return false;
   pendingLocalReloadAuthority = null;
+  clearLocalReloadRetryTimer();
+  applyingLocalReloadAuthority = true;
+  player.reloadState = null;
+  weaponView.cancelReload();
+  applyingLocalReloadAuthority = false;
+  recordReloadProtocolTrace({
+    direction: 'clear', actorId: player.id, requestId: pending.requestId, action: 'result',
+    status: 'cleared', reason: stale ? 'stale-life' : 'expired', actionSequence: pending.startSequence,
+  });
   recordMatchDiagnostic('reload-authority', 'rejected', {
     actorId: player.id,
     weaponOrEffect: pending.weapon,
@@ -6378,6 +6446,7 @@ function scheduleRemoteReloadCommit(playerId: string, state: GuestReloadAuthorit
     remoteReloadTimers.delete(playerId);
     const current = remoteReloadAuthorities.get(playerId);
     if (!current?.pending || current.pending.actionSequence !== pending.actionSequence
+      || current.pending.requestId !== pending.requestId
       || current.pending.connectionEpoch !== pending.connectionEpoch) return;
     const remote = remotes.get(playerId);
     const inventory = remoteCombatInventories.get(playerId);
@@ -6405,8 +6474,9 @@ function scheduleRemoteReloadCommit(playerId: string, state: GuestReloadAuthorit
       return;
     }
     if (advanced.status === 'committed') setRemoteCombatInventory(playerId, advanced.inventory);
-    if (advanced.actionSequence !== null && advanced.weapon !== null) sendRemoteReloadResult(
+    if (advanced.actionSequence !== null && advanced.requestId !== null && advanced.weapon !== null) sendRemoteReloadResult(
       playerId,
+      advanced.requestId,
       advanced.actionSequence,
       advanced.weapon,
       advanced.status === 'committed' ? 'committed' : 'cancelled',
@@ -6424,8 +6494,20 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
   const health = remoteHealthAuthorities.get(message.by);
   const connectionEpoch = hostLobbyConnectionEpochs.get(message.by);
   if (!remote || !inventory || !connectionEpoch) return;
+  const cached = remoteReloadResultCache.get(remoteReloadResultCacheKey(
+    message.by, connectionEpoch, message.lifeId, message.requestId,
+  ));
+  if (cached) {
+    recordReloadProtocolTrace({
+      direction: 'cache-hit', actorId: message.by, requestId: message.requestId,
+      action: message.action, status: cached.status, reason: cached.reason,
+      actionSequence: message.actionSequence,
+    });
+    network.sendToPlayer(message.by, cached);
+    return;
+  }
   if (!isOrdinaryWeapon(remote.snapshot.weapon)) {
-    sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'rejected', 'weapon-mismatch', null);
+    sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'rejected', 'weapon-mismatch', null);
     return;
   }
   let state = remoteReloadAuthorities.get(message.by);
@@ -6444,9 +6526,15 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
     inventory,
   });
   remoteReloadAuthorities.set(message.by, admission.state);
+  recordReloadProtocolTrace({
+    direction: 'admit', actorId: message.by, requestId: message.requestId,
+    action: message.action, status: admission.accepted ? 'accepted' : 'rejected',
+    reason: admission.reason, actionSequence: message.actionSequence,
+  });
   if (!admission.accepted) {
     sendRemoteReloadResult(
       message.by,
+      message.requestId,
       message.actionSequence,
       message.weapon,
       'rejected',
@@ -6459,24 +6547,33 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
     const timer = remoteReloadTimers.get(message.by);
     if (timer !== undefined) window.clearTimeout(timer);
     remoteReloadTimers.delete(message.by);
-    sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'cancelled', 'cancelled', null);
+    sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'cancelled', 'cancelled', null);
     return;
   }
   const completesAt = admission.state.pending?.completesAtHostTimeMs ?? null;
-  sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'started', 'accepted', completesAt);
+  sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'started', 'accepted', completesAt);
   scheduleRemoteReloadCommit(message.by, admission.state);
 }
 
 function acceptLocalReloadResult(message: ReloadResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id
     || message.connectionEpoch !== localConnectionEpoch || message.lifeId !== localContinuity) return;
+  recordReloadProtocolTrace({
+    direction: 'receive', actorId: message.forPlayerId, requestId: message.requestId,
+    action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence,
+  });
   const outcome = applyReloadResult(
     pendingLocalReloadAuthority,
     message,
     { localConnectionEpoch, currentLifeId: localContinuity },
   );
   pendingLocalReloadAuthority = outcome.pending;
-  if (outcome.action === 'ignore' || outcome.action === 'acknowledge-started') return;
+  if (outcome.action === 'ignore') return;
+  if (outcome.action === 'acknowledge-started') {
+    scheduleLocalReloadRetry(outcome.pending!, 'start');
+    return;
+  }
+  clearLocalReloadRetryTimer();
   applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSequenceWatermark);
   if (outcome.action === 'clear-and-apply-projection') {
     applyingLocalReloadAuthority = true;
@@ -7121,15 +7218,11 @@ function sendLocalReloadCancel(): void {
   if (network.role !== 'client' || !pending
     || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) return;
   const actionSequence = localReloadActionSequence.next();
-  const cancelling = cancelRequested(pending, actionSequence);
+  const requestId = reloadRequestId(localConnectionEpoch, localContinuity, actionSequence, 'cancel');
+  const cancelling = cancelRequested(pending, actionSequence, requestId);
   if (!cancelling) return;
   pendingLocalReloadAuthority = cancelling;
-  const message: ReloadIntentMessage = {
-    type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
-    actionSequence, weapon: pending.weapon, action: 'cancel', nonce: randomNonce(),
-  };
-  network.send(message);
+  sendLocalReloadIntent(cancelling, 'cancel');
 }
 
 function interruptReload(force = false, now = performance.now()): void {
@@ -7819,9 +7912,12 @@ function resetPrivateLobbyState(): void {
   retainedRemoteAuthorities.clear();
   remoteCombatInventories.clear();
   remoteCombatInventoryRevisions.clear();
+  remoteReloadResultCache.clear();
   for (const timer of remoteReloadTimers.values()) window.clearTimeout(timer);
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
+  reloadProtocolTrace.length = 0;
+  clearLocalReloadRetryTimer();
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
@@ -9477,6 +9573,9 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalCombatAuthorityRevision = projection.combatInventoryRevision;
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
+  clearLocalReloadRetryTimer();
+  remoteReloadResultCache.clear();
+  reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
   localReloadActionSequence.reset();
@@ -11648,6 +11747,15 @@ function currentViewmodelObstructionPose(): ViewmodelObstructionPoseWithCut {
   return resolveViewmodelObstructionPose(currentViewmodelObstructionInput());
 }
 
+function currentViewmodelSurfaceClipPlanes() {
+  return viewmodelSurfaceClipPlanes({
+    eye: camera.position,
+    colliders: activeWorldColliders(),
+    dressingBoxes: activePresentationObstructionBoxes(),
+    groundPlaneY: lastGroundedFeetY,
+  });
+}
+
 /**
  * The PRESENTATION lattice, per probe, as the cut and the fold actually see
  * it. Read-only observability.
@@ -12209,6 +12317,11 @@ function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
     player.stance === 'prone',
     weaponView.adsProgress(),
   );
+  weaponView.root.updateWorldMatrix(true, true);
+  const muzzleWorldPosition = weaponView.muzzleWorldPosition();
+  const surfaceClipPlanes = currentViewmodelSurfaceClipPlanes();
+  const muzzleInsideSurface = muzzleWorldPosition !== null
+    && viewmodelMuzzleInsideSurfaceClip(muzzleWorldPosition, surfaceClipPlanes);
   return {
     weapon: player.weapon,
     stance: player.stance,
@@ -12224,6 +12337,9 @@ function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
     nearestForwardMeters: nearestForward === null ? null : Math.round(nearestForward * 1000) / 1000,
     nearestColliderBounds: nearestBox ?? null,
     fireAdmission: admission,
+    muzzleWorldPosition: muzzleWorldPosition?.toArray() ?? null,
+    muzzleInsideSurface,
+    surfaceClipPlaneCount: surfaceClipPlanes.length,
     // Presentation-only observability. These are the numbers the 2026-08-31
     // clipping diagnosis had to reconstruct by hand: what the fold actually
     // measured, how much dressing it can see, and what the renderer did to the
@@ -13500,7 +13616,23 @@ function onNetworkMessage(message: GameMessage): void {
         const authoritativeHealth = respawnAdmission.state;
         remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
         respawned = respawnAdmission.respawned || redeployed;
-        admittedIncoming = { ...incoming, hp: authoritativeHealth.hp };
+        // A death-to-life transition is a host-owned loadout boundary. The
+        // guest's packet may still contain the prior special weapon, swapped
+        // slot, or depleted ammo; only the last canonical class fields retained
+        // by the host may seed this new life. Explicit redeploy is different:
+        // its already-authorized class selection is the new authored loadout.
+        const respawnLoadout = respawnAdmission.respawned
+          ? authoredRespawnLoadout({
+              primary: remote.snapshot.primary,
+              secondary: remote.snapshot.secondary,
+              grenade: remote.snapshot.grenade,
+            })
+          : authoredRespawnLoadout(incoming);
+        admittedIncoming = {
+          ...incoming,
+          ...respawnLoadout,
+          hp: authoritativeHealth.hp,
+        };
         if (respawned) {
           const grenadeCount = remoteGrenadeAuthorities.get(incoming.id)?.remaining ?? 1;
           resetRemoteCombatInventory(admittedIncoming, grenadeCount);
@@ -17391,17 +17523,20 @@ function respawn(
     player.switchingUntil = 0;
     weaponView.setWeapon(sidearm, true);
   } else {
-    player.primaryWeapon = deployment.primary;
-    player.secondaryWeapon = deployment.secondary;
+    const respawnLoadout = authoredRespawnLoadout(deployment);
+    player.primaryWeapon = respawnLoadout.primary;
+    player.secondaryWeapon = respawnLoadout.secondary;
     for (const weapon of handicapLoadout(deployment.primary)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
       player.reserve[weapon] = WEAPONS[weapon].reserve;
     }
-    if (player.weapon !== player.primaryWeapon) {
-      player.weapon = player.primaryWeapon;
-      player.switchingUntil = 0;
-      weaponView.setWeapon(player.primaryWeapon, true);
-    }
+    // Death/redeploy clears the transient special-weapon/swap presentation even
+    // when the previous weapon happened to equal the new primary. The host gets
+    // the same canonical primary below, so a stale depleted railgun cannot be
+    // resurrected by the next guest state packet.
+    player.weapon = respawnLoadout.weapon;
+    player.switchingUntil = 0;
+    weaponView.setWeapon(respawnLoadout.weapon, true);
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
@@ -17662,6 +17797,9 @@ async function startGame(
   localShotSeq = 0;
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
+  clearLocalReloadRetryTimer();
+  remoteReloadResultCache.clear();
+  reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
   localReloadActionSequence.reset();
@@ -19320,20 +19458,17 @@ function reload(): void {
   } : null;
   if (network.role === 'client' && player.reloadState && isOrdinaryWeapon(player.weapon)) {
     const actionSequence = localReloadActionSequence.next();
+    const requestId = reloadRequestId(localConnectionEpoch, localContinuity, actionSequence, 'start');
     pendingLocalReloadAuthority = createPendingReload({
       connectionEpoch: localConnectionEpoch,
       lifeId: localContinuity,
+      requestId,
       actionSequence,
       weapon: player.weapon,
       nowMs: reloadStartedAt,
       expectedCompletionMs: player.reloadState.endsAt,
     });
-    const message: ReloadIntentMessage = {
-      type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-      by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
-      actionSequence, weapon: player.weapon, action: 'start', nonce: randomNonce(),
-    };
-    network.send(message);
+    sendLocalReloadIntent(pendingLocalReloadAuthority, 'start');
   }
   weaponActionHistory.length = 0;
   audio.reload();
@@ -19469,8 +19604,12 @@ function tryFire(now: number): void {
     player.stance === 'prone',
     weaponView.adsProgress(),
   );
-  if (fireAdmission.fireBlocked) {
-    refuseFire('viewmodel-contact-raise');
+  weaponView.root.updateWorldMatrix(true, true);
+  const muzzleWorldPosition = weaponView.muzzleWorldPosition();
+  const muzzleInsideSurface = muzzleWorldPosition !== null
+    && viewmodelMuzzleInsideSurfaceClip(muzzleWorldPosition, currentViewmodelSurfaceClipPlanes());
+  if (muzzleInsideSurface) {
+    refuseFire('viewmodel-muzzle-clip');
     return;
   }
   if (isTimedMapWeaponId(player.weapon)) {
@@ -19595,7 +19734,10 @@ function tryFire(now: number): void {
   // is still exactly camera-forward and the shot is still cast this same frame,
   // so neither the authoritative ray nor hit timing moves. Open space reports a
   // zero penalty, which leaves this byte-for-byte identical to the old cone.
-  const obstructedSpread = applyObstructionSpreadPenalty(spread, fireAdmission.spreadPenaltyRadians);
+  const obstructedSpread = applyObstructionSpreadPenalty(
+    spread,
+    muzzleInsideSurface ? fireAdmission.spreadPenaltyRadians : 0,
+  );
   // HF-412: the reference's drop-shot cost. Players describe drop shotting as a
   // close-range technique precisely because the rounds that go out WHILE you
   // are falling are inaccurate - the answer is a wider cone, never a refused
@@ -27267,15 +27409,7 @@ function updatePhysics(dt: number): void {
     // at the Nuke Town house wall, that leaves 0.26-0.36 m of arm and weapon
     // inside the wall at every angle except head on, which was 117 of 183
     // measured poses. These cut at any angle because they are the wall.
-    surfaceClipPlanes: viewmodelSurfaceClipPlanes({
-      eye: camera.position,
-      colliders: activeWorldColliders(),
-      dressingBoxes: activePresentationObstructionBoxes(),
-      // Terrain is a raycast surface, not a collider box, so no box face can
-      // ever describe it. The tracked standing height is the cheapest exact
-      // answer, and it survives the frames `grounded` drops out between steps.
-      groundPlaneY: lastGroundedFeetY,
-    }),
+    surfaceClipPlanes: currentViewmodelSurfaceClipPlanes(),
     triggerHeld,
   });
   audio.minigunDrive(
@@ -32800,6 +32934,7 @@ const debugWindow = window as Window & {
     interactDrop: () => void;
     interactTestBayStation: () => boolean;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
+    setRemoteAmmoAuthoritatively: (weapon: WeaponId, ammo: number, reserve: number, playerId?: string) => boolean;
     setGrenades: (count: number) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
@@ -34042,6 +34177,28 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       last: fireBlockTelemetry.last,
       lastAtMs: fireBlockTelemetry.lastAtMs,
       lastFiredAtMs: fireBlockTelemetry.lastFiredAtMs,
+    },
+    reloadAuthority: {
+      localPending: pendingLocalReloadAuthority ? {
+        requestId: pendingLocalReloadAuthority.requestId,
+        weapon: pendingLocalReloadAuthority.weapon,
+        startSequence: pendingLocalReloadAuthority.startSequence,
+        cancelSequence: pendingLocalReloadAuthority.cancelSequence,
+        cancelRequestId: pendingLocalReloadAuthority.cancelRequestId,
+      } : null,
+      remote: [...remoteReloadAuthorities.entries()].map(([id, state]) => ({
+        playerId: id,
+        lastActionSequence: state.lastActionSequence,
+        pending: state.pending ? {
+          requestId: state.pending.requestId,
+          actionSequence: state.pending.actionSequence,
+          weapon: state.pending.weapon,
+          completesAtHostTimeMs: state.pending.completesAtHostTimeMs,
+        } : null,
+      })),
+      cachedResults: remoteReloadResultCache.size,
+      retryScheduled: localReloadRetryTimer !== null,
+      protocolTrace: reloadProtocolTrace.map((entry) => ({ ...entry })),
     },
     hostMatchRecoveryCheckpoint: {
       rejectedPoseWrites: hostCheckpointRejectedPoseWrites,
@@ -36388,6 +36545,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
+  },
+  setRemoteAmmoAuthoritatively: (weapon: WeaponId, ammo: number, reserve: number, playerId?: string) => {
+    if (!localMultiplayerQa || network.role !== 'host' || !isOrdinaryWeapon(weapon)) return false;
+    const targetId = playerId ?? (remotes.values().next().value as RemotePlayer | undefined)?.snapshot.id;
+    const inventory = targetId ? remoteCombatInventories.get(targetId) : undefined;
+    if (!targetId || !inventory) return false;
+    setRemoteCombatInventory(targetId, setGuestCombatInventoryWeapon(inventory, weapon, ammo, reserve));
+    return true;
   },
   setGrenades: (count: number) => {
     if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(1, Math.floor(count)));

@@ -27,8 +27,10 @@ export const LOCAL_RELOAD_EXPIRY_GRACE_MS = 2_000;
 export type LocalReloadPending = Readonly<{
   connectionEpoch: string;
   lifeId: number;
+  requestId: string;
   startSequence: number;
   cancelSequence: number | null;
+  cancelRequestId: string | null;
   weapon: OrdinaryWeaponId;
   requestedAtMs: number;
   expectedCompletionMs: number;
@@ -37,7 +39,7 @@ export type LocalReloadPending = Readonly<{
 /** The subset of a reload-result the state machine reasons about. */
 export type LocalReloadResultInput = Pick<
   ReloadResultMessage,
-  'connectionEpoch' | 'lifeId' | 'actionSequence' | 'weapon' | 'status' | 'reason'
+  'connectionEpoch' | 'lifeId' | 'actionSequence' | 'requestId' | 'weapon' | 'status' | 'reason'
 >;
 
 export type LocalReloadContext = Readonly<{
@@ -70,6 +72,7 @@ export type LocalReloadResultOutcome = Readonly<{
 export function createPendingReload(input: Readonly<{
   connectionEpoch: string;
   lifeId: number;
+  requestId: string;
   weapon: OrdinaryWeaponId;
   actionSequence: number;
   nowMs: number;
@@ -78,8 +81,10 @@ export function createPendingReload(input: Readonly<{
   return Object.freeze({
     connectionEpoch: input.connectionEpoch,
     lifeId: input.lifeId,
+    requestId: input.requestId,
     startSequence: input.actionSequence,
     cancelSequence: null,
+    cancelRequestId: null,
     weapon: input.weapon,
     requestedAtMs: input.nowMs,
     expectedCompletionMs: input.expectedCompletionMs,
@@ -94,9 +99,37 @@ export function createPendingReload(input: Readonly<{
 export function cancelRequested(
   pending: LocalReloadPending,
   actionSequence: number,
+  requestId: string,
 ): LocalReloadPending | null {
   if (pending.cancelSequence !== null) return null;
-  return Object.freeze({ ...pending, cancelSequence: actionSequence });
+  return Object.freeze({ ...pending, cancelSequence: actionSequence, cancelRequestId: requestId });
+}
+
+/**
+ * Stable request identity for an intent and every retry of that intent. The
+ * connection epoch is already an authenticated, bounded protocol value, so it
+ * is safe to derive a bounded digest from it, giving the host a stable key
+ * within a match without exposing the epoch or relying on a random nonce
+ * surviving a retry.
+ */
+export function reloadRequestId(
+  connectionEpoch: string,
+  lifeId: number,
+  actionSequence: number,
+  action: 'start' | 'cancel',
+): string {
+  // Keep the authenticated epoch out of diagnostics and browser snapshots. Two
+  // independent 32-bit FNV lanes make the bounded key deterministic without
+  // exposing the epoch value itself.
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < connectionEpoch.length; index += 1) {
+    const code = connectionEpoch.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  const epochDigest = `${(first >>> 0).toString(36)}${(second >>> 0).toString(36)}`;
+  return `reload-${epochDigest}-${lifeId.toString(36)}-${action === 'start' ? 's' : 'c'}-${actionSequence.toString(36)}`;
 }
 
 /**
@@ -133,13 +166,16 @@ export function pendingReloadClearReason(
 
 function sequenceMatches(pending: LocalReloadPending, message: LocalReloadResultInput): boolean {
   const expectedSequence = pending.cancelSequence ?? pending.startSequence;
-  if (message.actionSequence === expectedSequence) return true;
+  const expectedRequestId = pending.cancelRequestId ?? pending.requestId;
+  if (message.actionSequence === expectedSequence && message.requestId === expectedRequestId) return true;
   // Committed-start special case: the host committed the reload before our cancel
   // intent arrived. The commit at the start sequence stays authoritative even while
   // a cancel is in flight (the cancel will be rejected 'no-pending-reload').
   // HF-315(b): the legacy guard wrote this race with `cancelSequence === null`,
   // which made the branch unreachable and dropped the raced commit.
-  return message.status === 'committed' && message.actionSequence === pending.startSequence;
+  return message.status === 'committed'
+    && message.actionSequence === pending.startSequence
+    && message.requestId === pending.requestId;
 }
 
 /**
