@@ -256,8 +256,13 @@ describe('drone centre-map deployment and movement', () => {
       manualEnd[1] - manualStart[1],
       manualEnd[2] - manualStart[2],
     );
-    expect(autonomousDistance).toBeCloseTo(0.6, 8);
-    expect(manualDistance).toBeCloseTo(0.3, 8);
+    // HF-458 raised both by 15%; the distances are derived from the policy so
+    // the 2x relationship - the thing this test exists to protect - is asserted
+    // against the shipped speeds rather than against a frozen decimal.
+    expect(autonomousDistance).toBeCloseTo(DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps * 0.1, 8);
+    expect(manualDistance).toBeCloseTo(DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * 0.1, 8);
+    expect(autonomousDistance).toBeCloseTo(0.69, 8);
+    expect(manualDistance).toBeCloseTo(0.345, 8);
     expect(autonomousDistance).toBeCloseTo(manualDistance * 2, 8);
 
     expect(manual.control({
@@ -292,15 +297,18 @@ describe('drone centre-map deployment and movement', () => {
 
     const forward = move(1);
     const reverse = move(-1);
+    // sin(pi/6) = 1/2 of the manual step, cos(pi/6) = sqrt(3)/2 of it.
+    const manualStepM = DRONE_DEPLOYMENT_POLICY.manualHorizontalSpeedMps * 0.1;
     expect(forward[0]).toBeCloseTo(0, 8);
-    expect(forward[1]).toBeCloseTo(0.15, 8);
-    expect(forward[2]).toBeCloseTo(-Math.sqrt(3) * 0.15, 8);
+    expect(forward[1]).toBeCloseTo(manualStepM * 0.5, 8);
+    expect(forward[2]).toBeCloseTo(-Math.sqrt(3) * manualStepM * 0.5, 8);
+    expect(manualStepM).toBeCloseTo(0.345, 8);
     expect(reverse[0]).toBeCloseTo(-forward[0], 8);
     expect(reverse[1]).toBeCloseTo(-forward[1], 8);
     expect(reverse[2]).toBeCloseTo(-forward[2], 8);
   });
 
-  it('keeps autonomous standalone no-target patrol at the canonical 6m/s', () => {
+  it('keeps autonomous standalone no-target patrol at the canonical 2x manual speed', () => {
     const bounds = supportMapBounds[2];
     const noTargetWorld = world(bounds, [
       { id: 'owner', kind: 'player' as const, team: 0 as const, lifeId: 1, alive: true, position: [0, 1.7, 0] as const },
@@ -317,7 +325,8 @@ describe('drone centre-map deployment and movement', () => {
       end[0] - start[0],
       end[1] - start[1],
       end[2] - start[2],
-    )).toBeCloseTo(0.6, 8);
+    )).toBeCloseTo(DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps * 0.1, 8);
+    expect(DRONE_DEPLOYMENT_POLICY.autonomousStandaloneSpeedMps).toBe(6.9);
   });
 
   it('keeps all 24 Swarm units separated in deterministic clusters while engaging one target', () => {

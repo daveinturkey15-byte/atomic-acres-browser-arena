@@ -326,6 +326,7 @@ import {
   chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
+  type KillstreakTaserStunEvent,
   type KillstreakEntitySnapshot,
   type KillstreakRecipientSnapshot,
   type KillstreakTarget,
@@ -559,6 +560,7 @@ import {
 import { FramePacingSampler, cadenceWithNoProgressAge, presentationIsDisplayLimited } from './frame-pacing';
 import { advanceLocalHealthRegen } from './local-health-regen';
 import {
+  CAMERA_SHAKE_REFERENCE_DISTANCE,
   addCameraShakeImpulse,
   addCameraShakeTrauma,
   createCameraShakeTrauma,
@@ -1081,6 +1083,16 @@ import {
   type FlashVictimAdmission,
 } from './flash-authority';
 import { isFlashResultMessage, type FlashResultMessage } from './flash-protocol';
+import {
+  TASER_AUTHORITY_SCHEMA_VERSION,
+  TaserHostAuthority,
+  TaserVictimResultConsumer,
+  taserActivationId,
+  taserMovementAdmission,
+  type TaserStunResult,
+} from './taser-stun';
+import { isTaserStunMessage, type TaserStunMessage } from './taser-protocol';
+import { PILOTED_DRONE_TASER_CHARGES, TASER_PRESENTATION, TASER_STUN_DURATION_MS } from './killstreak-tuning';
 import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
@@ -5207,6 +5219,16 @@ let lastSmokeStateBroadcastRevision = -1;
 let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+// HF-458: the Piloted Drone taser. Same authority shape as the flashbang - the
+// host authors every stun, the victim client only replays an admitted result.
+const taserHostAuthority = new TaserHostAuthority(interactiveWorldMatchEpoch, 'host');
+const taserVictimConsumer = new TaserVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+let taserStunStartsAtHostTimeMs = 0;
+let taserStunEndsAtHostTimeMs = 0;
+let taserStunsAppliedThisMatch = 0;
+let taserStunNonce = 0;
+/** Bots the host has stunned: bot id -> host time the stun releases. */
+const botTaserStunUntilHostTimeMs = new Map<string, number>();
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 type CrossbowGlassMutationTrace = Readonly<{
   windowId: string;
@@ -6505,6 +6527,8 @@ let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackStat
 let lastSensoryPresentationAt = -Infinity;
 // HF-352: Camera shake and kill-confirm pulse presentation states
 let cameraShakeState: CameraShakeState = createCameraShakeState();
+/** HF-458: throttles the taser camera jitter to its authored rate. */
+let lastTaserJitterAtHostTimeMs = Number.NEGATIVE_INFINITY;
 // HF-370: the trauma model runs ALONGSIDE the spring model rather than
 // replacing it. Both feed the same camera; trauma supplies the weight and
 // falloff an explosion should have, the spring keeps the existing per-impulse
@@ -12567,6 +12591,20 @@ function handleSmokeAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function handleTaserAuthorityMessage(message: GameMessage): boolean {
+  if (message.type !== 'taser-stun') return false;
+  // Same fail-closed fence as the flash result: only the sitting host may stun
+  // this client, only for this player, only during a live match.
+  if (network.role !== 'client'
+    || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id
+    || message.result.targetId !== player.id
+    || matchState.phase !== 'active'
+    || !player.alive) return true;
+  applyAuthoritativeTaserStun(message.result);
+  return true;
+}
+
 function handleFlashAuthorityMessage(message: GameMessage): boolean {
   if (message.type !== 'flash-result') return false;
   // The host transport rejects host-authority message kinds from guests before
@@ -12741,6 +12779,7 @@ function onNetworkMessage(message: GameMessage): void {
   if (handleInteractiveWorldMessage(message)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
+  if (handleTaserAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -17393,6 +17432,12 @@ async function startGame(
   lastSmokeStateBroadcastRevision = -1;
   lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
   flashHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserVictimConsumer.reset(interactiveWorldMatchEpoch, player.id, localContinuity);
+  taserStunStartsAtHostTimeMs = 0;
+  taserStunEndsAtHostTimeMs = 0;
+  taserStunsAppliedThisMatch = 0;
+  botTaserStunUntilHostTimeMs.clear();
   lastAuthoredFlashResults.clear();
   remoteFlashVictimLifeIds.clear();
   lastFlashDispatch = null;
@@ -21032,7 +21077,12 @@ function updateBots(dt: number, now: number): void {
     bot.stance = stanceDecision.stance;
     bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
     const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
-    const speed = Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
+    // HF-458: a tasered bot is held in place for the stun, exactly like a
+    // tasered human. Its aim and fire logic keep running; only movement stops.
+    const botStunnedUntil = botTaserStunUntilHostTimeMs.get(bot.id);
+    const botTasered = botStunnedUntil !== undefined && currentHostTimeMs() < botStunnedUntil;
+    if (botStunnedUntil !== undefined && !botTasered) botTaserStunUntilHostTimeMs.delete(bot.id);
+    const speed = botTasered ? 0 : Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
     const botCapsuleHeight = 1.7;
     const movementColliders = collidersOverlappingVerticalSpan(
@@ -22637,6 +22687,73 @@ function dispatchAuthoritativeFlashResult(result: FlashResult): void {
   });
 }
 
+/**
+ * HF-458: the local victim side of a taser stun. Movement is refused by
+ * `localTaserMovementAdmission()` in updatePhysics; this only records the
+ * authored window and lets the presentation read it.
+ */
+function applyAuthoritativeTaserStun(result: TaserStunResult): boolean {
+  const admission = taserVictimConsumer.admit(result, currentHostTimeMs());
+  if (!admission.accepted) return false;
+  taserStunStartsAtHostTimeMs = result.startsAtHostTimeMs;
+  taserStunEndsAtHostTimeMs = result.endsAtHostTimeMs;
+  taserStunsAppliedThisMatch += 1;
+  return true;
+}
+
+function dispatchAuthoritativeTaserStun(result: TaserStunResult): void {
+  if (result.targetId === player.id) {
+    applyAuthoritativeTaserStun(result);
+    return;
+  }
+  if (network.role !== 'host') return;
+  const message: TaserStunMessage = {
+    type: 'taser-stun',
+    schemaVersion: TASER_AUTHORITY_SCHEMA_VERSION,
+    by: player.id,
+    forPlayerId: result.targetId,
+    result,
+    nonce: randomNonce(),
+  };
+  if (isTaserStunMessage(message)) network.sendToPlayer(result.targetId, message);
+}
+
+/** Movement/sprint/jump admission for the LOCAL player under a taser stun. */
+function localTaserMovementAdmission(nowHostTimeMs = currentHostTimeMs()) {
+  return taserMovementAdmission(taserStunEndsAtHostTimeMs, nowHostTimeMs, taserStunStartsAtHostTimeMs);
+}
+
+/**
+ * HF-458: turns one host-admitted taser hit into a replicated stun. Bots are
+ * stunned in the host's own bot table (they have no client to replicate to);
+ * humans go through TaserHostAuthority exactly like a flashbang victim.
+ */
+function applyKillstreakTaserStunEvent(event: KillstreakTaserStunEvent): boolean {
+  if (network.role === 'client') return false;
+  const nowHostTimeMs = currentHostTimeMs();
+  if (event.targetKind === 'bot') {
+    const bot = bots.get(event.targetId);
+    if (!bot?.alive) return false;
+    botTaserStunUntilHostTimeMs.set(bot.id, nowHostTimeMs + event.durationMs);
+    taserStunsAppliedThisMatch += 1;
+    return true;
+  }
+  taserStunNonce += 1;
+  const resolution = taserHostAuthority.resolveStun({
+    matchEpoch: interactiveWorldMatchEpoch,
+    activationId: taserActivationId(interactiveWorldMatchEpoch, event.ownerId, taserStunNonce),
+    startsAtHostTimeMs: nowHostTimeMs,
+    victims: [{
+      targetId: event.targetId,
+      targetLifeId: event.targetLifeId,
+      durationMs: Math.min(TASER_STUN_DURATION_MS, event.durationMs),
+    }],
+  });
+  if (!resolution.accepted || resolution.results.length !== 1) return false;
+  dispatchAuthoritativeTaserStun(resolution.results[0]!);
+  return true;
+}
+
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostTimeMs: number): void {
   // Clients may predict only projectile/world presentation. Human and AI flash
   // authority is resolved once by the host (or by the offline host runtime).
@@ -22724,6 +22841,7 @@ function updateOrdnanceVolumes(_now: number): void {
   if (authorityChanged) synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
   else updateSmokePresentationLeases(nowHostTimeMs);
   broadcastSmokeState(authorityChanged, nowHostTimeMs, authorityChanged);
+  updateTaserStunPresentation(nowHostTimeMs);
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntilHostTimeMs - nowHostTimeMs;
   if (remainingFlash <= 0) {
@@ -22733,6 +22851,43 @@ function updateOrdnanceVolumes(_now: number): void {
   } else {
     overlay.hidden = false;
     overlay.style.opacity = String(Math.min(1, flashExposureStrength * Math.min(1, remainingFlash / 550)));
+  }
+}
+
+/**
+ * HF-458 presentation: an electric-blue arc vignette plus a short camera jitter,
+ * so a tasered player never mistakes the effect for a flashbang. Reduced-sensory
+ * accessibility scales both, and the CSS crackle layer is disabled entirely
+ * under prefers-reduced-motion.
+ */
+function updateTaserStunPresentation(nowHostTimeMs: number): void {
+  const overlay = element<HTMLElement>('#taser-shock');
+  const stun = localTaserMovementAdmission(nowHostTimeMs);
+  if (!stun.stunned) {
+    if (!overlay.hidden) {
+      overlay.hidden = true;
+      overlay.style.opacity = '0';
+      overlay.style.setProperty('--taser-crackle', '0');
+    }
+    return;
+  }
+  const sensory = accessibilityRuntime.reducedSensory ? 0.4 : 1;
+  overlay.hidden = false;
+  overlay.style.opacity = String(Math.min(1, 0.35 + stun.intensity * 0.55) * sensory);
+  const crackle = Math.abs(Math.sin(nowHostTimeMs * Math.PI * 2 * TASER_PRESENTATION.crackleHz / 1_000));
+  overlay.style.setProperty('--taser-crackle', String(crackle * 0.55 * sensory));
+  // A jitter the flashbang never applies. Re-impulsed at the authored rate so
+  // the camera buzzes rather than heaves once and settles.
+  const jitterPeriodMs = 1_000 / TASER_PRESENTATION.cameraJitterHz;
+  if (nowHostTimeMs - lastTaserJitterAtHostTimeMs >= jitterPeriodMs) {
+    lastTaserJitterAtHostTimeMs = nowHostTimeMs;
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: CAMERA_SHAKE_REFERENCE_DISTANCE / Math.max(0.05, TASER_PRESENTATION.cameraJitterAmplitudeM * 8),
+      family: 'crossbow',
+      sensoryScale: accessibilityRuntime.weaponMotionScale * stun.intensity,
+      now: performance.now(),
+      seed: Math.round(nowHostTimeMs) | 0,
+    });
   }
 }
 
@@ -24187,7 +24342,7 @@ function requestKillstreakActivation(
 function requestKillstreakControl(
   entityId: string,
   action: KillstreakControlIntentMessage['action'],
-  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire'> = {},
+  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire' | 'taserFire'> = {},
   now = performance.now(),
 ): boolean {
   killstreakControlSequence += 1;
@@ -24234,6 +24389,31 @@ function requestKillstreakControl(
   refreshLocalKillstreakSnapshot(now);
   broadcastKillstreakState(now);
   return true;
+}
+
+/**
+ * HF-458 item 3: exact RMB action for the locally possessed Piloted Drone.
+ * Refused client-side when the drone has no charge left, so a dead click never
+ * costs a control packet; the host refuses it again regardless.
+ */
+function requestPossessedDroneTaser(now = performance.now()): boolean {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'piloted-drone') return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === possession.entityId
+    && candidate.kind === 'drone'
+    && candidate.mode === 'piloted'
+    && candidate.ownerId === player.id
+    && candidate.expiresInMs > 0
+    && (candidate.taserCharges ?? 0) > 0
+  ));
+  if (!entity) return false;
+  return requestKillstreakControl(entity.id, 'pilot-control', {
+    yawQ: player.yaw,
+    pitchQ: player.pitch,
+    fire: triggerHeld,
+    taserFire: true,
+  }, now);
 }
 
 /** Exact RMB action for the locally possessed Chopper Gunner. */
@@ -24587,6 +24767,17 @@ function syncGunnerCockpitHud(
       : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
     missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
   }
+  // HF-458: the drone's taser counter, same RMB slot, same lifecycle contract.
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  const dronePilot = possessionKind === 'piloted-drone';
+  taserStatus.hidden = !dronePilot;
+  taserStatus.setAttribute('aria-hidden', String(!dronePilot));
+  if (dronePilot) {
+    const charges = Math.max(0, Math.min(PILOTED_DRONE_TASER_CHARGES, entity.taserCharges ?? 0));
+    element<HTMLElement>('#gunner-taser-charges').textContent = `×${charges} / ${PILOTED_DRONE_TASER_CHARGES}`;
+    element<HTMLElement>('#gunner-taser-state').textContent = charges > 0 ? 'READY' : 'EMPTY';
+    taserStatus.dataset.ready = String(charges > 0);
+  }
   if (now >= gunnerTargetConfirmUntil) {
     element<HTMLElement>('#gunner-target-confirm').hidden = true;
     hud.dataset.hitConfirm = 'false';
@@ -24615,6 +24806,12 @@ function hideGunnerCockpitHud(): void {
   element<HTMLElement>('#gunner-control-gun-ammo').textContent = '∞';
   element<HTMLElement>('#gunner-missile-ammo').textContent = `×0 / ${CHOPPER_MISSILE_CAPACITY}`;
   element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  taserStatus.hidden = true;
+  taserStatus.setAttribute('aria-hidden', 'true');
+  taserStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-taser-charges').textContent = `×0 / ${PILOTED_DRONE_TASER_CHARGES}`;
+  element<HTMLElement>('#gunner-taser-state').textContent = 'OFFLINE';
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;
 }
@@ -24809,6 +25006,9 @@ function updatePass65KillstreakRuntime(now: number): void {
       (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
+    // HF-458: Piloted Drone taser hits, before damage - a stun is a control
+    // effect and must land even on a step where the victim also takes damage.
+    for (const stun of result.taserStunEvents) applyKillstreakTaserStunEvent(stun);
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) {
       recordOwnerSupportDamage(event);
@@ -26691,7 +26891,13 @@ function updatePhysics(dt: number): void {
   const keyProfile = activeKeyBindingProfile();
   const forwardInput = THREE.MathUtils.clamp(Number(actionHeld('move-forward', keys, keyProfile)) - Number(actionHeld('move-backward', keys, keyProfile)) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
   const strafeInput = THREE.MathUtils.clamp(Number(actionHeld('move-right', keys, keyProfile)) - Number(actionHeld('move-left', keys, keyProfile)) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
-  const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
+  // HF-458: a tasered operator supplies ZERO movement input for the stun -
+  // not reduced input - so the stun cannot be walked out of. Sprint follows for
+  // free (wantsSprint requires input.lengthSq() > 0) and jump is gated below.
+  const taserStun = localTaserMovementAdmission();
+  const input = taserStun.canMove
+    ? forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput)
+    : new THREE.Vector3();
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
   // HF-412: hold-crouch-to-prone, polled here because a held key produces no
@@ -26773,7 +26979,7 @@ function updatePhysics(dt: number): void {
   player.velocity.z = integrated.z;
 
   if (playerGrounded) lastGroundedAt = now;
-  const jumpBuffered = now - jumpQueuedAt <= 125;
+  const jumpBuffered = !taserStun.canJump ? false : now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
   if (jumpBuffered && coyoteGrounded && !adsHeld && player.stance === 'stand' && matchState.phase === 'active') {
     player.velocity.y = profile.jumpVelocity;
@@ -28997,6 +29203,7 @@ function pollGamepad(dt: number): void {
     // only re-fires held automatics), so a pad shot never waits on pointer lock.
     if (padTriggerActive && frame.pressed('fire')) tryFire(now);
     if (possession?.kind === 'chopper-gunner' && frame.pressed('ads')) requestPossessedChopperMissile(now);
+    if (possession?.kind === 'piloted-drone' && frame.pressed('ads')) requestPossessedDroneTaser(now);
     if (pointSupportTargeting && !tacticalMapOpen) {
       if (frame.pressed('fire') || frame.pressed('interact')) confirmCrosshairSupportTarget(now);
       else if (frame.pressed('crouch')) cancelSupportTargeting(true);
@@ -29418,6 +29625,15 @@ canvas.addEventListener('mousedown', (event) => {
     mouseAdsHeld = false;
     adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
     requestPossessedChopperMissile(performance.now());
+    return;
+  }
+  // HF-458: the same right-click slot on the possessed Piloted Drone fires the
+  // taser instead of entering ADS, mirroring the Chopper's RMB missile.
+  if (event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
+    event.preventDefault();
+    mouseAdsHeld = false;
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
+    requestPossessedDroneTaser(performance.now());
     return;
   }
   if (event.button === 2) {
@@ -32450,6 +32666,16 @@ const debugWindow = window as Window & {
     } | null;
     /** QA-only: exact RMB missile request for the locally possessed chopper. */
     firePossessedChopperMissile: () => boolean;
+    /** HF-458: right-click taser on the possessed Piloted Drone. */
+    firePossessedDroneTaser: () => boolean;
+    /** HF-458: taser stun counters for a headless killstreak run. */
+    taserTelemetry: () => {
+      stunsApplied: number;
+      localStunRemainingMs: number;
+      botsStunned: number;
+      host: ReturnType<TaserHostAuthority['telemetry']>;
+      victim: ReturnType<TaserVictimResultConsumer['telemetry']>;
+    };
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -35213,6 +35439,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     };
   },
   firePossessedChopperMissile: () => requestPossessedChopperMissile(),
+  // HF-458 QA: the taser's right-click, and the counters a headless run reads.
+  firePossessedDroneTaser: () => requestPossessedDroneTaser(),
+  taserTelemetry: () => ({
+    stunsApplied: taserStunsAppliedThisMatch,
+    localStunRemainingMs: Math.max(0, taserStunEndsAtHostTimeMs - currentHostTimeMs()),
+    botsStunned: botTaserStunUntilHostTimeMs.size,
+    host: taserHostAuthority.telemetry(),
+    victim: taserVictimConsumer.telemetry(),
+  }),
   aimPossessedChopperAtBot: (botId) => {
     // QA-only: the training-dummy variant is gun-range-only; this aims the
     // possessed autocannon at a live bot on ANY arena so possessed-fire
