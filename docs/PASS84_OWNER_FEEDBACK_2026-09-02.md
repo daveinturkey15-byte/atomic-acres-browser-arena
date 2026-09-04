@@ -1784,3 +1784,15 @@ assets and textures and lighting need to be tip top, raid can come next"
   branch, and the six-task capability ladder run on Muse itself (adds a
   --model option to the harness). New lane results get a review job each;
   reference-critic rounds run through the loop runner tonight.
+
+## HF-484 — owner 2026-09-04 16:00: "the control plane is not showing most of what I asked for; this is poor — bring it into a spec and get it properly orchestrated and done"
+
+- Accepted. Delivery is switched from scattered lanes to one control-plane
+  delivery workflow: (1) a single spec with every ask and an acceptance
+  criterion each (HF-471, the subscription notes, HF-481, the agent/usage
+  report asks, the auto-research asks), audited against the RUNNING app, not
+  branches; (2) gap-fix lanes in parallel off `feat/control-plane-unified`;
+  (3) one integrator that merges everything (liveness, tabs, usage readers,
+  loop catalogue, logos/tidy), asks the owning session to fast-forward and
+  restart the app, and verifies each criterion against the live API and
+  screenshots; owner sign-off per criterion.
