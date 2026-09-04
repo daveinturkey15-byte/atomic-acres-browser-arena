@@ -75,7 +75,7 @@ import { describe, expect, it } from 'vitest';
  * break if a tool rewrites this file with CRLF, so the ratchet asserts the
  * line ending too.
  */
-const LINE_CEILING = 37_124;
+const LINE_CEILING = 37_212;
 
 /**
  * How far below the ceiling the file has to fall before the test REPORTS the
@@ -238,6 +238,25 @@ const CEILING_HISTORY: ReadonlyArray<{ date: string; lines: number; note: string
       'PASS 92 candidate: Adaptive match admission cadence wait (GEM-3). Replaced fixed 5s stall '
       + 'with adaptive 30-frame presentation cadence evaluation; decision function extracted to '
       + 'src/admission-cadence-wait.ts; added achieved wait and exit reason to match admission profile.',
+  },
+  {
+    date: '2026-09-03',
+    lines: 37_188,
+    note:
+      'PASS 93 Luna rehearsal scope: the legacy integration keeps the existing admission '
+      + 'fence and state-walk contract, while wiring the new data-derived scheduler, safe-window '
+      + 'frame slices, synchronous switch fallback and admission-profile registry. Measured '
+      + 'on the requested branch after the change; the pure decision core is in '
+      + 'src/weapon-rehearsal-scheduler.ts.',
+  },
+  {
+    date: '2026-09-04',
+    lines: 37_212,
+    note:
+      'PASS 94 load-time lane: the two admission branches above were merged into one head. '
+      + 'Neither ceiling alone covers the union, and no line was rewritten to fit - 37_212 is '
+      + 'exactly 37_100 + 24 (cadence wait) + 88 (rehearsal scope), i.e. the arithmetic sum of '
+      + 'the two independently measured deltas with no overlap and nothing added by the merge.',
   },
 ];
 

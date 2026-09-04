@@ -404,6 +404,17 @@ import {
   webGlMatchBoundWeaponPrewarmCatalog,
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
+import {
+  arenaPickupWeaponIds,
+  createDeferredWeaponRehearsalScheduler,
+  createWeaponRehearsalPlan,
+  createWeaponRehearsalState,
+  decideWeaponSwitchRehearsal,
+  markWeaponRehearsed,
+  rehearseWeaponBeforeSwitch,
+  type WeaponRehearsalState,
+  type WeaponRehearsalWindow,
+} from './weapon-rehearsal-scheduler';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
 import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2, segmentBoxHitTime,
 } from './collision';
@@ -2887,12 +2898,20 @@ async function settleWebGpuPresentation(label: string): Promise<void> {
 }
 
 async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
+  await exercisePreparedWebGpuWeaponSwitchesFor(weaponRehearsalState?.plan.admissionWeaponIds);
+}
+
+async function exercisePreparedWebGpuWeaponSwitchesFor(weaponIds?: readonly WeaponId[]): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return;
   const readinessBefore = weaponView.browserCatalogReadiness();
   if (readinessBefore.retainedCount === 0
     || readinessBefore.loaded !== readinessBefore.retainedCount
     || readinessBefore.gpuReady !== readinessBefore.retainedCount) {
     throw new Error(`Prepared weapon-switch exercise requires an exact GPU-ready catalog: ${JSON.stringify(readinessBefore)}`);
+  }
+  const rehearsalIds = weaponIds ?? readinessBefore.retained;
+  if (rehearsalIds.some((weaponId) => !readinessBefore.retained.includes(weaponId))) {
+    throw new Error(`Prepared weapon-switch exercise received a non-retained weapon: ${JSON.stringify(rehearsalIds)}`);
   }
   const restoreWeapon = player.weapon;
   camera.fov = preferredFov;
@@ -2902,11 +2921,9 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
   camera.updateMatrixWorld(true);
   await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
   try {
-    for (const [index, weaponId] of readinessBefore.retained.entries()) {
-      // Catalog batching proves every model can draw, while this final state
-      // walk proves the real exclusive-visibility, socket, rig and flashlight
-      // state used by setWeapon(). It runs against the completed match scene
-      // behind the deployment surface, never against a synthetic compile root.
+    for (const [index, weaponId] of rehearsalIds.entries()) {
+      // Catalog batching proves every model can draw; this final state walk
+      // proves the exclusive-visibility, socket, rig and flashlight state.
       weaponView.setWeapon(weaponId, true);
       weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());
       const exercisesSniperScope = weaponId === 'sniper';
@@ -2956,7 +2973,8 @@ async function exercisePreparedWebGpuWeaponSwitches(): Promise<void> {
       if (presentation.status !== 'healthy') {
         throw new Error(`Prepared ${weaponId} switch exercise was ${presentation.status}: ${presentation.lastFailure ?? 'unknown failure'}`);
       }
-      if (index + 1 < readinessBefore.retained.length) await yieldBrowserPreparationFrame();
+      if (weaponRehearsalState) weaponRehearsalState = markWeaponRehearsed(weaponRehearsalState, [weaponId]);
+      if (index + 1 < rehearsalIds.length) await yieldBrowserPreparationFrame();
     }
   } finally {
     weaponView.setWeapon(restoreWeapon, true);
@@ -6054,6 +6072,18 @@ const verifiedRemoteKills = new Map<string, number>();
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let matchStartPreparing = false;
+let weaponRehearsalState: WeaponRehearsalState | null = null;
+let weaponRehearsalGeneration = 0;
+let pendingWeaponSwitchRehearsal: Promise<void> | null = null;
+const scheduleDeferredWeaponRehearsal = createDeferredWeaponRehearsalScheduler({
+  readState: () => weaponRehearsalState,
+  writeState: (state) => { weaponRehearsalState = state; },
+  isPreparing: () => matchStartPreparing,
+  backend: () => renderRuntime.backend,
+  prepare: (weaponId) => weaponView.prepareBrowserWeapon(weaponId),
+  exercise: (weaponIds) => exercisePreparedWebGpuWeaponSwitchesFor(weaponIds),
+  report: (error) => reportRuntimeError('deferred weapon rehearsal', error),
+});
 let activeMatchAdmissionRun: Readonly<{
   token: MatchAdmissionToken;
   promise: Promise<MatchAdmissionResult>;
@@ -17360,6 +17390,15 @@ async function startGame(
   const matchStartWeapon = selectedArena.id === 'gun-range'
     ? gunRangeSidearmForWeaponPrewarm()
     : activeLoadoutSelection().primary;
+  const matchAdmissionWeaponCatalog = weaponPrewarmCatalogForArena(
+    selectedArena.id,
+    gunRangeSidearmForWeaponPrewarm(),
+  );
+  weaponRehearsalState = createWeaponRehearsalState(createWeaponRehearsalPlan({
+    allWeaponIds: matchAdmissionWeaponCatalog,
+    loadout: { primary: player.primaryWeapon, sidearm: player.secondaryWeapon },
+    pickupWeaponIds: arenaPickupWeaponIds(selectedArena, matchAdmissionWeaponCatalog),
+  }));
   if (renderRuntime.backend === 'webgl2') {
     const webGlMatchBoundCatalog = webGlMatchBoundWeaponPrewarmCatalog(matchStartWeapon);
     await weaponView.prepareBrowserWeaponCatalogAssets(
@@ -19128,23 +19167,62 @@ function endSpawnProtectionOnOffense(now: number): void {
   if (now < player.invulnerableUntil) player.invulnerableUntil = 0;
 }
 
+function weaponRehearsalWindow(): WeaponRehearsalWindow | null {
+  if (matchStartPreparing) return null;
+  if (!gameStarted || menuLifecycle.surface !== 'hidden') return 'menu';
+  if (!player.alive) return 'respawn';
+  return matchState.phase === 'warmup' ? 'pre-match-countdown' : null;
+}
+
+function weaponRehearsalWindowForSwitch(): WeaponRehearsalWindow {
+  if (!gameStarted || menuLifecycle.surface !== 'hidden') return 'menu';
+  if (!player.alive) return 'respawn';
+  return matchState.phase === 'warmup' ? 'pre-match-countdown' : 'combat';
+}
+
 function switchWeapon(index: number): void {
   const authoritySpecial = localAuthoritySpecialWeapon();
   const id = selectedArena.id === 'gun-range'
     ? index === 0 ? authoritySpecial ?? (rangePrimaryUnlocked ? player.primaryWeapon : undefined) : index === 1 ? player.secondaryWeapon : undefined
     : index === 0 && authoritySpecial ? authoritySpecial : handicapLoadout(player.primaryWeapon)[index];
   if (!id || id === player.weapon || !player.alive) return;
-  if (player.reloadState) {
-    if (!cancelReload(player.reloadState, performance.now())) return;
-    interruptReload(true);
+  const rehearsalDecision = weaponRehearsalState
+    ? decideWeaponSwitchRehearsal(weaponRehearsalState, id, weaponRehearsalWindowForSwitch())
+    : null;
+  const commit = (): void => {
+    if (!player.alive || player.weapon === id) return;
+    if (player.reloadState) {
+      if (!cancelReload(player.reloadState, performance.now())) return;
+      interruptReload(true);
+    }
+    player.weapon = id;
+    resetLocalSpinUp();
+    syncLocalTriggerAuthority(triggerHeld);
+    player.switchingUntil = performance.now() + 360;
+    player.sustainedShots = 0;
+    weaponView.setWeapon(id);
+    audio.weaponSwitch();
+  };
+  if (rehearsalDecision && rehearsalDecision.rehearsal !== 'none') {
+    if (pendingWeaponSwitchRehearsal) return;
+    const generation = weaponRehearsalGeneration;
+    const priorState = weaponRehearsalState;
+    const operation = rehearseWeaponBeforeSwitch(
+      priorState!, id, generation, () => weaponRehearsalGeneration,
+      () => weaponRehearsalState, (weaponId) => weaponView.prepareBrowserWeapon(weaponId),
+    ).then((nextState) => {
+      if (nextState) {
+        weaponRehearsalState = nextState;
+        commit();
+      }
+    });
+    pendingWeaponSwitchRehearsal = operation;
+    void operation.catch((error) => reportRuntimeError('weapon switch rehearsal', error)).finally(() => {
+      if (pendingWeaponSwitchRehearsal === operation) pendingWeaponSwitchRehearsal = null;
+    });
+    return;
   }
-  player.weapon = id;
-  resetLocalSpinUp();
-  syncLocalTriggerAuthority(triggerHeld);
-  player.switchingUntil = performance.now() + 360;
-  player.sustainedShots = 0;
-  weaponView.setWeapon(id);
-  audio.weaponSwitch();
+  commit();
 }
 
 function reload(): void {
@@ -31022,6 +31100,8 @@ function frame(now: number, scheduleNext = true): void {
   // resources once page-exit teardown has started, and do not reschedule it.
   if (gameplayRuntimeDisposing) return;
   clearExpiredLocalReloadAuthority(now);
+  const rehearsalWindow = weaponRehearsalWindow();
+  if (rehearsalWindow) scheduleDeferredWeaponRehearsal(rehearsalWindow);
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
     // The prerecorded menu/loading media owns its own browser compositor path.
@@ -36882,10 +36962,15 @@ let lastMatchAdmissionProfile: Readonly<{
   steps: readonly Readonly<{ name: string; durationMs: number }>[];
   achievedWaitMs?: number | null;
   exitReason?: string | null;
+  admissionWeaponIds: readonly WeaponId[];
+  rehearsedWeaponIds: readonly WeaponId[];
+  deferredWeaponIds: readonly WeaponId[];
 }> | null = null;
 
 function beginMatchAdmissionProfile(): void {
   matchAdmissionMarks = [];
+  weaponRehearsalGeneration += 1;
+  weaponRehearsalState = null;
 }
 
 function markMatchAdmission(name: string): void {
@@ -36913,6 +36998,9 @@ function finalizeMatchAdmissionProfile(mode: string): void {
     steps: Object.freeze(steps),
     achievedWaitMs: lastMatchAdmissionCadence?.waitedMs ?? null,
     exitReason: lastMatchAdmissionCadence?.exitReason ?? null,
+    admissionWeaponIds: Object.freeze([...(weaponRehearsalState?.plan.admissionWeaponIds ?? [])]),
+    rehearsedWeaponIds: Object.freeze([...(weaponRehearsalState?.rehearsedWeaponIds ?? [])]),
+    deferredWeaponIds: Object.freeze([...(weaponRehearsalState?.plan.deferredWeaponIds ?? [])]),
   });
 }
 
