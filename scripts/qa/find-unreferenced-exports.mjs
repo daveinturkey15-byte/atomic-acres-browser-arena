@@ -1,9 +1,23 @@
 #!/usr/bin/env node
-// Unreferenced-exports sweep over src/ (report only).
+// Unreferenced-exports sweep over src/ (report only): reports exported
+// symbols whose module is reachable but whose name no other file
+// references. Complements find-unreachable-modules.mjs, which reports
+// modules no importer can reach.
 //
-// Complements find-unreachable-modules.mjs: that sweep reports modules no
-// importer can reach; this one reports exported symbols whose module is
-// reachable but whose name no other file references.
+// Usage: node scripts/qa/find-unreferenced-exports.mjs [--json <path>]
+//
+// Flags (from process.argv):
+//   --json <path>  Also write the findings as JSON to <path> (default:
+//                  not set, no JSON file is written; parent directories
+//                  are created as needed).
+// Environment variables: none are read.
+//
+// Writes:
+//   - The Markdown report to stdout (always).
+//   - The JSON findings file at <path> (only when --json is given).
+//
+// Exit code: always 0 (process.exitCode = 0). This tool reports, it does
+// not gate; findings are not failures, the reviewer decides removals.
 //
 // Definitions are collected from src/**/*.ts (skipping *.test.ts and
 // *.d.ts) for `export function|const|class|type|interface|enum <Name>`
@@ -11,15 +25,6 @@
 // as a whole identifier (\bName\b) across the search corpus - every
 // src/**/*.ts file plus scripts/**/*.{ts,mjs} - outside the defining
 // file. Names with zero hits are reported.
-//
-// Usage: node scripts/qa/find-unreferenced-exports.mjs [--json <path>]
-//
-// Flags:
-//   --json <path>  also write the findings as JSON to <path> (parent
-//                  directories are created as needed).
-//
-// Exit code is always 0: this tool reports, it does not gate. Findings are
-// not failures; the reviewer decides removals.
 
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
