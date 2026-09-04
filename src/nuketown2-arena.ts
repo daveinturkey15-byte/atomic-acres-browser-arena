@@ -127,6 +127,7 @@ import {
 } from './nuketown-mountain-backdrop';
 import {
   NUKETOWN2_BOUNDS,
+  NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_CUL_DE_SAC,
@@ -198,6 +199,7 @@ import {
  * every existing importer of this file is unchanged.
  */
 export {
+  NUKETOWN2_APPLIANCE_BLUE,
   NUKETOWN2_BOUNDS,
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
@@ -3162,7 +3164,7 @@ function thirdHouse(builder: Builder, m: Nuketown2Materials): void {
   // Authored x, beyond the closed end. The near gable stands 1.2 m past the
   // map bound so nothing is ever inside it, and the block is set on the head's
   // own centre line across the street so it closes the vista down the stem.
-  const nearX = NUKETOWN2_BOUNDS.minX - 1.2;
+  const nearX = head.closedX - 2.7;
   const width = 8.4;
   const centreX = nearX - width / 2;
   const depth = 10.5;
@@ -3204,7 +3206,6 @@ function thirdHouse(builder: Builder, m: Nuketown2Materials): void {
   // of a car you can stand on has to hold you up.
   box(builder, 'nuketown2 beyond-bounds third house car cabin',
     [nuketown2HandedX(driveX - 0.2), 1.55, driveZ], [2.2, 0.66, 1.7], m.carGlass, solid);
-  void head;
 }
 
 /** The perimeter: a 3.2 m wall on all four sides, just inside the bounds. */

@@ -42,6 +42,7 @@ import { createTimberMaterial } from './families/timber';
 import { createGlassMaterial } from './families/glass';
 import { createPaintedMetalMaterial } from './families/painted-metal';
 import { createLawnMaterial } from './families/lawn';
+import { NUKETOWN2_APPLIANCE_BLUE } from '../nuketown2-layout';
 
 export type { Nuketown2MaterialSpec, Nuketown2MaterialFamily, WearScale } from './spec';
 export {
@@ -230,15 +231,17 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // cooker bank, RED tops on the orange house's lawn and BLUE on the white
     // house's, which tells a player which half of a 180-degree symmetric map he
     // is standing in without moving a single collider. The RED is the coach's
-    // own 0xa8382c, already measured in this arena; the BLUE is 0x46809f, the
-    // value that used to paint the north HOUSE - demoted, not deleted, to the
-    // prop the reference actually paints blue. Enamelled steel, which is this
-    // family exactly.
+    // own 0xa8382c, already measured in this arena; the BLUE is
+    // NUKETOWN2_APPLIANCE_BLUE, the techniques lane's deep hob blue, so both
+    // appliance banks carry ONE canonical blue (accuracy-2 Muse review,
+    // a1219fe8): FINDINGS shows BO2-2025's white lawn carries blue appliance
+    // tops, while saturated blue house siding is a BO7-era read. Enamelled
+    // steel, which is this family exactly.
     applianceRed: createPaintedMetalMaterial('nuketown2-appliance-red', 0xa8382c, {
       roughness: 0.42,
       metalness: 0.18,
     }),
-    applianceBlue: createPaintedMetalMaterial('nuketown2-appliance-blue', 0x46809f, {
+    applianceBlue: createPaintedMetalMaterial('nuketown2-appliance-blue', NUKETOWN2_APPLIANCE_BLUE, {
       roughness: 0.42,
       metalness: 0.18,
     }),

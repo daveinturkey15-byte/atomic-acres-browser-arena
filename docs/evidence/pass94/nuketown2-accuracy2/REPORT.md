@@ -47,7 +47,7 @@ measurement plus one stated correction; the correction, not the number, is the c
 | Orange house, upper | `#a85e46` (`nt2025-street-boii.jpg`) | `0x9f6147` | hue held at 17.7 deg, chroma and value taken **down** 5 % |
 | Cream (both ground storeys, whole white house) | `#e4e2b4` / `#feffeb` (blown) | `0xeae3cf` | authored between the shipped map's `cream` 0xe7dbc1 and `white` 0xf0e4c9 |
 | White house roof glazing | `#aebdc0` / `#b6c6c9` (aerial) | `0xaebdc1` | none - the measurement and the shipped map's own `chrome` albedo agree to 1/255 |
-| Appliance tops | red / blue (aerial) | `0xa8382c` / `0x46809f` | reuse: the coach's red, and the value that used to paint the north house |
+| Appliance tops | red / blue (aerial) | `0xa8382c` / `0x2f5f92` | reuse the coach's red and the techniques lane's deep hob blue; BO2-2025 places blue tops on the white lawn |
 | Dark saloon / green classic | `#5a6b74` / `#78807a` under haze | `0x27394f` / `0x2f8f77` | hue taken, chroma authored at this arena's car-paint level |
 
 **The chroma correction reversed direction mid-lane, and the captures are why.** The first
@@ -149,8 +149,9 @@ enumerated classes, each paid for by a property:
   boundaries are an artefact of how the band was cut up; the region is the claim.
 - **Ground tiles** - 180-symmetric **everywhere off the carriageway**, sampled the same
   way, and classified by property rather than by a name list because the grid renumbers.
-- **Third house** - every body asserted **entirely outside NUKETOWN2_BOUNDS**, and on the
-  closed end, derived from the head's own footprint rather than from a literal sign.
+- **Third house** - every body asserted **entirely outside NUKETOWN2_BOUNDS**, on the
+  closed end, and anchored at a fixed 2.7 m near-face offset from the head's closed end;
+  both are derived from the head's own footprint rather than from a literal sign.
 
 Two bands moved, both with the reason written into the test:
 
@@ -188,6 +189,10 @@ gate both compared **world** boxes against the **authored** carriageway rects.
   eye/target) and two comment blocks. No other camera, light, policy or profile moved.
 - `scripts/qa/find-coplanar-pairs.ts` - the authored-to-world mirror above.
 - `scripts/qa/nuketown2-overhead-panel.mts` - one legend regex.
+
+**Techniques-lane follow-up:** import `NUKETOWN2_APPLIANCE_BLUE` from
+`src/nuketown2-layout.ts` and use it for the hob material instead of its local
+`0x2f5f92` literal, so both appliance banks have one canonical blue.
 
 ## OPEN
 

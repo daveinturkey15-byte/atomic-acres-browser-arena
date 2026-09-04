@@ -61,6 +61,7 @@ import * as THREE from 'three';
 import type { BallisticMaterialId } from './ballistics';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
+import { NUKETOWN2_APPLIANCE_BLUE } from './nuketown2-layout';
 
 const {
   abs,
@@ -214,7 +215,7 @@ function createTimberMaterial(): MeshStandardNodeMaterial {
 export function createNuketown2YardPropMaterials(): Nuketown2YardPropMaterials {
   const cabinet = createCabinetMaterial();
   const hobRed = createHobMaterial('nuketown2-appliance-hob-red', 0xb8352c);
-  const hobBlue = createHobMaterial('nuketown2-appliance-hob-blue', 0x2f5f92);
+  const hobBlue = createHobMaterial('nuketown2-appliance-hob-blue', NUKETOWN2_APPLIANCE_BLUE);
   const chrome = node('nuketown2-yard-chrome', 0xb9bec2, 0.24, 0.86);
   const glazing = createGlazingMaterial();
   const frame = node('nuketown2-glasshouse-frame', 0xb6b2a6, 0.56, 0.18);

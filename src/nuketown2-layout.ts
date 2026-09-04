@@ -182,6 +182,9 @@ export const NUKETOWN2_CUL_DE_SAC = Object.freeze({
   closedX: -8.5 - NUKETOWN2_TURNING_HEAD_HALF,
 });
 
+/** BO2-2025 deep blue used by the white-lawn appliance bank and techniques hobs. */
+export const NUKETOWN2_APPLIANCE_BLUE = 0x2f5f92;
+
 /**
  * Plan union that owns the carriageway floor. The ground builder cuts these
  * exact rectangles before emitting the real road slabs, so visual geometry and
