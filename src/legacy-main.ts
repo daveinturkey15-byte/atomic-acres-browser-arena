@@ -112,6 +112,7 @@ import {
   type LightingConditionWrites,
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
+import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
 import { resolveEyeClearance } from './camera-eye-clearance';
@@ -4198,15 +4199,14 @@ function captureLightingConditionBaseline(baseline: LightingConditionBaseline): 
 }
 
 function resolveActiveLightingConditions(): LightingConditionWrites {
-  return resolveLightingConditions({
+  // LIGHTING: the Nuke Town Rebuild owns three authored skies (src/nuketown2-lighting); every other arena takes the game-wide sun arc, and both return the same record.
+  return (selectedArena.id === NUKETOWN2_ARENA_ID ? resolveNuketown2LightingConditions : resolveLightingConditions)({
     arenaId: selectedArena.id,
     matchSeed: weatherMatchSeed,
     elapsedSeconds: lightingConditionsElapsedSeconds,
     choice: activeLightingTimeChoice(),
     skyDarkenAmount: lightingConditionsSkyDarken,
-    // `?todhour=` is the same class of local override as `?tod=` and obeys the
-    // same rule: inside a hosted lobby it is ignored, so the scan hour cannot
-    // desync a guest from the host's sky either.
+    // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby.
     ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
   });
 }
