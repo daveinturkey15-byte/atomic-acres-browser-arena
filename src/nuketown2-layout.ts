@@ -68,6 +68,31 @@ export const NUKETOWN2_BOUNDS = Object.freeze({ minX: -18, maxX: 18, minZ: -42, 
  */
 export const NUKETOWN2_STREET_HALF_WIDTH = 5.3;
 
+/** Half-width of the open turning head at the centre of the carriageway. */
+export const NUKETOWN2_TURNING_HEAD_HALF = 8;
+
+/**
+ * Plan union that owns the carriageway floor. The ground builder cuts these
+ * exact rectangles before emitting the real road slabs, so visual geometry and
+ * the coplanar-pair instrument share one source of truth.
+ */
+export const NUKETOWN2_CARRIAGEWAY_FOOTPRINTS = Object.freeze([
+  Object.freeze({
+    id: 'street' as const,
+    x0: NUKETOWN2_BOUNDS.minX,
+    x1: NUKETOWN2_BOUNDS.maxX,
+    z0: -NUKETOWN2_STREET_HALF_WIDTH,
+    z1: NUKETOWN2_STREET_HALF_WIDTH,
+  }),
+  Object.freeze({
+    id: 'turning-head' as const,
+    x0: -NUKETOWN2_TURNING_HEAD_HALF,
+    x1: NUKETOWN2_TURNING_HEAD_HALF,
+    z0: -NUKETOWN2_TURNING_HEAD_HALF,
+    z1: NUKETOWN2_TURNING_HEAD_HALF,
+  }),
+]);
+
 /**
  * Kerb line to house front - THE STRIP THE OWNER CALLED TOO NARROW ("the
  * areas on the side of the main street need to be a bit wider", PASS 91).
@@ -179,7 +204,7 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
  * height-and-radius rule over the arena's own core position, so with a
  * standing eye height of 1.70 m:
  *   - a player STANDING ON THE ROOF must claim: |roofY + 1.70 - coreY| <= 1.90
- *     gives roofY <= 3.95. Authored 3.15, dy 1.10.
+ *     gives roofY <= 3.95. Authored 3.25, dy 1.10.
  *   - a player STANDING IN THE CARGO BOX must NOT claim, because a core you can
  *     take from inside cover is not a contested position at all - and because
  *     `src/overdrive.ts`' own v6 comment says that window was tightened from 2.4
@@ -195,7 +220,7 @@ export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
   /** 0.0764 L south of the road centre-line; reference 0.076 L. */
   z: 2.75,
   deckY: 0.05,
-  roofY: 3.15,
+  roofY: 3.25,
   cabRoofY: 2.9,
   /** Cab centre along the street: box half plus cab half. */
   cabX: 6.5 / 2 + 5.2 / 2,

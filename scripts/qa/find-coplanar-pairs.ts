@@ -35,7 +35,11 @@ import * as THREE from 'three';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
-import { buildNuketown2, NUKETOWN2_BUILDING_FOOTPRINTS } from '../../src/nuketown2-arena';
+import {
+  buildNuketown2,
+  NUKETOWN2_BUILDING_FOOTPRINTS,
+  NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
+} from '../../src/nuketown2-arena';
 
 const NEAR_METERS = 0.03;
 
@@ -136,6 +140,13 @@ function overlapInsideBuilding(first: Box, second: Box): boolean {
   ));
 }
 
+function overlapInsideCarriageway(first: Box, second: Box): boolean {
+  return NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
+    Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
+    && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
+  ));
+}
+
 function main(): void {
   const outIndex = process.argv.indexOf('--out');
   const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
@@ -146,6 +157,7 @@ function main(): void {
   let fenced = 0;
   let benign = 0;
   let houseInteriorFindings = 0;
+  let streetFindings = 0;
   for (let a = 0; a < boxes.length; a += 1) {
     for (let b = a + 1; b < boxes.length; b += 1) {
       const first = boxes[a]!;
@@ -158,9 +170,12 @@ function main(): void {
       const sameMaterial = first.materialId === second.materialId;
       const fencedByOffset = first.polygonOffsetFactor < 0 || second.polygonOffsetFactor < 0;
       const houseInterior = overlapInsideBuilding(first, second);
-      const verdict = houseInterior ? 'HOUSE-INTERIOR-FINDING '
+      const street = overlapInsideCarriageway(first, second);
+      const verdict = street ? 'STREET-FINDING '
+        : houseInterior ? 'HOUSE-INTERIOR-FINDING '
         : fencedByOffset ? 'FENCED  ' : sameMaterial ? 'BENIGN  ' : 'FINDING ';
-      if (houseInterior) houseInteriorFindings += 1;
+      if (street) streetFindings += 1;
+      else if (houseInterior) houseInteriorFindings += 1;
       else if (fencedByOffset) fenced += 1;
       else if (sameMaterial) benign += 1;
       else findings += 1;
@@ -179,6 +194,7 @@ function main(): void {
   const header = [
     `# nuketown2 coplanar top-face pairs (HF-434 instrument)`,
     `# HOUSE-INTERIOR pairs<=${NEAR_METERS}m (offsets ignored): ${houseInteriorFindings}`,
+    `# STREET pairs<=${NEAR_METERS}m (offsets ignored): ${streetFindings}`,
     `# COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): ${collisionOnlySlopes.length}`
       + `${collisionOnlySlopes.length > 0 ? ` - ${collisionOnlySlopes.join(', ')}` : ''}`,
     `# head ${sha} · generated ${new Date().toISOString()}`,
@@ -198,7 +214,7 @@ function main(): void {
     console.log(`written: ${out}`);
   }
   console.log(report);
-  process.exitCode = findings === 0 && houseInteriorFindings === 0 ? 0 : 1;
+  process.exitCode = findings === 0 && houseInteriorFindings === 0 && streetFindings === 0 ? 0 : 1;
 }
 
 main();

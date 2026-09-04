@@ -7,6 +7,7 @@ import type { ArenaMap } from './map';
 import {
   NUKETOWN2_BOUNDS,
   NUKETOWN2_BUILDING_FOOTPRINTS,
+  NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
   NUKETOWN2_CENTRAL_TRUCK,
   NUKETOWN2_DOORWAYS,
   NUKETOWN2_HOUSE_STAIR,
@@ -425,7 +426,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(Math.abs(NUKETOWN2_CENTRAL_TRUCK.cabLength - 0.145 * L)).toBeLessThan(TOL);
     // The 2x-damage core floats 0.60 m over the box roof, inside the pickup
     // window, and the box deck is LOW so the interior cannot claim through it.
-    expect(NUKETOWN2_CENTRAL_TRUCK.roofY).toBeCloseTo(3.15, 10);
+    expect(NUKETOWN2_CENTRAL_TRUCK.roofY).toBeCloseTo(3.25, 10);
     expect(NUKETOWN2_CENTRAL_TRUCK.deckY).toBeCloseTo(0.05, 10);
 
     // The property, measured rather than assumed: no clear standing run along
@@ -617,7 +618,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect([...forbidden], 'Nuke Town must not ship QA marker cubes').toEqual([]);
   });
 
-  it('raises every interior slab and cuts the outdoor ground and lawn from its footprint', () => {
+  it('raises every interior slab and cuts outdoor ground and lawn from structures and carriageway', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
     const overlap = (first: { x0: number; x1: number; z0: number; z1: number },
@@ -633,6 +634,7 @@ describe('Nuke Town Rebuild fidelity', () => {
         z0: -footprint.z1,
         z1: -footprint.z0,
       })),
+      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
     ];
     const floors = map.root.children.filter((node): node is THREE.Mesh => (
       node instanceof THREE.Mesh && (node.name.endsWith('house floor') || node.name.endsWith('garage floor'))
@@ -850,6 +852,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     // the wall plane and DROPS outside - probed on the real physics.
     const map = buildNuketown2(new THREE.Scene());
     const names = map.root.children.map((node) => node.name);
+    const glassColliders = deriveGlassDynamicColliders(map.breakableWindows);
+    expect(map.breakableWindows, 'ground and upper panes register with glass authority').toHaveLength(8);
+    expect(glassColliders, 'all intact ground and upper panes derive movement colliders').toHaveLength(8);
 
     for (const [index, win] of NUKETOWN2_WINDOWS.entries()) {
       const width = win.x1 - win.x0;
@@ -862,9 +867,8 @@ describe('Nuke Town Rebuild fidelity', () => {
         // colliders so the shared breakable-window lifecycle can open it.
         const paneName = `house front window glass ${index}`;
         expect(names.filter((name) => name.endsWith(paneName)), paneName).toHaveLength(2);
-        const glassColliders = deriveGlassDynamicColliders(map.breakableWindows);
-        expect(map.breakableWindows, 'all ground panes register with glass authority').toHaveLength(4);
-        expect(glassColliders, 'all intact ground panes derive movement colliders').toHaveLength(4);
+        expect(map.breakableWindows.filter((pane) => pane.id.includes(`nuketown2-ground-window-${index}`)),
+          `${win.id} panes register with glass authority`).toHaveLength(2);
         const collider = glassColliders.find((entry) => (
           entry.id.includes(`nuketown2-ground-window-${index}`)
           && Math.abs(entry.bounds.maxX - entry.bounds.minX - width) < 0.01
@@ -886,11 +890,22 @@ describe('Nuke Town Rebuild fidelity', () => {
             `${win.id} pane blocks a standing capsule`).toBe(true);
         }
       } else {
-        // Upstairs: sill height at or below the brief's 1.1 m, and NOTHING
-        // across the opening - a capsule standing on the sill (eye sill + 1.7)
-        // is unobstructed at the wall plane.
+        // Upstairs: the lower drop-out remains an opening, while the authored
+        // upper sash is a breakable glass surface. Its dynamic collider is
+        // intentionally separate from static map colliders, so the existing
+        // drop-out route remains available after the pane breaks.
         expect(win.sillTop - NUKETOWN2_UPPER_Y0, `${win.id} sill height over the floor`)
           .toBeLessThanOrEqual(1.1);
+        const windowKey = win.id === 'upper front' ? 'upper-front' : 'upper-back';
+        expect(map.breakableWindows.filter((pane) => pane.id.includes(`nuketown2-${windowKey}-window`)),
+          `${win.id} panes register with glass authority`).toHaveLength(2);
+        expect(glassColliders.filter((entry) => entry.id.includes(`nuketown2-${windowKey}-window`)),
+          `${win.id} intact panes derive movement colliders`).toHaveLength(2);
+        const surface = map.shotSurfaces.find((entry) => entry.id.includes(`house ${windowKey.replace('-', ' ')} window glass`));
+        expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
+        expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
+        // No STATIC collider returns across the drop-out opening. The active
+        // dynamic glass collider is consumed only by the shared live authority.
         expect(isBlocked({ x: wx, y: win.sillTop + 1.7, z: win.wallZ }, map.colliders, PLAYER_RADIUS),
           `${win.id} opening is clear`).toBe(false);
       }
@@ -1410,7 +1425,7 @@ describe('Nuke Town Rebuild fidelity', () => {
   it('gives the 2x-damage core to the truck roof and to nobody else', () => {
     // THE OWNER'S FIRST KEPT FEATURE, measured against the REAL rule rather than
     // against the geometry the rule is supposed to imply. An early cut asserted
-    // only "roofY is 3.15 and the body is centred" and shipped a core that could
+    // only "roofY is fixed and the body is centred" and shipped a core that could
     // be taken from INSIDE the vehicle - which is exactly the case
     // src/overdrive.ts' v6 height-window tightening exists to prevent.
     const EYE = 1.7; // movementProfile(standing).eyeHeight
@@ -1460,7 +1475,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // The other half of the same defect: a core on a roof nobody can reach is
     // not a feature. Simulated on the REAL CharacterPhysics against the REAL
     // built colliders - jump apex from flat ground is 6.35^2 / (2 x 24.5) =
-    // 0.82 m and autostep is 0.42 m, so a 3.15 m roof with nothing beside it is
+    // 0.82 m and autostep is 0.42 m, so a 3.25 m roof with nothing beside it is
     // unreachable.
     const map = buildNuketown2(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds, map.physicsSafetyFloorY);
