@@ -310,6 +310,9 @@ try {
 } finally {
   for (const browser of browsers) await browser.close().catch(() => {});
   peerChild?.kill();
+  // Keep-alive sockets from three clients keep `close()` pending forever, and a
+  // driver that never exits holds its own port against the next run.
+  distServer?.closeAllConnections?.();
   distServer?.close();
 }
 
