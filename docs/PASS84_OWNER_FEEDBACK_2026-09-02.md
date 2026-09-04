@@ -2144,3 +2144,8 @@ assets and textures and lighting need to be tip top, raid can come next"
 ## HF-502 - owner 2026-09-04 21:30: 'Claude reset so you can go ham again, with opus and fable agents, this pass and overnight'
 
 - Opus lanes launched: nuketown2 geometry reconciliation (bays + turning head + rooflines/stairs + z-fight into one branch), gameplay feel (sticky stairs, movement/combat bands, killstreak tuning), perf lane 4 (PASS 93 frame-time parity). Luna keeps the release (PASS 94, third run), the multiplayer lanes, HITL 6 and reviews; Muse builders (paused during the cut) resume after publish; overnight plan follows HITL 6.
+
+## HF-503 - owner 2026-09-04 21:45: overnight fleet directive
+
+- 'Use a bunch of Muse Spark contributor 1.3, Gemini, Z.ai etc, some Lunas, no local Qwen, some Claudes and Fables; get all the nice things, nice graphics and the skills/techniques I sent in; make it a really nice experience; awake at 6 to check; get the other build live asap.'
+- Applied: overnight plan updated (docs/pass84-lanes/OVERNIGHT-2026-09-04-PLAN.md); HITL 6 publishes as PASS 95 as soon as the full gates + qa:mp-soak are green (PASS 94 stays the backup channel per HF-400) unless the owner asks to play-test first; Muse builder pool extended with graphics lanes (SSR denoise, volume fire, generator-building detail, albedo variation, transmission glass, arena ambient air), Opus on the two hardest look items (albedo variation pass, SH-L2 irradiance volume), Fable on the blind A/B critic harness + TAA/CSM evaluation after HITL 6; Gemini/Muse critics on every candidate; 06:00 candidate 7 + morning report.
