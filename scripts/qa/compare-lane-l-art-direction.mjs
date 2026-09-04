@@ -1,4 +1,15 @@
 #!/usr/bin/env node
+// Lane L capture comparison: quantifies before/after art-direction frame changes, checks combat-safety and visibility bounds, and builds side-by-side composites.
+//
+// Usage: node scripts/qa/compare-lane-l-art-direction.mjs [--before <dir>] [--after <dir>] [--out <dir>]
+//   --before <dir>  before-capture directory (default: artifacts/lane-l/before)
+//   --after <dir>   after-capture directory (default: artifacts/lane-l/after)
+//   --out <dir>     output directory (default: artifacts/lane-l/compare)
+//   (no environment variables are read)
+//
+// Writes: <out>/comparison.json and one <out>/<arena>--<camera>.png side-by-side composite per shot pair (default out directory: artifacts/lane-l/compare)
+//
+// Exit codes: 0 on success; no explicit process.exit calls — a missing input report.json throws an uncaught error (non-zero exit)
 // Lane L — READS the before/after capture pairs and judges them.
 //
 // A capture pass that only produces frames has done half the job: somebody
