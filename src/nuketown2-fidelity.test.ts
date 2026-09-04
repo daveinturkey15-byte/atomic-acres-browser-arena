@@ -2585,7 +2585,6 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0))
     * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0))
   );
-
   it('lands a roadside bay on both sides of the stem, each an exact z-mirror of its partner', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
@@ -2736,7 +2735,7 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
         expect(inBay, `${mesh.name}[${index}] grows through the bay paving`).toBeUndefined();
       }
     }
-    expect(blades, 'the lawn field is actually populated').toBeGreaterThan(0);
+    expect(blades, 'the lawn field retains the measured post-bay population').toBeGreaterThanOrEqual(8928);
 
     // (3) The re-tiled stem verge still COVERS its band exactly: every square
     //     metre that is not bay or driveway apron is still lawn, and no two
