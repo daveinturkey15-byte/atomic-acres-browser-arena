@@ -2,8 +2,8 @@
 
 Verdict: **SHIP-WITH-FIXES**
 
-Reviewed revision before review fix: `b0d6b097913cd8777bcfccf04a6a28f7ac3f90de`  
-Base: `3e2fd273f385713f8e645ba39bdf12d530b546f4`  
+Reviewed revision before review fix: `b0d6b097913cd8777bcfccf04a6a28f7ac3f90de`
+Base: `3e2fd273f385713f8e645ba39bdf12d530b546f4`
 Review fix: fail-closed combat switch guard plus source-contract assertion.
 
 Three reasons:
