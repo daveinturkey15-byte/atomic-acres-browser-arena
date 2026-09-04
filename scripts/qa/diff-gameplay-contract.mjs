@@ -1,5 +1,8 @@
-// Diagnostic: prints the exact leaf-level differences between the live
-// gameplay contract and the frozen pre-HITL baseline. Read-only.
+// Prints the exact leaf-level differences between the live gameplay contract and the frozen pre-HITL baseline (read-only diagnostic).
+// Usage: npx tsx scripts/qa/diff-gameplay-contract.mjs
+// Flags/env: none (no process.argv entries or process.env variables are read)
+// Writes: nothing (reads baselines/pass65-candidate/gameplay-contract.json; prints diffs to stdout)
+// Exit codes: 0 on success; non-zero on unhandled error (no explicit process.exit calls)
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { stableStringify } from '../../src/canonical-state.ts';
