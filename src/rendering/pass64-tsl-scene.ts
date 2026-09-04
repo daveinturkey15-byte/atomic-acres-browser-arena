@@ -40,7 +40,7 @@ import {
 } from 'three/tsl';
 import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
-import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { TSL_MIGRATION_INVENTORY, TSL_SHARED_MATERIAL_INVENTORY } from './tsl-migration-inventory';
 import type { GraphicsRuntime } from '../pass65-settings';
 // HF-358: WebGPU water presentation comes from the ocean-tsl factory driven by
 // the shared frozen ocean-spectrum band table — one table for CPU buoyancy and
@@ -1506,7 +1506,15 @@ export function assertRuntimeTslTraversal(audit: RuntimeTslTraversal): void {
   if (audit.legacyShaderMaterials.length > 0) {
     throw new Error(`WebGPU TSL review failed closed: legacy shader materials remain: ${audit.legacyShaderMaterials.join(', ')}`);
   }
-  const expected = TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId).sort();
+  // SH-L2 is intentionally a shared MeshStandard graph: it is present in the
+  // material traversal ledger but contributes zero new pipeline IDs. If that
+  // ever changes, this assertion fails closed until a budgeted pipeline entry
+  // is reviewed and admitted explicitly.
+  const sharedPipelineIds = TSL_SHARED_MATERIAL_INVENTORY.flatMap((entry) => entry.pipelineIds);
+  const expected = [
+    ...TSL_MIGRATION_INVENTORY.map((entry) => entry.replacementPipelineId),
+    ...sharedPipelineIds,
+  ].sort();
   const compiled = [...audit.compiledPipelineIds].sort();
   if (JSON.stringify(compiled) !== JSON.stringify(expected)) {
     throw new Error(`WebGPU TSL review failed closed: compiled pipeline ledger mismatch (${compiled.join(', ')})`);

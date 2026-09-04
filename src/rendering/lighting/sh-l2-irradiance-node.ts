@@ -175,6 +175,8 @@ export function uploadShL2Volume(textures: ShL2Textures, volume: ShL2Volume): vo
 export type ShL2NodeGraph = Readonly<{
   /** Additive linear-HDR bounced irradiance for a world position and normal. */
   irradiance: Node<'vec3'>;
+  /** Uniform-only topology-preserving enable switch. */
+  setEnabled(enabled: boolean): void;
   /** Uniform-only. Zero is the off switch and costs no pipeline rebuild. */
   setStrength(strength: number): void;
   /** Re-uploads probe data and re-points the volume transform. Uniform-only. */
@@ -183,7 +185,7 @@ export type ShL2NodeGraph = Readonly<{
   setBlend(weight: number): void;
   receipt(): Readonly<{
     dimensions: string; digest: string; band: string;
-    occluderShapes: number; strength: number; bytes: number;
+    occluderShapes: number; enabled: boolean; strength: number; bytes: number;
   }>;
   dispose(): void;
 }>;
@@ -211,6 +213,7 @@ export function buildShL2IrradianceNode(
   const volumeOrigin = uniform(new THREE.Vector3(0, 0, 0));
   const volumeSpacing = uniform(new THREE.Vector3(1, 1, 1));
   const volumeDimensions = uniform(new THREE.Vector3(nx, ny, nz));
+  const enabled = uniform(0);
   const strength = uniform(0);
   const maximumAdditive = uniform(SH_L2_MAXIMUM_ADDITIVE);
   let bound: ShL2Volume | null = null;
@@ -265,11 +268,14 @@ export function buildShL2IrradianceNode(
     return min(
       vec3(red, green, blue).mul(strength),
       vec3(1, 1, 1).mul(maximumAdditive),
-    );
+    ).mul(enabled);
   })();
 
   return Object.freeze({
     irradiance: irradiance as unknown as Node<'vec3'>,
+    setEnabled(next: boolean): void {
+      enabled.value = next ? 1 : 0;
+    },
     setStrength(next: number): void {
       // Clamped HERE, not only upstream. A value that reaches a live uniform
       // unclamped is not "clamped, not assumed" whatever the caller promises.
@@ -299,6 +305,7 @@ export function buildShL2IrradianceNode(
         digest: bound?.digest ?? 'unbound',
         band: bound?.band ?? 'unbound',
         occluderShapes: bound?.bake.occluderShapes ?? -1,
+        enabled: enabled.value === 1,
         strength: strength.value,
         bytes: nx * ny * nz * SH_L2_PLANES * 4 * 2,
       });

@@ -17,6 +17,34 @@ export type TslPipelineDescriptor = Readonly<{
   invariants: readonly string[];
 }>;
 
+/**
+ * TSL-authored material additions that deliberately reuse existing standard
+ * material graphs. They belong in the traversal ledger so the assertion knows
+ * about them, but they have no replacement pipeline ID of their own.
+ */
+export type SharedTslMaterialEntry = Readonly<{
+  id: string;
+  owner: string;
+  factorySources: readonly string[];
+  pipelineIds: readonly string[];
+  verification: string;
+}>;
+
+export const TSL_SHARED_MATERIAL_INVENTORY: readonly SharedTslMaterialEntry[] = Object.freeze([
+  Object.freeze({
+    id: 'nuketown2-sh-l2-indirect-materials',
+    owner: 'src/rendering/lighting/indirect-term.ts',
+    factorySources: Object.freeze([
+      'src/nuketown2-facade-materials.ts',
+      'src/nuketown2-interior-materials.ts',
+      'src/nuketown2-street-materials.ts',
+      'src/nuketown2-vehicle-materials.ts',
+    ]),
+    pipelineIds: Object.freeze([]),
+    verification: 'shared MeshStandardNodeMaterial lighting graphs; live strength and enable uniforms only',
+  }),
+]);
+
 function descriptor(stages: readonly string[], invariants: readonly string[]): TslPipelineDescriptor {
   return Object.freeze({
     schemaVersion: 1,

@@ -11,9 +11,10 @@
  *   4. Worn dashes: dirty warm-white lane markings with aggregate bite-through and wear.
  *   5. Distance falloff: high-frequency terms step down between 22 m and 46 m.
  */
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { fbm2, ridgedFbm2, valueNoise2 } from './map3/noise';
+import { createNuketown2IndirectMaterial } from './rendering/lighting/indirect-term';
 
 /** Cast boundary for TSL DSL runtime helpers */
 const {
@@ -45,7 +46,7 @@ function cameraDetailFactor() {
  * Turning head opens at [-8, 8] in X and [-8, 8] in Z.
  */
 export function createNuketown2AsphaltMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.96,
     metalness: 0.02,
   });
@@ -111,7 +112,7 @@ export function createNuketown2AsphaltMaterial(): MeshStandardNodeMaterial {
  * Weathered dirty warm-white with aggregate bite-through and edge degradation.
  */
 export function createNuketown2DashMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.88,
     metalness: 0.02,
   });
@@ -154,7 +155,7 @@ export function createNuketown2DashMaterial(): MeshStandardNodeMaterial {
  * chipped nose, concrete aggregate, vertical water streaks on vertical face.
  */
 export function createNuketown2KerbMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.94,
     metalness: 0.02,
   });
@@ -184,7 +185,7 @@ export function createNuketown2KerbMaterial(): MeshStandardNodeMaterial {
  * poured concrete slabs with joint lines, tonal variance between slabs, and oil/tire darkening.
  */
 export function createNuketown2DriveMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.94,
     metalness: 0.02,
   });

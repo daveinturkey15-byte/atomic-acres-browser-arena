@@ -12,9 +12,10 @@
  * Strictly procedural: zero imported textures, images, meshes or LUTs.
  */
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { fbm2, hash2, valueNoise2 } from './map3/noise';
+import { createNuketown2IndirectMaterial } from './rendering/lighting/indirect-term';
 
 /** Cast boundary for TSL DSL runtime helpers */
 const {
@@ -35,7 +36,7 @@ const {
  * Used for living rooms, stairs, and upstairs sniper rooms.
  */
 export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.54,
     metalness: 0.04,
   });
@@ -79,7 +80,7 @@ export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
  * Ceramic tile floor material for kitchen areas.
  */
 export function createNuketown2TileFloorMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.38,
     metalness: 0.06,
   });
@@ -119,7 +120,7 @@ export function createNuketown2TileFloorMaterial(): MeshStandardNodeMaterial {
  * Concrete garage floor with expansion joints, oil drips, and tire scuffs.
  */
 export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.92,
     metalness: 0.02,
   });
@@ -161,7 +162,7 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
  */
 export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNodeMaterial {
   const baseColor = new THREE.Color(colorHex);
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.94,
     metalness: 0.01,
   });
@@ -185,7 +186,7 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
  * Garage interior wall material: horizontal studs/board framing.
  */
 export function createNuketown2GarageWallMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.82,
     metalness: 0.04,
   });
@@ -213,7 +214,7 @@ export function createNuketown2GarageWallMaterial(): MeshStandardNodeMaterial {
  * @param warm If true, warm residential ceiling light; if false, cold garage fluorescent tube.
  */
 export function createNuketown2CeilingLightMaterial(warm = true): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.18,
     metalness: 0.12,
   });
@@ -238,7 +239,7 @@ export function createNuketown2CeilingLightMaterial(warm = true): MeshStandardNo
  * Procedural physical glass material with subtle specular fresnel reflectance and sky tint.
  */
 export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.08,
     metalness: 0.15,
     transparent: true,
@@ -260,7 +261,7 @@ export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
  * Deep cyan/aquamarine absorption, clearcoat specular reflection, subtle surface ripples.
  */
 export function createNuketown2PoolWaterMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.14,
     metalness: 0.02,
     transparent: true,

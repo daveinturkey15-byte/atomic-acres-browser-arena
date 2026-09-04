@@ -13,9 +13,10 @@
  * Strictly procedural: zero imported textures, images, meshes or LUTs.
  */
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { fbm2, valueNoise2 } from './map3/noise';
+import { createNuketown2IndirectMaterial } from './rendering/lighting/indirect-term';
 
 const {
   float,
@@ -32,7 +33,7 @@ const {
  */
 export function createNuketown2CarPaintMaterial(colorHex: number, name: string): MeshStandardNodeMaterial {
   const baseColor = new THREE.Color(colorHex);
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.20,
     metalness: 0.72,
   });
@@ -57,7 +58,7 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
  * Retro coach cream body material.
  */
 export function createNuketown2CoachMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.32,
     metalness: 0.38,
   });
@@ -77,7 +78,7 @@ export function createNuketown2CoachMaterial(): MeshStandardNodeMaterial {
  * Truck cab painted metal material.
  */
 export function createNuketown2TruckCabMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.38,
     metalness: 0.45,
   });
@@ -96,7 +97,7 @@ export function createNuketown2TruckCabMaterial(): MeshStandardNodeMaterial {
  * Truck cargo box with vertical corrugation ribs.
  */
 export function createNuketown2TruckBoxMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.68,
     metalness: 0.12,
   });
@@ -119,7 +120,7 @@ export function createNuketown2TruckBoxMaterial(): MeshStandardNodeMaterial {
  * Dark tinted automotive glass.
  */
 export function createNuketown2VehicleGlassMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.10,
     metalness: 0.35,
     transparent: true,
@@ -139,7 +140,7 @@ export function createNuketown2VehicleGlassMaterial(): MeshStandardNodeMaterial 
  * Polished automotive chrome for bumpers, grilles, and hubcaps.
  */
 export function createNuketown2ChromeMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.12,
     metalness: 0.94,
   });
@@ -156,7 +157,7 @@ export function createNuketown2ChromeMaterial(): MeshStandardNodeMaterial {
  * Emissive vehicle headlight material.
  */
 export function createNuketown2HeadlightMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.15,
     metalness: 0.10,
   });
@@ -173,7 +174,7 @@ export function createNuketown2HeadlightMaterial(): MeshStandardNodeMaterial {
  * Emissive vehicle taillight material.
  */
 export function createNuketown2TaillightMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.20,
     metalness: 0.10,
   });
@@ -191,7 +192,7 @@ export function createNuketown2TaillightMaterial(): MeshStandardNodeMaterial {
  * Textured tire rubber with radial tread.
  */
 export function createNuketown2TireMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.88,
     metalness: 0.04,
   });

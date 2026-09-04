@@ -142,8 +142,7 @@ describe('buildShL2IrradianceNode', () => {
 
   it('starts at zero strength, so a built node is invisible until asked for', () => {
     const node = graph();
-    expect(node.receipt().strength).toBe(0);
-    expect(node.receipt().digest).toBe('unbound');
+    expect(node.receipt()).toMatchObject({ strength: 0, enabled: false, digest: 'unbound' });
     node.dispose();
   });
 
@@ -171,13 +170,16 @@ describe('buildShL2IrradianceNode', () => {
     );
     node.setVolume(volume);
     node.setStrength(0.4);
+    node.setEnabled(true);
     const identities = textures.planes.map((plane) => plane.uuid);
 
-    node.setStrength(0);
-    expect(node.receipt().strength).toBe(0);
+    node.setEnabled(false);
+    expect(node.receipt()).toMatchObject({ strength: 0.4, enabled: false });
     expect(textures.planes.map((plane) => plane.uuid)).toEqual(identities);
     // Still bound: off is not unbound.
     expect(node.receipt().digest).toBe(volume.digest);
+    node.setEnabled(true);
+    expect(node.receipt().enabled).toBe(true);
     node.dispose();
   });
 

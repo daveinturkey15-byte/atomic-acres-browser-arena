@@ -10,9 +10,10 @@
  * Strictly procedural: zero imported textures, images, meshes or LUTs.
  */
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { fbm2, hash2 } from './map3/noise';
+import { createNuketown2IndirectMaterial } from './rendering/lighting/indirect-term';
 /** Cast boundary for TSL DSL runtime helpers */
 const {
   abs,
@@ -32,7 +33,7 @@ const {
  * Staggered shingle courses with lap shadows and mineral granule aggregate.
  */
 export function createNuketown2RoofMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.88,
     metalness: 0.02,
   });
@@ -81,7 +82,7 @@ export function createNuketown2RoofMaterial(): MeshStandardNodeMaterial {
  */
 export function createNuketown2LapSidingMaterial(baseColorHex: number, name: string): MeshStandardNodeMaterial {
   const baseColor = new THREE.Color(baseColorHex);
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.76,
     metalness: 0.02,
   });
@@ -125,7 +126,7 @@ export function createNuketown2LapSidingMaterial(baseColorHex: number, name: str
  * Vertical picket slats with dark gaps, wood grain, and per-slat tone variance.
  */
 export function createNuketown2FenceMaterial(): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = createNuketown2IndirectMaterial({
     roughness: 0.90,
     metalness: 0.02,
   });
