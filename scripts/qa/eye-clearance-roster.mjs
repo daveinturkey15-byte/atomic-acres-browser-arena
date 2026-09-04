@@ -1,3 +1,10 @@
+// Derives the eye-clearance browser stages' selectable and parked arena roster from src/map-selection.ts and exposes the ledger/ceiling helpers.
+//
+// Usage: node scripts/qa/eye-clearance-roster.mjs (library module; no entry point)
+// Flags/env: none read here; the caller stage parses --arenas (default: full selectable roster) and passes it to resolveArenaRoster()
+// Writes: nothing (read-only; reads src/map-selection.ts and docs/eye-clearance/ledger.json)
+// Exit codes: none (no process.exit calls; throws on empty roster, unknown arena ids, or roster below MINIMUM_EYE_CLEARANCE_ARENAS)
+
 // The arena roster for the eye-clearance pipeline's two BROWSER stages.
 //
 // Owner 2026-08-31. Stage 1 (sweep-eye-clearance-spots.ts) was fixed at
