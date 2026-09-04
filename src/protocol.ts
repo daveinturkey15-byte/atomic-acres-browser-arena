@@ -1443,7 +1443,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'window-break' && message.hostAuthority !== undefined;
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | ThinMetalPerforationStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
   return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state'
     || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state'
     || message.type === 'thin-metal-perforation-state'

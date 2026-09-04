@@ -9,6 +9,7 @@ import {
 } from './ballistics';
 import { WEAPONS } from './gameplay';
 import { canonicalSha256 } from './canonical-state';
+import { isStateTrafficMessage } from './protocol';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 import {
   THIN_METAL_MAX_HOLES_PER_ARENA,
@@ -180,8 +181,9 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
       by: 'host-1',
       envelope,
       nonce: 7,
-    };
+    } as const;
     expect(isThinMetalPerforationStateMessage(message)).toBe(true);
+    expect(isStateTrafficMessage(message)).toBe(true);
     expect(isThinMetalPerforationStateMessage({ ...message, by: 'guest-1' })).toBe(true);
     expect(isThinMetalPerforationStateMessage({ ...message, nonce: -1 })).toBe(false);
     expect(isThinMetalPerforationStateMessage({ ...message, envelope: { ...envelope, hash: 'f'.repeat(64) } })).toBe(false);
