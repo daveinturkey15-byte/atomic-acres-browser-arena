@@ -183,4 +183,4 @@ That 1.870 m divergence row is the shape of finding this lane was built to produ
 
 - **No upload path.** `src/match-diagnostics-upload.ts` is consented aggregated telemetry; this bundle is a raw trace a friend chooses to send directly, and it must not acquire a network side effect by accident.
 - **No publish, no `acceptance/pass-*.json` change, no PR merge** — a feature worktree edits and tests only.
-- **The `vite preview` on port 4207** started for the boot check should be stopped by whoever picks this up if it is still running.
+- **Port 4207 was released.** The `vite preview` started for the boot check (pid 85360) was stopped at the end of this lane; nothing of mine is left listening.
