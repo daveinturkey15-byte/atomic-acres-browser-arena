@@ -53,9 +53,10 @@ export const NUKETOWN_LAWN_SEED = 0x1aa2_82f1;
  * Keep-out inflation for the rebuild's collider-driven placement, in metres.
  * The same 0.34 m `COLLIDER_MARGIN` grass-placement.ts applies to the shipped
  * map's colliders — blades must not grow flush against a wall face or they
- * z-fight the wall's own base edge.
+ * z-fight the wall's own base edge. The extra 20 mm over the shared donor
+ * margin also covers float32 instance-matrix quantisation at a boundary.
  */
-export const NUKETOWN_LAWN_KEEPOUT_MARGIN_M = 0.34;
+export const NUKETOWN_LAWN_KEEPOUT_MARGIN_M = 0.36;
 
 const rect = (cx: number, cz: number, sizeX: number, sizeZ: number): Box2 => ({
   minX: cx - sizeX / 2,

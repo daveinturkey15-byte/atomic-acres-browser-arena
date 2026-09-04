@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { isBlocked } from './collision';
+import { deriveGlassDynamicColliders } from './glass-collider-bounds';
 import { movementProfile } from './gameplay';
 import type { ArenaMap } from './map';
 import {
@@ -29,7 +30,7 @@ import {
 } from './overdrive';
 import { CHARACTER_PHYSICS_CONFIG, CharacterPhysics, STANCE_SHAPES } from './physics';
 import { shedPlacementsForArena } from './destructible-shed-registry';
-import { nuketownRebuildLawnRegions } from './nuketown-lawn-field';
+import { NUKETOWN_LAWN_KEEPOUT_MARGIN_M, nuketownRebuildLawnRegions } from './nuketown-lawn-field';
 
 /**
  * NUKE TOWN REBUILD fidelity guard (HF-407, re-derived end to end under HF-426).
@@ -579,6 +580,43 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
+  it('pins distinct blue and yellow house siding and excludes debug marker cubes', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    const north = map.root.getObjectByName('nuketown2 north house wall west') as THREE.Mesh | undefined;
+    const south = map.root.getObjectByName('nuketown2 south house wall west') as THREE.Mesh | undefined;
+    expect(north, 'north house siding mesh').toBeDefined();
+    expect(south, 'south house siding mesh').toBeDefined();
+
+    const colourOf = (mesh: THREE.Mesh): THREE.Color => {
+      const material = mesh.material as THREE.Material & { color?: THREE.Color };
+      if (!material.color) throw new Error(`${mesh.name}: siding material has no base colour`);
+      return material.color;
+    };
+    const northColour = colourOf(north!);
+    const southColour = colourOf(south!);
+    expect(northColour.getHex(), 'north house keeps the blue base').toBe(0x46809f);
+    expect(southColour.getHex(), 'south house keeps the yellow base').toBe(0xf4be36);
+    expect(northColour.equals(southColour), 'house siding bases must differ').toBe(false);
+    const rgbDistance = Math.hypot(
+      northColour.r - southColour.r,
+      northColour.g - southColour.g,
+      northColour.b - southColour.b,
+    );
+    expect(rgbDistance, 'house siding colour margin').toBeGreaterThan(0.45);
+
+    const forbidden = new Set<string>();
+    map.root.traverse((node) => {
+      if (/(?:^|[-_ ])(?:debug|marker)(?:$|[-_ ])/i.test(node.name)) forbidden.add(node.name);
+      const material = node instanceof THREE.Mesh
+        ? node.material as THREE.Material & { color?: THREE.Color }
+        : undefined;
+      const hex = material?.color?.getHex();
+      if (hex === 0xff00ff) forbidden.add(`${node.name}:magenta`);
+      if (hex === 0x9d6bff) forbidden.add(`${node.name}:purple-marker`);
+    });
+    expect([...forbidden], 'Nuke Town must not ship QA marker cubes').toEqual([]);
+  });
+
   it('raises every interior slab and cuts the outdoor ground and lawn from its footprint', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
@@ -636,6 +674,41 @@ describe('Nuke Town Rebuild fidelity', () => {
       for (const footprint of footprints) {
         expect(overlap({ x0: region.minX, x1: region.maxX, z0: region.minZ, z1: region.maxZ }, footprint),
           `lawn region inside ${JSON.stringify(footprint)}`).toBe(0);
+      }
+    }
+  });
+
+  it('keeps every instanced grass root outside the collider-driven cover keep-outs', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+    const lawnMeshes: THREE.InstancedMesh[] = [];
+    map.root.traverse((node) => {
+      if (node instanceof THREE.InstancedMesh && node.name.startsWith('nuketown2-lawn-region-')) lawnMeshes.push(node);
+    });
+    expect(lawnMeshes.length, 'Nuke Town lawn regions').toBeGreaterThan(0);
+
+    // Ground tiles are the only builder colliders with the exact [-1.4, 0]
+    // floor slab band. The lawn builder receives every collider after that
+    // ground prefix, so this reconstructs its actual keep-out input rather
+    // than maintaining a second cover table in the test.
+    const keepOuts = map.colliders.filter((bounds) => !(
+      Math.abs((bounds.minY ?? 0) + 1.4) < 1e-9
+      && Math.abs((bounds.maxY ?? 0)) < 1e-9
+    ));
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    for (const mesh of lawnMeshes) {
+      for (let index = 0; index < mesh.count; index += 1) {
+        mesh.getMatrixAt(index, matrix);
+        position.setFromMatrixPosition(matrix);
+        mesh.localToWorld(position);
+        const overlap = keepOuts.find((bounds) => (
+          position.x > bounds.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.x < bounds.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.z > bounds.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+          && position.z < bounds.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+        ));
+        expect(overlap, `${mesh.name}[${index}] grass root clips a solid`).toBeUndefined();
       }
     }
   });
@@ -770,9 +843,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     // HF-435, owner after PASS 91: "go out of windows and putting glass on the
     // windows."
     //
-    // GROUND floor: the pane is a real collider (a shoulder does not cross it)
-    // and a real glass ballistic surface (a bullet pays the glass entry cost
-    // and crosses). UPSTAIRS: no collider across the opening, sill at or below
+    // GROUND floor: the pane is a real dynamic collider (a shoulder does not
+    // cross an intact pane) and a real glass ballistic surface (a bullet pays
+    // the glass entry cost and crosses). UPSTAIRS: no collider across the opening, sill at or below
     // 1.1 m over the floor, and a standing capsule that hops the sill crosses
     // the wall plane and DROPS outside - probed on the real physics.
     const map = buildNuketown2(new THREE.Scene());
@@ -783,23 +856,33 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(width, `${win.id} opening width`).toBeGreaterThanOrEqual(1.0);
       const wx = (win.x0 + win.x1) / 2;
       if (win.pane) {
-        // The pane: present, a movement collider spanning sill to head, and
-        // glass for gunfire - in BOTH houses (the partner is the exact
-        // 180-degree image).
+        // The pane: present, a dynamic movement collider spanning sill to head,
+        // and glass for gunfire - in BOTH houses (the partner is the exact
+        // 180-degree image). The pane is deliberately absent from static
+        // colliders so the shared breakable-window lifecycle can open it.
         const paneName = `house front window glass ${index}`;
         expect(names.filter((name) => name.endsWith(paneName)), paneName).toHaveLength(2);
-        const collider = map.colliders.find((bounds) => (
+        const glassColliders = deriveGlassDynamicColliders(map.breakableWindows);
+        expect(map.breakableWindows, 'all ground panes register with glass authority').toHaveLength(4);
+        expect(glassColliders, 'all intact ground panes derive movement colliders').toHaveLength(4);
+        const collider = glassColliders.find((entry) => (
+          entry.id.includes(`nuketown2-ground-window-${index}`)
+          && Math.abs(entry.bounds.maxX - entry.bounds.minX - width) < 0.01
+          && Math.abs((entry.bounds.minY ?? 0) - win.sillTop) < 0.01
+          && Math.abs((entry.bounds.maxY ?? 0) - win.headY) < 0.01
+        ))?.bounds;
+        expect(collider, `${win.id} dynamic pane movement collider`).toBeDefined();
+        expect(map.colliders.some((bounds) => (
           Math.abs((bounds.maxX - bounds.minX) - width) < 0.01
           && Math.abs((bounds.minY ?? 0) - win.sillTop) < 0.01
           && Math.abs((bounds.maxY ?? 0) - win.headY) < 0.01
-        ));
-        expect(collider, `${win.id} pane movement collider`).toBeDefined();
+        )), `${win.id} pane must not return as a static invisible wall`).toBe(false);
         const surface = map.shotSurfaces.find((entry) => entry.id.includes(paneName));
         expect(surface, `${win.id} pane ballistic surface`).toBeDefined();
         expect(surface!.material, `${win.id} pane ballistic class`).toBe('glass');
         // NOT walk-through, in both houses.
         for (const sign of [1, -1] as const) {
-          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, map.colliders, PLAYER_RADIUS),
+          expect(isBlocked({ x: sign * wx, y: 1.7, z: sign * win.wallZ }, [...map.colliders, ...glassColliders.map((entry) => entry.bounds)], PLAYER_RADIUS),
             `${win.id} pane blocks a standing capsule`).toBe(true);
         }
       } else {

@@ -568,6 +568,7 @@ function makeBuilder(scene: THREE.Scene, name: string): Builder {
     raycastMeshes: [],
     shotSurfaces: [],
     ballisticSurfaceSequence: 0,
+    breakableWindows: [],
   };
 }
 
@@ -602,8 +603,14 @@ function pair(
   const single = (material as { isMaterial?: boolean }).isMaterial === true;
   const north = single ? material as THREE.Material : (material as readonly THREE.Material[])[0]!;
   const south = single ? material as THREE.Material : (material as readonly THREE.Material[])[1]!;
-  box(builder, `nuketown2 north ${name}`, position, size, north, options);
-  box(builder, `nuketown2 south ${name}`, [-position[0], position[1], -position[2]], size, south, options);
+  const northOptions = options.breakableWindowId
+    ? { ...options, breakableWindowId: `${options.breakableWindowId}:north` }
+    : options;
+  const southOptions = options.breakableWindowId
+    ? { ...options, breakableWindowId: `${options.breakableWindowId}:south` }
+    : options;
+  box(builder, `nuketown2 north ${name}`, position, size, north, northOptions);
+  box(builder, `nuketown2 south ${name}`, [-position[0], position[1], -position[2]], size, south, southOptions);
 }
 
 /** A body already centred on the origin axis it would be rotated about. */
@@ -934,15 +941,22 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
   // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
-  // REAL collider (not walk-through) and a REAL ballistic surface
-  // (ballisticMaterial 'glass' - the shipped arenas' glazing class,
-  // entryCost 0.08), so bullets cross but shoulders do not.
+  // REAL dynamic collider (intact/cracked panes block movement, breached panes
+  // open) and a REAL ballistic surface (ballisticMaterial 'glass' - the
+  // shipped arenas' glazing class, entryCost 0.08), so bullets can admit the
+  // existing break lifecycle without leaving a static invisible wall behind.
   for (const [index, window] of [FRONT_WINDOW_A, FRONT_WINDOW_B].entries()) {
     const width = window[1] - window[0];
     const wx = (window[0] + window[1]) / 2;
     pair(builder, `house front window sill ${index}`, [wx, 0.5, zFront], [width, 1.0, WALL_T], m.trim);
     pair(builder, `house front window glass ${index}`, [wx, 1.55, zFront], [width, 1.1, 0.06], m.windowGlass,
-      { ballisticMaterial: 'glass', cast: false });
+      {
+        ballisticMaterial: 'glass',
+        breakableWindowId: `nuketown2-ground-window-${index}`,
+        cast: false,
+        solid: false,
+        shots: true,
+      });
     pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
     // HF-440 Cycle 1 Priority 3: facade bays with real recess (projecting sill nosing, lintel trim, jamb reveals)
     pair(builder, `house front window sill nose ${index}`, [wx, 0.96, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
@@ -2130,7 +2144,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     ].map(([x, z]) => new THREE.Vector3(x, 0, z)),
     targets: [],
     houses: [],
-    breakableWindows: [],
+    breakableWindows: builder.breakableWindows ?? [],
     physicalCover: [
       {
         id: 'nuketown2-central-truck',
