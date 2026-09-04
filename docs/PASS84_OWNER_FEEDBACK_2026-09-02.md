@@ -1435,3 +1435,57 @@ additive so the two merge without touching each other's rows.)*
   - The capture command, ready to run: `npx vite build --outDir dist-vr-i4`,
     then `node scripts/qa/capture-arena-viewpoints.mjs --serve-dist dist-vr-i4
     --arenas nuketown2 --label pass94-handedness --sha <head>`.
+
+### HF-477 — BO2 Nuketown 2025 accuracy (LANE ACCURACY-2, 2026-09-04)
+
+**Owner lane:** arena accuracy. **Maps/modes:** Nuke Town Rebuild (`nuketown2`), all modes.
+**Source of truth:** `docs/references/nuketown-2025/FINDINGS.md`, 20 images, 6 of them
+BO2-2025 primary. **Branch:** `contrib/dave-gaming-pc/claude/nuketown2-bo2-accuracy`,
+based on `nuketown2-handedness` @ `5f5ecc47` because the brief's named
+`pass93-candidate` does not exist on origin. **Evidence:**
+`docs/evidence/pass94/nuketown2-accuracy2/REPORT.md`, per-feature VERIFIED/OPEN.
+
+- **The two houses are ORANGE and WHITE/CREAM, not blue and yellow.** FINDINGS Q2,
+  VERIFIED on two BO2-2025 frames; blue-and-yellow is the ORIGINAL Nuketown's palette,
+  the same source as the yellow school bus HF-407 already removed. Terracotta over cream
+  on one, cream throughout with pale blue-grey roof glazing on the other. Values are
+  colour FAMILIES with the measurement and the correction written down; exact hexes OPEN
+  per FINDINGS open item 4. **Falsifier:** `captures/nuketown2-front-porch.png` beside
+  `nt2025-street-boii.jpg`.
+- **The chirality anchors are built.** FINDINGS Q4's three-unit cooker bank on each front
+  lawn, RED tops on the orange house's, BLUE on the white house's — the cheapest chirality
+  answer the reference has, and R4 §7 item 3 wrote it off as interchangeable dressing.
+- **The rear deck moved to the end OPPOSITE the garage**, with the paved undercroft under
+  it and the circular patio at the stair foot; the porch became a wide cantilevered eave
+  and lost its two posts. HF-465 recorded that the deck could not go there because
+  `BACK_UPPER_WINDOW` was in the way and yielded the new body; with a BO2-2025 frame
+  (FINDINGS Q3, VERIFIED) the window takes the mirror of its own run instead.
+- **The street is a LOLLIPOP.** One circular kerbed head at the cul-de-sac end and a stem
+  running off-map at the other, replacing a square 16 m head centred on the street with
+  two blank ends. Which end is which is DERIVED from the orange house's garage, not
+  copied. With it: the truck and coach into the bulb nosed down the stem, the invented
+  "head car" replaced by the reference's dark saloon and green classic, the third house
+  with its drive and red car beyond the head (out of play, asserted so), and the verge
+  re-tiled per side.
+- **Gates re-derived, never relaxed.** The symmetry gate gains three enumerated classes,
+  each paid for: the road is exactly z-mirror symmetric (the axis the teams are separated
+  across) and capped at kerb height; road-plus-verge covers a 180-symmetric region; the
+  ground tiling is 180-symmetric everywhere off the carriageway. `MAX_STREET_CENTRE_RUN_METRES`
+  is unchanged at 21.2 and transfers to the green classic. The x-half street-vehicle
+  floors are replaced by the statement the reference actually makes; both z-half floors,
+  the real fairness bands, are untouched.
+- **The browser gates HF-473 left OPEN are now GREEN, and running them found a real
+  regression.** `qa:stock-boot` 4 passed and the viewpoint capture reports
+  `nuketown2 OK 12/12` on a hardware WebGPU device (nvidia, blackwell). Getting there
+  required fixing a deploy-fence stall this lane introduced and then isolated against the
+  base: `createNuketown2CarPaintMaterial` baked its colour into the node graph, so each
+  car colour was its own pipeline compile, and the third and fourth pushed the arena's
+  first submission past 12,000 ms. The colour is a uniform now and every car paint shares
+  one pipeline. **Nothing between `5f5ecc47` and this branch had ever been booted.**
+- **Still OPEN:** the exact hexes; the orange still reading hotter than the reference
+  (partly because the reference's orange is a mullioned window band, not a painted wall);
+  the cul-de-sac's shape not being legible in-engine because the carriageway renders
+  near-black at the review hour (pre-existing — plan evidence substituted, falsifier is
+  one daylight capture of the head); the bulb's 1.5 m inset, which FINDINGS open item 5
+  records as unmeasured; and two review stations crowded by pre-existing yard dressing
+  this lane does not own.
