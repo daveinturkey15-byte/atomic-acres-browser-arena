@@ -6,6 +6,8 @@ import {
   CHIPTUNE_TRACKS,
   CHIPTUNE_TRACK_IDS,
   GAME_MUSIC_BUS_GAIN,
+  GAME_MUSIC_COMBAT_DUCK_GAIN,
+  GAME_MUSIC_NOTE_GAIN_SCALE,
   chiptuneBarSeconds,
   chiptuneLoopSeconds,
   createDeterministicRng,
@@ -245,6 +247,14 @@ describe('HF-430 runtime: the shipped ArenaAudio rotates the chiptune roster', (
     // must not have moved it, and 0.054 must be gone from the graph entirely.
     expect(busGains).toContain(0.78);
     expect(busGains).not.toContain(0.054);
+  });
+
+  it('pins the live music bus, note staging, and combat-ducker arithmetic', () => {
+    const unducked = GAME_MUSIC_BUS_GAIN * GAME_MUSIC_NOTE_GAIN_SCALE;
+    const ducked = unducked * GAME_MUSIC_COMBAT_DUCK_GAIN;
+    expect(unducked).toBeCloseTo(0.06075, 8);
+    expect(ducked).toBeCloseTo(0.01458, 8);
+    expect(ducked).toBeLessThan(unducked);
   });
 
   it('still scales the halved base by the persisted volume slider', () => {
