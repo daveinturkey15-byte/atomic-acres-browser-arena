@@ -949,7 +949,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   for (const [index, window] of [FRONT_WINDOW_A, FRONT_WINDOW_B].entries()) {
     const width = window[1] - window[0];
     const wx = (window[0] + window[1]) / 2;
-    pair(builder, `house front window sill ${index}`, [wx, 0.5, zFront], [width, 1.0, WALL_T], m.trim);
+    // HF-467: the sill and head are the solid TRIM boxes under and over the
+    // opening, but their names contain "window", so the glass name rule rated
+    // them `glass` (0.08 / 0.25) - bullets crossed the window FRAME like air
+    // and, worse, they read as glazing to anything that reasons about class.
+    // They are painted timber: `wood`.
+    pair(builder, `house front window sill ${index}`, [wx, 0.5, zFront], [width, 1.0, WALL_T], m.trim,
+      { ballisticMaterial: 'wood' });
     pair(builder, `house front window glass ${index}`, [wx, 1.55, zFront], [width, 1.1, 0.06], m.windowGlass,
       {
         ballisticMaterial: 'glass',
@@ -958,7 +964,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
         solid: false,
         shots: true,
       });
-    pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim);
+    pair(builder, `house front window head ${index}`, [wx, 2.55, zFront], [width, 0.9, WALL_T], m.trim,
+      { ballisticMaterial: 'wood' });
     // HF-440 Cycle 1 Priority 3: facade bays with real recess (projecting sill nosing, lintel trim, jamb reveals)
     pair(builder, `house front window sill nose ${index}`, [wx, 0.96, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
       { solid: false, shots: false, cast: true });
@@ -1015,7 +1022,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // ROOF_Y0: 2.0 m tall, so a standing capsule that hops the 0.9 m sill
     // (apex 0.82 + the 0.42 m autostep up-cast = 1.24) walks out and drops to
     // the verge. The roof deck itself closes the head, exactly like an eave.
-    pair(builder, 'house upper window sill', [wx, UPPER_Y0 + 0.45, zFront], [width, 0.9, WALL_T], m.trim);
+    // HF-467: same defect as the ground sills - rated `glass` by its name.
+    pair(builder, 'house upper window sill', [wx, UPPER_Y0 + 0.45, zFront], [width, 0.9, WALL_T], m.trim,
+      { ballisticMaterial: 'wood' });
     // HF-440 Cycle 1 Priority 3: upper front window projecting sill nosing and jamb reveals
     pair(builder, 'house upper window sill nose', [wx, UPPER_Y0 + 0.86, -9.95], [width + 0.12, 0.08, 0.10], m.trim,
       { solid: false, shots: false, cast: true });
@@ -1078,9 +1087,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // HF-435: sill stays at 0.9 m, the old head band goes - same reason as the
   // upper front window: the opening has to be tall enough for a capsule to
   // cross, and the roof deck is the head.
+  // HF-467: the back sill escaped the "window" rule and landed on the house
+  // rule instead, so the front and back sills of the SAME window family were
+  // `glass` and `interior-wall`. Both are timber trim: `wood`.
   pair(builder, 'house upper back sill',
     [(BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2, UPPER_Y0 + 0.45, zBack],
-    [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim);
+    [BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0], 0.9, WALL_T], m.trim,
+    { ballisticMaterial: 'wood' });
   const backUpperW = BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0];
   const backUpperWx = (BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2;
   pair(builder, 'house upper back sill nose', [backUpperWx, UPPER_Y0 + 0.86, -23.05], [backUpperW + 0.12, 0.08, 0.10], m.trim,
@@ -1191,8 +1204,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // FINDING. The wall hides the trimmed 0.3 m, so nothing visible moves.
     [[x0, INNER_DOOR[0]], [INNER_DOOR[1], HOUSE_X1 - WALL_T]].forEach((run, index) => {
       if (run[1]! - run[0]! <= 0.05) return;
+      // HF-467: the GROUND leaf's name contains "ground", which the earth name
+      // rule matched before the plaster rule could - so a ground-floor plaster
+      // partition (4.0 / 12.0) was harder to shoot through than brick, while
+      // the identical wall one storey up was `interior-wall` (0.42 / 1.05).
+      // Rating both leaves explicitly makes the storeys symmetric.
       pair(builder, `house ${storey} partition ${index}`,
-        [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior);
+        [(run[0]! + run[1]!) / 2, y0 + h / 2, PARTITION_Z], [run[1]! - run[0]!, h, WALL_T], m.interior,
+        { ballisticMaterial: 'interior-wall' });
     });
   }
 
@@ -1620,8 +1639,14 @@ function coach(builder: Builder, m: Nuketown2Materials): void {
   // inside the 21.2 m band - and it is still the coach's counterweight, which
   // is the other property nuketown2-fidelity.test.ts measures.
   const HEAD_CAR: readonly [number, number] = [4.5, -0.8];
-  streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA);
-  streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass);
+  // HF-467: the cabin is the WINDSCREEN. `m.carGlass` has metalness 0.50, so
+  // `classifyImpactSurface` called it metal and the vehicle name rule rated it
+  // as bodywork - a windscreen priced like a door skin. Glazing is `glass`,
+  // which is the shatter class, and the body is `vehicle`.
+  streetVehicle(builder, 'head car body', [HEAD_CAR[0], 0.72, HEAD_CAR[1]], [4.4, 1.0, 1.9], m.carA,
+    { ballisticMaterial: 'vehicle' });
+  streetVehicle(builder, 'head car cabin', [HEAD_CAR[0] - 0.2, 1.55, HEAD_CAR[1]], [2.2, 0.66, 1.7], m.carGlass,
+    { ballisticMaterial: 'glass' });
   // Head car bumpers, sloped windows, and separate wheels with hubcaps:
   streetVehicle(builder, 'head car bumper front', [HEAD_CAR[0] + 2.25, 0.30, HEAD_CAR[1]],
     [0.16, 0.22, 1.94], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
@@ -1664,8 +1689,13 @@ function cars(builder: Builder, m: Nuketown2Materials): void {
   // only leave by shuffling. 4.6 m leaves 2.25 m and the car is still on its
   // own apron (the dressing runs to z = -8) rather than out on the kerb.
   const cz = GARAGE_FRONT_Z + 4.6;
-  pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA);
-  pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass);
+  // HF-467: the driveway cars carry no `street-vehicle` name prefix, so BOTH
+  // halves fell through to `reinforced` - a hatchback that stops a sniper.
+  // Body `vehicle`, windscreen `glass`, matching the head car.
+  pair(builder, 'car body', [cx, 0.72, cz], [1.9, 1.0, 4.4], m.carA,
+    { ballisticMaterial: 'vehicle' });
+  pair(builder, 'car cabin', [cx, 1.55, cz - 0.2], [1.7, 0.66, 2.2], m.carGlass,
+    { ballisticMaterial: 'glass' });
   // Driveway sedan bumpers, sloped windows, headlights, taillights, and wheels:
   pair(builder, 'car bumper front', [cx, 0.30, cz + 2.25], [1.94, 0.22, 0.16], m.chrome,
     { solid: false, shots: false, cast: true });
@@ -1798,19 +1828,25 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
 function street(builder: Builder, m: Nuketown2Materials): void {
   const road = { solid: true, shots: true, cast: false } as const;
   for (const [index, span] of [[NUKETOWN2_BOUNDS.minX, -NUKETOWN2_TURNING_HEAD_HALF], [NUKETOWN2_TURNING_HEAD_HALF, NUKETOWN2_BOUNDS.maxX]].entries()) {
+    // HF-467: the carriageway resolved to `wood` through the impactSurface
+    // rescue, so bullets crossed the ROAD. The ground tiles either side of it
+    // are `earth`; the road is `concrete`, and both stop a round.
     centred(builder, `street asphalt ${index}`, [(span[0]! + span[1]!) / 2, -0.06, 0],
-      [span[1]! - span[0]!, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt, road);
+      [span[1]! - span[0]!, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt,
+      { ...road, ballisticMaterial: 'concrete' });
   }
   // The cul-de-sac turning head: the reference's road does not run through, it
   // opens out. 16 m across, which is 0.44 L against the 0.45 L the minimap's
   // head measures.
   centred(builder, 'street turning head', [0, -0.06, 0],
-    [NUKETOWN2_TURNING_HEAD_HALF * 2, 0.12, NUKETOWN2_TURNING_HEAD_HALF * 2], m.asphalt, road);
+    [NUKETOWN2_TURNING_HEAD_HALF * 2, 0.12, NUKETOWN2_TURNING_HEAD_HALF * 2], m.asphalt,
+    { ...road, ballisticMaterial: 'concrete' });
   // Kerb: a 0.12 m lip, under the 0.42 m autostep, so it reads without ever
   // being a wall. Two runs per side, because the turning head interrupts it.
   for (const [index, span] of [[NUKETOWN2_BOUNDS.minX, -NUKETOWN2_TURNING_HEAD_HALF], [NUKETOWN2_TURNING_HEAD_HALF, NUKETOWN2_BOUNDS.maxX]].entries()) {
+    // HF-467: cast kerb, resolving to `wood`. `concrete`, like the road.
     pair(builder, `street kerb ${index}`, [(span[0]! + span[1]!) / 2, 0.06, KERB_Z + 0.15],
-      [span[1]! - span[0]!, 0.24, 0.3], m.kerb, { cast: false });
+      [span[1]! - span[0]!, 0.24, 0.3], m.kerb, { cast: false, ballisticMaterial: 'concrete' });
   }
   // Centre line, as dash runs on the approach either side of the head.
   for (let i = 0; i < 3; i += 1) {
@@ -1848,8 +1884,14 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: true });
 
   // Curbside wheelie bins waiting for collection at the driveway edge:
-  pair(builder, 'verge wheelie bin 0', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 1.9], [0.52, 1.00, 0.55], m.planter);
-  pair(builder, 'verge wheelie bin 1', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 2.5], [0.52, 1.00, 0.55], m.sign);
+  // HF-467: both bins were `reinforced` - a wheelie bin that stops a sniper.
+  // A moulded plastic bin is the cheapest penetrable family the shared table
+  // ships, which is `wood`; there is no plastic id and inventing one would
+  // add a material with no arena but this asking for it.
+  pair(builder, 'verge wheelie bin 0', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 1.9], [0.52, 1.00, 0.55], m.planter,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'verge wheelie bin 1', [GARAGE_X1 + 0.65, 0.50, KERB_Z - 2.5], [0.52, 1.00, 0.55], m.sign,
+    { ballisticMaterial: 'wood' });
   pair(builder, 'verge wheelie bin lid 0', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 1.9], [0.56, 0.06, 0.59], m.rubber,
     { solid: false, shots: false });
   pair(builder, 'verge wheelie bin lid 1', [GARAGE_X1 + 0.65, 1.03, KERB_Z - 2.5], [0.56, 0.06, 0.59], m.rubber,
@@ -1869,12 +1911,17 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
 
   // Street name blade and speed limit sign post at turning head corner:
   pair(builder, 'verge street sign post', [7.6, 1.4, KERB_Z - 0.45], [0.12, 2.8, 0.12], m.trim);
+  // HF-467: the street blade was resolving to `wood` through the impactSurface
+  // rescue. It is the same pressed plate as the sign next to it.
   pair(builder, 'verge street name blade', [7.6, 2.65, KERB_Z - 0.45], [0.90, 0.22, 0.08], m.sign,
-    { solid: false, shots: true });
+    { solid: false, shots: true, ballisticMaterial: 'thin-metal' });
+  // HF-467: a 6 cm sign plate. `thin-metal`, like the hoarding.
   pair(builder, 'verge speed limit sign', [7.6, 2.10, KERB_Z - 0.45], [0.45, 0.60, 0.06], m.trim,
-    { solid: false, shots: true });
+    { solid: false, shots: true, ballisticMaterial: 'thin-metal' });
   // it inside the house's own east wall run.
-  pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb, { cast: false });
+  // HF-467: kerb-family edging, `reinforced` by fall-through. `concrete`.
+  pair(builder, 'verge drive edge', [GARAGE_X1 + 0.4, 0.15, GARAGE_FRONT_Z + 4.0], [0.3, 0.3, 8.0], m.kerb,
+    { cast: false, ballisticMaterial: 'concrete' });
   // Hedge along the front of each house's lawn: crouch cover for the last
   // stride out of the front door. LOW_COVER rather than HARD_COVER, and stopped
   // 0.60 m short of the front door reveal (0.85 m before HF-432 item 4 widened
@@ -1908,7 +1955,13 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   for (const [index, dx] of [-1.4, 1.4].entries()) {
     pair(builder, `verge sign post ${index}`, [-14.0 + dx, 1.9, KERB_Z - 2.6], [0.28, 3.8, 0.28], m.trim);
   }
-  pair(builder, 'verge sign board', [-14.0, 4.3, KERB_Z - 2.6], [3.6, 1.8, 0.3], m.sign);
+  // HF-467: a hoarding face is sheet, and `thin-metal` is the perforate
+  // class the owner named ("thin metal ... should get a hole"). It carries no
+  // perforation AUTHORITY yet - that is the shed's, and extending it to
+  // arbitrary panels is deferred (R3 section 9) - but the rating is now
+  // truthful and every firearm from the scattergun up crosses it.
+  pair(builder, 'verge sign board', [-14.0, 4.3, KERB_Z - 2.6], [3.6, 1.8, 0.3], m.sign,
+    { ballisticMaterial: 'thin-metal' });
 }
 
 /**
@@ -1940,9 +1993,15 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
       [run[1] - run[0], HARD_COVER, 0.25], m.fence);
   });
   // Porch step under the back door, so leaving the house is a walk not a drop.
-  pair(builder, 'yard porch', [-1.25, 0.1, HOUSE_BACK_Z - 0.9], [2.6, 0.2, 1.8], m.drive, { cast: false });
+  // HF-467: a 0.2 m poured step, `reinforced` by fall-through. `concrete`.
+  pair(builder, 'yard porch', [-1.25, 0.1, HOUSE_BACK_Z - 0.9], [2.6, 0.2, 1.8], m.drive,
+    { cast: false, ballisticMaterial: 'concrete' });
   // Cover in the deep yard, between the spawn line and the house:
-  pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.4, LOW_COVER, 2.0], m.planter);
+  // HF-467: matched the `cover` name rule and rated `concrete`; it is the
+  // same crate as `yard far crate`. Rated `wood` explicitly so the pair is
+  // symmetric to shoot at, which this arena's whole fairness contract needs.
+  pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.4, LOW_COVER, 2.0], m.planter,
+    { ballisticMaterial: 'wood' });
   // Tactical crate lid frame & horizontal strapping bands:
   pair(builder, 'yard cover crate lid', [-8.5, LOW_COVER + 0.03, HOUSE_BACK_Z - 4.5], [2.48, 0.06, 2.08], m.trim,
     { solid: false, shots: false, cast: true });
@@ -1950,7 +2009,9 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'yard cover wall', [5.5, HARD_COVER / 2, HOUSE_BACK_Z - 5.5], [7.0, HARD_COVER, 0.35], m.block);
   // Patio dining set with timber table & outdoor umbrella:
-  pair(builder, 'yard patio table', [-14.5, LOW_COVER / 2, -31.5], [2.2, LOW_COVER, 2.2], m.fence);
+  // HF-467: a garden table was `reinforced`. It is furniture: `wood`.
+  pair(builder, 'yard patio table', [-14.5, LOW_COVER / 2, -31.5], [2.2, LOW_COVER, 2.2], m.fence,
+    { ballisticMaterial: 'wood' });
   pair(builder, 'yard patio table top', [-14.5, LOW_COVER + 0.02, -31.5], [2.28, 0.04, 2.28], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'yard patio umbrella pole', [-14.5, 1.45, -31.5], [0.08, 1.90, 0.08], m.chrome,
@@ -1968,7 +2029,16 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // a prop that stops short of the wall just moves the lane to the wall: with
   // the store at x [-15.5, -10.5] the worst lane became a 70.0 m run straight
   // up x = -17. The reference draws its own flank props ON the boundary line.
-  pair(builder, 'yard side store', [-14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
+  // HF-467: a 6.0 x 2.6 m box called a STORE in a back yard reads as a shed
+  // to a player's eye, and it is the map's own hard cover. It had no name
+  // rule and no impactSurface rescue (`m.block` metalness 0.01 classifies as
+  // `concrete`, which is not one of the four rescued surfaces), so it fell
+  // through to `reinforced` - entryCost 1000 against a sniper's 10.90. It was
+  // literally unshootable. `concrete` is what it visually is: a rifle wallbang
+  // through 2.6 m of it is still out of reach, a rifle through its 0.35 m ends
+  // is not, and no weapon meets a 1000-cost wall any more.
+  pair(builder, 'yard side store', [-14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block,
+    { ballisticMaterial: 'concrete' });
   pair(builder, 'yard alley planter', [-15.6, HARD_COVER / 2, -33.0], [4.0, HARD_COVER, 2.0], m.planter);
   // HF-432 item 2 - THE OTHER FLANK. `pair()` negates x AND z, so the store
   // above and its partner both land on the WEST flank of one half and the EAST
@@ -1979,13 +2049,20 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // (schematic 5.4 and the yard note above), so both get one. Authored on the
   // perimeter wall's inner face for the reason the west store already records:
   // a prop that stops short of the wall just moves the lane to the wall.
-  pair(builder, 'yard far store', [14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block);
+  // HF-467: the far yard's twin of `yard side store`; same defect, same rating.
+  pair(builder, 'yard far store', [14.6, HARD_COVER / 2, -14.0], [6.0, HARD_COVER, 2.6], m.block,
+    { ballisticMaterial: 'concrete' });
   // ...and the same asymmetry inside the yard itself: west of x = 0 the yard
   // carried the crate, the water butt, the patio table, the alley planter and
   // the destructible shed; east of x = 9 it carried nothing at all across
   // 9 x 13 m of spawn ground. One waist-high body, in reach of the (12, -30)
   // spawn, which measured the yard's longest walk to cover.
-  pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter);
+  // HF-467: a crate was `reinforced`. `wood` - and the same rating as its
+  // twin `yard cover crate`, which the name rules were sending to `concrete`
+  // because the word "cover" appears in it. Two identical props must not
+  // resolve to two different materials because of their labels.
+  pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter,
+    { ballisticMaterial: 'wood' });
   pair(builder, 'yard far crate lid', [11.5, LOW_COVER + 0.03, -28.0], [2.68, 0.06, 2.28], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'yard far crate strap', [11.5, LOW_COVER / 2, -28.0], [2.64, 0.10, 2.24], m.chrome,
@@ -1996,15 +2073,24 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // flank route was a 36 m corridor with a spawn at each end of the map behind
   // it. Two hard bodies per path, off-axis from each other so the two paths do
   // not line up through the fence gaps.
-  pair(builder, 'path buttress west', [-3.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
-  pair(builder, 'path buttress east', [10.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block);
+  // HF-467: both buttresses were `reinforced` fall-throughs. They are cast
+  // blocks by design (HARD_COVER, `m.block`), so `concrete` is the honest
+  // rating - cover you go around, not cover that eats a sniper round.
+  pair(builder, 'path buttress west', [-3.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block,
+    { ballisticMaterial: 'concrete' });
+  pair(builder, 'path buttress east', [10.0, HARD_COVER / 2, -40.0], [3.0, HARD_COVER, 2.0], m.block,
+    { ballisticMaterial: 'concrete' });
   // Water butt beside the shed placement. x = -8.5 is NOT arbitrary: the shed
   // at (-14, -24.5) with yaw pi/2 occupies x [-16.1, -11.9] and z [-26.3,
   // -22.7] (destructible-shed-registry.ts, shedPlacementFootprint), so the butt
   // stands 2.8 m clear of its east wall instead of inside it. The shed sits
   // that far forward in the yard because the registry gate requires 5.5 m of
   // clearance from every spawn and the spawn line is at |z| = 30-32.
-  pair(builder, 'yard butt', [-8.5, LOW_COVER, -26], [1.2, LOW_COVER * 2, 1.2], m.block);
+  // HF-467: authored in `m.block` and standing as hard cover, so it is rated
+  // with the blocks rather than as the plastic water butt its NAME suggests.
+  // Rating follows the authored material and the gameplay role, not the noun.
+  pair(builder, 'yard butt', [-8.5, LOW_COVER, -26], [1.2, LOW_COVER * 2, 1.2], m.block,
+    { ballisticMaterial: 'concrete' });
   // --- HF-440 Cycle 2: Backyard swimming pool, patio decks & contact skirts --
   // Backyard swimming pool (HF-440 Lane BA: Beer-Lambert water feature):
   pair(builder, 'yard pool coping', [4.8, 0.18, -29.5], [4.4, 0.36, 3.2], m.drive,

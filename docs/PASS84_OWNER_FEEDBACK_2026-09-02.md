@@ -1336,6 +1336,75 @@ assets and textures and lighting need to be tip top, raid can come next"
   ritual. The Nuke Town tip-top branch (Luna verdict DO-NOT-SHIP: identical
   siding on both houses, stray marker cubes) waits behind the hotfix.
 
+## HF-464 — owner 2026-09-02: "the windows upstairs need to be breakable"
+
+- **Owner lane:** Nuke Town Rebuild fidelity / destructibility.
+- **Affected maps and modes:** `nuketown2` only, all modes.
+- **State:** VERIFIED (registration), 2026-09-04, lane I1.
+- **What was wrong:** `buildNuketown2` returned `breakableWindows: []`. The
+  arena had glazing you could see and not one pane in it — upstairs or down —
+  could ever break, because a `BreakableWindow` row is what binds a pane to
+  `glass-authority.ts`, to `activeBallisticSurfaces()`'s break filter and to
+  `activeGlassDynamicColliders()`.
+- **Mechanical falsifier:** `src/nuketown2-glass-authority.test.ts`. It asserts
+  eight registered panes with unique ids (two ground-front, one upper-front and
+  one upper-back per house), a `glass` explicit ballistic surface bound to each
+  window id, that NO pane appears in `arena.colliders` (a static collider can
+  never be removed, so `solid: true` would leave the frame shut after the break
+  and would also blind bots through that window permanently), and that driving
+  the shipped `admitGlassImpact` phase machine to `breached` drops that pane —
+  and only that pane — from `deriveGlassDynamicColliders`.
+- **Required evidence:** the suite above plus
+  `src/glass-collider-bounds.test.ts` and `src/glass-authority.test.ts`.
+- **Mutation check performed:** flipping one pane to `solid: true` fails the
+  static-collider assertion by name; recorded in the lane report.
+- **Planning mapping:** Nuke Town Rebuild destructibility; no protocol change —
+  it rides the existing validated-broadcast `window-break` message.
+
+## HF-467 — owner 2026-09-02: "glass or blocks have no penetration; metal and glass should be shot through, glass breaks; thin metal (the shed) should get a hole with no collision after"
+
+- **Owner lane:** shared ballistics / material authoring.
+- **Affected maps and modes:** `nuketown2` (the arena the owner was playing),
+  `gun-range` (the penetration lab), all modes.
+- **State:** VERIFIED for the rating and the gate; the perforation AUTHORITY
+  outside the field shed remains OPEN by design (see "explicitly not done").
+- **What was wrong, all measured:**
+  1. 30 shot surfaces on `nuketown2` classified `fallback` and therefore
+     resolved to `reinforced` (entryCost 1000 against a sniper's 10.90) — the
+     yard "stores", the path buttresses, both driveway cars, the sign boards,
+     the wheelie bins. They were literally unshootable, which is exactly the
+     "blocks have no penetration" the owner reported.
+  2. Three misclassification families inverted the owner's expectation: window
+     TRIM (sill/head) was rated `glass` because its name contains "window", so
+     bullets crossed the frame like air; the ground-floor partition was rated
+     `earth` because its name contains "ground", making it harder than brick
+     while the identical wall one storey up was `interior-wall`; car windscreens
+     were rated as bodywork because `m.carGlass` has metalness 0.50.
+  3. The zero-fallback assertion that should have caught (1) iterated a
+     hardcoded six-builder literal and had never built `nuketown2`, `map3`,
+     `raid2`, `test1` or `test2`.
+  4. Perforation admission used the MUZZLE constant
+     `penetrationPower × fmjMultiplier × 10`, so a shot through two walls at
+     60 m perforated sheet metal exactly as hard as a point-blank shot.
+- **Mechanical falsifier:** `src/ballistics.test.ts` — the roster is now derived
+  from the canonical registry (`ARENA_IDS` → `loadArenaFactories`), with an
+  explicit per-arena fallback ceiling (`nuketown2: 0`) that may only shrink, a
+  pinned `BALLISTIC_MATERIAL_CLASS` projection, and three assertions that the
+  trace's `energyAtEntryQ` falls with distance and with prior cover.
+  `src/additional-maps.test.ts` derives the penetration lab's lane contract.
+- **Required evidence:** the RED run of the derived gate naming all 30 surfaces
+  (`docs/evidence/pass94/nuketown2-ballistics/step2-red-derived-roster-gate.txt`),
+  the green rerun, `npm run qa:ballistic-parity -- --arenas nuketown2,gun-range`
+  at UNRATED 0 / ceiling 0, and the lane report.
+- **Explicitly NOT done in this lane, so it is not later mistaken for done:**
+  no perforable-panel authority outside the field shed (the moving truck's box
+  body and the new `thin-metal` sign faces are RATED but cannot yet gain a
+  hole); no persistent holes in wood; perforation still does not open bot line
+  of sight; `perforateEnergyQ` was deliberately not retuned in the same change
+  as its input.
+- **Planning mapping:** shared ballistics authority; no protocol change — glass
+  rides `window-break`, perforation rides `interactive-world-snapshot`.
+
 ## PASS 93 publish record — 2026-09-04 08:10 BST (hotfix)
 
 - **Published** by `scripts/orchestration/publish_pass93.py` (exit 0) from head
