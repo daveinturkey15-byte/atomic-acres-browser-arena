@@ -101,6 +101,11 @@ worktree and `HEAD`). This lane did not alter that unrelated evidence file.
 repository finding: `repository source audit failed: match admission must not
 regress to a raw whole-scene WebGL2 compile`. This lane did not weaken or edit
 that fence.
+**OPEN**: clean `npm run pipeline:preflight -- --machine dave-gaming-pc --harness codex`
+passes the lockfile check but rejects the explicitly requested branch name,
+requiring `contrib/dave-gaming-pc/codex/<slug>` while this task requires
+`contrib/dave-gaming-pc/claude/nuke-event`. The branch was preserved and pushed
+as requested; the gate needs repository-owner reconciliation.
 **OPEN by constraint**: browser menu-lifecycle, multiplayer-lifecycle and
 hardware frame-pacing captures were not run because this task explicitly
 forbade browsers and GPU use.
