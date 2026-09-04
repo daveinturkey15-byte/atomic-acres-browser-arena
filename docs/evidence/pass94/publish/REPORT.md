@@ -140,6 +140,17 @@ audio and menu work.
 horizon, sound redesign, rooflines/stairs, circular turning head, liveried vehicles and
 clustered lighting.
 
+## Record delivery
+
+- `VERIFIED`: release report commit `1feeef3e` is present on the candidate branch and its
+  remote readback is `1feeef3e`.
+- `VERIFIED`: the ledger update is committed locally as `c09f46a8` on
+  `contrib/dave-gaming-pc/omp/pass84-overnight`; its unrelated untracked overnight plan
+  was not staged or modified.
+- `OPEN`: the exact requested ledger push timed out twice; remote readback remains
+  `9b735c96`, so `c09f46a8` is not yet on origin. No alternate credential or additional
+  retry was used.
+
 ## Final status
 
 `CODEX-PASS94-BLOCKED` — required gate unresolved: standalone
