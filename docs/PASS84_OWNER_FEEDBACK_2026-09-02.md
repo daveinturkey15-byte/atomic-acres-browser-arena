@@ -1582,3 +1582,21 @@ assets and textures and lighting need to be tip top, raid can come next"
   better graphics and gameplay, evolving from there.
 - **Cadence from the reset:** research and tooling in the remaining hour, then
   improvements every hour or two with owner HITL feedback (possibly videos).
+
+## HF-474 — 2026-09-04 11:40: post-reset blitz launched (ten parallel Opus lanes)
+
+- Game: I1 Nuke Town ballistics wiring (branch `nuketown2-ballistics`), I4
+  handedness mirror + gate + balconies/porch (`nuketown2-handedness`) — both
+  start when Luna's round 2 exits and build on it; I2 vehicle forge
+  (`vehicle-forge`, presentation-only, method re-implemented from the diner
+  recipe); I3 reference-grounded loop runner (`reference-loop-runner`); I6
+  diner-method skill installed under AKP governance; Raid and Farcrysis plans
+  (research docs).
+- Control plane and governance: CP3 cockpit tabs (usage over time, quality /
+  hill-climb, daily digest) after Luna's cockpit lane; CP4 auto-research +
+  meta-loop spec (Karpathy autoresearch; "NVIDIA AVO" to be resolved
+  honestly); CP5 governance (Codex system-skills wipe fix, run-ledger writes
+  for delegated jobs, Codex/ChatGPT parity, inherited Codex problems closed);
+  the skills-ingestion hub (register, pipeline, script) in the vault.
+- Also running: Luna round 2, spawns, Qwen benchmark, cockpit NOW/Models&Plans;
+  Qwen header chain; Alibaba token plan wired into OMP.
