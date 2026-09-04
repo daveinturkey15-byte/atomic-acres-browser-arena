@@ -40,7 +40,13 @@ export const MOWER_CELL_M = 2.2;
 
 export type LawnVariant = 'turf' | 'scrub' | 'hedge';
 
-export function lawnSpec(name: string, baseSrgb: number, variant: LawnVariant, polygonOffset?: number): Nuketown2MaterialSpec {
+export function lawnSpec(
+  name: string,
+  baseSrgb: number,
+  variant: LawnVariant,
+  polygonOffset?: number,
+  readDistanceM?: number,
+): Nuketown2MaterialSpec {
   const open = variant !== 'hedge';
   return assertSpec({
     name,
@@ -52,6 +58,7 @@ export function lawnSpec(name: string, baseSrgb: number, variant: LawnVariant, p
     scuff: { sizeM: 0.060, albedo: 0.070, roughness: 0.05 },
     traffic: { sizeM: 2.4, albedo: open ? 0.085 : 0.060, roughness: 0.05 },
     soil: open ? 0.110 : 0.080,
+    ...(readDistanceM === undefined ? {} : { readDistanceM }),
     ...(polygonOffset === undefined ? {} : { polygonOffset }),
   });
 }
@@ -59,6 +66,8 @@ export function lawnSpec(name: string, baseSrgb: number, variant: LawnVariant, p
 export interface LawnOptions {
   readonly variant?: LawnVariant;
   readonly polygonOffset?: number;
+  /** Distance this surface is read from. The plain beyond the fence is a backdrop. */
+  readonly readDistanceM?: number;
   /** sRGB of the bare earth the wear paths expose. */
   readonly soilSrgb?: number;
 }
@@ -69,7 +78,7 @@ export function createLawnMaterial(
   options: LawnOptions = {},
 ): MeshStandardNodeMaterial {
   const variant = options.variant ?? 'turf';
-  const spec = lawnSpec(name, baseSrgb, variant, options.polygonOffset);
+  const spec = lawnSpec(name, baseSrgb, variant, options.polygonOffset, options.readDistanceM);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
   mat.type = 'MeshStandardMaterial';

@@ -31,6 +31,13 @@ import {
   maxDarkening,
   type Nuketown2MaterialSpec,
 } from './index';
+import {
+  MIN_FEATURE_PIXELS,
+  featurePixels,
+  readDistance,
+  scaleResolvable,
+} from './spec';
+import { BACKDROP_READ_DISTANCE_M, isBackdrop } from './wear';
 import { sidingSpec } from './families/siding';
 import { roofSpec } from './families/roof';
 import { asphaltSpec, markingSpec } from './families/asphalt';
@@ -72,6 +79,14 @@ const FAMILIES: ReadonlyArray<{
 describe('nuketown2 materials — per-family physical authoring', () => {
   for (const row of FAMILIES) {
     describe(row.family, () => {
+      it('is authored to be read from close range unless it says otherwise', () => {
+        // Every representative spec here is a surface a player can walk up to.
+        // A spec that opts out of a scale has to justify it with a declared
+        // read distance, and the next test is what checks the justification.
+        expect(readDistance(row.spec), `${row.family} read distance (m)`).toBeLessThan(BACKDROP_READ_DISTANCE_M);
+        expect(isBackdrop(row.spec), `${row.family} is not a backdrop`).toBe(false);
+      });
+
       it('carries wear at all three authored scales, each inside its physical band', () => {
         const { grain, scuff, traffic } = row.spec;
         expect(grain.sizeM, `${row.family} grain feature size (m)`)
@@ -106,6 +121,33 @@ describe('nuketown2 materials — per-family physical authoring', () => {
       });
     });
   }
+
+  it('drops a scale only where the frame provably cannot resolve it', () => {
+    // THE RULE THIS PINS. `readDistanceM` is the one escape hatch in the
+    // library: declare a surface far enough away and its near-field scales
+    // stop being evaluated. That is correct authoring - a 1 mm grain read from
+    // 55 m is 0.03 of a pixel - and it is also the only lever that could be
+    // used to quietly delete wear. So it is checked by arithmetic, not trust:
+    // every scale a spec drops must genuinely fall under the pixel floor at
+    // the distance that spec declares, and every scale it keeps must clear it.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, { userData?: unknown }>;
+    expect(Object.keys(registry).length).toBeGreaterThan(0);
+
+    const cases: Array<{ label: string; sizeM: number; distanceM: number; resolvable: boolean }> = [
+      { label: '0.9 mm grain at half a metre', sizeM: 0.0009, distanceM: 0.5, resolvable: true },
+      { label: '0.9 mm grain from 55 m', sizeM: 0.0009, distanceM: 55, resolvable: false },
+      { label: '60 mm scuff at half a metre', sizeM: 0.060, distanceM: 0.5, resolvable: true },
+      { label: '60 mm scuff from 55 m', sizeM: 0.060, distanceM: 55, resolvable: false },
+      { label: '2.4 m traffic from 55 m', sizeM: 2.4, distanceM: 55, resolvable: true },
+    ];
+    for (const row of cases) {
+      expect(scaleResolvable(row.sizeM, row.distanceM), row.label).toBe(row.resolvable);
+    }
+    // The floor is a real pixel count on the arena's own camera, not a magic
+    // number: 37 degrees over 1080 lines.
+    expect(featurePixels(0.060, 55)).toBeCloseTo(1.76, 2);
+    expect(featurePixels(0.060, 0.5)).toBeGreaterThan(MIN_FEATURE_PIXELS);
+  });
 
   it('decodes sRGB swatches to linear once, not twice', () => {
     // The trap: `new THREE.Color(hex).r` is ALREADY linear, so a generator

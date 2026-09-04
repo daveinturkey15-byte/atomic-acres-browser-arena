@@ -89,8 +89,62 @@ export interface Nuketown2MaterialSpec {
    * (which is symmetric) because soiling only ever subtracts.
    */
   readonly soil: number;
+  /**
+   * The distance, in metres, at which this surface is actually READ.
+   *
+   * WHY A MATERIAL HAS TO DECLARE THIS. Wear at a scale the frame cannot
+   * resolve is not fidelity, it is arithmetic nobody sees - and on a large
+   * surface it is expensive arithmetic over its whole projected area. The
+   * 220 m scrub plain beyond the fence is the case that forced the field:
+   * authored with all three scales it cost a **12-second first-submission
+   * stall** and failed the arena boot smoke outright, measured by bisecting
+   * this build against the same build with that one material's wear stubbed.
+   *
+   * It is a READ distance, not a nearest approach, because those differ for
+   * exactly the surfaces where it matters. A house wall is read at arm's
+   * length: a player stands against it, so its 0.9 mm paint tooth is real
+   * detail. The plain beyond the fence is a BACKDROP - it is behind a fence,
+   * no route crosses it, and it is seen across the map. At the 55 m it is
+   * actually read from, a 60 mm scuff is 1.8 of a pixel and a 1 mm grain is
+   * 0.01, so neither is detail; only the metre-scale field it exists to
+   * carry survives, which is what it was authored for.
+   *
+   * Defaults to 0.5 m - arm's length, the honest assumption for anything a
+   * player can walk up to and put their face against.
+   */
+  readonly readDistanceM?: number;
   /** Optional coplanar tier, preserved verbatim from the shipped arena. */
   readonly polygonOffset?: number;
+}
+
+/**
+ * Pixels a feature of `sizeM` subtends at `distanceM`.
+ *
+ * The arena's own camera: 37 degree vertical FOV over 1080 lines, so
+ * `px = sizeM * 1080 / (2 * tan(18.5 deg) * distanceM)`.
+ */
+export function featurePixels(sizeM: number, distanceM: number): number {
+  const CAMERA_LINES = 1080;
+  const HALF_FOV_TAN = Math.tan((37 / 2) * (Math.PI / 180));
+  return (sizeM * CAMERA_LINES) / (2 * HALF_FOV_TAN * distanceM);
+}
+
+/**
+ * A feature narrower than this many pixels is a dither, not a feature.
+ *
+ * Two, not one: a one-pixel feature aliases into noise the moment the camera
+ * moves, which is the thing the distance falloffs exist to prevent.
+ */
+export const MIN_FEATURE_PIXELS = 2;
+
+/** Is this scale worth evaluating on a surface read from `readDistanceM`? */
+export function scaleResolvable(sizeM: number, readDistanceM: number): boolean {
+  return featurePixels(sizeM, readDistanceM) >= MIN_FEATURE_PIXELS;
+}
+
+/** The read distance a spec declares, or arm's length if it declares none. */
+export function readDistance(spec: Nuketown2MaterialSpec): number {
+  return spec.readDistanceM ?? 0.5;
 }
 
 /**
@@ -102,7 +156,9 @@ export interface Nuketown2MaterialSpec {
  * fraction of the base albedo.
  */
 export function albedoWearStep(spec: Nuketown2MaterialSpec): number {
-  return spec.grain.albedo + spec.scuff.albedo + spec.traffic.albedo + spec.soil;
+  const d = readDistance(spec);
+  const term = (scale: WearScale): number => (scaleResolvable(scale.sizeM, d) ? scale.albedo : 0);
+  return term(spec.grain) + term(spec.scuff) + term(spec.traffic) + spec.soil;
 }
 
 /**
@@ -116,7 +172,7 @@ export function albedoWearStep(spec: Nuketown2MaterialSpec): number {
  * rather than trusting the sum of the terms to behave.
  */
 export function maxDarkening(spec: Nuketown2MaterialSpec): number {
-  return spec.grain.albedo + spec.scuff.albedo + spec.traffic.albedo + spec.soil;
+  return albedoWearStep(spec);
 }
 
 /** The authored bands, in metres. Exported so the gates read them rather than restating them. */

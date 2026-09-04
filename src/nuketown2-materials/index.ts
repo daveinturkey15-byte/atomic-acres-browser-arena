@@ -129,7 +129,18 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // Beyond the fence: dry scrubland keyed between the backdrop skirt's own
     // two authored ground colours, so the plain and the tree line read as the
     // same land rather than as a lit island in a void.
-    ground: createLawnMaterial('nuketown2-ground-scrub', 0x515642, { variant: 'scrub' }),
+    //
+    // It is a BACKDROP, and it says so. No route crosses it, a fence stands in
+    // front of it, and it is read across the map at about 55 m, where its
+    // 60 mm scuffs are 1.8 of a pixel and its 0.9 mm grain is 0.01. Authoring
+    // those two scales anyway - over a 220 m slab that fills the bottom of
+    // every horizon frame - was a measured 12-second first-submission stall
+    // that failed the arena boot smoke. Only the metre-scale field it exists
+    // to carry survives, which is the one it was authored for.
+    ground: createLawnMaterial('nuketown2-ground-scrub', 0x515642, {
+      variant: 'scrub',
+      readDistanceM: 55,
+    }),
     lawn: createLawnMaterial('nuketown2-lawn-decal', 0x496438, { variant: 'turf', polygonOffset: -2 }),
 
     asphalt: createAsphaltMaterial(),

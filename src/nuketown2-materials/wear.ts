@@ -23,6 +23,8 @@ import {
   MAX_ALBEDO_DARKENING,
   type Nuketown2MaterialSpec,
   assertSpec,
+  readDistance,
+  scaleResolvable,
 } from './spec';
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
@@ -30,10 +32,12 @@ const {
   cameraPosition,
   clamp,
   float,
+  fract,
   length,
   max,
   mix,
   positionWorld,
+  sin,
   smoothstep,
   vec2,
   vec3,
@@ -48,9 +52,37 @@ export function detailFalloff(nearM: number, farM: number): any {
   return smoothstep(float(farM), float(nearM), dist);
 }
 
-/** Signed [-1, 1] fBm of a 2D surface coordinate at a given feature size in metres. */
+/**
+ * Lattice cells per noise tile.
+ *
+ * THE BUG THIS EXISTS FOR, and it is not a micro-optimisation. A 0.9 mm grain
+ * authored across this arena's 220 m ground slab means noise coordinates up to
+ * 1.2e5. float32 resolves about 0.008 at that magnitude, so `fract` quantises
+ * to a couple of hundred steps and the grain stops being grain; worse, the
+ * value hash then evaluates `sin` of an argument around 5e7, and a transcendental
+ * that far out of range is both meaningless and, on this driver, catastrophically
+ * slow - measured as a 12-second first-submission stall that failed the arena
+ * boot smoke outright.
+ *
+ * Wrapping the coordinate into a tile of a fixed number of lattice cells is
+ * what a real texture generator does anyway: you author a 0.25 m grain tile and
+ * repeat it. 256 keeps every noise argument inside [0, 256) at every scale, and
+ * it is an INTEGER period, which is the condition tileable value noise needs -
+ * a fractional period yields NaN, and NaN turns every surface into a mirror.
+ */
+export const NOISE_TILE_CELLS = 256;
+
+/**
+ * Signed [-1, 1] fBm of a 2D surface coordinate at a given feature size in
+ * metres, evaluated on a tile of `NOISE_TILE_CELLS` features.
+ *
+ * The tile spans `featureSizeM * NOISE_TILE_CELLS`: 0.23 m for a 0.9 mm grain,
+ * 11.5 m for a 45 mm scuff, 614 m for a 2.4 m traffic gradient - which is
+ * larger than the map, so the term that carries the big shapes never repeats.
+ */
 export function signedNoise(uv: any, featureSizeM: number, octaves = 2): any {
-  return fbm2(uv.mul(float(1 / featureSizeM)), octaves).sub(float(0.5)).mul(float(2));
+  const tiled = fract(uv.mul(float(1 / (featureSizeM * NOISE_TILE_CELLS)))).mul(float(NOISE_TILE_CELLS));
+  return fbm2(tiled, octaves).sub(float(0.5)).mul(float(2));
 }
 
 /**
@@ -77,6 +109,53 @@ export interface WearNodes {
   readonly scuff: any;
 }
 
+
+/**
+ * Beyond this read distance a surface is authored as a backdrop.
+ *
+ * 30 m is where the smallest scale this library authors - an 80 mm scuff -
+ * falls to about 3.6 px, and where the next one down, a 1.5 mm grain, has been
+ * invisible for twenty-nine of those metres.
+ */
+export const BACKDROP_READ_DISTANCE_M = 30;
+
+/** Is this spec authored as a backdrop rather than as a surface you can approach? */
+export function isBackdrop(spec: Nuketown2MaterialSpec): boolean {
+  return readDistance(spec) >= BACKDROP_READ_DISTANCE_M;
+}
+
+/**
+ * The analytic metre-scale tonal field a backdrop gets in place of noise.
+ *
+ * Three sines on three axes whose bearings are not related by a rational
+ * fraction, at three periods that are not harmonics. A product of two
+ * axis-aligned sines is a checkerboard by construction; a SUM of three rotated
+ * ones at incommensurable periods is a smooth irregular mottle, which is what
+ * a scrub plain looks like from 55 m.
+ */
+export function backdropWear(spec: Nuketown2MaterialSpec): WearNodes {
+  const p = positionWorld;
+  const wave = (ax: number, az: number, periodM: number): any =>
+    sin(p.x.mul(float((ax * 2 * Math.PI) / periodM)).add(p.z.mul(float((az * 2 * Math.PI) / periodM))));
+  const field = wave(0.734, 0.679, 17.3)
+    .add(wave(-0.512, 0.859, 9.1))
+    .add(wave(0.921, -0.389, 4.7))
+    .div(float(3));
+
+  const soilMask = smoothstep(float(-0.45), float(0.55), field);
+  const albedoMul = clamp(
+    float(1).add(field.mul(float(spec.traffic.albedo))).sub(soilMask.mul(float(spec.soil))),
+    float(1 - MAX_ALBEDO_DARKENING),
+    float(1 + spec.traffic.albedo),
+  );
+  const roughness = clamp(
+    float(spec.roughness).add(field.mul(float(spec.traffic.roughness))),
+    float(0.03),
+    float(1.0),
+  );
+  return { albedoMul, roughness, soilMask, grain: float(0), scuff: float(0) };
+}
+
 /**
  * @param spec   the authored physical description
  * @param uv     a 2D surface coordinate IN METRES (x/z for a ground plane, run/height for a wall)
@@ -85,17 +164,49 @@ export interface WearNodes {
 export function buildWear(spec: Nuketown2MaterialSpec, uv: any, soilUv: any = uv): WearNodes {
   assertSpec(spec);
 
+  // A BACKDROP - a surface only ever read from tens of metres - gets an
+  // analytic tonal field instead of lattice noise, and it is not an
+  // optimisation dressed as authoring: at the distance it is read, the only
+  // scale that resolves is the metre-scale one, and a smooth metre-scale field
+  // is exactly what three summed sines are.
+  //
+  // MEASURED, and this is why the branch exists at all. The 220 m scrub plain
+  // carrying lattice value noise - at six octaves, at four, and at ONE - failed
+  // the arena boot smoke every time with "WebGPU queue completion exceeded
+  // 12000 ms for submission 1 (completed 0 ... fenced draws 515)": the arena
+  // never rendered a frame. The same build with that one material's wear
+  // stubbed passed in 59.5 s, and with a plain `positionWorld.x` gradient in
+  // its place passed in 58.8 s, so it is neither the arena nor the graph size.
+  // A sin-free hash did not rescue it either; that build crashed the GPU
+  // process outright. Seventy-one full-frame quads evaluating a hashed lattice
+  // is simply beyond what this route will complete, and no octave count fixes
+  // that. Three sines over the same surface cost nine instructions and read
+  // the same from 55 m.
+  if (isBackdrop(spec)) return backdropWear(spec);
+
+  // Only the scales this surface's own read distance can resolve are
+  // evaluated. A term the frame cannot show is not authored detail, it is
+  // per-fragment arithmetic over the surface's whole projected area - and on
+  // the 220 m scrub plain that arithmetic was a measured 12-second stall.
+  const readM = readDistance(spec);
+  const zero = float(0);
+
   // 0.5 - 1.5 mm. Paint tooth, aggregate grit, timber fibre. One octave: at
   // this size a second octave is below a nanometre of feature and costs a
   // texture fetch's worth of ALU for nothing.
-  const grain = signedNoise(uv, spec.grain.sizeM, 1).mul(detailFalloff(0.8, 3.0));
+  const grain = scaleResolvable(spec.grain.sizeM, readM)
+    ? signedNoise(uv, spec.grain.sizeM, 1).mul(detailFalloff(0.8, 3.0))
+    : zero;
 
   // 20 - 80 mm. Scuffs, chips, heel marks. Two octaves so the marks have
   // edges rather than being blobs.
-  const scuff = signedNoise(uv, spec.scuff.sizeM, 2).mul(detailFalloff(4.0, 18.0));
+  const scuff = scaleResolvable(spec.scuff.sizeM, readM)
+    ? signedNoise(uv, spec.scuff.sizeM, 2).mul(detailFalloff(4.0, 18.0))
+    : zero;
 
   // 0.5 - 3 m. The term that does the actual work in a wide frame: traffic,
-  // rain wash, sun fade. Three octaves, no falloff — it is metres wide.
+  // rain wash, sun fade. Three octaves, no falloff - it is metres wide, and
+  // it is resolvable from anywhere on the map.
   const traffic = signedNoise(soilUv, spec.traffic.sizeM, 3);
 
   // Soiling is one-sided: dirt subtracts. Thresholded so it has a shape (a
