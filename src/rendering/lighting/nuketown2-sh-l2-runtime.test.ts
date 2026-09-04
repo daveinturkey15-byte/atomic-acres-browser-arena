@@ -12,9 +12,13 @@ import {
   resolveNuketown2Sky,
 } from '../../nuketown2-lighting';
 import {
+  DERING_PROBE_DIRECTIONS,
+  SH_L2_BYTES_PER_PROBE,
+  SH_L2_COEFFICIENTS,
   bakeShL2Volume,
   deriveShL2Grid,
   evaluateShL2,
+  evaluateShL2Unclamped,
 } from './sh-l2-irradiance';
 import { bakeLightingFromNuketown2Sky } from './sh-l2-irradiance-runtime';
 import { buildNuketown2ShL2BakeOccluders } from './nuketown2-sh-l2-occluders';
@@ -74,5 +78,38 @@ describe('Nuke Town SH-L2 runtime bake', () => {
     const interiorMean = averageAt(interior);
     const exteriorMean = averageAt(exterior);
     expect(interiorMean, 'interior / exterior ratio').toBeLessThan(exteriorMean * 0.75);
+  });
+
+  it('checks relative dering across fixed probes from the real arena bake', () => {
+    const occluders = buildNuketown2ShL2BakeOccluders();
+    const lighting = bakeLightingFromNuketown2Sky({ arenaId: 'nuketown2', fixedHour: 10.5 });
+    const positions = [
+      vec3(-7, 4, -5), vec3(-3, 2, -10), vec3(4, 4, -4), vec3(8, 3, -9),
+      vec3(-7, 4, 27), vec3(0, 1.6, 20), vec3(8, 3, 29), vec3(14, 2, 8),
+    ];
+    const grid = {
+      originM: positions[0], spacingM: vec3(2, 2, 2),
+      dimensions: Object.freeze([1, 1, 1]) as unknown as readonly [number, number, number],
+      probeCount: 1, band: 'l2' as const, bytes: SH_L2_BYTES_PER_PROBE,
+    };
+    let demoted = 0;
+    for (const position of positions) {
+      const volume = bakeShL2Volume({
+        arenaId: 'nuketown2', conditionId: 'real-arena-dering',
+        grid: { ...grid, originM: position }, lighting, occluders,
+        raysPerProbe: 128, bounces: 1, seed: 0x51_12,
+      });
+      demoted += volume.bake.demotedProbes;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const offset = channel * SH_L2_COEFFICIENTS;
+        for (const direction of DERING_PROBE_DIRECTIONS) {
+          const l1 = evaluateShL2Unclamped(volume.coefficients, offset, direction, 1);
+          const l2 = evaluateShL2Unclamped(volume.coefficients, offset, direction, 2);
+          expect(l2).toBeGreaterThanOrEqual(Math.min(0, l1) - 1e-6);
+        }
+      }
+    }
+    expect(positions).toHaveLength(8);
+    expect(demoted).toBe(0);
   });
 });

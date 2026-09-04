@@ -193,6 +193,16 @@ export function evaluateShL2(
   offset: number,
   normal: Vec3,
 ): number {
+  return Math.max(0, evaluateShL2Unclamped(coefficients, offset, normal, 2));
+}
+
+/** Unclamped reconstruction used by the dering guarantee and its tests. */
+export function evaluateShL2Unclamped(
+  coefficients: ArrayLike<number>,
+  offset: number,
+  normal: Vec3,
+  bands: 1 | 2 = 2,
+): number {
   const basis = shBasisL2(normal);
   const value = SH_A0 * SH_Y00 * coefficients[offset]
     + SH_A1 * SH_Y1 * (
@@ -200,14 +210,14 @@ export function evaluateShL2(
       + normal[2] * coefficients[offset + 2]
       + normal[0] * coefficients[offset + 3]
     )
-    + SH_A2 * (
+    + (bands === 2 ? SH_A2 * (
       basis[0] * coefficients[offset + 4]
       + basis[1] * coefficients[offset + 5]
       + basis[2] * coefficients[offset + 6]
       + basis[3] * coefficients[offset + 7]
       + basis[4] * coefficients[offset + 8]
-    );
-  return Math.max(0, value / Math.PI);
+    ) : 0);
+  return value / Math.PI;
 }
 
 /**
@@ -288,23 +298,7 @@ function rawReconstruction(
   direction: Vec3,
   bands: 1 | 2,
 ): number {
-  let value = SH_A0 * SH_Y00 * coefficients[offset]
-    + SH_A1 * SH_Y1 * (
-      direction[1] * coefficients[offset + 1]
-      + direction[2] * coefficients[offset + 2]
-      + direction[0] * coefficients[offset + 3]
-    );
-  if (bands === 2) {
-    const basis = shBasisL2(direction);
-    value += SH_A2 * (
-      basis[0] * coefficients[offset + 4]
-      + basis[1] * coefficients[offset + 5]
-      + basis[2] * coefficients[offset + 6]
-      + basis[3] * coefficients[offset + 7]
-      + basis[4] * coefficients[offset + 8]
-    );
-  }
-  return value / Math.PI;
+  return evaluateShL2Unclamped(coefficients, offset, direction, bands);
 }
 
 export type DeringResult = Readonly<{
@@ -610,18 +604,11 @@ export function traceShL2Radiance(
   const albedo = options.bounceAlbedo ?? scene.shapes[hit.shapeIndex].albedo;
   const point = add(origin, scale(direction, hit.t));
 
-  // FLIP THE NORMAL TO FACE THE INCOMING RAY. `analytic-proxy-scene`'s box
-  // intersector returns the hit normal oriented ALONG the ray, not against it
-  // (verified: a -z ray into a box's +z face returns (0,0,-1)). For a mirror
-  // trace that is harmless because the reflection formula is sign-symmetric,
-  // which is why the ray-traced lane never noticed. For a DIFFUSE bounce it is
-  // fatal and silent: `dot(normal, sun)` comes out negative on every
-  // sun-facing surface, every bounce returns black, and the volume bakes to
-  // pure sky - a plausible-looking result in which the albedo is never read at
-  // all, so a red wall and a grey wall produce bit-identical volumes. That is
-  // exactly how this was found. Flipped here rather than in the shared
-  // intersector: the ray-traced lane depends on the existing convention and
-  // this lane has no business changing it underneath.
+  // Orient the geometric normal against the incoming ray. The shared box
+  // intersector now returns outward normals, while the historic plane path
+  // still returns a ray-facing normal; this consumer accepts either convention
+  // so diffuse N.L remains correct for every analytic shape. Mirror reflection
+  // is sign-symmetric, but diffuse bounce is not.
   const geometricNormal = hit.normal;
   const normal = dot(geometricNormal, direction) < 0
     ? geometricNormal
@@ -725,6 +712,7 @@ function uniformSphereDirection(random: () => number): Vec3 {
 
 /** A stable key for "this volume is what these inputs bake to". */
 export function shL2Digest(options: ShL2BakeOptions): string {
+  const q = (value: number, scaleBy: number): string => String(Math.round(value * scaleBy));
   const parts = [
     options.arenaId,
     options.conditionId,
@@ -739,10 +727,24 @@ export function shL2Digest(options: ShL2BakeOptions): string {
     String(options.raysPerProbe),
     String(options.bounces),
     String(options.occluders.shapes.length),
-  ].join('|');
+    `seed:${String(options.seed ?? 0x5f3759df)}`,
+    options.bounceAlbedo
+      ? `bounce-albedo:${options.bounceAlbedo.map((value) => q(value, 1000)).join(',')}`
+      : 'bounce-albedo:shape-albedo',
+  ];
+  for (const shape of options.occluders.shapes) {
+    parts.push([
+      shape.kind,
+      q(shape.centre[0], 1000), q(shape.centre[1], 1000), q(shape.centre[2], 1000),
+      q(shape.halfExtents[0], 1000), q(shape.halfExtents[1], 1000), q(shape.halfExtents[2], 1000),
+      q(shape.yaw, 1000),
+      q(shape.albedo[0], 1000), q(shape.albedo[1], 1000), q(shape.albedo[2], 1000),
+    ].join(','));
+  }
+  const text = parts.join('|');
   let hash = 0x811c9dc5;
-  for (let index = 0; index < parts.length; index += 1) {
-    hash ^= parts.charCodeAt(index);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash.toString(16).padStart(8, '0');
