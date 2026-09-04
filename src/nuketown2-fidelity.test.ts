@@ -816,29 +816,81 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
-  it('pins distinct blue and yellow house siding and excludes debug marker cubes', () => {
+  it('pins the reference ORANGE-over-cream and WHITE/CREAM houses, their glazing and their colour-coded lawn anchors', () => {
+    // HF-477. The old case pinned BLUE 0x46809f and YELLOW 0xf4be36 against
+    // `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md` section 5.3. Twenty
+    // reference images later that pairing is refuted:
+    // `docs/references/nuketown-2025/FINDINGS.md` Q2 is VERIFIED on two
+    // BO2-2025 frames and the blue/yellow read belongs to the ORIGINAL
+    // Nuketown (`nuketown-birdseye-bo.png`, BO1). So the case moves with the
+    // authority, and it moves UP: it now pins THREE distinctness facts where it
+    // pinned one, because the reference gives three.
     const map = buildNuketown2(new THREE.Scene());
-    const north = map.root.getObjectByName('nuketown2 north house wall west') as THREE.Mesh | undefined;
-    const south = map.root.getObjectByName('nuketown2 south house wall west') as THREE.Mesh | undefined;
-    expect(north, 'north house siding mesh').toBeDefined();
-    expect(south, 'south house siding mesh').toBeDefined();
-
-    const colourOf = (mesh: THREE.Mesh): THREE.Color => {
-      const material = mesh.material as THREE.Material & { color?: THREE.Color };
-      if (!material.color) throw new Error(`${mesh.name}: siding material has no base colour`);
+    const colourOf = (mesh: THREE.Mesh | undefined, label: string): THREE.Color => {
+      expect(mesh, label).toBeDefined();
+      const material = mesh!.material as THREE.Material & { color?: THREE.Color };
+      if (!material.color) throw new Error(`${mesh!.name}: material has no base colour`);
       return material.color;
     };
-    const northColour = colourOf(north!);
-    const southColour = colourOf(south!);
-    expect(northColour.getHex(), 'north house keeps the blue base').toBe(0x46809f);
-    expect(southColour.getHex(), 'south house keeps the yellow base').toBe(0xf4be36);
-    expect(northColour.equals(southColour), 'house siding bases must differ').toBe(false);
-    const rgbDistance = Math.hypot(
-      northColour.r - southColour.r,
-      northColour.g - southColour.g,
-      northColour.b - southColour.b,
+    const named = (name: string): THREE.Mesh | undefined => map.root.getObjectByName(name) as THREE.Mesh | undefined;
+    const margin = (first: THREE.Color, second: THREE.Color): number => Math.hypot(
+      first.r - second.r,
+      first.g - second.g,
+      first.b - second.b,
     );
-    expect(rgbDistance, 'house siding colour margin').toBeGreaterThan(0.45);
+
+    // (1) THE TWO HOUSES DIFFER, and the wall that carries the difference is
+    //     the UPPER one - which is where FINDINGS Q2 reads the terracotta off
+    //     `nt2025-street-boii.jpg`. The ground storeys are cream on both houses
+    //     in the reference, so asserting distinctness on a ground wall would be
+    //     asserting something the reference does not have.
+    const northUpper = colourOf(named('nuketown2 north house wall west upper'), 'north upper siding mesh');
+    const southUpper = colourOf(named('nuketown2 south house wall west upper'), 'south upper siding mesh');
+    expect(northUpper.getHex(), 'north house is the terracotta-orange one').toBe(0xb35a3c);
+    expect(southUpper.getHex(), 'south house is the white/cream one').toBe(0xeae3cf);
+    expect(northUpper.equals(southUpper), 'house siding bases must differ').toBe(false);
+    expect(margin(northUpper, southUpper), 'house siding colour margin').toBeGreaterThan(0.45);
+
+    // (2) THE ORANGE HOUSE IS TWO-TONE, orange over cream. This is the half of
+    //     Q2 the old case could not state at all, because the whole house was
+    //     one material.
+    const northGround = colourOf(named('nuketown2 north house wall west'), 'north ground siding mesh');
+    const southGround = colourOf(named('nuketown2 south house wall west'), 'south ground siding mesh');
+    expect(northGround.getHex(), 'the orange house stands on a CREAM ground storey').toBe(0xeae3cf);
+    expect(northGround.equals(southGround), 'both ground storeys are the reference cream').toBe(true);
+    expect(margin(northUpper, northGround), 'orange-over-cream margin').toBeGreaterThan(0.45);
+
+    // (3) THE WHITE HOUSE'S PALE BLUE-GREY ROOF GLAZING - its own strongest
+    //     identifier from above (`nt2025-aerial-boii.jpg`), and the only thing
+    //     that keeps the two houses apart when the map is read from a chopper
+    //     or a minimap rather than from a spawn.
+    const northRoof = colourOf(named('nuketown2 north house roof deck'), 'north roof deck');
+    const southRoof = colourOf(named('nuketown2 south house roof deck'), 'south roof deck');
+    expect(southRoof.getHex(), 'the white house wears pale blue-grey roof glazing').toBe(0xaebdc1);
+    expect(northRoof.equals(southRoof), 'the two roofs must differ').toBe(false);
+
+    // (4) THE CHIRALITY ANCHORS. FINDINGS Q4: red cooker tops on the orange
+    //     house's lawn, blue on the white house's. Measured on the BUILT
+    //     geometry, and tied to the houses rather than to a literal sign, so a
+    //     later mirror of the arena carries them with it.
+    for (const index of [0, 1, 2]) {
+      const red = colourOf(named(`nuketown2 north verge appliance top ${index}`), `north appliance top ${index}`);
+      const blue = colourOf(named(`nuketown2 south verge appliance top ${index}`), `south appliance top ${index}`);
+      expect(red.r, `appliance top ${index} on the orange lawn is RED`).toBeGreaterThan(red.b);
+      expect(blue.b, `appliance top ${index} on the white lawn is BLUE`).toBeGreaterThan(blue.r);
+      expect(margin(red, blue), `appliance top ${index} colour margin`).toBeGreaterThan(0.15);
+    }
+    // The bank stands on the lawn between the hedge and the kerb, on the same
+    // side of the street as its own house - so it reads from that house's own
+    // spawn across the road, which is the whole point of an anchor.
+    for (const half of ['north', 'south'] as const) {
+      const cabinet = named(`nuketown2 ${half} verge appliance cabinet`)!;
+      expect(cabinet, `${half} appliance cabinet`).toBeDefined();
+      const houseZ = NUKETOWN2_HOUSE_LAYOUT[half === 'north' ? 0 : 1]!.z;
+      expect(Math.sign(cabinet.position.z), `${half} bank is on its own house's side`).toBe(Math.sign(houseZ));
+      expect(Math.abs(cabinet.position.z), `${half} bank is out on the verge, not against the house`)
+        .toBeLessThan(Math.abs(houseZ));
+    }
 
     const forbidden = new Set<string>();
     map.root.traverse((node) => {
