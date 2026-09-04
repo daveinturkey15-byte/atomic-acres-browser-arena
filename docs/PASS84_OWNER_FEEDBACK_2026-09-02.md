@@ -1991,3 +1991,11 @@ assets and textures and lighting need to be tip top, raid can come next"
 - Cockpit delivery @ 70c9a49: liveness3 merged (9 scanned / 9 shown / 0
   dropped, awaiting 6), suite 626 green; OPEN: /api/state warm latency ~3 s
   under 94 % CPU load vs the peer's 1.1 s baseline — re-measure at low load.
+
+## HF-493 — owner 2026-09-04 18:25: "chill out with the opus and fable use, just orchestrate, we are at 80% usage and it resets in 1h44"
+
+- Applied at once: no new Opus/Fable agents or Claude workflows until the
+  reset (~20:10); the HITL 5 integrator and the perf-fix lane (both already
+  running) finish; the rooflines Opus lane told to commit WIP and stop, its
+  remainder re-routed to Codex/Luna. Everything else runs on Luna, Gemini,
+  GLM and Muse Spark. HITL 5b integration goes to Luna.
