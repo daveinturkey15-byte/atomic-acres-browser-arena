@@ -1,0 +1,19 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:pass65:owner-feedback
+> node .agents/skills/atomic-acres-owner-feedback-gate/scripts/verify-owner-feedback-ledger.mjs --self-test
+
+{
+  "ok": true,
+  "sourceOutcomes": 387,
+  "textSources": 17,
+  "artifacts": 0,
+  "feedbackRows": 314,
+  "graphNodes": 314,
+  "latestId": "HF-314",
+  "mappingRows": 270,
+  "planningRequirements": 99,
+  "supersessions": 48,
+  "tests": 87,
+  "selfTest": true,
+  "candidateMode": false
+}

@@ -4655,10 +4655,9 @@ function applyInteractiveWorldBallisticTrace(
   if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
   const spec = WEAPONS[weapon];
   const unitDirection = direction.clone().normalize();
-  const penetrationEnergyQ = Math.max(0, Math.round(
-    spec.penetration.penetrationPower * spec.penetration.fmjMultiplier * 10,
-  ));
-  const damageQ = Math.max(1, Math.round(spec.damage));
+  // HF-467: perforation and damage now cost the trace's REMAINING energy at
+  // each surface (`impact.energyAtEntryQ`), not a distance-blind muzzle constant.
+  const damageQ = Math.max(1, Math.round(applyPenetrationDamage(spec.damage, trace.damageMultiplier)));
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
   for (const impact of trace.impacts) {
@@ -4666,6 +4665,7 @@ function applyInteractiveWorldBallisticTrace(
       && !impact.surface.majorDebris
       && !impact.surface.houseFragment
       && !impact.surface.houseMajorDebris) continue;
+    const penetrationEnergyQ = Math.max(0, Math.round(impact.energyAtEntryQ));
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
     const impulseQ = Object.freeze({

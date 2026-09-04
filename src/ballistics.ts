@@ -83,6 +83,66 @@ export const BALLISTIC_MATERIALS: Readonly<Record<BallisticMaterialId, MaterialR
   reinforced: Object.freeze({ entryCost: 1_000, costPerMeter: 1_000 }),
 });
 
+/**
+ * HF-467, owner after PASS 93: "glass or blocks have no penetration; metal and
+ * glass should be shot through, glass breaks; thin metal (the shed) should get
+ * a hole with no collision after".
+ *
+ * That statement is a claim about CLASSES of surface, not about individual
+ * props, so it is written once here as a projection of the material table
+ * rather than as a second hand-maintained roster (AGENTS.md: "a second
+ * hand-maintained eligibility list is a release blocker"). Every consumer -
+ * the wallbang lab, the arena raters, the probes - derives from this map, so a
+ * new `BallisticMaterialId` cannot be added without deciding, in review, which
+ * of the four behaviours it has.
+ *
+ *   shatter   penetrable, and the surface BREAKS OPEN on admitted damage.
+ *             The glass authority owns the lifecycle; at `breached` the pane
+ *             leaves `activeBallisticSurfaces()` AND stops emitting a dynamic
+ *             movement collider, so the opening is real for bullets, players
+ *             and bot line of sight at the same instant.
+ *   perforate penetrable, and each admitted hit leaves a PERSISTENT aperture
+ *             that later rays pass through untouched (`apertureQuery`). The
+ *             movement collider is deliberately KEPT: a bullet hole is not a
+ *             doorway, and "no collision after" means no BALLISTIC collision
+ *             at the hole.
+ *   penetrate penetrable, energy-costed, no persistent state change.
+ *   stop      structural cover: no persistent state change, and priced so a
+ *             sidearm cannot cross it at cover thickness. Stated honestly,
+ *             because the shipped table does NOT make these invulnerable -
+ *             brick's entryCost is 1.7 against a sniper's 10.90 budget, so a
+ *             rifle wallbang through half a metre of brick is intended and
+ *             measured (`keeps the material table physically ordered`). What
+ *             the class promises is that the arena raters reach for it when
+ *             they mean "go around this", and that nothing in `shatter` or
+ *             `perforate` is ever priced as high as the cheapest of these.
+ *
+ * `reinforced` is in `stop` because it is the classifier's failure sentinel,
+ * not a material an arena may author: a surface that reaches it is an
+ * authoring defect, reported by `classification: 'fallback'`. It is the one
+ * member of the class that really is unreachable by every catalogue firearm.
+ */
+export type BallisticMaterialClass = 'shatter' | 'perforate' | 'penetrate' | 'stop';
+
+export const BALLISTIC_MATERIAL_CLASS: Readonly<Record<BallisticMaterialId, BallisticMaterialClass>> = Object.freeze({
+  glass: 'shatter',
+  'thin-metal': 'perforate',
+  fence: 'penetrate',
+  wood: 'penetrate',
+  'interior-wall': 'penetrate',
+  vehicle: 'penetrate',
+  container: 'penetrate',
+  'structural-metal': 'penetrate',
+  brick: 'stop',
+  concrete: 'stop',
+  earth: 'stop',
+  reinforced: 'stop',
+});
+
+export function ballisticMaterialClass(material: BallisticMaterialId): BallisticMaterialClass {
+  return BALLISTIC_MATERIAL_CLASS[material];
+}
+
 export type BallisticSurfaceEvidence = Readonly<{
   name: string;
   impactSurface?: ImpactSurface;
@@ -170,6 +230,20 @@ export type BallisticSurfaceImpact = Readonly<{
   thickness: number;
   penetrated: boolean;
   entryNormal: Point3;
+  /**
+   * HF-467: the round's REMAINING energy at this surface's entry face, on the
+   * same x10 quantised scale the interactive world's perforation thresholds
+   * use (`DestructibleShedDefinition.thresholds.perforateEnergyQ`).
+   *
+   * It exists because perforation admission used to be computed from the
+   * MUZZLE constant `penetrationPower * fmjMultiplier * 10`, which is the same
+   * number at 5 m through clear air and at 60 m through two walls. The trace
+   * has always known the real answer - distance falloff and every earlier
+   * surface's traversal cost are already charged against `energy` here - it
+   * simply never left this function. Reporting it is additive and cannot
+   * change any existing penetration outcome.
+   */
+  energyAtEntryQ: number;
 }>;
 
 export type BallisticTrace = Readonly<{
@@ -290,6 +364,18 @@ export function penetrationEnergyRetention(profile: WeaponPenetrationProfile, di
   return 1 + (profile.minimumEnergyRetention - 1) * progress;
 }
 
+/**
+ * The x10 quantisation the interactive world's damage authority already uses
+ * for every energy threshold. Kept in one place so the trace and the shed
+ * cannot drift onto two scales.
+ */
+export const BALLISTIC_ENERGY_Q = 10;
+
+function quantiseEnergy(energy: number): number {
+  if (!Number.isFinite(energy) || energy <= 0) return 0;
+  return Math.max(0, Math.round(energy * BALLISTIC_ENERGY_Q));
+}
+
 /** Shared deterministic FMJ-like trace used by local, bot, and network authority. */
 export function traceBallisticPath(
   origin: Point3,
@@ -344,6 +430,7 @@ export function traceBallisticPath(
         thickness: distanceIntoSurface,
         penetrated: false,
         entryNormal: interval.entryNormal,
+        energyAtEntryQ: quantiseEnergy(energy),
       });
       return {
         reachedDistance: false,
@@ -354,6 +441,7 @@ export function traceBallisticPath(
         stoppedBy: interval.surface,
       };
     }
+    const energyAtEntryQ = quantiseEnergy(energy);
     energy -= traversalCost;
     penetratedSurfaces += 1;
     lastDistance = interval.exitDistance;
@@ -364,6 +452,7 @@ export function traceBallisticPath(
       thickness,
       penetrated: true,
       entryNormal: interval.entryNormal,
+      energyAtEntryQ,
     });
   }
   const targetRetention = penetrationEnergyRetention(profile, targetDistance);

@@ -88,8 +88,12 @@ const ACCEPTED_WALK_THROUGH: Record<string, Array<{ name: string; centre: [numbe
     // (additional-maps.ts): they exist to be shot THROUGH, sit behind the
     // firing-line physics barrier players cannot cross, and are flanked by
     // solid lab side walls.
-    { name: 'gun-range-wallbang-panel-interior-wall', centre: [-12.3, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
-    { name: 'gun-range-wallbang-panel-brick', centre: [-9.9, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
+    // HF-467: the lab went from four lanes to six (a thin-metal and a
+    // structural-metal lane were added), so the row is re-pitched and these
+    // two centres moved with it. Only the CENTRES changed - both panels are
+    // the same authored shots:true/solid:false penetration targets they were.
+    { name: 'gun-range-wallbang-panel-interior-wall', centre: [-12.7, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
+    { name: 'gun-range-wallbang-panel-brick', centre: [-9.5, 1.45, -7.6], reason: 'penetration-lab panel: authored shots:true/solid:false behind the firing-line barrier' },
   ],
 };
 
