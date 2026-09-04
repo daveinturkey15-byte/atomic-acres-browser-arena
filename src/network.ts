@@ -76,6 +76,27 @@ type NetworkDiagnostics = Record<string, unknown> & {
   qaEventJitterMs: number;
 };
 
+export type QaTracedMessage = Readonly<{
+  /** performance.now() on the peer that recorded the row. */
+  atMs: number;
+  direction: 'out' | 'in';
+  type: string;
+  /** Serialized payload size; the wire uses binarypack, so this is an upper bound. */
+  bytes: number;
+  channel: ChannelKind;
+  /** The message's own playerId when it carries one -- the credit/ownership subject. */
+  subjectId: string | null;
+}>;
+
+export type QaMessageTrace = Readonly<{
+  enabled: boolean;
+  entries: readonly QaTracedMessage[];
+  recorded: number;
+  dropped: number;
+}>;
+
+const QA_TRACE_CAPACITY = 6_000;
+
 const STATE_LABEL = 'atomic-acres-state-v1';
 const EVENT_LABEL = 'atomic-acres-events-v1';
 const RECONNECT_WINDOW_MS = 90_000;
@@ -218,6 +239,27 @@ function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
   const delayMs = Math.max(0, Math.min(250, Number(params.get('eventDelayQaMs')) || 0));
   const jitterMs = Math.max(0, Math.min(100, Number(params.get('eventJitterQaMs')) || 0));
   return { delayMs, jitterMs };
+}
+
+/**
+ * HF-504 (mp audit): a QA-only message trace. Every multiplayer defect the
+ * owner has reported for months ("cannot reload", "cannot pick up guns",
+ * "desync") is a question about WHICH message did or did not cross the wire,
+ * and nothing in the build could answer it -- `diagnostics()` counts state
+ * messages but never records a type. This records one row per message on both
+ * the send and receive side so `scripts/qa/mp-audit.mjs` can diff the two
+ * peers' views of the same exchange.
+ *
+ * Fenced to the local QA harness (`multiplayerQa=1` + `qaTrace=1` on
+ * loopback). Production builds never allocate the ring and never pay the
+ * `JSON.stringify` byte measurement.
+ */
+function qaMessageTraceEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('multiplayerQa') === '1'
+    && params.get('qaTrace') === '1'
+    && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 }
 
 function channelKind(connection: DataConnection): ChannelKind {
@@ -418,6 +460,9 @@ export class ArenaNetwork {
    * the room), never the crashed-host reclaim ramp and never a fresh room. */
   private promotionClaim = false;
   private lastClientHostLivenessCheckMonoMs: number | null = null;
+  private readonly qaTrace: QaTracedMessage[] | null = qaMessageTraceEnabled() ? [] : null;
+  private qaTraceRecorded = 0;
+  private qaTraceDropped = 0;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
   private connectionAttemptSequence = 0;
@@ -435,7 +480,14 @@ export class ArenaNetwork {
     onDiagnostic: DiagnosticHandler = () => undefined,
     peerFactory: ArenaPeerFactory = createArenaPeer,
   ) {
-    this.onMessage = onMessage;
+    this.onMessage = this.qaTrace === null
+      ? onMessage
+      : (message: GameMessage) => {
+        // Recorded BEFORE the handler runs, so a row exists even when the
+        // handler throws or the message is dropped by an admission gate.
+        this.recordQaTrace('in', message, 'events');
+        onMessage(message);
+      };
     this.onStatus = onStatus;
     this.onDiagnostic = onDiagnostic;
     this.peerFactory = peerFactory;
@@ -868,6 +920,39 @@ export class ArenaNetwork {
     try { connection.close(); } catch { /* The reliable lane remains authoritative. */ }
     this.onStatus('Movement channel degraded; using reliable fallback', 'warn');
     return true;
+  }
+
+  private recordQaTrace(direction: 'out' | 'in', message: GameMessage, channel: ChannelKind): void {
+    const trace = this.qaTrace;
+    if (!trace) return;
+    this.qaTraceRecorded += 1;
+    if (trace.length >= QA_TRACE_CAPACITY) {
+      trace.shift();
+      this.qaTraceDropped += 1;
+    }
+    let bytes = 0;
+    try { bytes = JSON.stringify(message)?.length ?? 0; } catch { bytes = -1; }
+    const carried = message as unknown as Record<string, unknown>;
+    const subject = carried.playerId ?? carried.id ?? carried.targetId ?? carried.shooterId ?? null;
+    trace.push({
+      atMs: performance.now(),
+      direction,
+      type: String(message.type),
+      bytes,
+      channel,
+      subjectId: typeof subject === 'string' ? subject : null,
+    });
+  }
+
+  /** HF-504: read-only trace for `scripts/qa/mp-audit.mjs`. Empty unless the
+   * QA trace fence is open. */
+  qaMessageTrace(): QaMessageTrace {
+    return {
+      enabled: this.qaTrace !== null,
+      entries: this.qaTrace ? [...this.qaTrace] : [],
+      recorded: this.qaTraceRecorded,
+      dropped: this.qaTraceDropped,
+    };
   }
 
   diagnostics(): NetworkDiagnostics {
@@ -1536,6 +1621,7 @@ export class ArenaNetwork {
   }
 
   private transmit(connection: DataConnection, message: GameMessage, stateTraffic: boolean): void {
+    this.recordQaTrace('out', message, stateTraffic ? 'state' : 'events');
     const impairment = qaEventImpairment();
     if (stateTraffic || impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
       connection.send(message);

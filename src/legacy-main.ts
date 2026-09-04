@@ -691,7 +691,7 @@ import {
   type DeathDrop,
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
-import { ArenaNetwork } from './network';
+import { ArenaNetwork, type QaMessageTrace } from './network';
 import {
   MatchAdmissionCoordinator,
   isMatchAdmissionSuperseded,
@@ -32781,6 +32781,8 @@ const debugWindow = window as Window & {
     grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
+    /** HF-504: QA-only multiplayer message trace (see network.ts qaMessageTrace). */
+    sampleMessageTrace: () => QaMessageTrace;
     endMatch: () => void;
     rematch: () => void;
     returnToMainMenu: () => void;
@@ -36655,6 +36657,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return interactWithRailgunPickup();
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
+  // HF-504: the audit driver reads this on every peer to diff who sent and who
+  // received each message. Read-only; the trace ring is opened by URL fence.
+  sampleMessageTrace: () => network.qaMessageTrace(),
   endMatch: () => {
     endTimedMatchFromAuthority(performance.now());
   },
