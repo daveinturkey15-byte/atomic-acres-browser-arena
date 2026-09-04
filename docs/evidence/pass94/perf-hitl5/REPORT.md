@@ -368,3 +368,36 @@ CPU-only evidence above.
 3. Wear pipelines: uniforms for spec constants so family graphs share
    pipelines; that is where the remaining 0.5-1.9 ms wear CPU is.
 4. The 12 s fence on the static-serve route (integrator: reproduce on :4300).
+
+## Perf lane 3 (Codex, HF-491)
+
+VERIFIED: This lane was run from `0123a427` on `contrib/dave-gaming-pc/claude/perf-hitl5`, with the existing install, headless installed Chrome, `PASS73_NATIVE_WEBGPU=1`, HIGH/WebGPU, Solo, `nuketown2`, port `4188`, and ComfyUI left running. The complete final rung is `bisect/codex-perf3-final-47605e1d-nuketown2.json`; the pre-lane rung is `bisect/codex-perf3-pre-0123a427-nuketown2.json`. GPU telemetry was observed before the final material rung at 48 C / 9% / 1,963 MiB; a later read was 47 C / 9% / 3,182 MiB. These measurements are CPU-only within-session evidence, not absolute FPS claims.
+
+### Changes
+
+| fix | implementation | evidence |
+|---|---|---|
+| dormant killstreak pool | `285b28a9`: `freezeMatrixWorldWalk()` makes `pass65-killstreak-presentations` a static traversal boundary; active entities, effects, markers and sensors refresh explicit world roots. | VERIFIED: the root remains 4,233 nodes and reports `walkMs=0`; the final renderer attribution is 1.94 ms/frame for `_renderScene` versus 1.95 ms/frame in the pre-lane sample. The root-node count is unchanged by design. OPEN: because the previous lane had already deep-frozen pooled entry descendants, total scene auto nodes moved only 2,203 -> 2,198, not by 4,233; the census cannot truthfully claim a 4,233 auto-node drop. |
+| viewmodel arm IK | `9dd2c270`: `ViewmodelMatrixPathUpdater` deduplicates camera-to-target ancestor paths and updates parents once, with children only on the moving IK/socket chains. | VERIFIED (unit): viewmodel motion/socket tests pass. In the combined final rung, the named IK callers account for about 1.02 -> 0.92 ms/frame by CDP attribution (`alignRiggedPalmWorld`, `solveRiggedArms`/its updated path, `beforeRender`, `orientRiggedBone`); no absolute win is claimed. OPEN: this lane did not obtain a separately rebuilt pre-fix screenshot pair at a pinned spawn pose. |
+| wear graphs | `af1fce7`, `93844d52`, `4e8cb9c8`, `47605e1d`: shared family graph nodes use per-material uniforms; the vehicle paint family is clone-safe and cached; the pre-existing coach-glass offset tier is preserved. | VERIFIED: registry graph count is 8 and built-arena graph count is 40 (`npx tsx` structural and `customProgramCacheKey()` census); budget ceiling is 40, lowered from 54. Final in-combat pipeline creation is `pipes+0` for both toggles. OPEN: no absolute JS/FPS win is claimed under the loaded GPU. |
+
+### Bisect measurements
+
+| rung | toggle | JS busy ms/frame | matrix ms/frame | p50 / p95 frame ms | draws | pipelines created |
+|---|---|---:|---:|---:|---:|---:|
+| VERIFIED pre `0123a427` | baseline | 17.86 | 4.12 | 23.60 / 44.20 | 171.3 | 0 |
+| VERIFIED pre `0123a427` | wear | 15.87 | 4.62 | 20.90 / 42.80 | 170.0 | 0 |
+| VERIFIED final `47605e1d` | baseline | 21.08 | 4.09 | 25.50 / 36.00 | 167.4 | 0 |
+| VERIFIED final `47605e1d` | wear | 14.88 | 3.75 | 19.40 / 32.60 | 166.0 | 0 |
+
+VERIFIED: The final presentation telemetry was healthy, the 12 s WebGPU fence did not fail, and every final in-match toggle reported `pipes+0`. The final census was 10,639 nodes / 2,198 auto nodes, with 4,233 killstreak nodes / 279 auto / 0 ms root walk and 906 camera nodes / 199 auto. The pre-lane census was 10,643 / 2,203, 4,233 / 280 / 0 ms, and 906 / 199.
+
+VERIFIED: Final graph probes reported 18 registry materials across 8 distinct graphs and 72 arena node materials across 40 distinct `customProgramCacheKey()` values. The strengthened `src/nuketown2-pipeline-budget.test.ts` and material tests passed.
+
+OPEN: The before/after rows are different short headless sessions with ComfyUI active and are therefore not a claim of an absolute p50, p95, FPS, or JS-busy improvement. The final baseline JS busy value was higher while the final wear rung was lower; treat the per-fix mechanism, census, graph count, pipeline-zero fence and tests as the evidence. OPEN: the requested pinned visual-diff pair was not obtained for this lane; a raw pre/final full-frame comparison was 25.80/255 mean absolute difference and is not presented as visual equivalence because the sessions were not pose-locked.
+
+### Gates
+
+VERIFIED: `npx tsc --noEmit` passed after the final source change. VERIFIED: `npm run build` passed after the final source change. VERIFIED: the exact requested Vitest glob command selected 5 files / 58 tests. VERIFIED: the corrected expanded relevant set covering the nested material, vehicle-forge, cold-precompile and direct killstreak/viewmodel files passed 43 files / 430 tests with 1 skipped file / 2 skipped tests. The earlier coach-glass offset assertion was corrected before this final expanded run.
+
+VERIFIED: Commits `285b28a9`, `9dd2c270`, `af1fce7d`, `93844d52`, `4e8cb9c8`, and `47605e1d` use explicit paths, the `perf(hitl5):` prefix, the required Codex trailer, and were pushed to `origin/contrib/dave-gaming-pc/claude/perf-hitl5`. OPEN: the branch is not a production publication and no `:4300` or release deployment was performed.
