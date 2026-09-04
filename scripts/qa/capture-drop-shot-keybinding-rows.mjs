@@ -1,3 +1,14 @@
+// Captures and measures the drop-shot keybinding HUD rows (PRONE-row hint font size, clipping, and overflow) at the review viewports in headless Chromium, writing one cropped row screenshot per viewport plus a JSON record.
+//
+// Usage: node scripts/qa/capture-drop-shot-keybinding-rows.mjs [--url <url>] [--out-dir <dir>]
+//
+// Flags (process.argv; no environment variables are read):
+//   --url <url>      Base URL of the running build (default: http://127.0.0.1:41997)
+//   --out-dir <dir>  Evidence output directory (default: docs/evidence/pass85/hf412/keybindings)
+//
+// Writes: <out-dir>/key-binding-rows-<viewport-id>-<width>x<height>.png (one per viewport) and <out-dir>/keybinding-rows.json
+//
+// Exit codes: 0 all rows pass, 1 any row fails (set via process.exitCode; no process.exit calls)
 // HF-412 (Lane Y) — the HUD half of the drop shot, inspected rather than assumed.
 //
 // The drop shot's second control is a HOLD of the crouch bind, so it has no
