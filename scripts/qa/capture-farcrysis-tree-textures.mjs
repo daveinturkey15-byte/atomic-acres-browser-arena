@@ -1,4 +1,16 @@
 #!/usr/bin/env node
+// Captures close-up WebGPU screenshots of the farcrysis tree PBR treatment
+// (bark/leaf maps on live instanced tree meshes) plus capture evidence JSON.
+//
+// Usage: node scripts/qa/capture-farcrysis-tree-textures.mjs [--url <base>] [--outDir <dir>]
+// Flags (no environment variables are read):
+//   --url    base URL of the running game build; default http://127.0.0.1:41988
+//   --outDir output directory for captures; default artifacts/qa/farcrysis-tree-textures
+// Writes (under --outDir):
+//   close-trunk-broadleaf.png, close-trunk-kapok.png, close-trunk-coconut.png,
+//   close-leaves-banana.png, close-canopy-broadleaf.png, close-crowns-emergent.png
+//   (only for families with live anchors) and capture-evidence.json
+// Exit codes: 0 = success; 2 = fatal, page not on the WebGPU route (evidence invalid).
 // Lane-local visual verification for the Pass 79 farcrysis tree-species PBR
 // treatment (farcrysis-tree-materials gate). Adapted from
 // verify-arena-boot-cdp.mjs: INSTALLED Chrome (channel:'chrome') headless gets
