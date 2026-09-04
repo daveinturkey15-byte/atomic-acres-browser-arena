@@ -241,6 +241,12 @@ The graph repair now uses the public r185 TSL nodes from the same WebGPU module,
 but a valid on/off capture remains OPEN because the one-pair limit has been
 consumed.
 
+Diagnostic measurements only, not visual acceptance: the interior station
+pair has mean absolute RGB difference **0.4507 / 255** (normalized 0.001767),
+and the shadowed-exterior pair has **1.1058 / 255** (normalized 0.004337).
+Neither change is attributed to SH-L2 because both frames used Low rather than
+the requested Off / High comparison and the earlier graph emitted a TSL error.
+
 **[OPEN] Adoption preflight.** AKP adoption and receipt checks passed for Codex
 on `dave-gaming-pc`, but the repository preflight's branch-convention check is
 not applicable to this Claude-named feature branch. This remains an explicit
@@ -257,4 +263,6 @@ handoff caveat rather than a claimed preflight pass.
 | Existing baked-indirect tests | **[VERIFIED] 4 files included, 26 + 15 SH-L2 predecessor node tests also green** |
 | `src/legacy-main-size-ratchet.test.ts` | **[VERIFIED] 5 passed; 37,100 lines against the unchanged 37,100 ceiling** |
 | `git diff --check` | **[VERIFIED] clean before the post-repair commit** |
+| `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` | **[OPEN] lockfile passed; guard rejected uppercase harness slug** |
+| Same preflight with lowercase `codex` | **[OPEN] guard rejected the intentional `.../claude/...` branch prefix** |
 | Native capture pair | **[OPEN] the only attempt exposed a harness/profile-state error and a pre-repair TSL graph error; no valid visual delta claimed** |
