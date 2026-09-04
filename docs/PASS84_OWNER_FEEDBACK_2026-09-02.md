@@ -1256,3 +1256,36 @@ assets and textures and lighting need to be tip top, raid can come next"
   geometry atm, but nicely playable so thats good" → the ingested skills are
   already the builder's brief; the prompt now forbids flat single-colour
   surfaces anywhere a critic camera can see.
+
+## HF-452 — overnight results, 2026-09-04 05:05
+
+- **Nuke Town tip-top branch** (`nuketown2-tiptop`, head e1ce30f1, 28 commits
+  over PASS 92): round 1 cycles 1–3 (Gemini; road/kerbs/aprons, facade recess,
+  street furniture, interiors + lighting, glazed windows, siding/shingle/fence
+  materials, vehicle detail, pool, breakable-glass/bot-LOS attempt) with critic
+  scores per cycle; round-1 FINAL never ran (GLM and Gemini both hit their
+  quotas 21:12–21:50). **Luna x-high fixed the owner's P0/P1 (HF-448/449):**
+  interior slabs +0.08 m with the ground, lawn and dressing cut out of every
+  house/garage footprint (new house-interior coplanar class = 0, old FINDINGS
+  0, UNAUDITED unchanged at 16), and one collision-only ramp per stair flight
+  (probes up/down, max 1 ungrounded frame, parity gate green). Capture OPEN
+  (GPU < 3 GB while Qwen was awake). Round 2 (cycles 4–6 + final) starts on
+  Gemini after its quota reset; Luna pre-review of the whole branch follows.
+- **Load time:** Luna's skeptic review of `admission-cadence-wait` →
+  SHIP-WITH-FIXES, three hardening commits landed (fail-closed switch probe,
+  insufficient-history coverage). Luna also implemented the second lever on
+  `admission-rehearsal-scope` (new `src/weapon-rehearsal-scheduler.ts`; only
+  held weapons + arena roster rehearsed at admission, the rest deferred to safe
+  windows with a synchronous fallback before an unrehearsed combat switch;
+  legacy-main +88 lines). Both need the morning browser tripwire probe.
+- **Codex:** native AKP re-attestation done (receipt
+  `dave-gaming-pc--codex.json`, trust amber → check PASS, pushed 90863bc).
+- **Qwen:** 4 real deliverables (export finder, gotcha drafts, morning-report
+  skeleton, one comment fix); Luna's experiment diagnosed the empty runs
+  (open-ended multi-file tasks overflow the 65k context → compaction loop) and
+  recommends single-file exact-spec prompts with `--thinking low`.
+- **Gotcha (Codex):** every `codex exec` job hung after printing its done line
+  because config.toml's `notify` hook (`codex-computer-use.exe turn-ended`)
+  blocks on exit; the wrappers never wrote their exit markers and the gated
+  chain stalled from 22:30 to 05:05. Correction: pass `-c notify=[]` on
+  headless runs (applied to the pre-review launcher).
