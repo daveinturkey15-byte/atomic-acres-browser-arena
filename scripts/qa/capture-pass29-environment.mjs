@@ -1,3 +1,28 @@
+/**
+ * Pass 29 environment capture: opens the local game build in headless Chromium (Playwright),
+ * teleports through the authored environment camera views, and captures screenshots plus
+ * render telemetry as evidence.
+ *
+ * Usage: node scripts/qa/capture-pass29-environment.mjs
+ *
+ * Environment variables (no CLI flags, no process.argv):
+ *   BASE_URL       - game URL to capture (default: http://127.0.0.1:4173/)
+ *   RENDER_PROFILE - 'performance' | 'blender' | 'compat' (default: blender)
+ *   FORCE_EFFECTS  - '1' forces ?grass=on&rays=on unless profile is compat (default: off)
+ *   FORCE_SIGNAL   - '1' forces ?signal=on (default: off)
+ *   START_MATCH    - '0' disables solo-match start; any other value keeps it (default: on)
+ *   GRASS_TIME     - grass time value passed to the debug hook (default: 2.5)
+ *   CAPTURE_WIDTH  - capture viewport width in px (default: 1280)
+ *   CAPTURE_HEIGHT - capture viewport height in px (default: 720)
+ *   CAPTURE_VIEWS  - comma-separated view names to capture (default: all authored views)
+ *   OUTPUT_DIR     - output directory (default: artifacts/pass29/<profile>)
+ *
+ * Writes: <OUTPUT_DIR>/<view>.png for each captured view, <OUTPUT_DIR>/telemetry.json,
+ * and a one-line JSON summary to stdout.
+ *
+ * Exit codes: no explicit process.exit calls; 0 on normal completion, 1 on any thrown
+ * error (unsupported profile/viewport, browser/page errors, page errors logged by the game).
+ */
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 
