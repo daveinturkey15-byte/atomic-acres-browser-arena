@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// Scratch debug: boots headless Chrome (WebGPU), loads the local Atomic Acres build, starts a solo match on the Atomic Acres arena, and prints scene-graph/mesh sanity info (mid-coach-torso hierarchy, front wall, world group) as JSON to stdout.
+//
+// Usage: node scripts/qa/hf387-collect-debug.scratch.mjs
+// Flags/env: none (script reads no process.argv, process.env, or --flags; the target URL http://127.0.0.1:41937/?release=latest&renderer=webgpu&render=quality&seed=hf387&previewTime=0 is hardcoded)
+// Writes: nothing (JSON goes to stdout only)
+// Exit codes: no explicit process.exit calls; 0 on success, non-zero from the Node runtime on unhandled rejection
 // Debug the in-page eye-distance function (scratch).
 import { chromium } from '@playwright/test';
 
