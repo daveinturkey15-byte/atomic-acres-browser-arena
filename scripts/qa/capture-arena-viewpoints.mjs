@@ -1,4 +1,27 @@
 #!/usr/bin/env node
+// Arena viewpoint regression CAPTURE: deploys every arena, parks the camera on each authored deterministic review camera, and saves one screenshot per viewpoint/sample plus a manifest pinning the bundle, git SHA, backend and GPU adapter.
+//
+// Usage: node scripts/qa/capture-arena-viewpoints.mjs [flags]
+//   --renderer <name>       render backend to request; default: webgpu
+//   --url <url>             served build to capture; default: http://127.0.0.1:41911
+//   --label <name>          run label; default: null (out dir uses 'unlabeled')
+//   --settle-ms <n>         per-viewpoint settle wait; default: 5000
+//   --per-arena-ms <n>      per-arena time budget; default: 150000
+//   --viewport <WxH>        capture viewport; default: 1280x720
+//   --arenas <a,b>          comma-separated arenas; default: all catalog arenas
+//   --samples <n>           samples per viewpoint; default: 3 (min 1)
+//   --seed <name>           deterministic review seed; default: viewpoint
+//   --serve-dist <dir>      spawn/reap a vite preview of <dir>; default: none
+//   --out <dir>             output directory; default: artifacts/viewpoint-regression/<label|unlabeled>
+//   --sha <sha>             git SHA to pin; default: `git rev-parse HEAD` of cwd
+//   (no environment variables are read)
+//
+// Writes: <out>/<arena>/<cameraId>[.s<sample>].png per sample plus <out>/capture-manifest.json
+//         under the out dir (default artifacts/viewpoint-regression/<label|unlabeled>).
+//
+// Exit codes: 0 = PASS, 1 = FAIL (a viewpoint failed),
+//             2 = INVALID (requested backend not obtained or arena missing from results)
+//             or startup error (unknown --arenas entry, --serve-dist never came up).
 // Arena viewpoint regression — CAPTURE side.
 //
 // Answers "is the game worse than yesterday?" repeatably: deploys every arena,
