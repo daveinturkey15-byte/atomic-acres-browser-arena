@@ -79,3 +79,30 @@ notes, per the HF-418/PASS 89 precedents.
 - TODO: capture the exact-SHA WebGPU review cameras and representative frame
   cost on the owner's approved hardware; this review intentionally ran no
   browser, build, or GPU work.
+
+## Blocking findings fixed
+
+LUNA-REVIEW.md verdict DO-NOT-SHIP (review base `96ac213b`); every item below
+verified against the code on HEAD `d1f31e07`, fixed 2026-09-04 by Muse Spark 1.3.
+No item names a product-code defect, so no product source changed in this pass.
+
+- Finding 1 (OPEN — gates not independently green): FIXED-BY-EVIDENCE.
+  Re-ran all three named gates from a stable install (no `npm.exe` running;
+  `tasklist` shows no concurrent install): `npx tsc --noEmit` clean (empty
+  output, exit 0); Vitest 13 files passed (13) / 176 passed (176) — the
+  twelve-file gate plus `src/collider-visual-parity-gate.test.ts`
+  (`src/legacy-main-size-ratchet.test.ts` is already in the twelve);
+  `npx tsx scripts/qa/find-coplanar-pairs.ts` exit 0 (only FENCED known
+  pairs). Claim-state: VERIFIED.
+- Finding 2 (OPEN — player-visible proof absent): NOT-FIXABLE-HERE. Capture
+  needs a headed WebGPU run; this session carries the same no-browser/no-GPU
+  constraint the review cites. Kept as the TODO below, now anchored to the
+  authored camera rosters with file:line. Claim-state: OPEN (DESIGNED).
+- Finding 3 (VERIFIED — static contract coherent): CONFIRMED against code.
+  Toggle declared `src/graphics-settings-registry.ts:118`, registered
+  `:564` (atmosphere, live), evidenced `:678` against
+  `applyGroundProjectedEnvState` in `src/rendering/ground-projected-env.ts`;
+  options threading is two lines in `src/legacy-main.ts` (`:4489`, `:28816`);
+  feature entry `src/pass65-renderer-feature-inventory.ts:189-192`;
+  `src/graphics-profile-contract.test.ts:54` only adds the new toggle
+  fingerprints — no test, threshold, or gate weakened. Claim-state: VERIFIED.
