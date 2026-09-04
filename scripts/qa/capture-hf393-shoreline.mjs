@@ -1,3 +1,9 @@
+// HF-393/HF-394 shoreline review capture: boots farcrysis on the real WebGPU route in installed Chrome, deploys a solo match, teleports to shoreline vantages and screenshots the reshaped wade shelf and depth-blended water.
+// Usage: node scripts/qa/capture-hf393-shoreline.mjs
+// Env: BASE_URL - application base URL (default http://127.0.0.1:41910)
+// Writes: artifacts/hf393-water-frames/beach-waterline.png, artifacts/hf393-water-frames/wade-shelf.png, artifacts/hf393-water-frames/offshore-inward.png
+// Exit codes: 0 = all frames captured; 2 = page did not come up on the WebGPU backend
+
 // HF-393/HF-394 visual review: boot farcrysis on the real WebGPU route in
 // installed Chrome (same launch contract as verify-arena-boot-cdp.mjs), deploy
 // into a solo match, teleport to shoreline vantages and capture frames of the
