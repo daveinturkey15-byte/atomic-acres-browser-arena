@@ -1357,3 +1357,20 @@ assets and textures and lighting need to be tip top, raid can come next"
   shared node_modules was half-reinstalled by an elevated Codex run and cannot
   be repaired unelevated (EPERM on the rolldown binding); the integration
   branch is checked out in `aa-claude-hotfix` until the owner repairs it.
+
+## HF-455..457 — owner 2026-09-04 08:25 after playing PASS 93
+
+- **HF-455 (standing rule):** "It would be good to get a human in the loop
+  preview before you publish it that's been debugged" → every future pass gets
+  a local HITL build (stock-Chrome gate green first) and the owner's play
+  before publication. PASS 93 was the hotfix exception.
+- **HF-456 (P1, all maps):** "on the Nuke Town map the bot spawns seem to just
+  spawn in 1 or two places; all maps need better spawns for both players and
+  bots, that's a big thing to fix" → spawn-distribution lane: audit every
+  registered arena's player and bot spawn sets and the selection logic; spread
+  spawns (farthest-from-threat, recent-use avoidance, team-side aware), add
+  points where an arena has too few, keep the spawn audits green.
+- **HF-457:** "there's still wild z-fighting on the floor in the houses" and
+  the stairs → confirmed: PASS 93 is hotfix-only; Luna's floor/stair fixes and
+  the visual polish live on `nuketown2-tiptop`, being made shippable now
+  (HITL next, then PASS 94).
