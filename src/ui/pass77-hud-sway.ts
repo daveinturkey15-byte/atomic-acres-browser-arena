@@ -82,6 +82,8 @@
  * the property writes in `applyHudSway`.
  */
 
+import { HUD_MOTION_TARGETS, type HudMotionTargetDefinition } from './surface-registry';
+
 /** Retained lag state. Treat as opaque; construct with `createHudSwayState`. */
 export type HudSwayState = Readonly<{
   /** The "carried" yaw, in radians, trailing the camera. */
@@ -160,6 +162,37 @@ export type HudSwayOutput = Readonly<{
 export type HudSwayTarget = {
   style: { setProperty(property: string, value: string): void };
 };
+
+export type HudMotionTargets = Readonly<{
+  all: readonly HudSwayTarget[];
+  sway: readonly HudSwayTarget[];
+  health: HudSwayTarget;
+}>;
+
+/**
+ * Resolve the frame-driven HUD targets once after the shell has been built.
+ * Nothing in the frame loop queries the DOM; all later writes use these stable
+ * references. The registry is intentionally the source of the target count.
+ */
+export function createHudMotionTargets(root: ParentNode): HudMotionTargets {
+  const resolved = HUD_MOTION_TARGETS.map((definition: HudMotionTargetDefinition) => {
+    const target = root.querySelector<HTMLElement>(definition.selector);
+    if (!target) throw new Error(`Missing HUD motion target ${definition.id} (${definition.selector})`);
+    return target;
+  });
+  const sway = HUD_MOTION_TARGETS.reduce<HudSwayTarget[]>((targets, definition, index) => {
+    if (definition.role === 'sway') targets.push(resolved[index]!);
+    return targets;
+  }, []);
+  const healthIndex = HUD_MOTION_TARGETS.findIndex(({ role }) => role === 'health');
+  const health = healthIndex >= 0 ? resolved[healthIndex] : undefined;
+  if (!health) throw new Error('HUD motion registry has no health target');
+  return Object.freeze({
+    all: Object.freeze(resolved),
+    sway: Object.freeze(sway),
+    health,
+  });
+}
 
 /**
  * Lag time constant. 90 ms is deliberately short: AGENTS.md requires HUD
@@ -395,7 +428,7 @@ function serialise(value: number): string {
  * This is the one call the frame loop makes. It returns the next state, which
  * the caller retains:
  *
- *   hudSway = applyHudSway(hudRoot, hudSway, { yaw, pitch, speed, deltaMs });
+ *   hudSway = applyHudSway(hudMotionTargets, hudSway, { yaw, pitch, speed, deltaMs });
  */
 /**
  * HF-491 (perf lane 4): the last string actually written for each custom
@@ -419,6 +452,10 @@ function serialise(value: number): string {
  */
 const lastWrittenHudProperties = new WeakMap<HudSwayTarget, Map<string, string>>();
 
+function eachSwayTarget(target: HudSwayTarget | HudMotionTargets): readonly HudSwayTarget[] {
+  return 'sway' in target ? target.sway : [target];
+}
+
 function writeHudProperty(target: HudSwayTarget, property: string, value: string): void {
   let written = lastWrittenHudProperties.get(target);
   if (!written) {
@@ -440,15 +477,17 @@ export function setHudProperty(target: HudSwayTarget, property: string, value: s
 }
 
 export function applyHudSway(
-  target: HudSwayTarget,
+  target: HudSwayTarget | HudMotionTargets,
   state: HudSwayState,
   sample: HudSwaySample,
 ): HudSwayState {
   const next = sampleHudSway(state, sample);
-  writeHudProperty(target, '--hud-sway-x', serialise(next.swayX));
-  writeHudProperty(target, '--hud-sway-y', serialise(next.swayY));
-  writeHudProperty(target, '--hud-breathe', serialise(next.breathe));
-  writeHudProperty(target, '--hud-gait', serialise(next.gait));
+  for (const swayTarget of eachSwayTarget(target)) {
+    writeHudProperty(swayTarget, '--hud-sway-x', serialise(next.swayX));
+    writeHudProperty(swayTarget, '--hud-sway-y', serialise(next.swayY));
+    writeHudProperty(swayTarget, '--hud-breathe', serialise(next.breathe));
+    writeHudProperty(swayTarget, '--hud-gait', serialise(next.gait));
+  }
   return next.state;
 }
 
@@ -458,9 +497,11 @@ export function applyHudSway(
  * left frozen on screen. The CSS gates already zero the transform under both
  * reduced-motion switches; this exists for the runtime-side cases.
  */
-export function releaseHudSway(target: HudSwayTarget): void {
-  writeHudProperty(target, '--hud-sway-x', '0');
-  writeHudProperty(target, '--hud-sway-y', '0');
-  writeHudProperty(target, '--hud-breathe', '0');
-  writeHudProperty(target, '--hud-gait', '0');
+export function releaseHudSway(target: HudSwayTarget | HudMotionTargets): void {
+  for (const swayTarget of eachSwayTarget(target)) {
+    writeHudProperty(swayTarget, '--hud-sway-x', '0');
+    writeHudProperty(swayTarget, '--hud-sway-y', '0');
+    writeHudProperty(swayTarget, '--hud-breathe', '0');
+    writeHudProperty(swayTarget, '--hud-gait', '0');
+  }
 }

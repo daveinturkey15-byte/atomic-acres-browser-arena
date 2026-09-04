@@ -7,6 +7,38 @@ export type UiSurfaceDefinition = Readonly<{
   critical: boolean;
 }>;
 
+export const HUD_MOTION_PROPERTIES = Object.freeze([
+  '--hud-sway-x', '--hud-sway-y', '--hud-breathe', '--hud-gait', '--hud-health',
+] as const);
+
+export type HudMotionProperty = typeof HUD_MOTION_PROPERTIES[number];
+
+export type HudMotionTargetDefinition = Readonly<{
+  id: string;
+  selector: string;
+  role: 'sway' | 'health';
+  properties: readonly HudMotionProperty[];
+}>;
+
+/**
+ * The frame-driven HUD custom properties are written directly on the elements
+ * whose rules consume them. Keep this registry beside the typed surface
+ * inventory so markup, CSS and the runtime agree on the invalidation boundary.
+ */
+export const HUD_MOTION_TARGETS: readonly HudMotionTargetDefinition[] = Object.freeze([
+  { id: 'mission-console', selector: '.hud-mission-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'map-console', selector: '.hud-map-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'operator-console', selector: '.hud-operator-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'weapon-console', selector: '.hud-weapon-console', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'support-block', selector: '#support-block', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'killfeed', selector: '#killfeed', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'damage-feeds', selector: '#damage-feeds', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'pause-hint', selector: '#pause-hint', role: 'sway', properties: HUD_MOTION_PROPERTIES.slice(0, 4) },
+  { id: 'health-fill', selector: '#health-fill', role: 'health', properties: ['--hud-health'] },
+]);
+
+export const HUD_MOTION_TARGET_COUNT = HUD_MOTION_TARGETS.length;
+
 export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freeze([
   { id: 'deployment-shell', rootElementId: 'menu', renderer: 'main-shell', critical: true },
   { id: 'field-kit-panel', rootElementId: 'menu-panel-kit', renderer: 'main-shell', critical: true },

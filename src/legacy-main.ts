@@ -84,7 +84,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
 import { RainPresentation } from './weather/rain-presentation';
-import { applyHudSway, createHudSwayState, releaseHudSway, setHudProperty, type HudSwayState } from './ui/pass77-hud-sway';
+import { applyHudSway, createHudMotionTargets, createHudSwayState, releaseHudSway, setHudProperty, type HudMotionTargets, type HudSwayState } from './ui/pass77-hud-sway';
 import {
   advanceHudImpact,
   createHudImpactState,
@@ -1807,6 +1807,7 @@ let matchPauseBackdropFallbackCount = 0;
 let matchPauseSourceCaptureAttemptCount = 0;
 let matchPauseSourceCaptureCount = 0;
 const hudRoot = element<HTMLElement>('#hud');
+const hudMotionTargets: HudMotionTargets = createHudMotionTargets(hudRoot);
 // HF-370: the owner asked for a HUD that is not "pinned directly to the
 // screen". Clusters lag the camera slightly; crosshair and hitmarker never
 // move, because those are combat surfaces.
@@ -16887,7 +16888,7 @@ function syncMenuLifecyclePresentation(): void {
   // neutral pose once, outside the frame loop, respecting the ineligible-frame
   // contract (no per-frame HUD writes; one latched write per transition).
   if (menuLifecycle.surface !== 'hidden' && !hudSwayReleased) {
-    releaseHudSway(hudRoot);
+    releaseHudSway(hudMotionTargets);
     hudSway = createHudSwayState(player.yaw, player.pitch);
     hudSwayReleased = true;
   }
@@ -31607,7 +31608,7 @@ function frame(now: number, scheduleNext = true): void {
     && player.hp > 0
     && !localKillstreakActorSnapshot()?.possession;
   if (hudSwayLive) {
-    hudSway = applyHudSway(hudRoot, hudSway, {
+    hudSway = applyHudSway(hudMotionTargets, hudSway, {
       yaw: player.yaw,
       pitch: player.pitch,
       speed: Math.hypot(player.velocity.x, player.velocity.z),
@@ -31617,14 +31618,14 @@ function frame(now: number, scheduleNext = true): void {
   } else if (!hudSwayReleased) {
     // Latched: write the neutral pose once, then leave the properties alone
     // so a paused HUD is not re-writing four custom properties every frame.
-    releaseHudSway(hudRoot);
+    releaseHudSway(hudMotionTargets);
     hudSway = createHudSwayState(player.yaw, player.pitch);
     hudSwayReleased = true;
   }
   // HF-491 perf lane 4: same dirty-flag path as the sway writes - a
-  // byte-identical registered-custom-property write still invalidates style
-  // for the whole 245-element HUD subtree, and health is constant most frames.
-  setHudProperty(hudRoot, '--hud-health', (Math.max(0, player.hp) / 100).toFixed(3));
+  // Health is a direct write to its sole consuming element; the five frame-
+  // driven properties never live on the 245-element HUD root.
+  setHudProperty(hudMotionTargets.health, '--hud-health', (Math.max(0, player.hp) / 100).toFixed(3));
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   UI_HIGH_DPI_REVIEW_VIEWPORT,
+  HUD_MOTION_TARGET_COUNT,
+  HUD_MOTION_TARGETS,
   UI_MOBILE_REVIEW_VIEWPORTS,
   UI_REVIEW_VIEWPORTS,
   UI_STATE_INVENTORY,
@@ -17,6 +19,7 @@ const generatedDialogSources = [
 ].join('\n');
 const rendererSources = `${mainSource}\n${generatedDialogSources}`;
 const tacticalCssSource = readFileSync(new URL('./tactical-ui.css', import.meta.url), 'utf8');
+const hudMotionCssSource = readFileSync(new URL('./pass77-instrument-hud.css', import.meta.url), 'utf8');
 
 function cssHexToken(name: string): string {
   const match = tacticalCssSource.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`));
@@ -39,6 +42,25 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 describe('Pass 64 typed UI surface contract', () => {
+  it('keeps frame-driven HUD properties on their direct consuming targets', () => {
+    expect(HUD_MOTION_TARGETS).toHaveLength(HUD_MOTION_TARGET_COUNT);
+    expect(HUD_MOTION_TARGETS.filter(({ role }) => role === 'sway')).toHaveLength(8);
+    expect(HUD_MOTION_TARGETS.filter(({ role }) => role === 'health')).toHaveLength(1);
+    expect(HUD_MOTION_TARGETS.map(({ selector }) => selector)).toEqual([
+      '.hud-mission-console', '.hud-map-console', '.hud-operator-console',
+      '.hud-weapon-console', '#support-block', '#killfeed', '#damage-feeds',
+      '#pause-hint', '#health-fill',
+    ]);
+    for (const target of HUD_MOTION_TARGETS) {
+      expect(rendererSources).toMatch(target.selector.startsWith('#')
+        ? new RegExp(`id=["']${target.selector.slice(1)}["']`, 'u')
+        : new RegExp(`class=["'][^"']*${target.selector.slice(1)}[^"']*["']`, 'u'));
+      for (const property of target.properties) {
+        expect(hudMotionCssSource).toMatch(new RegExp(`@property ${property} \\{[\\s\\S]*?inherits: false;`, 'u'));
+      }
+    }
+  });
+
   it('assigns every typed surface to one renderer and one unique DOM root', () => {
     const surfaceIds = UI_SURFACE_INVENTORY.map((surface) => surface.id);
     const rootIds = UI_SURFACE_INVENTORY.map((surface) => surface.rootElementId);

@@ -2,7 +2,11 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
-import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
+import {
+  HUD_MOTION_TARGETS,
+  UI_HIGH_DPI_REVIEW_VIEWPORT,
+  UI_REVIEW_VIEWPORTS,
+} from '../../src/ui/surface-registry';
 import { ARENA_SELECTIONS, SELECTABLE_ARENAS } from '../../src/map-selection';
 import { GRAPHICS_PROFILE_DESCRIPTIONS } from '../../src/ui/graphics-profile-descriptions';
 import { RTX_NATIVE_RUNTIME_OPTION_LABEL } from '../../src/ui/rtx-native-runtime-explainer';
@@ -96,6 +100,26 @@ async function refreshPausedCanvasAfterViewportChange(page: Page): Promise<void>
 }
 
 test.describe('Pass 64 command HUD and menu contract', () => {
+  test('keeps frame-driven HUD variables on their consuming elements', async ({ page }) => {
+    test.setTimeout(90_000);
+    await ready(page);
+    await startDeterministicSolo(page);
+    const writes = await page.evaluate((definitions) => definitions.map((definition) => ({
+      selector: definition.selector,
+      role: definition.role,
+      properties: definition.properties.map((property) => ({
+        property,
+        value: document.querySelector<HTMLElement>(definition.selector)!.style.getPropertyValue(property),
+      })),
+    })), HUD_MOTION_TARGETS);
+    const rootWrites = await page.evaluate((properties) => properties.map((property) => ({
+      property,
+      value: document.querySelector<HTMLElement>('#hud')!.style.getPropertyValue(property),
+    })), HUD_MOTION_TARGETS.flatMap(({ properties }) => properties));
+    expect(rootWrites).toEqual(rootWrites.map(({ property }) => ({ property, value: '' })));
+    expect(writes.every(({ properties }) => properties.every(({ value }) => value !== ''))).toBe(true);
+  });
+
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
     const cards = page.locator('.map-card');
