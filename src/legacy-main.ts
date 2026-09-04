@@ -60,6 +60,7 @@ import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } f
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
 import { wrapAngleRadians } from './animation-additive-pose';
+import { setOperatorLookRenderBackend } from './operator-skin-tsl-materials'; // PASS 94
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
@@ -2007,6 +2008,11 @@ const gpuRetirement = createGpuRetirementScheduler({
 const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
 const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
+// PASS 94. The procedural operator looks are TSL node graphs, which only the
+// node-capable renderer evaluates; declaring the backend once here is what lets
+// `materialForTeam` choose between them and the shipped tinted path. Fail-closed:
+// until this runs, the tinted path is used.
+setOperatorLookRenderBackend(renderRuntime.backend);
 // (2026-08-30) The sticky WebGL2 fallback banner is retired with the
 // fallback itself - the renderer is WebGPU or an honest requirement screen.
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
