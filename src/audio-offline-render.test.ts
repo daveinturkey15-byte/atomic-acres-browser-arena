@@ -8,6 +8,7 @@ import {
   measureOfflineAudio,
   type OfflineAudioCategory,
 } from './audio-offline-render';
+import { GAME_MUSIC_COMBAT_DUCK_GAIN } from './chiptune-music';
 
 const CATEGORIES: readonly OfflineAudioCategory[] = ['weapons', 'movement', 'impacts', 'ui', 'music'];
 
@@ -33,7 +34,7 @@ describe('procedural audio offline render acceptance', () => {
     expect(metrics.weapons.peak).toBeGreaterThan(metrics.impacts.peak);
     expect(metrics.impacts.peak).toBeGreaterThan(metrics.movement.peak);
     expect(metrics.movement.peak).toBeGreaterThan(metrics.ui.peak);
-    expect(metrics.music.rms * 0.24).toBeLessThan(metrics.movement.rms);
+    expect(metrics.music.rms * GAME_MUSIC_COMBAT_DUCK_GAIN).toBeLessThan(metrics.movement.rms);
     // Kept as a compact receipt when this focused gate is run by a reviewer.
     console.info(`OFFLINE_AUDIO_METRICS ${JSON.stringify(metrics)}`);
     const baseline = Object.fromEntries(CATEGORIES.map((category) => {

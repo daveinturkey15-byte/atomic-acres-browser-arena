@@ -26,6 +26,10 @@ export const MINOR_PENTATONIC_SEMITONES = Object.freeze([0, 3, 5, 7, 10]);
 export const PREVIOUS_GAME_MUSIC_BUS_GAIN = 0.054;
 // HF-430: -6 dB halving of music gain (0.054 -> 0.027)
 export const GAME_MUSIC_BUS_GAIN = 0.027;
+// Runtime note staging and combat ducking coefficients. Keep these exported
+// so the offline acceptance contract can assert the live graph arithmetic.
+export const GAME_MUSIC_NOTE_GAIN_SCALE = 2.25;
+export const GAME_MUSIC_COMBAT_DUCK_GAIN = 0.24;
 
 export type ChiptuneChannel = 'lead' | 'bass';
 export type ChiptuneTrackId =

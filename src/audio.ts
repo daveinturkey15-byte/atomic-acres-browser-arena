@@ -13,6 +13,8 @@ import {
   type ChiptuneEvent,
   type ChiptuneTrackId,
   GAME_MUSIC_BUS_GAIN,
+  GAME_MUSIC_COMBAT_DUCK_GAIN,
+  GAME_MUSIC_NOTE_GAIN_SCALE,
   advanceMultiTrackSchedule,
 } from './chiptune-music';
 import { ARENA_AUDIO_DEFINITIONS, AUDIO_RUNTIME_BUDGET, selectVoiceToSteal, type FootstepMovement, type FootstepSurface as SpatialFootstepSurface, type SpatialPoint } from './spatial-audio';
@@ -60,10 +62,6 @@ import {
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
 ) as Record<WeaponId, number>);
-
-/** The bus stays at its pinned settings coefficient; authored note gain makes
- * the bed audible, while the combat ducker keeps it out of the report space. */
-const GAME_MUSIC_PERFORMANCE_GAIN = 2.25;
 
 export const EXPLOSION_AUDIO_COALESCE_MS = 90;
 
@@ -1589,7 +1587,7 @@ export class ArenaAudio {
     try {
       channel.osc.frequency.setValueAtTime(event.frequencyHz, atSeconds);
       channel.gain.gain.setValueAtTime(0, atSeconds);
-      const noteGain = Math.min(0.72, event.gain * GAME_MUSIC_PERFORMANCE_GAIN);
+      const noteGain = Math.min(0.72, event.gain * GAME_MUSIC_NOTE_GAIN_SCALE);
       channel.gain.gain.linearRampToValueAtTime(noteGain, peak);
       // Ramp to a small floor rather than 0: exponential ramps reject zero, and a
       // hard cut to silence on a square wave clicks audibly.
@@ -4100,7 +4098,7 @@ export class ArenaAudio {
     const duration = Math.max(0.08, Math.min(1.2, durationSeconds));
     ducker.gain.cancelScheduledValues(now);
     ducker.gain.setValueAtTime(Math.min(1, ducker.gain.value), now);
-    ducker.gain.setTargetAtTime(0.24, now, 0.012);
+    ducker.gain.setTargetAtTime(GAME_MUSIC_COMBAT_DUCK_GAIN, now, 0.012);
     ducker.gain.setTargetAtTime(1, now + duration, 0.12);
   }
 
