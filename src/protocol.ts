@@ -58,6 +58,12 @@ import {
   isTaserProtocolMessage,
   type TaserProtocolMessage,
 } from './taser-protocol';
+// HF-504: lobby/room flow. `lobby-roles.ts` is a leaf (types only from
+// private-match.ts), so importing it here creates no runtime cycle.
+import {
+  isLobbyKickMessage,
+  type LobbyKickMessage,
+} from './lobby-roles';
 import {
   isTimedMapWeaponProtocolMessage,
   type TimedMapWeaponProtocolMessage,
@@ -652,6 +658,8 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
   | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | EmoteMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage | TaserProtocolMessage
+  // HF-504: host -> room, "this peer is removed".
+  | LobbyKickMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
   | StickyAttachedMessage
   // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
@@ -791,6 +799,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isSmokeProtocolMessage(value)) return true;
   if (isFlashProtocolMessage(value)) return true;
   if (isTaserProtocolMessage(value)) return true; // HF-458
+  if (isLobbyKickMessage(value)) return true; // HF-504
   if (isTimedMapWeaponProtocolMessage(value)) return true;
   if (isFlarePresentationProtocolMessage(value)) return true;
   if (isBotWeaponPresentationMessage(value)) return true;
@@ -1315,6 +1324,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
   if (isFlashProtocolMessage(message)) return message.by === playerId;
   if (isTaserProtocolMessage(message)) return message.by === playerId;
+  if (isLobbyKickMessage(message)) return message.by === playerId; // HF-504
   if (isTimedMapWeaponProtocolMessage(message)) return message.by === playerId;
   if (isFlarePresentationProtocolMessage(message)) return message.by === playerId;
   if (isBotWeaponPresentationMessage(message)) return message.by === playerId;
@@ -1401,6 +1411,9 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     // HF-458: the taser stun is host-authored exactly like the flash result, so
     // a guest may never mint one and network.ts drops it on a guest connection.
     || isTaserProtocolMessage(message)
+    // HF-504: a kick is host-authored, so network.ts drops one arriving on a
+    // guest connection. A guest may never remove another player from the room.
+    || isLobbyKickMessage(message)
     || message.type === 'interactive-world-snapshot'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'

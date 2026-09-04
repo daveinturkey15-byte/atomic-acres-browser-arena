@@ -820,6 +820,13 @@ import {
   shouldAutoSendLoaded,
   waitingRoomGuidance,
 } from './lobby-countdown';
+// HF-504 lobby/room flow — roles, host controls, the guest-side rolling snapshot
+// copy, the host-changed notice. Every decision lives in the module; call sites only here.
+import {
+  authorizeLobbyKick, authorizeRoomClose, guestShouldHonorKick, hostChangedNotice, kickNotice,
+  planLobbyKick, promoteRetained, resolveSeatRole, retainLobbySnapshot, seatRoleHint, seatRoleLabel,
+  type LobbyKickMessage, type LobbyKickReason, type RetainedLobbySnapshot,
+} from './lobby-roles';
 import {
   MAX_AUTHORITATIVE_REWIND_MS,
   MAX_PROJECTILE_SHOT_FIRE_AGE_MS,
@@ -6142,6 +6149,8 @@ let rareWeaponMinimapPing: { position: readonly [number, number, number]; untilM
 let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
+/** HF-504: guest-side rolling copy of the newest host-authored lobby snapshot. */
+let retainedLobbySnapshot: RetainedLobbySnapshot | null = null;
 let privateLobbyRevision = 0;
 // HF-325 succession state. `hostSuccessionPublisher` is only meaningful while
 // role === 'host'; `successorHoldings` only while role === 'client'.
@@ -7233,12 +7242,22 @@ let lastMirrorAccept: { accepted: boolean; reason: string } | null = null;
  */
 function adoptMirroredHostAuthority(checkpoint: HostMatchCheckpoint): void {
   if (network.role !== 'host' || checkpoint.roomCode !== network.roomCode) return;
-  if (!initializeRecoveredHostLobby(checkpoint)) {
-    // Fail closed: a promoted host that cannot adopt the ledger owns nothing.
-    setStatus('Promoted, but the mirrored match state could not be adopted. Room closed.', 'error');
-    network.announceLobbyClosed('host-superseded');
-    network.close();
+  if (initializeRecoveredHostLobby(checkpoint)) return;
+  // HF-504 fallback, reached only by a peer whose promotion was ALREADY authorized (mandate,
+  // term fence, roster re-election): the mirror could not be adopted, so keep the room alive
+  // from this peer's rolling snapshot copy instead. Widens an authorized promotion, never mints one.
+  const fallback = promoteRetained(retainedLobbySnapshot, player.id);
+  if (fallback.promoted) {
+    privateLobbySnapshot = fallback.snapshot;
+    for (const member of fallback.snapshot.members) hostLobbyMembers.set(member.id, member);
+    broadcastHostLobby(fallback.snapshot.phase);
+    setStatus('Promoted without the mirrored ledger — room continued from the last shared snapshot.', 'warn');
+    return;
   }
+  // Fail closed: a promoted host that cannot adopt the ledger owns nothing.
+  setStatus('Promoted, but the mirrored match state could not be adopted. Room closed.', 'error');
+  network.announceLobbyClosed('host-superseded');
+  network.close();
 }
 
 /**
@@ -10495,6 +10514,16 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     && (gameStarted || matchStartPreparing)
     && previousSnapshot?.phase !== 'waiting';
   const endingFromHost = message.snapshot.phase === 'ended' && gameStarted && matchState.phase !== 'ended';
+  // HF-504: every guest keeps a rolling copy of the newest host-authored
+  // snapshot (by REVISION, so a replay cannot walk it backwards) and narrates a
+  // host change the same way on every peer. The copy is the succession
+  // FALLBACK — host-authority-mirror stays primary and is richer.
+  retainedLobbySnapshot = retainLobbySnapshot(retainedLobbySnapshot, message.snapshot, Date.now());
+  const migrationNotice = hostChangedNotice({
+    previousHostId: previousSnapshot?.hostId ?? message.snapshot.hostId,
+    newHostId: message.snapshot.hostId, localPlayerId: player.id, members: message.snapshot.members,
+  });
+  if (migrationNotice !== null) { setStatus(migrationNotice, 'warn'); addFeed('HOST CHANGED', 'coral'); }
   privateLobbySnapshot = message.snapshot;
   syncRemoteOperatorStances(); // HF-382: stance changes land on live rigs mid-match
   if (message.snapshot.phase === 'waiting') {
@@ -10568,7 +10597,41 @@ function acceptRedeployCommit(message: RedeployCommitMessage): void {
   trimNonceSet();
 }
 
+/**
+ * HF-504 host control. Authorization is asked a SECOND time here, on the LIVE snapshot,
+ * because the button that called this was rendered from one that may already be stale.
+ * Removal is the existing voluntary-leave cleanup — rejoin credential forgotten.
+ */
+function hostKickMember(targetId: string, reason: LobbyKickReason = 'host-removed'): boolean {
+  const plan = planLobbyKick({
+    role: network.role, snapshot: privateLobbySnapshot, actorId: player.id, targetId, reason, nonce: randomNonce(),
+  });
+  if (!plan.ok) { setStatus(`Kick refused (${plan.reason}).`, 'warn'); return false; }
+  network.send(plan.message);
+  handleLobbyMessage({ type: 'leave', playerId: targetId, voluntary: true });
+  window.setTimeout(() => network.disconnectPlayer(targetId), 75);
+  return true;
+}
+
+/** Guest half of HF-504: honoured only from the host this peer believes in,
+ * and only when it names this peer. Leaves by the lobby-reject path. */
+function acceptLobbyKick(message: LobbyKickMessage): void {
+  if (network.role !== 'client'
+    || !guestShouldHonorKick(message, { currentHostId: privateLobbySnapshot?.hostId ?? '', localPlayerId: player.id })) return;
+  setStatus(kickNotice(message.reason), 'error');
+  invalidateMatchAdmission(`Removed from the room by the host (${message.reason})`);
+  network.close();
+  privateLobbySnapshot = null;
+  renderPrivateLobby();
+  resetTextChat();
+  syncArenaSelectionUi();
+}
+
 function handleLobbyMessage(message: GameMessage): boolean {
+  if (message.type === 'lobby-kick') {
+    acceptLobbyKick(message); // HF-504; host-authority, so a guest can never mint one.
+    return true;
+  }
   // HF-325. These arrive only from the host: all three are
   // isHostAuthorityMessage, so network.ts drops any of them sent by a guest.
   if (message.type === 'host-succession-mandate') {
@@ -11025,13 +11088,23 @@ function renderPrivateLobby(): void {
   const renderedMembers = members.map((member) => {
     const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
     const quality = latencyQuality(ping);
-    const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
+    // HF-504: one module resolves the seat role, so the badge, its tooltip and
+    // the kick affordance cannot disagree about who this peer is. The KICK
+    // button is an OFFER only — hostKickMember authorizes again on the click.
+    const seatRole = resolveSeatRole({
+      hostId: snapshot?.hostId ?? (network.role === 'host' ? player.id : ''), memberId: member.id,
+      connected: member.connected, ready: member.ready, phase: snapshot?.phase ?? 'waiting',
+    });
+    const role = seatRoleLabel(seatRole);
+    const kickControl = snapshot !== null && authorizeLobbyKick({ role: network.role, snapshot, actorId: player.id, targetId: member.id }).ok
+      ? `<button type="button" class="lobby-kick" data-lobby-kick="${escapeHtml(member.id)}" title="Remove ${escapeHtml(member.name)} from this room.">KICK</button>`
+      : '';
     const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
     const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
     const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
       ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
       : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
+    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}" data-seat-role="${seatRole}"><span><strong>${escapeHtml(member.name)}</strong><small title="${escapeHtml(seatRoleHint(seatRole))}">${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em>${kickControl}</div>`;
   }).join('');
   // HF-323: show PLAYER JOINING... roster row so host understands the wait
   const pendingRow = pendingGuest
@@ -30604,6 +30677,11 @@ element<HTMLButtonElement>('#lobby-ready').addEventListener('click', (event) => 
   if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
   else if (network.role === 'client') network.send({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
 });
+// HF-504: delegated so the KICK buttons survive every roster re-render.
+element<HTMLElement>('#lobby-roster').addEventListener('click', (event) => {
+  const targetId = (event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-lobby-kick]') : null)?.dataset.lobbyKick;
+  if (targetId) hostKickMember(targetId);
+});
 element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
   const select = event.target instanceof HTMLSelectElement && event.target.matches('[data-lobby-dhv]') ? event.target : null;
   if (!select || !privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
@@ -30760,7 +30838,13 @@ renderOperatorAppearance();
 // identity is prescribed - so there are no change events to bind here. Squad identity
 // is committed by the team-assignment path instead.
 element<HTMLButtonElement>('#lobby-reset').addEventListener('click', () => {
-  if (network.role !== 'host') return;
+  if (network.role !== 'host') return; // Pass 72 contract: the literal host guard stays first.
+  // HF-504 adds the second, room-side check the kick control also asks: a superseded
+  // ex-host still reads role === 'host' locally for a few frames and must not close.
+  const close = authorizeRoomClose({
+    role: network.role, actorId: player.id, hostId: privateLobbySnapshot?.hostId ?? player.id,
+  });
+  if (!close.ok) { setStatus(`Close refused (${close.reason}).`, 'warn'); return; }
   if (!clearLastHostedRoomCode(clientPersistentStorage())) {
     setStatus('Saved room recovery could not be invalidated; fresh-code reset cancelled.', 'error');
     return;
