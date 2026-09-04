@@ -47,8 +47,9 @@ what is left after them.
 ## 1. The whole plan, re-measured against the aerial anchors
 
 Measured by running `npx tsx` against `src/nuketown2-layout.ts` and printing, not from memory.
-`L` = `NUKETOWN2_STREET_LENGTH` = 36 m. The reference column is FINDINGS Q4 and the schematic's
-first-party minimap pixel ratios.
+`L` = `NUKETOWN2_STREET_LENGTH` = 36 m. The numeric reference column is the lane's existing
+R4 measurement sheet. The copied FINDINGS document supplies qualitative topology/chirality anchors,
+but contains no numeric scale ratios, so it cannot independently correct these figures.
 
 | Anchor | Reference (L) | Ours before (L) | Ours after (L) | Delta | State |
 |---|---|---|---|---|---|
@@ -63,7 +64,8 @@ first-party minimap pixel ratios.
 | Truck length, box + cab | 0.325 | 0.3250 | 0.3250 | 0 | VERIFIED, untouched |
 | Truck z south of the centre-line | 0.076 | 0.0764 | 0.0764 | +0.5 % | VERIFIED, untouched |
 
-**Every anchor the reference actually measures is unchanged by this pass.** The one number that
+**Every R4 anchor the lane actually measures is unchanged by this pass.** FINDINGS supplies no
+numeric scale anchor that changes the table. The one number that
 moved - the truck's seat *along* the bulb - is one no reference measurement pins; HF-477
 authored it, and authored it off the wrong end of the vehicle.
 
@@ -388,3 +390,23 @@ BEFORE coach off-asphalt m2 1.2819
 BEFORE truck box off m2    0.0000
 BEFORE truck cab off m2    0.0000
 ```
+
+## Follow-ups
+
+- **VERIFIED** — text-only `FINDINGS.md` and `manifest.json` were copied from
+  `origin/contrib/dave-gaming-pc/claude/research-2026-09-04`; `PROVENANCE.md` records
+  the source branch and intentionally excludes reference images. `FINDINGS.md` matches
+  the source Git object; `manifest.json` has the same source text with the normal
+  worktree final-newline normalization.
+- **VERIFIED** — the FINDINGS cross-check found no numeric scale anchors: it provides
+  qualitative topology, chirality, and open questions only. Corrections to the numeric
+  measurements table: **none**. The table remains tied to the lane's existing R4
+  measurement sheet; bulb diameter remains **OPEN** because FINDINGS does not measure it.
+- **VERIFIED** — `npx tsc --noEmit` passed; the requested fidelity/roof/collider/size
+  Vitest command passed 47 tests in 3 files, the lane's original 9-file gate passed
+  80 tests, and `find-coplanar-pairs.ts` reported HOUSE-INTERIOR 0, STREET 0, and
+  FINDINGS 0.
+- **OPEN** — inherited `src/walkable-surface-parity-gate.test.ts` still has the three
+  documented roof/panel/band failures at the merge base; no threshold or fence was weakened.
+- **OPEN** — the report's inherited vehicle-envelope and lune-pocket items remain
+  unresolved; this follow-up did not claim a visual capture or pave geometry it did not measure.
