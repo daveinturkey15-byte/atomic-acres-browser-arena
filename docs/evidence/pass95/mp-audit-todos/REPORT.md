@@ -1,9 +1,9 @@
 # Pass 95 — HF-504 multiplayer audit TODO lane
 
-Date: 2026-09-04  
-Lane: `contrib/dave-gaming-pc/claude/mp-audit-todos`  
-Base: `origin/contrib/dave-gaming-pc/claude/mp-audit-hf504`  
-Arena: `nuketown2`  
+Date: 2026-09-04
+Lane: `contrib/dave-gaming-pc/claude/mp-audit-todos`
+Base: `origin/contrib/dave-gaming-pc/claude/mp-audit-hf504`
+Arena: `nuketown2`
 Runtime: three headless Chrome peers, native WebGPU, ports 4217/4218, clean impairment
 
 ## Claim-state summary
