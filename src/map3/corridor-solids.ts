@@ -38,7 +38,7 @@
  * and the audit will say so.
  */
 
-/** Ballistic material ids the corridors' solids use. Mirrors BallisticMaterialId. */
+/** Ballistic material ids the corridors' solids use; SOLID_BALLISTICS in map3-arena.ts maps them onto BallisticMaterialId. */
 export type CorridorSolidMaterial = 'wood' | 'stone' | 'glass' | 'metal';
 
 export type CorridorSolid = Readonly<{
