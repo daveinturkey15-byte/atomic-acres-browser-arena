@@ -196,15 +196,15 @@ describe('nuketown2 material registry', () => {
 
   it('keeps the two houses on the base hexes the fidelity gate pins', () => {
     const registry = createNuketown2MaterialRegistry();
-    expect((registry.sidingA as THREE.MeshStandardMaterial).color.getHex()).toBe(0x46809f);
-    expect((registry.sidingB as THREE.MeshStandardMaterial).color.getHex()).toBe(0xf4be36);
+    expect(registry.sidingA.color.getHex()).toBe(0x46809f);
+    expect(registry.sidingB.color.getHex()).toBe(0xf4be36);
   });
 
   it('keeps the coach glazing band a dielectric', () => {
     // It shipped at metalness 0.5, which is a coloured metal band, not glass.
     const registry = createNuketown2MaterialRegistry();
-    expect((registry.coachGlass as THREE.MeshStandardMaterial).metalness).toBe(0);
+    expect(registry.coachGlass.metalness).toBe(0);
     // Opaque, so it stays out of the transparent queue it was never in.
-    expect((registry.coachGlass as THREE.MeshStandardMaterial).transparent).toBe(false);
+    expect(registry.coachGlass.transparent).toBe(false);
   });
 });

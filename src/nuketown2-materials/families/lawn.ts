@@ -26,7 +26,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, groundUv, linearSwatch } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 
 const { abs, clamp, float, fract, mix, positionWorld, smoothstep } =
@@ -78,7 +78,9 @@ export function createLawnMaterial(
   }
 
   const p = positionWorld;
-  const uv = groundUv();
+  // A hedge, a crate and a wheelie bin are BOXES: an XZ-only coordinate would
+  // paint their vertical faces as streaks extruded from the top face.
+  const uv = boxUv();
   const wear = buildWear(spec, uv);
 
   const turf = linearSwatch(baseSrgb).mul(wear.albedoMul);

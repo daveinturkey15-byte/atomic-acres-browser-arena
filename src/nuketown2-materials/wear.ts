@@ -143,6 +143,29 @@ export function wallUv(): any {
 }
 
 /**
+ * A metre-scale coordinate for a whole BOX, whose faces are both horizontal
+ * and vertical.
+ *
+ * THE BUG THIS EXISTS FOR. A world XZ coordinate is constant along Y, so a
+ * material authored on it and applied to a box paints every vertical face as
+ * a set of vertical streaks - the pattern from the top face, extruded
+ * downwards. Half this arena's dressing is boxes: cover walls, planters,
+ * crates, stores, buttresses.
+ *
+ * Shearing the coordinate with height fixes it for two adds. On a flat slab
+ * at constant Y it is the XZ coordinate plus a constant offset, so horizontal
+ * surfaces are unaffected; on a vertical face it varies, so the wear does
+ * too. The coefficients are deliberately not equal and not round, so the two
+ * axes do not shear into each other and produce a diagonal moire.
+ */
+export function boxUv(): any {
+  return vec2(
+    positionWorld.x.add(positionWorld.y.mul(float(0.61))),
+    positionWorld.z.add(positionWorld.y.mul(float(0.37))),
+  );
+}
+
+/**
  * Linear-working-space RGB of an sRGB hex, as a TSL vec3.
  *
  * THE TRAP THIS EXISTS FOR. `new THREE.Color(r, g, b)` with floats has been
