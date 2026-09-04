@@ -1162,7 +1162,14 @@ describe('additional authored maps', () => {
   it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     for (const team of [0, 1] as const) {
-      expect(map.spawns[team]).toHaveLength(6);
+      // PASS 94 (HF-456): Skyline gained a seventh and eighth authored point per
+      // team when the spawn-distribution lane widened every arena's tables. The
+      // count pin is raised to the new authored reality rather than relaxed into
+      // a floor - src/spawn-layout-quality.test.ts owns the >= 8 floor, and this
+      // stays the exact-count tripwire that notices a table changing size at
+      // all. Every clearance, bounds and 6 m separation check below still runs
+      // over the whole table, so the two new points are proved, not waved past.
+      expect(map.spawns[team]).toHaveLength(8);
       for (const spawn of map.spawns[team]) {
         expect(pointInsideBounds(spawn, map.bounds, 0.5)).toBe(true);
         expect(isBlocked(spawn, map.colliders, 0.44), `${team}:${spawn.toArray().join(',')}`).toBe(false);

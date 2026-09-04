@@ -3981,8 +3981,17 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
       [
         [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14], [-12, -14], [12, -14],
       ],
+      // PASS 94 integration: the spawn-distribution lane (HF-456) added the
+      // seventh and eighth point at x = -12 and 12, which sat 4.00 m from the
+      // authored -16/-8 and 8/16 - inside src/additional-maps.test.ts' 6 m
+      // Skyline separation floor, which is stricter than the 3 m repo-wide one.
+      // The eight points are RE-SPACED along the same line rather than the
+      // floor being lowered: -24/-16/-10/-4/4/10/16/24 gives gaps of
+      // 8/6/6/8/6/6/8 m, every one at or over 6, with the same span and the
+      // same eight points the lane asked for. Team 0's line already cleared it
+      // (9/6/6/12/6/6/9) and is untouched.
       [
-        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30], [-12, 30], [12, 30],
+        [-24, 30], [-16, 30], [-10, 30], [-4, 30], [4, 30], [10, 30], [16, 30], [24, 30],
       ],
     ),
     patrolPoints: [

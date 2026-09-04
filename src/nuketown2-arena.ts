@@ -1514,14 +1514,16 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [bal.centreX + side * (bal.width - bal.postSize) / 2,
         (bal.deckTop - bal.slabThickness) / 2,
         bal.outboardZ + bal.postSize / 2],
-      [bal.postSize, bal.deckTop - bal.slabThickness, bal.postSize], m.trim);
+      [bal.postSize, bal.deckTop - bal.slabThickness, bal.postSize], m.trim,
+      { ballisticMaterial: 'wood' });
   }
   // Rails, 1.1 m over the deck: over LOW_COVER so they break a crouched line,
   // under the 1.65 m standing eye so a standing player shoots across them.
   // The doorway is in the wall, so no rail crosses it.
   pair(builder, 'balcony rail outboard',
     [bal.centreX, bal.deckTop + bal.railHeight / 2, bal.outboardZ + bal.railThickness / 2],
-    [bal.width, bal.railHeight, bal.railThickness], m.trim);
+    [bal.width, bal.railHeight, bal.railThickness], m.trim,
+    { ballisticMaterial: 'wood' });
   // The return at the far end runs the deck's whole depth. The one at the
   // flight's end does NOT: authored full, it stood 1.1 m tall across the top
   // of the exterior flight and the no-jump walk probe stalled 0.4 m short of
@@ -1531,12 +1533,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'balcony rail return far',
     [bal.centreX + (bal.width - bal.railThickness) / 2,
       bal.deckTop + bal.railHeight / 2, balDeckZ],
-    [bal.railThickness, bal.railHeight, bal.projection], m.trim);
+    [bal.railThickness, bal.railHeight, bal.projection], m.trim,
+    { ballisticMaterial: 'wood' });
   const balconyNewelDepth = yardStairOuterZ - bal.outboardZ;
   pair(builder, 'balcony rail newel',
     [bal.centreX - (bal.width - bal.railThickness) / 2,
       bal.deckTop + bal.railHeight / 2, bal.outboardZ + balconyNewelDepth / 2],
-    [bal.railThickness, bal.railHeight, balconyNewelDepth], m.trim);
+    [bal.railThickness, bal.railHeight, balconyNewelDepth], m.trim,
+    { ballisticMaterial: 'wood' });
   pair(builder, 'balcony rail cap',
     [bal.centreX, bal.deckTop + bal.railHeight - 0.05, bal.outboardZ + bal.railThickness / 2],
     [bal.width + 0.08, 0.10, bal.railThickness + 0.06], m.trim,
@@ -1584,6 +1588,22 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   }
 
   // ---- HF-465: the front ledge and the porch canopy ------------------------
+  // PASS 94 INTEGRATION, and it is the same defect HF-467 was written to kill.
+  // These bodies and the balcony above landed in a lane that did not carry the
+  // ballistics work, so they reached the merged head unrated and the shared
+  // NAME rules decided their material for them. Measured on the merged build,
+  // before this block: `porch canopy head` matched nothing and fell through to
+  // `reinforced` - the classifier's failure sentinel - which is what reds
+  // `gives every registered arena an explicit fallback ceiling that only
+  // shrinks`; `porch canopy wing 0/1` matched the JETLINER rule on the word
+  // "wing" and were rated as aircraft bodywork; `porch canopy post 0/1` and
+  // every balcony rail and post matched "post"/"rail" and were rated
+  // structural steel; and `window ledge sill` matched "window" and was rated
+  // GLASS, which is the exact misrating HF-467 had just repaired on the house's
+  // own window sills. Every one of them is painted timber trim built from
+  // `m.trim`, so every one of them is now rated `wood` explicitly. Nothing
+  // moved and no threshold changed: the geometry is the lane's, the material
+  // is what it was always made of.
   // The two rungs that make the upper front window a two-way opening. Heights
   // and plan overlaps are derived in NUKETOWN2_PORCH_CANOPY /
   // NUKETOWN2_WINDOW_LEDGE; the gate re-derives the chain rather than
@@ -1604,23 +1624,27 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   ] as const).entries()) {
     pair(builder, `porch canopy wing ${index}`,
       [(run[0] + run[1]) / 2, canopy.top - canopy.thickness / 2, canopyZ],
-      [run[1] - run[0], canopy.thickness, canopy.projection], m.trim);
+      [run[1] - run[0], canopy.thickness, canopy.projection], m.trim,
+      { ballisticMaterial: 'wood' });
   }
   pair(builder, 'porch canopy head',
     [(canopyDoor[0] + canopyDoor[1]) / 2, DOOR_HEAD_Y + canopy.thickness / 2, canopyZ],
-    [canopyDoor[1] - canopyDoor[0], canopy.thickness, canopy.projection], m.trim);
+    [canopyDoor[1] - canopyDoor[0], canopy.thickness, canopy.projection], m.trim,
+    { ballisticMaterial: 'wood' });
   // Posts clear of BOTH the front door's own span and the hedge's plan run, so
   // neither the door walk nor the hedge is interpenetrated.
   for (const [index, side] of [-1, 1].entries()) {
     pair(builder, `porch canopy post ${index}`,
       [canopy.centreX + side * 1.35, (canopy.top - canopy.thickness) / 2,
         HOUSE_FRONT_Z + canopy.projection - canopy.postSize / 2],
-      [canopy.postSize, canopy.top - canopy.thickness, canopy.postSize], m.trim);
+      [canopy.postSize, canopy.top - canopy.thickness, canopy.postSize], m.trim,
+      { ballisticMaterial: 'wood' });
   }
   const ledge = NUKETOWN2_WINDOW_LEDGE;
   pair(builder, 'window ledge sill',
     [ledge.centreX, ledge.top - ledge.thickness / 2, HOUSE_FRONT_Z + ledge.projection / 2],
-    [ledge.width, ledge.thickness, ledge.projection], m.trim);
+    [ledge.width, ledge.thickness, ledge.projection], m.trim,
+    { ballisticMaterial: 'wood' });
 
   // One waist-high body per ground room, so a room is a fight and not a box.
   pair(builder, 'house front room counter', [-4.8, LOW_COVER / 2, HOUSE_FRONT_Z - 2.8], [3.2, LOW_COVER, 1.0], m.interior);
