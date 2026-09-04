@@ -158,6 +158,8 @@ export type PlayerSnapshot = {
   stance?: 'stand' | 'crouch' | 'prone';
   /** HF-358: true while the swim movement state is engaged (swimmable water). */
   swimming?: boolean;
+  /** HF-504 R-5: host-authored reload presentation state for remote players. */
+  reloading?: boolean;
   seq: number;
 };
 

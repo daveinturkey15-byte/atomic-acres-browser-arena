@@ -256,7 +256,7 @@ const viewOf = (page) => page.evaluate(() => {
       secondary: remote.secondary,
       ammo: remote.combatInventory?.ammo?.[remote.weapon] ?? null,
       reserve: remote.combatInventory?.reserve?.[remote.weapon] ?? null,
-      reloading: null,
+      reloading: remote.reloading ?? null,
       kills: null,
       deaths: null,
       position: (remote.authoritativePosition ?? remote.position ?? []).map(round),
@@ -617,15 +617,20 @@ async function runScenarios(peers, report, step) {
     step('scenarios', { peer: role });
 
     results.pickup = await scenarioPickup(guest, host, peers, role);
-    results.reload = await scenarioReload(guest, host, role);
+    results.reload = await scenarioReload(guest, host, peers, role);
     results.swap = await scenarioSwap(guest, peers, role);
     results.fireAtHost = await scenarioFire(guest, host, role, 'host');
     results.fireAtGuest = await scenarioFire(guest, peers[role === 'guestA' ? 'guestB' : 'guestA'], role, 'other-guest');
     results.damageAndDeath = await scenarioDamageDeath(guest, host, peers, role);
     results.respawn = await scenarioRespawn(guest, host, role);
+    results.reloadAfterRespawn = await scenarioReload(guest, host, peers, role, 'post-respawn');
     results.pickupAuthority = await scenarioPickupAuthority(guest, host, peers, role);
     results.scoreboard = await scenarioScoreboard(guest, host, role);
-    for (const [caseName, scenario] of [['pickup-rejected-claim', results.pickup], ['pickup-accepted-claim', results.pickupAuthority]]) {
+    for (const [caseName, scenario] of [
+      ['pickup-rejected-claim', results.pickup],
+      ['pickup-accepted-claim', results.pickupAuthority],
+      ['reload-after-respawn', results.reloadAfterRespawn],
+    ]) {
       for (const rowId of scenario.measuredRows ?? []) {
         report.rowMeasures[rowId] ??= [];
         report.rowMeasures[rowId].push({ role, case: caseName, ok: scenario.ok, result: scenario });
@@ -781,8 +786,8 @@ async function scenarioPickupAuthority(guest, host, peers, role) {
 
 /** OWNER ITEM "cannot reload". Spend the magazine, reload, require both the
  *  local magazine AND the host's replica to refill. */
-async function scenarioReload(guest, host, role) {
-  const result = { ok: false };
+async function scenarioReload(guest, host, peers, role, phase = 'pre-respawn') {
+  const result = { ok: false, phase, measuredRows: phase === 'post-respawn' ? ['R-1', 'R-2', 'R-5'] : ['R-5'] };
   const selfId = (await viewOf(guest.page)).selfId;
   // Drain the magazine to a known low value through the QA ammo hook so the
   // reload has something to do regardless of which weapon is held.
@@ -798,6 +803,15 @@ async function scenarioReload(guest, host, role) {
 
   await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.reload());
   // Reload animations are seconds long; wait for completion, then the ack.
+  await sleep(350);
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const duringOther = await viewOf(peers[otherRole].page).catch(() => null);
+  result.otherSeesReloading = duringOther?.players?.[selfId]?.reloading ?? null;
+  if (result.otherSeesReloading !== true) {
+    record(`RELOAD-NOT-VISIBLE-${role}-${phase}`, 'high', 'the other guest did not observe the host-authored reload state', {
+      phase, otherRole, reloading: result.otherSeesReloading,
+    });
+  }
   await sleep(4_000 + ACK_BUDGET_MS);
 
   const after = await viewOf(guest.page);

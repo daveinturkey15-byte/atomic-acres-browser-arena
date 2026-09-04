@@ -133,6 +133,39 @@ describe('HF-504 P-3/P-4 pickup authority - claims stay host-only and results ar
   });
 });
 
+describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () => {
+  it('does not invent a new life id for a bounded movement resynchronization', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const continuityDecision = state.indexOf('const admittedContinuity');
+    const decision = state.slice(continuityDecision, state.indexOf('remote.positionHistory.length', continuityDecision));
+    expect(decision).toMatch(/movement\.resynchronized\s*\n\s*\? respawned\s*\n\s*\? Math\.max\(remote\.continuity \+ 1, claimedContinuity\)\s*\n\s*:\s*Math\.max\(remote\.continuity, claimedContinuity\)/);
+  });
+
+  it('cancels remote reload only after the pre-resolution shot guards pass', () => {
+    const resolve = functionBody(main, 'function resolveAuthoritativeShot(request: ShotRequestMessage): void {');
+    const cancel = resolve.indexOf("cancelRemoteReloadAuthority(request.by, 'cancelled');");
+    const missingHistory = resolve.indexOf("finish('rejected', reason, admission.appliedRewindMs);");
+    const badOrigin = resolve.indexOf("finish('rejected', 'bad-origin', admission.appliedRewindMs);");
+    const emptyMagazine = resolve.indexOf("finish('rejected', 'empty-magazine', admission.appliedRewindMs);");
+    expect(cancel).toBeGreaterThan(missingHistory);
+    expect(cancel).toBeGreaterThan(badOrigin);
+    expect(cancel).toBeGreaterThan(emptyMagazine);
+  });
+
+  it('applies the host ammo projection on a self state repair', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const selfRepair = state.indexOf('const repairedHealth =');
+    const projection = state.indexOf('applyLocalCombatInventoryProjection(message.combatInventory, true);', selfRepair);
+    expect(selfRepair).toBeGreaterThanOrEqual(0);
+    expect(projection).toBeGreaterThan(selfRepair);
+  });
+
+  it('carries and presents the host-authored remote reload state', () => {
+    expect(main).toContain('reloading: player.reloadState !== null,');
+    expect(main).toContain('operator.userData.reloading = renderedSnapshot.reloading === true;');
+  });
+});
+
 describe('HF-504 lobby - a guest must never render authority it no longer holds', () => {
   // localLobbyReady = localMember?.ready ?? localLobbyReady kept READY on
   // screen for a guest the host had already dropped (grace expired, rejoin

@@ -12459,6 +12459,7 @@ function snapshot(): PlayerSnapshot {
     weapon: player.weapon,
     stance: player.stance,
     swimming: localSwimState.swimming,
+    reloading: player.reloadState !== null,
     seq: ++player.seq,
   };
 }
@@ -13465,6 +13466,12 @@ function onNetworkMessage(message: GameMessage): void {
         if (repairedHealth < player.hp) lastDamageAt = performance.now();
         player.hp = repairedHealth;
         player.alive = player.hp > 0;
+        // HF-504 R-4: the host's state repair carries the canonical equipped
+        // ammo projection as well as health. A reconnect or dropped result
+        // must therefore repair ammo without accepting a client-selected split.
+        if (message.type === 'state' && message.combatInventory) {
+          applyLocalCombatInventoryProjection(message.combatInventory, true);
+        }
         weaponView.setPresentationVisible(player.alive);
       }
       return;
@@ -13721,8 +13728,10 @@ function onNetworkMessage(message: GameMessage): void {
       const admittedContinuity = network.role === 'host'
         ? registeredActorLifeId !== null
           ? registeredActorLifeId
-          : respawned || movement.resynchronized
-          ? Math.max(remote.continuity + 1, claimedContinuity)
+        : respawned || movement.resynchronized
+          ? respawned
+            ? Math.max(remote.continuity + 1, claimedContinuity)
+            : Math.max(remote.continuity, claimedContinuity)
           : remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity
             ? claimedContinuity
             : remote.continuity
@@ -14504,7 +14513,6 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   authoritativeShotAdmissions.set(request.by, admission.state);
-  cancelRemoteReloadAuthority(request.by, 'cancelled');
   const visualShot: ShotMessage = {
     type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
     direction: canonicalShotDirection(request.weapon, request.direction, request.pelletDirections),
@@ -14551,6 +14559,10 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       broadcastTimedMapWeaponState();
     }
   }
+  // R-3: only a shot that passed every pre-resolution admission guard may
+  // cancel the guest's in-flight reload. Missing history, bad origin and an
+  // empty magazine are rejected above and must leave reload untouched.
+  cancelRemoteReloadAuthority(request.by, 'cancelled');
   if (ordinaryShot && combatInventory) {
     setRemoteCombatInventory(request.by, consumeGuestCombatRound(combatInventory, request.weapon));
   }
@@ -27657,6 +27669,9 @@ function updateRemotes(dt: number, now: number): void {
     operator.userData.proneClearance = stance === 'prone'
       ? measuredProneClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
       : null;
+    // HF-504 R-5: keep the host-authored transient reload tell attached to the
+    // remote rig for presentation consumers, alongside the replicated weapon.
+    operator.userData.reloading = renderedSnapshot.reloading === true;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
