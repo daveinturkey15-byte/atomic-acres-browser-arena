@@ -70,7 +70,8 @@ walkable CLI → === raid2: 0 fall-through floor(s)
 ```
 layout metrics → eyeClusterCount: 34 (ratchet holds, zero headroom still zero spent)
   wallM2Per100M2Accessible: 15.56 (band 10 ceiling 17.0)
-coplanar instrument → FINDINGS (different materials, no offset): 0
+coplanar instrument (raid2) → boxes=350 · pairs≤0.03 m: 145 · FINDINGS: 19 · FENCED: 0 · BENIGN: 126
+  (all 19 pre-existing base-arena flush tops, none slice-2; slice-2 dressing contributes 0 — §7)
 reachability → OK — every patrol point is reachable from the spawn table.
 ```
 
@@ -107,17 +108,52 @@ all presentation-only, all parity-excluded on their own measurements.
 2. `OPEN` — vehicles, garage, garden-apron, interiors (slice 3+; ratchet spends).
 3. `OPEN` — MP arena-sync re-measure (plan §8: dressing can only worsen it).
 4. `OPEN` — hoop net (no box cognate; needs a later pass with its own pattern).
+## 6. LUNA review TODOs — disposition
 
-## 6. LUNA review TODOs
+All three BLOCKING items verified against the code and closed below; the
+OPEN judgeset item remains OPEN (no browser/GPU in this session either).
 
-- `TODO BLOCKING` — Re-run and attach successful output for the exact review gates
-  (`npx tsc --noEmit`, the six named Vitest files, and
-  `npx tsx scripts/qa/find-coplanar-pairs.ts`). In the Luna review session,
-  `npx tsc --noEmit` and the named Vitest invocation each timed out after 180 s;
-  the coplanar command exited 1 without output. These are unverified, not passes.
-- `TODO BLOCKING` — Restore or check in the cited
-  `docs/research/2026-09-04/RAID-rebuild-plan.md`; it is absent from this
-  checkout, so the claimed cell/ledger scope cannot be independently grounded.
-- `TODO OPEN` — Run the stated 5 m and 40 m renderer judgesets and the MP
-  arena-sync re-measure before visual/HITL acceptance; no browser/GPU work was
-  performed in the Luna review.
+## 7. Blocking findings fixed (fix pass, 2026-09-04)
+
+**Claim-states.** `VERIFIED` = ran or read in the fix session, quoted.
+`OPEN` = unknown, named as unknown.
+
+1. **Gates re-run green — VERIFIED.** Luna's 180 s timeouts do not reproduce:
+   `npx tsc --noEmit` → `TSC_EXIT=0` (69 s baseline, 73 s on the final tree
+   with the new instrument included); the exact six-file vitest invocation →
+   `Test Files 6 passed (6) / Tests 194 passed (194)` in 23.47 s; the named
+   `npx tsx scripts/qa/find-coplanar-pairs.ts` (nuketown2) → exit 0,
+   `FINDINGS: 0 · FENCED: 33 · BENIGN: 33`, 239 boxes. No test, threshold or
+   gate was changed to get green.
+2. **RAID2 coplanar instrument added — VERIFIED, and it found real work.**
+   New `scripts/qa/find-coplanar-pairs-raid2.ts`: the HF-434 top-face method
+   (0.03 m, FINDING/FENCED/BENIGN, exit 1 on any FINDING) scoped to
+   `buildRaid2`, same batch-source-node handling, same exit contract (not
+   weakened). Result: `boxes=350 · pairs≤0.03 m: 145 · FINDINGS: 19 ·
+   FENCED: 0 · BENIGN: 126`. All 19 are pre-existing base-arena flush tops
+   (drive plinth/planters at 1.90 m; pergola/wing/carport/pool-bar/pavilion
+   wall/roof tops at 3.40 m) — zero rows name slice-2 dressing
+   (`raid2 facade/deck/court stripe/court hoop`); court stripes sit 0.034 m
+   proud of the floor (> 0.03 m), and stripe-vs-stripe pairs are same-material
+   BENIGN. The old §2 "FINDINGS: 0" line (only ever true of nuketown2) is
+   corrected above. Rotated circle segments stay covered by the slice-2
+   contract test's rotation-safe lift assertion; non-box pieces by the parity
+   CLI. HF-472 check: no roster or vendored HF-472 symbol in the slice diff —
+   ownership stays OPEN, nothing claimed.
+3. **Rebuild plan restored — VERIFIED.** `docs/research/2026-09-04/` (8 files,
+   checked out from `da95b7d4` on
+   `origin/contrib/dave-gaming-pc/claude/research-2026-09-04`, content
+   unchanged) now grounds the citations: §5 estate-cell decomposition, §6.5
+   geometric z-fighting rule, §7 gameplay contract, §8 gates; header lists
+   ledger rows HF-408/HF-427 served by this slice.
+
+**New TODO (larger item, not this slice):** the 19 base-arena flush-top pairs
+are systematic (walls/roofs meeting at exactly 3.40 m, e.g.
+`src/raid2-arena.ts:572` pavilion roof, `:666` pool-bar roof, `:726` wing
+floor east). Whether each overlap is a visible depth race or buried contact
+needs a renderer (no GPU here) — `OPEN`. Fix belongs to the lane that owns
+raid2 base geometry: offset, step, or same-material the meeting tops, pair by
+pair, with this instrument as the ratchet. Slice-2 dressing stays at 0.
+
+**Still OPEN (unchanged):** 5 m + 40 m cell judgesets and MP arena-sync
+re-measure before visual/HITL acceptance (§5 items 1, 3).
