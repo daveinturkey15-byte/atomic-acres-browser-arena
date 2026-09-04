@@ -95,7 +95,7 @@ const catalog: Nuketown2LocalLightSpec[] = [];
 
 // Window emitters sit inside the exact openings used by the arena builder.
 for (const window of NUKETOWN2_WINDOWS) {
-  const interiorZ = window.wallZ === NUKETOWN2_WINDOWS[0]!.wallZ ? window.wallZ - 0.65 : window.wallZ + 0.65;
+  const interiorZ = window.face === 'front' ? window.wallZ - 0.65 : window.wallZ + 0.65;
   const y = window.pane ? 1.7 : window.sillTop + 0.65;
   catalog.push(...pair(
     `window-${window.id.replaceAll(' ', '-')}`,
@@ -109,8 +109,8 @@ for (const window of NUKETOWN2_WINDOWS) {
 }
 
 const northHouse = NUKETOWN2_HOUSE_LAYOUT[0]!;
-const frontZ = NUKETOWN2_WINDOWS[0]!.wallZ;
-const backZ = NUKETOWN2_WINDOWS[3]!.wallZ;
+const frontZ = NUKETOWN2_WINDOWS.find((window) => window.face === 'front')!.wallZ;
+const backZ = NUKETOWN2_WINDOWS.find((window) => window.face === 'back')!.wallZ;
 const garageCenterX = northHouse.x + NUKETOWN2_SECTION.houseWidth / 2 + NUKETOWN2_SECTION.garageWidth / 2;
 const garageFrontZ = frontZ - NUKETOWN2_SECTION.garageSetback;
 const garageBackZ = backZ;

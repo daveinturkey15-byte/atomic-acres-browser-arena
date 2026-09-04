@@ -453,10 +453,10 @@ const FRONT_WINDOW_B: [number, number] = [1.4, 3.4];
 const UPPER_WINDOW: [number, number] = [-2.85, 0.35];
 const BACK_UPPER_WINDOW: [number, number] = [-5.75, -3.25];
 export const NUKETOWN2_WINDOWS = Object.freeze([
-  Object.freeze({ id: 'ground front west', pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
-  Object.freeze({ id: 'ground front east', pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
-  Object.freeze({ id: 'upper front', pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
-  Object.freeze({ id: 'upper back', pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'ground front west', face: 'front' as const, pane: true as const, x0: FRONT_WINDOW_A[0], x1: FRONT_WINDOW_A[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'ground front east', face: 'front' as const, pane: true as const, x0: FRONT_WINDOW_B[0], x1: FRONT_WINDOW_B[1], wallZ: HOUSE_FRONT_Z, sillTop: 1.0, headY: 2.1 }),
+  Object.freeze({ id: 'upper front', face: 'front' as const, pane: false as const, x0: UPPER_WINDOW[0], x1: UPPER_WINDOW[1], wallZ: HOUSE_FRONT_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
+  Object.freeze({ id: 'upper back', face: 'back' as const, pane: false as const, x0: BACK_UPPER_WINDOW[0], x1: BACK_UPPER_WINDOW[1], wallZ: HOUSE_BACK_Z, sillTop: NUKETOWN2_UPPER_Y0 + 0.9, headY: ROOF_Y0 }),
 ]);
 
 /**
