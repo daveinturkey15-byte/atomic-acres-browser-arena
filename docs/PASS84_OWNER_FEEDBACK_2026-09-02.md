@@ -2124,6 +2124,21 @@ assets and textures and lighting need to be tip top, raid can come next"
   `src/nuketown2-pipeline-budget.test.ts` timed out in two required tests. No live URL
   or published record exists.
 
+### PASS 94 publication attempt record — BLOCKED (rerun, 2026-09-04)
+
+- **Head:** `8d6b41f241cc3533f12fdf6a9f15e0499ea0f99e` on
+  `contrib/dave-gaming-pc/claude/pass93-candidate`; the retained PASS 94 cut includes
+  HF-495 and the candidate-5 source head `3e2fd273`.
+- **Gates:** `tsc` 0; release Vitest 11/11 files and 127/127 tests; publish-plan
+  contract 9/9; the required standalone HF-477 pipeline-budget attempt was run without
+  changing its timeout but returned command-bound exit 124 with no usable Vitest result
+  while CPU remained at 100% under an owner workload. Full Vitest, build-last, browser,
+  publisher and live checks were not run.
+- **Live URL:** `OPEN` — no PASS 94 publication was performed.
+- **Claim state:** `BLOCKED`; the unchanged HF-477 standalone gate must be rerun only
+  after CPU is below 70%, and publication remains prohibited until it produces a green
+  result and every later required gate is rerun.
+
 ### PASS 94 publication attempt record — BLOCKED (not published)
 
 - **Head:** `09980a5a3c58fd70c980be4056e3cefbee872d5d` on
