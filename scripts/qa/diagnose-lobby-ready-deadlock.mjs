@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// Diagnostic probe: is the #lobby-ready deadlock arena-intrinsic, or cumulative GPU/memory after several lanes in one browser?
+// Usage: node scripts/qa/diagnose-lobby-ready-deadlock.mjs [flags]
+//   --url <url>          base URL (default: http://127.0.0.1:41912/)
+//   --peer-port <port>   PeerJS relay port (default: 9341)
+//   --arena <id>         target arena (default: rustworks-1v1)
+//   --mode <mode>        target mode: tdm | ffa (default: tdm)
+//   --warmup <n>         number of warmup lanes before the target lane (default: 0)
+//   --sync-wait-ms <ms>  per-lane sync wait budget in ms (default: 45000)
+// Writes: JSON report to stdout (no files written).
+// Exit codes: 0 = READY-enabled; 2 = still deadlocked; 3 = environment error.
 // Diagnostic for the verify-hf-matrix-definitive run of 2026-08-25: from
 // rustworks-1v1 onwards, every lane timed out because #lobby-ready stayed
 // disabled. legacy-main.ts gates that button on lobbyArenaSynchronized
