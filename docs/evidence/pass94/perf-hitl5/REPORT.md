@@ -199,3 +199,172 @@ Honest reading of the forge merge:
   fixed here.
 - The pipeline count (418 vs 250) is only partly addressed (three duplicate
   forge sets -> one); the wear materials (50) and operator looks are the rest.
+
+## Fix lane (Fable, 17:55-18:35): the three offenders, measured before and after
+
+Worktree `C:/Users/david/projects/aa-claude-perf`, cut from `145d33c5`. Same
+harness, extended (`scripts/qa/perf-hitl5-bisect-cdp.mjs`): the census now
+reports per top-level root the nodes three walks each frame, how many still
+auto-recompose, how many subtrees carry the walk-skip, and the in-page cost of
+one `updateMatrixWorld()` of that root (median of 50 - CPU only, ComfyUI on
+the GPU cannot distort it); `--cpu-all` profiles every rung; and every matrix
+sample is charged to the app/renderer function that started the walk. All
+runs: headless installed Chrome, real WebGPU device, 2560x1440, HIGH, Solo,
+bots frozen, `dist` served on :4188, one browser at a time. GPU before each
+run is in `bisect/*-gpu.txt`.
+
+### Where the nodes are (pre-fix census, `bisect/pre-census-nuketown2.json`)
+
+- Scene: **10,643 nodes, 3,029 auto-updating**; one full-scene walk
+  **0.9 ms** in-page. `Nuketown2 arena`: 976 nodes / 965 auto / 958 meshes
+  (89 visible) / **0.2 ms** of that walk. `pass65-killstreak-presentations`:
+  4,233 nodes, 280 auto, 29 walk-skipped subtrees, 0 ms. Camera subtree
+  (viewmodel): 906 nodes, 199 auto. Two bot rigs: 187 + 167 nodes, 0.1 ms each.
+- The **+709 meshes vs PASS 93 are NOT the operator-look clones.** The census
+  diff by material shows the 56 `through-wall-exact:operator-look-*` meshes
+  replaced 56 `through-wall-exact:Swat*` meshes one-for-one (63 through-wall
+  meshes in both builds); likewise `operator-look-*-garment*` (+56) replaced
+  `Swat`/`Swat_Black` (-56). They are not a capture-time artefact and not
+  net-new. The growth is the arena's own authored source meshes under the
+  new named node materials: `nuketown2-trim` +239 (228 of which left the
+  unnamed `MeshStandardMaterial` row), `nuketown2-drywall` +77,
+  `nuketown2-ground-scrub` +67, `nuketown2-automotive-chrome` +57, hedge LOD
+  +25, `nuketown2-block` +25, `nuketown2-tire-rubber` +25, glasshouse frame
+  +24, and so on - the Rebuild's material split and dressing. They are hidden
+  batch sources, walked every frame but never drawn.
+
+### Who spends the matrix time (`bisect/pre-callers-nuketown2.json`, profiled ms/frame)
+
+| caller | baseline | lawn (no-op) |
+|---|---|---|
+| three `_renderScene` (the per-frame full-scene walk) | 1.72 | 1.81 |
+| `getWorldPosition` / `getWorldQuaternion` (parent-chain refreshes) | 0.36 | 0.60 |
+| `solveRiggedArms` + `orientRiggedBone` + `alignRiggedPalmWorld` + `beforeRender` (viewmodel arm IK: repeated `updateWorldMatrix(true, true)` over the 906-node camera subtree, art-kit.ts) | 1.07 | 0.88 |
+| gameplay (`Sw`) | 0.15 | 0.14 |
+| total matrix | **3.8** | **4.0** |
+
+So of the ~4 ms the previous lane saw, roughly half is the renderer's own
+walk over 10.6k nodes (the arena is a fifth of it) and a quarter is the
+first-person arm solver re-multiplying the weapon subtree several times a
+frame. Freezing the arena could never have been worth more than ~0.2 ms.
+
+### Fix 1 - `perf(hitl5): freeze the batched arena's static matrices after mount` (`f7f16d92`)
+
+`freezeStaticArenaMatrices()` (static-matrix-freeze.ts, tested): after
+batching, hidden batch sources (`userData.staticBatchRendered`),
+`*-render-batches` groups and LOD subtrees compose once and stop;
+`userData.dynamic` subtrees are skipped; no walk-skip, so forced refreshes
+stay correct. Measured: scene auto nodes **3,029 -> 2,206**, arena auto
+**965 -> 139**, arena walk **0.2 -> 0.1 ms**, full-scene walk 0.9 -> 0.8 ms
+in-page. The profiled `_renderScene` share did not move outside noise
+(1.7-1.8 before, 1.8-2.1 after under a heavier machine, below). Node count is
+unchanged (freezing removes recompose, not nodes): the +709 are real authored
+sources and stay for raycast/collision references. **Small, real, not the
+win.** Collider-visual parity, fidelity and viewmodel gates green.
+
+### Fix 2 - `perf(hitl5): sample one shared CPU-generated noise tile in the Nuke Town wear graphs` (`a0956d25`)
+
+`nuketown2-materials/noise-lut.ts`: one 512x512 RGBA8 `DataTexture`
+(R/G/B = 1/2/3-octave fBm, A = ridged) generated on the CPU at first use,
+64-cell tile with integer octave periods (seam pinned on the bytes in
+`noise-lut.test.ts`); `signedNoise()` and the asphalt/interior/vehicle
+`fbm2`/`valueNoise2`/`ridgedFbm2` terms are one `texture()` fetch each.
+Every authored feature size, albedo/roughness swing and falloff is unchanged.
+`nuketown2-materials.test.ts` "loads no texture" now says a CPU-generated
+DataTexture is generated, not loaded, and asserts it on the bytes (no URL).
+
+Measured, within-session `wear` rung (strip the graphs -> flat PBR) on the
+fixed build: JS busy **17.42 -> 15.54** (run 1) and **16.32 -> 15.80** (run 2)
+ms/frame; p50 22.6 -> 21.3 and 21.4 -> 21.2. Read honestly: the LUT removed
+the fragment ALU, but **the remaining wear cost is CPU-side and is still
+there** - 50 distinct graphs are 50 distinct pipelines, so the per-object
+node update and pipeline switching the profile showed (`_renderObjectDirect`
+0.7, `_update` 0.6, `update`/`updateNumber`/`updateForRender` ~0.9 ms/frame)
+did not collapse. Collapsing it needs the spec constants turned into
+per-material uniforms so structurally identical family graphs share one
+pipeline (concrete x4, lawn x2, painted-metal x3, siding x2); not done in
+this box. Look: capture pair at the spawn pose, same harness pose, before
+(`bisect/pre-census-nuketown2.png`) vs after (`bisect/post-fixes-2-nuketown2.png`),
+`scripts/qa/perf-hitl5-capture-diff.mjs`: mean abs difference **4.2/255**
+over the frame, 11.8 % of pixels moved by >8, 3.0 % by >32; the station crop
+(`bisect/wear-lut-pair-crop.png`, 900x500 at 880,560) 4.5 / 11.1 % / 3.6 %.
+Eyeballed side by side: block wall, drive, garage door, both sidings, lawn
+checker and desire lines read the same; the >32 pixels are the wind-animated
+grass blades and the viewmodel between two captures, not the wear. What did
+change and is visible on inspection: the exact mottle pattern (octaves are
+decorrelated by seed, not by domain rotation) and a 64-cell period instead of
+256 (1 mm grain repeats every 6.4 cm, 60 mm scuff every 3.8 m, 2.4 m traffic
+every 154 m - beyond the arena).
+
+### Fix 3 - vegetation: measured, NOT changed
+
+- On HIGH the sun shadow map is **static** (`shadowUpdateMode: 'static'`;
+  `configureLightShadows` sets `shadow.autoUpdate = false`, refreshed only on
+  `requestStaticShadowRefresh`). There is no per-frame shadow pass and so no
+  "shadow duplicate" draw to remove; `veg` measured **-11 to -12 draws/frame**
+  (169.5 -> 158, 170.6 -> 159.6), all main-pass, i.e. the 12 LOD level
+  draws. The previous lane's 22 was a different session.
+- The JS delta of hiding vegetation was -1.0, +0.7 (fixed build run 1: veg
+  17.03 vs lawn 18.44) and +1.8 ms across three runs - noise, not cost.
+- The arena solids cast no shadows (`nuketown2-arena.ts` sets none), so the
+  hedge L0 shadow is the only shadow a hedge has; dropping it is a visual
+  change, not a free win. Left as is; breakable-grass API and vegetation
+  tests untouched and green.
+
+### The pipeline-total discrepancy (533 on :4188 vs 420 on :4300) - explained
+
+`renderPipelinesTotal` is the harness's cumulative `createRenderPipeline`
+count from page init. On the `--dist` static serve **every run today tripped
+the 12 s first-submission fence** ("WebGPU queue completion exceeded 12000 ms
+for submission 1", 5 of 5 runs, GPU idle at 4 % or loaded at 33 %), the app's
+map selection failed and retried, and the pipelines compiled for the failed
+attempt are counted: the SAME dist read 532, 623, 621 and 619 across four
+runs. The :4300 preview did not trip the fence in the previous lane's A/B
+(418-420). The number is therefore not comparable across serves; in-match
+creation was **0 on every rung of every run** (`pipes+0`). The fence trip on
+the static-server route is itself the candidate-4 OPEN 2 "fence is close"
+finding reproducing; the fence was not widened.
+
+### Absolute numbers - why there is no "after" table you should trust
+
+Both after-runs ran under heavier background load than the before-runs:
+ComfyUI loaded a model during `post-fixes-2` (GPU 1.4 -> 2.9 GB by the end)
+and a 100 % CPU spike was sampled right after `post-fixes`; baseline JS busy
+read 16.3-17.4 ms/frame after vs 13.6-14.1 before, and the no-op `lawn` rung
+moved **+1.0 / +2.1 ms** against its own baseline within one session. That is
+larger than either fix's effect, so this lane makes **no absolute p50/p95 or
+JS-busy improvement claim**, and the target (JS busy <= 10 ms at the spawn
+pose) is **NOT demonstrated**. What is claimed is the within-session,
+CPU-only evidence above.
+
+### Claim states
+
+- VERIFIED: census, caller attribution, fix 1 node/walk numbers (in-page, CPU
+  only), the +709 provenance, the static-shadow reading, the fence/retry
+  explanation of the pipeline count, the capture-pair numbers.
+- VERIFIED (gates): `npx tsc --noEmit`; vitest 20 files / 216 tests (the
+  named gates plus noise-lut, static-matrix-freeze, corpse-presentation,
+  viewmodel motion/socket, weapon-runtime-behavior); `npm run build`;
+  `legacy-main.ts` under the ratchet (37,368 <= 37,371: the freeze call is
+  one line and two dead `updateMatrixWorld(true)` calls after
+  `deepFreezeSubtreeMatrices` went).
+- ASSUMPTION: the after-run inflation is background load, not the fixes; the
+  in-page walk (0.9 -> 0.8 ms, fewer auto nodes) says the freeze cannot have
+  added CPU, and the wear rung says the LUT build still strips 0.5-1.9 ms.
+  Falsifier: an interleaved A/B (old dist vs new dist, same session order)
+  on a quiet machine.
+- NOT ACHIEVED: JS busy <= 10 ms; node count "back near 6366" (the nodes are
+  real authored sources, frozen not removed); pipeline sharing.
+
+### Still open (next lane, in order of measured size)
+
+1. Viewmodel arm IK: `solveRiggedArms` / `orientRiggedBone` /
+   `alignRiggedPalmWorld` / `beforeRender` call `updateWorldMatrix(true, true)`
+   on shoulder/wrist bones several times a frame; each re-multiplies the whole
+   weapon subtree. ~1.1-1.3 ms/frame profiled. Refresh the arm chain only.
+2. The renderer's full-scene walk (~2 ms profiled, 0.8 ms in-page): the
+   4,233-node killstreak root is walked even though its pools are frozen;
+   a walk-skip on the pool ROOT (not per entry) when nothing is checked out.
+3. Wear pipelines: uniforms for spec constants so family graphs share
+   pipelines; that is where the remaining 0.5-1.9 ms wear CPU is.
+4. The 12 s fence on the static-serve route (integrator: reproduce on :4300).

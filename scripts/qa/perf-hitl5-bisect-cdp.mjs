@@ -42,6 +42,7 @@ const WIDTH = Number(arg('--width', '2560'));
 const HEIGHT = Number(arg('--height', '1440'));
 const OUT_DIR = resolve(arg('--out-dir', 'docs/evidence/pass94/perf-hitl5/bisect'));
 const PROFILE = arg('--profile', 'none');
+const CPU_ALL = argv.includes('--cpu-all');
 const TOGGLES = arg('--toggles', 'baseline,wear,veg,lawn,vehicles,grime,props,pool,operators,shadows,baseline-again').split(',');
 const BOOT_TIMEOUT_MS = 300_000;
 mkdirSync(OUT_DIR, { recursive: true });
@@ -183,8 +184,30 @@ try {
       }
     });
     const rows = [...byMaterial.values()].sort((a, b) => b.tris - a.tris);
-    return { meshes, visibleMeshes, materials: materials.size, rows };
+    // Where the nodes live (HF-491 offender 3): per top-level root, how many
+    // nodes three walks each frame, how many still auto-recompose, how many
+    // subtrees carry the static-matrix-freeze walk-skip, and how long ONE
+    // `updateMatrixWorld()` of that root costs (median of 50, in-page, CPU
+    // only - ComfyUI on the GPU cannot distort it).
+    const timeWalk = (object) => {
+      const samples = [];
+      for (let i = 0; i < 50; i += 1) { const t0 = performance.now(); object.updateMatrixWorld(); samples.push(performance.now() - t0); }
+      samples.sort((a, b) => a - b);
+      return Number(samples[25].toFixed(3));
+    };
+    const roots = scene.children.map((root) => {
+      let nodes = 0; let auto = 0; let frozen = 0; let rootMeshes = 0; let visible = 0;
+      root.traverse((n) => { nodes += 1; if (n.matrixAutoUpdate) auto += 1; if (Object.prototype.hasOwnProperty.call(n, 'updateMatrixWorld')) frozen += 1; if (n.isMesh) { rootMeshes += 1; let v = true; for (let p = n; p; p = p.parent) if (p.visible === false) { v = false; break; } if (v) visible += 1; } });
+      return { name: root.name || `(${root.type})`, type: root.type, visible: root.visible, nodes, auto, frozen, meshes: rootMeshes, visibleMeshes: visible, walkMs: timeWalk(root) };
+    }).sort((a, b) => b.walkMs - a.walkMs);
+    const prefixes = new Map();
+    scene.traverse((n) => { const key = (n.name || `(${n.type})`).split(/[\s:_-]+/).slice(0, 2).join('-'); prefixes.set(key, (prefixes.get(key) ?? 0) + 1); });
+    const prefixRows = [...prefixes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([prefix, count]) => ({ prefix, count }));
+    let totalNodes = 0; let totalAuto = 0; scene.traverse((n) => { totalNodes += 1; if (n.matrixAutoUpdate) totalAuto += 1; });
+    return { meshes, visibleMeshes, materials: materials.size, totalNodes, totalAuto, sceneWalkMs: timeWalk(scene), roots, prefixes: prefixRows, rows };
   });
+  console.error(`[bisect] scene walk ${report.census.sceneWalkMs} ms (${report.census.totalNodes} nodes, ${report.census.totalAuto} auto)`);
+  for (const root of report.census.roots.slice(0, 14)) console.error(`[bisect]   root ${root.name.padEnd(44).slice(0, 44)} nodes ${String(root.nodes).padStart(5)} auto ${String(root.auto).padStart(5)} frozen ${String(root.frozen).padStart(3)} meshes ${String(root.meshes).padStart(5)} vis ${String(root.visibleMeshes).padStart(3)} walk ${root.walkMs} ms${root.visible ? '' : ' (hidden)'}`);
   writeFileSync(join(OUT_DIR, `${LABEL}-${ARENA}-census.json`), `${JSON.stringify(report.census, null, 2)}\n`);
   console.error(`[bisect] census: ${report.census.meshes} meshes (${report.census.visibleMeshes} visible), ${report.census.materials} materials`);
   report.presentation = await page.evaluate(() => {
@@ -312,7 +335,27 @@ try {
       else { busy += dt; const key = `${fnName || '(anonymous)'} ${node.callFrame.url.split('/').pop()}:${node.callFrame.lineNumber}`; self.set(key, (self.get(key) ?? 0) + dt); }
     }
     const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25).map(([key, micros]) => ({ fn: key, ms: Number((micros / 1000).toFixed(1)) }));
-    return { result, cpu: { busyMs: busy / 1000, idleMs: idle / 1000, gcMs: gc / 1000, programMs: program / 1000, top } };
+    // Caller attribution for the matrix pass (HF-491 offender 3): for every
+    // sample inside updateMatrixWorld / updateWorldMatrix / multiplyMatrices /
+    // updateMatrix, charge it to the nearest ancestor frame that is NOT one
+    // of those (the app or renderer function that started the walk).
+    const parentOf = new Map();
+    for (const node of profile.nodes) for (const childId of node.children ?? []) parentOf.set(childId, node.id);
+    const MATRIX_FNS = new Set(['updateMatrixWorld', 'updateWorldMatrix', 'multiplyMatrices', 'updateMatrix', 'compose', 'skipUpdateMatrixWorldWhileFrozen']);
+    const matrixCallers = new Map();
+    let matrixMicros = 0;
+    for (let i = 0; i < profile.samples.length; i += 1) {
+      const node = byId.get(profile.samples[i]);
+      if (!node || !MATRIX_FNS.has(node.callFrame.functionName)) continue;
+      const dt = profile.timeDeltas[i] ?? 0;
+      matrixMicros += dt;
+      let cursor = node;
+      while (cursor && MATRIX_FNS.has(cursor.callFrame.functionName)) cursor = byId.get(parentOf.get(cursor.id));
+      const key = cursor ? `${cursor.callFrame.functionName || '(anonymous)'} ${cursor.callFrame.url.split('/').pop()}:${cursor.callFrame.lineNumber}` : '(root)';
+      matrixCallers.set(key, (matrixCallers.get(key) ?? 0) + dt);
+    }
+    const matrix = { totalMs: matrixMicros / 1000, callers: [...matrixCallers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, micros]) => ({ fn: key, ms: Number((micros / 1000).toFixed(1)) })) };
+    return { result, cpu: { busyMs: busy / 1000, idleMs: idle / 1000, gcMs: gc / 1000, programMs: program / 1000, top, matrix } };
   };
 
   for (const name of TOGGLES) {
@@ -321,7 +364,7 @@ try {
     const applied = await page.evaluate(toggle.apply);
     await page.waitForTimeout(SETTLE * 1000);
     let raw; let cpu = null;
-    if (name === 'baseline') {
+    if (name === 'baseline' || CPU_ALL) {
       const profiled = await profileWindow(async () => { await startSampler(); await page.waitForTimeout(SECONDS * 1000); return stopSampler(); });
       raw = profiled.result; cpu = profiled.cpu;
     } else {
@@ -337,7 +380,10 @@ try {
       perFrame: Object.fromEntries(Object.entries(raw.perFrame).map(([k, v]) => [k, Number(v.toFixed(1))])),
       created: raw.created,
     };
-    if (cpu) row.cpu = { ...cpu, busyMsPerFrame: Number((cpu.busyMs / Math.max(1, raw.frames)).toFixed(2)), programMsPerFrame: Number((cpu.programMs / Math.max(1, raw.frames)).toFixed(2)) };
+    if (cpu) {
+      row.cpu = { ...cpu, busyMsPerFrame: Number((cpu.busyMs / Math.max(1, raw.frames)).toFixed(2)), programMsPerFrame: Number((cpu.programMs / Math.max(1, raw.frames)).toFixed(2)), matrixMsPerFrame: Number((cpu.matrix.totalMs / Math.max(1, raw.frames)).toFixed(2)) };
+      console.error(`[bisect]   matrix ${row.cpu.matrixMsPerFrame} ms/frame by caller: ${cpu.matrix.callers.slice(0, 8).map((c) => `${c.fn}=${(c.ms / Math.max(1, raw.frames)).toFixed(2)}`).join('  ')}`);
+    }
     report.toggles.push(row);
     console.error(`[bisect] ${LABEL} ${ARENA} ${name.padEnd(14)} fps ${String(row.fps).padStart(6)}  p50 ${row.frameMs.p50} p95 ${row.frameMs.p95} p99 ${row.frameMs.p99}  draws ${row.perFrame.draws} tris ${Math.round(row.perFrame.triangles)} inst ${Math.round(row.perFrame.instances)} pipes+${row.created.renderPipelines}  (${applied})${cpu ? `  js-busy ${row.cpu.busyMsPerFrame} ms/frame` : ''}`);
   }
