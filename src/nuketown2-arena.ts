@@ -178,6 +178,7 @@ import {
   createNuketown2TruckCabMaterial,
   createNuketown2VehicleGlassMaterial,
 } from './nuketown2-vehicle-materials';
+import { thinMetalPanelPlacements, type ThinMetalPanelSpec } from './thin-metal-perforation';
 
 // ---------------------------------------------------------------------------
 // Footprint
@@ -2806,6 +2807,29 @@ function perimeter(builder: Builder, m: Nuketown2Materials): void {
 // Build
 // ---------------------------------------------------------------------------
 
+/**
+ * HF-467 / R3 section 9: this arena's PLAIN thin-metal panels - sheet that is
+ * rated `thin-metal` but is not a destructible shed - registered with the
+ * sibling perforation authority (`src/thin-metal-perforation.ts`). Each spec
+ * binds by exact authored surface name, so `pair()`'s two handed halves each
+ * become their own panel. `hitsToOpen` is the authored N: admitted hits whose
+ * trace energy could buy into thin metal, counted per panel, before that
+ * panel opens a real hole the aperture query lets bullets and bot shot
+ * traces cross. Rating stays untouched - the truck box body and garage doors
+ * are deliberately still `vehicle`/`interior-wall` by the name rules (R3
+ * section 3.2) and gain holes only if a later lane rates and registers them.
+ */
+export const NUKETOWN2_THIN_METAL_PANELS: readonly ThinMetalPanelSpec[] = Object.freeze([
+  // Each spec binds the FULL emitted surface name (pair() prefixes the
+  // handedness), so the registry cannot silently half-bind a body.
+  Object.freeze({ surfaceName: 'nuketown2 north verge sign board', hitsToOpen: 3, holeRadiusM: 0.11 }),
+  Object.freeze({ surfaceName: 'nuketown2 south verge sign board', hitsToOpen: 3, holeRadiusM: 0.11 }),
+  Object.freeze({ surfaceName: 'nuketown2 north verge speed limit sign', hitsToOpen: 3, holeRadiusM: 0.06 }),
+  Object.freeze({ surfaceName: 'nuketown2 south verge speed limit sign', hitsToOpen: 3, holeRadiusM: 0.06 }),
+  Object.freeze({ surfaceName: 'nuketown2 north verge street name blade', hitsToOpen: 3, holeRadiusM: 0.05 }),
+  Object.freeze({ surfaceName: 'nuketown2 south verge street name blade', hitsToOpen: 3, holeRadiusM: 0.05 }),
+]);
+
 export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   const builder = makeBuilder(scene, 'Nuketown2 arena');
   const m = nuketown2Materials();
@@ -2899,6 +2923,10 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
+    // HF-467: the thin-metal perforation registry, filled from the surfaces
+    // this build just emitted (one derived line - the authority lives in
+    // src/thin-metal-perforation.ts).
+    thinMetalPanels: thinMetalPanelPlacements(NUKETOWN2_THIN_METAL_PANELS, builder.shotSurfaces),
     spawns: spawnRecord(
       NUKETOWN2_SPAWN_LAYOUT[0]!.map(([x, z]) => [x, z] as [number, number]),
       NUKETOWN2_SPAWN_LAYOUT[1]!.map(([x, z]) => [x, z] as [number, number]),

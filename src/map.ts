@@ -37,6 +37,7 @@ import type { GlassState } from './glass-authority';
 import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
 import type { ArenaId } from './map-selection';
 import type { ArenaFrameUpdate } from './arena-frame-animation';
+import type { ThinMetalPanelPlacement } from './thin-metal-perforation';
 
 export type PracticeTarget = {
   id: string;
@@ -71,6 +72,8 @@ export type ArenaMap = {
     staticBallisticSurfaceIds: readonly string[];
   }>;
   breakableWindows: BreakableWindow[];
+  /** HF-467: this arena's plain thin-metal perforation registry (see src/thin-metal-perforation.ts). */
+  thinMetalPanels?: readonly ThinMetalPanelPlacement[];
   physicalCover: Array<{
     id: string;
     bounds: Box2;
