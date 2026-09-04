@@ -35,6 +35,10 @@ export function glassSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec
     name,
     family: 'glass',
     baseSrgb,
+    // Deliberate readability/performance exception to the skill's transmission
+    // 1.0 / IOR 1.5 clear-glass start: these panes use alpha/opaque glazing so
+    // coachGlass stays out of the transparent queue. Do not silently restore
+    // transmission here; the consumer's queue contract is part of the gate.
     roughness: 0.045,
     // DIELECTRIC. Not negotiable, and the family gate asserts it.
     metalness: 0.0,
