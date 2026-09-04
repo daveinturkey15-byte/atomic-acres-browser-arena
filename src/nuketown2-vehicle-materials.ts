@@ -22,6 +22,7 @@ const {
   fract,
   positionWorld,
   smoothstep,
+  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -46,7 +47,27 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
     .sub(float(0.5))
     .mul(float(0.04));
 
-  const base = vec3(baseColor.r, baseColor.g, baseColor.b).add(flake);
+  // HF-477: THE BASE COLOUR IS A UNIFORM, NOT THREE BAKED CONSTANTS.
+  //
+  // It used to be `vec3(baseColor.r, baseColor.g, baseColor.b)`, which puts the
+  // colour INSIDE the node graph - so every colour this factory is asked for is
+  // a different shader and a different WebGPU pipeline. That cost nothing while
+  // the arena wanted one car paint. FINDINGS Q4 puts three coloured cars in the
+  // reference's street (the driveway pair, a dark saloon and a green classic),
+  // and the third and fourth pipeline compiles pushed the arena's first
+  // submission past its own 12,000 ms deploy fence: measured on installed
+  // Chrome headless with a real hardware WebGPU device (nvidia, blackwell), the
+  // build reported "WebGPU queue completion exceeded 12000 ms for submission 1
+  // ... fenced draws 511" and Nuke Town Rebuild would not deploy at all, while
+  // every other arena still did and the same build with plain
+  // MeshStandardMaterial cars deployed fine.
+  //
+  // As a uniform the graph is IDENTICAL for every colour, so all of them share
+  // one compiled pipeline and the arena pays for one car paint no matter how
+  // many are parked in it - which is fewer pipelines than before this pass, not
+  // more. Nothing about the look changes: the flake, the roughness modulation
+  // and the metalness are untouched, and the value fed in is the same colour.
+  const base = uniform(new THREE.Vector3(baseColor.r, baseColor.g, baseColor.b)).add(flake);
   mat.colorNode = base;
   mat.roughnessNode = float(0.20).add(flake.mul(float(0.25)));
 

@@ -153,8 +153,23 @@ function overlapInsideBuilding(first: Box, second: Box): boolean {
   ));
 }
 
+/**
+ * HF-477. `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` is AUTHORED and the boxes measured
+ * above are WORLD, and until the lollipop that difference could not bite: the
+ * old carriageway was a full-width street plus a turning head centred on the
+ * origin, so it was its own mirror image and the two frames agreed. A
+ * cul-de-sac at one end is not, so the rects are put through the same mirror
+ * every solid is. Without this the instrument reported nine STREET findings on
+ * verge decals that are nowhere near the road - the road it was comparing them
+ * against was the reflection of the real one.
+ */
+const WORLD_CARRIAGEWAY_FOOTPRINTS = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
+  const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
+  return { ...footprint, x0, x1 };
+});
+
 function overlapInsideCarriageway(first: Box, second: Box): boolean {
-  return NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
+  return WORLD_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
     Math.min(first.x1, second.x1, footprint.x1) - Math.max(first.x0, second.x0, footprint.x0) > 1e-4
     && Math.min(first.z1, second.z1, footprint.z1) - Math.max(first.z0, second.z0, footprint.z0) > 1e-4
   ));

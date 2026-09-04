@@ -1,4 +1,4 @@
-import { NUKETOWN2_CENTRAL_TRUCK } from './nuketown2-layout';
+import { NUKETOWN2_CENTRAL_TRUCK, nuketown2HandedX } from './nuketown2-layout';
 
 // HF-385 (owner, 2026-08-28): "the 2x damage needs adjusting". Retuned 120 s/30 s ->
 // 90 s/20 s: the core contests half again as often and a holder's reign is a third
@@ -73,7 +73,15 @@ export const OVERDRIVE_POSITION = Object.freeze({ x: 0, y: 3.75, z: 0 });
  */
 export const OVERDRIVE_ARENA_POSITIONS: Readonly<Record<string, Readonly<{ x: number; y: number; z: number }>>> = Object.freeze({
   nuketown2: Object.freeze({
-    x: 0,
+    // HF-477: the seat's x was a literal 0 while the turning head was centred
+    // on the map and the truck stood at the world origin. The head is now a
+    // cul-de-sac bulb at one end (NUKETOWN2_CUL_DE_SAC) and the truck moved
+    // into it, so x is DERIVED from the truck the same way y and z already
+    // were - through `nuketown2HandedX`, because this seat is read by the
+    // runtime and must be in the WORLD frame while the truck is authored.
+    // A literal left here is exactly the failure src/railgun-authority.ts'
+    // header records against the shipped map.
+    x: nuketown2HandedX(NUKETOWN2_CENTRAL_TRUCK.x),
     y: NUKETOWN2_CENTRAL_TRUCK.roofY + NUKETOWN2_CENTRAL_TRUCK.coreHeightOverRoof,
     z: NUKETOWN2_CENTRAL_TRUCK.z,
   }),

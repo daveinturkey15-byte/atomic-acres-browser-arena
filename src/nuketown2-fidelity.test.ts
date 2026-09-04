@@ -241,16 +241,21 @@ const MIN_STANDING_EYE_LINE_METRES = 30;
  * carriageway between the truck and the coach - straight down z = 0. Left
  * alone, the road became a 34 m clear lane.
  *
- * The band is re-derived from the body that stops it now: the head car, the
- * arena's own authored counterweight (see `coach()`), parked ACROSS the
- * centre-line at x [2.3, 6.7]. The run from the west sample is 17 + 2.3 =
- * 19.3 m, plus one 0.5 m sample step. Measured: 20.0 m, from x = -17 to x = 3.
+ * The band was re-derived under HF-432 from the body that stopped it then: the
+ * "head car", this arena's own authored counterweight, parked ACROSS the
+ * centre-line at authored x [2.3, 6.7].
  *
- * THE VALUE IS UNCHANGED AT 21.2, deliberately: a band re-derived at a NEW
- * number would not be the same promise, and this one is still "the street is
- * not a shooting gallery". It is the number that moves if the head car is
- * deleted, shortened or pushed off the line - which is now the property that
- * carries it, and which is also why `coach()` says so in its own comment.
+ * HF-477 CHANGED THE BODY AND NOT THE BAND. The head car was an invention -
+ * `nt2025-aerial-boii.jpg` shows a GREEN CLASSIC CAR out in the stem and a dark
+ * saloon beside the truck, and the classic is the one parked across z = 0. So
+ * the derivation transfers to it intact: authored x [2.8, 7.2], run from the
+ * far sample 17 + 2.8 = 19.8 m plus one 0.5 m sample step.
+ *
+ * THE VALUE IS UNCHANGED AT 21.2 THROUGH BOTH RE-DERIVATIONS, deliberately: a
+ * band re-derived at a NEW number would not be the same promise, and this one
+ * is still "the street is not a shooting gallery". It is the number that moves
+ * if the classic is deleted, shortened or pushed off the line - which is now
+ * the property that carries it.
  */
 const MAX_STREET_CENTRE_RUN_METRES = 21.2;
 
@@ -448,14 +453,22 @@ describe('Nuke Town Rebuild fidelity', () => {
     // own bodies go through. Asserted as the mirrored interval rather than as
     // a re-typed number, so the two cannot drift apart.
     const truckSpan = nuketown2HandedSpan(
-      -NUKETOWN2_CENTRAL_TRUCK.boxLength / 2,
+      NUKETOWN2_CENTRAL_TRUCK.x - NUKETOWN2_CENTRAL_TRUCK.boxLength / 2,
       NUKETOWN2_CENTRAL_TRUCK.cabX + NUKETOWN2_CENTRAL_TRUCK.cabLength / 2,
+      // (the cab centre is itself derived from `x`, so this whole interval
+      // moves with the truck and cannot be left behind)
     );
     expect(truck!.bounds.minX).toBeCloseTo(truckSpan[0], 10);
     expect(truck!.bounds.maxX).toBeCloseTo(truckSpan[1], 10);
-    // The cargo box's own centre is still the world origin along the street,
-    // which is what lets the 2x core ride it: mirroring x cannot move x = 0.
-    expect(hx(0), 'the cargo box centre is a fixed point of the mirror').toBeCloseTo(0, 12);
+    // HF-477: THE TRUCK IS IN THE BULB. It used to stand on the world origin,
+    // which was also the centre of the turning head, so "in the head" needed no
+    // assertion. With the head at the cul-de-sac end the two are different
+    // claims, and this is the one that matters: the whole truck, cab included,
+    // stands inside the turning head's own authored footprint.
+    const bulb = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.find((rect) => rect.id === 'turning-head')!;
+    const [bulbX0, bulbX1] = nuketown2HandedSpan(bulb.x0, bulb.x1);
+    expect(truck!.bounds.minX, 'the truck stands inside the bulb').toBeGreaterThanOrEqual(bulbX0 - 1e-9);
+    expect(truck!.bounds.maxX, 'the truck stands inside the bulb').toBeLessThanOrEqual(bulbX1 + 1e-9);
     // HF-432 item 5: the truck stands where the REFERENCE has it, 0.076 L
     // south of the road centre-line, and the 2x core follows it because
     // OVERDRIVE_POSITION is per-arena now. HF-426 had to centre it on the
@@ -510,9 +523,12 @@ describe('Nuke Town Rebuild fidelity', () => {
     for (const part of ['truck box flank 0 pier 0', 'truck box flank 0 header', 'truck box flank 1 pier 1']) {
       expect(meshNames.some((name) => name.includes(part)), part).toBe(true);
     }
-    // The truck's interior is a real room: a standing eye at the origin, on the
-    // deck, is under a roof and inside the walls, and it is NOT blocked.
-    expect(isBlocked({ x: 0, y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
+    // The truck's interior is a real room: a standing eye at the cargo box's
+    // own centre, on the deck, is under a roof and inside the walls, and it is
+    // NOT blocked. HF-477: that centre used to be the world origin, because the
+    // turning head was centred on the map; it is now the truck's authored `x`
+    // put through the same mirror the body is.
+    expect(isBlocked({ x: hx(NUKETOWN2_CENTRAL_TRUCK.x), y: 1.7, z: NUKETOWN2_CENTRAL_TRUCK.z }, map.colliders, PLAYER_RADIUS), 'truck cargo box interior').toBe(false);
     // HF-436: the room is enterable from THREE mouths - the -x rear end and a
     // 1.6 x 1.9 m opening in EACH flank. Each mouth is clear just outside it
     // AND in the wall plane at standing eye height.
@@ -520,9 +536,9 @@ describe('Nuke Town Rebuild fidelity', () => {
     const mouths: Array<{ id: string; x: number; z: number; plane: { x: number; z: number } }> = [
       // HF-473: every x below is AUTHORED and put through the handedness
       // mirror, exactly as `streetVehicle()` does when it emits the body.
-      { id: 'rear end', x: hx(-t.boxLength / 2 - 0.6), z: t.z, plane: { x: hx(-t.boxLength / 2 + 0.075), z: t.z } },
-      { id: 'left flank', x: hx(0), z: t.z - t.width / 2 - 0.6, plane: { x: hx(0), z: t.z - (t.width / 2 - 0.075) } },
-      { id: 'right flank', x: hx(0), z: t.z + t.width / 2 + 0.6, plane: { x: hx(0), z: t.z + (t.width / 2 - 0.075) } },
+      { id: 'rear end', x: hx(t.x - t.boxLength / 2 - 0.6), z: t.z, plane: { x: hx(t.x - t.boxLength / 2 + 0.075), z: t.z } },
+      { id: 'left flank', x: hx(t.x), z: t.z - t.width / 2 - 0.6, plane: { x: hx(t.x), z: t.z - (t.width / 2 - 0.075) } },
+      { id: 'right flank', x: hx(t.x), z: t.z + t.width / 2 + 0.6, plane: { x: hx(t.x), z: t.z + (t.width / 2 - 0.075) } },
     ];
     for (const mouth of mouths) {
       expect(isBlocked({ x: mouth.x, y: 1.7, z: mouth.z }, map.colliders, PLAYER_RADIUS), `truck ${mouth.id} mouth outside`).toBe(false);
@@ -530,7 +546,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     // ...and a standing player WALKS in through the left mouth and out the
     // right one, on the real physics, no jump.
-    const through = await walkStanding(map, [hx(0), 1.7, t.z - t.width / 2 - 1.8], [[hx(0), t.z + t.width / 2 + 1.8]]);
+    const through = await walkStanding(map, [hx(t.x), 1.7, t.z - t.width / 2 - 1.8], [[hx(t.x), t.z + t.width / 2 + 1.8]]);
     expect(Math.abs(through[0]!.z - (t.z + t.width / 2 + 1.8)), `side-to-side walk ended at ${JSON.stringify(through[0])}`).toBeLessThan(0.45);
 
     // REVIEW ADDITION (Opus, PASS 92). The walk above proves the openings work
@@ -584,7 +600,12 @@ describe('Nuke Town Rebuild fidelity', () => {
     expect(NUKETOWN2_STREET_COACH.offsetAcross / L, 'coach offset across the street').toBeCloseTo(0.150, 3);
     // ...and the offsets are what the placement is actually built from, so the
     // two can never describe different things.
-    expect(Math.abs(NUKETOWN2_STREET_COACH.x)).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAlong, 10);
+    // HF-477: measured from the TRUCK, which is what "0.178 L from the truck's
+    // cargo box" says and what the schematic measured. It used to be measured
+    // from the world origin, which was the same point only because the truck
+    // stood on it.
+    expect(Math.abs(NUKETOWN2_STREET_COACH.x - NUKETOWN2_CENTRAL_TRUCK.x))
+      .toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAlong, 10);
     expect(NUKETOWN2_CENTRAL_TRUCK.z - NUKETOWN2_STREET_COACH.z).toBeCloseTo(NUKETOWN2_STREET_COACH.offsetAcross, 10);
     // Both street bodies stay on the carriageway, on OPPOSITE sides of the
     // road centre-line - which is what the reference draws and what HF-426
@@ -817,7 +838,10 @@ describe('Nuke Town Rebuild fidelity', () => {
       .toBe(-garageSide);
     // The driveway apron decal is authored in the same table the lawn field
     // reads, so it is checked from that table rather than from a mesh name.
-    const drive = WORLD_GROUND_DRESSING.find((piece) => piece.id === 'street driveway')!;
+    // HF-477 split the single paired `street driveway` into one entry per side
+    // (they meet different kerbs now - see the dressing table), so this reads
+    // the north house's own apron by name.
+    const drive = WORLD_GROUND_DRESSING.find((piece) => piece.id === 'street driveway north')!;
     expect(Math.sign((drive.x0 + drive.x1) / 2 - houseCentre.x), 'the driveway apron follows the garage')
       .toBe(garageSide);
 
@@ -922,29 +946,81 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
-  it('pins distinct blue and yellow house siding and excludes debug marker cubes', () => {
+  it('pins the reference ORANGE-over-cream and WHITE/CREAM houses, their glazing and their colour-coded lawn anchors', () => {
+    // HF-477. The old case pinned BLUE 0x46809f and YELLOW 0xf4be36 against
+    // `docs/nuketown-rebuild/REFERENCE_SCHEMATIC.md` section 5.3. Twenty
+    // reference images later that pairing is refuted:
+    // `docs/references/nuketown-2025/FINDINGS.md` Q2 is VERIFIED on two
+    // BO2-2025 frames and the blue/yellow read belongs to the ORIGINAL
+    // Nuketown (`nuketown-birdseye-bo.png`, BO1). So the case moves with the
+    // authority, and it moves UP: it now pins THREE distinctness facts where it
+    // pinned one, because the reference gives three.
     const map = buildNuketown2(new THREE.Scene());
-    const north = map.root.getObjectByName('nuketown2 north house wall west') as THREE.Mesh | undefined;
-    const south = map.root.getObjectByName('nuketown2 south house wall west') as THREE.Mesh | undefined;
-    expect(north, 'north house siding mesh').toBeDefined();
-    expect(south, 'south house siding mesh').toBeDefined();
-
-    const colourOf = (mesh: THREE.Mesh): THREE.Color => {
-      const material = mesh.material as THREE.Material & { color?: THREE.Color };
-      if (!material.color) throw new Error(`${mesh.name}: siding material has no base colour`);
+    const colourOf = (mesh: THREE.Mesh | undefined, label: string): THREE.Color => {
+      expect(mesh, label).toBeDefined();
+      const material = mesh!.material as THREE.Material & { color?: THREE.Color };
+      if (!material.color) throw new Error(`${mesh!.name}: material has no base colour`);
       return material.color;
     };
-    const northColour = colourOf(north!);
-    const southColour = colourOf(south!);
-    expect(northColour.getHex(), 'north house keeps the blue base').toBe(0x46809f);
-    expect(southColour.getHex(), 'south house keeps the yellow base').toBe(0xf4be36);
-    expect(northColour.equals(southColour), 'house siding bases must differ').toBe(false);
-    const rgbDistance = Math.hypot(
-      northColour.r - southColour.r,
-      northColour.g - southColour.g,
-      northColour.b - southColour.b,
+    const named = (name: string): THREE.Mesh | undefined => map.root.getObjectByName(name) as THREE.Mesh | undefined;
+    const margin = (first: THREE.Color, second: THREE.Color): number => Math.hypot(
+      first.r - second.r,
+      first.g - second.g,
+      first.b - second.b,
     );
-    expect(rgbDistance, 'house siding colour margin').toBeGreaterThan(0.45);
+
+    // (1) THE TWO HOUSES DIFFER, and the wall that carries the difference is
+    //     the UPPER one - which is where FINDINGS Q2 reads the terracotta off
+    //     `nt2025-street-boii.jpg`. The ground storeys are cream on both houses
+    //     in the reference, so asserting distinctness on a ground wall would be
+    //     asserting something the reference does not have.
+    const northUpper = colourOf(named('nuketown2 north house wall west upper'), 'north upper siding mesh');
+    const southUpper = colourOf(named('nuketown2 south house wall west upper'), 'south upper siding mesh');
+    expect(northUpper.getHex(), 'north house is the terracotta-orange one').toBe(0x9f6147);
+    expect(southUpper.getHex(), 'south house is the white/cream one').toBe(0xeae3cf);
+    expect(northUpper.equals(southUpper), 'house siding bases must differ').toBe(false);
+    expect(margin(northUpper, southUpper), 'house siding colour margin').toBeGreaterThan(0.45);
+
+    // (2) THE ORANGE HOUSE IS TWO-TONE, orange over cream. This is the half of
+    //     Q2 the old case could not state at all, because the whole house was
+    //     one material.
+    const northGround = colourOf(named('nuketown2 north house wall west'), 'north ground siding mesh');
+    const southGround = colourOf(named('nuketown2 south house wall west'), 'south ground siding mesh');
+    expect(northGround.getHex(), 'the orange house stands on a CREAM ground storey').toBe(0xeae3cf);
+    expect(northGround.equals(southGround), 'both ground storeys are the reference cream').toBe(true);
+    expect(margin(northUpper, northGround), 'orange-over-cream margin').toBeGreaterThan(0.45);
+
+    // (3) THE WHITE HOUSE'S PALE BLUE-GREY ROOF GLAZING - its own strongest
+    //     identifier from above (`nt2025-aerial-boii.jpg`), and the only thing
+    //     that keeps the two houses apart when the map is read from a chopper
+    //     or a minimap rather than from a spawn.
+    const northRoof = colourOf(named('nuketown2 north house roof deck'), 'north roof deck');
+    const southRoof = colourOf(named('nuketown2 south house roof deck'), 'south roof deck');
+    expect(southRoof.getHex(), 'the white house wears pale blue-grey roof glazing').toBe(0xaebdc1);
+    expect(northRoof.equals(southRoof), 'the two roofs must differ').toBe(false);
+
+    // (4) THE CHIRALITY ANCHORS. FINDINGS Q4: red cooker tops on the orange
+    //     house's lawn, blue on the white house's. Measured on the BUILT
+    //     geometry, and tied to the houses rather than to a literal sign, so a
+    //     later mirror of the arena carries them with it.
+    for (const index of [0, 1, 2]) {
+      const red = colourOf(named(`nuketown2 north verge appliance top ${index}`), `north appliance top ${index}`);
+      const blue = colourOf(named(`nuketown2 south verge appliance top ${index}`), `south appliance top ${index}`);
+      expect(red.r, `appliance top ${index} on the orange lawn is RED`).toBeGreaterThan(red.b);
+      expect(blue.b, `appliance top ${index} on the white lawn is BLUE`).toBeGreaterThan(blue.r);
+      expect(margin(red, blue), `appliance top ${index} colour margin`).toBeGreaterThan(0.15);
+    }
+    // The bank stands on the lawn between the hedge and the kerb, on the same
+    // side of the street as its own house - so it reads from that house's own
+    // spawn across the road, which is the whole point of an anchor.
+    for (const half of ['north', 'south'] as const) {
+      const cabinet = named(`nuketown2 ${half} verge appliance cabinet`)!;
+      expect(cabinet, `${half} appliance cabinet`).toBeDefined();
+      const houseZ = NUKETOWN2_HOUSE_LAYOUT[half === 'north' ? 0 : 1]!.z;
+      expect(Math.sign(cabinet.position.z), `${half} bank is on its own house's side`).toBe(Math.sign(houseZ));
+      expect(Math.abs(cabinet.position.z), `${half} bank is out on the verge, not against the house`)
+        .toBeLessThan(Math.abs(houseZ));
+    }
 
     const forbidden = new Set<string>();
     map.root.traverse((node) => {
@@ -979,7 +1055,14 @@ describe('Nuke Town Rebuild fidelity', () => {
         z0: -footprint.z1,
         z1: -footprint.z0,
       })),
-      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
+      // HF-477: the carriageway used to be symmetric about x = 0 (a full-width
+      // street plus a centred head), so the authored table WAS the world one
+      // and this line got away with not converting. The lollipop is not
+      // symmetric, so it converts exactly the way the buildings above do.
+      ...NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((footprint) => {
+        const [x0, x1] = nuketown2HandedSpan(footprint.x0, footprint.x1);
+        return { ...footprint, x0, x1 };
+      }),
     ];
     const floors = map.root.children.filter((node): node is THREE.Mesh => (
       node instanceof THREE.Mesh && (node.name.endsWith('house floor') || node.name.endsWith('garage floor'))
@@ -1313,8 +1396,28 @@ describe('Nuke Town Rebuild fidelity', () => {
           // capsule must be GROUNDED (eye 1.7 m, i.e. fell the 4.2 m from the
           // sill - impossible anywhere inside the house, whose floor is at
           // 3.3) and at least a foot outside the wall plane.
+          //
+          // HF-477 RE-DERIVED THE CEILING AND MADE IT TWO-SIDED. The bare
+          // 1.9 was 1.7 m of eye plus 0.2 m of slack, chosen when the ground in
+          // front of both houses was flat lawn. With the cul-de-sac at one end,
+          // the north house's front window drops onto the bulb's own KERB
+          // APRON - 0.18 m of outdoor concrete, which is a surface a player
+          // stands on and autosteps off, not somewhere they are stuck. So the
+          // ceiling is stated as "eye height on any surface at or below kerb
+          // height", against the SAME 0.30 m constant the carriageway class is
+          // held to, rather than as a bare number.
+          //
+          // This does not loosen what the case discriminates. The surfaces it
+          // has to reject are the ground-floor slab (0.08 -> eye 1.78, still
+          // inside), the upper floor it fell FROM (3.3 -> eye 5.0) and a
+          // vehicle roof (3.25 -> eye 4.95); the nearest of those is 3 m away
+          // from either edge of the band. The FLOOR is new and is a
+          // strengthening: the old case would have passed a capsule that ended
+          // up below ground.
+          const KERB_CEILING_M = 0.30;
           expect((end.z - wallZ) * outward, `${label} - clear of the wall`).toBeGreaterThan(0.2);
-          expect(end.y, `${label} - landed outside`).toBeLessThan(1.9);
+          expect(end.y, `${label} - landed outside`).toBeLessThan(1.7 + KERB_CEILING_M);
+          expect(end.y, `${label} - landed on a real surface`).toBeGreaterThan(1.65);
         }
       }
     } finally {
@@ -1436,9 +1539,17 @@ describe('Nuke Town Rebuild fidelity', () => {
       return top;
     };
     // The two letterboxes: a 0.32 x 0.50 m lid on a 0.16 m post, authored in
-    // `verge()` at (GARAGE_X1 + 0.6, KERB_Z - 1.2) and its rotational partner.
-    // They are the ONE thing on this map you may duck under.
-    const letterbox: [number, number] = [9.85, -7.1];
+    // `verge()` at (GARAGE_X1 + 0.6, VERGE_FURNITURE_Z) and its rotational
+    // partner. They are the ONE thing on this map you may duck under.
+    // HF-477 moved the whole verge furniture line to |z| = 8.55 - every paired
+    // prop had to clear the cul-de-sac bulb, which now fills the verge band at
+    // one end of the map - and the exception cell moved with it. The
+    // ENTITLEMENT is unchanged: one lid, nothing else.
+    // Read off the BUILT lid rather than transcribed: HF-477 moved the whole
+    // verge furniture line and a literal here would have to be chased.
+    const lid = map.root.getObjectByName('nuketown2 north verge mailbox');
+    expect(lid, 'the letterbox lid the exception is for').toBeDefined();
+    const letterbox: [number, number] = [lid!.position.x, lid!.position.z];
     const offenders: Array<[number, number]> = [];
     for (let x = NUKETOWN2_BOUNDS.minX + 0.5; x <= NUKETOWN2_BOUNDS.maxX - 0.5; x += 0.25) {
       for (let z = NUKETOWN2_BOUNDS.minZ + 0.5; z <= NUKETOWN2_BOUNDS.maxZ - 0.5; z += 0.25) {
@@ -1450,6 +1561,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       }
     }
     for (const [x, z] of offenders) {
+      // The lid and its exact 180-degree partner, which is what `pair()` emits.
       const nearest = Math.min(
         Math.hypot(x - letterbox[0], z - letterbox[1]),
         Math.hypot(x + letterbox[0], z + letterbox[1]),
@@ -1650,12 +1762,27 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle coach waist stripe 1',
       'nuketown2 street-vehicle coach window band 0',
       'nuketown2 street-vehicle coach window band 1',
-      'nuketown2 street-vehicle head car body',
-      'nuketown2 street-vehicle head car cabin',
-      'nuketown2 street-vehicle head car wheel 00',
-      'nuketown2 street-vehicle head car wheel 01',
-      'nuketown2 street-vehicle head car wheel 10',
-      'nuketown2 street-vehicle head car wheel 11',
+      // HF-477 - DELIBERATE REPLACEMENT, with the reason. The single aqua
+      // "head car" was this arena's own invention, authored across the road
+      // centre-line to hold two bands down. `nt2025-aerial-boii.jpg` shows
+      // what is actually parked in the road: a DARK SALOON beside the box
+      // truck on the white house's side, and a GREEN CLASSIC out in the stem.
+      // Both bands survive on the new bodies - the saloon is on the truck's own
+      // z half (the counterweight) and the classic is the one body across
+      // z = 0 (the centre-line run) - so this is a substitution, not a
+      // relaxation.
+      'nuketown2 street-vehicle stem classic body',
+      'nuketown2 street-vehicle stem classic cabin',
+      'nuketown2 street-vehicle stem classic wheel 00',
+      'nuketown2 street-vehicle stem classic wheel 01',
+      'nuketown2 street-vehicle stem classic wheel 10',
+      'nuketown2 street-vehicle stem classic wheel 11',
+      'nuketown2 street-vehicle stem saloon body',
+      'nuketown2 street-vehicle stem saloon cabin',
+      'nuketown2 street-vehicle stem saloon wheel 00',
+      'nuketown2 street-vehicle stem saloon wheel 01',
+      'nuketown2 street-vehicle stem saloon wheel 10',
+      'nuketown2 street-vehicle stem saloon wheel 11',
       // HF-432 ITEM 5 - DELIBERATE ADDITION, with the reason. The truck moved
       // 0.076 L SOUTH of the road centre-line, where the reference has it, so
       // the four parts that used to be their own 180-degree partners across
@@ -1694,6 +1821,50 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle truck wheel 2',
     ];
 
+    // ---- HF-477: THE CARRIAGEWAY, AND WHY IT IS A SECOND EXCEPTION ---------
+    // The lollipop breaks the 180-degree property for the ROAD, and it has to:
+    // `docs/references/nuketown-2025/FINDINGS.md` Q4 VERIFIES one circular
+    // turning head at ONE end with a stem running off the map at the other, so
+    // a road that maps onto itself under (x, z) -> (-x, -z) is a road the
+    // reference does not have. Everything below is enumerated exactly, like the
+    // street vehicles, and paid for by three properties written under it.
+    const EXPECTED_ASYMMETRIC_CARRIAGEWAY = [
+      'nuketown2 carriageway turning head',
+      'nuketown2 carriageway stem',
+      'nuketown2 carriageway stem kerb 0',
+      'nuketown2 carriageway stem kerb 1',
+      'nuketown2 carriageway stem dash 0',
+      'nuketown2 carriageway stem dash 1',
+      'nuketown2 carriageway stem dash 2',
+      'nuketown2 carriageway stem dash 3',
+      ...Array.from({ length: 16 }, (_, index) => `nuketown2 carriageway head kerb island ${index}`),
+      // The front verge is tiled per z-side for the same reason - the bulb
+      // fills the whole verge band at one end of the map and none of it at the
+      // other, so `pair()` would put each tile's image on the road. The names
+      // come from the arena's OWN dressing table, filtered on the same
+      // `paired: false` flag its builder reads, so a tile added there cannot be
+      // missed here and a tile deleted there cannot be left behind.
+      ...NUKETOWN2_GROUND_DRESSING
+        .filter((piece) => piece.paired === false)
+        .map((piece) => `nuketown2 ${piece.id}`),
+    ];
+
+    // ---- HF-477: THE THIRD HOUSE -------------------------------------------
+    // FINDINGS Q4: "a dark pitched-roof house with big white window bands, its
+    // own driveway and a red car on it, sitting past the fence at the head
+    // end", and FINDINGS calls it the best chirality landmark the reference
+    // has. There is one of it, at one end, so it cannot be a rotational pair.
+    const EXPECTED_ASYMMETRIC_BEYOND_BOUNDS = [
+      'nuketown2 beyond-bounds third house block',
+      'nuketown2 beyond-bounds third house eaves',
+      'nuketown2 beyond-bounds third house roof',
+      'nuketown2 beyond-bounds third house window band 0',
+      'nuketown2 beyond-bounds third house window band 1',
+      'nuketown2 beyond-bounds third house drive',
+      'nuketown2 beyond-bounds third house car body',
+      'nuketown2 beyond-bounds third house car cabin',
+    ];
+
     const solids = solidMeshes(map);
     expect(solids.length).toBeGreaterThan(120);
     const size = (mesh: THREE.Mesh) => {
@@ -1706,43 +1877,229 @@ describe('Nuke Town Rebuild fidelity', () => {
     const present = new Set(solids.map((mesh) => `${size(mesh)}|${at(mesh.position.x, mesh.position.y, mesh.position.z)}`));
     const asymmetric = solids
       .filter((mesh) => !present.has(`${size(mesh)}|${at(-mesh.position.x, mesh.position.y, -mesh.position.z)}`));
-    expect(asymmetric.map((mesh) => mesh.name).sort()).toEqual([...EXPECTED_ASYMMETRIC].sort());
-    // Every one of them is a street vehicle by NAME as well as by list, so the
-    // list cannot be grown with a wall by renaming it.
-    for (const mesh of asymmetric) {
+    // ---- HF-477: THE OUTDOOR GROUND SLAB -----------------------------------
+    // The third consequence, and the one that is DERIVED rather than
+    // enumerated. `buildNuketown2Ground` tiles the outdoor slab as the
+    // complement of the cuts, so the tiling inherits whatever asymmetry the
+    // cuts have - and the carriageway is now asymmetric, so 43 tiles are.
+    //
+    // A written list of tile names would be the wrong instrument: it is a
+    // generated grid and any re-cut renumbers every entry. So this class is
+    // classified by a PROPERTY instead, and the property is exactly the claim
+    // being made - the ground's asymmetry is the ROAD's asymmetry and nothing
+    // else. A tile whose 180-degree image is not on the carriageway fails, and
+    // a body that is not a ground tile cannot enter the class at all: they are
+    // the only meshes on this map whose top face is the 0 m outdoor datum.
+    const worldCarriageway = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.map((rect) => {
+      const [x0, x1] = nuketown2HandedSpan(rect.x0, rect.x1);
+      return { ...rect, x0, x1 };
+    });
+    const isGroundTile = (mesh: THREE.Mesh) => /^nuketown2 ground tile \d+$/.test(mesh.name);
+    const groundTiles = asymmetric.filter(isGroundTile);
+    expect(groundTiles.length, 'the lollipop makes some ground tiles asymmetric').toBeGreaterThan(0);
+    // Nothing but the outdoor slab can enter this class: these are the only
+    // meshes on the map whose top face is the 0 m outdoor ground datum.
+    for (const mesh of groundTiles) {
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      expect(bounds.max.y, `${mesh.name} is the outdoor ground datum`).toBeCloseTo(0, 5);
+    }
+    // AND THE ASYMMETRY IS THE ROAD'S, MEASURED ON THE REGION RATHER THAN ON
+    // THE TILES. A tile is a cell of a generated grid, and the grid's own cut
+    // lines are asymmetric, so individual tiles differ in SIZE either side of
+    // the origin even where the ground they cover is identical. The claim that
+    // is actually being made is about the ground, not about the grid: every
+    // point of the map is ground if and only if its 180-degree image is, EXCEPT
+    // on the carriageway - which is the one asymmetric cut. Sampled on a 0.5 m
+    // lattice over the whole playable rectangle.
+    const groundRects = solids.filter(isGroundTile).map(planFootprint);
+    const isGround = (x: number, z: number) => groundRects.some((rect) => (
+      x > rect.x0 && x < rect.x1 && z > rect.z0 && z < rect.z1
+    ));
+    const onCarriageway = (x: number, z: number) => worldCarriageway.some((rect) => (
+      x > rect.x0 - 1e-6 && x < rect.x1 + 1e-6 && z > rect.z0 - 1e-6 && z < rect.z1 + 1e-6
+    ));
+    const groundBreaks: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 0.25; x < NUKETOWN2_BOUNDS.maxX; x += 0.5) {
+      for (let z = NUKETOWN2_BOUNDS.minZ + 0.25; z < NUKETOWN2_BOUNDS.maxZ; z += 0.5) {
+        if (isGround(x, z) === isGround(-x, -z)) continue;
+        if (onCarriageway(x, z) || onCarriageway(-x, -z)) continue;
+        groundBreaks.push([x, z]);
+      }
+    }
+    expect(groundBreaks, 'the ground is 180-symmetric everywhere off the carriageway').toEqual([]);
+
+    expect(asymmetric.filter((mesh) => !groundTiles.includes(mesh)).map((mesh) => mesh.name).sort()).toEqual([
+      ...EXPECTED_ASYMMETRIC,
+      ...EXPECTED_ASYMMETRIC_CARRIAGEWAY,
+      ...EXPECTED_ASYMMETRIC_BEYOND_BOUNDS,
+    ].sort());
+    // Every one of them is a street vehicle, a carriageway body or a
+    // beyond-bounds body by NAME as well as by list, so no list can be grown
+    // with a wall by renaming it.
+    const carriageway = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_CARRIAGEWAY.includes(mesh.name));
+    const beyondBounds = asymmetric.filter((mesh) => EXPECTED_ASYMMETRIC_BEYOND_BOUNDS.includes(mesh.name));
+    const vehicles = asymmetric.filter((mesh) => (
+      !carriageway.includes(mesh) && !beyondBounds.includes(mesh) && !groundTiles.includes(mesh)
+    ));
+    for (const mesh of vehicles) {
       expect(mesh.name.startsWith('nuketown2 street-vehicle '), mesh.name).toBe(true);
     }
+    for (const mesh of carriageway) {
+      expect(/^nuketown2 (carriageway|verge lawn|street driveway) /.test(mesh.name), mesh.name).toBe(true);
+    }
+    for (const mesh of beyondBounds) {
+      expect(mesh.name.startsWith('nuketown2 beyond-bounds '), mesh.name).toBe(true);
+    }
 
-    // AND THE EXCEPTION IS PAID FOR. Two properties the old exact-symmetry test
-    // got for free and a name filter would have thrown away:
+    // ---- WHAT THE CARRIAGEWAY EXCEPTION PAYS ------------------------------
+    // The class splits in two, and the split is not cosmetic: the ROAD is what
+    // the lollipop made asymmetric, and the VERGE DRESSING around it is
+    // asymmetric only because it has to tile around that road and around two
+    // driveway aprons that follow the garages (which ARE a rotational pair).
+    // Each half gets the strongest property that is actually true of it.
+    const roadBodies = carriageway.filter((mesh) => mesh.name.startsWith('nuketown2 carriageway '));
+    const vergeDressing = carriageway.filter((mesh) => !roadBodies.includes(mesh));
+    expect(roadBodies.length, 'the road is the asymmetric body').toBeGreaterThan(8);
+    expect(vergeDressing.length, 'and the verge tiles around it').toBeGreaterThan(4);
+
+    // (i) THE ROAD IS STILL FAIR, and this is the band that replaces the
+    //     180-degree one rather than dropping it. The teams are separated
+    //     across z. The lollipop's asymmetry runs entirely along x - head at
+    //     one end, stem at the other - and across z every piece of road is an
+    //     EXACT MIRROR of itself. So both teams get an identical road, which is
+    //     the property the 180-degree rule was buying, proved directly instead
+    //     of as a corollary.
+    const zMirrorKey = (mesh: THREE.Mesh) => `${size(mesh)}|${at(mesh.position.x, mesh.position.y, -mesh.position.z)}`;
+    const roadPresent = new Set(roadBodies.map((mesh) => `${size(mesh)}|${at(mesh.position.x, mesh.position.y, mesh.position.z)}`));
+    for (const mesh of roadBodies) {
+      expect(roadPresent.has(zMirrorKey(mesh)), `${mesh.name} has an exact z-mirror partner`).toBe(true);
+    }
+    // (ii) IT CANNOT GROW INTO STRUCTURE. Every carriageway body tops out at or
+    //      under kerb height - 0.30 m, against the 0.42 m autostep - so a wall,
+    //      a house, a vehicle or any piece of cover is structurally barred from
+    //      joining this list. That is a stronger bar than the vehicles' own
+    //      plan-area cap, because it is not a budget anything can eat into.
+    const KERB_CEILING_M = 0.30;
+    for (const mesh of carriageway) {
+      const bounds = new THREE.Box3().setFromObject(mesh);
+      expect(bounds.max.y, `${mesh.name} is at or under kerb height`).toBeLessThanOrEqual(KERB_CEILING_M);
+    }
+    // (iii) THE ROAD CANNOT LEAVE THE STREET. Every road body stays inside the
+    //       corridor between the two house front lines, so no amount of road
+    //       asymmetry can ever reach a house, a yard or a spawn. (The verge
+    //       dressing is excluded here for one honest reason: a driveway apron
+    //       runs from the kerb up to its own garage door, which is deliberately
+    //       behind the house front line.)
+    const CORRIDOR_HALF = NUKETOWN2_SECTION.streetHalfWidth + NUKETOWN2_SECTION.frontVergeDepth;
+    for (const mesh of roadBodies) {
+      const f = planFootprint(mesh);
+      expect(Math.max(Math.abs(f.z0), Math.abs(f.z1)), `${mesh.name} stays in the street corridor`)
+        .toBeLessThanOrEqual(CORRIDOR_HALF + 1e-6);
+    }
+    // (iv) THE VERGE DRESSING IS ASYMMETRIC ONLY BECAUSE THE ROAD IS, measured
+    //      on the REGION rather than on the tiles for exactly the reason the
+    //      ground tiles are: a tile boundary is an artefact of how the band was
+    //      cut up, and moving one is not a change to what a player sees. The
+    //      claim is that road-plus-verge together COVER a 180-symmetric region.
+    //      Every square metre of hard surface and mown verge one team has, the
+    //      other has too; only the tile seams differ. Sampled on a 0.5 m
+    //      lattice, and it fails the moment a verge tile is dropped, widened or
+    //      moved off its own side.
+    const surfaceRects = [
+      ...roadBodies.map(planFootprint),
+      ...vergeDressing.map(planFootprint),
+    ];
+    const isSurface = (x: number, z: number) => surfaceRects.some((rect) => (
+      x > rect.x0 + 1e-6 && x < rect.x1 - 1e-6 && z > rect.z0 + 1e-6 && z < rect.z1 - 1e-6
+    ));
+    // The lattice is offset by 0.15 m and not 0.25 m so that neither a sample
+    // nor its own negation ever lands ON a tile seam: every seam on this band
+    // is at a whole or half metre (the bounds, the mouth, the closed end, the
+    // garage edges, |z| = 8) and a sample exactly on one is inside neither
+    // rectangle, which reads as a hole that is not there.
+    const surfaceBreaks: Array<[number, number]> = [];
+    for (let x = NUKETOWN2_BOUNDS.minX + 0.15; x < NUKETOWN2_BOUNDS.maxX; x += 0.5) {
+      for (let z = -CORRIDOR_HALF - 6.35; z < CORRIDOR_HALF + 6.35; z += 0.5) {
+        if (isSurface(x, z) === isSurface(-x, -z)) continue;
+        surfaceBreaks.push([Math.round(x * 100) / 100, Math.round(z * 100) / 100]);
+      }
+    }
+    expect(surfaceBreaks, 'road plus verge covers a 180-symmetric region').toEqual([]);
+
+    // ---- WHAT THE THIRD HOUSE PAYS ----------------------------------------
+    // It is OUT OF PLAY, structurally. Every one of its bodies lies entirely
+    // beyond `NUKETOWN2_BOUNDS`, so an asymmetric building can never be an
+    // in-play advantage for either team; it is a landmark and nothing else.
+    for (const mesh of beyondBounds) {
+      const f = planFootprint(mesh);
+      const outside = f.x0 >= NUKETOWN2_BOUNDS.maxX || f.x1 <= NUKETOWN2_BOUNDS.minX;
+      expect(outside, `${mesh.name} stands entirely outside the playable bounds`).toBe(true);
+    }
+    // ...and it is on the CUL-DE-SAC side, which is the whole point of it: the
+    // reference puts it past the fence at the head end. Derived from the head's
+    // own authored footprint rather than from a literal sign.
+    const bulbRect = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.find((rect) => rect.id === 'turning-head')!;
+    const stemRect = NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.find((rect) => rect.id === 'street')!;
+    const bulbWorld = nuketown2HandedSpan(bulbRect.x0, bulbRect.x1);
+    const stemWorld = nuketown2HandedSpan(stemRect.x0, stemRect.x1);
+    const closedEndSign = Math.sign((bulbWorld[0] + bulbWorld[1]) - (stemWorld[0] + stemWorld[1]));
+    for (const mesh of beyondBounds) {
+      expect(Math.sign(mesh.position.x), `${mesh.name} stands beyond the CLOSED end`).toBe(closedEndSign);
+    }
+
+    // ---- WHAT THE STREET-VEHICLE EXCEPTION PAYS ---------------------------
     //
     // (a) The exception cannot GROW into structure. Total plan area of every
-    //     asymmetric body is capped at 6 % of the playspace - 181 m² on 3,024.
-    //     Measured 89.3 m², 2.95 %. One house footprint alone is 143 m², so no
-    //     building can ever join this list without failing here.
+    //     asymmetric street vehicle is capped at 6 % of the playspace - 181 m²
+    //     on 3,024. One house footprint alone is 143 m², so no building can
+    //     ever join this list without failing here.
     let asymArea = 0;
     const half = { xNeg: 0, xPos: 0, zNeg: 0, zPos: 0 };
-    for (const mesh of asymmetric) {
+    let inBulb = 0;
+    let inStem = 0;
+    for (const mesh of vehicles) {
       const f = planFootprint(mesh);
-      asymArea += (f.x1 - f.x0) * (f.z1 - f.z0);
+      const area = (f.x1 - f.x0) * (f.z1 - f.z0);
+      asymArea += area;
       half.xNeg += Math.max(0, Math.min(f.x1, 0) - f.x0) * (f.z1 - f.z0);
       half.xPos += Math.max(0, f.x1 - Math.max(f.x0, 0)) * (f.z1 - f.z0);
       half.zNeg += Math.max(0, Math.min(f.z1, 0) - f.z0) * (f.x1 - f.x0);
       half.zPos += Math.max(0, f.z1 - Math.max(f.z0, 0)) * (f.x1 - f.x0);
+      inBulb += Math.max(0, Math.min(f.x1, bulbWorld[1]) - Math.max(f.x0, bulbWorld[0])) * (f.z1 - f.z0);
+      inStem += Math.max(0, Math.min(f.x1, stemWorld[1]) - Math.max(f.x0, stemWorld[0])) * (f.z1 - f.z0);
     }
     expect(asymArea).toBeLessThan(0.06 * width * depth);
 
-    // (b) Neither team's HALF may be bare. The teams are separated across z, so
-    //     the z halves are the ones that decide who owns the turning head: each
-    //     must carry at least 20 m² of street-vehicle plan area, which is one
-    //     substantial body (the coach alone is 23.7 m², the head car plus the
-    //     truck's own south-side treads and half its box make the other half).
-    //     This is the assertion the coach's counterweight exists to satisfy -
-    //     see `coach()` - and it fails if the head car is deleted.
+    // (b) NEITHER TEAM'S HALF MAY BE BARE, and this is the half of the old band
+    //     that survives untouched. The teams are separated across z, so the z
+    //     halves are the ones that decide who owns the head: each must carry at
+    //     least 20 m² of street-vehicle plan area. The coach alone is 23.7 m²
+    //     on one side; the truck is 30.4 m² on the other.
     expect(half.zNeg, 'north half street-vehicle cover').toBeGreaterThan(20);
     expect(half.zPos, 'south half street-vehicle cover').toBeGreaterThan(20);
-    expect(half.xNeg, 'west half street-vehicle cover').toBeGreaterThan(20);
-    expect(half.xPos, 'east half street-vehicle cover').toBeGreaterThan(20);
+
+    // (c) THE X-HALF FLOORS ARE RE-DERIVED, AND HERE IS WHY THEY HAD TO BE.
+    //     The old band asked for 20 m² of street-vehicle plan area on each side
+    //     of x = 0. It was a proxy: with a turning head CENTRED on the map,
+    //     "cover on both sides of the origin" and "cover in the head" were the
+    //     same statement, and the origin was the head's own centre. Under the
+    //     lollipop they are different statements and only one of them is a
+    //     property of the reference. `nt2025-aerial-boii.jpg` puts the coach,
+    //     the truck and the saloon IN THE BULB or at its mouth and one classic
+    //     car out in the stem, so the x halves are unequal BY CONSTRUCTION -
+    //     asking for 20 m² in the far half of the stem would be asking for a
+    //     body the reference does not have.
+    //
+    //     What replaces it is the statement the reference actually makes, and
+    //     it is more specific, not looser: the great majority of the street
+    //     bodies stand in the turning head, and at least one stands out in the
+    //     stem. Delete the coach or the truck and (i) fails; park everything in
+    //     the bulb and the stem floor fails; scatter them down the stem and the
+    //     bulb share fails. x = 0 is not mentioned, because it is not a feature
+    //     of this map any more - it is a point in the middle of the stem.
+    expect(inBulb / asymArea, 'street bodies stand in the turning head').toBeGreaterThan(0.6);
+    expect(inStem, 'at least one street body is out in the stem').toBeGreaterThan(8);
+    expect(half.xNeg + half.xPos).toBeCloseTo(asymArea, 6);
   });
 
   it('leaves no floating solid geometry over the playable yards', () => {
@@ -1795,7 +2152,11 @@ describe('Nuke Town Rebuild fidelity', () => {
     // cannot leave the core behind, which is the failure
     // src/railgun-authority.ts' header records against the shipped map.
     const SEAT = overdrivePositionForArena('nuketown2');
-    expect(SEAT.x).toBeCloseTo(0, 10);
+    // HF-477: the seat follows the truck, which moved into the cul-de-sac
+    // bulb. Derived from the same field the arena builds the box from, and put
+    // through the handedness mirror because the seat is read by the runtime in
+    // the WORLD frame - which is what `src/overdrive.ts` now does.
+    expect(SEAT.x).toBeCloseTo(hx(NUKETOWN2_CENTRAL_TRUCK.x), 10);
     expect(SEAT.z).toBeCloseTo(t.z, 10);
     expect(SEAT.y).toBeCloseTo(t.roofY + t.coreHeightOverRoof, 10);
     // THE SHIPPED MAP'S SEAT IS UNTOUCHED, byte for byte, which is the
@@ -1807,12 +2168,15 @@ describe('Nuke Town Rebuild fidelity', () => {
     const claimFrom = (feetY: number, x: number, z: number): boolean => (
       claimOverdrive(createOverdriveState(0, SEAT), 'probe', { x, y: feetY + EYE, z }, true, 10_000_000).claimed
     );
+    // HF-477: every plan coordinate below used to be the world origin, because
+    // that is where the cargo box stood. It is the truck's own x now, put
+    // through the same mirror the body is.
     // Standing on the cargo-box roof, at the core: CLAIMED. dy 1.10.
-    expect(claimFrom(t.roofY, 0, t.z), 'box roof').toBe(true);
+    expect(claimFrom(t.roofY, hx(t.x), t.z), 'box roof').toBe(true);
     // Standing on the deck directly beneath it: REJECTED. dy 2.00.
-    expect(claimFrom(t.deckY, 0, t.z), 'cargo box interior').toBe(false);
+    expect(claimFrom(t.deckY, hx(t.x), t.z), 'cargo box interior').toBe(false);
     // Standing on the road beside the truck: REJECTED. dy 2.05.
-    expect(claimFrom(0, 1.2, t.z + 3.0), 'road').toBe(false);
+    expect(claimFrom(0, hx(t.x + 1.2), t.z + 3.0), 'road').toBe(false);
     // Standing on the CAB roof: REJECTED by radius. The cab roof is a real
     // walkable surface on the climb route, and it is 0.25 m below the box roof,
     // so height alone would admit it.
@@ -1823,7 +2187,7 @@ describe('Nuke Town Rebuild fidelity', () => {
     // must not be a way to take the core out of a covered position.
     const treadZ = t.z - (t.width / 2 + 2.45) / 2;
     for (const [top, x0, x1] of [[0.80, 7.0, 8.2], [1.75, 5.8, 7.0], [2.60, 4.6, 5.8]] as const) {
-      for (const x of [hx(x0), hx(x1), hx((x0 + x1) / 2)]) {
+      for (const x of [hx(t.x + x0), hx(t.x + x1), hx(t.x + (x0 + x1) / 2)]) {
         for (const z of [treadZ - 0.55, treadZ, treadZ + 0.55]) {
           expect(claimFrom(top, x, z), `tread top ${top} at (${x}, ${z})`).toBe(false);
         }
@@ -1850,10 +2214,13 @@ describe('Nuke Town Rebuild fidelity', () => {
       const treadZ = t.z - (t.width / 2 + 2.45) / 2;
       // Authored x, mirrored (HF-473) - the treads themselves are emitted
       // through `pair()` and moved with the map.
+      // HF-477: every x here is an OFFSET from the cargo box centre put
+      // through the mirror, because `TRUCK_ROOF_STEPS` became offsets when the
+      // truck stopped standing on the world origin.
       const route: Array<[number, number]> = [
-        [hx(7.6), treadZ], [hx(6.4), treadZ], [hx(5.2), treadZ], [hx(t.cabX), t.z], [hx(0), t.z],
+        [hx(t.x + 7.6), treadZ], [hx(t.x + 6.4), treadZ], [hx(t.x + 5.2), treadZ], [hx(t.cabX), t.z], [hx(t.x), t.z],
       ];
-      physics.teleportEye({ x: hx(9.6), y: 1.9, z: treadZ });
+      physics.teleportEye({ x: hx(t.x + 9.6), y: 1.9, z: treadZ });
       let vy = 0;
       for (const waypoint of route) {
         for (let step = 0; step < 420; step += 1) {
@@ -1874,7 +2241,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       }
       const end = physics.eyePosition();
       // Standing (or mid-hop) on the roof over the core, not on the road.
-      expect(Math.hypot(end.x, end.z - NUKETOWN2_CENTRAL_TRUCK.z), 'reached the core in plan').toBeLessThan(1.2);
+      expect(Math.hypot(end.x - hx(t.x), end.z - NUKETOWN2_CENTRAL_TRUCK.z), 'reached the core in plan').toBeLessThan(1.2);
       expect(end.y, 'eye height on the truck roof').toBeGreaterThan(NUKETOWN2_CENTRAL_TRUCK.roofY + 1.5);
     } finally {
       physics.dispose();

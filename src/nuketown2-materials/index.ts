@@ -102,6 +102,12 @@ export interface Nuketown2MaterialRegistry {
   readonly fence: MeshStandardNodeMaterial;
   /** Painted panel signage. */
   readonly sign: MeshStandardNodeMaterial;
+  /** HF-477: the white house's pale blue-grey roof glazing. */
+  readonly roofGlazing: MeshStandardNodeMaterial;
+  /** HF-477: cooker tops on the ORANGE house's front lawn. */
+  readonly applianceRed: MeshStandardNodeMaterial;
+  /** HF-477: cooker tops on the WHITE house's front lawn. */
+  readonly applianceBlue: MeshStandardNodeMaterial;
   /** Hedges, planters and garden mass. */
   readonly planter: MeshStandardNodeMaterial;
   /** Coach body trim band. Decal tier -1. */
@@ -113,8 +119,9 @@ export interface Nuketown2MaterialRegistry {
 /** Every role name, for the gates that sweep the registry rather than naming rows. */
 export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
   'ground', 'lawn', 'asphalt', 'kerb', 'drive', 'driveDecal', 'trimDecal',
-  'block', 'sidingA', 'sidingB', 'garageDoor', 'trim', 'roof', 'fence',
-  'sign', 'planter', 'busTrim', 'coachGlass',
+  'block', 'sidingA', 'sidingB', 'garageDoor', 'trim', 'roof', 'roofGlazing',
+  'fence', 'sign', 'planter', 'applianceRed', 'applianceBlue', 'busTrim',
+  'coachGlass',
 ] as const);
 
 /**
@@ -150,11 +157,29 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     trimDecal: createMarkingMaterial(),
     block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block' }),
 
-    // The two houses keep the base hexes the fidelity gate pins; what changed
-    // is everything on top of them.
-    sidingA: createSidingMaterial(0x46809f, 'nuketown2-siding-north-blue'),
-    sidingB: createSidingMaterial(0xf4be36, 'nuketown2-siding-south-yellow'),
+    // HF-477 SUPERSEDES THE HEXES THIS LANE INHERITED, and it is the accuracy
+    // lane's call, not this one's: `docs/references/nuketown-2025/FINDINGS.md`
+    // Q2 is VERIFIED on two BO2-2025 frames and reads TERRACOTTA-ORANGE over
+    // CREAM, not the blue-and-yellow pairing (which is the ORIGINAL Nuketown's
+    // palette, the same source as the school bus HF-407 removed). What this
+    // lane owns is everything ON TOP of the hex - the lap shadow, the chalking,
+    // the weathering - and all of that is unchanged. `sidingA` is now the
+    // orange UPPER band only; `sidingB` is the cream that three of the four
+    // storey-halves wear, which is why one material carries both ground
+    // storeys and the whole south house.
+    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper'),
+    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream'),
     roof: createRoofMaterial(),
+    // HF-477: the white house's PALE BLUE-GREY ROOF GLAZING, the aerial's
+    // single strongest identifier for that house (measured #aebdc0/#b6c6c9 on
+    // `nt2025-aerial-boii.jpg`). Authored 0xaebdc1 - within 1/255 of the
+    // measurement and already this map's own `chrome` albedo, so no new value
+    // is invented. Smooth and unpanelled, because it is glazing rather than a
+    // shingled deck.
+    roofGlazing: createPaintedMetalMaterial('nuketown2-roof-glazing', 0xaebdc1, {
+      roughness: 0.22,
+      metalness: 0.10,
+    }),
 
     // A sectional door is PAINTED STEEL, not chrome. It was shipping at
     // metalness 0.76, which made a 5 x 2 m panel mirror the sky and read as a
@@ -170,6 +195,22 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // fence a shade lighter and oranger and the review captures showed it.
     fence: createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence'),
     sign: createPaintedMetalMaterial('nuketown2-sign', 0xdbd1ba, { roughness: 0.62 }),
+    // HF-477 - THE CHIRALITY ANCHORS. Each front lawn carries a three-unit
+    // cooker bank, RED tops on the orange house's lawn and BLUE on the white
+    // house's, which tells a player which half of a 180-degree symmetric map he
+    // is standing in without moving a single collider. The RED is the coach's
+    // own 0xa8382c, already measured in this arena; the BLUE is 0x46809f, the
+    // value that used to paint the north HOUSE - demoted, not deleted, to the
+    // prop the reference actually paints blue. Enamelled steel, which is this
+    // family exactly.
+    applianceRed: createPaintedMetalMaterial('nuketown2-appliance-red', 0xa8382c, {
+      roughness: 0.42,
+      metalness: 0.18,
+    }),
+    applianceBlue: createPaintedMetalMaterial('nuketown2-appliance-blue', 0x46809f, {
+      roughness: 0.42,
+      metalness: 0.18,
+    }),
     planter: createLawnMaterial('nuketown2-planter', 0x415a33, { variant: 'hedge' }),
 
     busTrim: createPaintedMetalMaterial('nuketown2-coach-trim', 0xa8382c, {
