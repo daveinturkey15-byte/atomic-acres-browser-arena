@@ -8,6 +8,7 @@ import {
 import {
   NUKETOWN2_GARAGE_SPAN,
   NUKETOWN2_GROUND_FLOOR_TOP,
+  NUKETOWN2_UPPER_Y0,
   nuketown2HandedX as hx,
 } from './nuketown2-layout';
 
@@ -166,7 +167,12 @@ describe('Nuke Town Rebuild interiors (HF-478)', () => {
       // is recorded as an OPEN item in this lane's report with this number, so
       // whoever raises them raises ALL of them - the four solids and the four
       // presentation tops that are laid on them - in one edit.
-      const floorTop = box.minY > 2 ? 3.3 : NUKETOWN2_GROUND_FLOOR_TOP;
+      // VERIFY (HF-478): the upper-storey floor top is read from the layout
+      // module's own constant, not the literal 3.3 it currently evaluates to.
+      // A gate that hardcodes a storey height stops measuring the arena the
+      // day the arena moves, and the storey split is taken at the midpoint of
+      // that same constant rather than at a second unexplained literal.
+      const floorTop = box.minY > NUKETOWN2_UPPER_Y0 / 2 ? NUKETOWN2_UPPER_Y0 : NUKETOWN2_GROUND_FLOOR_TOP;
       expect(box.minY, `${piece.authored} does not float over its floor`)
         .toBeLessThanOrEqual(floorTop + 1e-6);
       expect(box.minY, `${piece.authored} is not below its own storey`)

@@ -1886,9 +1886,17 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The kitchen island: the second body that turns the front room from a
   // corridor with a counter down one wall into a place with two sides to it.
   // Its own clearances, all measured against what is already there: 1.30 m to
-  // the counter, 1.05 m to the west wall lining, 0.95 m to the partition, and
-  // its east face stops at x = -3.4 so the internal doorway's 1.8 m run
-  // ([-3.6, -1.8]) and the straight front-door-to-internal-door walk are clear.
+  // the counter, 1.05 m to the west wall lining, 0.95 m to the partition face.
+  //
+  // VERIFY (HF-478) CORRECTS THE NEXT SENTENCE. It read "its east face stops at
+  // x = -3.4 so the internal doorway's 1.8 m run ([-3.6, -1.8]) is clear", which
+  // is not what the numbers say: the island's authored x run [-5.4, -3.4]
+  // OVERLAPS that door run by 0.20 m. The clearance is real but it is in Z, not
+  // X - the internal door lies on z = -16.5 and the island's near face is
+  // z = -15.4, so it stands 1.10 m off the door plane and 0.34 m clear of the
+  // standing-capsule threshold band the doorway sweep measures. The straight
+  // front-door-to-internal-door walk passes ~1.0 m west of the island's corner
+  // and is clear as claimed.
   pair(builder, 'house kitchen island', [-4.4, LOW_COVER / 2, HOUSE_FRONT_Z - 5.0], [2.0, LOW_COVER, 0.8], m.interior,
     { ballisticMaterial: 'wood' });
   pair(builder, 'house back room bench', [1.5, LOW_COVER / 2, HOUSE_BACK_Z + 2.4], [3.0, LOW_COVER, 1.0], m.interior,

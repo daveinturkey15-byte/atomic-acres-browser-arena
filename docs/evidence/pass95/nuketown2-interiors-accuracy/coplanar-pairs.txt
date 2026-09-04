@@ -2,7 +2,7 @@
 # HOUSE-INTERIOR pairs<=0.03m (offsets ignored): 0
 # STREET pairs<=0.03m (offsets ignored): 0
 # COLLISION-ONLY SLOPES (audited by parity/traversal, excluded from horizontal top-face scan): 4 - nuketown2 north house stair ramp, nuketown2 south house stair ramp, nuketown2 north yard stair ramp, nuketown2 south yard stair ramp
-# head 51f16012 · generated 2026-09-04T21:46:32.210Z
+# head 51eca436 · generated 2026-09-04T22:07:14.057Z
 # boxes=855 · pairs<=0.03m: 141 · FINDINGS (different materials, no offset): 0 · FENCED (material offset): 115 · SAME-MATERIAL (benign): 26
 # UNAUDITED meshes (instanced / rotated / non-parametric geometry, not covered by the top-face test above): 19 - nuketown2-lawn-region-0 (instanced), nuketown2-lawn-region-1 (instanced), nuketown2-lawn-region-2 (instanced), nuketown2-lawn-region-3 (instanced), nuketown2-lawn-region-5 (instanced), nuketown2-lawn-region-6 (instanced), nuketown2-lawn-region-8 (instanced), nuketown2-lawn-region-10 (instanced), nuketown2-lawn-region-11 (instanced), nuketown2-lawn-region-14 (instanced), nuketown2-lawn-region-15 (instanced), forest-conifers (instanced), forest-broadleaf-trunks (instanced), forest-broadleaf-canopies (instanced), forest-understory (instanced), forest-contact-skirts (instanced), nuketown-mountain-foothills (non-box), nuketown-mountain-ridge (non-box), nuketown-mountain-far-range (non-box)
 

@@ -162,3 +162,68 @@ material and no new pipeline.
 5. The car is a reference ASSERTION this lane could not check. If BO2's Nuketown
    2025 garages are empty, the bodies to delete are `garage car body` and its
    four presentation partners, and the workbench's 1.6 m goes back.
+
+## Adversarial verification pass (see `VERIFY.md`)
+
+An adversarial verifier re-ran every gate quoted above at head `51eca436` in this
+worktree. All four reproduce, plus the full suite. Two things were corrected on
+the branch and four are recorded here as TODOs.
+
+**Corrected in the verify commit:**
+
+- `coplanar-pairs.txt` was stamped `# head 51f16012` - the BASE, whose box count
+  is 819 - while carrying the post-change numbers (855). It was generated from a
+  dirty worktree before the feat commit landed. Regenerated at the real head;
+  every counted class is byte-identical.
+- The kitchen island's comment claimed its east face at authored `x = -3.4`
+  keeps the internal doorway's `[-3.6, -1.8]` run clear. It does not - the
+  island's run `[-5.4, -3.4]` OVERLAPS that door run by 0.20 m. The clearance is
+  real but it is in Z: the island stands 1.10 m off the `z = -16.5` door plane
+  and 0.34 m clear of the standing threshold band the doorway sweep measures.
+  Comment corrected to the measured statement.
+- `nuketown2-interiors.test.ts` hardcoded the upper-storey floor top as the
+  literal `3.3` and split the storeys at the literal `2`. Both now read
+  `NUKETOWN2_UPPER_Y0` from the layout module, so the gate keeps measuring the
+  arena if the storey height moves.
+
+**TODO 1 (highest, PRE-EXISTING, not this lane's) - nuketown2 is not in the
+ballistic coverage roster, and it has 56 unrated shot surfaces.**
+`src/ballistics.test.ts` -> "classifies every current arena shot blocker with
+unique authority" iterates a HARDCODED roster of six builders (`buildArena`,
+`buildRustworks1v1`, `buildGunRange`, `buildSkylineTerminal`, `buildFarcrysis`,
+`buildHighSeas`) and asserts zero `fallback` surfaces. `buildNuketown2` is not
+in it. A fresh build of this arena has **56 `classification: 'fallback'`
+surfaces**, every one rated `reinforced` (entryCost 1000, i.e. unshootable): the
+whole carriageway and kerb set, both porch canopy heads, the verge drive edges,
+appliance cabinets and sign boards, the yard porches, patio tables, side/far
+stores and far crates, the path buttresses, the water butts - and
+`nuketown2 north/south car body` and `car cabin`.
+
+Consequence for THIS lane: the sentence "an explicit id is what the
+ballistic-parity ledger can see" is not backed by any gate that looks at this
+arena, and after this lane the GARAGE car is `vehicle` (entryCost 2.5) while the
+STREET car parked on the same drive is `reinforced` (1000). One is wallbangable
+and the other is not. The fix is two steps and belongs to an accuracy lane, not
+to a verify commit: rate the 56 surfaces explicitly, then add `buildNuketown2`
+to that roster so the arena can never regress out of coverage again. Adding the
+builder first would simply land the gate red.
+
+**TODO 2 - the new gate's `FURNITURE` roster is hardcoded.** Ten names, listed by
+hand. An eleventh interior body added next week gets no explicit-rating, no
+float, no doorway and no lane coverage, and the gate stays green - which is the
+same shape as TODO 1 one level down. Derive the roster from the built arena
+(solid colliders whose bounds fall inside the house/garage footprint) and assert
+the count instead of the names.
+
+**TODO 3 - the vehicle door's clear run is 0.90 m against a 0.76 m threshold.**
+Measured: the door run is world x `[-8.5, -5.0]`, the car blocks
+`[-7.70, -5.90]`, leaving 0.80 m outboard and 0.90 m inboard. The design is
+deliberate and documented (a car is parked through a vehicle door), but this is
+the thinnest margin in the lane and a later 0.2 m nudge of the car closes it.
+Worth a named constant and a comment at the car, not a change.
+
+**TODO 4 - the gate's collider match compares X/Z bounds only.** In
+`makes every furniture body a SOLID...` the collider lookup ignores Y, so two
+bodies sharing an XZ footprint at different heights would satisfy each other's
+assertion. No such pair exists today; include the Y bounds when this is next
+touched.
