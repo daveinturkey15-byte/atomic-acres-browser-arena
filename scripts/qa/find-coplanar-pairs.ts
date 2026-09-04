@@ -198,7 +198,7 @@ function main(): void {
     console.log(`written: ${out}`);
   }
   console.log(report);
-  process.exitCode = findings === 0 ? 0 : 1;
+  process.exitCode = findings === 0 && houseInteriorFindings === 0 ? 0 : 1;
 }
 
 main();
