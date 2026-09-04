@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// Builds the invisible-wall coordinate map (MAP-INVISIBLE-WALLS.md) from sweep-invisible-walls-cdp.mjs output: classifies, clusters and counts invisible-wall findings per arena.
+// Usage: node scripts/qa/build-invisible-wall-map.mjs [--dir <directory>]
+//   --dir <directory>  Directory of sweep JSON output (default: artifacts/qa/invisible-walls)
+// Writes: <directory>/MAP-INVISIBLE-WALLS.md (one markdown file inside the --dir directory)
+// Exit codes: 0 on success; no process.exit calls, non-zero only via uncaught exception
 // Builds the invisible-wall coordinate MAP for the invisible-geometry team
 // from sweep-invisible-walls-cdp.mjs output (artifacts/qa/invisible-walls/).
 //
