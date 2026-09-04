@@ -224,6 +224,36 @@ consequence of §5.1 and it is the flow the owner is asking for.
   hard cover entirely on the north half, and the engine pins the truck to the
   centre-line, so without a counterweight the north team would own the head.
 
+### 5.4b Handedness — settled 2026-09-04 (HF-473)
+
+Everything above is about the *relation* between the two halves. It says nothing
+about **chirality**, and neither minimap resolves it for us, because the drawn
+overhead is only meaningful once you know which way its axes map onto ours.
+R4 (`docs/research/2026-09-04/R4-bo2-nuketown-accuracy.md` §3) reached exactly
+that point and wrote the row down as OPEN with a one-look falsifier.
+
+The owner ran the falsifier. Playing Black Ops 2 on Steam, standing in a house's
+own back yard and looking at that house, **the garage is on the RIGHT**. Ours had
+both on the LEFT.
+
+Because the map is 180°-rotationally symmetric, the two houses cannot disagree
+with each other about this — they were both wrong together, and a *rotation*
+could never have fixed it. The correction is a **mirror across the street axis**:
+`x → −x` applied once to the whole authored layout, through the single constant
+`NUKETOWN2_HANDEDNESS` in `src/nuketown2-layout.ts`. Every relation the schematic
+measures — every ratio, every offset, the 180° involution itself — is preserved
+exactly by a reflection, so nothing else in this document moves.
+
+Two gates hold it: `puts each garage on the RIGHT of its own house, seen from
+that house own back-yard spawn` (the cross-product sign, from all twelve spawn
+points, on built geometry) and `agrees with NUKETOWN2_HANDEDNESS on every handed
+feature, and the minimap agrees with the world`.
+
+**Claim-state:** VERIFIED against the owner's own play session, not against a
+pixel. **Falsifier:** the same look, giving the opposite answer — then
+`NUKETOWN2_HANDEDNESS` becomes `1` and every handed feature follows it in one
+edit, because nothing downstream hard-codes a side.
+
 ### 5.5 Deviations knowingly taken
 
 | Deviation | Reference | Arena | Why |
@@ -288,7 +318,13 @@ row is inside the lane's 5 %-of-L (1.8 m) tolerance.
 | Fence holes | both sides, to a path round to the far yard | two gaps per fence, deliberately off-axis from their own rotational partners | ✔ |
 | Flank props | S3 draws hatched props along **both** long boundaries | one side store per flank per half, on the perimeter wall's inner face (HF-432 item 2) | ✔ corrected: one flank per half was bare, carrying the map's worst 46.0 m lane |
 | Border path cover | the path the fence holes lead round on | two hard bodies per path (HF-432 item 2) | ✔ corrected: it was a 36 × 6 m corridor with no cover at all |
-| Bunker / shelter | **not in the reference** — neither minimap draws one, §2's landmark table has none | absent | ✔ deliberately absent |
+| Bunker / shelter | **not in the reference for 2025** — neither minimap draws one, §2's landmark table has none. R4 §2 corrects the *general* claim: the fallout-shelter door is a real feature of the **original** map's yellow-house back yard (CoD Wiki, Nuketown Zombies), so it belongs to the arena HF-466 parked, not to this one | absent | ✔ deliberately absent for 2025 |
+| Handedness (which end each garage is on) | **owner, HF-473, 2026-09-04:** from a house's own back yard, that house's garage is on the **RIGHT** | `NUKETOWN2_HANDEDNESS = −1` mirrors the whole authored layout on x | ✔ corrected §5.4b — was mirrored, and no gate could see it because the arena had no chirality anchor at all |
+| Rear balcony | **stated first-party** (Activision's own Nuketown '84 intel; CoD Wiki's three routes upstairs; the Nukehouse article's second-floor balcony) — an upper-floor deck over the back yard | 4.4 × 2.0 m deck flush with the upper floor at 3.3, 1.1 m rail, two posts to the lawn, a 1.8 m door with a 0.4 m header | ✔ added HF-465 — derived, not measured; no source gives a dimension |
+| Exterior staircase, balcony → back lawn | the **second** of the reference's three routes to the upper floor | 11 risers × 0.30 m, going 0.42, 1.4 m wide, parallel to the back wall off the deck's non-garage end; one collision-only ramp plus presentation treads, exactly like the interior flight | ✔ added HF-465 |
+| Ledge under the second-storey window | a small ledge protruding just under the street-side upper window, on both houses | 0.5 m projection, top at 3.3, width = the opening + 0.6 | ✔ added HF-465 |
+| Front window as an ENTRY | climbed from outside off objects | ground → hedge 0.95 → porch canopy 2.15 → ledge 3.30 → sill 4.20; every rise inside the 1.24 m one-move ceiling **and** each rung over the one below in plan | ✔ added HF-465 |
+| Front porch / covered entry | the living room welcomes you in through the front door | two canopy wings at 2.15 plus a raised head bay whose soffit is the front door's own 2.4 m head band | ✔ added HF-465 — the single 2.15 m slab it started as put a 1.97 m soffit over the door's approach |
 | Stair | **not drawn on either minimap** (see `NUKETOWN2_HOUSE_STAIR` for the two fetches) | derived: west (blind) wall, back room, landing at the partition, upper hallway (HF-432 item 1) | — derivation, not a measurement |
 | Doors | no widths measured | 1.8 m clear × 2.4 m head for every person door; 3.5 m garage door (HF-432 item 4) | — derived from the standing capsule (1.82 m + 0.42 m autostep up-cast) |
 

@@ -1357,3 +1357,62 @@ assets and textures and lighting need to be tip top, raid can come next"
   shared node_modules was half-reinstalled by an elevated Codex run and cannot
   be repaired unelevated (EPERM on the rolldown binding); the integration
   branch is checked out in `aa-claude-hotfix` until the owner repairs it.
+
+## HF-473 and HF-465 — PASS 94 lane I4 status, 2026-09-04
+
+*(The HF-472/HF-473 rows themselves are authored on
+`contrib/dave-gaming-pc/omp/pass84-overnight` at `2a367bbd`; this section records
+what lane I4 did about HF-473 and HF-465 on
+`contrib/dave-gaming-pc/claude/nuketown2-handedness` and is written to be
+additive so the two merge without touching each other's rows.)*
+
+- **HF-473 (garage handedness) — IMPLEMENTED, and the underlying question is now
+  CLOSED rather than merely made settleable.** R4 §3 could only leave it OPEN
+  because no source it could open states which end each garage is on; the owner
+  played Black Ops 2 on Steam and answered it. The map is 180°-rotationally
+  symmetric, so both houses were wrong together and a rotation could not have
+  fixed it: the correction is a **mirror across the street axis**, applied once
+  through `NUKETOWN2_HANDEDNESS` in `src/nuketown2-layout.ts` and enforced at the
+  four places an authored number becomes a solid, so a half-mirror is
+  structurally impossible rather than merely tested for.
+  - Falsifier, and it is a gate rather than a look now: `puts each garage on the
+    RIGHT of its own house, seen from that house own back-yard spawn` walks the
+    cross-product sign from all twelve spawn points against BUILT geometry, and
+    `agrees with NUKETOWN2_HANDEDNESS on every handed feature, and the minimap
+    agrees with the world` holds the bench, mailbox, drive edging, car and
+    driveway apron on the garage side and the interior flight on the blind wall.
+  - Claim-state **VERIFIED** against the owner's own play session, not a pixel.
+    If the owner ever reads it the other way the flag becomes `1` and every
+    handed feature follows in one edit.
+- **HF-473, minimap half — CHECKED, one NEW finding, reported OPEN.** The owner's
+  memory of a back-to-front Atomic Acres minimap was the reason to look. The
+  chirality is **correct**: `worldToMinimap` is a left-handed pixel space (+x
+  right and +z up at once, which is a view from below) and both consumers undo
+  it — the player-up HUD with `playerUpScaleX() = −1`, the static Tri-Pass board
+  with `width − x` — so the sign of a screen-space bearing equals the sign of the
+  world one, and the gate asserts that equality.
+  - **OPEN (new, not caused by this lane):** the minimap paints a 36 × 84 m arena
+    into a SQUARE canvas, so x is scaled 6.1 px/m and z 2.6 px/m. A non-uniform
+    scale composed with the player-up rotation is not a similarity, so BEARINGS
+    are stretched — Nuke Town Rebuild's garage sits ~12° right of forward in the
+    world and lands a few pixels *left* of the map's centre line. Chirality
+    survives (the composite determinant is positive) but direction-finding on
+    this arena is misleading. The fix is an isotropic pixel scale with
+    letterboxing, which touches `src/minimap.ts`, `legacy-main.ts` and the
+    Atomic Acres static landmark layer — a HUD lane, not this one. Deliberately
+    NOT asserted, because asserting the current bearing error would freeze it.
+- **HF-465 (missing balconies) — IMPLEMENTED.** R4 §5, built as specified except
+  where this arena's own geometry contradicted the spec; each contradiction was
+  found by a gate and moved the geometry, never the gate. Rear deck, 1.1 m rail,
+  posts to the lawn, a 1.8 m door with a 0.4 m header, an 11 × 0.30 m exterior
+  flight as one collision-only ramp plus presentation treads, a 0.5 m window
+  ledge and a porch canopy — all through `pair()`, both houses.
+  - Deviations from R4 §5, with reasons: the deck sits centred in the wall the
+    upper back window leaves (R4's own position put the deck's rail return
+    0.25 m off that window's centre line and the window stopped being an exit);
+    the flight's end of the deck carries a 0.6 m newel instead of a full return
+    (a full one stood across the top of the flight); and the canopy is two wings
+    plus a raised head bay (one 2.15 m slab put a 1.97 m soffit over the front
+    door's approach, under this map's 2.24 m band).
+  - Drop-out semantics kept and asserted through `computeFallDamage` rather than
+    restated: the exterior flight is free, a rail vault costs 6.
