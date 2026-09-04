@@ -2057,3 +2057,35 @@ assets and textures and lighting need to be tip top, raid can come next"
   lane launched: static catalog check (is atomic-acres selectable again; does the
   Rebuild card map to nuketown2 by id), headless click-through on :4300 reading
   the active arena id, off-by-one check, fix on hf496-rebuild-card-fix if certain.
+
+## HF-498 — owner 2026-09-04 19:50: multiplayer reload, respawn loadout and stair firing regressions
+
+- **Owner lane:** host-authoritative multiplayer gameplay state; original Nuketown;
+  host and guest; all authored weapon classes and stair/ramp traversal.
+- **Statement:** "guests struggling to reload sometimes still" means guest reload
+  requests intermittently do nothing or are lost. "I swapped to my secondary and
+  then swapped back and I had a zero-bullet railgun from about three deaths ago,
+  not my gun - it's the same now" means weapon/loadout and swap state survives a
+  guest death or respawn and can replace the current class weapon with stale ammo.
+  "people can't shoot on the stairs" means the fire blocker rejects shots while a
+  player stands on stair colliders even when the muzzle is clear of geometry.
+- **Affected maps/modes:** published PASS 92/93 original Nuketown multiplayer,
+  one host plus one guest, all supported classes/weapons, death/respawn and stair
+  or ramp positions; retain the same authority and input-validation rules in both
+  graphics profiles.
+- **Mechanical falsifier:** a bounded headless host+guest trace on ports 4191/4192
+  shows each admitted guest reload request carrying a retry/idempotency key,
+  receiving an authoritative acknowledgement, and completing exactly once even
+  across a dropped or delayed response; a lethal death followed by the real
+  respawn resets the guest to the class-authored primary/secondary with full ammo
+  and no stale swap state; and stair firing is admitted whenever the existing
+  muzzle clipping probe reports the muzzle outside geometry, while shots remain
+  blocked when the muzzle is actually inside geometry.
+- **Required evidence:** file:line transport/schema/dispatch trace, unit tests for
+  reload acknowledgement/idempotency, respawn loadout reset and muzzle-only fire
+  admission, plus one installed-Chrome headless host+guest E2E run using
+  `PASS73_NATIVE_WEBGPU=1`, stock flags, `--mute-audio`, at most two browsers and
+  only ports 4191/4192. Record message traces and client/host state in
+  `docs/evidence/pass94/mp-bugs/REPORT.md` with claim-states.
+- **Planning requirements:** R105, R110, R203, R204, R232, R236, R304, R307,
+  R600, R604, R605, R608, R610, R613.
