@@ -1403,3 +1403,18 @@ assets and textures and lighting need to be tip top, raid can come next"
 - Gates: tsc clean; full suite 582 files / 5689 tests. OPEN: browser checks
   (VRAM held by the local model at the time), live two-peer stun, and the
   owner's read of the taser effect (HITL).
+
+## HF-459 — HITL candidate 2 (PASS 94 candidate), 2026-09-04 10:05
+
+- **Handoff claim:** candidate `c3880181` on `pass93-candidate` (worktree
+  `aa-claude-hitl`) = live PASS 93 head + `killstreak-tuning` (517b7491)
+  + `nuketown2-tiptop` (Luna ship-candidate verdict SHIP: north house siding
+  0x46809f, south 0xf4be36 pinned distinct; marker cubes removed; stock-Chrome
+  boot 10/10 shots there). Built 10:0x, served on http://127.0.0.1:4300/ (host
+  0.0.0.0). Still calls itself PASS 93 until the real cut. NOT published.
+- **Owner checklist:** house floors (no z-fighting at any angle), stairs both
+  ways, house colours read blue vs yellow, detail/materials/lighting, pool,
+  chopper rockets (autopilot 6 / piloted 12, weaker MG), swarm and piloted
+  drone speed, right-click taser (3 charges, 1 s stun, blue crackle), FPS.
+- **Not in it yet:** spawn distribution (Luna, running) and the two load-time
+  branches (need the browser tripwire probe).
