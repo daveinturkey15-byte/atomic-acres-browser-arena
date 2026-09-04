@@ -76,7 +76,15 @@ the table is pinned as-is.
   remaining proof. Touch controls are untouched.
 - DESIGNED (needs a capture) — visual check of the two new Options controls
   and d-pad Solo start in a headed browser (no browsers per lane rules).
-- OPEN — none. No gate is red; no test/threshold/fence was weakened.
+- OPEN — the claimed zero-allocation-per-poll contract is not met by the
+  submitted source. `samplePads()` allocates a per-pad axis array and frozen
+  sample objects (`src/input/gamepad/gamepad-input.ts:200-203`), while
+  `poll()` allocates raw/shaped stick objects, `buttons.map`, two action arrays,
+  d-pad snapshots, a frame object, and per-frame closures
+  (`src/input/gamepad/gamepad-input.ts:318-391`). `reduceHotplug()` also creates
+  a `Set` on each poll (`src/input/gamepad/hotplug.ts:94`). The retained-frame
+  test passes precisely because these snapshots allocate; it does not prove
+  zero allocation.
 
 ## Quoted gate output
 
@@ -117,3 +125,14 @@ size ratchet:
 
 (ceiling `LINE_CEILING = 37_396` in
 `src/legacy-main-size-ratchet.test.ts`; 37240 ≤ 37396, green.)
+
+## Luna review follow-ups
+
+- TODO (blocking implementation): redesign the hot poll/frame ownership so
+  the measured steady-state poll has zero transient allocations while keeping
+  retained frames valid. Do not weaken the retained-frame or allocation gate;
+  quote a real allocation measurement in the replacement evidence.
+- TODO (owner evidence): run a real Bluetooth/mobile pad capture and headed
+  Options/menu review after the allocation correction. Static mapping,
+  deadzone, arbitration, persistence, and menu tests are green, but those
+  player-visible checks were not run here.
