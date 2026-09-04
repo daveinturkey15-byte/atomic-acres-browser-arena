@@ -1,4 +1,14 @@
 #!/usr/bin/env node
+// Usage header
+// Reports inclusive (caller-attributed) and self CPU time per function from a .cpuprofile, printed to stdout.
+// Usage: node scripts/qa/hf399-cpuprofile-inclusive.mjs <file.cpuprofile> [--frames N] [--frame-ms MS] [--top N]
+// Flags read from process.argv (no process.env variables are read):
+//   <file.cpuprofile>  path to the .cpuprofile to analyze (required, no default)
+//   --frames N         number of frames in the capture (default: 0, no per-frame ms columns)
+//   --frame-ms MS      unprofiled frame time in ms to rescale shares onto (default: 0, no rescaling)
+//   --top N            number of inclusive rows printed (default: 45)
+// Writes: stdout only; no files or directories are written.
+// Exit codes: no process.exit calls; exits 0 on success, non-zero (thrown error) when no .cpuprofile path is given.
 // Inclusive (caller-attributed) time from a .cpuprofile written by
 // hf399-frame-anatomy-cdp.mjs. Self time says WHICH three.js primitive is hot;
 // inclusive time says WHOSE call started it, which is what a fix needs.
