@@ -1,3 +1,11 @@
+// Numerically diffs HF-410 near-plane A/B capture frames (near 0.02 vs 0.08) and reports per-pixel max-channel delta statistics.
+// Usage: node scripts/qa/hf410-near-plane-ab-diff.mjs [--a <dir>] [--b <dir>] [--out <file>]
+//   --a <dir>    A-side capture directory under docs/evidence/pass86/hf410-prep/frames/ (default: near002)
+//   --b <dir>    B-side capture directory under docs/evidence/pass86/hf410-prep/frames/ (default: near008)
+//   --out <file> JSON report output path (default: docs/evidence/pass86/hf410-prep/near-plane-ab-numeric.json)
+// Writes: JSON report to --out (default: docs/evidence/pass86/hf410-prep/near-plane-ab-numeric.json)
+// Exit codes: 0 on success; 1 on uncaught error (frame size mismatch, unreadable files). No explicit process.exit calls.
+
 // HF-410 near-plane A/B numeric diff: near 0.02 (merged) vs near 0.08 (reverted).
 // Same commit, same arenas, same authored review cameras, same 2560x1440
 // viewport, same frozen time/seed/exposure. The ONLY difference between the two
