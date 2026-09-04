@@ -3675,7 +3675,7 @@ export class ArenaAudio {
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
       // HF-337: low-rate blade-slap noise layer for unmistakable rotor presence
-      if (this.context && this.ambience && this.noiseBuffer && Math.random() < 0.025) {
+      if (this.context && this.ambience && this.noiseBuffer && presentationRandom() < 0.025) {
         const slapSource = this.context.createBufferSource();
         const slapFilter = this.context.createBiquadFilter();
         const slapGain = this.context.createGain();
