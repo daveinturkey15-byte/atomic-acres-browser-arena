@@ -1,4 +1,19 @@
 #!/usr/bin/env node
+// Per-arena ART DIRECTION capture on the real WebGPU route at MAX: deterministic before/after grading frames plus per-frame statistics.
+// Usage: node scripts/qa/capture-lane-l-art-direction.mjs --url http://127.0.0.1:41893 --label after --out artifacts/lane-l/after [--arenas farcrysis,high-seas]
+//   --url <url>            Base URL of the deployed release (default: http://127.0.0.1:41893)
+//   --label <label>        Label for this capture (default: after)
+//   --out <dir>            Output directory (default: artifacts/lane-l/<label>)
+//   --per-arena <ms>       Max wait per arena (default: 420000)
+//   --settle <ms>          Camera settle time (default: 2200)
+//   --boot <ms>            Boot deadline (default: 420000)
+//   --width <px>           Viewport width (default: 1920)
+//   --height <px>          Viewport height (default: 1080)
+//   --arenas <a,b,c>       Comma-separated arena ids (default: all: farcrysis,high-seas,atomic-acres,skyline-terminal,rustworks-1v1,gun-range)
+//   --preset <preset>      Graphics preset seeded into settings (default: max)
+//   --ssgi <on|off>        SSGI override; 'off' swaps MAX for Custom-with-SSGI-off (default: on)
+// Writes: the --out directory (created if missing); <out>/<arena>--<camera>.png (one per shot); <out>/report.json (merged, not clobbered)
+// Exit: no explicit process.exit calls; exits 0 on success and 1 on uncaught error (fatal conditions throw)
 // Lane L — per-arena ART DIRECTION capture, on the REAL WebGPU route, at MAX.
 //
 // WHY THIS EXISTS. The owner's report was "the whole game artstyle looks the
