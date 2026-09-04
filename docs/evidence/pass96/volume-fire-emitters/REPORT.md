@@ -73,6 +73,17 @@ legacy-main-size-ratchet (37,248 vs 37,396 ceiling), particle-catalog,
 pass65-settings-inventory, pass65-renderer-feature-inventory,
 nuketown2-pipeline-budget, presentation-prewarm-contract.
 
+## Luna review TODOs
+
+- TODO: obtain the required native-WebGPU visual capture for authored fire and
+  the nuke event in both supported graphics profiles; this review was
+  intentionally no-browser/no-GPU.
+- TODO: record a real cold-session precompile measurement for the added shared
+  fire pipeline; source/test reach is present, but this is not runtime timing
+  evidence.
+- TODO: replace the remaining grep-only settings-consumer observations with
+  live runtime receipts when the settings audit lane owns that work.
+
 ## Per-frame cost estimate (defended)
 
 20 march steps × ~20 ALU ≈ 400 flop/px over authored boxes covering at most

@@ -33,6 +33,7 @@
  * timing in legacy-main and never extends it.
  */
 import * as THREE from 'three';
+import { ARENA_IDS, type ArenaId } from './arena-identity';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
@@ -73,7 +74,6 @@ export const VOLUME_FIRE_POOL_CAPACITY = VOLUME_FIRE_MAX_AUTHORED_PER_ARENA + 1;
 /** Reserved slot index the nuke-event lane drives; never used by authored sync. */
 export const VOLUME_FIRE_NUKE_SLOT = VOLUME_FIRE_MAX_AUTHORED_PER_ARENA;
 /** Arenas with authored placements (tests pin this roster and the ceiling). */
-export const VOLUME_FIRE_AUTHORED_ARENAS: readonly string[] = Object.freeze(['nuketown2', 'skyline-terminal']);
 /** Nuke fireball lifetime driver: growth ramp and trailing decay, ms. */
 export const VOLUME_FIRE_NUKE_GROW_MS = 400;
 export const VOLUME_FIRE_NUKE_DECAY_MS = 1_200;
@@ -139,11 +139,19 @@ function skylineTerminalVolumeFireSpecs(): readonly VolumeFireEmitterSpec[] {
     });
   }));
 }
+const VOLUME_FIRE_PLACEMENT_FACTORIES: Readonly<Partial<Record<ArenaId, () => readonly VolumeFireEmitterSpec[]>>> = Object.freeze({
+  nuketown2: nuketown2VolumeFireSpecs,
+  'skyline-terminal': skylineTerminalVolumeFireSpecs,
+});
+/** Authored placement IDs projected from the canonical arena catalog. */
+export const VOLUME_FIRE_AUTHORED_ARENAS: readonly ArenaId[] = Object.freeze(
+  ARENA_IDS.filter((arenaId) => VOLUME_FIRE_PLACEMENT_FACTORIES[arenaId] !== undefined),
+);
+const EMPTY_VOLUME_FIRE_PLACEMENTS: readonly VolumeFireEmitterSpec[] = Object.freeze([]);
 /** Authored placements for an arena id; empty for arenas without fire moments. */
 export function volumeFireAuthoredPlacements(arenaId: string): readonly VolumeFireEmitterSpec[] {
-  if (arenaId === 'nuketown2') return nuketown2VolumeFireSpecs();
-  if (arenaId === 'skyline-terminal') return skylineTerminalVolumeFireSpecs();
-  return Object.freeze([]);
+  const factory = VOLUME_FIRE_PLACEMENT_FACTORIES[arenaId as ArenaId];
+  return factory ? factory() : EMPTY_VOLUME_FIRE_PLACEMENTS;
 }
 
 /** One material factory for every slot: identical graph, per-slot uniforms. */

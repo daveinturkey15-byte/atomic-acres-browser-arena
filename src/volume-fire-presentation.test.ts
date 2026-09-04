@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { ARENA_IDS } from './arena-identity';
 import {
   ADVANCED_GRAPHICS_CONTROLS,
   GRAPHICS_PRESET_VALUES,
@@ -95,7 +96,7 @@ describe('volume fire march band and arena ceiling', () => {
 
   it('holds every arena at or below four authored emitters', () => {
     expect(VOLUME_FIRE_MAX_AUTHORED_PER_ARENA).toBeLessThanOrEqual(4);
-    for (const arenaId of [...VOLUME_FIRE_AUTHORED_ARENAS, 'gun-range', 'farcrysis', 'atomic-acres', 'map3']) {
+    for (const arenaId of ARENA_IDS) {
       expect(volumeFireAuthoredPlacements(arenaId).length, arenaId)
         .toBeLessThanOrEqual(VOLUME_FIRE_MAX_AUTHORED_PER_ARENA);
     }
