@@ -12,6 +12,7 @@ import { WEAPONS } from './gameplay';
 import { canonicalSha256 } from './canonical-state';
 import { isStateTrafficMessage } from './protocol';
 import {
+  broadcastThinMetalPerforationState,
   createAndAttachThinMetalPerforationRuntime,
   createThinMetalPerforationRuntime,
   disposeThinMetalPerforationRuntime,
@@ -431,5 +432,52 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     const guardBody = source.slice(guard, guardEnd);
     expect(guardBody).not.toContain('ThinMetalPerforation');
     expect(guardBody).toContain('interactiveWorldRuntime.reset(interactiveWorldMatchEpoch)');
+  });
+  it('a counted hit that mints nothing neither bumps nor broadcasts (F-10)', () => {
+    const placements = thinMetalPanelPlacements(
+      [{ surfaceName: 'verge street name blade', hitsToOpen: 3 }],
+      [bladeSurface('budget:1')],
+    );
+    const runtime = createThinMetalPerforationRuntime({ id: 'nuketown2', thinMetalPanels: placements }, 4, true)!;
+    const authority = runtime.authority;
+    const surface = bladeSurface('budget:1');
+    const point = { x: 7.7, y: 2.7, z: -0.45 };
+    const sent: unknown[] = [];
+    const network = {
+      role: 'host',
+      send: (message: unknown) => { sent.push(message); },
+      sendStateCommitReliably: (message: unknown) => { sent.push(message); },
+    };
+    // Arena commit resets lastBroadcastRevision to -1, so the very first
+    // tick always sends the initial (revision 0) state once. Record that.
+    broadcastThinMetalPerforationState(runtime, false, true, 'host-1', network, () => 1);
+    expect(sent).toHaveLength(1);
+    // Hits one and two are counted dents: no hole mints, the revision stays
+    // at 0, and the revision-gated broadcast stays silent.
+    expect(hitAt(authority, surface, point)?.accepted).toBe(true);
+    expect(hitAt(authority, surface, point)?.accepted).toBe(true);
+    expect(authority.panelStates()[0]!.hits).toBe(2);
+    expect(authority.panelStates()[0]!.holes).toHaveLength(0);
+    expect(authority.stateEnvelope().revision).toBe(0);
+    broadcastThinMetalPerforationState(runtime, false, true, 'host-1', network, () => 1);
+    expect(sent).toHaveLength(1);
+    // Hits three and four each mint one of the panel's two holes: the
+    // revision advances per mint and each envelope broadcasts exactly once.
+    expect(hitAt(authority, surface, point)?.accepted).toBe(true);
+    expect(authority.stateEnvelope().revision).toBe(1);
+    broadcastThinMetalPerforationState(runtime, false, true, 'host-1', network, () => 1);
+    expect(sent).toHaveLength(2);
+    expect(hitAt(authority, surface, point)?.accepted).toBe(true);
+    expect(authority.stateEnvelope().revision).toBe(2);
+    broadcastThinMetalPerforationState(runtime, false, true, 'host-1', network, () => 1);
+    expect(sent).toHaveLength(3);
+    // Over the per-panel budget the hit still counts, but mints nothing:
+    // no bump, and the revision-gated broadcast stays silent.
+    expect(hitAt(authority, surface, point)?.accepted).toBe(true);
+    expect(authority.panelStates()[0]!.hits).toBe(5);
+    expect(authority.panelStates()[0]!.holes).toHaveLength(THIN_METAL_MAX_HOLES_PER_PANEL);
+    expect(authority.stateEnvelope().revision).toBe(2);
+    broadcastThinMetalPerforationState(runtime, false, true, 'host-1', network, () => 1);
+    expect(sent).toHaveLength(3);
   });
 });

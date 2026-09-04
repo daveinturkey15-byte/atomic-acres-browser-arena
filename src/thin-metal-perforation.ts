@@ -589,7 +589,10 @@ export class ThinMetalPerforationAuthority {
       hits: panel.state.hits + 1,
       holes,
     });
-    this.revision += 1;
+    // Only a minted hole is state worth replicating: an over-budget hit
+    // still counts (dents read on later hits) but must not bump the revision
+    // or trigger a broadcast.
+    if (opensHole) this.revision += 1;
     if (opensHole) this.presentation.sync([...this.panels.values()].map((entry) => entry.placement), this.panelStates());
     return Object.freeze({ accepted: true, state: this.panelStates() });
   }
