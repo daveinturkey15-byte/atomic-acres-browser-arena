@@ -250,3 +250,25 @@ through the fallback; T4 decide whether KICK should render in an `active`
 phase; T5 `hostKickMember`'s bare 75 ms `setTimeout` before
 `disconnectPlayer`; T6 pre-existing `qa:text-integrity` red on a PASS 94
 evidence file (not this lane's).
+
+## Follow-ups
+
+- **VERIFIED** — the follow-up fixture uses three headless installed-Chrome contexts,
+  the production field-kit redeploy listener, and the lane-owned preview/PeerJS ports
+  4223/4224. Direct debug weapon mutation is not used as a network admission shortcut.
+- **VERIFIED** — `npx tsc --noEmit` passed, and the quoted seven-file succession/lobby
+  unit gate passed with 229 tests.
+- **VERIFIED** — the existing three-context role/control e2e passed on the owned
+  preview/PeerJS topology at 4223/4224 with installed Chrome headless, WebGPU, and
+  muted audio (1 passed, 35.5 s).
+- **OPEN** — the real active-match host-loss handoff was not proven in this time box.
+  The custom three-context lane test reached no reliable successor assertion before its
+  360,000 ms test timeout; the lane CDP QA driver also timed out at its 180,000 ms
+  active-match wait (served bundle `legacy-main-DYK9fcer.js`, backend `webgpu`, no page
+  errors). First successor snapshot: **N/A**; one 40 Hz snapshot interval is 25 ms, so
+  the designed one-interval claim remains OPEN rather than being inferred.
+- **OPEN** — because no successor snapshot was observed, score/loadout/position
+  preservation and deterministic successor reconnection remain unverified by browser
+  evidence; the underlying unit claims remain covered by the 229-test gate.
+- **OPEN** — live spectator badge rendering and a real guest-forged `lobby-kick` browser
+  attempt remain the existing lane OPEN items.
