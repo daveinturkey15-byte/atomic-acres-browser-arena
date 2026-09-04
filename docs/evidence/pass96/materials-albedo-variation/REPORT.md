@@ -409,23 +409,23 @@ arenas intentionally not captured in this pair.
 **VERIFIED:** Mean absolute luminance delta is on the 0-255 analysis scale;
 the overall 17-station mean is **60.867** (equal-sized 640x360 analysis frames).
 
-- **OBSERVED:** `nuketown2-overhead` — macro/micro variation is visible across the roofs, grass and road; asphalt is no longer a uniform black field.
-- **OBSERVED:** `nuketown2-north-yard` — siding, concrete and lawn show broad colour breakup plus fine wear; no asphalt is in the principal read.
-- **OBSERVED:** `nuketown2-south-yard` — the mirrored yard shows the same macro/micro surface variation; asphalt is not the dominant surface.
-- **OBSERVED:** `nuketown2-street-centre` — asphalt is visibly no longer black, with road wear/specular breakup and changed vehicle paint.
-- **OBSERVED:** `nuketown2-north-upper-window` — the window surround and adjacent siding carry visible albedo breakup at both scales; asphalt is not the principal read.
-- **OBSERVED:** `nuketown2-south-upper-window` — the mirrored window/siding read carries the same macro and micro variation; asphalt is not the principal read.
-- **OBSERVED:** `nuketown2-into-sun-street` — road material is lighter and textured rather than black, with visible vehicle and facade variation.
-- **OBSERVED:** `nuketown2-north-interior` — interior walls and timber floor show differentiated macro colour and fine surface wear; asphalt is not present.
-- **OBSERVED:** `nuketown2-south-interior` — the paired interior shows the same wall/floor variation at both scales; asphalt is not present.
-- **OBSERVED:** `nuketown2-garage` — garage masonry, grass and adjacent facade surfaces show visible macro/micro variation; asphalt is secondary.
-- **OBSERVED:** `nuketown2-north-balcony` — balcony-adjacent siding, roof and yard surfaces read with non-uniform albedo; asphalt is not dominant.
-- **OBSERVED:** `nuketown2-front-porch` — porch, siding and planted surfaces show visible macro/micro breakup; asphalt is not the principal read.
-- **OBSERVED:** `nuketown2-vehicle-near` — near vehicle paint and the road carry visible variation, and the asphalt is no longer uniformly black.
-- **OBSERVED:** `nuketown2-vehicle-mid` — mid-distance vehicle paint, road and masonry show the changed albedo response; asphalt is visibly lifted from black.
-- **OBSERVED:** `nuketown2-vehicle-far` — far vehicle surfaces retain visible colour/wear variation against a textured road; asphalt is no longer a black monolith.
-- **OBSERVED:** `nuketown2-coach-elevation` — coach paint and road materials both show macro/micro variation; the asphalt read is no longer black.
-- **OBSERVED:** `nuketown2-truck-cab-near` — truck paint, nearby masonry and road wear are visibly differentiated; asphalt is no longer uniformly black.
+- **OBSERVED:** `nuketown2-overhead` — meanAbsDelta **48.524**; macro/micro variation is visible across the roofs, grass and road, and asphalt is no longer a uniform black field.
+- **OBSERVED:** `nuketown2-north-yard` — meanAbsDelta **80.237**; siding, concrete and lawn show broad colour breakup plus fine wear, with no asphalt in the principal read.
+- **OBSERVED:** `nuketown2-south-yard` — meanAbsDelta **78.387**; the mirrored yard shows the same macro/micro surface variation, with asphalt not the dominant surface.
+- **OBSERVED:** `nuketown2-street-centre` — meanAbsDelta **60.614**; asphalt is visibly no longer black, with road wear/specular breakup and changed vehicle paint.
+- **OBSERVED:** `nuketown2-north-upper-window` — meanAbsDelta **58.523**; the window surround and adjacent siding carry visible albedo breakup at both scales, with asphalt not the principal read.
+- **OBSERVED:** `nuketown2-south-upper-window` — meanAbsDelta **45.592**; the mirrored window/siding read carries the same macro and micro variation, with asphalt not the principal read.
+- **OBSERVED:** `nuketown2-into-sun-street` — meanAbsDelta **56.983**; road material is lighter and textured rather than black, with visible vehicle and facade variation.
+- **OBSERVED:** `nuketown2-north-interior` — meanAbsDelta **60.827**; interior walls and timber floor show differentiated macro colour and fine surface wear, with asphalt not present.
+- **OBSERVED:** `nuketown2-south-interior` — meanAbsDelta **40.784**; the paired interior shows the same wall/floor variation at both scales, with asphalt not present.
+- **OBSERVED:** `nuketown2-garage` — meanAbsDelta **52.759**; garage masonry, grass and adjacent facade surfaces show visible macro/micro variation, with asphalt secondary.
+- **OBSERVED:** `nuketown2-north-balcony` — meanAbsDelta **63.973**; balcony-adjacent siding, roof and yard surfaces read with non-uniform albedo, with asphalt not dominant.
+- **OBSERVED:** `nuketown2-front-porch` — meanAbsDelta **65.247**; porch, siding and planted surfaces show visible macro/micro breakup, with asphalt not the principal read.
+- **OBSERVED:** `nuketown2-vehicle-near` — meanAbsDelta **57.313**; near vehicle paint and the road carry visible variation, and asphalt is no longer uniformly black.
+- **OBSERVED:** `nuketown2-vehicle-mid` — meanAbsDelta **54.540**; mid-distance vehicle paint, road and masonry show the changed albedo response, with asphalt visibly lifted from black.
+- **OBSERVED:** `nuketown2-vehicle-far` — meanAbsDelta **62.235**; far vehicle surfaces retain visible colour/wear variation against a textured road, and asphalt is no longer a black monolith.
+- **OBSERVED:** `nuketown2-coach-elevation` — meanAbsDelta **75.330**; coach paint and road materials both show macro/micro variation, and the asphalt read is no longer black.
+- **OBSERVED:** `nuketown2-truck-cab-near` — meanAbsDelta **72.866**; truck paint, nearby masonry and road wear are visibly differentiated, and asphalt is no longer uniformly black.
 
 **VERIFIED:** The candidate material-variation test remained green at **104/104**,
 including the preserved channel-mean assertions. The capture artifacts are at
