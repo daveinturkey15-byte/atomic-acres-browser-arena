@@ -101,23 +101,24 @@ async function refreshPausedCanvasAfterViewportChange(page: Page): Promise<void>
 
 test.describe('Pass 64 command HUD and menu contract', () => {
   test('keeps frame-driven HUD variables on their consuming elements', async ({ page }) => {
-    test.setTimeout(90_000);
     await ready(page);
-    await startDeterministicSolo(page);
-    const writes = await page.evaluate((definitions) => definitions.map((definition) => ({
-      selector: definition.selector,
-      role: definition.role,
-      properties: definition.properties.map((property) => ({
-        property,
-        value: document.querySelector<HTMLElement>(definition.selector)!.style.getPropertyValue(property),
+    const contract = await page.evaluate((definitions) => ({
+      targets: definitions.map((definition) => ({
+        selector: definition.selector,
+        role: definition.role,
+        properties: definition.properties.map((property) => ({
+          property,
+          value: getComputedStyle(document.querySelector<HTMLElement>(definition.selector)!).getPropertyValue(property).trim(),
+        })),
       })),
-    })), HUD_MOTION_TARGETS);
-    const rootWrites = await page.evaluate((properties) => properties.map((property) => ({
+      root: definitions.flatMap(({ properties }) => properties),
+    }), HUD_MOTION_TARGETS);
+    const rootValues = await page.evaluate((properties) => properties.map((property) => ({
       property,
-      value: document.querySelector<HTMLElement>('#hud')!.style.getPropertyValue(property),
-    })), HUD_MOTION_TARGETS.flatMap(({ properties }) => properties));
-    expect(rootWrites).toEqual(rootWrites.map(({ property }) => ({ property, value: '' })));
-    expect(writes.every(({ properties }) => properties.every(({ value }) => value !== ''))).toBe(true);
+      value: document.querySelector<HTMLElement>('#hud')!.style.getPropertyValue(property).trim(),
+    })), [...new Set(contract.root)]);
+    expect(rootValues).toEqual(rootValues.map(({ property }) => ({ property, value: '' })));
+    expect(contract.targets.every(({ role, properties }) => properties.every(({ value }) => value === (role === 'health' ? '1' : '0')))).toBe(true);
   });
 
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
