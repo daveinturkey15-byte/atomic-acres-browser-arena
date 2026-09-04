@@ -37,9 +37,12 @@ const SHEETS = [
 ];
 
 function startVite() {
+  // Spawn the vite entry with this Node, not `npx.cmd`: since Node 18.20 /
+  // 20.12 Windows refuses to spawn a .cmd without `shell: true`, and the
+  // failure is a bare `spawn EINVAL` that says nothing about why.
   const child = spawn(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['vite', '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
+    process.execPath,
+    [resolve(root, 'node_modules/vite/bin/vite.js'), '--port', String(port), '--strictPort', '--host', '127.0.0.1'],
     { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
   );
   return new Promise((resolveReady, rejectReady) => {
