@@ -103,6 +103,28 @@
       "acceptance": "human",
       "state": "pending",
       "evidence": []
+    },
+    {
+      "id": "R6",
+      "summary": "Nuke Town Rebuild review cameras cover every catalog station",
+      "expected": "The north rear-balcony/exterior-flight station and south front-porch/eave station are authored in the live visual definition, derive their poses from the shared layout, apply handedness once, and remain covered by the viewpoint catalog.",
+      "falsifier": "A catalog station has no matching authored runtime camera, or either HF-465 camera reverts to a mirrored literal that no longer follows the shared layout.",
+      "acceptance": "mechanical",
+      "state": "verified",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-review-camera.test.ts",
+          "command": "npx vitest run src/nuketown2-fidelity.test.ts src/nuketown2-review-camera.test.ts",
+          "note": "The roster-derived assertion passed alongside the Nuke Town fidelity suite; TypeScript also passed with npx tsc --noEmit."
+        },
+        {
+          "kind": "browser",
+          "ref": "docs/evidence/pass94/review-cameras (deleted after inspection)",
+          "command": "node scripts/qa/capture-arena-viewpoints.mjs --url http://127.0.0.1:4304 --arenas nuketown2 --out docs/evidence/pass94/review-cameras",
+          "note": "Native WebGPU/NVIDIA capture passed 17/17 stations on this Pass 94 base, including both HF-465 stations; generated PNGs were deleted after visual inspection as requested."
+        }
+      ]
     }
   ]
 }
