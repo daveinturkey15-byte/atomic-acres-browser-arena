@@ -2050,3 +2050,10 @@ assets and textures and lighting need to be tip top, raid can come next"
   src/map-selection.ts — nuketown2 first; old Raid unselectable (HF-466
   pattern, byte-preserved for links/history); raid2 preview second or third;
   contract pins rewritten honestly. Lands in HITL 5b if pushed in time.
+
+## HF-496 — owner 2026-09-04 19:14: "I click on Rebuild Nuketown and it is now the OLD map" (HITL 5 on :4300)
+
+- Served build verified as candidate 5 (pid 1608, dist of 3e2fd273). Luna repro
+  lane launched: static catalog check (is atomic-acres selectable again; does the
+  Rebuild card map to nuketown2 by id), headless click-through on :4300 reading
+  the active arena id, off-by-one check, fix on hf496-rebuild-card-fix if certain.
