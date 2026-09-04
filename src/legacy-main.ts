@@ -908,7 +908,7 @@ import {
   type MatchParticipantReportInput,
 } from './match-report';
 import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
-import { selectSpawnCandidates, type SpawnUse } from './spawn-selection';
+import { selectSpawnCandidates, spawnUseWindow, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
   CHARACTER_PHYSICS_CONFIG,
@@ -16740,13 +16740,13 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
 function recentSpawnUseRecords(now = performance.now()): readonly SpawnUse[] {
-  while (recentSpawnUses.length > 0 && now - recentSpawnUses[0]!.at > 12_000) recentSpawnUses.shift();
+  while (recentSpawnUses.length > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth && now - recentSpawnUses[0]!.at > spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseAvoidanceMs) recentSpawnUses.shift(); // HF-491: derived horizons, not a flat 12 s
   return recentSpawnUses;
 }
 function recordSpawnUse(index: number, now = performance.now()): void {
   recentSpawnUseRecords(now);
   recentSpawnUses.push({ index, at: now });
-  if (recentSpawnUses.length > 64) recentSpawnUses.shift();
+  if (recentSpawnUses.length > Math.max(64, spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length).recentUseDepth)) recentSpawnUses.shift();
 }
 function spawnPoint(): THREE.Vector3 {
   const spawnMode = activeSpawnMode();
@@ -16841,7 +16841,7 @@ function spawnPoint(): THREE.Vector3 {
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(spawnNow),
-    recentUses: recentSpawnUseRecords(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
     nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex,
@@ -20009,7 +20009,7 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
     threats,
     occupants: otherPlayers,
     recentDeaths: recentSpawnDeathPoints(spawnNow),
-    recentUses: recentSpawnUseRecords(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow), ...spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length),
     nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
