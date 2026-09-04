@@ -1965,3 +1965,9 @@ assets and textures and lighting need to be tip top, raid can come next"
   1.4–2×, 7075 nodes vs 6366, 418 vs 250 pipelines; JS 15.2 ms/frame (matrix
   updates ~4 ms, wear node graphs 1.4 ms, vegetation 22 draws). Fix lane
   (Fable high) running on those three.
+- 18:00 bots-hitl5 @ 535319e1: `initialSoloBots` catalog field (nuketown2 opens
+  at 4, escalates to its declared 6); ladder derived for every arena that
+  declares `maximumSoloBots`; HUD next-reinforcement readout fixed. Side effect
+  for the owner to confirm: skyline-terminal also declares 6 and now escalates
+  1 → 6 (one catalog field to pin it back). Gap recorded: no per-bot per-frame
+  cost test exists in the suite.
