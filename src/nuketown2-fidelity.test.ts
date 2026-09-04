@@ -580,6 +580,8 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(new THREE.Box3().setFromObject(kerb).max.y, `${kerb.name} is a low solid`).toBeLessThanOrEqual(0.30 + 1e-9);
       expect(Math.hypot(kerb.position.x - centreX, kerb.position.z), `${kerb.name} stays on the authored ring`)
         .toBeCloseTo(ringRadius, 1);
+      expect((kerb.geometry as THREE.BoxGeometry).parameters.depth, `${kerb.name} keeps the uniform kerb width`)
+        .toBe(NUKETOWN2_TURNING_HEAD_KERB_WIDTH);
     }
     const ringKeys = new Set(kerbs.map((kerb) => {
       const bounds = new THREE.Box3().setFromObject(kerb);

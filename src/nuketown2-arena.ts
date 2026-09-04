@@ -2610,12 +2610,8 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     const angle = (index + 0.5) * segmentAngle;
     const authoredX = head.centreX + Math.cos(angle) * kerbRadius;
     const authoredZ = Math.sin(angle) * kerbRadius;
-    const isMouthFillet = Math.abs(authoredZ) < NUKETOWN2_STREET_HALF_WIDTH + 0.5
-      && authoredX > head.centreX;
-    const segmentWidth = isMouthFillet ? NUKETOWN2_TURNING_HEAD_KERB_WIDTH * 0.9
-      : NUKETOWN2_TURNING_HEAD_KERB_WIDTH;
     centred(builder, `carriageway head kerb segment ${index}`,
-      [authoredX, 0.06, authoredZ], [chord, 0.24, segmentWidth], m.kerb,
+      [authoredX, 0.06, authoredZ], [chord, 0.24, NUKETOWN2_TURNING_HEAD_KERB_WIDTH], m.kerb,
       { cast: false, rotation: [0, angle - Math.PI / 2, 0] });
   }
 
