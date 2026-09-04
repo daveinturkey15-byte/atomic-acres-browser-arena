@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// HF-387 eye-distance metric probe: loads atomic-acres, teleports the player into the yard fence, presses prone, and dumps mesh-tracking, eye source, and raw nearest-distance diagnostics.
+// Usage: node scripts/qa/hf387-metric-debug.scratch.mjs [base-url]
+//   base-url  (argv[2])  origin of the running game  default: http://127.0.0.1:41952
+// Writes: artifacts/qa/hf387-r9-eye2/debug-yardfence.png; JSON report on stdout
+// Exit: 0 on success; non-zero on unhandled error (no explicit process.exit calls)
 // HF-387 probe metric debugger (scratch). Loads atomic-acres, teleports to the
 // yard fence, presses prone into it, then introspects why the eye-distance
 // metric reports null: mesh tracking, eye source, and raw nearest distances.
