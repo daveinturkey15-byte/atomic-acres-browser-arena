@@ -1503,3 +1503,39 @@ assets and textures and lighting need to be tip top, raid can come next"
   implementation plan sized for one post-reset Opus lane.
 - Owner idea logged: Blender experiments, if ever needed, go on a test map
   ("test map 4"), never on Nuke Town.
+
+## HF-470 — research outcomes, 2026-09-04 10:55 (branch `research-2026-09-04`, docs/research/2026-09-04/, 3,253 lines)
+
+- **R1 diner method:** the repo has NO licence (private: true) → port the
+  method and physics, never the source; attribute. 16-step skill draft
+  `photoreal-procedural-scene-forge` (textures at true physical size in 8
+  OffscreenCanvas workers, wear at three scales, albedo-visible wear rule,
+  physical exposure and film curve, two-sun rig + probes, closed-form slat
+  transmittance), a TSL port table (every onBeforeCompile patch must become
+  TSL nodes; their post chain is replaced by ours; photographic sun:shade
+  ratios must NOT enter a competitive FPS), and a vehicle-from-code recipe
+  (station rings on a flank profile, superellipse arches, crease normals,
+  shut lines, glass cut from the loft, paint as pigment under clearcoat).
+- **R2 reference loop:** VERIFIED the 18 overnight critic files never named a
+  reference; scores drifted 77 → 97 against a rubric with no anchor, and
+  nothing proves the critics received image bytes. Design: first-party
+  reference sets with provenance (HF-426 precedent), a reference-comparing
+  critic with a probe-token receipt, a mechanical perceptual pre-check, a
+  journaled runner replacing the .cmd chains.
+- **R3 penetration:** the system already SHIPS (traceBallisticPath energy
+  budget, apertureQuery holes, glass crack/breach/detach, host-authoritative
+  shed perforation). Nuke Town Rebuild never connected to it:
+  `breakableWindows: []`, window glass is a permanent static collider, 22
+  shot surfaces fall through to `reinforced` (unshootable — the owner's
+  "blocks"), trim/partitions/car glass misclassified, and the ballistics gate
+  hard-codes six builders (nuketown2, map3, raid2, test1, test2 never gated).
+- **R4 accuracy:** the Rebuild has no chirality — every handed feature is
+  built through pair() (180° rotation), so "mirrored" is undefined; fix =
+  reference-anchored frame + NUKETOWN2_HANDEDNESS + a gate, then a ten-second
+  owner look sets the sign. Balconies are absent entirely; spec written (rear
+  balcony 4.4 × 2.0 m deck at y = 3.3, 1.1 m rail, exterior stair, front
+  ledge + porch canopy). House colours for the 2025 remaster CLAIMED
+  blue + orange, needs one capture to settle.
+- **R5 survey:** the shared skills junction had drifted again (this harness
+  saw 0 of 163) → relinked 11:18; Skills Hub has zero procedural-texture
+  skills and nothing above our TSL contract → ingest nothing, write our own.
