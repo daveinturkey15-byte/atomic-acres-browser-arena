@@ -5958,7 +5958,7 @@ type PendingLocalPickup = Readonly<{
   resentAt: number | null;
 }>;
 let pendingLocalPickup: PendingLocalPickup | null = null;
-/** HF-504: host-side (playerId, nonce) -> verdict, so a repeat replays rather than rejects. */
+/** HF-504: host-side (playerId, nonce) -> resolution, so a repeat replays rather than rejects. */
 const hostPickupResolutions = createPickupResolutionLedger();
 let applyingLocalReloadAuthority = false;
 let localConnectionEpoch: string = crypto.randomUUID();
@@ -15085,7 +15085,7 @@ function clearDeathDrops(): void {
   for (const entity of deathDrops) disposeDeathDrop(entity);
   deathDrops.length = 0;
   authorizedRemotePickups.clear();
-  // Every drop id these verdicts referred to has just ceased to exist; replaying
+  // Every drop id these resolutions referred to has just ceased to exist; replaying
   // one into the next round would answer for a gun that is no longer there.
   hostPickupResolutions.clear();
   renderPickupInteractionPrompt(element<HTMLElement>('#pickup-prompt'), null);
@@ -15655,7 +15655,7 @@ function expirePendingLocalPickup(now: number): void {
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
   if (message.by === player.id) return;
   // HF-504 idempotency. A repeat of a request this host ALREADY resolved is
-  // answered with the same verdict and the host's CURRENT canonical inventory,
+  // answered with the same resolution and the host's CURRENT canonical inventory,
   // never re-executed and never turned into a rejection. That is what makes a
   // lost ack cost one round trip instead of the gun: the guest resends the same
   // nonce, the host replays 'accepted', and the guest confirms the swap it had
@@ -15810,7 +15810,7 @@ function acceptRemotePickup(message: PickupMessage, now = performance.now()): vo
   }
   processedNonces.add(message.nonce);
   const acceptedRecord = sendRemotePickupResult(message, 'accepted', 'accepted', entity.drop, now);
-  // The verdict is remembered BEFORE the entity is torn down, with the same
+  // The resolution is remembered BEFORE the entity is torn down, with the same
   // ground-state delta the guest was just sent, so a replay of this request
   // reproduces it exactly even after the drop object is gone.
   rememberPickupResolution(hostPickupResolutions, requestKey, {
@@ -16797,7 +16797,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
   remotes.delete(id);
-  // HF-504: a departed peer's pickup verdicts can never be replayed again, and
+  // HF-504: a departed peer's pickup resolutions can never be replayed again, and
   // a rejoin issues a fresh connection epoch, so the ledger is scoped down with
   // the peer rather than left to age out.
   forgetPlayerPickupResolutions(hostPickupResolutions, id);

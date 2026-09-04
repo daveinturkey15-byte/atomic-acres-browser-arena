@@ -129,7 +129,7 @@ describe('HF-504 host pickup admission - idempotency', () => {
     resolvedAt: 1_000,
   });
 
-  it('replays an ACCEPTED verdict, so a lost ack costs a round trip and never the gun', () => {
+  it('replays an ACCEPTED resolution, so a lost ack costs a round trip and never the gun', () => {
     // This is the whole HF-504 failure mode. The host accepted; the result was
     // lost; the guest resent the same nonce. Before PASS 95 the answer was
     // 'rejected: duplicate', and the guest's rejection path reverted a swap the
@@ -143,7 +143,7 @@ describe('HF-504 host pickup admission - idempotency', () => {
     expect(replay?.reason).toBe('accepted');
   });
 
-  it('replays a REJECTED verdict, so a retry cannot become a second successful pick', () => {
+  it('replays a REJECTED resolution, so a retry cannot become a second successful pick', () => {
     const ledger = createPickupResolutionLedger();
     const key = pickupRequestKey('guest-a', 78);
     rememberPickupResolution(ledger, key, {
@@ -152,13 +152,13 @@ describe('HF-504 host pickup admission - idempotency', () => {
     expect(recallPickupResolution(ledger, key, 1_400)?.reason).toBe('drop-distance');
   });
 
-  it('scopes a verdict to (playerId, nonce), so one guest cannot replay another guest\'s pickup', () => {
+  it('scopes a resolution to (playerId, nonce), so one guest cannot replay another guest\'s pickup', () => {
     const ledger = createPickupResolutionLedger();
     rememberPickupResolution(ledger, pickupRequestKey('guest-a', 5), acceptedResolution);
     expect(recallPickupResolution(ledger, pickupRequestKey('guest-b', 5), 1_100)).toBeNull();
   });
 
-  it('keeps a verdict replayable for longer than the guest\'s whole retry schedule', () => {
+  it('keeps a resolution replayable for longer than the guest\'s whole retry schedule', () => {
     // If the ledger forgot before the guest gave up, the last retry would be
     // re-executed against a drop that is already gone and answered
     // 'unknown-drop', which reverts the swap. The TTL has to outlive the
@@ -184,7 +184,7 @@ describe('HF-504 host pickup admission - idempotency', () => {
     expect(ledger.has(newest)).toBe(true);
   });
 
-  it('drops every verdict for a peer that has left', () => {
+  it('drops every resolution for a peer that has left', () => {
     const ledger = createPickupResolutionLedger();
     rememberPickupResolution(ledger, pickupRequestKey('guest-a', 1), acceptedResolution);
     rememberPickupResolution(ledger, pickupRequestKey('guest-a', 2), acceptedResolution);

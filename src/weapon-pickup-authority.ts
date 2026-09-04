@@ -133,7 +133,7 @@ export function pickupRequestKey(playerId: string, nonce: number): string {
 
 /**
  * The replay lookup. A hit means this exact request was already resolved and
- * the host must answer with the SAME verdict — an accepted pickup answers
+ * the host must answer with the SAME resolution - an accepted pickup answers
  * accepted again, so a lost ack costs a round trip and never the gun, and a
  * rejected one answers rejected again, so a retry cannot become a second
  * successful pick of the same drop.
@@ -154,7 +154,7 @@ export function recallPickupResolution(
 }
 
 /**
- * Records a verdict. Insertion-ordered eviction: expired entries first, then
+ * Records a resolution. Insertion-ordered eviction: expired entries first, then
  * the oldest, so the ledger cannot outgrow `limit` even under a flood of
  * fabricated nonces from a hostile guest.
  */
