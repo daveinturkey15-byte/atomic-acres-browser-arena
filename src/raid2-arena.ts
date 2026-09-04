@@ -564,11 +564,14 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // N5 hot tub pavilion. Sited at z -35..-30.5 rather than mid-lane on purpose:
   // it breaks the 70 m band that would otherwise run along the north strip
   // WITHOUT touching the lane line at z ~ -28.
-  wallAlongX('raid2 pavilion north', -20, -15, -35, -34.2, WALL_TOP, []);
-  wallAlongZ('raid2 pavilion west', -20, -19.2, -35, -30.5, WALL_TOP, []);
-  wallAlongZ('raid2 pavilion east', -15.8, -15, -35, -30.5, WALL_TOP, []);
+  // Walls seat at the roof soffit (3.16 m); the stone roof slab covers 3.16-3.40 m
+  // over the same footprint, so seating at WALL_TOP left coincident top faces
+  // (raid2 coplanar fence FINDINGs, Luna review 2).
+  wallAlongX('raid2 pavilion north', -20, -15, -35, -34.2, UPPER_SOFFIT, []);
+  wallAlongZ('raid2 pavilion west', -20, -19.2, -35, -30.5, UPPER_SOFFIT, []);
+  wallAlongZ('raid2 pavilion east', -15.8, -15, -35, -30.5, UPPER_SOFFIT, []);
   // One 2 m mouth, facing the pool.
-  wallAlongX('raid2 pavilion south', -20, -15, -31.3, -30.5, WALL_TOP, [[-18.5, -16.5]]);
+  wallAlongX('raid2 pavilion south', -20, -15, -31.3, -30.5, UPPER_SOFFIT, [[-18.5, -16.5]]);
   roofSlab('raid2 pavilion roof', -20, -15, -35, -30.5);
 
   // N3 pool. MEASURED, not a rectangle (src/raid2-reference.ts).
@@ -660,9 +663,10 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // ONE mouth, in the east wall, so every segment of the bar stays joined to
   // every other: a block with mouths in two faces is two wall masses, and this
   // rebuild is counting masses.
-  wallAlongZ('raid2 pool bar west', 4, 4.8, -36, -32, WALL_TOP, []);
-  wallAlongZ('raid2 pool bar east', 9.2, 10, -36, -32, WALL_TOP, [[-36, -33.2]]);
-  wallAlongX('raid2 pool bar south', 4, 10, -32.8, -32, WALL_TOP, []);
+  // As above: walls seat at the soffit so no wall top meets the stone roof top.
+  wallAlongZ('raid2 pool bar west', 4, 4.8, -36, -32, UPPER_SOFFIT, []);
+  wallAlongZ('raid2 pool bar east', 9.2, 10, -36, -32, UPPER_SOFFIT, [[-36, -33.2]]);
+  wallAlongX('raid2 pool bar south', 4, 10, -32.8, -32, UPPER_SOFFIT, []);
   roofSlab('raid2 pool bar roof', 4, 10, -36, -32);
 
   // N4 pool deck: the walk between the water and the house. Two pergola piers
@@ -671,7 +675,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   // Footed AGAINST the house's north face rather than free in the deck: they
   // break exactly the same lines and cost the map two fewer wall masses.
   for (const x of [-2, 8]) {
-    rect(`raid2 pergola pier ${x}`, x - 0.6, x + 0.6, 0, WALL_TOP, -21.2, -19.9, m.timber);
+    rect(`raid2 pergola pier ${x}`, x - 0.6, x + 0.6, 0, WALL_TOP, -21.2, -20, m.timber);
   }
   rect('raid2 deck planter run', -12, -4, 0, MOUNT, -22.4, -21.4, m.planting);
   rect('raid2 deck planter run east', 12, 17, 0, MOUNT, -22.4, -21.4, m.planting);
@@ -684,7 +688,7 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongZ('raid2 wing east', 31.2, 32, -34, -28, WALL_TOP, []);
   wallAlongX('raid2 wing spine', 18, 32, -28.8, -28, WALL_TOP, [[22, 27]]);
   for (const x of [19.6, 25, 30.4]) {
-    rect(`raid2 wing colonnade pier ${x}`, x - 0.7, x + 0.7, 0, WALL_TOP, -24.7, -23.3, m.stone);
+    rect(`raid2 wing colonnade pier ${x}`, x - 0.7, x + 0.7, 0, UPPER_SOFFIT, -24.7, -23.3, m.stone);
   }
   // NO GLAZED RETURN HERE, and the reason is measured rather than aesthetic.
   //
@@ -920,8 +924,10 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   for (const [index, band] of discBands(0, 14, 2.6, 5).entries()) {
     rect(`raid2 drive plinth step ${index}`, band[0], band[1], 0, 0.42, band[2], band[3], m.stone, { cast: false });
   }
+  // +0.05 m cap: the overlap above is wanted (one mass), but equal 1.90 m tops
+  // left coincident top faces (raid2 coplanar fence FINDINGs, Luna review 2).
   for (const [index, band] of discBands(0, 14, 2.2, 5).entries()) {
-    rect(`raid2 drive fountain plinth ${index}`, band[0], band[1], 0.42, HARD_COVER, band[2], band[3], m.stone);
+    rect(`raid2 drive fountain plinth ${index}`, band[0], band[1], 0.42, HARD_COVER + 0.05, band[2], band[3], m.stone);
   }
   // The ribbon: a tall twisted form on the plinth, replacing a 1.45 m torus
   // with something the drive lane can actually be read against from the
@@ -983,8 +989,10 @@ export function buildRaid2(scene: THREE.Scene): ArenaMap {
   wallAlongX('raid2 garage south', 38, 50, 11.2, 12, WALL_TOP, []);
   wallAlongZ('raid2 garage back', 49.2, 50, -16, 12, WALL_TOP, []);
   floorSlab('raid2 garage roof', 40, 50, -10, 6);
+  // Pier 7 overlaps the carport block (one mass by design); its +0.05 m cap
+  // breaks the coincident 3.40 m tops (raid2 coplanar fence FINDING, Luna review 2).
   for (const z of [-9, -1, 7]) {
-    rect(`raid2 garage bay pier ${z}`, 33.4, 34.6, 0, WALL_TOP, z - 0.6, z + 0.6, m.stone);
+    rect(`raid2 garage bay pier ${z}`, 33.4, 34.6, 0, z === 7 ? WALL_TOP + 0.05 : WALL_TOP, z - 0.6, z + 0.6, m.stone);
   }
   for (const [z0, z1] of [[-13, -6], [-3, 4], [7, 10]] as const) {
     rect(`raid2 garage kerb ${z0}`, 36.2, 37, 0, 0.4, z0, z1, m.stone, { cast: false });
