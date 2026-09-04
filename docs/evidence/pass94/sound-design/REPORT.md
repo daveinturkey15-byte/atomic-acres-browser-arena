@@ -28,7 +28,10 @@ as an owner microphone measurement.
 
 The render gate also verified finite samples, no clipping above 0.999, exact
 repeatability for the same seed, and different buffers for consecutive weapon
-variants. The live runtime keeps the existing global 48, spatial 12,
+variants. A headless Chromium probe additionally rendered all five categories
+through a native `OfflineAudioContext` with the final compressor settings and
+verified finite, non-clipping output plus variant differentiation. The live
+runtime keeps the existing global 48, spatial 12,
 continuous 8, and per-bus caps.
 
 ## Synthesis recipes
@@ -113,4 +116,3 @@ contexts remain dry and safe. The master stage is a -1 dB, 20:1, 1 ms attack,
   not to raise the combat buses.
 - The required legacy size fence remains OPEN on the unchanged base: 37,372
   lines versus the recorded 37,371 ceiling.
-
