@@ -665,7 +665,7 @@ describe('guest event connection lifecycle', () => {
   });
 
   it('rejects a v17 peer before it can mix with the required v18 support-shot schema', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(19);
     const currentSupportResult = {
       type: 'killstreak-damage-result' as const,
       by: 'host',

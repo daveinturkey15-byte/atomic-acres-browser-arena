@@ -373,3 +373,31 @@ export function viewmodelSurfaceClipPlanes(input: Readonly<{
   found.sort((left, right) => left.eyeDistanceMeters - right.eyeDistanceMeters);
   return found.length > limit ? found.slice(0, limit) : found;
 }
+
+/**
+ * Gameplay fire admission for the first-person rig. The clipping probe already
+ * identifies the world-space half-spaces that can cut the rendered weapon; use
+ * the authored muzzle socket against those planes, rather than the collider's
+ * class or the conservative camera-forward contact lattice. This keeps stairs
+ * and ramps fireable when the muzzle is clear while retaining a real muzzle-in-
+ * solid block.
+ */
+export function viewmodelMuzzleInsideSurfaceClip(
+  muzzle: Point3,
+  planes: readonly Pick<ViewmodelSurfacePlane, 'normal' | 'constant'>[],
+): boolean {
+  return planes.some((plane) => (
+    plane.normal.x * muzzle.x
+      + plane.normal.y * muzzle.y
+      + plane.normal.z * muzzle.z
+      + plane.constant < 0
+  ));
+}
+
+export function viewmodelMuzzleFireBlockReason(
+  muzzle: Point3 | null,
+  planes: readonly Pick<ViewmodelSurfacePlane, 'normal' | 'constant'>[],
+): 'viewmodel-muzzle-unavailable' | 'viewmodel-muzzle-clip' | null {
+  if (muzzle === null) return 'viewmodel-muzzle-unavailable';
+  return viewmodelMuzzleInsideSurfaceClip(muzzle, planes) ? 'viewmodel-muzzle-clip' : null;
+}
