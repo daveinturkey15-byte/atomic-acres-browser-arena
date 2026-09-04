@@ -197,6 +197,19 @@ describe('thin-metal perforation (HF-467, R3 section 9 sibling)', () => {
     expect(nextEpochAuthority.applyAuthoritativeEnvelope(envelope)).toBe(false);
   });
 
+  it('rejects a valid older envelope after a newer state was applied', () => {
+    const host = panelAuthority(['a:1']);
+    const guest = panelAuthority(['a:1'], false);
+    const surface = bladeSurface('a:1');
+    const point = { x: 7.7, y: 2.7, z: -0.45 };
+    const oldEnvelope = host.stateEnvelope();
+    for (let index = 0; index < 3; index += 1) hitAt(host, surface, point);
+    expect(guest.applyAuthoritativeEnvelope(host.stateEnvelope())).toBe(true);
+    expect(guest.apertureQuery(surface, point)).toBe(true);
+    expect(guest.applyAuthoritativeEnvelope(oldEnvelope)).toBe(false);
+    expect(guest.apertureQuery(surface, point)).toBe(true);
+  });
+
   it('requires sub-threshold and non-penetrating hits to be ignored', () => {
     const authority = panelAuthority(['a:1']);
     const surface = bladeSurface('a:1');

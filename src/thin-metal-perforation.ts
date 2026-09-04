@@ -479,6 +479,7 @@ export class ThinMetalPerforationAuthority {
   private matchEpoch: number;
   private hostAuthority: boolean;
   private revision = 0;
+  private lastAppliedRevision = -1;
   private nextHoleId = 0;
   private disposed = false;
 
@@ -619,6 +620,7 @@ export class ThinMetalPerforationAuthority {
   applyAuthoritativeEnvelope(value: unknown): boolean {
     if (this.disposed || !isThinMetalPerforationEnvelope(value)) return false;
     if (value.arenaId !== this.arenaId || value.matchEpoch !== this.matchEpoch) return false;
+    if (value.revision <= this.lastAppliedRevision) return false;
     const known = new Set(this.panels.keys());
     if (!value.panels.every((state) => known.has(state.panelId))) return false;
     this.revision = value.revision;
@@ -631,6 +633,7 @@ export class ThinMetalPerforationAuthority {
       });
     }
     this.presentation.sync([...this.panels.values()].map((entry) => entry.placement), this.panelStates());
+    this.lastAppliedRevision = value.revision;
     return true;
   }
 
@@ -640,6 +643,7 @@ export class ThinMetalPerforationAuthority {
     }
     this.matchEpoch = nextMatchEpoch;
     this.revision = 0;
+    this.lastAppliedRevision = -1;
     this.nextHoleId = 0;
     for (const panel of this.panels.values()) {
       panel.state = Object.freeze({ panelId: panel.placement.id, hits: 0, holes: Object.freeze([]) });
