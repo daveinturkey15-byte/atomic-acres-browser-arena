@@ -255,6 +255,9 @@ traversal, no new render target, no new scene-graph mutation.
    grime term inside the road material itself — materials lane, not this one.
 2. **Two review cameras are missing at runtime** — `nuketown2-north-balcony`
    and `nuketown2-front-porch`, PRE-EXISTING at the base SHA (section 5).
+2b. **`qa:pass74:arena-boot-smoke` and `qa:stock-boot` did not run** — the
+   shared `node_modules` junction lost `@playwright/test` and `.bin` mid-pass
+   (section 5). Not repaired, because that tree is shared with live lanes.
 3. **Persistent world-fixed foam** for the pool (one render target + one blit per
    frame for a 9.9 m2 pool) was judged a bad trade and not built; refraction of
    the scene behind the surface and bed caustics likewise need a pass each. The
@@ -347,6 +350,30 @@ transformation.
 | **Hedges** | Landed, and visibly better than the flat olive box — the near tier has a soft crown and a value gradient in `nuketown2-street-centre`. Modest at these camera ranges; the fix history above is the interesting part. |
 | **Hero props** | Present as cream masses in both back yards in `nuketown2-overhead`. At the yard cameras they sit behind the eye point, so no close read of the glasshouse/pod detail tiers exists yet. **Not visually verified at close range.** |
 | **Grime decals** | **Not confirmed in any capture.** None of the ten cameras frames the driveway apron, the border path or the wall runs at a range where a decal resolves. Recorded as OPEN 8 rather than claimed. |
+
+### The two named boot gates did NOT run, and the reason is not this branch
+
+`npm run qa:pass74:arena-boot-smoke` and `npm run qa:stock-boot` are **OPEN**.
+Both failed to start with `Cannot find module '@playwright/test'`. The cause is
+external to this branch: this worktree's `node_modules` is a junction into the
+shared `C:/Users/david/projects/aa-claude-chopper/node_modules`, and partway
+through this pass `@playwright/test` and the whole `node_modules/.bin` directory
+disappeared from it. It is not a transient install — the tree still holds 350
+packages including `three` and `vitest`, and no npm/pnpm process is running, so
+another lane pruned or replaced it. **It was left alone**: repairing a
+`node_modules` that several live worktrees share is not this lane's call, and an
+`npm install` there could break whichever lane is mid-run.
+
+What this costs, stated precisely: the two named boot gates have no receipt.
+What partly covers it: the review-capture run above IS a real WebGPU boot — it
+loaded the built app, waited for `__ATOMIC_ACRES_DEBUG__`, selected `nuketown2`,
+called `startSolo()`, froze the bots and drove ten deterministic cameras to
+committed frames on an nvidia/blackwell adapter with **zero page errors and zero
+console errors**. That is stronger boot evidence than a smoke spec, but it is
+not the named gate and is not offered as one.
+
+Everything else was re-verified at this head after the `node_modules` change:
+`npx tsc --noEmit` clean, and 10 test files / 95 tests green.
 
 ### The biggest remaining art problem is not this lane's
 
