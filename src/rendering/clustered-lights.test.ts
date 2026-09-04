@@ -78,5 +78,7 @@ describe('Nuke Town clustered light catalog', () => {
     expect(runtimeSource.indexOf('renderer.lighting = createNuketown2ClusteredLighting();'))
       .toBeLessThan(runtimeSource.indexOf('await renderer.init();'));
     expect(legacySource).toContain('await exactScenePass.precompileExactScenePass(scene);');
+    expect(legacySource.indexOf('createNuketown2LocalLights('))
+      .toBeLessThan(legacySource.indexOf('await exactScenePass.precompileExactScenePass(scene);'));
   });
 });
