@@ -160,8 +160,8 @@ function createRingMaterial(
 
 /**
  * Nuke Town's persistent horizon cloud and deterministic match-end event.
- * The scene owns one shared volume graph and one ring graph; background/event
- * meshes are draw instances whose origins, extents and mode are uniforms.
+ * The scene owns one volume graph per draw and one ring graph; background/event
+ * meshes keep distinct origin, extent, mode and opacity uniform instances.
  */
 export class NukeEventPresentation {
   readonly root: THREE.Group;
@@ -171,9 +171,13 @@ export class NukeEventPresentation {
   private readonly volumeOrigin = uniform(new THREE.Vector3());
   private readonly volumeHalfExtents = uniform(new THREE.Vector3());
   private readonly volumeMode = uniform(0);
+  private readonly eventVolumeOrigin = uniform(new THREE.Vector3());
+  private readonly eventVolumeHalfExtents = uniform(new THREE.Vector3());
+  private readonly eventVolumeMode = uniform(1);
   private readonly volumeClock = uniform(0);
   private readonly volumeSeed = uniform(0);
   private readonly volumeOpacity = uniform(1);
+  private readonly eventVolumeOpacity = uniform(1);
   private readonly eventFlash = uniform(0);
   private readonly eventGrowth = uniform(0);
   private readonly eventFade = uniform(0);
@@ -217,6 +221,18 @@ export class NukeEventPresentation {
       this.eventFade,
       this.sunDirection,
     );
+    const eventVolumeMaterial = createVolumeMaterial(
+      this.eventVolumeOrigin,
+      this.eventVolumeHalfExtents,
+      this.eventVolumeMode,
+      this.volumeClock,
+      this.volumeSeed,
+      this.eventVolumeOpacity,
+      this.eventFlash,
+      this.eventGrowth,
+      this.eventFade,
+      this.sunDirection,
+    );
     const volumeGeometry = new THREE.BoxGeometry(2, 2, 2);
     this.backgroundVolume = new THREE.Mesh(volumeGeometry, volumeMaterial);
     this.backgroundVolume.name = 'nuketown2-horizon-mushroom-cloud';
@@ -228,7 +244,7 @@ export class NukeEventPresentation {
     this.backgroundVolume.userData.uniformInstance = 'background-origin-extents-mode';
     this.backgroundVolume.onBeforeRender = () => this.bindBackgroundUniforms();
 
-    this.eventVolume = new THREE.Mesh(volumeGeometry, volumeMaterial);
+    this.eventVolume = new THREE.Mesh(volumeGeometry, eventVolumeMaterial);
     this.eventVolume.name = 'nuketown2-detonation-mushroom-cloud';
     this.eventVolume.position.set(...EVENT_VOLUME_ORIGIN);
     this.eventVolume.scale.set(...EVENT_VOLUME_HALF_EXTENTS);
@@ -368,10 +384,10 @@ export class NukeEventPresentation {
   }
 
   private bindEventUniforms(): void {
-    this.volumeMode.value = 1;
-    this.volumeOpacity.value = 1;
-    this.volumeOrigin.value.set(...EVENT_VOLUME_ORIGIN);
-    this.volumeHalfExtents.value.set(...EVENT_VOLUME_HALF_EXTENTS);
+    this.eventVolumeMode.value = 1;
+    this.eventVolumeOpacity.value = 1;
+    this.eventVolumeOrigin.value.set(...EVENT_VOLUME_ORIGIN);
+    this.eventVolumeHalfExtents.value.set(...EVENT_VOLUME_HALF_EXTENTS);
   }
 
   private bindRingUniforms(): void {

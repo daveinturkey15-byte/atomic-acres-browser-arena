@@ -95,6 +95,16 @@ describe('HF-490 Nuke Town event timeline', () => {
     expect(update).not.toContain('new ');
   });
 
+  it('keeps background and event volume materials and uniforms isolated', () => {
+    const presentation = new NukeEventPresentation(new THREE.Scene(), { backend: 'webgpu' });
+    const background = presentation.root.getObjectByName('nuketown2-horizon-mushroom-cloud') as THREE.Mesh;
+    const event = presentation.root.getObjectByName('nuketown2-detonation-mushroom-cloud') as THREE.Mesh;
+    expect(background.material).not.toBe(event.material);
+    expect(moduleSource).toContain('const eventVolumeMaterial = createVolumeMaterial(');
+    expect(moduleSource).toContain('private readonly eventVolumeOrigin = uniform(new THREE.Vector3())');
+    expect(moduleSource).toContain('private readonly eventVolumeOpacity = uniform(1)');
+  });
+
   it('prewarms both graph families through one menu-time submission', async () => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
