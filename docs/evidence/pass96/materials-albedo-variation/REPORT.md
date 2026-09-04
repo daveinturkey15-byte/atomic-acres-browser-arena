@@ -242,34 +242,66 @@ both sides served from their own `vite preview` on port 4212, one browser at a
 time. Diffed with `scripts/qa/diff-arena-viewpoints.mjs` (`meanAbsDelta`,
 grayscale, downscaled, persistence-min across samples).
 
-**RESULT: the pair was NOT produced. Reported as a failure, not smoothed over.**
+**RESULT: the pair was NOT produced. Reported as a failure, with the full
+diagnosis, rather than smoothed over.**
 
-The browser half is healthy - installed Chrome headless obtained a real
-hardware WebGPU device (`backend=webgpu`, `vendor=nvidia`,
-`architecture=blackwell`), the arena served and loaded, and the run took 133 s.
-Every one of the 17 authored Nuke Town review cameras then returned the same
-error:
+The browser half is healthy: installed Chrome headless obtained a real hardware
+WebGPU device (`backend=webgpu`, `vendor=nvidia`, `architecture=blackwell`) and
+the arena served and loaded. What fails is camera resolution - all 17 authored
+Nuke Town review cameras return the same error on a freshly started
+`vite preview`, on BOTH trees:
 
 ```
-[viewpoint-capture] nuketown2  FAIL 0/17 shots 133346 ms
+[viewpoint-capture] nuketown2  FAIL 0/17 shots 123359 ms   (base,      978da7e6)
+[viewpoint-capture] nuketown2  FAIL 0/17 shots 126150 ms   (candidate, 4ab23611)
   nuketown2-overhead: setArenaReviewCamera returned false - authored camera missing
-  ... same for all 17 camera ids ...
-verdict FAIL, backend webgpu, adapterVendor nvidia
+  ... identical for all 17 camera ids, both sides ...
+[viewpoint-diff] INVALID comparison: base capture did not pass, candidate capture did not pass
 ```
 
-Both sides fail identically, and **the base tree fails it too** - so this is
-not a regression introduced by this lane, it is the viewpoint harness not
-resolving the authored review cameras out of a `vite preview` production
-bundle on this branch. Diagnosing that is its own task; guessing at it, or
-substituting a hand-driven screenshot and calling it the pair, would put an
-unearned number in this row.
+### The wrong turn, written down, because it nearly became a fake result
+
+The FIRST attempt looked much better than this: base 0/17, **candidate 17/17**.
+It would have been easy to report that as "the candidate captures fine". It was
+wrong, and `diff-arena-viewpoints.mjs` is what caught it:
+
+```
+[viewpoint-diff] INVALID comparison:
+  - both runs served the same bundle '/legacy-main-DEY6khyQ.js'
+    - harness mistake, not a code regression
+```
+
+`DEY6khyQ` is the **base** bundle; the candidate is `Ao7VKn3G`. The teardown in
+my capture wrapper sent `kill` to the `npx` wrapper rather than to the `vite`
+child, so the base preview server survived, and the candidate's
+`vite preview --port 4212 --strictPort` lost the port bind while `curl` still
+saw a healthy server. The "candidate" run therefore drove the **base** build,
+and its 17 PNGs were base frames wearing a candidate label. They have been
+deleted, not published.
+
+**Symptom -> Cause -> Correction -> Verify.** A viewpoint capture pair where one
+side passes and the other fails, with no code reason -> the previous side's
+preview server was never killed (`kill` hit the npx wrapper, not the vite
+child) and `--strictPort` silently reused it -> tear the port down by listener
+PID (`Get-NetTCPConnection -LocalPort <p> -State Listen` -> `Stop-Process`) and
+confirm the port is closed before starting the next side -> the diff tool's
+served-bundle check reports two DIFFERENT bundle hashes.
+
+### What the corrected run then showed
+
+With the port torn down properly, both sides fail identically at 0/17. The one
+17/17 success came from a server that had **already been driven through a full
+133 s session** - so the authored review cameras do register eventually, but the
+harness's own first-visit path does not reach that state on a cold
+`vite preview` within its window. That is the actual defect, it predates this
+lane, and it is a harness/route problem rather than a materials regression.
+Chasing it properly is its own task and is outside this lane's time box.
 
 **What this means for the lane's claims.** Nothing in section 2 or section 4
 depends on the capture: those are CPU measurements of the generated tile and of
 the material graph, reproducible from the test file. What is NOT evidenced is
 the frame itself - no "mean abs diff between before and after at two stations"
 figure exists, and none is claimed. That is OPEN 6.
-
 
 ## 7. Claim-states
 
@@ -338,11 +370,17 @@ figure exists, and none is claimed. That is OPEN 6.
 5. **Micro falloff is arena-specific.** 55->110 m is chosen so the term never
    fades inside Nuke Town. A larger map reusing these families would want that
    pair re-derived from its own read distances rather than inherited.
-6. **The capture pair is owed.** `scripts/qa/capture-arena-viewpoints.mjs`
-   cannot resolve the authored Nuke Town review cameras out of a `vite preview`
-   production bundle on this branch (it fails identically on the base tree, so
-   it is a harness/route issue, not a lane regression). The visual claim is
-   therefore UNEVIDENCED and this branch should not be treated as visually
-   reviewed until a working pair exists. Both bundles are built and left in
-   place - `dist-vr-base` (978da7e6) and `dist-vr-after` (332494cc) - so whoever
-   picks this up can re-run the capture without rebuilding.
+6. **The capture pair is owed, and the harness needs a warm-up fix first.**
+   `capture-arena-viewpoints.mjs` cannot resolve the authored Nuke Town review
+   cameras on a cold `vite preview` - 0/17 on the base tree and on the
+   candidate, so it is a harness/route issue and not a lane regression. The
+   evidence that it is a WARM-UP problem specifically: the identical bundle
+   scored 17/17 when it was driven a second time against a server that had
+   already served a full session. A fix probably means having the harness
+   deploy the arena and wait for the review-camera registry before it starts
+   asking for cameras. The visual claim is UNEVIDENCED and this branch must not
+   be treated as visually reviewed until a real pair exists. Both bundles are
+   left built - `dist-vr-base` (978da7e6, `legacy-main-DEY6khyQ.js`) and
+   `dist-vr-after` (4ab23611, `legacy-main-Ao7VKn3G.js`) - so the pair can be
+   re-run without rebuilding, and those two hashes are what the diff tool's
+   served-bundle check must show as different.
