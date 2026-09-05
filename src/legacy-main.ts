@@ -35058,7 +35058,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       graphicsRefinement: graphicsRefinement.telemetry(),
       arenaContrastLighting: arenaContrastLighting.telemetry(),
       worldLocalLightOcclusion: auditLocalLightOcclusion(scene, 1),
-      qualityAssetStreaming: { ...qualityAssetStreaming },
+      qualityAssetStreaming: { ...qualityAssetStreaming }, arenaArtReady: arena.artReadyContract?.snapshot() ?? null,
       skyBackdrop: {
         preset: scene.userData.pass66SkyBackdropPreset ?? null,
         status: scene.userData.pass66SkyBackdropStatus ?? null,

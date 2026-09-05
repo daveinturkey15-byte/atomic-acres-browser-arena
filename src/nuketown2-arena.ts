@@ -108,6 +108,7 @@ import {
   spawnRecord,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { createArenaArtReadyContract } from './arena-art-ready';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface } from './ballistics';
 import {
@@ -3589,6 +3590,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     id: 'nuketown2',
     label: 'Nuke Town Rebuild',
     root: builder.root,
+    artReadyContract: createArenaArtReadyContract('nuketown2', builder.root, scene),
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,
     raycastMeshes: builder.raycastMeshes,

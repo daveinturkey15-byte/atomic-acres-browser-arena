@@ -37,6 +37,7 @@ import type { GlassState } from './glass-authority';
 import { bindPass73CollisionVisualOwner } from './pass73-collision-route-authority';
 import type { ArenaId } from './map-selection';
 import type { ArenaFrameUpdate } from './arena-frame-animation';
+import type { ArenaArtReadyContract } from './arena-art-ready';
 
 export type PracticeTarget = {
   id: string;
@@ -56,6 +57,8 @@ export type ArenaMap = {
   id: ArenaId;
   label: string;
   root: THREE.Group;
+  /** Optional authored-art proof for arenas whose registry owns its presentation. */
+  artReadyContract?: ArenaArtReadyContract;
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
