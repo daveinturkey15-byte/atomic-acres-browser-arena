@@ -22,7 +22,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { farcrysisTerrainHeight, FARCRYSIS_WATER_LEVEL } from '../../src/farcrysis-terrain-authority.ts';
-import { FARCRYSIS_CROSS_LANES, FARCRYSIS_LOOPS } from '../../src/farcrysis-layout.ts';
+import { FARCRYSIS_CROSS_LANES, FARCRYSIS_ROUTE_SEGMENTS, FARCRYSIS_SCALE } from '../../src/farcrysis-layout.ts';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -40,17 +40,31 @@ process.env.PASS73_NATIVE_WEBGPU = '1';
 
 /** Every walk: start x/z, heading toward the next waypoint. */
 const walks = [];
-for (const loop of FARCRYSIS_LOOPS) {
-  for (let i = 0; i < loop.waypoints.length; i += 1) {
-    const a = loop.waypoints[i];
-    const b = loop.waypoints[(i + 1) % loop.waypoints.length];
-    walks.push({ route: loop.id, segment: i, from: [a[0], a[1]], to: [b[0], b[1]] });
-  }
+for (const edge of FARCRYSIS_ROUTE_SEGMENTS) {
+  walks.push({
+    route: edge.routeId,
+    segment: edge.segment,
+    from: [edge.from[0], edge.from[1]],
+    to: [edge.to[0], edge.to[1]],
+    widthM: edge.widthM,
+    plannedDistanceM: Number(edge.distanceM.toFixed(2)),
+    plannedSprintSeconds: Number(edge.sprintSeconds.toFixed(2)),
+  });
 }
 for (const lane of FARCRYSIS_CROSS_LANES) {
   const mid = [(lane.from[0] + lane.to[0]) / 2, (lane.from[1] + lane.to[1]) / 2];
-  walks.push({ route: lane.id, segment: 0, from: [lane.from[0], lane.from[1]], to: [lane.to[0], lane.to[1]] });
-  walks.push({ route: lane.id, segment: 1, from: mid, to: [lane.to[0], lane.to[1]] });
+  // Keep the previous stage's midpoint probe as an additional check; the
+  // full edge above is the canonical route table entry, so this extends the
+  // probe instead of replacing its earlier coverage.
+  walks.push({
+    route: lane.id,
+    segment: 1,
+    from: mid,
+    to: [lane.to[0], lane.to[1]],
+    widthM: lane.widthM,
+    plannedDistanceM: Number(Math.hypot(lane.to[0] - mid[0], lane.to[1] - mid[1]).toFixed(2)),
+    plannedSprintSeconds: Number((Math.hypot(lane.to[0] - mid[0], lane.to[1] - mid[1]) / FARCRYSIS_SCALE.sprintMps).toFixed(2)),
+  });
 }
 
 const groundAt = (x, z) => {
@@ -166,7 +180,13 @@ const record = {
   backend,
   flags: ['--mute-audio'],
   env: { PASS73_NATIVE_WEBGPU: '1' },
-  method: { walkMs: WALK_MS, blockerNearM: BLOCKER_NEAR_M, slopeStepM: SLOPE_STEP_M, routes: FARCRYSIS_LOOPS.map((l) => l.id).concat(FARCRYSIS_CROSS_LANES.map((l) => l.id)) },
+  method: {
+    walkMs: WALK_MS,
+    blockerNearM: BLOCKER_NEAR_M,
+    slopeStepM: SLOPE_STEP_M,
+    routes: [...new Set(FARCRYSIS_ROUTE_SEGMENTS.map((edge) => edge.routeId))],
+    routeSegments: FARCRYSIS_ROUTE_SEGMENTS.length,
+  },
   planned: walks.length,
   attempted: attempted.length,
   skipped: rows.filter((r) => r.skipped).length,

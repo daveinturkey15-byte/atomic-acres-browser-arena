@@ -30,7 +30,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { buildFarcrysis } from './farcrysis';
-import { TSL_FOLIAGE_MAX_DISTINCT_GRAPHS, tslResetWindUniforms } from './farcrysis-tsl-foliage';
+import { FARCRYSIS_PIPELINE_BUDGET } from './farcrysis-layout';
+import { tslResetWindUniforms } from './farcrysis-tsl-foliage';
 
 function fakeCanvasContext(): CanvasRenderingContext2D {
   const gradient = () => ({ addColorStop: vi.fn() });
@@ -122,9 +123,9 @@ describe('HF-374 farcrysis WebGPU pipeline budget', () => {
       `farcrysis built ${distinct.size} distinct WebGPU node-material programs from `
       + `${keys.length} materials; arena admission must realise every one of them inside a `
       + 'single fenced coverage submission (HF-374)',
-    ).toBeLessThanOrEqual(TSL_FOLIAGE_MAX_DISTINCT_GRAPHS);
+    ).toBeLessThanOrEqual(FARCRYSIS_PIPELINE_BUDGET.maximumFoliageNodeGraphs);
     // The ratio is the actual protection — one program per layer is the bug.
-    expect(distinct.size).toBeLessThan(keys.length / 4);
+    expect(distinct.size).toBeLessThan(keys.length / FARCRYSIS_PIPELINE_BUDGET.minimumMaterialsPerFoliageGraph);
   });
 
   it('leaves the WebGL2 compatibility route on plain standard materials', () => {

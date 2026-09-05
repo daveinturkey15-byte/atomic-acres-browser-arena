@@ -1,4 +1,5 @@
 import { buildFarcrysis } from '../../farcrysis';
+import { FARCRYSIS_PIPELINE_BUDGET, FARCRYSIS_REVIEW_STATIONS } from '../../farcrysis-layout';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { ATOMIC_ACRES_GENERATED_SKY_ASSET_URL } from '../sky-backdrop';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
@@ -34,11 +35,14 @@ export const definition = createProceduralArenaVisualDefinition({
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 200, normalBias: 0.03 },
   atmosphere: { preset: 'jungle-golden-hour', mist: 0.12, dust: 0.05, clouds: true },
   colorPipeline: colorPipeline('pass69.farcrysis.hdr.v1', 1.08),
-  budgets: budgets({ maximumDrawCalls: 460, maximumTriangles: 1_100_000 }),
+  budgets: budgets({
+    maximumDrawCalls: FARCRYSIS_PIPELINE_BUDGET.maximumDrawCalls,
+    maximumTriangles: FARCRYSIS_PIPELINE_BUDGET.maximumTriangles,
+  }),
   // HF-396: cameras track the rescaled landmarks — spawn-side beach (doubled
   // corner), jungle mid-ring, core interior, and the seaplane throwback now
   // at (48, -48). maximumDistance for shadows raised to cover the island.
-  reviewCameras: [
+  /* reviewCameras: [
     camera('farcrysis-beach-golden', [-54, 3.2, -54], [0, 1.2, 0], 'overview', 1.08),
     camera('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion', 1.08),
     // HF-423: this camera sat at [0, 2.6, 0] - INSIDE farcrysis-core-catwalk,
@@ -58,7 +62,9 @@ export const definition = createProceduralArenaVisualDefinition({
     // where beach grass meets the actual waterline.
     camera('farcrysis-island-topdown', [0, 95, 2], [0, 0, 0], 'overview', 1.08),
     camera('farcrysis-west-shoreline', [-62, 5, -6], [-50, 1.2, 12], 'overview', 1.08),
-  ],
+  ], */
+  reviewCameras: FARCRYSIS_REVIEW_STATIONS.map((entry) =>
+    camera(entry.id, entry.position, entry.target, entry.purpose, entry.exposure, entry.far)),
   collisionIdentity: { authoritativeArenaId: 'farcrysis', evidence: 'ArenaMap farcrysis collider, cover and shot-surface identity', presentationMayMutateAuthority: false },
   exceptions: ['beach/jungle foliage may remain presentation-only while authoritative cover and shot surfaces remain unchanged'],
 }, buildFarcrysis);

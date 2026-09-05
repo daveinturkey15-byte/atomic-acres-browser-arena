@@ -47,6 +47,11 @@ import {
   landmarkTreePositions,
   landmarkWallSpecs,
 } from './farcrysis-midmap-landmarks';
+import {
+  FARCRYSIS_LAYOUT_TABLES,
+  FARCRYSIS_VERTICAL_CROSSING,
+  FARCRYSIS_SCALE,
+} from './farcrysis-layout';
 
 // Re-export for downstream consumers (tests, map registry)
 export { FARCRYSIS_BOUNDS, FARCRYSIS_COVER_MIN, FARCRYSIS_MAX_SIGHTLINE };
@@ -108,7 +113,7 @@ function spawnRecord(
   team1: readonly (readonly [number, number])[],
 ): Record<Team, THREE.Vector3[]> {
   const seat = ([x, z]: readonly [number, number]): THREE.Vector3 =>
-    new THREE.Vector3(x, farcrysisTerrainHeight(x, z) + 1.7, z);
+    new THREE.Vector3(x, farcrysisTerrainHeight(x, z) + FARCRYSIS_SCALE.eyeHeightM, z);
   return { 0: team0.map(seat), 1: team1.map(seat) };
 }
 
@@ -131,20 +136,22 @@ type Builder = {
 /** Terrain surface Y under a prop centre — always the single authority. */
 const groundY = farcrysisTerrainHeight;
 
+type BoxOptions = {
+  solid?: boolean;
+  shots?: boolean;
+  cover?: boolean;
+  rotation?: [number, number, number];
+  cast?: boolean;
+  ballistic?: BallisticMaterialId;
+};
+
 function box(
   builder: Builder,
   name: string,
   position: [number, number, number],
   size: [number, number, number],
   material: THREE.Material,
-  options: {
-    solid?: boolean;
-    shots?: boolean;
-    cover?: boolean;
-    rotation?: [number, number, number];
-    cast?: boolean;
-    ballistic?: BallisticMaterialId;
-  } = {},
+  options: BoxOptions = {},
 ): THREE.Mesh {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
   mesh.name = name;
@@ -204,6 +211,32 @@ function box(
     mesh.userData.ballisticMaterial = surface.material;
   }
   return mesh;
+}
+
+/** A body whose authored centre is the arena origin. */
+function centred(
+  builder: Builder,
+  name: string,
+  size: [number, number, number],
+  material: THREE.Material,
+  options: BoxOptions = {},
+): THREE.Mesh {
+  return box(builder, name, [0, 0, 0], size, material, options);
+}
+
+/** Emit one authored body and its exact 180-degree partner. */
+function pair(
+  builder: Builder,
+  name: string,
+  position: [number, number, number],
+  size: [number, number, number],
+  material: THREE.Material,
+  options: BoxOptions = {},
+  firstSuffix = 'w',
+  secondSuffix = 'e',
+): void {
+  box(builder, `${name}-${firstSuffix}`, position, size, material, options);
+  box(builder, `${name}-${secondSuffix}`, [-position[0], position[1], -position[2]], size, material, options);
 }
 
 /** Register one collision-backed cover piece (solid + shot-blocking + physical). */
@@ -759,7 +792,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // takes the ruined-wall stone (weathered warm concrete), the bracket and
   // hood take the catwalk steel, and the lens takes the beacon ember glow -
   // the one warm emissive the arena already carries (hoisted below).
-  const coreFloor = box(builder, 'farcrysis-core-floor-slab', [0, 0.0, 0], [10.2, 0.08, 10.2], ruinedWallMat, {
+  const coreFloor = centred(builder, 'farcrysis-core-floor-slab', [10.2, 0.08, 10.2], ruinedWallMat, {
     solid: false,
     shots: true,
     cast: false,
@@ -768,20 +801,10 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   coreFloor.receiveShadow = true;
   const workLightMetalMat = stairMat;
   const workLightLensMat = warmEmberMat;
-  const corePair = (
-    name: string,
-    position: [number, number, number],
-    size: [number, number, number],
-    material: THREE.Material,
-    options: Parameters<typeof box>[5],
-  ): void => {
-    box(builder, `${name}-w`, position, size, material, options);
-    box(builder, `${name}-e`, [-position[0], position[1], -position[2]], size, material, options);
-  };
   const lampOptions = { solid: false, shots: true, cast: false, ballistic: 'thin-metal' as BallisticMaterialId };
-  corePair('farcrysis-core-work-light-bracket', [-5.12, 2.85, 1.6], [0.16, 0.08, 0.08], workLightMetalMat, lampOptions);
-  corePair('farcrysis-core-work-light-hood', [-4.9, 2.78, 1.6], [0.32, 0.22, 0.36], workLightMetalMat, lampOptions);
-  corePair('farcrysis-core-work-light-lens', [-4.72, 2.72, 1.6], [0.04, 0.16, 0.3], workLightLensMat, { solid: false, shots: true, cast: false, ballistic: 'glass' });
+  pair(builder, 'farcrysis-core-work-light-bracket', [-5.12, 2.85, 1.6], [0.16, 0.08, 0.08], workLightMetalMat, lampOptions);
+  pair(builder, 'farcrysis-core-work-light-hood', [-4.9, 2.78, 1.6], [0.32, 0.22, 0.36], workLightMetalMat, lampOptions);
+  pair(builder, 'farcrysis-core-work-light-lens', [-4.72, 2.72, 1.6], [0.04, 0.16, 0.3], workLightLensMat, { solid: false, shots: true, cast: false, ballistic: 'glass' });
 
   // ---- Throwbacks (R9): crashed seaplane, signal beacon, warning barrels.
   //
@@ -1142,10 +1165,15 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // grid and the catwalk deck, plus the stair flight as a ramp route.
   const verticalNavigation: ArenaVerticalNavigation = Object.freeze({
     routes: Object.freeze([
-      { id: 'core-catwalk-stairs', foot: [2.9, 0, 4.6] as const, top: [2.9, 2.59, 1.35] as const },
+      { id: FARCRYSIS_VERTICAL_CROSSING.id, foot: FARCRYSIS_VERTICAL_CROSSING.foot, top: FARCRYSIS_VERTICAL_CROSSING.top },
     ]),
     ramps: Object.freeze([
-      { id: 'core-catwalk-stairs', from: [2.9, 0, 4.6] as const, to: [2.9, 2.59, 1.35] as const, width: 1.2 },
+      {
+        id: FARCRYSIS_VERTICAL_CROSSING.id,
+        from: FARCRYSIS_VERTICAL_CROSSING.foot,
+        to: FARCRYSIS_VERTICAL_CROSSING.top,
+        width: FARCRYSIS_VERTICAL_CROSSING.widthM,
+      },
     ]),
     platforms: Object.freeze([
       { id: 'core-catwalk', minX: -3.5, maxX: 3.5, minZ: -1.2, maxZ: 1.2, y: 2.59 },
@@ -1153,6 +1181,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
     ]),
   });
   root.userData.verticalNavigation = verticalNavigation;
+  root.userData.farcrysisLayout = FARCRYSIS_LAYOUT_TABLES;
   root.userData.farcrysisColliderAudit = Object.freeze(builder.colliderAudit.map((entry) => Object.freeze({ ...entry })));
   root.userData.farcrysisTerrainPlateCount = terrainPlates.length;
 

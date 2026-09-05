@@ -35,6 +35,7 @@ import {
   FARCRYSIS_SPAWNS_XZ,
 } from './farcrysis-constants';
 import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
+import { TSL_FOLIAGE_MAX_DISTINCT_GRAPHS } from './farcrysis-tsl-foliage';
 
 // ---------------------------------------------------------------------------
 // 1. Scale anchors — the numbers every layout distance is read against
@@ -71,6 +72,13 @@ export const FARCRYSIS_SCALE = Object.freeze({
    * of the number.
    */
   engagementM: FARCRYSIS_MAX_SIGHTLINE,
+  /** legacy-main.ts local/bot/world trace caps; the island is geometry-limited. */
+  weaponRangeM: Object.freeze({
+    localHitscan: 90,
+    botHitscan: 110,
+    worldTrace: 220,
+    flamethrower: 18,
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -100,6 +108,8 @@ export type FarcrysisLoop = Readonly<{
   waypoints: ReadonlyArray<readonly [number, number]>;
   /** Design register from PASS 69 §R3 — quoted, not invented. */
   register: string;
+  /** Clear corridor width reserved for this route, in player metres. */
+  widthM: number;
   /** Nominal lap time at sprint, seconds (perimeter / sprintMps). */
   sprintLapS: number;
 }>;
@@ -121,12 +131,19 @@ function ring(chebyshev: number): ReadonlyArray<readonly [number, number]> {
   ];
 }
 
-function loop(id: FarcrysisLoop['id'], chebyshevM: number, waypoints: ReadonlyArray<readonly [number, number]>, register: string): FarcrysisLoop {
+function loop(
+  id: FarcrysisLoop['id'],
+  chebyshevM: number,
+  waypoints: ReadonlyArray<readonly [number, number]>,
+  register: string,
+  widthM: number,
+): FarcrysisLoop {
   return Object.freeze({
     id,
     chebyshevM,
     waypoints: Object.freeze(waypoints.map((p) => Object.freeze([p[0], p[1]] as const))),
     register,
+    widthM,
     sprintLapS: perimeter(waypoints) / FARCRYSIS_SCALE.sprintMps,
   });
 }
@@ -139,11 +156,11 @@ function loop(id: FarcrysisLoop['id'], chebyshevM: number, waypoints: ReadonlyAr
  */
 export const FARCRYSIS_LOOPS: readonly FarcrysisLoop[] = Object.freeze([
   loop('beach-ring', FARCRYSIS_HALF_M - 14, ring(FARCRYSIS_HALF_M - 14),
-    'wide, open-ish, sightline breaks via palms, skiffs and rocks'),
+    'wide, open-ish, sightline breaks via palms, skiffs and rocks', 8),
   loop('jungle-band', 26, ring(26),
-    'dense, cover-heavy, tight turns, short sightlines (~4-8 m)'),
+    'dense, cover-heavy, tight turns, short sightlines (~4-8 m)', 6),
   loop('core-loop', 5.5, [[0, -8], [4, -5.5], [5.5, 0], [4, 5.5], [0, 8], [-4, 5.5], [-5.5, 0], [-4, -5.5]],
-    'ruined research core: two doors, one catwalk, the one vertical crossing'),
+    'ruined research core: two doors, one catwalk, the one vertical crossing', 4.5),
 ]);
 
 /**
@@ -151,11 +168,16 @@ export const FARCRYSIS_LOOPS: readonly FarcrysisLoop[] = Object.freeze([
  * axis. These are the "mid-ring cardinal corridor" the physics placement
  * comments keep clear, made explicit so a test can probe them.
  */
-export const FARCRYSIS_CROSS_LANES: ReadonlyArray<Readonly<{ id: string; from: readonly [number, number]; to: readonly [number, number] }>> = Object.freeze([
-  { id: 'lane-n', from: [0, -(FARCRYSIS_HALF_M - 14)], to: [0, -8] },
-  { id: 'lane-s', from: [0, FARCRYSIS_HALF_M - 14], to: [0, 8] },
-  { id: 'lane-w', from: [-(FARCRYSIS_HALF_M - 14), 0], to: [-8, 0] },
-  { id: 'lane-e', from: [FARCRYSIS_HALF_M - 14, 0], to: [8, 0] },
+export const FARCRYSIS_CROSS_LANES: ReadonlyArray<Readonly<{
+  id: 'lane-n' | 'lane-s' | 'lane-w' | 'lane-e';
+  from: readonly [number, number];
+  to: readonly [number, number];
+  widthM: number;
+}>> = Object.freeze([
+  { id: 'lane-n', from: [0, -(FARCRYSIS_HALF_M - 14)], to: [0, -8], widthM: 6 },
+  { id: 'lane-s', from: [0, FARCRYSIS_HALF_M - 14], to: [0, 8], widthM: 6 },
+  { id: 'lane-w', from: [-(FARCRYSIS_HALF_M - 14), 0], to: [-8, 0], widthM: 6 },
+  { id: 'lane-e', from: [FARCRYSIS_HALF_M - 14, 0], to: [8, 0], widthM: 6 },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -163,6 +185,137 @@ export const FARCRYSIS_CROSS_LANES: ReadonlyArray<Readonly<{ id: string; from: r
 // ---------------------------------------------------------------------------
 
 /** A named solid the metric can occlude with. `arena.root.userData.farcrysisColliderAudit` has this shape. */
+export type FarcrysisRouteSegment = Readonly<{
+  routeId: string;
+  segment: number;
+  from: readonly [number, number];
+  to: readonly [number, number];
+  widthM: number;
+  distanceM: number;
+  sprintSeconds: number;
+}>;
+
+function routeSegment(
+  routeId: string,
+  segment: number,
+  from: readonly [number, number],
+  to: readonly [number, number],
+  widthM: number,
+): FarcrysisRouteSegment {
+  const distanceM = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  return Object.freeze({
+    routeId,
+    segment,
+    from: Object.freeze([from[0], from[1]] as const),
+    to: Object.freeze([to[0], to[1]] as const),
+    widthM,
+    distanceM,
+    sprintSeconds: distanceM / FARCRYSIS_SCALE.sprintMps,
+  });
+}
+
+/** Every authored route edge, used by the stock-flags probe and the report. */
+export const FARCRYSIS_ROUTE_SEGMENTS: readonly FarcrysisRouteSegment[] = Object.freeze([
+  ...FARCRYSIS_LOOPS.flatMap((route) => route.waypoints.map((from, segment) =>
+    routeSegment(route.id, segment, from, route.waypoints[(segment + 1) % route.waypoints.length]!, route.widthM))),
+  ...FARCRYSIS_CROSS_LANES.map((route) => routeSegment(route.id, 0, route.from, route.to, route.widthM)),
+]);
+
+export type FarcrysisSpawnZone = Readonly<{
+  id: string;
+  team: 0 | 1;
+  centre: readonly [number, number];
+  bounds: Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;
+  preferredRoute: 'jungle-band' | 'lane-n' | 'lane-s' | 'lane-w' | 'lane-e';
+  coverReachM: number;
+  visibleEnemyFloorM: number;
+}>;
+
+function spawnZone(team: 0 | 1, preferredRoute: FarcrysisSpawnZone['preferredRoute']): FarcrysisSpawnZone {
+  const points = FARCRYSIS_SPAWNS_XZ[team];
+  const xs = points.map(([x]) => x);
+  const zs = points.map(([, z]) => z);
+  return Object.freeze({
+    id: `spawn-zone-t${team}`,
+    team,
+    centre: Object.freeze([
+      xs.reduce((sum, value) => sum + value, 0) / xs.length,
+      zs.reduce((sum, value) => sum + value, 0) / zs.length,
+    ] as const),
+    bounds: Object.freeze({ minX: Math.min(...xs), maxX: Math.max(...xs), minZ: Math.min(...zs), maxZ: Math.max(...zs) }),
+    preferredRoute,
+    coverReachM: FARCRYSIS_SCALE.spawnCoverReachM,
+    visibleEnemyFloorM: 30,
+  });
+}
+
+/** Spawn bands are derived from the one constants table, never hand-copied. */
+export const FARCRYSIS_SPAWN_ZONES: readonly FarcrysisSpawnZone[] = Object.freeze([
+  spawnZone(0, 'lane-w'),
+  spawnZone(1, 'lane-e'),
+]);
+
+export type FarcrysisVerticalCrossing = Readonly<{
+  id: 'core-catwalk-stairs';
+  foot: readonly [number, number, number];
+  top: readonly [number, number, number];
+  widthM: number;
+  purpose: string;
+}>;
+
+/** The core stair is the single deliberate level change in the layout. */
+export const FARCRYSIS_VERTICAL_CROSSING: FarcrysisVerticalCrossing = Object.freeze({
+  id: 'core-catwalk-stairs',
+  foot: Object.freeze([2.9, 0, 4.6] as const),
+  top: Object.freeze([2.9, 2.59, 1.35] as const),
+  widthM: 1.2,
+  purpose: 'one core loop crossing from terrain floor to the catwalk lookout',
+});
+
+export type FarcrysisReviewStation = Readonly<{
+  id: string;
+  position: readonly [number, number, number];
+  target: readonly [number, number, number];
+  purpose: 'overview' | 'geometry' | 'light-occlusion';
+  exposure: number;
+  far: number;
+}>;
+
+function station(
+  id: string,
+  position: readonly [number, number, number],
+  target: readonly [number, number, number],
+  purpose: FarcrysisReviewStation['purpose'],
+): FarcrysisReviewStation {
+  return Object.freeze({
+    id,
+    position: Object.freeze([...position] as [number, number, number]),
+    target: Object.freeze([...target] as [number, number, number]),
+    purpose,
+    exposure: 1.08,
+    far: 190,
+  });
+}
+
+/** Stable station ids consumed by the capture harness and viewpoint catalog. */
+export const FARCRYSIS_REVIEW_STATIONS: readonly FarcrysisReviewStation[] = Object.freeze([
+  station('farcrysis-beach-golden', [-54, 3.2, -54], [0, 1.2, 0], 'overview'),
+  station('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion'),
+  station('farcrysis-core-interior', [-4.3, 1.65, 0], [3.4, 1.9, 2.4], 'geometry'),
+  station('farcrysis-seaplane-throwback', [48, 2.4, -48], [40, 1.2, -40], 'overview'),
+  station('farcrysis-island-topdown', [0, 95, 2], [0, 0, 0], 'overview'),
+  station('farcrysis-west-shoreline', [-62, 5, -6], [-50, 1.2, 12], 'overview'),
+]);
+
+/** Render limits are derived here once and consumed by both definition and tests. */
+export const FARCRYSIS_PIPELINE_BUDGET = Object.freeze({
+  maximumFoliageNodeGraphs: TSL_FOLIAGE_MAX_DISTINCT_GRAPHS,
+  minimumMaterialsPerFoliageGraph: 4,
+  maximumDrawCalls: 460,
+  maximumTriangles: 1_100_000,
+  derivation: 'TSL foliage graph ceiling plus the authored visual-definition arena ceilings',
+});
+
 export type NamedBox = Readonly<{ id: string; bounds: Box2 }>;
 
 /** The slice of an `ArenaMap` the metric reads. */
@@ -460,6 +613,11 @@ export const FARCRYSIS_LAYOUT_TABLES = Object.freeze({
   patrol: FARCRYSIS_PATROL_XZ,
   loops: FARCRYSIS_LOOPS,
   crossLanes: FARCRYSIS_CROSS_LANES,
+  routeSegments: FARCRYSIS_ROUTE_SEGMENTS,
+  spawnZones: FARCRYSIS_SPAWN_ZONES,
+  verticalCrossing: FARCRYSIS_VERTICAL_CROSSING,
+  reviewStations: FARCRYSIS_REVIEW_STATIONS,
+  pipelineBudget: FARCRYSIS_PIPELINE_BUDGET,
   middleRadiusM: FARCRYSIS_MIDDLE_RADIUS_M,
   scale: FARCRYSIS_SCALE,
 });

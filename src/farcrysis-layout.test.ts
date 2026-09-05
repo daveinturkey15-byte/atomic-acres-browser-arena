@@ -31,7 +31,12 @@ import {
   FARCRYSIS_LOOPS,
   FARCRYSIS_MIDDLE_EXEMPT,
   FARCRYSIS_MIDDLE_RADIUS_M,
+  FARCRYSIS_PIPELINE_BUDGET,
+  FARCRYSIS_REVIEW_STATIONS,
+  FARCRYSIS_ROUTE_SEGMENTS,
   FARCRYSIS_SCALE,
+  FARCRYSIS_SPAWN_ZONES,
+  FARCRYSIS_VERTICAL_CROSSING,
   measureFarcrysisMidMapMasses,
   measureFarcrysisSightlines,
   openDistance,
@@ -41,6 +46,8 @@ import { FARCRYSIS_LANDMARKS } from './farcrysis-midmap-landmarks';
 import { CHARACTER_PHYSICS_CONFIG } from './physics';
 import { SPAWN_EYE_HEIGHT, SPAWN_LAYOUT_THRESHOLDS } from './spawn-layout-constraints';
 import { SPRINT_ENTER_MPS } from './operator-posture-layer';
+import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
+import { TSL_FOLIAGE_MAX_DISTINCT_GRAPHS } from './farcrysis-tsl-foliage';
 
 // ---------------------------------------------------------------------------
 // Ratchets — MEASURED at the L2 head by scripts/qa/measure-farcrysis-layout.ts
@@ -119,8 +126,43 @@ describe('farcrysis layout stage (PASS 95, SPEC section 7)', () => {
     expect(FARCRYSIS_SCALE.sprintMps).toBe(SPRINT_ENTER_MPS);
     expect(FARCRYSIS_SCALE.spawnCoverReachM).toBe(SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM);
     expect(FARCRYSIS_SCALE.engagementM).toBe(FARCRYSIS_MAX_SIGHTLINE);
+    expect(FARCRYSIS_SCALE.weaponRangeM).toEqual({ localHitscan: 90, botHitscan: 110, worldTrace: 220, flamethrower: FLAMETHROWER_EFFECT.rangeM });
     expect(FARCRYSIS_MAX_SIGHTLINE).toBe(22);
     expect(FARCRYSIS_COVER_MIN).toBe(14);
+  });
+
+  it('exposes one factory-owned route, spawn, vertical and capture contract', () => {
+    expect(FARCRYSIS_ROUTE_SEGMENTS).toHaveLength(28);
+    expect(FARCRYSIS_ROUTE_SEGMENTS.every((edge) => edge.distanceM > 0 && edge.widthM >= 4.5)).toBe(true);
+    expect(FARCRYSIS_ROUTE_SEGMENTS.reduce((sum, edge) => sum + edge.sprintSeconds, 0))
+      .toBeCloseTo(FARCRYSIS_LOOPS.reduce((sum, route) => sum + route.sprintLapS, 0)
+        + FARCRYSIS_CROSS_LANES.reduce((sum, lane) => sum + Math.hypot(lane.to[0] - lane.from[0], lane.to[1] - lane.from[1]) / FARCRYSIS_SCALE.sprintMps, 0), 8);
+    expect(FARCRYSIS_SPAWN_ZONES.map((zone) => zone.team)).toEqual([0, 1]);
+    expect(FARCRYSIS_SPAWN_ZONES.every((zone) => zone.coverReachM === SPAWN_LAYOUT_THRESHOLDS.maximumCoverDistanceM
+      && zone.visibleEnemyFloorM === SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM)).toBe(true);
+    expect(FARCRYSIS_VERTICAL_CROSSING).toMatchObject({ id: 'core-catwalk-stairs', widthM: 1.2 });
+    expect(FARCRYSIS_VERTICAL_CROSSING.top[1]).toBeGreaterThan(FARCRYSIS_VERTICAL_CROSSING.foot[1]);
+    expect(FARCRYSIS_REVIEW_STATIONS).toHaveLength(6);
+    expect(new Set(FARCRYSIS_REVIEW_STATIONS.map((entry) => entry.id)).size).toBe(6);
+    expect(FARCRYSIS_REVIEW_STATIONS.some((entry) => entry.purpose === 'overview')).toBe(true);
+    expect(FARCRYSIS_REVIEW_STATIONS.some((entry) => entry.purpose === 'geometry')).toBe(true);
+    expect(FARCRYSIS_REVIEW_STATIONS.some((entry) => entry.purpose === 'light-occlusion')).toBe(true);
+  });
+
+  it('derives the render budget from the shared foliage ceiling', () => {
+    expect(FARCRYSIS_PIPELINE_BUDGET.maximumFoliageNodeGraphs).toBe(TSL_FOLIAGE_MAX_DISTINCT_GRAPHS);
+    expect(FARCRYSIS_PIPELINE_BUDGET.maximumDrawCalls).toBe(460);
+    expect(FARCRYSIS_PIPELINE_BUDGET.maximumTriangles).toBe(1_100_000);
+    expect(FARCRYSIS_PIPELINE_BUDGET.minimumMaterialsPerFoliageGraph).toBeGreaterThanOrEqual(4);
+  });
+
+  it('publishes the same layout contract on the built factory root', () => {
+    const arena = buildArena();
+    expect(arena.root.userData.farcrysisLayout).toBeDefined();
+    expect(arena.root.userData.farcrysisLayout.routeSegments).toBe(FARCRYSIS_ROUTE_SEGMENTS);
+    expect(arena.root.userData.farcrysisLayout.reviewStations).toBe(FARCRYSIS_REVIEW_STATIONS);
+    expect(arena.root.userData.farcrysisLayout.verticalCrossing).toBe(FARCRYSIS_VERTICAL_CROSSING);
+    expect(arena.root.userData.farcrysisLayout.pipelineBudget).toBe(FARCRYSIS_PIPELINE_BUDGET);
   });
 
   it('derives the three loops and the cross lanes from the island bounds', () => {
