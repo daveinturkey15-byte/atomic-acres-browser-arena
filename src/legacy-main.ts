@@ -79,7 +79,7 @@ import {
 } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
-import { arenaNeedsColdSessionPrecompile, coldArenaOperation } from './rendering/cold-session-precompile-reach';
+import { arenaNeedsColdSessionPrecompile, coldArenaOperation, withDetachedRoots } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -30147,7 +30147,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      if (hadPreparedArena) { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); }
+      requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission();
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -30164,7 +30164,7 @@ async function performArenaSelection(
     await waitForPendingArtTextures();
     assertAdmission();
     setBootstrapStage('prewarming-weapon-catalog');
-    profileArenaTransition('weapon-catalog-prewarm'); if (hadPreparedArena) await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
+    profileArenaTransition('weapon-catalog-prewarm'); await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
     assertAdmission();
     profileArenaTransition('presentation-batching');
     setBootstrapStage('batching-static-meshes');
@@ -30210,7 +30210,8 @@ async function performArenaSelection(
       if (!exactScenePass) {
         throw new Error('WebGPU arena coverage requires the exact Pass 64 ScenePass graph');
       }
-      await withArenaFrustumCullingDisabled(scene, async () => {
+      const coldOptionalRoots = !hadPreparedArena ? [overdriveRoot, nukeShockwave, nukeEvent.root, explosiveBoltPresentationRoot, railgunPresentation.root, timedMapWeaponPresentation.root, flareProjectileSystem.root, flamethrowerStreamPresentation.root, tracerPool.lines, impactPresentation.root, grenadeExplosionPresentation.root, supportExplosionPresentation.root, deathDropPresentationPool.root, grenadeWorldPresentationPool.root, smokeVolumePresentationPool.root, killstreakPresentation.root, botWeaponGpuVocabulary.root] : [];
+      await withDetachedRoots(coldOptionalRoots, () => withArenaFrustumCullingDisabled(scene, async () => {
         // Three yields between node shader stages/render objects during this
         // exact HDR/MRT compile, preventing one monolithic first-coverage CPU
         // task. The forced full draw below remains the authoritative geometry,
@@ -30235,7 +30236,7 @@ async function performArenaSelection(
         // budget. Keep the longer allowance behind the menu/loading surface.
         await flushWebGpuFrames(12_000);
         assertAdmission();
-      });
+      }));
       assertAdmission();
     } else {
       if (admissionToken) await waitForVisibleBrowserPreparation(admissionToken.signal);
@@ -37377,7 +37378,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
 }
 function bootstrapMenuPreview(): void {
   document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
-  arenaSelectionReady = false;
+  arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
@@ -37385,9 +37386,8 @@ function bootstrapMenuPreview(): void {
   requestAnimationFrame(frame);
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
-    return ensureAuthoredSupportPresentationAssets(killstreakPresentation).then(() => prepareMenuDeploymentAssets('idle')).then(() => {
+    return prepareMenuDeploymentAssets('idle').then(() => {
       if (gameStarted || matchStartPreparing) return;
-      arenaSelectionReady = true; syncArenaSelectionUi();
       setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
     });
   }).catch(showFatalError);

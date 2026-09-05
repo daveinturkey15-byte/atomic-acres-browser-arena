@@ -1,4 +1,5 @@
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
+import type { Object3D } from 'three';
 
 /**
  * Arenas whose OWN vocabulary has been MEASURED to exceed the 12 s admission
@@ -101,4 +102,12 @@ export function arenaNeedsColdSessionPrecompile(arena: { readonly id: string }):
 
 export function coldArenaOperation(cold: boolean, operation: () => Promise<unknown>): () => Promise<unknown> {
   return cold ? () => Promise.resolve() : operation;
+}
+
+export async function withDetachedRoots<T>(roots: readonly Object3D[], operation: () => Promise<T>): Promise<T> {
+  const parents = roots.map((root) => root.parent);
+  for (const root of roots) root.removeFromParent();
+  try { return await operation(); } finally {
+    roots.forEach((root, index) => parents[index]?.add(root));
+  }
 }

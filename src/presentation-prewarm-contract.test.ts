@@ -613,7 +613,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('if (submitWebGpuFrame(performance.now(), force, submissionMode)) return;');
     expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match');"))
       .toBeLessThan(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'));
-    expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(scene, async () => {');
+    expect(arenaDeployment).toContain('withArenaFrustumCullingDisabled(scene, async () => {');
     expect(arenaDeployment).toContain('const exactScenePass = pass64TslSystems;');
     expect(arenaDeployment).toContain('await waitForVisibleBrowserPreparation();');
     expect(arenaDeployment).toContain('await exactScenePass.precompileExactScenePass(scene);');
