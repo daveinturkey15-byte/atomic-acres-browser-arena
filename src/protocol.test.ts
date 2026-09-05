@@ -21,15 +21,20 @@ describe('network protocol guards', () => {
     expect(isGameMessage(state({ ...player, stance: 'prone' as const }))).toBe(true);
   });
 
-  it('accepts only a compact inventory projection bound to the state sequence', () => {
+  it('accepts a compact inventory projection in either revision domain', () => {
     const combatInventory = {
       revision: player.seq,
       primary: { weapon: 'carbine', ammo: 19, reserve: 100 },
       sidearm: { weapon: 'pistol', ammo: 11, reserve: 48 },
       grenades: 0,
     } as const;
+    // Sender-originated: projection captured at the snapshot sequence.
     expect(isGameMessage({ ...state(), combatInventory })).toBe(true);
-    expect(isGameMessage({ ...state(), combatInventory: { ...combatInventory, revision: player.seq - 1 } })).toBe(false);
+    // Host-relayed (HF-533): the relay stamps its inventory-event revision,
+    // which diverges from the live snapshot sequence. Transport must accept
+    // the shape; ordering is enforced by the admission cursors. Demanding
+    // equality here dropped every relayed guest state on observers.
+    expect(isGameMessage({ ...state({ ...player, seq: 179 }), combatInventory: { ...combatInventory, revision: 0 } })).toBe(true);
     expect(isGameMessage({
       ...state(),
       combatInventory: { ...combatInventory, primary: { ...combatInventory.primary, weapon: 'smg' } },

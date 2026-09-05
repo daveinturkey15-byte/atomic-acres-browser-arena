@@ -9,7 +9,7 @@ import {
   clampAdmittedHeldWeapon,
   createCanonicalRemoteState,
 } from './multiplayer-relay';
-import { MULTIPLAYER_PROTOCOL_VERSION, type PlayerSnapshot, type ReloadResultMessage } from './protocol';
+import { MULTIPLAYER_PROTOCOL_VERSION, isGameMessage, type PlayerSnapshot, type ReloadResultMessage } from './protocol';
 
 function snapshot(id: string, weapon: PlayerSnapshot['weapon']): PlayerSnapshot {
   return {
@@ -37,6 +37,20 @@ describe('host-authoritative multiplayer relay', () => {
     expect(applied).toBe(true);
     expect(guestBView.weapon).toBe('pistol');
     expect(inventories.get('guest-a')?.ammo.pistol).toBe(15);
+  });
+
+  it('emits host-relayed guest states that observers accept at transport (HF-533)', () => {
+    // The relay stamps the host inventory-event revision (2) while the live
+    // snapshot sequence has moved on (179). Transport validation must accept
+    // this shape or every relayed guest state is silently dropped and
+    // guest-to-guest replication never converges.
+    const guestA = { ...snapshot('guest-a', 'pistol'), seq: 179 };
+    const hostState = createCanonicalRemoteState(
+      guestA, 500, 3, 40,
+      createGuestCombatInventoryProjection(createGuestCombatInventory('m4a1', 'pistol', 1), 2, 'm4a1', 'pistol'),
+    );
+    expect(hostState.combatInventory!.revision).not.toBe(hostState.player.seq);
+    expect(isGameMessage(hostState)).toBe(true);
   });
 
   it('carries host reload state and ammo into the observer ledger', () => {

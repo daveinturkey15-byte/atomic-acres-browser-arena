@@ -873,8 +873,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
       if (!isPlayerSnapshot(msg.player)) return false;
       if (msg.combatInventory !== undefined) {
         if (!isGuestCombatInventoryProjection(msg.combatInventory)) return false;
-        if (msg.combatInventory.revision !== msg.player.seq
-          || msg.combatInventory.primary.weapon !== msg.player.primary
+        // No revision/sequence lockstep here: the sender stamps the snapshot
+        // sequence while the host relay stamps its inventory-event revision, so
+        // demanding equality silently drops every host-relayed guest state
+        // (guest-to-guest replication loss, HF-533). Ordering is enforced on
+        // admission by the monotonic inventory cursors, not by transport shape.
+        if (msg.combatInventory.primary.weapon !== msg.player.primary
           || msg.combatInventory.sidearm.weapon !== msg.player.secondary
             && msg.combatInventory.sidearm.weapon !== 'magnum') return false;
       }
