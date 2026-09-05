@@ -112,7 +112,166 @@ path up is resolved in section 2.
 
 ## 2. Test-file diff audit
 
-_(in progress)_
+Scope: `git diff 3e2fd273...HEAD --stat -- '*.test.ts' '*.test.mjs' scripts/qa vitest.config.* package.json`
+= **85 files, +8,367 / -653**. Every hunk of every file was scanned mechanically (the whole diff was
+dumped once and parsed) and the 19 files that removed an assertion line were then read by hand.
+
+### 2.0 Mechanical sweeps over the whole diff
+
+* **`.skip` / `.only` / `.todo` / `.failing` / `xit` / `xdescribe`: ZERO added, ZERO removed.**
+  `grep -E "^[+-][[:space:]]*(it|test|describe)\.(skip|only|todo|failing|concurrent)"` over the full
+  diff returns nothing at all. [VERIFIED]
+* **`vitest.config.*`: not in the diff** - no reporter, threshold, pool, timeout or include/exclude
+  change. `package.json` gained 4 lines, none of them a test-script change (no `expect`/assert lines
+  in its diff). [VERIFIED]
+* **Removed assertion lines: 68, across 19 of the 85 files.** Every one is accounted for below.
+  The other **66 files have NO finding** - they are pure additions (the new netcode-diagnostics,
+  gamepad, nuke-event, breakable-windows, roofs, stair-traversal, movement-feel, static-matrix-freeze,
+  clustered-lights, audio-offline-render, hf504 and mp-soak suites) or comment-only edits.
+
+### 2.1 Findings
+
+**F1 - LOOSER. A guard was deleted with no replacement.**
+`src/nuketown2-pipeline-budget.test.ts` - `it('keeps the graph-TOPOLOGY variants as separate shaders')`
+was removed in full, taking its eight-pair `mustDiffer` table with it
+(`garageDoor`/`roofGlazing`, `drive`/`kerb`, `drive`/`block`, `kerb`/`block`, `fence`/`trim`,
+`lawn`/`planter`, `lawn`/`ground`, `coachGlass`/`asphalt`). Its own comment said exactly what it was
+for: *"a future 'optimisation' could buy its budget by flattening the arena's actual detail"*. At HEAD
+there is **no lower bound on distinct registry graphs at all** - `materialGraphKey` appears in this one
+file, and its only surviving `not.toBe` (`:138`) compares two vehicle-forge constants, not arena roles.
+The replacement assertion (`new Set(keys).size <= 8`, `:106`) bounds the count from ABOVE, i.e. it
+rewards precisely the flattening the deleted test forbade. **This is the one gate in the range that
+lost coverage with nothing standing in its place.** Commit: the HF-491 pipeline-budget rewrite;
+`git log -S"keeps the graph-TOPOLOGY variants"` locates it. [VERIFIED]
+
+**F2 - LOWERED numbers, in lockstep with the real roster, exclusion asserted.**
+Five roster floors moved **9 -> 8**:
+`scripts/qa/arena-roster.mjs:59` (`MINIMUM_SELECTABLE_ARENAS`),
+`scripts/qa/eye-clearance-roster.mjs` (`MINIMUM_EYE_CLEARANCE_ARENAS`),
+`scripts/qa/sweep-eye-clearance-spots.ts` (`MINIMUM_SWEPT_ARENAS`),
+`scripts/qa/cross-browser-gate-contract.test.mjs:114`,
+`scripts/qa/eye-clearance-sweep-contract.test.mjs:113, 165, 468, 476`.
+Cause: `09980a5a feat(menu): HF-495 map order - lead Nuke Town Rebuild and park old Raid` sets
+`selectable: false` on the `test2` row (`src/map-selection.ts:416`), taking parked registry rows from
+2 to 3 and the derived selectable roster from 9 to 8. This has the exact silhouette of a weakening, so
+it deserves the owner's eye - but it is not one, on four counts I checked directly:
+1. the floors are *alarms on the derived scrape collapsing*, and the code's own rule is that a floor
+   left above the real roster "reds every run and gets switched off, which is not a stronger gate";
+2. `test2` was not merely dropped from the required sets - its exclusion is **positively asserted** in
+   three places (`assert.ok(!selectable.includes('test2'))` in both contracts, plus
+   `assert.ok(hiddenArenaIds().includes('test2'), 'the original Raid is parked, not removed')`), the
+   same pattern already used for farcrysis and the original Nuketown;
+3. `MINIMUM_ARENA_IDS = 11` (the *registry* floor) did not move, so the arena cannot be deleted;
+4. `src/arena-selectability.test.ts` gained a dedicated test pinning the flag, the id and the decoder.
+   **[OPEN] for the owner:** parking the original Raid is attributed in-code to "owner, 2026-09-04",
+   but commit `09980a5a` carries a one-line body and a Codex co-author trailer with no quoted
+   directive. If Dave did not ask for the original Raid to leave the picker, F2 becomes a real
+   weakening and five floors go with it.
+
+**F3 - LOOSER coverage in the cold-admission smoke** (detail in section 1, row 9). `originalArtLoaded`
+was dropped from the playable-arena check and not replaced; Atomic Acres' cold Quality-art path is no
+longer exercised by this smoke at all. `grep -rn "originalArtLoaded"` finds it still asserted in
+`src/blender-environment.test.ts` and the runtime, but **not** in any cold-session browser smoke.
+[VERIFIED] that it left this file; **[OPEN]** whether the browser-level coverage exists elsewhere.
+
+**F4 - NEW EXEMPTIONS in the hardcoded-roster detector.**
+`scripts/qa/arena-roster-contract.test.mjs`'s `BOUNDED_SUBSET_ALLOWANCES` (the allowlist of files
+permitted to hardcode an arena subset) **lost 2 entries and gained 5**, net +3:
+removed `cross-browser-gate-contract.test.mjs` and `eye-clearance-sweep-contract.test.mjs` (tighter -
+those files now comply); added `capture-lane-ab-time-of-day.mjs`, `hf410-near-plane-ab-diff.mjs`,
+`publish-lane-ab-frames.mjs`, `raid2-layout-metrics.ts`, `scan-lane-ab-band-readability.mjs`. Each
+carries a written reason and all five are bounded A/B capture experiments rather than coverage
+rosters, which is the category the allowlist exists for. Not a weakening on its face; **[OPEN]** that
+three of the five reasons cite "HF-495" as the trigger for exempting a file it did not otherwise
+touch, which is the kind of drive-by exemption worth one owner glance. [VERIFIED] the counts.
+
+**F5 - Fingerprint re-pinned correctly, re-measurement obligation not met.**
+`src/graphics-profile-contract.test.ts:47-53` - all four `PINNED_CONTROL_SET_HASHES` changed in the
+range (`performance 445a9754 -> 8b9050cb`, `balanced 0753ee34 -> 09c22d33`, `high 430da2ad -> 7ca68dea`,
+`max 03ee2e10 -> 2ec0fa43`), and `docs/GRAPHICS_PROFILES_2026-09-03.md` had exactly those four table
+cells edited and nothing else. The pin's own contract says a changed hash "means a profile now renders
+something different from what the player was told it renders, and the doc row has to be re-measured";
+the measured rows were not re-measured, the doc is still dated 2026-09-03, and the only in-file
+justification is the stale HF-438/PASS 92 note. The likely cause is legitimate - `graphics.clusteredLighting`
+joined the pipeline-rebuild control set (`src/pass65-settings-inventory.test.ts:44, 57`), which moves
+every profile's hash. **I ran this file to settle whether the pins were hand-faked: they were not.**
+`npx vitest run src/graphics-profile-contract.test.ts` -> **14 passed**, so the pins agree with
+`graphicsControlSetHashes()` as computed at HEAD. [VERIFIED by execution] Verdict: regenerated, not
+laundered; the shortfall is documentation, not a threshold.
+Note the final values were written by `f597c6b6 Revert "Merge ... taa-resolve"`, so they arrived
+through a revert's conflict resolution rather than a deliberate re-pin commit - which is why running
+it mattered.
+
+**F6 - REVIEW GAP, not a gate: a new QA script is un-diffable.**
+`scripts/qa/mp-evidence-analyse.mjs` shows as `Bin 0 -> 19255 bytes` in the stat. It contains **one
+raw NUL byte at offset 4354**, inside a control-character regex class written with literal bytes
+instead of escapes, so git classifies the whole file as binary. 19,255 bytes of new multiplayer
+evidence-analysis logic therefore entered the branch with **no reviewable diff** - by this audit or
+any other. Nothing about it weakens a gate; it defeats diff review of itself. Cheap fix: write the
+class as `\x00-\x1f\x7f-\x9f`. [VERIFIED]
+
+**F7 - Narrowed, explained, and re-pinned: the cold-session precompile root.**
+`src/presentation-prewarm-contract.test.ts:673` - `precompileExactScenePass(` occurrences in the cold
+WebGPU warm frame went `toHaveLength(1)` -> `toHaveLength(2)`, and the invariant "both surviving cases
+take the WHOLE SCENE ... no arena's relief is narrower than the one it ships with today" was replaced
+by "a cold session ... is scoped to the admitted arena root". A new exact-source assertion pins the
+new call
+(`await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));`).
+This is a real narrowing of the relief that the 12 s fence depends on, but it is asserted, explained
+and directionally guarded ("a future edit that ... widens the cold root fails here"). Not a weakened
+threshold; flagged because it touches the fence's blast radius. [VERIFIED]
+
+**F8 - minor.** `src/ui/surface-registry.test.ts:72` - the "one unique DOM root per surface"
+`toHaveLength(1)` check now branches: surfaces of `kind === 'diagnostics-overlay'` are checked against
+`element.id = NETCODE_OVERLAY_ELEMENT_ID` in the overlay source instead, because that root is created
+in JS and has no markup literal. Substitute assertion present; uniqueness is no longer proven for that
+one surface. Same commit adds a full contract test for the overlay. [VERIFIED]
+
+### 2.2 Changes that are TIGHTER or neutral (checked, no finding)
+
+* `src/nuketown2-fidelity.test.ts` (+484): tolerance `toBeLessThan(0.35)` -> `toBeLessThan(0.20)`
+  (twice, **tighter**); the hardcoded `length: 16` kerb-island roster replaced by
+  `NUKETOWN2_TURNING_HEAD_SEGMENTS` (**derived, not literal**); `overlap()` replaced by
+  `overlapsFootprint()`, which keeps `.toBe(0)` and adds circular-footprint support (**strictly more
+  cases**); box extents now taken from `Box3.setFromObject` with a non-box fallback rather than
+  `geometry.parameters`, so non-parametric bodies stop silently escaping the scan. The verge ceiling
+  is section 1, row 8.
+* `src/private-match.test.ts:98, 114`: two assertions **inverted from `true` to `false`** - a lone
+  ready host may no longer start, and the host readiness bit must now agree with every connected
+  guest - plus one new assertion. Inverted in the **stricter** direction.
+* `src/local-reload-authority.test.ts`: `requestId` / `cancelRequestId` threaded through the pending
+  record; the frozen-object equality now asserts two more fields. Tighter.
+* Source-pinned string tests re-pointed at modules extracted out of `legacy-main.ts`, 1:1, no
+  assertion lost: `src/spawn-layout-quality.test.ts` (-> `mp-lobby-authority-views.ts`),
+  `src/host-match-recovery-main-integration.test.ts` (-> `mp-remote-pickup-authority.ts`),
+  `src/gun-range-test-bay-main-integration.test.ts` and `src/ui/hud-sway-release-wiring.test.ts`
+  (renamed symbols).
+* `MULTIPLAYER_PROTOCOL_VERSION` `18 -> 19` in `src/combat/legacy-weapon-adapter.test.ts`,
+  `src/combat/weapon-catalog.test.ts`, `src/network-lifecycle.test.ts` - a version bump, same
+  assertion shape in all three.
+* PASS 93 -> PASS 94 rotation in `src/build-identity-handshake.test.ts`, `src/changelog.test.ts`,
+  `src/project-map.test.ts`, `src/release-topology.test.ts`. Same assertion counts; the backup pin
+  rotates `pass92Backup` -> `pass93Backup`, `KEEP_AT_LEAST {"pass92"}` -> `{"pass93"}`,
+  `LIVE_TREE pass93` -> `pass94`. `changelog.test.ts` even **keeps** the old
+  "arenas load again in stock Chrome" assertion by re-homing it onto the `pass93` entry rather than
+  deleting it.
+* `src/map-selection.test.ts`: catalog reordered (HF-495), the compatibility fallback now resolves to
+  `nuketown2`, and a **new** exact-order `SELECTABLE_ARENAS` assertion was added. `ARENA_SELECTIONS.length`
+  is still pinned at 11 and display names are still asserted unique. (Stale test title: "falls back
+  safely to Nuke Town" now falls back to Nuke Town Rebuild.)
+* `scripts/qa/find-coplanar-pairs.ts` (-252 lines): the CLI's scan/classify body moved into
+  `src/nuketown2-coplanar-audit.ts` and the CLI now imports it, which is what makes the vitest pin and
+  the instrument share one core. The CLI gained two new report classes (`SAME-VISIBLE`, `CONTACT`).
+  Deleted lines are the extracted implementation, not assertions.
+* **Hardcoded gate rosters that miss the newest arenas: none found.** The parity gate derives from
+  `ARENA_IDS` (`src/arena-identity.ts:8`), whose head is now `nuketown2, raid2, ...` (11 ids), and
+  `collider-visual-parity-core.ts:684-715` really does build `nuketown2` and `raid2`. Only the
+  docblock prose ("all six arenas") is stale. The arena-roster contract's `MINIMUM_ARENA_IDS = 11`
+  floor is unchanged.
+* **Fixtures/inventories hand-edited rather than regenerated: none found**, with F5 as the near miss
+  (regenerated, but the measurement behind it was not refreshed). The only new fixtures
+  (`scripts/qa/fixtures/mp-soak/{valid,invalid}-bundle.json`) belong to the new soak gate.
+* **Tests whose subject was replaced by a stub: none found.**
 
 ## 3. Cross-check against the candidate-7 REPORT
 
