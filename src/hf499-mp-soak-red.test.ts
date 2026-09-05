@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const soak = readFileSync(new URL('../scripts/qa/mp-soak-gate.mjs', import.meta.url), 'utf8');
+const audit = readFileSync(new URL('../scripts/qa/mp-audit.mjs', import.meta.url), 'utf8');
 
 describe('HF-499 active-match rejoin authority', () => {
   it('retains a voluntary active-match reservation instead of deleting its credential', () => {
@@ -35,5 +37,24 @@ describe('HF-499 active-match rejoin authority', () => {
     expect(repair).toContain('awaitingAuthoritativeRejoinContinuity = true;');
     expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
     expect(repair).toContain("pendingVoluntaryActiveMatchRejoinRoomCode = ''");
+  });
+});
+
+describe('HF-499 replication evidence', () => {
+  it('compares host authority with each guest presentation and records the required forensic fields', () => {
+    expect(soak).toContain("const hostPlayers = views.host?.players ?? {};");
+    expect(soak).toContain("source: 'host-authoritative'");
+    expect(soak).toContain('hostAuthoritativePosition');
+    expect(soak).toContain('guestViewPosition');
+    expect(soak).toContain('guestSnapshotAgeMs');
+    expect(soak).toContain('classificationCounts');
+    expect(soak).toContain("bundle.replication.pairDirections[`host->${to}`] = true;");
+  });
+
+  it('keeps rendered and last-authoritative remote positions distinct', () => {
+    expect(audit).toContain('position: (remote.visualPosition ?? remote.position ?? []).map(round)');
+    expect(audit).toContain('authoritativePosition: (remote.authoritativePosition ?? remote.position ?? []).map(round)');
+    expect(audit).toContain('snapshotAgeMs: round(remote.snapshotAgeMs)');
+    expect(audit).toContain('snapshotBuffer: remote.snapshotBuffer ?? null');
   });
 });

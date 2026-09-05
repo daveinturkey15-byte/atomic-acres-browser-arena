@@ -86,7 +86,7 @@ const bundle = {
     browserPolicy: 'headless Chrome, stock flags, mute-audio, max three peers',
   },
   timing: { startedAtEpochMs, endedAtEpochMs: null, playDurationMs: 0 },
-  replication: { samples: [], divergences: [], pairDirections: Object.fromEntries(
+  replication: { samples: [], divergences: [], classificationCounts: {}, pairDirections: Object.fromEntries(
     PEERS.flatMap((from) => PEERS.filter((to) => to !== from).map((to) => [`${from}->${to}`, false])),
   ) },
   rejoin: {
@@ -164,28 +164,62 @@ function evidenceView(view) {
 }
 
 function addReplicationDivergences(views, second) {
-  const ids = new Set(PEERS.flatMap((role) => Object.keys(views[role]?.players ?? {})));
-  for (const playerId of ids) {
-    for (const from of PEERS) {
-      for (const to of PEERS) {
-        if (from === to) continue;
-        const fromPlayer = views[from]?.players?.[playerId] ?? null;
-        const toPlayer = views[to]?.players?.[playerId] ?? null;
-        if (fromPlayer) bundle.replication.pairDirections[`${to}->${from}`] = true;
-        if (!fromPlayer || !toPlayer) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'presence', from, expected: 'present', actual: toPlayer ? 'present' : 'absent' });
-          continue;
-        }
-        const fromPosition = fromPlayer.position ?? [];
-        const toPosition = toPlayer.position ?? [];
-        if (fromPosition.length !== 3 || toPosition.length !== 3) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'position-shape', from, fromPosition, toPosition });
-          continue;
-        }
-        const distanceM = Math.hypot(fromPosition[0] - toPosition[0], fromPosition[1] - toPosition[1], fromPosition[2] - toPosition[2]);
-        if (distanceM > positionBoundM) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'position', from, distanceM: Number(distanceM.toFixed(3)), fromPosition, toPosition });
-        }
+  const hostPlayers = views.host?.players ?? {};
+  const classify = (hostPlayer, guestPlayer, distanceM) => {
+    if (!guestPlayer) return 'stale-snapshot-never-applied';
+    if (guestPlayer.self) return 'guest-self-prediction-over-authority';
+    const age = Number(guestPlayer.snapshotAgeMs);
+    if (Number.isFinite(age) && age > Math.max(500, 4 * MP_SOAK_THRESHOLDS.sampleIntervalMs)) return 'stale-snapshot-never-applied';
+    if (guestPlayer.continuity !== null && hostPlayer.continuity !== null && guestPlayer.continuity !== hostPlayer.continuity) return 'interpolation-target-previous-session';
+    if (Number.isFinite(guestPlayer.seq) && Number.isFinite(hostPlayer.seq) && guestPlayer.seq < hostPlayer.seq) return 'ordering-or-coalescing';
+    if (distanceM > positionBoundM) return 'authority-not-relayed';
+    return 'within-bound';
+  };
+  const distance = (left, right) => left.length === 3 && right.length === 3
+    ? Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2])
+    : null;
+  for (const playerId of Object.keys(hostPlayers)) {
+    const hostPlayer = hostPlayers[playerId];
+    const hostPosition = hostPlayer.position ?? [];
+    for (const to of PEERS.filter((role) => role !== 'host')) {
+      const guestPlayer = views[to]?.players?.[playerId] ?? null;
+      bundle.replication.pairDirections[`host->${to}`] = true;
+      const guestViewPosition = guestPlayer?.position ?? [];
+      const guestAuthoritativePosition = guestPlayer?.authoritativePosition ?? guestViewPosition;
+      if (!guestPlayer) {
+        bundle.replication.classificationCounts['stale-snapshot-never-applied'] = (bundle.replication.classificationCounts['stale-snapshot-never-applied'] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'presence', source: 'host-authoritative', classification: 'stale-snapshot-never-applied',
+          hostAuthoritativePosition: hostPosition, guestViewPosition: null, guestAuthoritativePosition: null,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: null, hostContinuity: hostPlayer.continuity ?? null, guestContinuity: null,
+          guestSnapshotAgeMs: null,
+        });
+        continue;
+      }
+      const distanceM = distance(hostPosition, guestViewPosition);
+      if (distanceM === null) {
+        bundle.replication.classificationCounts['invalid-position-shape'] = (bundle.replication.classificationCounts['invalid-position-shape'] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'position-shape', source: 'host-authoritative', classification: 'invalid-position-shape',
+          hostAuthoritativePosition: hostPosition, guestViewPosition, guestAuthoritativePosition,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: guestPlayer.seq ?? null,
+          hostContinuity: hostPlayer.continuity ?? null, guestContinuity: guestPlayer.continuity ?? null,
+          guestSnapshotAgeMs: guestPlayer.snapshotAgeMs ?? null,
+        });
+        continue;
+      }
+      if (distanceM > positionBoundM) {
+        const classification = classify(hostPlayer, guestPlayer, distanceM);
+        bundle.replication.classificationCounts[classification] = (bundle.replication.classificationCounts[classification] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'position', source: 'host-authoritative', classification,
+          distanceM: Number(distanceM.toFixed(3)),
+          hostAuthoritativePosition: hostPosition, guestViewPosition, guestAuthoritativePosition,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: guestPlayer.seq ?? null,
+          hostContinuity: hostPlayer.continuity ?? null, guestContinuity: guestPlayer.continuity ?? null,
+          guestSnapshotAgeMs: guestPlayer.snapshotAgeMs ?? null,
+          guestSnapshotBuffer: guestPlayer.snapshotBuffer ?? null,
+        });
       }
     }
   }

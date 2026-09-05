@@ -254,7 +254,11 @@ const viewOf = (page) => page.evaluate(() => {
     kills: snapshot.player.kills,
     deaths: snapshot.player.deaths,
     position: (snapshot.player.position ?? []).map(round),
+    authoritativePosition: (snapshot.player.position ?? []).map(round),
     seq: snapshot.player.seq ?? null,
+    continuity: snapshot.networkSync?.localContinuity ?? null,
+    snapshotAgeMs: null,
+    snapshotBuffer: null,
     score: scoreOf(snapshot.player.id),
   };
   for (const remote of snapshot.remotePlayers ?? []) {
@@ -270,10 +274,13 @@ const viewOf = (page) => page.evaluate(() => {
       reloading: remote.reloading ?? null,
       kills: null,
       deaths: null,
-      position: (remote.authoritativePosition ?? remote.position ?? []).map(round),
+      position: (remote.visualPosition ?? remote.position ?? []).map(round),
+      authoritativePosition: (remote.authoritativePosition ?? remote.position ?? []).map(round),
       seq: remote.seq ?? null,
+      continuity: remote.continuity ?? null,
       authoritativeReady: remote.authoritativeReady ?? true,
       snapshotAgeMs: round(remote.snapshotAgeMs),
+      snapshotBuffer: remote.snapshotBuffer ?? null,
       score: scoreOf(remote.id),
     };
   }
