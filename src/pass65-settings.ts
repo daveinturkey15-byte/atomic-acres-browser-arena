@@ -405,7 +405,7 @@ export function resolveGraphicsRuntime(
   const qualityScale = (tier: GraphicsSettings['particleQuality']): number => tier === 'low' ? 0.5 : tier === 'high' ? 0.8 : 1;
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
-  const antialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
+  const requestedAntialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
   const postAntiAliasing = settings.antiAliasing === 'fxaa' || settings.antiAliasing === 'smaa'
     ? settings.antiAliasing
     : 'off' as const;
@@ -418,6 +418,23 @@ export function resolveGraphicsRuntime(
       : settings.ambientOcclusion === 'high'
         ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true })
         : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62, denoise: true });
+  const screenSpace = resolveScreenSpacePostRuntime({
+    bakedIndirect: settings.bakedIndirect,
+    volumetricLightShafts: settings.volumetricLightShafts,
+    volumetricQuality: settings.volumetricQuality,
+    screenSpaceReflections: settings.screenSpaceReflections,
+    screenSpaceGi: settings.screenSpaceGi,
+    depthOfField: settings.depthOfField,
+    depthOfFieldStrength: settings.depthOfFieldStrength,
+    motionBlur: settings.motionBlur,
+    taaResolve: settings.taaResolve,
+    spatialUpscaling: settings.spatialUpscaling,
+    rayTracing: settings.rayTracing,
+  }, { shadowsEnabled: settings.shadows === 'high' });
+  // TAA owns the principal resolve. MSAA would pay the multisampled principal
+  // target cost and then resolve it a second time, so admission makes the
+  // principal target single-sampled while the saved selector remains intact.
+  const antialiasSamples = screenSpace.taaResolve.enabled ? 0 : requestedAntialiasSamples;
   if (forceCompatibility) {
     return Object.freeze({
       requestedPreset: requestedGraphics.preset,
@@ -486,28 +503,7 @@ export function resolveGraphicsRuntime(
     // Volumetric shafts raymarch the sun shadow map, so the shadow setting is a
     // hard capability input here rather than a taste preference: with shadows
     // off there is nothing to occlude the volume and the resolver reports why.
-    screenSpace: resolveScreenSpacePostRuntime({
-      // HF-418 / Lane AL. Baked indirect is resolved with the screen-space
-      // family because it composites into the same additive bounce term, but
-      // it is the one member whose cost is paid offline: both tiers are three
-      // texture fetches per pixel and differ only in bake time.
-      bakedIndirect: settings.bakedIndirect,
-      volumetricLightShafts: settings.volumetricLightShafts,
-      // HF-481. Aerial perspective rides the atmosphere setting that already
-      // exists rather than a new control; this is its only runtime wiring.
-      volumetricQuality: settings.volumetricQuality,
-      screenSpaceReflections: settings.screenSpaceReflections,
-      screenSpaceGi: settings.screenSpaceGi,
-      depthOfField: settings.depthOfField,
-      depthOfFieldStrength: settings.depthOfFieldStrength,
-      motionBlur: settings.motionBlur,
-      spatialUpscaling: settings.spatialUpscaling,
-      // HF-398. The trace shares the shafts' one hard capability dependency: a
-      // shadow-casting sun. Without one there is nothing for a shadow ray to
-      // resolve against, and the resolver reports that rather than silently
-      // drawing a reflection with no shadows in it.
-      rayTracing: settings.rayTracing,
-    }, { shadowsEnabled: settings.shadows === 'high' }),
+    screenSpace,
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),

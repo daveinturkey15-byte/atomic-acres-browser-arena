@@ -54,11 +54,18 @@ const OUT_DIR = resolve(arg('--out-dir', 'artifacts/qa/hf399'));
 const PROFILE = arg('--profile', 'high');
 const BOOT_TIMEOUT_MS = 300_000;
 const EXTRA_QUERY = arg('--query', '');
+const TAA_MODE = arg('--taa', null);
 // Attribution experiments: JSON of advanced-graphics keys applied as a CUSTOM
 // preset through the same localStorage the Options panel writes, e.g.
 // --graphics-override '{"screenSpaceReflections":"off"}'. Missing keys fall
 // back to this machine's default preset (Quality on 8-core/8 GB).
 const GRAPHICS_OVERRIDE = arg('--graphics-override', null);
+const OVERRIDE_VALUES = GRAPHICS_OVERRIDE
+  ? JSON.parse(GRAPHICS_OVERRIDE)
+  : TAA_MODE === 'off' ? { taaResolve: false }
+    : TAA_MODE === 'on' ? { taaResolve: true }
+      : null;
+if (TAA_MODE !== null && !['off', 'on'].includes(TAA_MODE)) throw new Error('--taa must be on or off');
 
 if (!DIST && !URL_BASE) throw new Error('Pass --dist <build dir> or --url <base url>');
 mkdirSync(OUT_DIR, { recursive: true });
@@ -117,19 +124,18 @@ try {
   await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[page] ${message.text().slice(0, 200)}`); });
 
-  if (GRAPHICS_OVERRIDE) {
-    const override = JSON.parse(GRAPHICS_OVERRIDE);
-    report.graphicsOverride = override;
+  if (OVERRIDE_VALUES) {
+    report.graphicsOverride = OVERRIDE_VALUES;
     await page.addInitScript((values) => {
       try {
         localStorage.setItem('atomic-acres-pass65-settings-v1', JSON.stringify({ version: 1, graphics: { schemaVersion: 1, preset: 'custom', ...values } }));
       } catch { /* storage unavailable */ }
-    }, override);
+    }, OVERRIDE_VALUES);
   }
   await page.addInitScript(() => {
     const state = {
       hooked: false, draws: 0, triangles: 0, instances: 0, passes: 0, computePasses: 0, dispatches: 0, submits: 0,
-      pipelines: 0, computePipelines: 0, shaderModules: 0, frames: [], longTasks: [], running: false,
+      pipelines: 0, computePipelines: 0, shaderModules: 0, pipelineRecords: [], frames: [], longTasks: [], running: false,
     };
     window.__HF399__ = state;
     const install = () => {
@@ -146,8 +152,14 @@ try {
         if (typeof original !== 'function') return;
         proto[name] = function patched(...args) { sink(args); return original.apply(this, args); };
       };
-      wrapCount(device.prototype, 'createRenderPipeline', () => { state.pipelines += 1; });
-      wrapCount(device.prototype, 'createRenderPipelineAsync', () => { state.pipelines += 1; });
+      wrapCount(device.prototype, 'createRenderPipeline', (args) => {
+        state.pipelines += 1;
+        state.pipelineRecords.push({ atMs: Math.round(performance.now()), label: args[0]?.label ?? null, method: 'sync' });
+      });
+      wrapCount(device.prototype, 'createRenderPipelineAsync', (args) => {
+        state.pipelines += 1;
+        state.pipelineRecords.push({ atMs: Math.round(performance.now()), label: args[0]?.label ?? null, method: 'async' });
+      });
       wrapCount(device.prototype, 'createComputePipeline', () => { state.computePipelines += 1; });
       wrapCount(device.prototype, 'createComputePipelineAsync', () => { state.computePipelines += 1; });
       wrapCount(device.prototype, 'createShaderModule', () => { state.shaderModules += 1; });
@@ -195,7 +207,7 @@ try {
       document.querySelector('#graphics-save')?.click();
     }
     return { before, after: select?.value ?? null, options: select ? [...select.options].map((option) => `${option.value}=${option.textContent}`) : null };
-  }, GRAPHICS_OVERRIDE ? 'custom' : PROFILE);
+  }, OVERRIDE_VALUES ? 'custom' : PROFILE);
   await page.waitForTimeout(1_000);
   // A save can stage a renderer reload; if the page navigated, wait for it again.
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
@@ -228,6 +240,7 @@ try {
       atMs: performance.now(), draws: state.draws, triangles: state.triangles, instances: state.instances, passes: state.passes,
       computePasses: state.computePasses, dispatches: state.dispatches, submits: state.submits, pipelines: state.pipelines,
       computePipelines: state.computePipelines, shaderModules: state.shaderModules,
+      pipelineRecords: state.pipelineRecords.length,
       heap: performance.memory?.usedJSHeapSize ?? null,
     };
     let last = performance.now();
@@ -272,6 +285,7 @@ try {
         shaderModules: state.shaderModules - mark.shaderModules,
         renderPipelinesTotal: state.pipelines,
         shaderModulesTotal: state.shaderModules,
+        pipelineLabels: state.pipelineRecords.slice(mark.pipelineRecords),
       },
       longTasks: { count: state.longTasks.length, totalMs: state.longTasks.reduce((sum, task) => sum + task.durationMs, 0), maxMs: state.longTasks.reduce((max, task) => Math.max(max, task.durationMs), 0) },
       heap: { startBytes: mark.heap, endBytes: heapNow, deltaMbPerMinute: mark.heap !== null && heapNow !== null ? Number((((heapNow - mark.heap) / 1048576) / (elapsedMs / 60_000)).toFixed(2)) : null },
@@ -324,6 +338,15 @@ try {
   console.error('[hf399] match active; warming up');
   await page.evaluate(() => { try { window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen?.(true); } catch { /* absent on old builds */ } });
   await page.waitForTimeout(WARMUP_SECONDS * 1000);
+  report.runtimeReceipt = await page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const advanced = snapshot.render?.atomicSignal?.advancedGraphics ?? null;
+    return {
+      taaPrecompileReach: advanced?.taaPrecompileReach ?? null,
+      exactScenePassPrecompile: advanced?.exactScenePassPrecompile ?? null,
+      taaResolve: advanced?.screenSpace?.taaResolve ?? null,
+    };
+  });
 
   await runPhase('deployed-idle');
 

@@ -14,13 +14,13 @@ import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } 
 import { arenaEnvironmentScale } from '../graphics-refinement';
 
 describe('Pass 64 authored TSL pipeline set', () => {
-  it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
+  it('has stable unique SHA-256 descriptors for all seven former GLSL owners and the TAA resolve', async () => {
     const descriptors = TSL_MIGRATION_INVENTORY.map(canonicalTslDescriptor);
     const hashes = await Promise.all(TSL_MIGRATION_INVENTORY.map(tslDescriptorSha256));
-    expect(descriptors).toHaveLength(7);
-    expect(new Set(descriptors).size).toBe(7);
+    expect(descriptors).toHaveLength(8);
+    expect(new Set(descriptors).size).toBe(8);
     expect(hashes.every((hash) => /^[a-f0-9]{64}$/.test(hash))).toBe(true);
-    expect(new Set(hashes).size).toBe(7);
+    expect(new Set(hashes).size).toBe(8);
     expect(Object.fromEntries(TSL_MIGRATION_INVENTORY.map((entry, index) => [entry.replacementPipelineId, hashes[index]]))).toEqual({
       'pass64.sky-atmosphere.tsl.v1': 'df27ed5c5ef4aa30a9e4f81ca832fee18102ce0dacf94c57ba7649c56fdc2219',
       'pass64.hdr-grade-grain.tsl.v1': '627c0548678e85ab989f8a467342e0b7ca701d5c9537c2194b82be4e5a964805',
@@ -29,6 +29,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       'pass64.atmosphere-dust.tsl.v1': 'd769f801d91d6578073f374f49ff59b7e67249965c66e21d1261bacc9f936167',
       'pass64.grass.tsl.v1': '2e532ce383727f954067dadad411fb0ca4450613c44b74d160bea282cf85cc34',
       'pass64.water.tsl.v1': '35442c51b89d6c192c22e65d3dbf329995608e50a743c3f741214ee4312e89d8',
+      'pass96.taa-temporal-resolve.tsl.v1': '85040fce735205b1665715e356e6cfc16e3e2920689d5d67517ed3e69f995b54',
     });
   });
 
@@ -41,7 +42,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
     const audit = auditRuntimeTslTraversal(scene, systems.compiledPipelineIds);
     expect(audit.legacyShaderMaterials).toEqual([]);
-    expect(audit.compiledPipelineIds).toHaveLength(7);
+    expect(audit.compiledPipelineIds).toHaveLength(8);
     expect(audit.nodeMaterialPipelineIds).toHaveLength(6);
     expect(systems.principalHdrTarget.samples).toBe(4);
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output']);
@@ -367,6 +368,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
         globalIllumination: SCREEN_SPACE_POST_DISABLED.globalIllumination,
         depthOfField: SCREEN_SPACE_POST_DISABLED.depthOfField,
         motionBlur: SCREEN_SPACE_POST_DISABLED.motionBlur,
+        taaResolve: SCREEN_SPACE_POST_DISABLED.taaResolve,
         upscaling: SCREEN_SPACE_POST_DISABLED.upscaling,
       },
       // Cold-compile attribution for the arena coverage fence, published from

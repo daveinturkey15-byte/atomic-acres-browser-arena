@@ -1,0 +1,69 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "taa-quality-on",
+  "sha": "99bf0908",
+  "url": "http://127.0.0.1:4220",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-Cvfaa8L0.js",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "seed": "viewpoint",
+  "settleMs": 3000,
+  "samples": 3,
+  "capturedAt": "2026-09-04T22:40:59.802Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-north-yard.png",
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-north-yard.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-north-yard.s2.png"
+          ],
+          "committedFrame": 119,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 153
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-street-centre.png",
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-street-centre.s1.png",
+            "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\candidate\\nuketown2\\nuketown2-street-centre.s2.png"
+          ],
+          "committedFrame": 313,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 351
+        }
+      ],
+      "ms": 198066,
+      "errors": [
+        "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion exceeded 12000 ms for submission 1 (completed 0, mode serialized, in-flight 1, pending 12005 ms, probes 1, prior latency none, fenced draws 489)\n    at http://127.0.0.1",
+        "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion exceeded 4000 ms for submission 1 (completed 0, mode serialized, in-flight 1, pending 20134 ms, probes 1, prior latency none, fenced draws 489)\n    at http://127.0.0.1:"
+      ]
+    }
+  ]
+}
