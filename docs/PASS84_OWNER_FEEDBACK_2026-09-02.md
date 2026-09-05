@@ -2287,3 +2287,47 @@ Do NOT take:
 - 03:05 Red-gate fix lane (pass93-candidate @ 88d7ae68): stock-boot 4/4, bot probe and soak duration now pass; full Vitest down to one failure - the Pass 64 ancestry assertion (a merged lane's rebased line dropped the released Pass 64 source from the candidate's history); still red: the strict cold-admission smoke (Nuke Town transition 53.3 s - the merged lanes added cold work; menu prewarm 11.0 s), 22 audit findings, soak rows replication/rejoin/stair-fire (REJOIN-NOT-REGISTERED, W-1 residue, P-1 recovery proof). Two Luna lanes launched to 04:40: cold-admission profiling + honest ancestry restore (merge the Pass 64 source commit, test untouched) on the candidate worktree; rejoin re-registration + W-1/P-1 residue on a new branch. Candidate 7 at 05:00 takes both if pushed.
 - 04:40 Cold-admission + ancestry lane (pass93-candidate @ 22f2a78b): the Pass 64 lineage was restored honestly by merging the released source commit (ancestry test 3/3; test untouched); the Nuke Town cold transition fell from 53.3 s to 32.1 s (visual definition 11.9 s, coverage fence 11.6 s) but the strict 10 s cold-admission smoke stays red - it is a publish gate, not a play gate: candidate 7 is told to serve on :4300 when the other gates are green and to leave out any visual lane that adds more than 2 s of cold work, quoting the numbers.
 - 04:43 **Rejoin lane** (Luna, mp-rejoin @ 17ea58dd, base candidate 6 + fixes): rejoin re-registration fixed host-authoritatively (fresh replication slot broadcast to every peer, direct full-state snapshot to the rejoiner, current-session admission); the audit's REJOIN-NOT-REGISTERED and one-way-replication rows are clean; 501 tests green. Still OPEN in the soak table: replication bound, rejoin damage visibility, the W-1 runtime residue and P-1 recovery proof - findings for the morning, no bound loosened. Candidate 7 takes this branch.
+
+## Morning report 2026-09-05
+
+### Candidate 7 owner handoff
+
+Candidate 7 runtime is served at `http://127.0.0.1:4300/` from the gated
+candidate runtime SHA `ae79572410f02639bb189622d34703b42425ce4d`. It includes
+the reviewed multiplayer diagnostics evidence, gamepad support, breakable
+window contract, the blind-A/B harness and review evidence, and the previously
+integrated HITL-6 multiplayer/perf/clustered-lighting base. It does not include
+the late TAA runtime, albedo global-shift, yard-prop, load-time, or arena-look
+branches that failed the integrated cold/runtime gates.
+
+The owner should test first in this order:
+
+1. Nuke Town solo on :4300: spawn, north yard, street, garage, minimap, and
+   one vehicle; then Raid2 and Skyline Terminal.
+2. A three-peer room: rejoin damage visibility, directed replication, weapon
+   swaps, and stair fire. The real soak still reports replication `606`
+   divergences, `seenByEveryoneAfter=false`, and stair fire false for both
+   guests.
+3. Cold Nuke Town admission. The measured transition is `24,065.5 ms` against
+   the unchanged `10,000 ms` publish fence; this remains an owner-test/play
+   condition, not publish evidence.
+
+### What stayed out
+
+`mp-rejoin` was reviewed SHIP-WITH-FIXES but its integration broke the full
+suite's teleport contract and legacy size ratchet, so it was reverted. TAA pass
+2 was reviewed green in isolation but its integration caused 16 full-suite
+ failures and was reverted. Capture warmup, yard props, load-time, skyline
+ terminal look, Nuke accuracy/interiors, albedo, and the older renderer-control
+ look lanes were either over the +2 s cold budget, produced the
+`THREE.AttributeNode: Vertex attribute "position" not found on geometry` error,
+or had no safe current-base forward port. `mp-lobby-overhaul` and countdown
+were left out on old inline-renderer conflicts; weapon pickup remains
+DO-NOT-SHIP; mp-desync produced no commits.
+
+### Publish recommendation
+
+Do not publish PASS 95 from candidate 7. The build is playable and served for
+the 06:00 owner test, but the preserved cold-admission fence and three required
+multiplayer soak rows are red. No threshold, fence, timeout, or budget was
+widened.
