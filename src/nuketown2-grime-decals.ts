@@ -60,6 +60,8 @@ const {
   min,
   mix,
   positionWorld,
+  pow,
+  sin,
   smoothstep,
   vec2,
   vec3,
@@ -252,20 +254,46 @@ function createCourtMaterial(): MeshStandardNodeMaterial {
 }
 
 /**
- * STEPPING STONES. Round pale slabs on a 0.62 m pitch - the aerial shows them
- * crossing both back yards from the deck to the yard props.
+ * FLAGSTONE PATH. One organic meandering run per yard: ten irregular polygonal
+ * flagstones on a gentle S-curve across the plate, from the patio side toward
+ * the garden side. Evaluated in the plate's own folded frame (qx, qz), which is
+ * identical on both yards, so `pair()`'s 180-degree rotation lands the same
+ * path on each - never a mirrored pair of different paths. The plate, its lift
+ * and its family are unchanged, so the verge ceilings and the coplanar split
+ * are untouched: same top (plate + 3 mm + stones lift), same -3 tier.
  */
 function createStoneMaterial(): MeshStandardNodeMaterial {
   const mat = decalMaterial('nuketown2-stepping-stones', 0.93);
   const p = positionWorld;
-  const cell = vec2(floor(p.x.div(float(0.62))), floor(p.z.div(float(0.62))));
-  const wobble = hash(cell.x.mul(21.7).add(cell.y.mul(13.3))) as any;
-  const local = vec2(fract(p.x.div(float(0.62))).sub(0.5), fract(p.z.div(float(0.62))).sub(0.5));
-  const r = local.length().mul(0.62);
-  const radius = float(0.19).add((wobble as any).mul(0.04));
-  const stone = float(1).sub(smoothstep(radius.sub(0.018), radius, r));
+  const az = abs(p.z);
+  // Fold sign: +1 on the north plate (z < 0), -1 on the south plate, so the
+  // local frame below is identical on both yards.
+  const s = float(0).sub(p.z.div(az));
+  const qx = s.mul(p.x).add(1);
+  const qz = s.mul(p.z).add(29);
+  // Ten stones on a 0.86 m pitch across the 9 m plate.
+  const u = qx.add(4.3).div(0.86);
+  const idx = floor(u);
+  const h1 = hash(idx.mul(12.9).add(7.7)) as any;
+  const h2 = hash(idx.mul(5.3).add(2.1)) as any;
+  const h3 = hash(idx.mul(9.1).add(4.4)) as any;
+  const cx = float(-4.3).add(idx.add(0.5).mul(0.86)).add((h1 as any).sub(0.5).mul(0.30));
+  const cz = sin(qx.add(4.3).mul(0.72)).mul(0.95).add((h2 as any).sub(0.5).mul(0.34));
+  const lx = qx.sub(cx);
+  const lz = qz.sub(cz);
+  // Irregular polygonal flagstone: a superellipse with hashed axes and
+  // exponent, so each stone has its own footprint and no two match.
+  const a = float(0.30).add((h1 as any).mul(0.14));
+  const b = float(0.28).add((h2 as any).mul(0.12));
+  const e = float(2.0).add(h3.mul(2.5));
+  const q = pow(abs(lx).div(a), e).add(pow(abs(lz).div(b), e));
+  const edge = float(1);
+  const inPath = smoothstep(float(-0.05), float(0.05), u)
+    .mul(float(1).sub(smoothstep(float(9.95), float(10.05), u)));
+  const stone = float(1).sub(smoothstep(edge.sub(0.06), edge.add(0.02), q)).mul(inPath);
   const grain = fract(p.x.mul(61.3).add(p.z.mul(43.9)).sin().mul(1237.7)).sub(0.5).mul(0.12);
-  mat.colorNode = vec3(0.70, 0.69, 0.65).add(vec3(1, 1, 1).mul(grain));
+  const tone = float(0.92).add((h3 as any).mul(0.14));
+  mat.colorNode = vec3(0.70, 0.69, 0.65).mul(tone).add(vec3(1, 1, 1).mul(grain));
   mat.opacityNode = stone.mul(0.95);
   return mat;
 }
