@@ -256,11 +256,12 @@ describe('HF-477 vehicle forge graph-shape budget', () => {
     expect(materialGraphKey(truck.paint)).toBe(materialGraphKey(coach.paint));
     expect(materialGraphKey(truck.accent)).toBe(materialGraphKey(coach.paint));
     expect(materialGraphKey(coupe.paint)).toBe(materialGraphKey(coach.paint));
-    for (const material of [navy.paint, coach.paint, coach.accent, truck.paint, truck.accent, coupe.paint]) {
+    expect(materialGraphKey(coupe.accent)).toBe(materialGraphKey(coach.paint));
+    for (const material of [navy.paint, coach.paint, coach.accent, truck.paint, truck.accent, coupe.paint, coupe.accent]) {
       expect(material.userData.forgePaintUniform).toBe(true);
       expect(material.userData.forgeRole).toBe('paint');
     }
-    for (const [material, hex] of [[navy.paint, 0x173451], [coach.paint, 0xe7dec6], [coach.accent, 0xa8382c], [truck.paint, 0xf2ede2], [truck.accent, 0x2b3138], [coupe.paint, 0x9e1c1c]] as const) {
+    for (const [material, hex] of [[navy.paint, 0x173451], [coach.paint, 0xe7dec6], [coach.accent, 0xa8382c], [truck.paint, 0xf2ede2], [truck.accent, 0x2b3138], [coupe.paint, 0x9e1c1c], [coupe.accent, 0x9e1c1c]] as const) {
       const expected = new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
       expect(uniformValues(material)).toEqual([
         expect.closeTo(expected.r, 12),
