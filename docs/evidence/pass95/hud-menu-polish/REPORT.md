@@ -151,3 +151,125 @@ scoreline, minimap console) rather than the custom-property channel again.
 Nothing was weakened, skipped, widened or deleted. Every heavy step
 (`npm run build`, every browser session) was taken under the machine lock and
 released after it.
+
+---
+
+## Re-verification and gate re-run (second session, 2026-09-05)
+
+This lane was paused under memory pressure and resumed in a fresh session on
+the same worktree and branch. Nothing was recreated or reset; the pushed commit
+`fa8694fc` was kept and continued from. Everything below was run in the
+resumed session, so these claims are first-hand rather than inherited.
+
+### Gates, re-run from scratch on the resumed tree
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **[VERIFIED]** exit 0, no output |
+| `npm run build` | **[VERIFIED]** exit 0, `built in 5.30s` |
+| `npx vitest run` (full) | **[VERIFIED]** `Test Files 622 passed \| 1 skipped (623)`, `Tests 6257 passed \| 2 skipped (6259)`, zero failures |
+| `src/legacy-main-size-ratchet.test.ts` | **[VERIFIED]** passes inside the full run; `wc -l src/legacy-main.ts` = **37396**, exactly the LINE_CEILING. Not raised, and this lane adds no line to that file. |
+
+`npm run build` and the full `vitest run` were taken under the machine lock and
+released immediately after. The power plan was **[VERIFIED]** High performance
+(`8c5e7fda-...`) before any measurement, so the perf numbers were not taken on
+a throttled scheme.
+
+### Requirement (2) re-checked against the source, not the screenshot
+
+**[VERIFIED]** the focus and selection rules this lane added are live, not
+decorative. `src/ui/pass64-shell.ts:64` builds each map card as a real
+`<button type="button" class="map-card" data-arena-id=... aria-pressed=...>`,
+so `#menu #map-selector .map-card:focus-visible` and
+`.map-card[aria-pressed='true']` both have something to match, keyboard focus
+reaches them in DOM order, and the gamepad roving-focus hooks that read
+`.map-card[data-arena-id]` (`legacy-main.ts:29697`, `:30394`) are untouched.
+
+**[VERIFIED]** Nuke Town Rebuild is first and pre-selected, per HF-495:
+`ARENA_SELECTIONS` order begins `nuketown2, raid2, atomic-acres,
+skyline-terminal, rustworks-1v1, gun-range`, `SELECTABLE_ARENAS` preserves that
+order, and the card at index 0 receives both `selected` and
+`aria-pressed="true"`.
+
+### The perf OPEN item, narrowed — one hypothesis killed, one raised
+
+The previous section left "bisect the remaining per-frame DOM text writes" as
+the next step. Reading the source in this session **changes that advice**, and
+the correction is worth more to the next owner than another unmeasured guess.
+
+**[VERIFIED] the impact channel is NOT a per-frame writer — do not spend a
+cycle there.** The six `--hud-impact-*` properties are declared
+`inherits: true` (`src/ui/pass77-instrument-hud.css:133-166`), which looks
+exactly like the defect perf lane 1 fixed on the sway set, and they are written
+on `#hud`, whose subtree is the entire HUD. But `advanceHudImpact`
+(`src/ui/hud-impact-response.ts`) integrates, sees `isHudImpactIdle`, and
+returns **without writing**, and `releaseHudImpact` clears all six exactly once
+on the transition into idle. On a settled HUD — almost every frame of a match —
+that channel writes nothing. A future lane that greps for `inherits: true` will
+flag this; it is already handled.
+
+**[OPEN] the real remaining unregistered inheriting per-frame write is the
+crosshair spread.** `src/legacy-main.ts:28287` runs
+`crosshair.style.setProperty('--spread', ...)` every frame, unguarded.
+`--spread` has **no `@property` registration anywhere** in `src/**/*.css` — the
+only eleven registrations in the repository are the `--hud-*` set — so it is an
+unregistered custom property and therefore **inherits by default**, invalidating
+the crosshair subtree on every frame. Its readers make that worse than a style
+invalidation: `src/style.css:94` spends it as
+`#crosshair i:nth-child(1..4) { left/right/top/bottom: calc(50% - var(--spread) - 7px) }`
+— four **layout** properties on four elements — and `#crosshair i` carries
+`transition: left .08s ease, right .08s ease, top .08s ease, bottom .08s ease`.
+So one unguarded per-frame custom-property write drives a transitioned layout
+change on four elements, every frame.
+
+This is stated as a **hypothesis with a mechanism, not a measured cause**, and
+it was deliberately **not** fixed here. Registering `--spread` as
+`@property { syntax: '<length>'; inherits: false }`, or moving the four arms
+onto `transform`, changes visible crosshair behaviour (registered properties
+are type-checked and animate differently; a transitioned `left` and a
+transitioned `transform` do not look identical), so it needs its own measured
+cycle plus a visual review against the ADS states. That did not fit this time
+box. The 1.5 ms budget stands unwidened and still gates.
+
+### The re-measurement I attempted and did not get — stated, not hidden
+
+**[OPEN].** I tried to re-run `scripts/qa/audit-hud-menu-layout.mjs` in this
+session against a freshly built `dist`, to reproduce the after-numbers
+first-hand rather than inherit them. It did not produce a measurement, and the
+numbers in the sections above it are therefore still the **first session's**
+measurements, unconfirmed by a second run. They are left exactly as they were
+rather than restated as if I had re-taken them.
+
+The failure was in the harness plumbing, not in the page, and it is worth
+recording as a gotcha because the next owner will hit it:
+
+- **Symptom.** `npx vite preview --port 4261 --strictPort` prints
+  `➜  Local:   http://localhost:4261/` and yet
+  `curl http://127.0.0.1:4261/` returns `000` (connection refused) for well
+  over a minute, so a readiness probe that polls `127.0.0.1` never passes while
+  a probe that greps the log passes immediately and hands the audit a base URL
+  nothing is listening on.
+- **Cause.** Vite binds `localhost`, which on this machine resolves to `::1`
+  first, while `audit-hud-menu-layout.mjs` defaults `BASE_URL` to
+  `http://127.0.0.1:${QA_PORT}`. The two names are not the same socket. A node
+  process *was* listening on 4261 by the end (confirmed by
+  `Get-NetTCPConnection -LocalPort 4261`), just not where the audit looks.
+- **Correction (for the next run, untested here).** Start the server with
+  `--host 127.0.0.1` **and** gate on an HTTP 200 from `127.0.0.1`, never on the
+  log line; keep the readiness wait bounded so a server that never binds cannot
+  spin while holding the machine lock.
+- **Verify.** `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4261/`
+  returns `200` before the audit is invoked.
+
+No lock was leaked: the heavy lock was released and port 4261 was left clear
+(**[VERIFIED]** `UNLOCKED`, and the one orphaned `node` still holding 4261 was
+killed — my assigned port only, nothing else on the machine was touched).
+
+### Net effect of this session
+
+No source file changed. The lane's shipped change is still exactly the commit
+`fa8694fc` described above: one new gating instrument, one new stylesheet, one
+new test file, three lines in `bootstrap.ts`. What this session adds is the
+independent gate re-run, the two source-verified confirmations for requirement
+(2), the falsification of the impact-channel hypothesis, the sharper
+crosshair-spread hypothesis for the perf OPEN item, and this gotcha.
