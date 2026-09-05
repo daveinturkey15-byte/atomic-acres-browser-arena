@@ -183,6 +183,12 @@ export type MotionBlurTuning = Readonly<{
   maximumUvOffset: number;
 }>;
 
+export type TaaResolveTuning = Readonly<{
+  enabled: boolean;
+  /** History contribution, clamped at admission and exposed as a live uniform. */
+  strength: number;
+}>;
+
 export type SpatialUpscalingTuning = Readonly<{
   mode: SpatialUpscalingMode;
   enabled: boolean;
@@ -209,6 +215,7 @@ export type ScreenSpacePostRuntime = Readonly<{
   globalIllumination: ScreenSpaceGiTuning;
   depthOfField: DepthOfFieldTuning;
   motionBlur: MotionBlurTuning;
+  taaResolve: TaaResolveTuning;
   upscaling: SpatialUpscalingTuning;
   /**
    * HF-481 lane LOOK — aerial perspective. It rides in this runtime for the
@@ -539,6 +546,7 @@ export type ScreenSpacePostSelection = Readonly<{
   depthOfField: boolean;
   depthOfFieldStrength: number;
   motionBlur: number;
+  taaResolve?: boolean;
   spatialUpscaling: SpatialUpscalingMode;
   /** HF-398 — the classic recursive ray-tracing tier. */
   rayTracing: RayTracingTier;
@@ -568,6 +576,10 @@ export function resolveScreenSpacePostRuntime(
     globalIllumination: resolveScreenSpaceGiTuning(selection.screenSpaceGi),
     depthOfField: resolveDepthOfFieldTuning(selection.depthOfField, selection.depthOfFieldStrength),
     motionBlur: resolveMotionBlurTuning(selection.motionBlur),
+    taaResolve: Object.freeze({
+      enabled: selection.taaResolve === true,
+      strength: selection.taaResolve === true ? 0.9 : 0,
+    }),
     upscaling: resolveSpatialUpscaling(selection.spatialUpscaling),
     aerialPerspective: resolveAerialPerspectiveTuning(selection.volumetricQuality),
     // The trace supplies its own normal and material attachments through
@@ -616,6 +628,7 @@ export function screenSpaceTopologyKey(screenSpace: ScreenSpacePostRuntime): str
     screenSpace.globalIllumination.enabled ? 'ssgi' : '-',
     screenSpace.depthOfField.enabled ? 'dof' : '-',
     screenSpace.motionBlur.enabled ? 'motion' : '-',
+    screenSpace.taaResolve.enabled ? 'taa' : '-',
     screenSpace.upscaling.enabled ? `fsr${screenSpace.upscaling.sceneResolutionScale}` : '-',
     // HF-398 / PASS 81. The trace allocates the normal and material MRT
     // attachments it reads (`screenSpaceMrtRequirement`) and composites its own
@@ -634,6 +647,7 @@ export const SCREEN_SPACE_POST_DISABLED: ScreenSpacePostRuntime = Object.freeze(
   globalIllumination: SSGI_OFF,
   depthOfField: resolveDepthOfFieldTuning(false, 0),
   motionBlur: MOTION_BLUR_OFF,
+  taaResolve: Object.freeze({ enabled: false, strength: 0 }),
   upscaling: resolveSpatialUpscaling('off'),
   aerialPerspective: AERIAL_PERSPECTIVE_OFF,
   rayTracing: RAY_TRACING_DISABLED,

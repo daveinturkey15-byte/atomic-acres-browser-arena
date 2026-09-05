@@ -30137,13 +30137,13 @@ async function performArenaSelection(
       if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
         const scenePassPrecompile = pass64TslSystems;
         if (hadPreparedArena) {
-          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene, arena.root));
         } else {
           // A cold page has no prior arena vocabulary to protect. Compile only
           // the newly admitted arena root; the pass graph and shared retained
           // roots are covered by the later exact coverage draw. This keeps the
           // cold-fence relief from compiling unrelated menu/support roots.
-          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root, arena.root));
         }
         exactScenePassPrecompiled = true;
         assertAdmission();
@@ -30217,7 +30217,7 @@ async function performArenaSelection(
         // task. The forced full draw below remains the authoritative geometry,
         // shadow-caster, post-graph and queue-completion proof.
         if (!exactScenePassPrecompiled) {
-          await exactScenePass.precompileExactScenePass(scene);
+          await exactScenePass.precompileExactScenePass(scene, presentationRoot);
           exactScenePassPrecompiled = true;
         }
         assertAdmission();

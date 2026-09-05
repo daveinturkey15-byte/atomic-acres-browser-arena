@@ -1,0 +1,195 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-04T22:45:34.638Z",
+  "label": "taa-on",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4220",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 3,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 3056,
+      "elapsedMs": 3030,
+      "fps": 1008.6,
+      "frameMs": {
+        "p50": 0.8,
+        "p95": 2.2,
+        "p99": 3.3,
+        "max": 16.3,
+        "mean": 0.99
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 123755367,
+        "endBytes": 124663959,
+        "deltaMbPerMinute": 17.16
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\perf-on\\taa-on-nuketown2-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 113,
+      "elapsedMs": 3039,
+      "fps": 37.2,
+      "frameMs": {
+        "p50": 24.9,
+        "p95": 39.2,
+        "p99": 55.5,
+        "max": 63.3,
+        "mean": 26.65
+      },
+      "perFrame": {
+        "draws": 164.4,
+        "triangles": 338923,
+        "instances": 11175,
+        "renderPasses": 25.2,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 27.2
+      },
+      "created": {
+        "renderPipelines": 6,
+        "computePipelines": 0,
+        "shaderModules": 8,
+        "renderPipelinesTotal": 606,
+        "shaderModulesTotal": 725
+      },
+      "longTasks": {
+        "count": 1,
+        "totalMs": 62,
+        "maxMs": 62
+      },
+      "heap": {
+        "startBytes": 474416291,
+        "endBytes": 291009990,
+        "deltaMbPerMinute": -3453.19
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          -16,
+          1.6983986282348633,
+          -24
+        ],
+        "yaw": -2.5535900500422257,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\perf-on\\taa-on-nuketown2-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 114,
+      "elapsedMs": 3025,
+      "fps": 37.7,
+      "frameMs": {
+        "p50": 26.1,
+        "p95": 31.1,
+        "p99": 41.3,
+        "max": 41.6,
+        "mean": 26.4
+      },
+      "perFrame": {
+        "draws": 145.4,
+        "triangles": 302467.9,
+        "instances": 9197.5,
+        "renderPasses": 25.2,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 27.2
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 606,
+        "shaderModulesTotal": 725
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 390543249,
+        "endBytes": 546704081,
+        "deltaMbPerMinute": 2953.92
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          -6.667491436004639,
+          1.725768187046051,
+          -6.105159759521484
+        ],
+        "yaw": -2.5535900500422257,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\perf-on\\taa-on-nuketown2-move.png"
+    }
+  ],
+  "graphicsOverride": {
+    "taaResolve": true
+  },
+  "profileSelection": {
+    "before": "custom",
+    "after": "custom",
+    "options": [
+      "performance=PERFORMANCE",
+      "balanced=BALANCED",
+      "high=QUALITY",
+      "max=MAX",
+      "custom=CUSTOM",
+      "rtx-native-runtime-info=RTX — WHAT IS IT?"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "custom",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: CUSTOM",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

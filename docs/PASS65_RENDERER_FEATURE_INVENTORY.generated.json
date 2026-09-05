@@ -209,7 +209,7 @@
       "runtimeEvidence": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "symbol": "ssr(sceneColor, sources.sceneDepth, sources.sceneNormal",
           "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.reflections"
         }
       ]
@@ -222,7 +222,7 @@
       "runtimeEvidence": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal",
+          "symbol": "ssgi(sceneColor, sources.sceneDepth, sources.sceneNormal",
           "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.globalIllumination"
         }
       ]
@@ -353,7 +353,7 @@
       "runtimeEvidence": [
         {
           "path": "src/rendering/pass64-tsl-scene.ts",
-          "symbol": "bloom(sceneColor, graphics.post.bloomStrength",
+          "symbol": "bloom(screenSpace.sceneColor, graphics.post.bloomStrength",
           "telemetryPath": "render.atomicSignal.advancedGraphics.bloomStrength"
         }
       ]
@@ -470,8 +470,21 @@
       "runtimeEvidence": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))",
+          "symbol": "motionBlur(sceneColor, limited, int(runtime.motionBlur.samples))",
           "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.motionBlur"
+        }
+      ]
+    },
+    {
+      "key": "graphics.taaResolve",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "temporal-anti-aliasing",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/taa-resolve.ts",
+          "symbol": "buildTaaResolveNode",
+          "telemetryPath": "render.atomicSignal.advancedGraphics.screenSpace.taaResolve"
         }
       ]
     },
@@ -658,6 +671,7 @@
         "depthOfField": false,
         "depthOfFieldStrength": 0.3,
         "motionBlur": 0,
+        "taaResolve": false,
         "spatialUpscaling": "off",
         "weatherIntensity": "light",
         "rainDensity": 0.5,
@@ -751,6 +765,10 @@
             "deadZoneNdc": 0.006,
             "kneeNdc": 0.024,
             "maximumUvOffset": 0
+          },
+          "taaResolve": {
+            "enabled": false,
+            "strength": 0
           },
           "upscaling": {
             "mode": "off",
@@ -877,6 +895,7 @@
         "depthOfField": false,
         "depthOfFieldStrength": 0.3,
         "motionBlur": 0,
+        "taaResolve": true,
         "spatialUpscaling": "off",
         "weatherIntensity": "storm",
         "rainDensity": 1,
@@ -893,7 +912,7 @@
         "adaptive": true,
         "targetFps": 240,
         "frameRateLimit": 0,
-        "antialiasSamples": 4,
+        "antialiasSamples": 0,
         "postAntiAliasing": "off",
         "shadows": true,
         "shadowMapSize": 2048,
@@ -970,6 +989,10 @@
             "deadZoneNdc": 0.006,
             "kneeNdc": 0.024,
             "maximumUvOffset": 0
+          },
+          "taaResolve": {
+            "enabled": true,
+            "strength": 0.9
           },
           "upscaling": {
             "mode": "off",
@@ -1096,6 +1119,7 @@
         "depthOfField": true,
         "depthOfFieldStrength": 0.6,
         "motionBlur": 0.35,
+        "taaResolve": true,
         "spatialUpscaling": "off",
         "weatherIntensity": "storm",
         "rainDensity": 1.35,
@@ -1112,7 +1136,7 @@
         "adaptive": true,
         "targetFps": 240,
         "frameRateLimit": 0,
-        "antialiasSamples": 4,
+        "antialiasSamples": 0,
         "postAntiAliasing": "off",
         "shadows": true,
         "shadowMapSize": 2048,
@@ -1189,6 +1213,10 @@
             "deadZoneNdc": 0.006,
             "kneeNdc": 0.024,
             "maximumUvOffset": 0.008749999999999999
+          },
+          "taaResolve": {
+            "enabled": true,
+            "strength": 0.9
           },
           "upscaling": {
             "mode": "off",
@@ -1311,6 +1339,11 @@
     {
       "id": "pass64.water.tsl.v1",
       "owner": "src/water-system.ts",
+      "status": "verified"
+    },
+    {
+      "id": "pass96.taa-temporal-resolve.tsl.v1",
+      "owner": "src/rendering/taa-resolve.ts",
       "status": "verified"
     }
   ],
@@ -1594,7 +1627,7 @@
       "sourceProbes": [
         {
           "path": "src/rendering/pass64-tsl-scene.ts",
-          "symbol": "bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92)"
+          "symbol": "bloom(screenSpace.sceneColor, graphics.post.bloomStrength, 0.32, 0.92)"
         }
       ],
       "pipelineIds": [
@@ -2158,7 +2191,7 @@
       "sourceProbes": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+          "symbol": "ssgi(sceneColor, sources.sceneDepth, sources.sceneNormal"
         },
         {
           "path": "src/rendering/screen-space-post-profile.ts",
@@ -2186,7 +2219,7 @@
       "sourceProbes": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal"
+          "symbol": "ssr(sceneColor, sources.sceneDepth, sources.sceneNormal"
         },
         {
           "path": "src/rendering/pass64-tsl-scene.ts",
@@ -2275,7 +2308,7 @@
       "sourceProbes": [
         {
           "path": "src/rendering/screen-space-post.ts",
-          "symbol": "motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))"
+          "symbol": "motionBlur(sceneColor, limited, int(runtime.motionBlur.samples))"
         },
         {
           "path": "src/rendering/screen-space-post-profile.ts",
@@ -2293,6 +2326,40 @@
       },
       "budget": "One velocity MRT attachment and eight taps; zero allocations while the control reads zero.",
       "verifier": "src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts",
+      "authorityAffecting": false
+    },
+    {
+      "id": "taa-resolve",
+      "title": "Temporal anti-aliasing resolve",
+      "availability": "active",
+      "owner": "src/rendering/taa-resolve.ts + src/rendering/screen-space-post.ts",
+      "sourceProbes": [
+        {
+          "path": "src/rendering/taa-resolve.ts",
+          "symbol": "export function buildTaaResolveNode"
+        },
+        {
+          "path": "src/rendering/screen-space-post.ts",
+          "symbol": "if (runtime.taaResolve.enabled && sources.sceneVelocity)"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "precompileExactScenePass"
+        }
+      ],
+      "pipelineIds": [
+        "pass96.taa-temporal-resolve.tsl.v1"
+      ],
+      "control": {
+        "kind": "setting",
+        "settingKeys": [
+          "graphics.taaResolve"
+        ],
+        "effectiveValue": "Off on BALANCED; on for QUALITY and MAX; admission-only fullscreen resolve with velocity and depth history",
+        "rationale": "The resolve is a single in-repo r185 TSL NodeMaterial with two RGBA16F targets. It is admitted before motion blur, disables principal MSAA, and owns the temporal filtering prerequisite for GTAO and SSGI."
+      },
+      "budget": "Two RGBA16F history/resolve targets, one velocity RG16F MRT attachment, and one resolve/copy pair per frame; no in-combat pipeline creation.",
+      "verifier": "src/rendering/taa-resolve.test.ts + src/rendering/pass64-tsl-scene.test.ts + scripts/qa/perf-hitl5-bisect-cdp.mjs",
       "authorityAffecting": false
     },
     {
@@ -2376,11 +2443,11 @@
     }
   ],
   "summary": {
-    "total": 37,
-    "active": 35,
+    "total": 38,
+    "active": 36,
     "unsupported": 2,
-    "adjustable": 28,
+    "adjustable": 29,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "85a6de44d54bda18ad5243fe29968220325af4395e64adbd86ec5f137fe25ca7"
+  "inventorySha256": "1fdfbb4b9f3e436eafa3d73b5284c9e08fbc0a742563aa251f0dc1033ba2def4"
 }
