@@ -1347,6 +1347,23 @@ async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
     return result;
   }
 
+  // The lobby roster is restored before the rejoiner's arena admission is
+  // complete. Wait for the real world-ready lifecycle bit so this check
+  // measures replication after the guest has emitted its post-load `join`,
+  // rather than racing beginPrivateMatch().
+  const matchReady = await Promise.allSettled(settledRoles.map((role) => peers[role].page.waitForFunction(
+    () => window.__ATOMIC_ACRES_DEBUG__?.samplePlayerPose?.().gameStarted === true,
+    undefined,
+    { timeout: JOIN_TIMEOUT_MS },
+  )));
+  result.matchReadyAfterRejoin = Object.fromEntries(settledRoles.map((role, index) => [role, matchReady[index].status]));
+  const notReady = settledRoles.filter((role, index) => matchReady[index].status === 'rejected');
+  if (notReady.length > 0) {
+    record('REJOIN-MATCH-NOT-READY', 'critical', 'the rejoined document never completed world admission',
+      { notReady, matchReadyAfterRejoin: result.matchReadyAfterRejoin });
+    return result;
+  }
+
   const afterId = (await viewOf(guest.page)).selfId;
   result.identityAfter = afterId;
   result.afterRejoinLifecycle = await guest.page.evaluate(() => {
