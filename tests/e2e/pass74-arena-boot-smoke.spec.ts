@@ -175,6 +175,7 @@ test.describe('arena boot smoke — every canonical arena', () => {
         undefined,
         { timeout: 90_000 },
       );
+      await expect(page.locator('#solo')).toBeEnabled({ timeout: 90_000 });
 
       await page.evaluate(async (id) => {
         await (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.selectArena(id);
