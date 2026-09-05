@@ -90,3 +90,58 @@ export function roundStatSummary(input: RoundStatInput): RoundStatSummary {
     headshots: boundedCount(input.headshots),
   };
 }
+
+/**
+ * HF-512 damage numbers: OFF by default, fully supported when switched on.
+ *
+ * Damage numbers were unconditional. They are a competitive-readability
+ * preference, not a core cue - the hitmarker and the kill-confirm pulse carry
+ * the confirmation, and the numbers add per-hit screen churn the owner did not
+ * ask for by default. This is PRESENTATION ONLY: the host still resolves and
+ * broadcasts the same damage, and `damageNumberPresentation` still computes the
+ * same row. Only whether the local client draws it changes, so two peers with
+ * different settings still agree on every authoritative value.
+ */
+export const DAMAGE_NUMBERS_STORAGE_KEY = 'aa.hud.damageNumbers' as const;
+export const DAMAGE_NUMBERS_DEFAULT_ENABLED = false as const;
+
+let damageNumbersEnabledOverride: boolean | null = null;
+
+function damageNumberStore(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    // Private-mode / blocked storage must never throw into a hit-feedback path.
+    return null;
+  }
+}
+
+/** True when this client should DRAW damage numbers. Default false. */
+export function damageNumbersEnabled(): boolean {
+  if (damageNumbersEnabledOverride !== null) return damageNumbersEnabledOverride;
+  const raw = (() => {
+    try {
+      return damageNumberStore()?.getItem(DAMAGE_NUMBERS_STORAGE_KEY) ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  if (raw === 'on') return true;
+  if (raw === 'off') return false;
+  return DAMAGE_NUMBERS_DEFAULT_ENABLED;
+}
+
+/** Persists the preference and applies it immediately for this session. */
+export function setDamageNumbersEnabled(enabled: boolean): void {
+  damageNumbersEnabledOverride = enabled;
+  try {
+    damageNumberStore()?.setItem(DAMAGE_NUMBERS_STORAGE_KEY, enabled ? 'on' : 'off');
+  } catch {
+    // A refused write leaves the session override in place; never throw.
+  }
+}
+
+/** Test/lifecycle hook: forget the session override and re-read storage. */
+export function resetDamageNumberPreference(): void {
+  damageNumbersEnabledOverride = null;
+}

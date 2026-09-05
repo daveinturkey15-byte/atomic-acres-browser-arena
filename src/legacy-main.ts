@@ -501,7 +501,7 @@ import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
 import { arenaZoneLabel, classifyArenaZone } from './arena-storytelling';
 import { routeIdentityTelemetry } from './world-identity';
-import { damageNumberPresentation, roundStatSummary } from './player-feedback';
+import { damageNumberPresentation, damageNumbersEnabled, roundStatSummary } from './player-feedback';
 import { SupportDamageFeedbackTelemetry, projectSupportDamageAnchor, type SupportDamageScreenAnchor } from './support-damage-feedback';
 import { isHoldInteraction, primaryInteraction, type InteractionCandidate } from './interaction-arbitration';
 import {
@@ -23401,8 +23401,8 @@ function showDamageNumber(
   healthBefore?: number,
   worldAnchor?: SupportDamageScreenAnchor & Readonly<{ targetId: string }>,
 ): void {
-  const presentation = damageNumberPresentation(damage, zone, healthBefore);
-  if (!presentation || worldAnchor && !worldAnchor.visible) return;
+  const presentation = damageNumbersEnabled() ? damageNumberPresentation(damage, zone, healthBefore) : null;
+  if (!presentation || worldAnchor && !worldAnchor.visible) return; // HF-512: numbers default OFF; hitmarker/kill-confirm unaffected
   const root = element<HTMLElement>('#damage-numbers');
   root.dataset.lastDamage = String(presentation.amount);
   root.dataset.lastOverkill = String(presentation.overkill);
