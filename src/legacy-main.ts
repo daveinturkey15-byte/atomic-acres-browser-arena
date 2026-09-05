@@ -30568,7 +30568,10 @@ function returnToMainMenu(): void {
   const leavingHostedMatch = network.role === 'host';
   pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client'
     && network.roomCode
-    && (gameStarted || matchState.phase === 'active' || privateLobbySnapshot?.phase === 'active')
+    && (gameStarted
+      || matchState.phase === 'active'
+      || privateLobbySnapshot?.phase === 'active'
+      || privateMatchActiveAtEpochMs !== null)
     ? network.roomCode
     : '';
   // A voluntary lobby leave is still inside the host's bounded rejoin grace

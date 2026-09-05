@@ -277,7 +277,7 @@ describe('HF-504 lobby authority and succession fences', () => {
     expect(ready).toContain('if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = \'\';');
     const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'));
     expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role === \'client\'');
-    expect(leave).toContain('matchState.phase === \'active\'');
+    expect(leave).toContain('privateMatchActiveAtEpochMs !== null');
   });
 
   it('sends the rejoiner a direct canonical snapshot for each existing remote', () => {
