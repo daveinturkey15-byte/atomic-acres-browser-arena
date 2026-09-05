@@ -69,7 +69,8 @@ describe('hosted bot skirmish parity integration', () => {
     expect(receiver).toContain('hostedBotWeaponPresentationReplay.admit(');
     expect(receiver).toContain("admitted.presentation === 'flamethrower-stream'");
     expect(receiver).toContain('flamethrowerStreamPresentation.emit(');
-    expect(receiver).toContain('audio.shot(admitted.weapon, true, origin.distanceTo(camera.position))');
+    // PASS 95 (HF-509): the replicated report carries its emitter so it is positioned.
+    expect(receiver).toContain('audio.shot(admitted.weapon, true, origin.distanceTo(camera.position), origin)');
     expect(receiver).not.toContain('spawnTracer(');
     expect(receiver).not.toContain('audio.impact(');
 
@@ -91,7 +92,8 @@ describe('hosted bot skirmish parity integration', () => {
 
     const receiver = functionBody('acceptHostedBotWeaponPresentation', 'botElevationAt');
     expect(receiver).toContain('hostedBotWeaponPresentationReplay.admit(');
-    expect(receiver).toContain('audio.shot(admitted.weapon, true, origin.distanceTo(camera.position))');
+    // PASS 95 (HF-509): the replicated report carries its emitter so it is positioned.
+    expect(receiver).toContain('audio.shot(admitted.weapon, true, origin.distanceTo(camera.position), origin)');
     expect(receiver).not.toContain('flareProjectileSystem.spawn(');
     expect(receiver).not.toContain('audio.impact(');
   });

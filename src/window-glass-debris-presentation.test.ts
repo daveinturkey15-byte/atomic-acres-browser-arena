@@ -173,7 +173,8 @@ describe('persistent window glass debris presentation', () => {
     const breach = runtime.slice(runtime.indexOf('function breakHouseWindow('), runtime.indexOf('\nfunction breakWindowsAlongBallisticTrace('));
     expect(matchStart).toContain("document.documentElement.dataset.glassImpactAudioPrewarm = audio.prepareGlassImpact() ? 'ready' : 'unavailable';");
     expect(matchStart.indexOf('audio.prepareGlassImpact()')).toBeLessThan(matchStart.indexOf('prepareDeploymentTransition()'));
-    expect(breach).toContain("audio.impact('glass', point.distanceTo(camera.position));");
+    // PASS 95 (HF-509): the breach impact carries its point so it is positioned.
+    expect(breach).toContain("audio.impact('glass', point.distanceTo(camera.position), point);");
     const prewarm = audio.slice(audio.indexOf('prepareGlassImpact(): boolean {'), audio.indexOf('\n  setLowHealthFeedback('));
     expect(prewarm).toContain("filter.type = 'bandpass';");
     expect(prewarm).toContain('filter.frequency.value = 5_200;');
