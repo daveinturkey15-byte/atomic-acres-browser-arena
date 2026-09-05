@@ -88,7 +88,9 @@ describe('ray-trace capability gate (HF-438 shape)', () => {
       expect(runtime.screenSpace.rayTracing.enabled).toBe(false);
       expect(runtime.reason).toBe(RAY_TRACED_REQUIRES_WEBGPU_REASON);
       // Every OTHER value survives: the player keeps the rung they chose.
-      expect(runtime.antialiasSamples).toBe(settings.antiAliasing === 'msaa-4x' ? 4 : 0);
+      // TAA remains enabled while the trace capability is gated, so its
+      // principal resolve still owns the attachment and MSAA stays off.
+      expect(runtime.antialiasSamples).toBe(0);
       expect(runtime.ambientOcclusion.enabled).toBe(settings.ambientOcclusion !== 'off');
     }
     expect(resolveDisplayedGraphicsPreset('high')).toBe('high');

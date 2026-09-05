@@ -348,6 +348,7 @@ describe('Pass 64 render runtime boundary', () => {
       'atmosphere-dust',
       'procedural-grass',
       'perimeter-water',
+      'taa-resolve',
     ]);
     expect(pendingTslMigrationIds()).toHaveLength(0);
     expect(new Set(TSL_MIGRATION_INVENTORY.map((entry) => entry.status))).toEqual(new Set(['verified']));

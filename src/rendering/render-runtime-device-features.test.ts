@@ -61,7 +61,7 @@ function fakeGpu(adapterFeatures: readonly string[], recorder: Recorder) {
 }
 
 function stubThreeWebGpu(): void {
-  vi.doMock('three/webgpu', () => {
+  vi.doMock('three/webgpu', async (importOriginal) => {
     class WebGPURenderer {
       backend = { isWebGPUBackend: true };
       info = { reset: () => {}, render: { drawCalls: 0, triangles: 0, points: 0, lines: 0 } };
@@ -78,7 +78,11 @@ function stubThreeWebGpu(): void {
       render(): void {}
       dispose(): void {}
     }
-    return { WebGPURenderer, RenderPipeline };
+    // TAA's admission-only resolve quad is a real three/webgpu export. Keep
+    // the rest of the module intact so this renderer-boundary mock does not
+    // accidentally turn a newly imported WebGPU primitive into a missing
+    // export failure.
+    return { ...(await importOriginal()), WebGPURenderer, RenderPipeline };
   });
 }
 

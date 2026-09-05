@@ -54,6 +54,7 @@ const OFF_AND_ON: Readonly<Record<string, readonly [unknown, unknown]>> = Object
   screenSpaceReflections: ['off', 'high'],
   screenSpaceGi: ['off', 'high'],
   rayTracing: ['off', 'reflections'],
+  taaResolve: [false, true],
   volumetricLightShafts: ['off', 'high'],
   depthOfField: [false, true],
   motionBlur: [0, 0.6],

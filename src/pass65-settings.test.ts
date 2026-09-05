@@ -29,7 +29,9 @@ describe('Pass 65 settings contract', () => {
     });
     expect(settings.graphics.rayTracing).toBe('reflections');
     expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({
-      renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
+      // High enables TAA, which owns the principal resolve and therefore
+      // disables the competing MSAA attachment.
+      renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 0,
       shadowMapSize: 2048, maximumAnisotropy: 8,
       ambientOcclusion: {
         quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
