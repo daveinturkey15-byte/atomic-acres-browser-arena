@@ -785,6 +785,12 @@ import {
   type SnapshotRateState,
 } from './network-sync';
 import {
+  LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M,
+  applyRemoteAuthoritativeSnapshot,
+  createRemoteAuthoritativeState,
+  reconcileLocalAuthoritativeSnapshot,
+} from './remote-snapshot-reconciliation';
+import {
   createHostTimeMapping,
   hostTimeDiagnostics,
   hostTimeToGuestMono,
@@ -1279,6 +1285,7 @@ type RemotePlayer = {
   positionHistory: CombatantPoseSample[];
   interpolation: SnapshotInterpolationBuffer<PlayerSnapshot>;
   snapshotRateHz: 20 | 30 | 40;
+  authoritativeHostTimeMs: number;
   renderedHostTimeMs: number;
   renderedWorldAgeMs: number;
   continuity: number;
@@ -5909,6 +5916,8 @@ const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
 let localContinuity = 1;
+/** Highest player-state sequence acknowledged by the host for this document. */
+let lastAcknowledgedLocalInputSeq = -1;
 let localHostConfirmedContinuity: number | null = null;
 let awaitingAuthoritativeRejoinContinuity = false;
 let awaitingCanonicalGuestAuthority = false;
@@ -9556,6 +9565,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.invulnerableUntil = 0;
   localContinuity = projection.continuity;
   localHostConfirmedContinuity = projection.continuity;
+  lastAcknowledgedLocalInputSeq = Math.max(lastAcknowledgedLocalInputSeq, canonical.seq);
   killstreakLoadoutController.reconcileActiveMatchAuthority(projection.loadout);
   gamepadSupportSelection = projection.loadout.slots[0];
   syncFieldSupportRows(projection.loadout);
@@ -12288,6 +12298,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     }],
     interpolation,
     snapshotRateHz: 40,
+    authoritativeHostTimeMs: currentHostTimeMs(),
     renderedHostTimeMs: currentHostTimeMs(),
     renderedWorldAgeMs: 0,
     continuity: 1,
@@ -13316,6 +13327,41 @@ function onNetworkMessage(message: GameMessage): void {
       return;
     }
     if (incoming.id === player.id) {
+      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) {
+        const reconciliation = reconcileLocalAuthoritativeSnapshot({
+          predicted: {
+            ...incoming,
+            x: player.position.x,
+            y: player.position.y,
+            z: player.position.z,
+            yaw: player.yaw,
+            pitch: player.pitch,
+            seq: player.seq,
+          },
+          authoritative: incoming,
+          lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq,
+        });
+        if (!reconciliation.accepted) return;
+        lastAcknowledgedLocalInputSeq = incoming.seq;
+        if (reconciliation.correction === 'snap') {
+          const authoritativeStance = incoming.stance ?? 'stand';
+          if (!characterPhysics || characterPhysics.setStance(authoritativeStance)) {
+            player.position.set(incoming.x, incoming.y, incoming.z);
+            player.velocity.set(0, 0, 0);
+            player.yaw = incoming.yaw;
+            player.pitch = incoming.pitch;
+            player.stance = authoritativeStance;
+            characterPhysics?.teleportEye(player.position);
+            localPositionHistory.length = 0;
+            recordMatchDiagnostic('state-reconciliation', 'accepted', {
+              actorId: player.id,
+              position: [incoming.x, incoming.y, incoming.z],
+              reason: 'local-authority-snap',
+              modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`],
+            });
+          }
+        }
+      }
       // A host-authored echo of the reconnecting guest is the only canonical
       // health repair available before the next damage result. Without it a
       // replacement document always resumed at 100 HP while the host retained
@@ -13441,7 +13487,20 @@ function onNetworkMessage(message: GameMessage): void {
     }
     if (network.role === 'host' && message.type === 'state'
       && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) return;
-    if (incoming.seq > remote.snapshot.seq) {
+    const snapshotAdmission = applyRemoteAuthoritativeSnapshot(
+      createRemoteAuthoritativeState({
+        snapshot: remote.snapshot,
+        continuity: remote.continuity,
+        hostTimeMs: remote.authoritativeHostTimeMs,
+      }),
+      {
+        kind: message.type,
+        snapshot: incoming,
+        continuity: message.type === 'state' ? message.continuity : remote.continuity,
+        hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs(),
+      },
+    );
+    if (snapshotAdmission.accepted) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
       const redeployed = redeployAuthorization !== undefined
@@ -13603,6 +13662,7 @@ function onNetworkMessage(message: GameMessage): void {
       if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
       remote.continuity = admittedContinuity;
+      remote.authoritativeHostTimeMs = admittedHostTimeMs;
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
         seq: admittedIncoming.seq,

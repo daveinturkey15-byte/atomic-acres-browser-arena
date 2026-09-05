@@ -65,4 +65,12 @@ describe('HF-499 replication evidence', () => {
     expect(audit).toContain('snapshotAgeMs: round(remote.snapshotAgeMs)');
     expect(audit).toContain('snapshotBuffer: remote.snapshotBuffer ?? null');
   });
+
+  it('applies continuity before the remote sequence fence and reconciles guest prediction to host authority', () => {
+    expect(main).toContain('applyRemoteAuthoritativeSnapshot(');
+    expect(main).toContain('continuity: message.type === \'state\' ? message.continuity : remote.continuity');
+    expect(main).toContain('reconcileLocalAuthoritativeSnapshot({');
+    expect(main).toContain("if (reconciliation.correction === 'snap')");
+    expect(main).toContain('lastAcknowledgedLocalInputSeq = incoming.seq;');
+  });
 });
