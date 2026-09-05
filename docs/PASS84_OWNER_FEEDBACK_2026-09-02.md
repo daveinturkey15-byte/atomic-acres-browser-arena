@@ -2340,3 +2340,5 @@ Candidate 7 (runtime ae795724, pushed 452d7aba) is served on :4300 for the owner
 - `mp-soak-red` (worktree aa-claude-soakred, branch contrib/dave-gaming-pc/claude/mp-soak-red, ports 4233-4235): the three red soak rows on candidate 7 (replication 606 divergences, rejoin damage seenByEveryoneAfter=false, stair fire) at cause; full soak table before/after. Report: docs/evidence/pass95/mp-soak-red/REPORT.md.
 
 Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled task). PASS 95 waits for the owner verdict plus green cold admission and soak.
+
+| HF-508 | 2026-09-05 06:5x | Owner: use more Claude (about 90% usage left); OpenAI at 14% so transition away from Luna entirely (running lanes finish, no new ones); keep Muse Spark 1.3 contributor; Gemini has plenty (Flash 3.8 high); Opus 4.6 via Antigravity on a separate quota. Two owner-started sessions: P-3/P-4 pickup relay, R-1 reload falsifier (both already covered by mp-audit-todos on candidate 7; flagged to owner). | Fleet shift: Claude Opus workflows for forward-ports + adversarial verification; Gemini for mechanical checks; Antigravity Opus 4.6 for a bounded lane. |
