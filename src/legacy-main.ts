@@ -35843,7 +35843,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
-    if (gameStarted) network.send(createStateMessage());
+    if (gameStarted) {
+      const teleportState = createStateMessage();
+      network.send(teleportState);
+      // The QA stair probe deliberately changes pose in one frame. Keep the
+      // normal lossy state publication, but mirror this one staging sample on
+      // the ordered state-commit lane so a simulated packet loss cannot make
+      // the host validate the shot against the pre-teleport pose.
+      if (network.role === 'client') network.sendStateCommitReliably(teleportState);
+    }
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
     resetDebugChopperExteriorReviewTracker();

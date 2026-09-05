@@ -223,6 +223,43 @@ function addReplicationDivergences(views, second) {
       }
     }
   }
+  // The host-authoritative loop above proves host -> guest presentation. Mark
+  // and sample the reverse guest-originated directions separately so the
+  // release row cannot silently report only one half of the mesh.
+  for (const from of PEERS.filter((role) => role !== 'host')) {
+    const sourceId = views[from]?.selfId;
+    const source = sourceId ? views[from]?.players?.[sourceId] : null;
+    if (!source) continue;
+    for (const to of PEERS.filter((role) => role !== from)) {
+      const target = views[to]?.players?.[sourceId] ?? null;
+      if (!target || target.self) continue;
+      bundle.replication.pairDirections[`${from}->${to}`] = true;
+      const targetPosition = target.position ?? [];
+      const sourcePosition = source.authoritativePosition ?? source.position ?? [];
+      const distanceM = distance(sourcePosition, targetPosition);
+      if (distanceM === null || distanceM <= positionBoundM) continue;
+      const age = Number(target.snapshotAgeMs);
+      const classification = Number.isFinite(age) && age > Math.max(500, 4 * MP_SOAK_THRESHOLDS.sampleIntervalMs)
+        ? 'stale-snapshot-never-applied'
+        : Number.isFinite(target.seq) && Number.isFinite(source.seq) && target.seq < source.seq
+          ? 'ordering-or-coalescing'
+          : 'authority-not-relayed';
+      bundle.replication.classificationCounts[classification] = (bundle.replication.classificationCounts[classification] ?? 0) + 1;
+      bundle.replication.divergences.push({
+        second, playerId: sourceId, peer: to, field: 'position', source: 'guest-authoritative', classification,
+        distanceM: Number(distanceM.toFixed(3)),
+        hostAuthoritativePosition: views.host?.players?.[sourceId]?.authoritativePosition ?? null,
+        guestViewPosition: targetPosition,
+        guestAuthoritativePosition: sourcePosition,
+        hostSeq: views.host?.players?.[sourceId]?.seq ?? null,
+        guestSeq: target.seq ?? null,
+        hostContinuity: views.host?.players?.[sourceId]?.continuity ?? null,
+        guestContinuity: target.continuity ?? null,
+        guestSnapshotAgeMs: target.snapshotAgeMs ?? null,
+        guestSnapshotBuffer: target.snapshotBuffer ?? null,
+      });
+    }
+  }
 }
 
 async function sampleReplication(playStart) {

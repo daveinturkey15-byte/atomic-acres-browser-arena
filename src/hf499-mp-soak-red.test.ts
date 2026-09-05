@@ -53,6 +53,8 @@ describe('HF-499 replication evidence', () => {
     expect(soak).toContain('guestSnapshotAgeMs');
     expect(soak).toContain('classificationCounts');
     expect(soak).toContain("bundle.replication.pairDirections[`host->${to}`] = true;");
+    expect(soak).toContain("bundle.replication.pairDirections[`${from}->${to}`] = true;");
+    expect(main).toContain('if (network.role === \'client\') network.sendStateCommitReliably(teleportState);');
   });
 
   it('keeps rendered and last-authoritative remote positions distinct', () => {
