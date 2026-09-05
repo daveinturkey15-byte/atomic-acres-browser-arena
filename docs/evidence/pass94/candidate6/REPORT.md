@@ -176,3 +176,34 @@ The first locator-screenshot attempt timed out waiting for the live canvas to st
 - `[OPEN]` Thin-metal-perforation was not taken because the multiplayer/static/browser gates were already red and the time box was reached.
 - `[VERIFIED]` No threshold, fence, timeout, size ceiling, or pipeline budget was widened. The 12-second WebGPU fence and zero in-combat pipeline tripwire remain unchanged.
 - `[OPEN]` No candidate6 service was installed on `:4300`; PID `1608` still serves HITL5. PASS 95 publication remains pending owner play/HITL and the new multiplayer soak gate.
+
+## Red-gate fixes
+
+`[VERIFIED]` The multiplayer remediation lanes were merged at the fetched remote heads: `mp-audit-todos` `04bed66f83a80383299edd722d2e2c9f4c910b40` (at or beyond requested `549d2d35`) and `mp-soak-gate` `19744f1a23a29757ba8a3a2eb94a8bb4e4439210`. Conflicts were resolved toward the file-owning lane. The contribution commits are `e0d445f9`, `6f6836af`, `fe504cea`, `6cd630a9`, `98d4d983`, and `11130a25`.
+
+`[VERIFIED]` Two of the three original full-Vitest failures were corrected at their causes: the gameplay contract now records the intentional HF-497 `groundStickFloor: 0.02` delta; multiplayer pickup/countdown/lobby assertions follow their merged module ownership; and the legacy-main size ratchet is satisfied by hoisting remote pickup authority/presentation helpers, leaving `src/legacy-main.ts` at exactly `37,396` lines. The relevant commits are `387b1f0d`, `0a79f340`, and `11130a25`.
+
+`[VERIFIED]` Post-fix full Vitest:
+
+```text
+Test Files  1 failed | 614 passed | 1 skipped (616)
+Tests       1 failed | 6165 passed | 2 skipped (6168)
+```
+
+`[VERIFIED]` The only remaining test failure is the isolated Pass 64 ancestry assertion in `src/pass65-release-foundation-evidence.test.ts`: `5075a52d80c6db69a97ed53acc2df5368728371a` is not an ancestor of this composite candidate history. The isolated rerun was `Test Files 1 failed (1)` and `Tests 1 failed | 2 passed (3)`. No timeout occurred in the full Vitest run, so no timeout-only rerun was applicable; the reported baseline was `3 failed, 6143 passed, 2 skipped` tests. `[OPEN]` The ancestry failure remains because fabricating ancestry or weakening the verifier would invalidate the release evidence.
+
+`[VERIFIED]` Static/build gates passed after the fixes: `npx tsc --noEmit`; `npx tsx scripts/qa/find-coplanar-pairs.ts` (`HOUSE-INTERIOR 0`, `STREET 0`, `HF-497 visible 0`, different-material findings `0`); and `npm run build` (Vite `562 modules`, warnings only for existing large chunks). The gameplay baseline check also passed.
+
+`[VERIFIED]` The original stock-flag boot timeout was reproduced as an unchanged WebGPU fence failure when the Nuke Town cold relief was removed: `queue completion exceeded 12000 ms ... fenced draws 687`. The measured correction retains Nuke Town in the evidenced cold-session precompile authority (`cfc71824`), and the final owned direct-Vite stock run passed `4/4`, including Nuketown2 and Raid2, with no console errors or pipeline repair. The 12-second fence and 120-second patience were not changed.
+
+`[OPEN]` The strict cold-admission smoke still fails on the retained relief's cost. The existing cold instrumentation measured: menu deployment prewarm `10,964.9 ms` (shared assets `10,867.9 ms`); Nuke Town transition `53,317.8 ms`; `visual-definition` `20,785.9 ms`; weapon catalog `3,076.4 ms`; batched effects `9,947.7 ms`; coverage fence `8,182.7 ms`; and combined preparation `53,834.8 ms`. Foreground cadence was also degraded (`admittedDegraded=true`, `drained=false`). Construction (`444.2 ms`), interactive world (`4.2 ms`), physics (`182.2 ms`), and bot spawn (`2,016.0 ms`) were not the dominant offender. The failure receipt is `artifacts/pass65/cold-webgpu-admission/failure-receipt.json` and the source-side corrective commits are `8c08a4cf`, `d5efca8e`, and `cfc71824`. No fence, patience, pipeline, size, or timeout bound was loosened.
+
+`[VERIFIED]` The earlier bot probe exit `124` was a stale launcher/ownership failure, not a missing-bot failure on this head. The fresh owned probe exited `0`: Nuketown2 requested/target/active `4/4/4`, first alive `99 ms`; Raid2 `2/2/2`, first alive `86 ms`; both arenas showed visible, moving bots and no page errors. Evidence is committed in `docs/evidence/pass94/bots-hitl5/probe-hitl6-fixed.json` by `4e85d2b`.
+
+`[VERIFIED]` `node scripts/qa/mp-audit.mjs --dist dist --port 4193 --peer-port 4194 --label hitl6-fixed` completed the three-peer WebGPU run with joins, arena sync, all-ready, and deployment successful. Before the merge, the report recorded `16 findings (13 high, 3 critical)` with rows `LOBBY-START-EARLY`, `PICKUP-NO-EFFECT` (2 critical), repeated `SWAP-NOT-REPLICATED`, `SWAP-THEN-FIRE-NO-EFFECT`, `REJOIN-NOT-REGISTERED`, and `RELAY-GAP`. After the merged lanes it recorded `22 findings (21 high, 1 critical)`: `DESYNC-POSITION`; `RELOAD-NOT-VISIBLE` and `RELOAD-HOST-DISAGREES` for both guests; repeated `SWAP-NOT-REPLICATED` for both guests; `SWAP-THEN-FIRE-NO-EFFECT` for both guests; `REJOIN-NOT-REGISTERED`; and `RELAY-GAP` in both directions. `[OPEN]` Audit completion is not a clean audit; the rows remain morning-report findings.
+
+`[VERIFIED]` `npm run qa:mp-soak` completed the full preserved `180,159 ms` duration with clean console (`0`) and scoreboard agreement. Passing rows were reload-after-death for both guests, respawn reset for both guests, and scoreboard agreement. `[OPEN]` The required soak rows still failing were replication (`179/180` samples, `604` divergences), rejoin damage visibility (`seenByEveryoneAfter=false`), and stair fire (`guestA=false`, `guestB=false`). These bounds were not loosened.
+
+`[OPEN]` The required repository preflight remains blocked by the repository's contradictory harness/branch validation: the literal `Codex` harness value fails lowercase-slug validation, while lowercase `codex` fails the pinned branch-name validation. No bypass or branch rewrite was used.
+
+`[VERIFIED]` All browser checks used the owned headless installed-Chrome route with native WebGPU and allowed QA ports only. No process on `:4300` was restarted or touched; PID `1608` remains the HITL5 service. No publish or deployment was performed.
