@@ -56,7 +56,7 @@
  *       continuing out of the arena, and the arena's fog is correct for it.
  *
  * Original geometry only (repo sourcePolicy): every vertex is computed here
- * from a fixed-seed mulberry32 stream — deterministic on every peer.
+ * from closed-form sine octaves of the ring angle and phase — deterministic on every peer.
  */
 import * as THREE from 'three';
 
@@ -122,15 +122,18 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
   skirt: false,
 });
 
-const SEED = 0x0a82_5c17;
 /**
- * Dusk horizon haze. Deliberately NOT the arena's fog colour: 0xb1c0be is
- * brighter than this arena's sky and hazing toward it is what inverted the
- * ridge in the first place. This is the blue-violet a sunset horizon actually
- * washes distant land toward, and it sits BELOW the measured sky luminance so
- * the far rows recede instead of glowing.
+ * Atmospheric-perspective haze, derived FROM the arena's fog colour 0xb1c0be
+ * (nuketown2-lighting/presets.ts, fog 58..148 m) rather than picked freehand.
+ * Raw fog colour cannot be used directly: v4 measured it at relative
+ * luminance 0.73 against a sunset sky of 85-95/255, so hazing toward it put
+ * a floor under the ridge ABOVE the sky (ridge/sky 2.15 in the worst band).
+ * This keeps the fog hue and scales it by 0.45 (0xb1c0be -> 0x505656), which
+ * sits below the measured sky luminance so the far rows recede instead of
+ * glowing. Distance fog tuning is untouched (RIDGE_FOG stays false, the
+ * skirt stays scene-fogged): the perspective term is baked per vertex below.
  */
-const HAZE_COLOR = new THREE.Color(0x47526f);
+const HAZE_COLOR = new THREE.Color(0x505656);
 /** Direction the arena's key light comes FROM (atomic-acres sun at -48/42/30). */
 const SUN_DIRECTION = new THREE.Vector3(-48, 42, 30).normalize();
 /** Measurement switch — see the v4 note in the file header. */
@@ -147,15 +150,19 @@ export interface NuketownMountainBackdrop {
   dispose(): void;
 }
 
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+/**
+ * Smooth per-angle variation, v5. Integer sine frequencies are 2π-periodic,
+ * so the ring closes exactly at segment === segments with no seam and no
+ * per-segment discontinuity. This replaces the v2 hash jitter, whose
+ * per-segment steps were the faceting the reference critic read as separate
+ * plates (one flat tone and one straight crest run per segment). Same range
+ * as the old jitter, none of its edges. Deterministic: pure function of
+ * angle and the ring's own phase.
+ */
+function smoothVar(angle: number, baseFreq: number, phase: number): number {
+  return 0.5 * Math.sin(angle * baseFreq + phase)
+    + 0.3 * Math.sin(angle * (2 * baseFreq + 1) + phase * 1.7)
+    + 0.2 * Math.sin(angle * (3 * baseFreq + 2) + phase * 2.3);
 }
 
 type RidgeRingSpec = Readonly<{
@@ -190,8 +197,11 @@ type RidgeRingSpec = Readonly<{
  * and saddles the way ridged FBM does, instead of the old three-row tent
  * profile that read as one soft lump from every angle. Colour is banded by
  * altitude (dry scrub foot, sage rock mid-slope, pale granite crest) with
- * per-segment tonal break-up, and the shoulders carry their own radial spur
- * jitter so spurs run down the slopes. Deterministic: same seeded stream.
+ * smooth tonal variation, and the shoulders wander off the crest line so
+ * spurs run down the slopes. Deterministic: pure function of angle and phase.
+ * v5: the per-segment hash jitter is gone (it faceted the silhouette into one
+ * flat plate per segment); segment density rises only on the two far rings
+ * whose crests form the visible silhouette (see buildNuketownMountainBackdrop).
  */
 function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   const positions: number[] = [];
@@ -215,24 +225,29 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   for (let segment = 0; segment <= spec.segments; segment += 1) {
     const wrapped = segment % spec.segments;
     const angle = (wrapped / spec.segments) * Math.PI * 2;
-    const jitterA = mulberry32((SEED ^ (wrapped * 2654435761)) >>> 0)();
-    const jitterB = mulberry32((SEED ^ ((wrapped + 977) * 40503)) >>> 0)();
-    const jitterC = mulberry32((SEED ^ ((wrapped + 4409) * 69069)) >>> 0)();
+    // v5: smooth variation, continuous in angle (see smoothVar). The old
+    // hash jitter stepped every segment, faceting both the silhouette and
+    // the tone into one flat plate per segment.
+    const varA = smoothVar(angle, 3, spec.phase) * 0.5 + 0.5;
+    const varB = smoothVar(angle, 2, spec.phase * 0.7) * 0.5 + 0.5;
+    const varC = smoothVar(angle, 4, spec.phase + 1.1) * 0.5 + 0.5;
 
     const relief = ridged(angle, spec.phase);
-    const heightT = Math.min(1, Math.max(0.08, relief * 1.15 + (jitterA - 0.5) * 0.4));
+    const heightT = Math.min(1, Math.max(0.08, relief * 1.15 + (varA - 0.5) * 0.4));
     const height = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
     const band = spec.outerRadius - spec.innerRadius;
     const crestRadius = spec.innerRadius
-      + band * (0.36 + 0.26 * ridged(angle * 0.5 + 1.3, spec.phase * 1.7) + (jitterB - 0.5) * 0.16);
-    // Spur jitter: shoulders wander off the crest line so ridgelines run
-    // DOWN the slopes instead of the slope being one straight cone face.
-    const spurIn = (jitterC - 0.5) * band * 0.18;
-    const spurOut = (0.5 - jitterC) * band * 0.14;
-    const innerShoulderR = spec.innerRadius + (crestRadius - spec.innerRadius) * 0.55 + spurIn;
-    const outerShoulderR = crestRadius + (spec.outerRadius - crestRadius) * 0.5 + spurOut;
+      + band * (0.36 + 0.26 * ridged(angle * 0.5 + 1.3, spec.phase * 1.7) + (varB - 0.5) * 0.16);
+    // Spur wander: shoulders leave the crest line so ridgelines run DOWN the
+    // slopes instead of the slope being one straight cone face. Smooth like
+    // the rest: the old per-segment spur steps read as kinks from the street.
+    const spurIn = (varC - 0.5) * band * 0.18;
+    const spurOut = (0.5 - varC) * band * 0.14;
     const innerShoulderY = height * (0.4 + 0.18 * ridged(angle * 2.1, spec.phase + 2.2));
     const outerShoulderY = height * (0.5 + 0.16 * ridged(angle * 1.7, spec.phase + 4.4));
+    const innerShoulderR = Math.min(crestRadius,
+      Math.max(spec.innerRadius, spec.innerRadius + (crestRadius - spec.innerRadius) * 0.55 + spurIn));
+    const outerShoulderR = crestRadius + (spec.outerRadius - crestRadius) * 0.5 + spurOut;
 
     const ringRows: Array<readonly [number, number, number]> = [
       [spec.innerRadius, -0.2, 0],
@@ -273,7 +288,7 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
         0.5 + 0.5 * (Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * facing), 0, 1,
       );
       const shade = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
-      const tone = (0.94 + jitterA * 0.12) * shade;
+      const tone = (0.94 + varA * 0.12) * shade;
       colors.push(vertexColor.r * tone, vertexColor.g * tone, vertexColor.b * tone);
     }
   }
@@ -423,11 +438,13 @@ export function buildNuketownMountainBackdrop(
     }),
     ridgeMaterial,
   );
-  // Main ridge: taller, further, mostly fog-graded silhouette.
+  // Main ridge: taller, further, mostly fog-graded silhouette. v5: 144 -> 168
+  // segments. Density rises here and on the far range because their crests
+  // ARE the visible silhouette; the foothills stay at 108.
   const ridge = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-ridge',
-      segments: 144,
+      segments: 168,
       innerRadius: ridgeInner,
       outerRadius: envelope.maxRadialM,
       heightMin: 13,
@@ -443,10 +460,14 @@ export function buildNuketownMountainBackdrop(
   // v3: a third, taller far range fills the gap between the main ridge's
   // saddles so the horizon reads as a layered massif instead of one band.
   // v4: it carries the heaviest haze instead of a snowline, so it recedes.
+  // v5: 120 -> 144 segments, same silhouette-only reason as the main ridge.
+  // The two far rings are the FAR parallax plane; the foothills are the NEAR
+  // plane (haze 0.34 vs 0.6/0.82), which is the two-plane layering the desert
+  // horizon reads by.
   const farRange = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-far-range',
-      segments: 120,
+      segments: 144,
       innerRadius: farRangeInner,
       outerRadius: envelope.maxRadialM,
       heightMin: 20,
