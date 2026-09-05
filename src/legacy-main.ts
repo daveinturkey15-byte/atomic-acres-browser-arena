@@ -30841,10 +30841,8 @@ const updateLobbyConfigFromUi = (): void => {
   const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
-  // HF-533/HF-534: Nuke Town hosts exactly two bots when bots are enabled.
-  // The coerced value is written back so the select never promises a count
-  // the match will not field (Nuke Town 4 -> 2); programmatic set fires no
-  // change event, so this cannot recurse into updateLobbyConfigFromUi.
+  // HF-533/HF-534: Nuke Town hosts exactly two bots when enabled; the coerced value is
+  // written back so the select never promises an unfielded count (no change event, no recursion).
   const hostedBotCount: HostedBotCount = rangeLobby ? 0 : coerceHostedBotCountForArena(arenaId, requestedBots);
   element<HTMLSelectElement>('#lobby-bots').value = rangeLobby ? '0' : String(hostedBotCount);
   // Pass 70 + HF-377: a host MAP CHANGE canonicalizes the round to THAT arena's
