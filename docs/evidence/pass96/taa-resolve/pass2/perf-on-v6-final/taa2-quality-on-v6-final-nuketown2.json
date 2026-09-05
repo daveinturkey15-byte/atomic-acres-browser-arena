@@ -1,0 +1,297 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-05T00:32:25.406Z",
+  "label": "taa2-quality-on-v6-final",
+  "arena": "nuketown2",
+  "base": "http://127.0.0.1:4220/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 4,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 6406,
+      "elapsedMs": 4006,
+      "fps": 1599.1,
+      "frameMs": {
+        "p50": 0.6,
+        "p95": 0.9,
+        "p99": 1.1,
+        "max": 8.4,
+        "mean": 0.63
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0,
+        "pipelineLabels": []
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 147757010,
+        "endBytes": 134242190,
+        "deltaMbPerMinute": -193.02
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\pass2\\perf-on-v6-final\\taa2-quality-on-v6-final-nuketown2-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 216,
+      "elapsedMs": 4035,
+      "fps": 53.5,
+      "frameMs": {
+        "p50": 18.8,
+        "p95": 32.1,
+        "p99": 33.9,
+        "max": 34.5,
+        "mean": 18.6
+      },
+      "perFrame": {
+        "draws": 208,
+        "triangles": 379406.4,
+        "instances": 11172.5,
+        "renderPasses": 25.1,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 26.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 523,
+        "shaderModulesTotal": 594,
+        "pipelineLabels": []
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 409291541,
+        "endBytes": 422069718,
+        "deltaMbPerMinute": 181.21
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          -16,
+          1.6983986282348633,
+          -24
+        ],
+        "yaw": -2.5535900500422257,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\pass2\\perf-on-v6-final\\taa2-quality-on-v6-final-nuketown2-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 241,
+      "elapsedMs": 4022,
+      "fps": 59.9,
+      "frameMs": {
+        "p50": 16.2,
+        "p95": 31.3,
+        "p99": 32.9,
+        "max": 33.5,
+        "mean": 16.62
+      },
+      "perFrame": {
+        "draws": 177,
+        "triangles": 328111.1,
+        "instances": 8570.4,
+        "renderPasses": 25.1,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 26.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 523,
+        "shaderModulesTotal": 594,
+        "pipelineLabels": []
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 407280078,
+        "endBytes": 442622833,
+        "deltaMbPerMinute": 502.8
+      },
+      "activeClipPlanes": 7,
+      "pose": {
+        "position": [
+          -3.2845258712768555,
+          1.7250000023841858,
+          -1.9552417993545532
+        ],
+        "yaw": -2.5535900500422257,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-taa\\docs\\evidence\\pass96\\taa-resolve\\pass2\\perf-on-v6-final\\taa2-quality-on-v6-final-nuketown2-move.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "performance=PERFORMANCE",
+      "balanced=BALANCED",
+      "high=QUALITY",
+      "max=MAX",
+      "custom=CUSTOM",
+      "rtx-native-runtime-info=RTX — WHAT IS IT?"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  },
+  "runtimeReceipt": {
+    "taaPrecompileReach": {
+      "resolveNodeMaterial": "pass96.taa-temporal-resolve.tsl.v1",
+      "historyCopy": "taa-history.copyTextureToTexture",
+      "velocityMrt": "scene-pass.velocity-mrt",
+      "velocityMrtMaterialVariants": [
+        "MeshBasicMaterial|nuketown-ridge-painted|v0|side=0",
+        "MeshBasicMaterial|pass66-aurora-0|v0|side=2",
+        "MeshBasicMaterial|pass66-aurora-1|v0|side=2",
+        "MeshBasicMaterial|pass66-aurora-2|v0|side=2",
+        "MeshBasicMaterial|pass66-cloud-veil-primary|v0|side=1",
+        "MeshBasicMaterial|pass66-cloud-veil-secondary|v0|side=1",
+        "MeshBasicNodeMaterial|vehicle-forge-shut-line|v0|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-car-classic|v1|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-car-saloon|v1|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-car|v1|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-coach-accent|v1|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-coach|v1|side=0",
+        "MeshPhysicalNodeMaterial|nuketown2-forge-truck-cab|v1|side=0",
+        "MeshPhysicalNodeMaterial|vehicle-forge-glass|v1|side=2",
+        "MeshStandardMaterial|MeshStandardMaterial|v1|side=0",
+        "MeshStandardMaterial|MeshStandardMaterial|v2|side=0",
+        "MeshStandardMaterial|nuketown-forest-contact-skirt|v2|side=0",
+        "MeshStandardNodeMaterial|MeshStandardNodeMaterial|v0|side=2",
+        "MeshStandardNodeMaterial|nuketown2-appliance-cabinet|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-appliance-hob-blue|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-appliance-hob-red|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-asphalt-road|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-automotive-chrome|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-block|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-car-aqua|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-car-classic-jade|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-car-saloon-navy|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-coach-glass-band|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-coach-shell|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-coach-trim|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-cold-tube-light|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-court-paint|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-drive-decal|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-drive|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-drywall-dbd1ba|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-foliage-clipped-box-hedge|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-foliage-deciduous-avenue-tree|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-garage-door|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-garage-floor-concrete|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-garden-pod-shell|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-glasshouse-frame|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-glasshouse-glazing|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-grime-crack|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-grime-oil|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-grime-tyre|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-ground-scrub|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-headlight-lens|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-house-wood-floor|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-kerb|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-lawn-decal|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-planter|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-pool-water-material|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-roof-glazing|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-roof-shingles|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-sandpit-sand|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-siding-cream|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-siding-orange-upper|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-sign|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-stepping-stones|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-taillight-lens|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-timber-fence|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-tire-rubber|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-trim-decal|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-trim|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-truck-box-ribbed|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-truck-cab|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-vehicle-glass|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-wall-grime|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-warm-ceiling-light|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-window-glass|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-yard-chrome|v0|side=0",
+        "MeshStandardNodeMaterial|nuketown2-yard-timber|v0|side=0",
+        "MeshStandardNodeMaterial|vehicle-forge-chrome|v0|side=0",
+        "MeshStandardNodeMaterial|vehicle-forge-lamp-head|v0|side=0",
+        "MeshStandardNodeMaterial|vehicle-forge-lamp-tail|v0|side=0",
+        "MeshStandardNodeMaterial|vehicle-forge-lining|v0|side=0",
+        "MeshStandardNodeMaterial|vehicle-forge-tyre|v0|side=0",
+        "PointsMaterial|pass66-galaxy-band|v0|side=0",
+        "PointsMaterial|pass66-night-stars|v0|side=0",
+        "pass64.atmosphere-dust.tsl.v1|PointsNodeMaterial|v0|side=0",
+        "pass64.atmosphere-mist.tsl.v1|PointsNodeMaterial|v0|side=0",
+        "pass64.atmosphere-smoke.tsl.v1|PointsNodeMaterial|v0|side=0",
+        "pass64.grass.tsl.v1|MeshStandardNodeMaterial|v0|side=2",
+        "pass64.sky-atmosphere.tsl.v1|NodeMaterial|v0|side=1",
+        "pass64.water.tsl.v1|MeshStandardNodeMaterial|v0|side=0"
+      ]
+    },
+    "exactScenePassPrecompile": {
+      "durationMs": 10475.8,
+      "runs": 2
+    },
+    "taaResolve": {
+      "enabled": true,
+      "strength": 0.9
+    }
+  }
+}
