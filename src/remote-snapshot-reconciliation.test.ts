@@ -4,6 +4,7 @@ import {
   applyRemoteAuthoritativeSnapshot,
   createRemoteAuthoritativeState,
   reconcileLocalAuthoritativeSnapshot,
+  shouldApplyStaleSelfHealthRepair,
 } from './remote-snapshot-reconciliation';
 
 const actor = (overrides: Partial<PlayerSnapshot> = {}): PlayerSnapshot => ({
@@ -66,5 +67,26 @@ describe('guest local authoritative reconciliation', () => {
     });
 
     expect(result).toMatchObject({ accepted: false, correction: 'ignore' });
+  });
+});
+
+describe('stale self health repair after rejoin', () => {
+  const base = { messageType: 'state', continuity: 9, localContinuity: 9, incomingHp: 80, currentHp: 100 };
+
+  it('admits a same-life HP decrease when the movement sequence is frozen', () => {
+    expect(shouldApplyStaleSelfHealthRepair(base)).toBe(true);
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, incomingHp: 0 })).toBe(true);
+  });
+
+  it('never heals, resurrects, or no-ops on a stale echo', () => {
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, incomingHp: 100 })).toBe(false);
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, incomingHp: 120 })).toBe(false);
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, incomingHp: Number.NaN })).toBe(false);
+  });
+
+  it('rejects stale-life and non-state packets even when HP decreased', () => {
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, continuity: 8 })).toBe(false);
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, messageType: 'join' })).toBe(false);
+    expect(shouldApplyStaleSelfHealthRepair({ ...base, continuity: Number.NaN })).toBe(false);
   });
 });

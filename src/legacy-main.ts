@@ -797,7 +797,7 @@ import {
   type InterpolationDelayState,
   type SnapshotRateState,
 } from './network-sync';
-import { LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M, admitRemoteSnapshot, reconcileLocalAuthoritativeSnapshot } from './remote-snapshot-reconciliation'; import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
+import { LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M, admitRemoteSnapshot, reconcileLocalAuthoritativeSnapshot, shouldApplyStaleSelfHealthRepair } from './remote-snapshot-reconciliation'; import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
 import {
   createHostTimeMapping,
   hostTimeDiagnostics,
@@ -6225,6 +6225,7 @@ const pendingGuestAuthorityRepairs = new Map<string, Readonly<{
   authorityNonce: number;
   message: GuestResumeAuthorityMessage;
 }>>();
+const rejoinLatchResendAtMs = new Map<string, number>();
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -7889,7 +7890,7 @@ function resetPrivateLobbyState(): void {
   hostDisconnectedAt.clear();
   pendingHostRecoveryJoins.clear();
   hostLobbyAdmissionInFlight.clear();
-  pendingGuestAuthorityRepairs.clear();
+  pendingGuestAuthorityRepairs.clear(); rejoinLatchResendAtMs.clear();
   hostMatchRecoveryPreparing = false;
   retainedRemoteAuthorities.clear();
   remoteCombatInventories.clear();
@@ -9080,7 +9081,7 @@ function rejectLobbyPlayer(
 function resetAuthenticatedGuestReplacement(playerId: string): void {
   const now = performance.now();
   hostKillstreakLoadoutAcks.clearActor(playerId);
-  pendingGuestAuthorityRepairs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
   clearRemoteReloadAuthority(playerId);
   const remote = remotes.get(playerId);
   if (remote) {
@@ -9206,7 +9207,7 @@ function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   // releases mutable pose authority; earlier samples must not replace the
   // retained host pose used by the resume transaction.
   remote.awaitingReplacementState = false;
-  pendingGuestAuthorityRepairs.delete(message.by);
+  pendingGuestAuthorityRepairs.delete(message.by); rejoinLatchResendAtMs.delete(message.by);
   const member = hostLobbyMembers.get(message.by);
   if (member && !member.connected) {
     // This ACK can only arrive on the current admitted event connection and is
@@ -9232,7 +9233,7 @@ function sendGuestResumeFailure(
     worldRevision: pending.worldRevision, authorityNonce: pending.nonce,
     attempt: pending.attempt, reason, nonce: randomNonce(),
   };
-  pendingGuestAuthorityRepairs.delete(pending.forPlayerId);
+  pendingGuestAuthorityRepairs.delete(pending.forPlayerId); rejoinLatchResendAtMs.delete(pending.forPlayerId);
   network.sendToPlayer(pending.forPlayerId, failure);
 }
 
@@ -9489,6 +9490,11 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
 
 function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolean {
   if (message.type !== 'guest-resume-authority') return false;
+  const appliedResume = lastAppliedGuestResumeAuthority;
+  if (appliedResume !== null && message.nonce === appliedResume.authorityNonce && message.connectionEpoch === appliedResume.connectionEpoch && message.connectionEpoch === localConnectionEpoch) {
+    const reack: GuestResumeAckMessage = { type: 'guest-resume-ack', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, connectionEpoch: localConnectionEpoch, matchEpoch: killstreakMatchEpoch, authorityNonce: message.nonce, nonce: randomNonce() };
+    network.send(reack); network.sendStateCommitReliably(createStateMessage()); return true;
+  }
   if (network.role !== 'client' || !gameStarted || !awaitingCanonicalGuestAuthority) return true;
   const admission = admitGuestResumeAuthority(message, {
     expectedHostId: privateLobbySnapshot?.hostId ?? null,
@@ -9968,7 +9974,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyTokenDigests.delete(playerId);
     pendingHostRecoveryJoins.delete(playerId);
     hostLobbyAdmissionInFlight.delete(playerId);
-    pendingGuestAuthorityRepairs.delete(playerId);
+    pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
     hostKillstreakLoadoutAcks.clearActor(playerId);
     const retained = retainedRemoteAuthorities.get(playerId);
     if (retained) {
@@ -10010,7 +10016,7 @@ function markLobbyDisconnected(playerId: string): void {
   if (!member || playerId === player.id) return;
   if (!member.connected && hostDisconnectedAt.has(playerId)) return;
   hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
-  pendingGuestAuthorityRepairs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
   hostDisconnectedAt.set(playerId, performance.now());
   broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   scheduleDisconnectedLobbyExpiry(playerId);
@@ -13339,7 +13345,7 @@ function onNetworkMessage(message: GameMessage): void {
       return;
     }
     if (incoming.id === player.id) {
-      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) { const reconciliation = reconcileLocalAuthoritativeSnapshot({ predicted: { ...incoming, x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch, seq: player.seq }, authoritative: incoming, lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq }); if (!reconciliation.accepted) { recordStateAdmissionDrop('local-reconciliation-stale-seq'); return; } lastAcknowledgedLocalInputSeq = incoming.seq; if (reconciliation.correction === 'snap' && (!characterPhysics || characterPhysics.setStance(incoming.stance ?? 'stand'))) { player.position.set(incoming.x, incoming.y, incoming.z); player.velocity.set(0, 0, 0); player.yaw = incoming.yaw; player.pitch = incoming.pitch; player.stance = incoming.stance ?? 'stand'; characterPhysics?.teleportEye(player.position); localPositionHistory.length = 0; recordMatchDiagnostic('state-reconciliation', 'accepted', { actorId: player.id, position: [incoming.x, incoming.y, incoming.z], reason: 'local-authority-snap', modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`] }); } }
+      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) { const reconciliation = reconcileLocalAuthoritativeSnapshot({ predicted: { ...incoming, x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch, seq: player.seq }, authoritative: incoming, lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq }); if (!reconciliation.accepted) { recordStateAdmissionDrop('local-reconciliation-stale-seq'); if (message.type === 'state' && shouldApplyStaleSelfHealthRepair({ messageType: message.type, continuity: message.continuity, localContinuity, incomingHp: incoming.hp, currentHp: player.hp })) { player.hp = THREE.MathUtils.clamp(incoming.hp, 0, 100); player.alive = player.hp > 0; lastDamageAt = performance.now(); if (message.combatInventory) applyLocalCombatInventoryProjection(message.combatInventory, true); weaponView.setPresentationVisible(player.alive); } return; } lastAcknowledgedLocalInputSeq = incoming.seq; if (reconciliation.correction === 'snap' && (!characterPhysics || characterPhysics.setStance(incoming.stance ?? 'stand'))) { player.position.set(incoming.x, incoming.y, incoming.z); player.velocity.set(0, 0, 0); player.yaw = incoming.yaw; player.pitch = incoming.pitch; player.stance = incoming.stance ?? 'stand'; characterPhysics?.teleportEye(player.position); localPositionHistory.length = 0; recordMatchDiagnostic('state-reconciliation', 'accepted', { actorId: player.id, position: [incoming.x, incoming.y, incoming.z], reason: 'local-authority-snap', modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`] }); } }
       // A host-authored echo of the reconnecting guest is the only canonical
       // health repair available before the next damage result. Without it a
       // replacement document always resumed at 100 HP while the host retained
@@ -13460,7 +13466,7 @@ function onNetworkMessage(message: GameMessage): void {
       }
     }
     if (network.role === 'host' && message.type === 'state'
-      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) { recordStateAdmissionDrop(remote.awaitingReplacementState ? 'rejoin-latch-awaiting-replacement' : 'rejoin-latch-pending-repair'); return; }
+      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) { recordStateAdmissionDrop(remote.awaitingReplacementState ? 'rejoin-latch-awaiting-replacement' : 'rejoin-latch-pending-repair'); const latchNowMs = performance.now(); if (latchNowMs - (rejoinLatchResendAtMs.get(incoming.id) ?? Number.NEGATIVE_INFINITY) > 1000) { rejoinLatchResendAtMs.set(incoming.id, latchNowMs); sendGuestResumeAuthority(incoming.id, remote); } return; }
     const snapshotAdmission = admitRemoteSnapshot(remote.snapshot, remote.continuity, remote.authoritativeHostTimeMs, { kind: message.type, snapshot: incoming, continuity: message.type === 'state' ? message.continuity : remote.continuity, hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs() }); if (snapshotAdmission.accepted) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);

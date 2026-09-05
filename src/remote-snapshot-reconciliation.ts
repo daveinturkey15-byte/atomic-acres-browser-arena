@@ -116,3 +116,27 @@ export function reconcileLocalAuthoritativeSnapshot(
     snapshot: input.authoritative,
   };
 }
+
+export type StaleSelfHealthRepairInput = Readonly<{
+  messageType: string;
+  continuity: number;
+  localContinuity: number;
+  incomingHp: number;
+  currentHp: number;
+}>;
+
+/**
+ * Damage-direction-only repair for a host-authored self echo whose movement
+ * sequence is stale (rejoin freeze: lastAcknowledgedLocalInputSeq pinned at
+ * the resume seq while the host damage broadcast reuses that same seq).
+ * Admits only a same-life HP decrease: never heals, never resurrects, never
+ * moves the player, never advances the input acknowledgement. Stale-life and
+ * non-state packets stay rejected; the caller keeps the movement drop counted.
+ */
+export function shouldApplyStaleSelfHealthRepair(input: StaleSelfHealthRepairInput): boolean {
+  return input.messageType === 'state'
+    && Number.isSafeInteger(input.continuity)
+    && input.continuity === input.localContinuity
+    && Number.isFinite(input.incomingHp)
+    && input.incomingHp < input.currentHp;
+}
