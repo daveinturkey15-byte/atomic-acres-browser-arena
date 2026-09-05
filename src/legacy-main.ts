@@ -30037,6 +30037,13 @@ async function performArenaSelection(
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
     syncInteractiveWorldPhysics(true);
+    // Static arena meshes must be collapsed before the first cold WebGPU warm
+    // frame. The later idempotent call remains after quality presentation so
+    // the Gun Range can attach its authored rack before that root is batched;
+    // every other arena has no later quality-owned static child dependency.
+    profileArenaTransition('presentation-batching');
+    setBootstrapStage('batching-static-meshes');
+    batchColdArenaPresentation();
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     // HF-371: the air is part of the arena. Swap it with the audio so nothing
@@ -30167,8 +30174,6 @@ async function performArenaSelection(
     setBootstrapStage('prewarming-weapon-catalog');
     profileArenaTransition('weapon-catalog-prewarm'); await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
     assertAdmission();
-    profileArenaTransition('presentation-batching');
-    setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
     arena.root.userData.staticMatricesFrozen = freezeStaticArenaMatrices(arena.root); // HF-491: batched arena is static from here on
     setArenaPresentationVisibility();
@@ -36973,6 +36978,15 @@ function batchPresentationRootOnce(root: THREE.Group, materialMode: typeof stati
   if (root.userData.pass65StaticBatchReady === true) return;
   batchStaticMeshes(root, root, () => '', materialMode);
   root.userData.pass65StaticBatchReady = true;
+}
+
+function batchColdArenaPresentation(): void {
+  // Gun Range loads five authored rack models in ensureSelectedQualityPresentation;
+  // keep its existing post-load batch boundary. All other arena roots are
+  // complete at construction, so batching them here removes their source-draw
+  // fan-out from the first cold ScenePass submission.
+  if (selectedArena.id === 'gun-range') return;
+  batchSelectedArenaPresentation();
 }
 
 function batchSelectedArenaPresentation(): void {
