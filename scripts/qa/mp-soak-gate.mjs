@@ -285,8 +285,8 @@ async function runGuestScenarios(role) {
   const guest = peers[role];
   const other = role === 'guestA' ? peers.guestB : peers.guestA;
   const host = peers.host;
-  await runScenario(role, 'pickup', () => scenarioPickup(guest, host, role));
-  await runScenario(role, 'reloadBeforeDeath', () => scenarioReload(guest, host, role));
+  await runScenario(role, 'pickup', () => scenarioPickup(guest, host, peers, role));
+  await runScenario(role, 'reloadBeforeDeath', () => scenarioReload(guest, host, peers, role));
   await runScenario(role, 'swap', () => scenarioSwap(guest, peers, role));
   await runScenario(role, 'fireAtHost', () => scenarioFire(guest, host, role, 'host'));
   await runScenario(role, 'fireAtOtherGuest', () => scenarioFire(guest, other, role, 'other-guest'));
@@ -306,7 +306,7 @@ async function runGuestScenarios(role) {
     && current.players[current.selfId].reserve > 0;
   bundle.scenarios.guests[role].respawnLoadoutReset = loadoutReset;
   bundle.scenarios.guests[role].respawnCheckpoint = summarizeScenario({ dead: dead?.players?.[dead.selfId] ?? null, after: current?.players?.[current.selfId] ?? null, result: respawn });
-  const reloadAfterDeath = await runScenario(role, 'reloadAfterDeath', () => scenarioReload(guest, host, role));
+  const reloadAfterDeath = await runScenario(role, 'reloadAfterDeath', () => scenarioReload(guest, host, peers, role, 'post-death'));
   bundle.scenarios.guests[role].reloadAfterDeath = reloadAfterDeath?.ok === true;
 }
 
