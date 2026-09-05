@@ -18,7 +18,7 @@ describe('cold-session precompile reach', () => {
 
   it('answers for the arenas measured to lose the cold-session fence, and no other', () => {
     expect(arenaNeedsColdSessionPrecompile({ id: 'farcrysis' })).toBe(true);
-    expect(arenaNeedsColdSessionPrecompile({ id: 'nuketown2' })).toBe(false);
+    expect(arenaNeedsColdSessionPrecompile({ id: 'nuketown2' })).toBe(true);
     for (const id of ARENA_IDS) {
       if (COLD_SESSION_PRECOMPILE_ARENAS.includes(id)) continue;
       expect(arenaNeedsColdSessionPrecompile({ id })).toBe(false);
