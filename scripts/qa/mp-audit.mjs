@@ -63,6 +63,9 @@ const LABEL = arg('--label', 'baseline');
 const LATENCY = flag('--latency');
 const EVENT_DELAY_MS = Number(arg('--event-delay-ms', LATENCY ? '50' : '0'));
 const EVENT_JITTER_MS = Number(arg('--event-jitter-ms', LATENCY ? '20' : '0'));
+const QA_RTT_MS = Number(arg('--qa-rtt-ms', '0'));
+const QA_LOSS_PCT = Number(arg('--qa-loss-pct', '0'));
+const QA_SEED = arg('--qa-seed', `mp-audit-${LABEL}`);
 const DIFF_SECONDS = Math.max(4, Number(arg('--diff-seconds', '12')));
 
 const BOOT_TIMEOUT_MS = 180_000;
@@ -173,22 +176,30 @@ function chromeArgs() {
   ];
 }
 
-function pageUrl(role, arenaId) {
-  const url = new URL(`http://127.0.0.1:${PORT}/`);
+function pageUrl(role, arenaId, options = {}) {
+  const port = options.port ?? PORT;
+  const peerPort = options.peerPort ?? PEER_PORT;
+  const rttMs = options.qaRttMs ?? QA_RTT_MS;
+  const lossPct = options.qaLossPct ?? QA_LOSS_PCT;
+  const seed = options.qaSeed ?? QA_SEED;
+  const url = new URL(`http://127.0.0.1:${port}/`);
   url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', RENDERER);
   url.searchParams.set('render', RENDER_PROFILE);
   url.searchParams.set('multiplayerQa', '1');
   url.searchParams.set('qaTrace', '1');
-  url.searchParams.set('peerQaPort', String(PEER_PORT));
+  url.searchParams.set('peerQaPort', String(peerPort));
   url.searchParams.set('peerQaPath', '/peerjs');
   if (EVENT_DELAY_MS > 0) url.searchParams.set('eventDelayQaMs', String(EVENT_DELAY_MS));
   if (EVENT_JITTER_MS > 0) url.searchParams.set('eventJitterQaMs', String(EVENT_JITTER_MS));
-  url.searchParams.set('seed', `mp-audit-${arenaId}-${role}`);
+  if (rttMs > 0) url.searchParams.set('qaRttMs', String(rttMs));
+  if (lossPct > 0) url.searchParams.set('qaLossPct', String(lossPct));
+  if (rttMs > 0 || lossPct > 0) url.searchParams.set('qaSeed', seed);
+  url.searchParams.set('seed', options.seed ?? `mp-audit-${arenaId}-${role}`);
   return url.toString();
 }
 
-async function openPeer(browser, role, arenaId, name) {
+async function openPeer(browser, role, arenaId, name, options = {}) {
   // Fresh context per peer: a saved room code or sticky renderer-fallback record
   // in storage means the second guest is not a fresh join.
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
@@ -203,7 +214,7 @@ async function openPeer(browser, role, arenaId, name) {
   // Headless documents never own the foreground and the renderer refuses to
   // present without it (browserOwnsForegroundPresentation).
   await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
-  await page.goto(pageUrl(role, arenaId), { waitUntil: 'domcontentloaded', timeout: BOOT_TIMEOUT_MS });
+  await page.goto(pageUrl(role, arenaId, options), { waitUntil: 'domcontentloaded', timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true, undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(
@@ -299,7 +310,7 @@ const viewOf = (page) => page.evaluate(() => {
 const traceOf = (page) => page.evaluate(() => {
   const trace = window.__ATOMIC_ACRES_DEBUG__?.sampleMessageTrace?.();
   if (!trace) return { enabled: false, entries: [], recorded: 0, dropped: 0 };
-  return { enabled: trace.enabled, recorded: trace.recorded, dropped: trace.dropped, entries: trace.entries };
+  return trace;
 });
 
 /** Message types seen since a mark, in order - the ack evidence for a request. */
@@ -335,7 +346,7 @@ async function main() {
     arena: arena.id,
     renderer: RENDERER,
     renderProfile: RENDER_PROFILE,
-    impairment: { eventDelayMs: EVENT_DELAY_MS, eventJitterMs: EVENT_JITTER_MS, ackBudgetMs: ACK_BUDGET_MS },
+    impairment: { eventDelayMs: EVENT_DELAY_MS, eventJitterMs: EVENT_JITTER_MS, qaRttMs: QA_RTT_MS, qaLossPct: QA_LOSS_PCT, qaSeed: QA_SEED, ackBudgetMs: ACK_BUDGET_MS },
     ports: { dist: PORT, peer: PEER_PORT },
     flow: [],
     scenarios: {},
@@ -1224,29 +1235,32 @@ async function scenarioScoreboard(guest, host, role) {
 
 /** Leave and rejoin: the guest closes its session and joins the same room
  *  again, then must be replicated in BOTH directions to BOTH other peers. */
-async function scenarioRejoin(peers, report) {
+async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
   const result = { ok: false };
-  const { host, guestA, guestB } = peers;
+  const { host } = peers;
+  const guest = peers[rejoinRole];
+  const observers = PEERS.filter((role) => role !== rejoinRole);
   const roomCode = (await host.page.textContent('#room-code'))?.trim() ?? '';
   result.roomCode = roomCode.length;
-  const beforeId = (await viewOf(guestA.page)).selfId;
+  result.role = rejoinRole;
+  const beforeId = (await viewOf(guest.page)).selfId;
   result.identityBefore = beforeId;
 
-  await guestA.page.evaluate(() => {
+  await guest.page.evaluate(() => {
     const leave = document.querySelector('#lobby-leave');
     if (leave) leave.click();
   });
   await sleep(2_000);
   const afterLeave = {};
-  for (const role of ['host', 'guestB']) afterLeave[role] = (await viewOf(peers[role].page).catch(() => null))?.remotes ?? null;
+  for (const role of observers) afterLeave[role] = (await viewOf(peers[role].page).catch(() => null))?.remotes ?? null;
   result.remotesAfterLeave = afterLeave;
 
   // Rejoin through the real menu.
-  await guestA.page.evaluate(() => {
+  await guest.page.evaluate(() => {
     const menu = document.querySelector('#menu');
     if (menu) menu.classList.remove('hidden');
   }).catch(() => {});
-  const rejoined = await guestA.page.evaluate(async (code) => {
+  const rejoined = await guest.page.evaluate(async (code) => {
     const input = document.querySelector('#room-input');
     const join = document.querySelector('#join');
     if (!input || !join) return { ok: false, reason: 'join controls absent after leaving' };
@@ -1263,20 +1277,21 @@ async function scenarioRejoin(peers, report) {
     return result;
   }
 
-  const settled = await Promise.allSettled(['host', 'guestA', 'guestB'].map((role) => peers[role].page.waitForFunction(
+  const settledRoles = [rejoinRole, ...observers];
+  const settled = await Promise.allSettled(settledRoles.map((role) => peers[role].page.waitForFunction(
     () => (window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? []).filter((member) => member.connected).length === 3,
     undefined,
     { timeout: JOIN_TIMEOUT_MS },
   )));
-  result.rosterAfterRejoin = Object.fromEntries(['host', 'guestA', 'guestB'].map((role, index) => [role, settled[index].status]));
-  const missing = ['host', 'guestA', 'guestB'].filter((role, index) => settled[index].status === 'rejected');
+  result.rosterAfterRejoin = Object.fromEntries(settledRoles.map((role, index) => [role, settled[index].status]));
+  const missing = settledRoles.filter((role, index) => settled[index].status === 'rejected');
   if (missing.length > 0) {
     record('REJOIN-NOT-REGISTERED', 'critical', 'after a rejoin, a peer never saw the full roster again',
       { missing, rosterAfterRejoin: result.rosterAfterRejoin });
     return result;
   }
 
-  const afterId = (await viewOf(guestA.page)).selfId;
+  const afterId = (await viewOf(guest.page)).selfId;
   result.identityAfter = afterId;
   // Two-way replication after a rejoin: the rejoined guest must see the others
   // AND the others must see it.
@@ -1343,7 +1358,31 @@ function printSummary(report) {
   console.log(`artifact: ${join(OUT_DIR, `${report.label}-audit.json`)}`);
 }
 
-main().then((code) => process.exit(code)).catch((error) => {
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) main().then((code) => process.exit(code)).catch((error) => {
   console.error(error);
   process.exit(1);
 });
+
+export {
+  ACK_BUDGET_MS,
+  PEERS,
+  chromeArgs,
+  markOf,
+  multiplayerArenaRoster,
+  openPeer,
+  serveDist,
+  sleep,
+  startPeerServer,
+  traceOf,
+  traceSince,
+  viewOf,
+  scenarioFire,
+  scenarioPickup,
+  scenarioReload,
+  scenarioDamageDeath,
+  scenarioRejoin,
+  scenarioRespawn,
+  scenarioScoreboard,
+  scenarioSwap,
+};

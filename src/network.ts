@@ -74,6 +74,9 @@ type NetworkDiagnostics = Record<string, unknown> & {
   lobbyClosedFarewells: number;
   qaEventDelayMs: number;
   qaEventJitterMs: number;
+  qaNetworkRttMs: number;
+  qaNetworkLossPct: number;
+  qaNetworkSeed: string | null;
 };
 
 export type QaTracedMessage = Readonly<{
@@ -93,6 +96,9 @@ export type QaMessageTrace = Readonly<{
   entries: readonly QaTracedMessage[];
   recorded: number;
   dropped: number;
+  impairedSends: number;
+  impairedDrops: number;
+  impairment: Readonly<{ rttMs: number; lossPct: number; seed: string | null }>;
 }>;
 
 const QA_TRACE_CAPACITY = 6_000;
@@ -232,13 +238,26 @@ function createArenaPeer(preferredId?: string): Peer {
   return preferredId ? new Peer(preferredId) : new Peer();
 }
 
-function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
+function qaNetworkImpairment(): Readonly<{ delayMs: number; jitterMs: number; rttMs: number; lossPct: number; seed: string | null }> {
   const params = new URLSearchParams(window.location.search);
   const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
-  if (!localQa) return { delayMs: 0, jitterMs: 0 };
+  if (!localQa) return { delayMs: 0, jitterMs: 0, rttMs: 0, lossPct: 0, seed: null };
+  const rttMs = Math.max(0, Math.min(500, Number(params.get('qaRttMs')) || 0));
   const delayMs = Math.max(0, Math.min(250, Number(params.get('eventDelayQaMs')) || 0));
   const jitterMs = Math.max(0, Math.min(100, Number(params.get('eventJitterQaMs')) || 0));
-  return { delayMs, jitterMs };
+  const lossPct = Math.max(0, Math.min(100, Number(params.get('qaLossPct')) || 0));
+  const seed = params.get('qaSeed')?.slice(0, 120) || null;
+  return { delayMs: rttMs > 0 ? rttMs / 2 : delayMs, jitterMs: rttMs > 0 ? 0 : jitterMs, rttMs, lossPct, seed };
+}
+
+function qaLossSample(seed: string, sequence: number): number {
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < seed.length; index += 1) hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619) >>> 0;
+  let value = (hash + Math.imul(sequence + 1, 0x9e3779b9)) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x85ebca6b) >>> 0;
+  value ^= value >>> 13;
+  return (value >>> 0) / 0x1_0000_0000;
 }
 
 /**
@@ -463,6 +482,8 @@ export class ArenaNetwork {
   private readonly qaTrace: QaTracedMessage[] | null = qaMessageTraceEnabled() ? [] : null;
   private qaTraceRecorded = 0;
   private qaTraceDropped = 0;
+  private qaImpairedSends = 0;
+  private qaImpairedDrops = 0;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
   private connectionAttemptSequence = 0;
@@ -949,16 +970,20 @@ export class ArenaNetwork {
   /** HF-504: read-only trace for `scripts/qa/mp-audit.mjs`. Empty unless the
    * QA trace fence is open. */
   qaMessageTrace(): QaMessageTrace {
+    const impairment = qaNetworkImpairment();
     return {
       enabled: this.qaTrace !== null,
       entries: this.qaTrace ? [...this.qaTrace] : [],
       recorded: this.qaTraceRecorded,
       dropped: this.qaTraceDropped,
+      impairedSends: this.qaImpairedSends,
+      impairedDrops: this.qaImpairedDrops,
+      impairment: { rttMs: impairment.rttMs, lossPct: impairment.lossPct, seed: impairment.seed },
     };
   }
 
   diagnostics(): NetworkDiagnostics {
-    const qaImpairment = qaEventImpairment();
+    const qaImpairment = qaNetworkImpairment();
     const eventChannels = this.role === 'host'
       ? [...this.guestBundles.values()].filter((bundle) => bundle.events.open).length
       : Number(this.hostEventConnection?.open ?? false);
@@ -1018,6 +1043,9 @@ export class ArenaNetwork {
       pendingLobbyReset: this.pendingLobbyResetTimer !== null,
       qaEventDelayMs: qaImpairment.delayMs,
       qaEventJitterMs: qaImpairment.jitterMs,
+      qaNetworkRttMs: qaImpairment.rttMs,
+      qaNetworkLossPct: qaImpairment.lossPct,
+      qaNetworkSeed: qaImpairment.seed,
     };
   }
 
@@ -1625,19 +1653,28 @@ export class ArenaNetwork {
 
   private transmit(connection: DataConnection, message: GameMessage, stateTraffic: boolean): void {
     this.recordQaTrace('out', message, stateTraffic ? 'state' : 'events');
-    const impairment = qaEventImpairment();
-    if (stateTraffic || impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
-      connection.send(message);
+    const impairment = qaNetworkImpairment();
+    const sequence = this.qaEventSendSequence;
+    this.qaEventSendSequence += 1;
+    const shouldDrop = impairment.lossPct > 0 && impairment.seed !== null
+      && qaLossSample(impairment.seed, sequence) < impairment.lossPct / 100;
+    if (impairment.lossPct > 0 || impairment.delayMs > 0 || impairment.jitterMs > 0) this.qaImpairedSends += 1;
+    const send = () => {
+      if (shouldDrop) {
+        this.qaImpairedDrops += 1;
+        return;
+      }
+      if (connection.open) connection.send(message);
+    };
+    if (impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
+      send();
       return;
     }
     const phase = (this.qaEventSendSequence % 5) - 2;
-    this.qaEventSendSequence += 1;
     const requestedDue = performance.now() + impairment.delayMs + phase * impairment.jitterMs / 2;
     const due = Math.max(requestedDue, (this.qaEventLastDue.get(connection) ?? 0) + 0.1);
     this.qaEventLastDue.set(connection, due);
-    window.setTimeout(() => {
-      if (connection.open) connection.send(message);
-    }, Math.max(0, due - performance.now()));
+    window.setTimeout(send, Math.max(0, due - performance.now()));
   }
 
   private reportNetworkIssue(source: string, error: unknown, fallbackMessage: string): void {

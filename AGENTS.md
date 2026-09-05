@@ -87,6 +87,20 @@ machine. The five that cause the most damage when ignored:
 - The first successful receipt plus cache-busted live smoke is terminal for that release task. Report success immediately; route non-blocking hygiene to a later PR instead of silently extending the release.
 - Do not run synchronous or duplicate `gh run watch` processes from an agent turn. Use one-shot status reads, report material state changes, and keep waits bounded.
 
+## Pass 95 required gate list
+
+- **REQUIRED before any Pass 95 publish:** from the candidate checkout, set
+  `PASS73_NATIVE_WEBGPU=1` and run `npm run qa:mp-soak`. This is the three-peer,
+  three-minute, headless installed-Chrome soak on ports 4227-4228 with seeded 120 ms
+  RTT and 1% packet loss. It must complete with exit code 0 and a passing table in
+  `artifacts/qa/mp-soak-gate/`; any failed row is a release-blocking finding.
+- The gate must retain its 1.5 m position bound, one-RTT damage bound, no-console-error
+  assertion, and final scoreboard agreement. Do not replace it with a shorter smoke,
+  a two-peer run, a headed browser, or a rerun with weaker thresholds.
+- The gate's own browser-free logic is covered by
+  `npm run qa:mp-soak:contract`; the real soak remains required even when that unit
+  test is green.
+
 ## Durable gotcha
 
 **Symptom -> Cause -> Correction -> Verify:** several agents report successful work but production is stale or contradictory -> local worktrees, PR merges, Pages pushes, and release metadata were treated as interchangeable state -> use PRs as the contribution ledger and the single serialized production workflow as the only publisher -> confirm exact `main` SHA, successful required checks, workflow receipt, Pages SHA, release-button timestamp, and live browser logs.
