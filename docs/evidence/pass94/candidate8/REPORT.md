@@ -294,3 +294,98 @@ either; the 14/14 tests pass against the pins.
 `[OPEN]` **F3 carried forward:** Nuke Town has no cold-session art-ready signal, so the
 cold smoke's art assertions cover the other subjects but not the arena the owner cares most
 about.
+
+---
+
+## 8. `qa:mp-soak` - run after the swap, ports 4233-4235
+
+`[MEASURED]` three real peers, 183,726 ms of scripted play. Full log:
+`mp-soak.txt`; bundle `artifacts/qa/mp-soak-gate/hf499-bundle.json`.
+**Five of eight rows PASS; three FAIL. No bound was loosened to get here.**
+
+| ID | Requirement | Result | Evidence | vs candidate 7 |
+| --- | --- | --- | --- | --- |
+| MP-SOAK-DURATION | scripted play lasts at least three minutes | **PASS** | `durationMs 183,726` / required 180,000 | same |
+| MP-SOAK-REPLICATION | all directed peer pairs replicate every one-second sample within 1.5 m | **FAIL** | `samples 179 / 180`, **`divergences 100`**, `missingDirections []`, bound 1.5 m | **606 -> 100 divergences, a 6.1x improvement**, and no direction is missing entirely any more |
+| MP-SOAK-REJOIN-DAMAGE | guest B leaves/rejoins and damage is observed by everyone within one 120 ms RTT | **FAIL** | `leaveObserved true`, `rejoinObserved true`, **`seenByEveryoneAfter TRUE`**, `damageTriggered true`, `damageLatencyMs null` | **the owner's actual complaint is fixed** - `seenByEveryoneAfter` was `false` on candidate 7 and is now `true`. The row fails only because `damageLatencyMs` came back `null`, i.e. the latency was never measured, so the "within one RTT" half is unproven |
+| MP-SOAK-RELOAD-AFTER-DEATH | both guests complete a reload after a death | **PASS** | `guestA true, guestB true` | same |
+| MP-SOAK-RESPAWN-RESET | respawn restores the authored loadout and usable ammo | **PASS** | `guestA true, guestB true` | same |
+| MP-SOAK-STAIR-FIRE | both guests fire successfully while staged on a house stair | **FAIL** | `guestA false, guestB false` | unchanged - still red |
+| MP-SOAK-CONSOLE-CLEAN | the three peers emit no page or console errors | **PASS** | `total 0` across host, guestA, guestB | same |
+| MP-SOAK-SCOREBOARD | all three peers agree on the final scoreboard | **PASS** | `agreement true`, all three peers present | same |
+
+`[MEASURED]` **40 findings: 6 critical, 34 high.** These are findings for the owner, not a
+reason to loosen anything:
+
+| Finding | Count | What it means |
+| --- | --- | --- |
+| `SWAP-NOT-REPLICATED-<peer>-to-<peer>` | 32 (high) | **A weapon swap never reached another peer.** Every direction is affected (guestA->host, guestA->guestB, guestB->host, guestB->guestA). |
+| `SWAP-NO-EFFECT-guestB` | 2 (high) | Switching weapon slots never changed the held weapon locally either. |
+| `FIRE-REFUSED-<guest>-other-guest` | 4 (critical) | A guest pulled the trigger and nothing was spent. |
+| `RELOAD-NO-EFFECT-<peer>` | 2 (critical) | A reload did not change the magazine. |
+
+`[OPEN]` **Weapon swap replication is the biggest live multiplayer defect in candidate 8**
+and it maps straight onto the owner's HF-504 sentence ("cannot reload or pick up guns").
+It is not what `mp-soak-red` round 2 was aimed at - round 2 targeted the replication,
+rejoin-damage and stair-fire rows, and it moved two of those three a long way. Weapon swap
+should be the next multiplayer lane.
+
+`[OPEN]` **Stair fire is still false for both guests** after round 2's probe hardening.
+
+`[OPEN]` **`damageLatencyMs` is `null`.** Rejoin damage is now seen by everyone, but the
+gate cannot prove it arrives within one 120 ms RTT because the latency is not being
+recorded. That is an instrument gap, and it is what keeps a row red that has otherwise
+been fixed - worth closing before anyone reads this row as "still broken".
+
+---
+
+## 9. `node scripts/qa/mp-audit.mjs` - run after the swap
+
+`[MEASURED]` **20 findings, all `high`, 0 critical.** Full log `mp-audit.txt`; artifact
+`artifacts/qa/mp-audit/baseline-audit.json`. `state-diff divergences by field: {}` - empty.
+
+| Finding | Count | What it means |
+| --- | --- | --- |
+| `SWAP-NOT-REPLICATED-<peer>-to-<peer>` | 16 | A weapon swap never reached another peer. Same defect the soak found, in every direction. |
+| `RELOAD-NOT-VISIBLE-<guest>-{pre-respawn,post-death,post-respawn}` | 12 | The other guest did not observe the host-authored reload state. |
+| `SWAP-THEN-FIRE-NO-EFFECT-<guest>` | 4 | A fast weapon did not fire after switching from a slow one. |
+| `RELOAD-HOST-DISAGREES-<guest>` | 4 | The host's replica of the guest carries different ammo after a reload. |
+| `RELAY-GAP-<guest>-to-<guest>` | 4 | The host received a guest message type it never relayed to the other guest. |
+
+`[MEASURED]` **Killstreak awareness (HF-509 #6): `ok=false`, `activated=true`,
+`damageObserved=true`** - and the detail is much better than that headline reads:
+
+| Peer | announced | relayed by guest | banner | replicated | phase agreement | damage source |
+| --- | --- | --- | --- | --- | --- | --- |
+| guestA | true | **false** (correct - guests must never relay) | true | true | inbound/inbound, inbound/orbiting, orbiting/orbiting; 0.48 / 0.51 / 0.31 m from the host's position | `CHOPPER GUNNER@[11.95, 17.56, -13.34]` |
+| guestB | true | **false** | true | true | orbiting/orbiting x3; 0.67 / 0.36 / 0.35 m | **`null`** |
+
+So on both peers the announcement lands, the banner shows, the entity replicates and the
+phase tracks the host to within 0.7 m. The row fails on one thing: **guestB never received
+a damage-source label.** That is the owner's headline requirement for item #6 ("clear
+source when shot by the chopper") half-working, and it is the next thing to fix on that
+lane - the fix round is in any case still awaiting re-verification.
+
+`[OPEN]` **Weapon swap and reload replication is now confirmed by two independent gates**
+(the soak and this audit) across every peer direction. Together with the `RELAY-GAP`
+findings - the host receiving a guest message type it never relays - this looks like one
+missing relay path rather than four separate bugs. It maps directly onto HF-504's
+"cannot reload or pick up guns" and should be the next multiplayer lane.
+
+---
+
+## 10. Gates that did not fit the time box
+
+`[OPEN]` `npm run qa:hitches` (frame-hitch attributor), the 12 authored Nuke Town stations
+plus Raid 2 and Skyline captures, and the Muse blind A/B of candidate 7 vs 8 were **not
+run**. The 100-minute box went on the merge set, four rounds of coordinator corrections
+(two of which changed the merge set after it had been built), three integration repairs and
+the two-hour-equivalent browser gates. None of them blocks the owner's HITL; all three are
+needed before PASS 95 is judged.
+
+Note for whoever picks them up: the attributor `scripts/qa/frame-hitch-attributor.mjs` has
+four verifier-recorded instrument defects - undisclosed `--enable-unsafe-webgpu` /
+`--ignore-gpu-blocklist` / `--disable-gpu-vsync` flags, a `PASS73_NATIVE_WEBGPU` claim the
+script never reads, missing GC trace categories, and residual bucketing that makes the
+published table sum to 430.8 of 718.6 ms. **Fix the instrument before trusting its
+numbers.**
