@@ -27,6 +27,7 @@
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 import sharp from 'sharp';
+import { pinnedDaylightArenaIds } from './arena-roster.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -40,7 +41,11 @@ const OUT = resolve(process.cwd(), arg('--out', 'docs/evidence/pass87/dynamic-li
  *  reader should be able to look at. Reported in the same points the safety
  *  threshold uses; it selects frames and gates nothing. */
 const MOVED_POINTS = Number(arg('--moved-points', '1'));
-const PINNED = new Set(['gun-range', 'map3', 'nuketown2', 'raid2']);
+/** The arenas `ARENA_DAYLIGHT_PROFILES` pins, so a "pinned late" frame really
+ *  is the null case. Derived rather than written out (gate audit F4): promoting
+ *  an arena out of PREVIEW must not leave this publish step still treating it as
+ *  a fixed reference. */
+const PINNED = new Set(pinnedDaylightArenaIds());
 
 const report = JSON.parse(readFileSync(REPORT, 'utf8'));
 mkdirSync(OUT, { recursive: true });
