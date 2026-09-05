@@ -56,6 +56,6 @@
 
 ## Handoff
 
-- [VERIFIED] HEAD: `f0a126b6bd6567e7c1636d834249f4e3bdea7a50`.
+- [VERIFIED] HEAD: `bc439298dc323043e405b3469e779400824c5cdf`.
 - [VERIFIED] Remote branch is tracking `origin/contrib/dave-gaming-pc/claude/mp-swap-reload-relay`.
 - [OPEN] A permitted three-peer browser audit remains required to convert the source/unit evidence into live SWAP, RELOAD, RELAY-GAP, killstreak-label, and rejoin-latency evidence.
