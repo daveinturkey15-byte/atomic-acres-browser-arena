@@ -340,7 +340,7 @@ async function main() {
     flow: [],
     scenarios: {},
     rowMeasures: {},
-    stateDiff: { samples: [], divergences: [] },
+    stateDiff: { samples: [], divergences: [], samplesCompared: 0 },
     trace: {},
     findings,
     completed: false,
@@ -554,8 +554,16 @@ async function runLobby(peers, arena, report, step) {
   measure('L-9', 'telemetry-does-not-advance-revision', steadyRevision !== null && telemetryRevision === steadyRevision, { result: lobby.telemetryRevision });
   step('all-ready');
 
-  const allReadyStartEnabled = await host.page.evaluate(() => document.querySelector('#lobby-start')?.disabled === false);
-  measure('L-3', 'all-ready-start-enabled', allReadyStartEnabled, { result: partial });
+  const allReadyStart = await host.page.evaluate(() => {
+    const members = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [];
+    return {
+      startDisabled: document.querySelector('#lobby-start')?.disabled ?? null,
+      ready: members.filter((member) => member.ready).length,
+      members: members.length,
+    };
+  });
+  const allReadyStartEnabled = allReadyStart.startDisabled === false;
+  measure('L-3', 'all-ready-start-enabled', allReadyStartEnabled, { result: allReadyStart });
   await host.page.click('#lobby-start');
   await sleep(250);
   const countdownTitles = Object.fromEntries(await Promise.all(PEERS.map(async (role) => [
@@ -597,6 +605,7 @@ async function runStateDiff(peers, report, step) {
     const hostView = views.host;
     if (!hostView) { await sleep(1_000); continue; }
     const sample = { second, players: {} };
+    let sampleCompared = false;
     for (const [playerId, hostPlayer] of Object.entries(hostView.players)) {
       const row = { host: hostPlayer };
       for (const role of ['guestA', 'guestB']) {
@@ -610,6 +619,7 @@ async function runStateDiff(peers, report, step) {
         // admission. The object may exist from the join envelope, but its
         // seed pose is deliberately withheld from presentation.
         if (guestPlayer.authoritativeReady === false) continue;
+        sampleCompared = true;
         for (const field of FIELDS) {
           // A guest's view of a REMOTE carries no kills/deaths (they are not in
           // the replicated snapshot), so only compare what the peer actually
@@ -637,6 +647,7 @@ async function runStateDiff(peers, report, step) {
       sample.players[playerId] = row;
     }
     report.stateDiff.samples.push(sample);
+    if (sampleCompared) report.stateDiff.samplesCompared += 1;
     await sleep(1_000);
   }
   const byField = {};
@@ -650,8 +661,13 @@ async function runStateDiff(peers, report, step) {
   if (Object.keys(byField).length === 0) step('state-diff-clean');
   report.rowMeasures['X-2'] = [{
     case: 'post-deploy-state-diff',
-    ok: !report.stateDiff.divergences.some((divergence) => divergence.field === 'position'),
-    result: { divergencesByField: byField, samples: report.stateDiff.samples.length },
+    ok: report.stateDiff.samplesCompared > 0
+      && !report.stateDiff.divergences.some((divergence) => divergence.field === 'position'),
+    result: {
+      divergencesByField: byField,
+      samples: report.stateDiff.samples.length,
+      samplesCompared: report.stateDiff.samplesCompared,
+    },
   }];
 }
 
@@ -939,7 +955,11 @@ async function scenarioReload(guest, host, peers, role, phase = 'pre-respawn') {
     record(`RELOAD-HOST-DISAGREES-${role}`, 'high', "the host's replica of the guest carries different ammo after a reload",
       { guestAmmo: result.ammoAfter, hostSeesAmmo: result.hostSeesAmmo });
   }
-  result.ok = result.ammoAfter > result.ammoBefore;
+  result.ok = result.ammoAfter > result.ammoBefore
+    && result.sentIntent
+    && result.gotResult
+    && result.otherSeesReloading === true
+    && result.hostSeesAmmo === result.ammoAfter;
   return result;
 }
 
@@ -1200,6 +1220,8 @@ async function scenarioRejoin(peers, report) {
 
 // --- trace-level audit ------------------------------------------------------
 async function auditTrace(report) {
+  const HOST_ARBITRATED_GUEST_TYPES = new Set(['pickup', 'reload-intent', 'shot-request']);
+  const PRESENTATION_GUEST_TYPES = new Set(['trigger-state']);
   const summary = {};
   for (const role of PEERS) {
     const trace = report.trace[role];
@@ -1225,8 +1247,9 @@ async function auditTrace(report) {
     const sent = new Set(Object.keys(summary[from]?.byType ?? {}).filter((key) => key.startsWith('out:')).map((key) => key.slice(4)));
     const received = new Set(Object.keys(summary[to]?.byType ?? {}).filter((key) => key.startsWith('in:')).map((key) => key.slice(3)));
     const hostReceived = new Set(Object.keys(summary.host?.byType ?? {}).filter((key) => key.startsWith('in:')).map((key) => key.slice(3)));
-    const notRelayed = [...sent].filter((type) => hostReceived.has(type) && !received.has(type));
-    relayed[`${from}->${to}`] = { sent: [...sent], notRelayed };
+    const notRelayed = [...sent].filter((type) => PRESENTATION_GUEST_TYPES.has(type) && hostReceived.has(type) && !received.has(type));
+    const hostArbitrated = [...sent].filter((type) => HOST_ARBITRATED_GUEST_TYPES.has(type) && hostReceived.has(type) && !received.has(type));
+    relayed[`${from}->${to}`] = { sent: [...sent], notRelayed, hostArbitrated };
     if (notRelayed.length > 0) {
       record(`RELAY-GAP-${from}-to-${to}`, 'high', 'the host received a guest message type it never relayed to the other guest',
         { notRelayed, from, to });
