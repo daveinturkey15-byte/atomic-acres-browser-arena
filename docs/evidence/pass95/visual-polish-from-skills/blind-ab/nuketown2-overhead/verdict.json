@@ -1,0 +1,67 @@
+{
+  "station": "nuketown2-overhead",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.97,
+  "probes": {
+    "left": {
+      "expected": "MHXE",
+      "answered": "MHXE"
+    },
+    "right": {
+      "expected": "CKNH",
+      "answered": "CKNH"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "1ee079ecac28031e6d20af821598eb2a2274c6de28acda55a92877b3cc826240",
+      "shownSha256": "4bbe0223dce79348e9f3541278f1c10e4e64d0e394bc60ed3ad7628eff1a51b7",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "adf7abde1b4d09309d1ceee0c35e6839c8b8c921702aa4fb40c93cb2368138f9",
+      "shownSha256": "ed9fb07852f043d2ae640b5971a27fd4caf02d8202c25af5c99d5d6457c636e3",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both renders match the overhead references (r0c0 through r2c2) identically in structure, proportion, material read and value relationships with no discernible scene-pixel difference in any grid cell.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c2",
+    "what": "probe-box text differs (MHXE vs CKNH) while all scene pixels are identical"
+  },
+  "elapsedMs": 47220,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

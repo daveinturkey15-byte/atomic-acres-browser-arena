@@ -1,0 +1,72 @@
+{
+  "station": "nuketown2-north-yard",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.96,
+  "probes": {
+    "left": {
+      "expected": "JMAC",
+      "answered": "JMAC"
+    },
+    "right": {
+      "expected": "MXJJ",
+      "answered": "MXJJ"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "ceb2585431d0764c6acd9156676aa8f137c552917b44d72d470bcf480e047d9a",
+      "shownSha256": "d644d55663fbc0d591fe940a41a22fd4af7fbe36ea99377569487725ba453ba9",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "4d262e8c4b176975045d05c2a3b32d1c4bd106001a579455a1d7ad8c5b034705",
+      "shownSha256": "71746eb4c33b7f73ccc33310ac6391469191ed90158462e0b9cdbf4407fa60d4",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "The matching reference shows the two-story house from this camera with deep red upper siding, white lower siding, black platform base, and a deep foreground shadow swallowing the grass with bright pavers beyond, and LEFT reproduces all of those value relationships while RIGHT inverts them: upper wall in r0c1-r1c1 shifts from reference deep red to bright orange, platform sides in r1c0-r2c1 shift from reference black to green, and foreground grass shadow in r2c0-r2c1 lifts from near-black to bright lime, destroying the reference contact-shadow depth and brightest-plane ordering seen in r1c2-r2c2.",
+  "leftCloser": [
+    "upper red siding material and value in r0c1-r1c1 matches reference deep red vs RIGHT orange",
+    "platform base sides in r1c0-r2c1 read as black/dark as in reference vs RIGHT green",
+    "foreground grass shadow depth and value in r2c0-r2c1 matches reference near-black contact shadow vs RIGHT bright sunlit green",
+    "paver/ground value contrast in r1c2-r2c2 and side path in r1c0 preserves reference dark-shadow vs sunlit split vs RIGHT washed bright"
+  ],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "foreground grass and platform shadow goes from near-black in LEFT to bright lime green in RIGHT with base sides black vs green"
+  },
+  "elapsedMs": 36325,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

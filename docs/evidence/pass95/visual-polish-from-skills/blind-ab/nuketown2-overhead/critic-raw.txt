@@ -1,0 +1,2 @@
+{"contract": "blind-ab-v1", "station": "nuketown2-overhead", "probes": {"left": "MHXE", "right": "CKNH"}, "winner": "tie", "confidence": 0.97, "why": "Both renders match the overhead references (r0c0 through r2c2) identically in structure, proportion, material read and value relationships with no discernible scene-pixel difference in any grid cell.", "leftCloser": [], "rightCloser": [], "largestDifference": {"region": "r2c2", "what": "probe-box text differs (MHXE vs CKNH) while all scene pixels are identical"}}
+
