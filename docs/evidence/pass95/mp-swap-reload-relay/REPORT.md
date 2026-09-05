@@ -56,6 +56,6 @@
 
 ## Handoff
 
-- [VERIFIED] HEAD: `bc439298dc323043e405b3469e779400824c5cdf`.
+- [VERIFIED] Implementation commits `7ef2d40d` and `f0a126b6`, plus the evidence commits on this branch, are pushed to the requested remote branch.
 - [VERIFIED] Remote branch is tracking `origin/contrib/dave-gaming-pc/claude/mp-swap-reload-relay`.
 - [OPEN] A permitted three-peer browser audit remains required to convert the source/unit evidence into live SWAP, RELOAD, RELAY-GAP, killstreak-label, and rejoin-latency evidence.
