@@ -149,9 +149,11 @@ tower's rails already use where they lap:
 - pool entry steps sw/ne: top raised +0.04 clear of the paving (riser to coping still
   0.26 m, under the 0.42 m autostep; the "route not a pit" property holds)
 
-No geometry hidden: every body keeps its mass, collider and shot authority; only a
-flush top face moved 4 cm inside the solid it meets. `raid2-fidelity` (layout,
-reachability, palette) and `collider-visual-parity-gate` stay green.
+No geometry hidden and no collider decoupled: `rect()` delegates to `box()` with the
+same extents (`src/raid2-arena.ts:308-320`), so each shifted body's collider and shot
+surface move WITH the visual by the same 0.04 m — inside the 0.06 m parity tolerance,
+buried in the mating solid, with no hidden or decoupled collider. `raid2-fidelity`
+(layout, reachability, palette) and `collider-visual-parity-gate` stay green.
 
 ### farcrysis — 5 findings cleared (claim-state: VERIFIED, no geometry moved)
 
