@@ -239,10 +239,11 @@ import {
   type GunRangeClockParticipant,
   type GunRangeMatchClockSnapshot,
 } from './gun-range-match-clock-authority';
+import { botHazeSprite } from './bot-haze';
+import { BOT_COVER_COMMIT_MS, advanceBotNavigation, applyBotProneCap, botBurstAimJitter, botBurstRecoveryUntil, botDifficultyProfile, botDifficultyTierForIndex, botFireDecision, chooseBotCoverNode, createBotNavigationState, deriveBotCoverNodes, shouldBotSeekCover, type BotDifficultyTier, type BotNavigationState } from './bot-behaviour';
 import {
-  BOT_DEATHS_PER_REINFORCEMENT,
+  BOT_DEATHS_PER_REINFORCEMENT, BOT_FIRE_RANGE,
   BOT_GRENADE_POOL,
-  BOT_REACTION_DELAY,
   BOT_GRENADE_COOLDOWN_MS,
   BOT_WEAPON_POOL,
   BOT_STARTING_WEAPON_POOL,
@@ -1349,6 +1350,8 @@ type BotPlayer = {
   stance: Stance;
   stanceHeldUntil: number;
   lastDamagedAt: number;
+  /** PASS 95 lane v8-bot-behaviour: readable-opponent state, all decided in src/bot-behaviour.ts. */
+  tier: BotDifficultyTier; navigation: BotNavigationState; burstRecoveryUntil: number; coverCommittedUntil: number; coverTarget: THREE.Vector3 | null; coverNodeId: string | null; shotsFired: number;
 };
 
 type GrenadeEntity = {
@@ -20161,7 +20164,7 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false, in
     perceptionCanFire: true,
     perceptionAimError: 0,
     stance: 'stand',
-    stanceHeldUntil: 0,
+    stanceHeldUntil: 0, tier: botDifficultyTierForIndex(index), navigation: createBotNavigationState(index % 2 === 0 ? 1 : -1), burstRecoveryUntil: 0, coverCommittedUntil: 0, coverTarget: null, coverNodeId: null, shotsFired: 0,
     lastDamagedAt: Number.NEGATIVE_INFINITY,
     networkInterpolation: new SnapshotInterpolationBuffer<HostedBotSnapshot>(interpolateHostedBotSnapshot),
     networkContinuity: 0,
@@ -20238,7 +20241,7 @@ function activateDormantBot(index: number): boolean {
   bot.sightStartedAt = 0;
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
-  bot.blockedSince = 0;
+  bot.blockedSince = 0; bot.navigation = createBotNavigationState(bot.navigation.detourSign); bot.coverTarget = null; bot.coverNodeId = null; bot.burstRecoveryUntil = 0;
   bot.stance = 'stand';
   bot.stanceHeldUntil = 0;
   bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
@@ -20683,7 +20686,7 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.sightStartedAt = 0;
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
-  bot.blockedSince = 0;
+  bot.blockedSince = 0; bot.navigation = createBotNavigationState(bot.navigation.detourSign); bot.coverTarget = null; bot.coverNodeId = null; bot.burstRecoveryUntil = 0;
   bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
   bot.deathVisibleUntil = 0;
   bot.stance = 'stand';
@@ -20959,29 +20962,6 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
 function botCombatDamage(rawDamage: number): number {
   return botScaledDamage(rawDamage);
 }
-// HF-399: the haze sprite is attached by addNeonBotHaze when the bot rig is
-// built and never moves within it, so it is resolved once per rig instead of
-// with a getObjectByName walk over ~190 rig nodes per bot per frame.
-//
-// INVARIANT THIS CACHE DEPENDS ON: `addNeonBotHaze` (the only site in src/ that
-// creates a node named 'neon-purple-bot-haze') runs exactly once per rig, in
-// the bot rig builder immediately after buildOperator, and no code re-attaches
-// or replaces it afterwards - the other three read sites only set `visible` or
-// test `instanceof`. A cached sprite that has been detached from its rig is
-// re-resolved below, so a future change that swaps the sprite still works; a
-// haze attached to a rig that had NONE at build time would still be missed,
-// which is why the invariant is stated here rather than only assumed.
-const botHazeSpriteByRoot = new WeakMap<THREE.Object3D, THREE.Sprite | null>();
-function botHazeSprite(root: THREE.Object3D): THREE.Sprite | null {
-  let haze = botHazeSpriteByRoot.get(root);
-  if (haze === undefined || (haze !== null && haze.parent === null)) {
-    const found = root.getObjectByName('neon-purple-bot-haze');
-    haze = found instanceof THREE.Sprite && found.material instanceof THREE.SpriteMaterial ? found : null;
-    botHazeSpriteByRoot.set(root, haze);
-  }
-  return haze;
-}
-
 function updateBots(dt: number, now: number): void {
   if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
@@ -21018,7 +20998,7 @@ function updateBots(dt: number, now: number): void {
       bot.hasLineOfSight = false;
       bot.sightStartedAt = 0;
       bot.burstShots = 0;
-      bot.blockedSince = 0;
+      bot.blockedSince = 0; bot.navigation = createBotNavigationState(bot.navigation.detourSign); bot.coverTarget = null; bot.coverNodeId = null; bot.burstRecoveryUntil = 0;
       bot.lastSightAt = now;
       continue;
     }
@@ -21064,10 +21044,19 @@ function updateBots(dt: number, now: number): void {
       waypointReached,
       random: bot.strafeSign === 1 ? 0.25 : 0.75,
       lineOfSightSince: bot.sightStartedAt,
-      reactionDelay: BOT_REACTION_DELAY,
+      reactionDelay: botDifficultyProfile(bot.tier).reactionDelayMs,
       burstShotsRemaining: bot.burstShots,
       fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0),
       fireSuppressed: !bot.perceptionCanFire,
+    });
+    // PASS 95 lane v8-bot-behaviour: the ONE place "may this bot shoot" is
+    // answered; sight and reaction delay are hard preconditions inside it.
+    const fireDecision = botFireDecision({
+      alive: bot.alive, hasLineOfSight: lineOfSight, lineOfSightSince: bot.sightStartedAt, now,
+      reactionDelayMs: botDifficultyProfile(bot.tier).reactionDelayMs, fireSuppressed: !bot.perceptionCanFire,
+      distanceM: distance, minRangeM: 2.5, maxRangeM: BOT_FIRE_RANGE, lastShotAt: bot.lastShotAt,
+      fireIntervalMs: botWeaponFireInterval(bot.weapon, bot.burstShots > 0), burstShotsRemaining: bot.burstShots,
+      burstRecoveryUntil: bot.burstRecoveryUntil, invulnerableUntil: bot.invulnerableUntil,
     });
     if (intent.changeWaypoint && !waypointReached) {
       bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
@@ -21076,12 +21065,25 @@ function updateBots(dt: number, now: number): void {
     toPatrol = patrolTarget.clone().sub(bot.position).setY(0);
 
     const verticalRouteTarget = botVerticalRouteTarget(bot, targetPosition);
+    // PASS 95 lane v8-bot-behaviour: under fire, break to an authored cover box
+    // whose far face is measured to occlude the threat; the choice is committed.
+    if (shouldBotSeekCover({ alive: bot.alive, hp: bot.hp, lastDamagedAt: bot.lastDamagedAt, now, coverCommittedUntil: bot.coverCommittedUntil, tier: bot.tier, random: gameplayRandom() })) {
+      const cover = chooseBotCoverNode(deriveBotCoverNodes(
+        arena.physicalCover.map((entry) => ({ id: entry.id, minX: entry.bounds.minX, maxX: entry.bounds.maxX, minZ: entry.bounds.minZ, maxZ: entry.bounds.maxZ })),
+        bot.position, targetPosition,
+        new Set([...bots.values()].flatMap((other) => (other !== bot && other.coverNodeId ? [other.coverNodeId] : []))),
+      ));
+      bot.coverTarget = cover ? new THREE.Vector3(cover.x, bot.position.y, cover.z) : null; bot.coverNodeId = cover ? cover.id : null;
+      bot.coverCommittedUntil = now + (cover ? BOT_COVER_COMMIT_MS : 600);
+    }
+    if (bot.coverTarget && (now >= bot.coverCommittedUntil || bot.coverTarget.distanceToSquared(bot.position) < 1.4)) { bot.coverTarget = null; bot.coverNodeId = null; }
     const pursuit = verticalRouteTarget
       ? verticalRouteTarget.clone().sub(bot.position).setY(0)
-      : lineOfSight ? toPlayer : toPatrol;
+      : bot.coverTarget ? bot.coverTarget.clone().sub(bot.position).setY(0)
+        : lineOfSight ? toPlayer : toPatrol;
     const forward = pursuit.lengthSq() > 0.01 ? pursuit.normalize() : new THREE.Vector3(0, 0, -1);
     const side = new THREE.Vector3(-forward.z, 0, forward.x);
-    const routeMovement = verticalRouteTarget ? 'advance' : intent.movement;
+    const routeMovement = verticalRouteTarget || bot.coverTarget ? 'advance' : intent.movement;
     const desiredDirection = routeMovement === 'advance' ? forward
       : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
@@ -21094,8 +21096,8 @@ function updateBots(dt: number, now: number): void {
       hasLineOfSight: lineOfSight, travelling: routeMovement === 'advance' || routeMovement === 'retreat',
       stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil,
     });
-    bot.stance = stanceDecision.stance;
-    bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
+    const cappedStance = applyBotProneCap(stanceDecision, bot.id, bot.tier);
+    bot.stance = cappedStance.stance; bot.stanceHeldUntil = cappedStance.stanceHeldUntil;
     const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
     // HF-458: a tasered bot is held in place for the stun, exactly like a
     // tasered human. Its aim and fire logic keep running; only movement stops.
@@ -21113,25 +21115,21 @@ function updateBots(dt: number, now: number): void {
     const collisionPosition = bot.position.clone().setY(bot.position.y + botCapsuleHeight);
     const collisionDesired = desired.clone().setY(desired.y + botCapsuleHeight);
     let resolved = resolveHorizontalMove(collisionPosition, collisionDesired, movementColliders, arena.bounds, 0.44);
-    const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
-      && desiredDirection.lengthSq() > 0;
-    if (stalled) {
-      const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
-      const collisionDetour = detour.clone().setY(detour.y + botCapsuleHeight);
-      resolved = resolveHorizontalMove(collisionPosition, collisionDetour, movementColliders, arena.bounds, 0.44);
-      const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
-      if (detourStalled) {
-        if (bot.blockedSince === 0) bot.blockedSince = now;
-        else if (now - bot.blockedSince >= 400) {
-          bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
-          bot.blockedSince = 0;
-        }
-      } else {
-        bot.blockedSince = 0;
-      }
-    } else {
-      bot.blockedSince = 0;
+    // PASS 95 lane v8-bot-behaviour: the stall rule, the unstick ladder and the
+    // committed detour direction that ended the wall shuffle all live in
+    // src/bot-behaviour.ts, where each of them is asserted directly.
+    const nav = advanceBotNavigation(bot.navigation, {
+      now, speedMps: Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) / Math.max(dt, 1 / 240),
+      hasGoal: desiredDirection.lengthSq() > 0,
+    });
+    bot.navigation = nav.state;
+    if (nav.blockedForMs > 0) {
+      const escape = nav.state.stage >= 3 ? forward.clone().multiplyScalar(-1) : side.clone().multiplyScalar(nav.detourSign);
+      const detour = bot.position.clone().addScaledVector(escape, speed * dt * 1.5);
+      resolved = resolveHorizontalMove(collisionPosition, detour.setY(detour.y + botCapsuleHeight), movementColliders, arena.bounds, 0.44);
+      if (nav.action === 'repath' || nav.action === 'reverse') bot.waypoint = selectBotTacticalWaypoint(bot, targetPosition, combatTarget !== null);
     }
+    bot.blockedSince = nav.blockedForMs > 0 ? now - nav.blockedForMs : 0;
     const resolvedPosition = new THREE.Vector3(resolved.x, bot.position.y, resolved.z);
     bot.position.set(resolved.x, botElevationAt(resolvedPosition, bot.position.y), resolved.z);
     bot.root.position.copy(bot.position);
@@ -21165,7 +21163,7 @@ function updateBots(dt: number, now: number): void {
     const threwBotGrenade = madeTacticalDecision && shouldBotThrowGrenade({
       alive: bot.alive,
       hasLineOfSight: lineOfSight,
-      reacted: bot.perceptionCanFire && bot.sightStartedAt > 0 && now - bot.sightStartedAt >= BOT_REACTION_DELAY,
+      reacted: bot.perceptionCanFire && bot.sightStartedAt > 0 && now - bot.sightStartedAt >= botDifficultyProfile(bot.tier).reactionDelayMs,
       distanceToPlayer: distance,
       now,
       nextGrenadeAt: bot.nextGrenadeAt,
@@ -21174,14 +21172,15 @@ function updateBots(dt: number, now: number): void {
       random: gameplayRandom(),
     }) && combatTarget !== null && throwBotGrenade(bot, now, 2_300, targetPosition, combatTarget.stance);
 
-    if (!threwBotGrenade && botCanFireWhileProtected(intent.fire, now, bot.invulnerableUntil) && combatTarget !== null) {
+    if (!threwBotGrenade && botCanFireWhileProtected(fireDecision.fire, now, bot.invulnerableUntil) && combatTarget !== null) {
       if (bot.burstShots <= 0) bot.burstShots = botWeaponBurstSize(bot.weapon, botIndex);
-      bot.burstShots -= 1;
+      bot.burstShots -= 1; bot.shotsFired += 1;
+      if (bot.burstShots <= 0) bot.burstRecoveryUntil = botBurstRecoveryUntil(now, bot.tier);
       bot.lastShotAt = now;
       fireOperator(bot.root);
       const origin = bot.position.clone().add(new THREE.Vector3(0, 1.42, 0));
       const baseDirection = targetPosition.clone().sub(origin).normalize();
-      const jitter = botAimJitter(distance) + bot.perceptionAimError + bot.burstShots * 0.006;
+      const jitter = botBurstAimJitter(botAimJitter(distance), bot.tier, bot.burstShots) + bot.perceptionAimError;
       const flamethrowerShot = bot.weapon === 'flamethrower';
       const shotLength = flamethrowerShot
         ? Math.min(distance + 2, FLAMETHROWER_EFFECT.rangeM)
@@ -34441,6 +34440,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         rootYaw: bot.root.rotation.y,
         waypoint: bot.waypoint,
         blockedSince: bot.blockedSince,
+        tier: bot.tier, stuckEvents: bot.navigation.stuckEvents, unstickActions: bot.navigation.unstickActions, shotsFired: bot.shotsFired, coverNodeId: bot.coverNodeId,
         hasLineOfSight: bot.hasLineOfSight,
         perception: {
           revision: bot.perception.revision,
@@ -35206,7 +35206,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.updateMatrixWorld(true);
     bot.lastSightAt = 0;
     bot.hasLineOfSight = false;
-    bot.sightStartedAt = now - BOT_REACTION_DELAY;
+    bot.sightStartedAt = now - botDifficultyProfile(bot.tier).reactionDelayMs;
     bot.lastShotAt = 0;
     bot.burstShots = 0;
     bot.nextDecisionAt = 0;
@@ -35664,7 +35664,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.velocity.set(0, 0, 0);
     bot.hp = 100;
     bot.alive = true;
-    bot.blockedSince = 0;
+    bot.blockedSince = 0; bot.navigation = createBotNavigationState(bot.navigation.detourSign); bot.coverTarget = null; bot.coverNodeId = null; bot.burstRecoveryUntil = 0;
     bot.hasLineOfSight = false;
     bot.sightStartedAt = 0;
     botsFrozen = false;
