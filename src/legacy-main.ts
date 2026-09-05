@@ -37009,10 +37009,10 @@ function batchColdArenaPresentation(): void {
   // complete at construction, so batching them here removes their source-draw
   // fan-out from the first cold ScenePass submission.
   if (selectedArena.id === 'gun-range') return;
-  batchSelectedArenaPresentation();
+  batchSelectedArenaPresentation(selectedArena.id === 'nuketown2' ? 'palette-lit' : staticMaterialMode);
 }
 
-function batchSelectedArenaPresentation(): void {
+function batchSelectedArenaPresentation(materialMode = staticMaterialMode): void {
   const arenaRoot = arena.root;
   if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {
     if (arenaRoot.userData.pass65StaticBatchReady !== true) {
@@ -37027,14 +37027,14 @@ function batchSelectedArenaPresentation(): void {
     }
   } else if (!(selectedArena.id === 'atomic-acres' && blenderArenaActive)
     && !(renderRuntime.backend === 'webgl2' && selectedArena.id === 'skyline-terminal')) {
-    batchPresentationRootOnce(arenaRoot, staticMaterialMode);
+    batchPresentationRootOnce(arenaRoot, materialMode);
   }
   if (selectedArena.id === 'atomic-acres' && !blenderArenaActive && arenaArtRoot) {
-    const decorativeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    const decorativeMaterialMode = materialMode === 'texture-lit' ? 'palette-lit' : materialMode;
     batchPresentationRootOnce(arenaArtRoot, decorativeMaterialMode);
   }
   if (neighbourhoodLifeRoot) {
-    const lifeMaterialMode = staticMaterialMode === 'texture-lit' ? 'palette-lit' : staticMaterialMode;
+    const lifeMaterialMode = materialMode === 'texture-lit' ? 'palette-lit' : materialMode;
     batchPresentationRootOnce(neighbourhoodLifeRoot, lifeMaterialMode);
   }
 }
