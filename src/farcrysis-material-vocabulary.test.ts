@@ -83,6 +83,18 @@ const CEILING_HISTORY: ReadonlyArray<{ readonly at: string; readonly ceiling: nu
       + 'shared geometry (varyInstanceColors idiom per the Luna review, zero visual change by '
       + 'construction).',
   },
+  {
+    at: '2026-09-05',
+    ceiling: 166,
+    why: 'PASS 95 layout stage L1. The slice-1/slice-2 vocabulary work was cherry-picked onto '
+      + 'candidate 7 (452d7aba) and the count was RE-MEASURED at that head rather than inherited: '
+      + 'this test measures 166 under its WebGPU-route document stub (968 meshes: 62 standard, '
+      + '85 node, 19 other), i.e. the inherited ceiling holds exactly at the new base; '
+      + 'scripts/qa/measure-farcrysis-layout.ts measures 149 in the WebGL2-route unit environment '
+      + '(docs/evidence/pass95/farcrysis-rebuild/layout-baseline-eda54adf.json) - the 17-object '
+      + 'gap is the TSL foliage/water node materials the WebGPU route constructs. The ceiling '
+      + 'stays 166 because this test is the WebGPU count; target 110 stays OPEN.',
+  },
 ];
 
 function fakeCanvasContext(): CanvasRenderingContext2D {
