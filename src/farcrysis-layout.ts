@@ -30,11 +30,17 @@
 import { firstSegmentBoxHit, type Box2, type Point3 } from './collision';
 import {
   FARCRYSIS_BOUNDS,
+  FARCRYSIS_COVER_MIN,
   FARCRYSIS_MAX_SIGHTLINE,
   FARCRYSIS_PATROL_XZ,
   FARCRYSIS_SPAWNS_XZ,
 } from './farcrysis-constants';
-import { farcrysisTerrainHeight } from './farcrysis-terrain-authority';
+import {
+  FARCRYSIS_SAFETY_FLOOR_Y,
+  FARCRYSIS_SHORE,
+  FARCRYSIS_WATER_LEVEL,
+  farcrysisTerrainHeight,
+} from './farcrysis-terrain-authority';
 import { TSL_FOLIAGE_MAX_DISTINCT_GRAPHS } from './farcrysis-tsl-foliage';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +85,26 @@ export const FARCRYSIS_SCALE = Object.freeze({
     worldTrace: 220,
     flamethrower: 18,
   }),
+});
+
+/** Terrain and water remain one authority, including the rectangular shore. */
+export const FARCRYSIS_TERRAIN_WATER = Object.freeze({
+  heightAuthority: 'farcrysisTerrainHeight(x, z)',
+  safetyFloorY: FARCRYSIS_SAFETY_FLOOR_Y,
+  waterLevelY: FARCRYSIS_WATER_LEVEL,
+  dryFootprint: 'rectangular 55.5 m half-extent',
+  shore: FARCRYSIS_SHORE,
+});
+
+/** The cover rhythm is a placement rule, not a decorative scatter count. */
+export const FARCRYSIS_COVER_RHYTHM = Object.freeze({
+  minimumPhysicalPieces: FARCRYSIS_COVER_MIN,
+  spawnCoverReachM: FARCRYSIS_SCALE.spawnCoverReachM,
+  bands: Object.freeze([
+    Object.freeze({ id: 'beach-ring', register: 'wide gaps broken by palms, skiffs and rocks' }),
+    Object.freeze({ id: 'jungle-band', register: 'cover-heavy chain with tight turns' }),
+    Object.freeze({ id: 'core-loop', register: 'hard shell and interior cover at the vertical crossing' }),
+  ]),
 });
 
 // ---------------------------------------------------------------------------
@@ -618,6 +644,8 @@ export const FARCRYSIS_LAYOUT_TABLES = Object.freeze({
   verticalCrossing: FARCRYSIS_VERTICAL_CROSSING,
   reviewStations: FARCRYSIS_REVIEW_STATIONS,
   pipelineBudget: FARCRYSIS_PIPELINE_BUDGET,
+  terrainWater: FARCRYSIS_TERRAIN_WATER,
+  coverRhythm: FARCRYSIS_COVER_RHYTHM,
   middleRadiusM: FARCRYSIS_MIDDLE_RADIUS_M,
   scale: FARCRYSIS_SCALE,
 });

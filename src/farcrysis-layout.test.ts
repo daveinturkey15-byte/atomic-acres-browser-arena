@@ -36,7 +36,9 @@ import {
   FARCRYSIS_ROUTE_SEGMENTS,
   FARCRYSIS_SCALE,
   FARCRYSIS_SPAWN_ZONES,
+  FARCRYSIS_TERRAIN_WATER,
   FARCRYSIS_VERTICAL_CROSSING,
+  FARCRYSIS_COVER_RHYTHM,
   measureFarcrysisMidMapMasses,
   measureFarcrysisSightlines,
   openDistance,
@@ -142,6 +144,11 @@ describe('farcrysis layout stage (PASS 95, SPEC section 7)', () => {
       && zone.visibleEnemyFloorM === SPAWN_LAYOUT_THRESHOLDS.minimumVisibleEnemySpawnDistanceM)).toBe(true);
     expect(FARCRYSIS_VERTICAL_CROSSING).toMatchObject({ id: 'core-catwalk-stairs', widthM: 1.2 });
     expect(FARCRYSIS_VERTICAL_CROSSING.top[1]).toBeGreaterThan(FARCRYSIS_VERTICAL_CROSSING.foot[1]);
+    expect(FARCRYSIS_TERRAIN_WATER.waterLevelY).toBe(-0.25);
+    expect(FARCRYSIS_TERRAIN_WATER.safetyFloorY).toBe(-4.5);
+    expect(FARCRYSIS_TERRAIN_WATER.shore).toMatchObject({ descentStartDist: 10, outerDropDist: 1.5 });
+    expect(FARCRYSIS_COVER_RHYTHM.minimumPhysicalPieces).toBe(FARCRYSIS_COVER_MIN);
+    expect(FARCRYSIS_COVER_RHYTHM.bands.map((band) => band.id)).toEqual(['beach-ring', 'jungle-band', 'core-loop']);
     expect(FARCRYSIS_REVIEW_STATIONS).toHaveLength(6);
     expect(new Set(FARCRYSIS_REVIEW_STATIONS.map((entry) => entry.id)).size).toBe(6);
     expect(FARCRYSIS_REVIEW_STATIONS.some((entry) => entry.purpose === 'overview')).toBe(true);

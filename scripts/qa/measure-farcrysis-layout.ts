@@ -101,6 +101,8 @@ async function main(): Promise<void> {
     verticalCrossing: layout.FARCRYSIS_VERTICAL_CROSSING,
     reviewStations: layout.FARCRYSIS_REVIEW_STATIONS,
     pipelineBudget: layout.FARCRYSIS_PIPELINE_BUDGET,
+    terrainWater: layout.FARCRYSIS_TERRAIN_WATER,
+    coverRhythm: layout.FARCRYSIS_COVER_RHYTHM,
     census: { solidColliders: audit.length, physicalCover: arena.physicalCover.length, shotSurfaces: arena.shotSurfaces.length, colliders: arena.colliders.length, ...census },
     sightlines: {
       eyeHeightM: sightlines.eyeHeightM,
