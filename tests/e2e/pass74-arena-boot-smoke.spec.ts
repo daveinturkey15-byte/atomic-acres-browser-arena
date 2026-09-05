@@ -128,7 +128,9 @@ async function captureDeploymentDiagnostic(page: Page): Promise<DeploymentDiagno
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__;
     const state = api?.snapshot();
     const bootstrap = state?.bootstrap as Record<string, unknown> | undefined;
-    const transition = state?.transition as Record<string, unknown> | undefined;
+    const arenaSelection = state?.arenaSelection as Record<string, unknown> | undefined;
+    const streaming = arenaSelection?.streaming as Record<string, unknown> | undefined;
+    const transition = streaming?.transition as Record<string, unknown> | undefined;
     return {
       status: document.querySelector('#status')?.textContent ?? '',
       bootstrap: bootstrap
