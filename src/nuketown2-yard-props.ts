@@ -59,21 +59,12 @@
  */
 import * as THREE from 'three';
 import type { BallisticMaterialId } from './ballistics';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
-import * as TSL from 'three/tsl';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import { NUKETOWN2_APPLIANCE_BLUE } from './nuketown2-layout';
-
-const {
-  abs,
-  float,
-  floor,
-  fract,
-  mix,
-  positionWorld,
-  smoothstep,
-  step,
-  vec3,
-} = TSL as unknown as Record<string, any>;
+import { createPaintedMetalMaterial } from './nuketown2-materials/families/painted-metal';
+import { createGlassMaterial } from './nuketown2-materials/families/glass';
+import { createTimberMaterial } from './nuketown2-materials/families/timber';
+import { createConcreteMaterial } from './nuketown2-materials/families/concrete';
 
 /** Waist-high cover, matching the arena's own `LOW_COVER`. */
 const LOW_COVER = 0.95;
@@ -96,16 +87,23 @@ export type Nuketown2YardPropSolid = Readonly<{
 }>;
 
 // ---------------------------------------------------------------------------
-// Materials — procedural, no imported texture, image or LUT
+// Materials — shared families, per-instance colours as uniforms (HF-477)
 // ---------------------------------------------------------------------------
-
-function node(name: string, color: number, roughness: number, metalness: number): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({ color, roughness, metalness });
-  mat.name = name;
-  // WebGLRenderer fallback safety, the rule the donor grass field records.
-  mat.type = 'MeshStandardMaterial';
-  return mat;
-}
+// Every prop surface below is a `src/nuketown2-materials/*` family material,
+// looked up by ROLE in the prop's own colour. The families carry the caller's
+// hex as a UNIFORM (`uniformSwatch`), so these nine materials share the family
+// graphs instead of compiling one pipeline each: same roles, same colours,
+// the wear on top is the family's. Roughness/metalness are CPU-side
+// constructor values and cost no shader; `panelled`/`variant` are left at the
+// already-instantiated settings so no new graph is introduced here.
+//
+// The appliance-hob red/blue pair is the point of the exercise: two materials
+// from the same unpanelled painted-metal factory, so ONE graph with a uniform
+// tint. The chirality anchor stays colour-only on identical geometry, and the
+// fidelity gate still reads the red/blue bases off `material.color`.
+// TRADE-OFF, stated: the bespoke hob-ring distance field is gone — the deck
+// reads as a coloured enamel plate in the anchor colour rather than as a
+// ringed cooker top. Rings need their own graph; roles and colours do not.
 
 export interface Nuketown2YardPropMaterials {
   cabinet: MeshStandardNodeMaterial;
@@ -120,108 +118,46 @@ export interface Nuketown2YardPropMaterials {
   dispose(): void;
 }
 
-/**
- * The white enamel cabinet, with a real appliance's panel breakup: a horizontal
- * plinth shadow, a vertical split every 0.6 m where the three units butt
- * together, and a fine enamel mottle. Procedural from world position, so the
- * two 180-degree partners are the same material object and one pipeline.
- */
-function createCabinetMaterial(): MeshStandardNodeMaterial {
-  const mat = node('nuketown2-appliance-cabinet', 0xe6e3dc, 0.42, 0.08);
-  const p = positionWorld;
-  // Unit splits: a dark seam every 0.6 m across the bank.
-  const u = p.x.div(float(0.6));
-  const seam = float(1).sub(smoothstep(0.0, 0.035, abs(fract(u).sub(0.5)).mul(2.0).oneMinus()));
-  // Enamel mottle, tiny - an appliance is nearly uniform and reads wrong if it
-  // is noisy, so this is deliberately at the threshold of visibility.
-  const mottle = fract(p.x.mul(37.1).add(p.z.mul(23.7)).sin().mul(43758.5453)).sub(0.5).mul(0.035);
-  // Plinth shadow: the recessed kick under a floor-standing unit.
-  const plinth = smoothstep(0.0, 0.14, p.y);
-  const base = vec3(0.902, 0.890, 0.863).add(vec3(1, 1, 1).mul(mottle));
-  mat.colorNode = mix(base.mul(0.36), base, plinth).mul(mix(float(0.45), float(1), seam));
-  return mat;
-}
-
-/**
- * A hob top. Four rings on a coloured enamel plate - the detail that makes the
- * bank read as a cooker rather than as a coloured box, and it costs one
- * distance field.
- */
-function createHobMaterial(name: string, color: number): MeshStandardNodeMaterial {
-  const mat = node(name, color, 0.28, 0.12);
-  const p = positionWorld;
-  // Ring grid at 0.30 m pitch, ring radius 0.09 m.
-  const cellX = p.x.div(float(0.3));
-  const cellZ = p.z.div(float(0.3));
-  const local = vec3(fract(cellX).sub(0.5).mul(0.3), float(0), fract(cellZ).sub(0.5).mul(0.3));
-  const r = local.length();
-  const ring = smoothstep(0.075, 0.085, r).mul(float(1).sub(smoothstep(0.095, 0.105, r)));
-  const base = vec3(
-    ((color >> 16) & 255) / 255,
-    ((color >> 8) & 255) / 255,
-    (color & 255) / 255,
-  );
-  mat.colorNode = mix(base, base.mul(0.34), ring);
-  // Enamel is glossier where it has not been scrubbed; rings are matte iron.
-  mat.roughnessNode = mix(float(0.22), float(0.68), ring);
-  return mat;
-}
-
-/**
- * Glasshouse glazing: pale, glossy, with the condensation banding a real
- * glasshouse carries near its foot. Opaque on purpose - a transparent
- * glasshouse whose collider is solid is the parity read this arena's own
- * forging review rejects ("opaque surfaces occlude local light/effects").
- */
-function createGlazingMaterial(): MeshStandardNodeMaterial {
-  const mat = node('nuketown2-glasshouse-glazing', 0xd6e4e2, 0.16, 0.04);
-  const p = positionWorld;
-  const condensation = float(1).sub(smoothstep(0.15, 1.35, p.y));
-  const band = fract(p.y.mul(7.3)).mul(0.12);
-  mat.colorNode = mix(
-    vec3(0.839, 0.894, 0.886),
-    vec3(0.93, 0.95, 0.94).mul(float(1).sub(band)),
-    condensation,
-  );
-  mat.roughnessNode = mix(float(0.10), float(0.46), condensation);
-  return mat;
-}
-
-/** Sand: a fine grain plus the raked banding a used sand pit keeps. */
-function createSandMaterial(): MeshStandardNodeMaterial {
-  const mat = node('nuketown2-sandpit-sand', 0xd8c497, 0.96, 0.0);
-  const p = positionWorld;
-  const grain = fract(p.x.mul(97.3).add(p.z.mul(61.7)).sin().mul(43758.5453)).sub(0.5).mul(0.09);
-  const rake = fract(p.x.mul(6.1).add(p.z.mul(2.3))).mul(0.06);
-  const dampPatch = step(float(0.62), fract(p.x.mul(0.7).add(p.z.mul(0.9)).sin().mul(7.13))).mul(0.13);
-  mat.colorNode = vec3(0.847, 0.769, 0.592)
-    .add(vec3(1, 1, 1).mul(grain))
-    .sub(vec3(1, 1, 1).mul(rake))
-    .sub(vec3(0.10, 0.09, 0.06).mul(dampPatch));
-  return mat;
-}
-
-/** Timber: sawn boards with a plank seam and a per-plank tonal shift. */
-function createTimberMaterial(): MeshStandardNodeMaterial {
-  const mat = node('nuketown2-yard-timber', 0x9a7a52, 0.88, 0.02);
-  const p = positionWorld;
-  const plank = floor(p.y.div(float(0.18)).add(p.x.div(float(2.4))));
-  const tone = fract(plank.mul(0.618).add(0.21)).sub(0.5).mul(0.16);
-  const seam = smoothstep(0.0, 0.02, abs(fract(p.y.div(float(0.18))).sub(0.5)).mul(2).oneMinus());
-  mat.colorNode = vec3(0.604, 0.478, 0.322).add(vec3(1, 0.94, 0.86).mul(tone)).mul(mix(float(1), float(0.55), seam));
-  return mat;
-}
-
 export function createNuketown2YardPropMaterials(): Nuketown2YardPropMaterials {
-  const cabinet = createCabinetMaterial();
-  const hobRed = createHobMaterial('nuketown2-appliance-hob-red', 0xb8352c);
-  const hobBlue = createHobMaterial('nuketown2-appliance-hob-blue', NUKETOWN2_APPLIANCE_BLUE);
-  const chrome = node('nuketown2-yard-chrome', 0xb9bec2, 0.24, 0.86);
-  const glazing = createGlazingMaterial();
-  const frame = node('nuketown2-glasshouse-frame', 0xb6b2a6, 0.56, 0.18);
-  const timber = createTimberMaterial();
-  const sand = createSandMaterial();
-  const podShell = node('nuketown2-garden-pod-shell', 0xe9e6df, 0.5, 0.05);
+  // White enamel cabinet in its own white — the unpanelled painted-metal graph
+  // the registry's signs and appliance fronts already share.
+  const cabinet = createPaintedMetalMaterial('nuketown2-appliance-cabinet', 0xe6e3dc, {
+    roughness: 0.42,
+    metalness: 0.08,
+  });
+  // THE CHIRALITY ANCHOR, colour alone: red north, blue south, one graph.
+  const hobRed = createPaintedMetalMaterial('nuketown2-appliance-hob-red', 0xb8352c, {
+    roughness: 0.28,
+    metalness: 0.12,
+  });
+  const hobBlue = createPaintedMetalMaterial('nuketown2-appliance-hob-blue', NUKETOWN2_APPLIANCE_BLUE, {
+    roughness: 0.28,
+    metalness: 0.12,
+  });
+  // Plinth, panels and handles: polished steel, same family, CPU metalness.
+  const chrome = createPaintedMetalMaterial('nuketown2-yard-chrome', 0xb9bec2, {
+    roughness: 0.24,
+    metalness: 0.86,
+  });
+  // Glasshouse glazing: the family glass, opaque like the coach band (opaque
+  // surfaces occlude; the collider is solid), in the glazing's own pale tint.
+  const glazing = createGlassMaterial('nuketown2-glasshouse-glazing', 0xd6e4e2, { opacity: 1 });
+  // Glasshouse frame, cill, posts and bars: weathered light metal.
+  const frame = createPaintedMetalMaterial('nuketown2-glasshouse-frame', 0xb6b2a6, {
+    roughness: 0.56,
+    metalness: 0.18,
+  });
+  // Sand-pit kerb and seats: the fence-timber graph in the pit's own sawn tone.
+  const timber = createTimberMaterial('nuketown2-yard-timber', 0x9a7a52, 'fence');
+  // The sand itself: the poured-apron graph in the pit's own sand colour —
+  // control joints stay wider than the pit, so the field reads with the
+  // broom relief where the bespoke rake banding was.
+  const sand = createConcreteMaterial('nuketown2-sandpit-sand', 0xd8c497, { variant: 'apron' });
+  // Garden pod shell, eaves and cap: smooth moulded pale shell.
+  const podShell = createPaintedMetalMaterial('nuketown2-garden-pod-shell', 0xe9e6df, {
+    roughness: 0.5,
+    metalness: 0.05,
+  });
   const all = [cabinet, hobRed, hobBlue, chrome, glazing, frame, timber, sand, podShell];
   return {
     cabinet, hobRed, hobBlue, chrome, glazing, frame, timber, sand, podShell,
