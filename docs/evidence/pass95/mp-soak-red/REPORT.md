@@ -101,7 +101,7 @@ The final retry artifacts are quoted separately because they never entered gamep
 - `fa8bb834c2631c6dc21f1089f5e50e0230c8e643` — harden stair and directional probes
 - `33ef9c2121a42fbd544fd935c7e10de743c3dcd0` — fit authority repair under ratchet
 
-[VERIFIED] Round 2 final working tree is clean and the remote branch resolves to `a47a6429` after the report corrections.
+[VERIFIED] Round 2 report correction checkpoint was pushed at `a47a6429`; the final report-only pin follows that checkpoint.
 
 ## Round 2 — deterministic soak-red repair
 
