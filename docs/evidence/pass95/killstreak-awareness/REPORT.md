@@ -129,7 +129,7 @@ Test Files  3 passed (3)
 Tests       43 passed (43)
 ```
 
-`[VERIFIED]` `src/killstreak-awareness.test.ts` (11 tests): announce shape/authority/audience,
+`[VERIFIED]` `src/killstreak-awareness.test.ts` (12 tests): announce shape/authority/audience,
 malformed rejection, admission (forged host / epoch / duplicate activation), bounded de-dup,
 two-guest replication at three advance times, phase derivation, attenuation curve
 (monotone, 1 at 10 m, 0 at 220 m, altitude halving and floor), bounded nearest-first pool,
@@ -211,4 +211,17 @@ a run reaches deploy; artifacts: `artifacts/qa/mp-audit-hf509/hf509-audit.json`,
   that file changed after the green-but-for-it full run).
 - `[OPEN]` headed listening pass by the owner: the raised rotor gains and the new flight loop /
   bomb release / announce sting are procedural values chosen by ear-reasoning, not A/B'd.
-- `[OPEN]` a base-build mp-audit run for the literal "before" rows.
+ - `[OPEN]` a base-build mp-audit run for the literal "before" rows.
+
+## Verifier fix round
+
+- `[VERIFIED]` Damage-direction regression: the RED test `src/killstreak-awareness-fix-round.test.ts` / `keeps generic damage direction` reproduced the broad `cause.kind === 'killstreak'` suppression. The guard now excludes only `chopper`, `piloted-drone`, and `drone-swarm`, so Yardhawk, Tri-Pass, Hunter Swarm, and Nuke retain the generic attacker-direction marker. GREEN: 1 test passed. Commit `548ab778` pushed.
+- `[VERIFIED]` Match-end flight-audio regression: the same test file / `stops support flight loops` reproduced the missing cleanup in the `matchState.phase === 'ended'` early-return branch. `audio.syncSupportFlightLoops([])` now runs beside the rotor cleanup. GREEN: 1 test passed. Commit `6b71961b` pushed.
+- `[VERIFIED]` Solo-announcement regression: the same test file / `presents solo announcements` reproduced the `offline` role being rejected before presentation. Offline now presents the banner/sting/feed locally, while only `host` sends `killstreak-announce`. GREEN: 1 test passed. Commit `0c567668` pushed.
+- `[VERIFIED]` MP-audit gate issue: the same test file / `requires the labelled damage-source observation` reproduced `result.ok` omitting `damageSourceLabelled`. The success predicate now requires that labelled observation for every guest. GREEN: 1 test passed. Commit `78b5f4f9` pushed.
+- `[VERIFIED]` Evidence-count issue: the same test file / `reports the actual twelve tests` reproduced the stale `(11 tests)` claim. REPORT.md now states `(12 tests)`. GREEN: 1 test passed. Commit `6efa60fe` pushed.
+- `[VERIFIED]` The flight cleanup added a second legitimate `syncSupportFlightLoops([])` callsite, so `src/sound-event-inventory.ts` was updated from occurrence count 1 to 2. `src/sound-event-inventory.test.ts` plus the fix-round tests passed: 118 tests. Commit `6549bb70` pushed.
+- `[VERIFIED]` No test, threshold, fence, timeout, budget, or legacy-main size ceiling was weakened. Each commit was explicit-path committed and pushed to `origin/contrib/dave-gaming-pc/claude/v7-killstreak-awareness`.
+- `[VERIFIED]` Final `npx tsc --noEmit`: exit 0, no output.
+- `[VERIFIED]` Final expanded PowerShell resolution of the requested gate families plus `src/killstreak-awareness-fix-round.test.ts`: 63 test files passed, 1 skipped; 614 tests passed, 2 skipped. The skipped test is pre-existing.
+- `[OPEN]` No browser or build was run in this fix round per the lane constraint; the existing MP audit remains open because the prior runs stopped at the preserved WebGPU fence before deploy.

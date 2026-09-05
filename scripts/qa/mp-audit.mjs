@@ -848,7 +848,7 @@ async function scenarioKillstreakAwareness(peers, report) {
     record('KILLSTREAK-DAMAGE-SOURCE-UNOBSERVED', 'info', 'the AI chopper hit neither guest inside the 25 s window, so the damage-source cue row is OPEN in this run',
       { guests: Object.fromEntries(Object.entries(result.guests).map(([role, row]) => [role, row.damageSource])) });
   }
-  result.ok = Object.values(result.guests).every((row) => row.announced && !row.relayedByGuest && row.bannerShown && row.replicated);
+  result.ok = Object.values(result.guests).every((row) => row.announced && !row.relayedByGuest && row.bannerShown && row.replicated && row.damageSourceLabelled);
   return result;
 }
 

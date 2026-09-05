@@ -15049,7 +15049,7 @@ function applyDamage(
   lastDamageAt = now;
   audio.damage();
   gamepadRuntime.rumble('damage', now); // GAMEPAD: damage-taken pulse
-  if (cause.kind !== 'killstreak') showDamageDirection(attacker, appliedDamage, now);
+  if (cause.kind !== 'killstreak' || !['chopper', 'piloted-drone', 'drone-swarm'].includes(cause.effect)) showDamageDirection(attacker, appliedDamage, now);
   // HF-352: Camera shake impulse from taking damage
   if (appliedDamage > 0) {
     // HF-370: the owner wants hits FELT. Trauma scales with how hard the hit
@@ -24386,7 +24386,7 @@ function requestKillstreakActivation(
 
 /** HF-509: host-only, once per admitted activation; the whole lobby hears and sees it. */
 function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: string, ownerTeam: Team, now: number): void {
-  if (network.role !== 'host' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
+  if (network.role === 'client' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
   if (!killstreakAnnouncements.admit(admission.activationId)) return;
   const entry = killstreakRuntime.snapshotFor(null, now).entities.find((entity) => entity.activationId === admission.activationId)?.position;
   const owner = ownerId === player.id ? player.position : remotes.get(ownerId)?.target ?? player.position;
@@ -24394,7 +24394,7 @@ function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: s
     type: 'killstreak-announce', by: player.id, matchEpoch: killstreakMatchEpoch, activationId: admission.activationId,
     ownerId, ownerTeam, source: admission.activatedId, position: entry ?? [owner.x, owner.y, owner.z], nonce: randomNonce(),
   };
-  network.send(message);
+  if (network.role === 'host') network.send(message);
   presentKillstreakAnnouncement(message, now);
 }
 
@@ -25004,6 +25004,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
+    audio.syncSupportFlightLoops([]);
     killstreakPresentation.clear();
     resetKillstreakPossessionPresentation();
     return;

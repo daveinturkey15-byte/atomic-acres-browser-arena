@@ -381,7 +381,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('missileLaunch', 'drop.emitter', 1, ['support.missile-launch.positional']),
   runtimeCallsite('bombRelease', 'drop.emitter', 1, ['support.carpet-bomb']),
   runtimeCallsite('killstreakAnnounce', 'banner.tone', 1, ['support.killstreak-announce']),
-  runtimeCallsite('syncSupportFlightLoops', '[]', 1, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
+  runtimeCallsite('syncSupportFlightLoops', '[]', 2, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
   runtimeCallsite('syncSupportFlightLoops', 'supportFlightAudioCollector.collect(killstreakSnapshot.entities, camera.position, killstreakActivity, now)', 1, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
   // Owner 2026-08-30: Domination zone ownership cues (friendly rise / loss fall).
   runtimeCallsite('dominationCue', 'false', 1, ['match.domination-cue']),
