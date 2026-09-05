@@ -4090,26 +4090,6 @@ function ensureAtomicWorldPresentation(): void {
 
 const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt | null = null;
-let menuArenaEnvironmentPrewarmPromise: Promise<void> | null = null;
-
-function prepareMenuArenaEnvironment(): Promise<void> {
-  if (renderRuntime.backend !== 'webgpu') return Promise.resolve();
-  const arenaId = selectedArena.id;
-  const operation: Promise<void> = loadArenaVisualModule(arenaId)
-    .then((module) => {
-      applySkyBackdrop(scene, module.definition.atmosphere.preset, (url) => {
-        arenaVisualStream.recordSelectedAssetRequest(arenaId, url);
-      });
-      return waitForSkyBackdropAdmission(scene).then(() => undefined);
-    });
-  const settled = operation.catch((error: unknown) => {
-    // Menu sky admission is an optimization. The admitted transition remains
-    // the fallback authority if the backdrop cannot be prepared here.
-    console.warn(`[${arenaId} menu environment prewarm skipped]`, error);
-  });
-  menuArenaEnvironmentPrewarmPromise = settled;
-  return settled;
-}
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
 let appliedTslArenaDefinitions = 0;
 let activeArenaReviewCameraId: string | null = null;
@@ -29995,9 +29975,6 @@ async function performArenaSelection(
   try {
     setBootstrapStage('loading-gameplay-assets');
     await prepareMenuDeploymentAssets(); if (hadPreparedArena) await ensureAuthoredSupportPresentationAssets(killstreakPresentation);
-    if (!hadPreparedArena && selectedArena.id === nextSelection.id && menuArenaEnvironmentPrewarmPromise) {
-      await menuArenaEnvironmentPrewarmPromise;
-    }
     assertAdmission();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
@@ -30060,13 +30037,7 @@ async function performArenaSelection(
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
     syncInteractiveWorldPhysics(true);
-    // Static arena meshes must be collapsed before the first cold WebGPU warm
-    // frame. The later idempotent call remains after quality presentation so
-    // the Gun Range can attach its authored rack before that root is batched;
-    // every other arena has no later quality-owned static child dependency.
-    profileArenaTransition('presentation-batching');
-    setBootstrapStage('batching-static-meshes');
-    batchColdArenaPresentation();
+    profileArenaTransition('presentation-batching'); if (selectedArena.id !== 'gun-range') batchSelectedArenaPresentation();
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     // HF-371: the air is part of the arena. Swap it with the audio so nothing
@@ -37003,15 +36974,6 @@ function batchPresentationRootOnce(root: THREE.Group, materialMode: typeof stati
   root.userData.pass65StaticBatchReady = true;
 }
 
-function batchColdArenaPresentation(): void {
-  // Gun Range loads five authored rack models in ensureSelectedQualityPresentation;
-  // keep its existing post-load batch boundary. All other arena roots are
-  // complete at construction, so batching them here removes their source-draw
-  // fan-out from the first cold ScenePass submission.
-  if (selectedArena.id === 'gun-range') return;
-  batchSelectedArenaPresentation();
-}
-
 function batchSelectedArenaPresentation(): void {
   const arenaRoot = arena.root;
   if (selectedArena.id === 'rustworks-1v1' && renderProfile === 'blender') {
@@ -37415,22 +37377,12 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
 }
 function bootstrapMenuPreview(): void {
   document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
-  arenaSelectionReady = false;
+  arenaSelectionReady = true;
   syncArenaSelectionUi();
   setArenaMenuCamera();
-  setStatus(`${selectedArena.displayName} preview loading deployment assets…`);
-  bootstrapStage = 'loading-module-assets';
-  requestAnimationFrame(frame);
-  void Promise.all([
-    prepareMenuDeploymentAssets('idle'),
-    prepareMenuArenaEnvironment(),
-  ]).then(() => {
-    if (gameStarted || matchStartPreparing) return;
-    arenaSelectionReady = true;
-    syncArenaSelectionUi();
-    setStatus(`${selectedArena.displayName} preview ready · deployment assets retained.`);
-    bootstrapStage = 'ready';
-  }).catch(showFatalError);
+  setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
+  bootstrapStage = 'ready';
+  requestAnimationFrame(frame); void prepareMenuDeploymentAssets('idle');
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
     return prepareMenuDeploymentAssets('idle').then(() => {
