@@ -280,6 +280,7 @@ describe('HF-402: every authored spawn is inside the map, on a floor, with a rou
  */
 describe('HF-402: the free-for-all exemption matches what the runtime does', () => {
   const legacyMain = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+  const lobbyView = readFileSync(new URL('./mp-lobby-authority-views.ts', import.meta.url), 'utf8');
 
   it('pins every exempted arena to the runtime line that forces it to free-for-all', () => {
     for (const arenaId of FREE_FOR_ALL_ONLY_ARENA_IDS) {
@@ -290,7 +291,7 @@ describe('HF-402: the free-for-all exemption matches what the runtime does', () 
     }
     // ...and that the forced mode really is ffa, not merely a named lobby.
     expect(legacyMain).toContain("const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';");
-    expect(legacyMain).toContain('modeInput.disabled = !hostControls || rangeLobby;');
+    expect(lobbyView).toContain('modeInput.disabled = !hostControls || rangeLobby;');
   });
 
   it('exempts nothing else: every registered TEAM arena is held to team separation', () => {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const pickupAuthority = readFileSync(new URL('./mp-remote-pickup-authority.ts', import.meta.url), 'utf8');
 
 function functionBody(name: string, nextName: string): string {
   const start = main.indexOf(`function ${name}`);
@@ -80,7 +81,7 @@ describe('same-browser hosted active-match recovery integration', () => {
       'network.confirmPlayerAdmission(message.playerId, message.resumeToken, message.connectionEpoch)',
     );
     const connectedAt = hostAdmission.indexOf('hostLobbyMembers.set(message.playerId, restored);');
-    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(currentPhase);');
+    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(phaseAtCommit);');
     const receiverReadyAt = hostAdmission.indexOf(
       'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);',
     );
@@ -249,8 +250,8 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(shotAdmission).toContain('applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSeq)');
     expect(main).toContain('setGuestCombatInventoryGrenades(inventory, admission.state.remaining)');
     expect(main).toContain('resetRemoteCombatInventory(admittedIncoming, grenadeCount)');
-    expect(main).toContain('setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0)');
-    expect(main).toContain('remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary }');
+    expect(pickupAuthority).toContain('setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0)');
+    expect(pickupAuthority).toContain('remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary }');
   });
 
   it('commits a redeploy loadout, inventory and checkpoint before publishing the receipt', () => {

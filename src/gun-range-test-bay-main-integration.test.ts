@@ -70,7 +70,7 @@ describe('Gun Range test-bay match timer integration', () => {
     const rejoinEnd = source.indexOf('\nfunction acceptLobbyReady', rejoinStart);
     const rejoin = source.slice(rejoinStart, rejoinEnd);
     expect(rejoin).toContain('network.confirmPlayerAdmission(message.playerId');
-    expect(rejoin).toContain('broadcastHostLobby(currentPhase);');
+    expect(rejoin).toContain('broadcastHostLobby(phaseAtCommit);');
 
     const projectionStart = source.indexOf('function projectActiveGunRangeMatchClock');
     const projectionEnd = source.indexOf('\nfunction initializeGunRangeMatchClock', projectionStart);

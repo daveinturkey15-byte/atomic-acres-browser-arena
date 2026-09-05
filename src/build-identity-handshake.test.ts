@@ -68,9 +68,10 @@ describe('pass94 build-identity lobby handshake', () => {
   it('hosts a five second numbered deploy countdown from the shared epoch', () => {
     const privateMatch = read('private-match.ts');
     expect(privateMatch).toContain('export const LOBBY_START_LEAD_MS = 5_000;');
-    const main = read('legacy-main.ts');
-    expect(main).toContain("snapshot?.phase === 'countdown' && snapshot.activeAtEpochMs !== null");
-    expect(main).toContain('`DEPLOYING IN ${countdownRemainS}`');
-    expect(main).toContain('function scheduleLobbyCountdownRefresh');
+    const lobbyView = read('mp-lobby-authority-views.ts');
+    expect(lobbyView).toContain("snapshot?.phase === 'countdown' && snapshot.activeAtHostTimeMs !== null");
+    expect(lobbyView).toContain('hostTimeToGuestMono(');
+    expect(lobbyView).toContain('`DEPLOYING IN ${countdownRemainS}`');
+    expect(read('legacy-main.ts')).toContain('function scheduleLobbyCountdownRefresh');
   });
 });
