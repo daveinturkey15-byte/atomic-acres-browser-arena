@@ -670,10 +670,13 @@ describe('presentation prewarm startup contract', () => {
     //    byte-for-byte the sequence that took the 56-pair switch matrix to 56/56,
     //  * on a cold session only where a cold session has been MEASURED to lose
     //    the 12 s fence, answered by cold-session-precompile-reach.ts.
-    // Both surviving cases take the WHOLE SCENE, exactly as PASS 86 does, so no
-    // arena's relief is narrower than the one it ships with today. A future edit
-    // that drops the guard, inverts it, or narrows the root fails here.
-    expect(coldWebGpuWarmFrame.match(/precompileExactScenePass\(/g) ?? []).toHaveLength(1);
+    // In-session switches retain the whole-scene relief; a cold session has no
+    // prior arena vocabulary, so its first compile is scoped to the admitted
+    // arena root and the later coverage draw owns the shared roots. A future
+    // edit that drops the guard, inverts it, or widens the cold root fails here.
+    expect(coldWebGpuWarmFrame.match(/precompileExactScenePass\(/g) ?? []).toHaveLength(2);
+    expect(coldWebGpuWarmFrame)
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));');
     for (const fencedStep of [
       'requestStaticShadowRefresh(true);',
       'await submitForegroundWebGpuFrame(true);',

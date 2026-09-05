@@ -61,11 +61,11 @@ import { ARENA_IDS, type ArenaId } from '../arena-identity';
  * The relief this buys is the SAME relief: `precompileExactScenePass` runs
  * first, through `compileAsync` -> `createRenderPipelineAsync`, which Dawn
  * compiles on worker threads OUTSIDE any fence, so the fenced warm frame finds
- * the pipelines already built. IT DOES NOT WIDEN THE FENCE - the 12 s bound in
- * the transition is untouched and `presentation-prewarm-contract.test.ts` still
- * pins it verbatim. It costs this arena's first load the added
- * `visual-definition` time lane H2 measured, which is the price farcrysis
- * already pays and is worth paying against a rollback.
+ * the pipelines already built. Cold sessions pass the newly admitted arena
+ * root; in-session switches pass the whole scene because their prior arena
+ * cache is the falsifier that caused the original switch failure. IT DOES NOT
+ * WIDEN THE FENCE - the 12 s bound in the transition is untouched and
+ * `presentation-prewarm-contract.test.ts` still pins it verbatim.
  *
  * Candidate 6 remeasured this authority after the geometry/material merge.
  * The first measurement made the Nuke cold precompile look redundant because

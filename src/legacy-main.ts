@@ -30126,17 +30126,24 @@ async function performArenaSelection(
       // evidence. So the cold-session relief is asked of that authority, and
       // this region still contains no arena id (pinned twice).
       //
-      // The intermediate step of this lane scoped the COLD-SESSION root to
-      // `arena.root` and measured it: it recovered 2 932 ms of the 8 583 and left
-      // 5 645 ms, so the cold session stopped running the relief at all except
-      // where it is needed. That left the narrowed root reachable ONLY for the
-      // arena the authority names - which would have shipped farcrysis a
-      // NARROWER relief than PASS 86 gives it today, on no evidence. Both
-      // surviving cases therefore take the whole scene, exactly as PASS 86 does.
+      // A cold session has no prior arena vocabulary to protect. Keep the
+      // measured off-fence relief for the named cold-fence losers, but scope
+      // that first compile to the newly admitted arena root; the later exact
+      // coverage draw owns the shared retained roots. In-session switches keep
+      // the whole-scene relief above because their prior arena cache is the
+      // falsifier that caused the original switch failure.
       const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
       if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
         const scenePassPrecompile = pass64TslSystems;
-        await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+        if (hadPreparedArena) {
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+        } else {
+          // A cold page has no prior arena vocabulary to protect. Compile only
+          // the newly admitted arena root; the pass graph and shared retained
+          // roots are covered by the later exact coverage draw. This keeps the
+          // cold-fence relief from compiling unrelated menu/support roots.
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));
+        }
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
