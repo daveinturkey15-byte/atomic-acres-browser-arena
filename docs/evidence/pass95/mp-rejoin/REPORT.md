@@ -82,7 +82,7 @@ PASS73_NATIVE_WEBGPU=1 MP_SOAK_DIST_PORT=4233 MP_SOAK_PEER_PORT=4234 npm run qa:
 ## Verification and commits
 
 - **[VERIFIED]** `npx tsc --noEmit` passed after the final ratchet-preserving cleanup.
-- **[VERIFIED]** Final targeted ratchet and multiplayer audit-fix tests passed: 42 tests across 2 files. The preceding complete requested focused selection reached 500/501 before the size-only cleanup; its only failure was the unchanged size ceiling, then the final rerun passed the ratchet and affected tests.
+- **[VERIFIED]** The complete requested focused selection passed after cleanup: 48 test files, 501 tests passed. The legacy-main size ratchet remained unchanged at 37,396 lines.
 - **[VERIFIED]** The build, audit, soak, and evidence artifacts are local under `artifacts/qa/`; no secrets were printed or stored.
 - **[OPEN]** Pipeline preflight's lockfile check passed, but the repository contract rejected this user-mandated branch name because it expects `contrib/dave-gaming-pc/codex/<short-outcome>`. No bypass or threshold change was made.
-- **[VERIFIED]** Each implementation step was committed and pushed to `origin/contrib/dave-gaming-pc/claude/mp-rejoin`: `e61ce70e`, `989a89ad`, `0cc85d8f`, `021ce6b7`, `afc0bafa`, `b783eede`, `da563c3e`, `0b3221f6`, `e15bbfe8`, `8cd024aa`, and `dd79438b`. This report is the final evidence commit.
+- **[VERIFIED]** Each implementation step was committed and pushed to `origin/contrib/dave-gaming-pc/claude/mp-rejoin`: `e61ce70e`, `989a89ad`, `0cc85d8f`, `021ce6b7`, `afc0bafa`, `b783eede`, `da563c3e`, `0b3221f6`, `e15bbfe8`, `8cd024aa`, `dd79438b`, and `12de0456`; this report update is pushed as the final evidence commit.
