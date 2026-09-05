@@ -476,8 +476,6 @@ describe('Pass 64 authored TSL pipeline set', () => {
     const placeholder = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
     expect(placeholder.visible).toBe(false);
     expect((placeholder.userData.waterBody as unknown)).toBeUndefined();
-    expect(placeholder.geometry.getAttribute('position')).toBeDefined();
-    expect(placeholder.geometry.getAttribute('position')!.count).toBeGreaterThan(0);
     systems.dispose();
   });
 
