@@ -42,9 +42,7 @@ export const definition = createProceduralArenaVisualDefinition({
   // HF-396: cameras track the rescaled landmarks — spawn-side beach (doubled
   // corner), jungle mid-ring, core interior, and the seaplane throwback now
   // at (48, -48). maximumDistance for shadows raised to cover the island.
-  /* reviewCameras: [
-    camera('farcrysis-beach-golden', [-54, 3.2, -54], [0, 1.2, 0], 'overview', 1.08),
-    camera('farcrysis-jungle-dapple', [-20, 1.9, -24], [0, 1.7, 0], 'light-occlusion', 1.08),
+  // Review camera positions are owned by FARCRYSIS_REVIEW_STATIONS below.
     // HF-423: this camera sat at [0, 2.6, 0] - INSIDE farcrysis-core-catwalk,
     // whose slab spans x -3.5..3.5, z -1.2..1.2 at y 2.41..2.59. MEASURED by
     // casting the frame's own rays through the built arena: the nearest opaque
@@ -54,15 +52,10 @@ export const definition = createProceduralArenaVisualDefinition({
     // the stair run: nearest surface 1.24 m, 32 distinct surfaces (was 23),
     // and the frame is catwalk 24 % / terrain 20 % / desk 9 % / east wall 6 %
     // - the interior it is named for.
-    camera('farcrysis-core-interior', [-4.3, 1.65, 0], [3.4, 1.9, 2.4], 'geometry', 1.08),
-    camera('farcrysis-seaplane-throwback', [48, 2.4, -48], [40, 1.2, -40], 'overview', 1.08),
     // Shore-band audit cameras (HF-395/396 round 4): the top-down frame proves
     // every vegetation band hugs the square shoreline instead of a legacy
     // circular radius, and the west-shoreline frame proves it at eye level
     // where beach grass meets the actual waterline.
-    camera('farcrysis-island-topdown', [0, 95, 2], [0, 0, 0], 'overview', 1.08),
-    camera('farcrysis-west-shoreline', [-62, 5, -6], [-50, 1.2, 12], 'overview', 1.08),
-  ], */
   reviewCameras: FARCRYSIS_REVIEW_STATIONS.map((entry) =>
     camera(entry.id, entry.position, entry.target, entry.purpose, entry.exposure, entry.far)),
   collisionIdentity: { authoritativeArenaId: 'farcrysis', evidence: 'ArenaMap farcrysis collider, cover and shot-surface identity', presentationMayMutateAuthority: false },
