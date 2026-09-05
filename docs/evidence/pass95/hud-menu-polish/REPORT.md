@@ -273,3 +273,111 @@ new test file, three lines in `bootstrap.ts`. What this session adds is the
 independent gate re-run, the two source-verified confirmations for requirement
 (2), the falsification of the impact-channel hypothesis, the sharper
 crosshair-spread hypothesis for the perf OPEN item, and this gotcha.
+
+---
+
+## Finish round (third session, 2026-09-05) - Muse review UNFINISHED waterfront
+
+Harness for this round: OMP on `dave-gaming-pc`, same worktree and branch,
+continued from `c0b13857`. Constraints honoured throughout: no browsers, no
+GPU, no builds, no `npm install/ci/rebuild`; nothing outside this worktree
+touched; port 4300 untouched; power plan **[VERIFIED]** High performance
+(`8c5e7fda-...`) before meaningful work. One commit per item below, each with
+explicit paths and the `fix(ui): finish -` prefix. Nothing was weakened,
+skipped, widened or deleted; the 1.5 ms budget and the 12px ramp stand
+unchanged on both sides of every edit.
+
+### 1. Menu column overflow at 1280x720 (UNFINISHED-3 / F3) - mechanism landed, measurement [OPEN]
+
+**[VERIFIED]** `src/ui/pass95-hud-menu-polish.css` gains PART 5: a
+`min-height: 0` chain over `#menu-panel-deploy` / `.arena-command` /
+`#map-selector` (without it a grid item refuses to shrink and no overflow
+rule can engage), `overflow-y: auto` on the arena column and the selector
+itself with a viewport-relative `max-height`, `overscroll-behavior: contain`
+on the selector, `scrollbar-gutter: stable`, and a `max-height: 800px` media
+tightening (showcase ceiling `min(22vh, 220px)`, denser column). The sheet
+still contains no `@keyframes`, no `transition:`, no font and no network
+asset (asserted). The horizontal card rail stays a design change, as the
+review ruled - this makes the overflow reachable, it does not restyle the
+grid.
+
+**[VERIFIED]** the unit suite extends the bounding-box gate without a browser:
+two source contracts (containment rules present in the sheet; the harness
+gates menu offscreen per viewport at all three sizes) plus a measurement
+shape pin (the committed capture contains `#map-selector`,
+`#high-score-card`, `#menu-showcase` at all three sizes, so a re-record
+cannot silently drop them). Strict `[]`-green for menu offscreen needs one
+browser re-record and stays **[OPEN]** alongside the rail.
+
+### 2. `.hud-map-console` 12px-ramp disagreement (UNFINISHED-2 / F2) - model fixed
+
+**[VERIFIED]** the harness was the wrong model, and the harness is what
+moved. Its text is two status labels (`#map-heading`, `#location-label`:
+`900/800 9px` in `src/ui/tactical-ui.css:1218-1228`, 10-11px measured) and
+its decision content is the `#minimap` canvas, so no 12px value exists by
+design. `scripts/qa/audit-hud-menu-layout.mjs` now records
+`.hud-map-console` as `critical: false` with that canvas rationale in a
+comment; the 12px ramp assertion itself is byte-identical on both sides. The
+suite pins the agreement (`critical: false` present in the harness source).
+The committed `after-layout.json` still carries the 3 `type-ramp` findings
+from the old flag - re-recording them away needs the same single browser
+cycle as item 1 and stays **[OPEN]**.
+
+### 3. HUD-attributed 2.852 ms/frame vs the 1.5 ms budget (UNFINISHED-1 / F1) - churn removed, proof [OPEN]
+
+**[VERIFIED]** static profile of `updateHud` (`src/legacy-main.ts:28269`,
+10 Hz tick): ~20 text/style writes every 100 ms even when unchanged
+(location, health, health-fill width, damage dealt/taken, weapon, ammo,
+reserve, mode/aqua/coral labels, both scores, timer, objective, respawn
+countdown, reload line, stance, grenades), one unguarded crosshair `--spread`
+write per tick (the F1 mechanism: unregistered, inheriting, spent in four
+transitioned layout properties), and a full `#network-strip` innerHTML
+rebuild per tick (10 Hz DOM reconstruction for ping text that moves at ~1 Hz
+at best).
+
+**[VERIFIED]** fixed without changing any displayed value:
+`src/ui/hud-write-cache.ts` (new) exports `setHudText` / `setHudStyle`
+(per-element last-value caches; the DOM write is skipped only when the value
+is already there) and `railgunStatusCopy` (the pure status line, hoisted so
+`legacy-main.ts` goes 37396 -> **37394** lines, under the ratchet with no
+ceiling change). Every 10 Hz site plus the four overlapping match-start
+sites (`#match-mode-label`, `#objective`, `#aqua-label`, `#coral-label` -
+converted so no direct write can desynchronise a cache) now goes through the
+helpers, 1:1; the strip rebuild is throttled to 500 ms. Untouched and
+profiled: `crosshair.hidden` / `ads` toggles, `#health-block` toggle,
+respawn/roster conditionals (already event-gated), `updateFieldSupportHud`
+internals, the 60 Hz minimap canvas redraw (Canvas2D cost, not style/layout),
+and every `querySelector` (ID lookups, negligible next to invalidation).
+`src/ui/hud-write-cache.test.ts` (new, 4 tests) pins skip-on-identical,
+per-property independence, and all five railgun branches.
+
+**[OPEN] - blocking, unchanged in kind.** Whether the residual 2.2 ms of
+recalc actually falls can only be shown by the harness attribution rung in a
+browser (same `--host 127.0.0.1` + HTTP-200 readiness as below). The budget
+stands unwidened and still gates.
+
+### 4. Other small, certain review findings - done
+
+**[VERIFIED]** F4 is now documented where the next runner will read it: the
+audit header records the preview-bind gotcha with the exact invocation
+(`npx vite preview --port 4261 --strictPort --host 127.0.0.1`) and the
+HTTP-200-from-127.0.0.1 readiness gate. F3's "do not lower the 160px
+threshold" required no action and none was taken; F1's crosshair-register vs
+transform choice stays with its measured cycle plus ADS visual review, per
+the review. The candidate-7 cold fence (`WebGPU queue completion exceeded
+12000 ms`) was not touched.
+
+### Gates quoted for this round
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | **[VERIFIED]** exit 0, no output |
+| `npx vitest run src/ui src/legacy-main-size-ratchet.test.ts` | **[VERIFIED]** `Test Files 25 passed (25)`, `Tests 258 passed (258)`, zero failures |
+| `node --check scripts/qa/audit-hud-menu-layout.mjs` | **[VERIFIED]** clean, after each harness edit |
+| `wc -l src/legacy-main.ts` | **[VERIFIED]** **37394**, 2 under the 37,396 ceiling; ceiling and history untouched |
+| `git status` | **[VERIFIED]** clean after each commit; 4 commits, one per item, explicit paths |
+
+No build was run (out of scope for this round by instruction); no browser
+measurement was taken or restated. Every number above the Gates table that is
+not marked **[VERIFIED]** here is inherited from the earlier sessions'
+**[MEASURED]** runs and is left exactly as it was.

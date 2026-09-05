@@ -26,6 +26,13 @@
  * Usage:
  *   node scripts/qa/audit-hud-menu-layout.mjs --label before --out <dir>
  * Exit code is non-zero when a finding is present, so it can gate.
+ *
+ * Preview bind gotcha (F4, measured 2026-09-05): `vite preview` binds
+ * `localhost` (::1 first) while BASE_URL defaults to 127.0.0.1, so start
+ * the server with `--host 127.0.0.1` and gate readiness on HTTP 200 from
+ * 127.0.0.1, never on the log line:
+ *   npx vite preview --port 4261 --strictPort --host 127.0.0.1
+ *   curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4261/  # 200 first
  */
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
