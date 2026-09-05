@@ -211,7 +211,7 @@ async function scenarioStairFire(role) {
     const value = snapshot?.player?.team ?? snapshot?.privateMatch?.members?.find((member) => member.id === snapshot?.player?.id)?.team;
     return value === 1 ? 1 : 0;
   });
-  const stair = arenaStairGeometry(arenaId, team);
+  const stair = arenaStairGeometry(bundle.arena ?? arenaId, team);
   if (!stair) return { ok: false, staged: false, reason: `no authored stair geometry for ${arenaId}` };
   const eyeOffset = Number(before?.players?.[before.selfId]?.position?.[1]) - stair.foot[1];
   const bodyPosition = stair.foot.map((value, index) => value + ((stair.top[index] - value) * 0.5));

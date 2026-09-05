@@ -21,7 +21,7 @@ test('soak hard stop remains under the five-minute browser fence and starts afte
 });
 
 test('stair probe uses returned arena anchors and preserves fire evidence', () => {
-  assert.match(source, /arenaStairGeometry\(arenaId, team\)/);
+  assert.match(source, /arenaStairGeometry\(bundle\.arena \?\? arenaId, team\)/);
   assert.match(source, /stair\.foot/);
   assert.match(source, /stair\.top/);
   assert.match(source, /debug\.teleportPlayer\(bodyPosition\[0\], bodyPosition\[1\], bodyPosition\[2\]/);
