@@ -296,7 +296,9 @@ describe('Pass 65 sound-event inventory', () => {
     // inventory - the Raid rebuild's two bed sources, its one event source and
     // its music variant row now sit alongside the Nuke Town Rebuild's, so
     // neither branch's pin was correct on its own.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9');
+    // PASS 95 audio-polish (HF-509, 2026-09-05): recomputed after the frag and
+    // support explosion events gained the positional `explosionAt` emitter.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('9cb2cc80d6393e7458758eb62f0f562d916e998fd890daa68fbaab8f0e9eddc9');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

@@ -15,7 +15,9 @@ describe('conventional fragmentation grenade audio contract', () => {
     const audioSource = readFileSync('src/audio.ts', 'utf8');
     const gameplaySource = readFileSync('src/legacy-main.ts', 'utf8');
     expect(audioSource).not.toMatch(/sanctified|hallelujah|choir/i);
-    expect(gameplaySource).toContain('audio.explosion(afterPresentationDetach)');
+    // PASS 95: the frag detonation is positioned (explosionAt) but still the
+    // normal explosion mix; the retired choir sting stays retired.
+    expect(gameplaySource).toContain("audio.explosionAt(point, 'semtex', afterPresentationDetach)");
     expect(gameplaySource).not.toMatch(/sanctifiedFragExplosion|preloadSanctifiedFragChoir/);
   });
 });

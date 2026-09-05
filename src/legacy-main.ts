@@ -3994,7 +3994,7 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
         tick: interactiveWorldTick,
       })?.accepted) {
         changed = true;
-        audio.shedDoorMotion(blocker.position.distanceTo(camera.position));
+        audio.shedDoorMotion(blocker.position.distanceTo(camera.position), blocker.position);
       }
       continue;
     }
@@ -8036,7 +8036,7 @@ function synchronizeGunRangeTestBayDoorWorld(
     presentedGunRangeTestBayDoorThumpSequence = doorState.thumpSequence;
     if (presentThump) {
       const trigger = GUN_RANGE_TEST_BAY_CONTRACT.door.trigger;
-      audio.testBayDoorThump(player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)));
+      audio.testBayDoorThump(player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)), trigger);
     }
   }
   if (doorArenaChanged || doorFrame.collisionChanged) syncInteractiveWorldPhysics();
@@ -13068,7 +13068,7 @@ function onNetworkMessage(message: GameMessage): void {
         // so the replicated host receipt cannot double-apply residual damage.
         flamethrowerStreamPresentation.igniteGround(point, presentedAt);
       }
-      audio.explosion(presentedAt);
+      audio.explosionAt(point, 'support', presentedAt);
       supportExplosionPresentation.emit(
         point,
         impact.source === 'chopper' ? 3.2 : CARPET_BOMBER_BLAST_RADIUS_M,
@@ -14458,7 +14458,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     });
     const operator = sender.root.userData.operator as THREE.Group | undefined;
     if (operator) fireOperator(operator);
-    audio.shot('flare-gun', true, new THREE.Vector3(...request.origin).distanceTo(camera.position));
+    audio.shot('flare-gun', true, new THREE.Vector3(...request.origin).distanceTo(camera.position), { x: request.origin[0], y: request.origin[1], z: request.origin[2] });
     if (!spawned) {
       finishPendingFlareShot(request.by, request.nonce, null);
     } else {
@@ -14479,7 +14479,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     );
     const operator = sender.root.userData.operator as THREE.Group | undefined;
     if (operator) fireOperator(operator);
-    audio.shot('explosive-crossbow', true, new THREE.Vector3(...request.origin).distanceTo(camera.position));
+    audio.shot('explosive-crossbow', true, new THREE.Vector3(...request.origin).distanceTo(camera.position), { x: request.origin[0], y: request.origin[1], z: request.origin[2] });
     finish('accepted-miss', 'none', admission.appliedRewindMs);
     return;
   }
@@ -14872,7 +14872,7 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
     });
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
-    audio.shot('flare-gun', true, origin.distanceTo(camera.position));
+    audio.shot('flare-gun', true, origin.distanceTo(camera.position), origin);
     return null;
   }
   if (message.weapon === 'explosive-crossbow') {
@@ -14883,7 +14883,7 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
     spawnExplosiveBolt(message.by, ownerTeam, origin, direction, false, message.nonce);
     const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
     if (remoteOperator) fireOperator(remoteOperator);
-    audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+    audio.shot(message.weapon, true, origin.distanceTo(camera.position), origin);
     return null;
   }
   const traceDistance = message.weapon === 'railgun'
@@ -14913,11 +14913,11 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
     ));
     if (!impactAudioPlayed) {
       impactAudioPlayed = true;
-      audio.impact(surface, point.distanceTo(camera.position));
+      audio.impact(surface, point.distanceTo(camera.position), point);
     }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
-  if (message.weapon !== 'railgun') audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+  if (message.weapon !== 'railgun') audio.shot(message.weapon, true, origin.distanceTo(camera.position), origin);
   return visibleEnd;
 }
 
@@ -15945,7 +15945,7 @@ function breakHouseWindow(
   // deferred physics sync. Visual effects still happen immediately.
   scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
   spawnImpactFlash(point, 'glass', normal);
-  audio.impact('glass', point.distanceTo(camera.position));
+  audio.impact('glass', point.distanceTo(camera.position), point);
   return true;
 }
 
@@ -19614,7 +19614,7 @@ function tryFire(now: number): void {
       spawnImpactFlash(point, impact.surface.material, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
-        audio.impact(surface, point.distanceTo(camera.position));
+        audio.impact(surface, point.distanceTo(camera.position), point);
       }
       // HF-386: this is the branch most floor and wall strikes actually take
       // (the ground is a ballistic surface, so the pure-world fallback below
@@ -19635,7 +19635,7 @@ function tryFire(now: number): void {
       spawnImpactFlash(point, result.impactMaterial ?? surface, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
-        audio.impact(surface, point.distanceTo(camera.position));
+        audio.impact(surface, point.distanceTo(camera.position), point);
       }
       // HF-386: remember the first pure-world strike of this trigger pull so
       // the post-loop pass can decide whether the pull deserves an explicit
@@ -20785,7 +20785,7 @@ function acceptHostedBotWeaponPresentation(message: BotWeaponPresentationMessage
     flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, new THREE.Vector3(...admitted.end), performance.now());
   }
   if (bot && bot.weapon === admitted.weapon) fireOperator(bot.root);
-  audio.shot(admitted.weapon, true, origin.distanceTo(camera.position));
+  audio.shot(admitted.weapon, true, origin.distanceTo(camera.position), origin);
 }
 
 function botElevationAt(position: THREE.Vector3, previousY: number): number {
@@ -20951,7 +20951,7 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
     || message.presentation === 'signal-flare-projectile';
   if (!hasDedicatedPresentation) {
     spawnTracer(bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3()) ?? origin, origin.clone().addScaledVector(direction, 55), WEAPONS[message.weapon].color);
-    audio.shot(message.weapon, true, origin.distanceTo(camera.position));
+    audio.shot(message.weapon, true, origin.distanceTo(camera.position), origin);
   }
   trimNonceSet();
 }
@@ -21197,7 +21197,7 @@ function updateBots(dt: number, now: number): void {
       const shotUp = new THREE.Vector3().crossVectors(shotRight, baseDirection).normalize();
       const botMuzzle = bot.root.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
       const actionNonce = randomNonce();
-      audio.shot(bot.weapon, true);
+      audio.shot(bot.weapon, true, (botMuzzle ?? bot.root.position).distanceTo(camera.position), botMuzzle ?? bot.root.position);
       if (fireAdapter === 'signal-flare-projectile') {
         const sample = sampleWeaponPellet(botWeapon, 0, jitter, gameplayRandom(), gameplayRandom());
         const jitteredDirection = baseDirection.clone()
@@ -21263,7 +21263,7 @@ function updateBots(dt: number, now: number): void {
           ));
           if (!impactAudioPlayed) {
             impactAudioPlayed = true;
-            audio.impact(surface, point.distanceTo(player.position));
+            audio.impact(surface, point.distanceTo(player.position), point);
           }
         }
         if (resolution.hitTarget) {
@@ -21639,7 +21639,7 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
     : null;
   disposeExplosiveBolt(bolt);
   spawnGrenadeExplosionVisual(point, now);
-  audio.explosion(now);
+  audio.explosionAt(point, 'crossbow', now);
   cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
     distanceUnits: point.distanceTo(player.position),
     family: 'crossbow',
@@ -22918,7 +22918,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
   if (entity.grenade === 'smoke') {
-    audio.coverImpact(point.distanceTo(player.position));
+    audio.coverImpact(point.distanceTo(player.position), point);
     spawnSmokeVolume(point, afterPresentationDetach, entity.actionNonce, entity.ownerId);
     return;
   }
@@ -22927,7 +22927,7 @@ function explodeGrenade(entity: GrenadeEntity): void {
     applyFlashGrenade(point, entity, afterPresentationDetach);
     return;
   }
-  audio.explosion(afterPresentationDetach);
+  audio.explosionAt(point, 'semtex', afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
   const explosionDistance = point.distanceTo(player.position);
@@ -23101,7 +23101,7 @@ function armImpactGrenade(
       );
     }
   }
-  audio.coverImpact(position.distanceTo(player.position));
+  audio.coverImpact(position.distanceTo(player.position), position);
 }
 
 function updateGrenades(dt: number, now: number): void {
@@ -23189,7 +23189,7 @@ function updateGrenades(dt: number, now: number): void {
         continue;
       }
       spawnImpactFlash(grenade.mesh.position.clone());
-      audio.coverImpact(grenade.mesh.position.distanceTo(player.position));
+      audio.coverImpact(grenade.mesh.position.distanceTo(player.position), grenade.mesh.position);
       releaseGrenadeWorldPresentation(grenade.mesh);
       releaseBotGrenadeOwner(grenade);
       grenades.splice(index, 1);
@@ -24954,7 +24954,7 @@ function updateKillstreakPossession(now: number): void {
         );
         spawnImpactFlash(point, firstImpact.surface.material, normal);
         const surface = ballisticImpactSurface(firstImpact.surface.material);
-        audio.impact(surface, point.distanceTo(camera.position));
+        audio.impact(surface, point.distanceTo(camera.position), point);
         // HF-386 truth gate: a world-hit round cannot know its own host
         // outcome synchronously, so while showGunnerTargetConfirm is still
         // presenting a CONFIRMED damage event (gunnerTargetConfirmUntil is
@@ -25084,7 +25084,7 @@ function updatePass65KillstreakRuntime(now: number): void {
             modifiers: [`activation:${impact.activationId}`, `impact:${impact.ordinal}`],
           });
         }
-        audio.explosion(now);
+        audio.explosionAt(point, 'support', now);
         supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
         cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
           distanceUnits: point.distanceTo(player.position),
@@ -25094,7 +25094,7 @@ function updatePass65KillstreakRuntime(now: number): void {
         });
       } else {
         applyInteractiveWorldExplosion(point, CHOPPER_MISSILE_BLAST_RADIUS_M, CHOPPER_MISSILE_MAX_DAMAGE);
-        audio.explosion(now);
+        audio.explosionAt(point, 'support', now);
         // Presentation radius deliberately tighter than the 4.5 m authority
         // radius: the full-size additive sphere reads as a flat disc from the
         // cockpit; a denser ball + the grenade anatomy reads as a blast.
@@ -25795,7 +25795,7 @@ function supportBlast(
   recordProfile = true,
 ): ExplosionSyncProfile {
   const started = performance.now();
-  audio.explosion(started);
+  audio.explosionAt(point, 'support', started);
   const afterAudio = performance.now();
   supportExplosionPresentation.emit(point, radius, started);
   cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
@@ -36917,7 +36917,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const detachedChunksBefore = interactiveWorldRuntime.telemetry().detachedChunks;
     const grenadeExplosionsBefore = grenadeExplosions;
     const detonatedAt = performance.now();
-    audio.explosion(detonatedAt);
+    audio.explosionAt(point, 'semtex', detonatedAt);
     spawnGrenadeExplosionVisual(point, detonatedAt);
     cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
       distanceUnits: point.distanceTo(player.position),

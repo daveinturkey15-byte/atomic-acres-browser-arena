@@ -12,7 +12,6 @@ import {
   ChiptuneRotation,
   type ChiptuneEvent,
   type ChiptuneTrackId,
-  GAME_MUSIC_BUS_GAIN,
   GAME_MUSIC_COMBAT_DUCK_GAIN,
   GAME_MUSIC_NOTE_GAIN_SCALE,
   advanceMultiTrackSchedule,
@@ -58,6 +57,12 @@ import {
   weaponReportLayering,
   type AcousticSpace,
 } from './audio-immersion';
+// PASS 95 audio-polish: one level table for every bus, pan-only pooled world
+// panners with a documented per-family range, and a reverb return keyed by
+// the listener's acoustic zone.
+import { audioBusBaseGain } from './audio-buses';
+import { WORLD_PANNER_PROFILE, reverbZoneProfile, worldSoundAttenuation, type WorldSoundFamily } from './audio-world-positional';
+import { acousticSpaceOverrideFor } from './audio-zone-map';
 
 const WEAPON_REPORT_GAIN = Object.freeze(Object.fromEntries(
   WEAPON_CATALOG.map((weapon) => [weapon.id, weapon.effects.reportGain]),
@@ -628,8 +633,22 @@ const WEAPON_ACOUSTIC_CHARACTERS: Readonly<Record<WeaponId, WeaponAcousticCharac
 type ReverbGraph = Readonly<{
   input: GainNode;
   returnGain: GainNode;
+  earlyDelay: DelayNode;
+  lateDelay: DelayNode;
+  earlyFeedback: GainNode;
+  lateFeedback: GainNode;
   nodes: readonly AudioNode[];
 }>;
+
+/** Footstep chains pre-built at unlock; a two-bot skirmish uses at most this many at once. */
+const WORLD_FOOTSTEP_CHAIN_PREWARM = 4;
+
+/** One pooled, pan-only world panner. Created before the fence, reused in combat. */
+type WorldPannerSlot = {
+  panner: PannerNode;
+  busy: boolean;
+  timer: ReturnType<typeof setTimeout> | null;
+};
 
 /**
  * HF-376 shaping shared by both transient primitives. Every field is optional
@@ -882,6 +901,10 @@ export class ArenaAudio {
   private damageFeedbackPulses = 0;
   private spatialChains = 0;
   private footstepChains: SpatialFootstepChain[] = [];
+  /** PASS 95: pooled world panners; see prepareWorldPanners(). */
+  private worldPanners: WorldPannerSlot[] = [];
+  private worldPannerAcquisitions = 0;
+  private worldPannerStarved = 0;
   private listenerPosition = { x: 0, y: 0, z: 0 };
   /** Pass 75: context time at which the next ambient one-shot may fire. */
   private nextAmbientEventAtSeconds = Number.POSITIVE_INFINITY;
@@ -922,7 +945,7 @@ export class ArenaAudio {
         compressor.attack.value = MASTER_LIMITER_PROFILE.attackSeconds;
         compressor.release.value = MASTER_LIMITER_PROFILE.releaseSeconds;
         this.master = this.context.createGain();
-        this.master.gain.value = 0.34;
+        this.master.gain.value = audioBusBaseGain('master');
         this.master.connect(compressor);
         if (typeof this.context.createAnalyser === 'function') {
           this.outputAnalyser = this.context.createAnalyser();
@@ -939,23 +962,16 @@ export class ArenaAudio {
         this.buses.set('master', this.master);
         this.busIdentity.set(this.master, 'master');
         this.createSharedReverb();
-        this.weapons = this.createBus('sfx', 0.78);
+        // Every coefficient comes from AUDIO_BUS_LEVEL_TABLE (audio-buses.ts);
+        // the table is the level document and the runtime at once.
+        this.weapons = this.createBus('sfx');
         this.feedback = this.weapons;
-        // Fixed mix target: movement sits below gunfire, while readable
-        // confirmations get a little more headroom than the old flat split.
-        this.movement = this.createBus('movement', 0.3);
-        this.ui = this.createBus('ui', 0.45);
-        this.announcements = this.createBus('announcements', 0.55);
-        this.ambience = this.createBus('ambience', 0.12);
-        // Owner 2026-08-30 music halving (see GAME_MUSIC_BUS_GAIN).
-        // Owner 2026-08-30: third halving alongside the game-music bus.
-        this.createBus('menu-music', 0.045);
-        // 2026-08-29 (owner: the chiptunes were promised and never heard).
-        // The old staging multiplied out to ~0.009 amplitude at the default
-        // slider (-41 dBFS) - inaudible under any gunfire. 0.45 x restaged
-        // note gains x default 68% slider lands the bed near -26 dBFS: an
-        // audible background layer that still sits far under weapon SFX.
-        this.createBus('game-music', GAME_MUSIC_BUS_GAIN);
+        this.movement = this.createBus('movement');
+        this.ui = this.createBus('ui');
+        this.announcements = this.createBus('announcements');
+        this.ambience = this.createBus('ambience');
+        this.createBus('menu-music');
+        this.createBus('game-music');
         this.noiseBuffer = this.createNoiseBuffer(1.2);
         this.noiseTextures.clear();
         this.noiseTextures.set('white', this.noiseBuffer);
@@ -969,6 +985,8 @@ export class ArenaAudio {
         }
         for (const id of AUDIO_BUS_IDS) this.applyBusSetting(id);
         this.prepareCombat();
+        this.prepareWorldPanners();
+        this.applyReverbZone();
         if (this.activeArena) this.startArenaBed(this.activeArena);
       } catch {
         // Audio is optional. A sandbox/device policy may expose a constructor
@@ -1044,6 +1062,14 @@ export class ArenaAudio {
     }
     this.spatialChains = Math.max(0, this.spatialChains - this.railgunSpatialChainCount);
     this.railgunSpatialChainCount = 0;
+    for (const slot of this.worldPanners.splice(0)) {
+      if (slot.timer) clearTimeout(slot.timer);
+      if (slot.busy) this.spatialChains = Math.max(0, this.spatialChains - 1);
+      this.spatialReportDestinations.delete(slot.panner);
+      this.spatialReportDistances.delete(slot.panner);
+      this.busIdentity.delete(slot.panner);
+      try { slot.panner.disconnect(); } catch { /* partial browser node */ }
+    }
     const context = this.context;
     this.context = null;
     this.contextSource = 'uninitialized';
@@ -1092,6 +1118,7 @@ export class ArenaAudio {
     // clear any interior override left over from the previous arena.
     this.acousticSpace = arenaAcousticSpace(arenaId);
     this.acousticSpaceOverride = null;
+    this.applyReverbZone();
     this.stopSources(this.arenaSources);
     this.disconnectNodes(this.arenaNodes);
     this.startArenaBed(arenaId);
@@ -1103,7 +1130,113 @@ export class ArenaAudio {
    * Lifecycle only - it emits nothing, it changes how the next report sounds.
    */
   setAcousticSpace(space: AcousticSpace | null): void {
-    this.acousticSpaceOverride = space && acousticProfile(space).space === space ? space : null;
+    const next = space && acousticProfile(space).space === space ? space : null;
+    if (next === this.acousticSpaceOverride) return;
+    this.acousticSpaceOverride = next;
+    this.applyReverbZone();
+  }
+
+  /**
+   * PASS 95: retune the ONE shared reverb return to the current acoustic
+   * zone. Four AudioParam writes with a short ramp - never a new graph, so
+   * crossing a doorway mid-firefight costs nothing on the audio thread.
+   */
+  private applyReverbZone(): void {
+    const graph = this.reverbGraph;
+    const context = this.context;
+    if (!graph || !context) return;
+    const zone = reverbZoneProfile(this.currentAcousticSpace());
+    const now = context.currentTime;
+    const ramp = 0.08;
+    graph.earlyDelay.delayTime.setTargetAtTime(zone.earlyDelaySeconds, now, ramp);
+    graph.lateDelay.delayTime.setTargetAtTime(zone.lateDelaySeconds, now, ramp);
+    graph.earlyFeedback.gain.setTargetAtTime(zone.feedback, now, ramp);
+    graph.lateFeedback.gain.setTargetAtTime(zone.feedback * 0.82, now, ramp);
+    graph.returnGain.gain.setTargetAtTime(zone.returnGain, now, ramp);
+  }
+
+  /**
+   * PASS 95: pre-create the pooled world panners so combat never constructs
+   * a PannerNode (HRTF panner construction is the classic first-shot hitch).
+   * Idempotent; feature-detected so partial test contexts stay dry.
+   */
+  private prepareWorldPanners(): void {
+    const context = this.context;
+    if (!context || !this.weapons || this.worldPanners.length > 0 || typeof context.createPanner !== 'function') return;
+    for (let index = 0; index < AUDIO_RUNTIME_BUDGET.spatialVoices; index += 1) {
+      const panner = context.createPanner();
+      panner.panningModel = WORLD_PANNER_PROFILE.panningModel;
+      panner.distanceModel = WORLD_PANNER_PROFILE.distanceModel;
+      panner.refDistance = WORLD_PANNER_PROFILE.refDistance;
+      panner.maxDistance = WORLD_PANNER_PROFILE.maxDistance;
+      panner.rolloffFactor = WORLD_PANNER_PROFILE.rolloffFactor;
+      panner.connect(this.weapons);
+      this.busIdentity.set(panner, 'sfx');
+      this.worldPanners.push({ panner, busy: false, timer: null });
+    }
+    // Footstep chains were allocated lazily on the first world step of a
+    // match; warm the steady-state set so a bot's first sprint is not the
+    // frame that constructs four HRTF panners.
+    const warmChains: SpatialFootstepChain[] = [];
+    for (let index = 0; index < WORLD_FOOTSTEP_CHAIN_PREWARM; index += 1) {
+      const chain = this.acquireFootstepChain();
+      if (!chain) break;
+      warmChains.push(chain);
+    }
+    for (const chain of warmChains) chain.busy = false;
+  }
+
+  /**
+   * PASS 95: a pan-only pooled panner at `emitter` for a world sound of
+   * `family`, or null when the sound is out of the family's range, the pool
+   * is exhausted, or the spatial budget is full. Level is the caller's; the
+   * panner contributes direction only (see WORLD_PANNER_PROFILE).
+   */
+  private acquireWorldPanner(emitter: SpatialPoint, distance: number, family: WorldSoundFamily): PannerNode | null {
+    if (!this.context || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)) return null;
+    if (worldSoundAttenuation(distance, family) <= 0) return null;
+    if (this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
+      this.voicesDropped += 1;
+      return null;
+    }
+    const slot = this.worldPanners.find((entry) => !entry.busy);
+    if (!slot) {
+      this.worldPannerStarved += 1;
+      return null;
+    }
+    const { panner } = slot;
+    panner.positionX.value = emitter.x;
+    panner.positionY.value = emitter.y;
+    panner.positionZ.value = emitter.z;
+    slot.busy = true;
+    this.worldPannerAcquisitions += 1;
+    this.spatialReportDestinations.add(panner);
+    this.spatialReportDistances.set(panner, distance);
+    this.spatialChains += 1;
+    slot.timer = setTimeout(() => {
+      slot.timer = null;
+      slot.busy = false;
+      this.spatialReportDestinations.delete(panner);
+      this.spatialReportDistances.delete(panner);
+      this.spatialChains = Math.max(0, this.spatialChains - 1);
+    }, WORLD_PANNER_PROFILE.holdMs);
+    return panner;
+  }
+
+  /** Bus destination for a world one-shot: the pooled panner when positioned, else the dry sfx bus. */
+  private worldDestination(emitter: SpatialPoint | undefined, distance: number, family: WorldSoundFamily): AudioNode | null {
+    return (emitter ? this.acquireWorldPanner(emitter, distance, family) : null) ?? this.feedback;
+  }
+
+  /** PASS 95 world-panner pool telemetry, for the headless routing test and the report. */
+  worldPannerTelemetry(): Readonly<{ pooled: number; busy: number; acquisitions: number; starved: number; spatialChains: number }> {
+    return Object.freeze({
+      pooled: this.worldPanners.length,
+      busy: this.worldPanners.filter((slot) => slot.busy).length,
+      acquisitions: this.worldPannerAcquisitions,
+      starved: this.worldPannerStarved,
+      spatialChains: this.spatialChains,
+    });
   }
 
   /**
@@ -1599,6 +1732,9 @@ export class ArenaAudio {
   }
 
   updateListener(position: SpatialPoint, yawRadians: number): void {
+    // PASS 95: the listener's position is also the acoustic-zone probe. A
+    // handful of AABB tests per frame; setAcousticSpace early-outs unchanged.
+    this.setAcousticSpace(acousticSpaceOverrideFor(this.activeArena, position));
     if (!this.context || ![position.x, position.y, position.z, yawRadians].every(Number.isFinite)) return;
     this.listenerPosition.x = position.x;
     this.listenerPosition.y = position.y;
@@ -2064,7 +2200,14 @@ export class ArenaAudio {
     const railgunSpatial = weapon === 'railgun' && remote && emitter
       ? this.createRailgunSpatialDestinations(emitter, distance)
       : null;
-    const weaponDestination = railgunSpatial?.weapons ?? this.weapons;
+    // PASS 95 (HF-509): every other player's and bot's report is positioned
+    // through a pooled pan-only panner. Beyond the family's range the report
+    // is not scheduled at all rather than played at a floor level.
+    if (weapon !== 'railgun' && remote && emitter && worldSoundAttenuation(distance, 'weapon-report') <= 0) return;
+    const worldPanner = weapon !== 'railgun' && remote && emitter
+      ? this.acquireWorldPanner(emitter, distance, 'weapon-report')
+      : null;
+    const weaponDestination = railgunSpatial?.weapons ?? worldPanner ?? this.weapons;
     const ambienceDestination = railgunSpatial?.ambience ?? this.ambience;
     // HF-366: the report is layered rather than uniformly scaled. `layering`
     // answers how much crack, body and tail this distance and space deserve;
@@ -2222,7 +2365,7 @@ export class ArenaAudio {
     }, ambienceDestination);
     if (weapon === 'carbine') {
       // Original HK416 pressure and yard-reflection layers; short enough to stay readable at full RPM.
-      this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', this.weapons, 0.008, { punch: 0.34, drive: 0.4, detuneCents });
+      this.sweep(74, 38, 0.16, 0.052 * attenuation, 'triangle', weaponDestination, 0.008, { punch: 0.34, drive: 0.4, detuneCents });
       this.noise({
         duration: 0.14, volume: 0.046 * attenuation, filter: 'bandpass', frequency: 830, q: 0.62, delay: 0.058,
         texture: 'pink', attack: 0.008, punch: 0.5,
@@ -2403,15 +2546,17 @@ export class ArenaAudio {
    * debris (dust, splinters, shards, dirt) that arrives slightly late.
    */
   impact(surface: ImpactSurface, distance = 0, emitter?: SpatialPoint): void {
-    this.duckGameMusicForCombat(0.12);
     const safeDistance = Math.max(0, Number.isFinite(distance) ? distance : 0);
+    this.impactInto(surface, safeDistance, this.worldDestination(emitter, safeDistance, surface === 'glass' ? 'glass' : 'impact'));
+  }
+
+  /** The material strike itself, into an already-resolved (pooled or dry) destination. */
+  private impactInto(surface: ImpactSurface, safeDistance: number, destination: AudioNode | null): void {
+    this.duckGameMusicForCombat(0.12);
     const attenuation = Math.max(0.08, 1 - Math.min(1, safeDistance / 34));
     const variant = (this.stepVariant + this.reportVariant) % 8;
     const detuneCents = roundRobinDetune(variant, 90);
     const profile = IMPACT_MATERIAL_PROFILES[surface];
-    const destination = emitter
-      ? this.createImpactSpatialDestination(emitter, safeDistance) ?? this.feedback
-      : this.feedback;
     const directCutoffHz = distanceLowpassHz(safeDistance, this.currentAcousticSpace());
     // Strike: the moment of contact. Texture is the material's grain - glass
     // and concrete shatter into grains, metal and wood do not.
@@ -2474,21 +2619,28 @@ export class ArenaAudio {
     }
   }
 
-  coverImpact(distance = 0): void {
-    this.impact('concrete', distance);
+  coverImpact(distance = 0, emitter?: SpatialPoint): void {
+    this.impact('concrete', distance, emitter);
   }
 
-  shedDoorMotion(distance = 0): void {
+  shedDoorMotion(distance = 0, emitter?: SpatialPoint): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, distance / 34));
-    this.impact('metal', distance);
-    this.shedPerforation(distance);
-    this.sweep(118, 72, 0.13, 0.032 * attenuation, 'triangle', this.feedback, 0.012);
+    // One pooled panner for the whole door event: strike, perforation and
+    // hinge flex all come from the same place.
+    const destination = this.worldDestination(emitter, Math.max(0, distance), 'door');
+    this.impactInto('metal', Math.max(0, distance), destination);
+    this.shedPerforationInto(distance, destination);
+    this.sweep(118, 72, 0.13, 0.032 * attenuation, 'triangle', destination, 0.012);
   }
 
   /** Thin sheet perforation: sharp puncture, flexing panel and falling chips. */
-  shedPerforation(distance = 0): void {
+  shedPerforation(distance = 0, emitter?: SpatialPoint): void {
+    this.shedPerforationInto(distance, this.worldDestination(emitter, Math.max(0, distance), 'door'));
+  }
+
+  private shedPerforationInto(distance: number, destination: AudioNode | null): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / 42));
-    this.metallicClick(2_900, 0.012, 0.052 * attenuation, { resonanceQ: 10, drive: 0.58 });
+    this.metallicClick(2_900, 0.012, 0.052 * attenuation, { resonanceQ: 10, drive: 0.58, destination });
     this.noise({
       duration: 0.18,
       volume: 0.046 * attenuation,
@@ -2501,7 +2653,7 @@ export class ArenaAudio {
       attack: 0.001,
       punch: 0.42,
       punchSeconds: 0.028,
-    }, this.feedback);
+    }, destination);
     this.noise({
       duration: 0.12,
       volume: 0.022 * attenuation,
@@ -2512,14 +2664,15 @@ export class ArenaAudio {
       delay: 0.052,
       attack: 0.002,
       punch: 0.36,
-    }, this.feedback);
+    }, destination);
   }
 
   /** Vehicle body hit: low panel flex under a bright metal contact. */
-  vehicleHit(distance = 0): void {
+  vehicleHit(distance = 0, emitter?: SpatialPoint): void {
     const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / 60));
-    this.impact('metal', distance);
-    this.sweep(92, 38, 0.28, 0.11 * attenuation, 'sine', this.feedback, 0.008, {
+    const destination = this.worldDestination(emitter, Math.max(0, distance), 'vehicle');
+    this.impactInto('metal', Math.max(0, distance), destination);
+    this.sweep(92, 38, 0.28, 0.11 * attenuation, 'sine', destination, 0.008, {
       attack: 0.003,
       punch: 0.46,
       punchSeconds: 0.06,
@@ -2528,13 +2681,14 @@ export class ArenaAudio {
     });
   }
 
-  glassShatter(distance = 0): void {
-    this.impact('glass', distance);
+  glassShatter(distance = 0, emitter?: SpatialPoint): void {
+    this.impact('glass', distance, emitter);
   }
 
-  testBayDoorThump(distance = 0): void {
+  testBayDoorThump(distance = 0, emitter?: SpatialPoint): void {
     const profile = TEST_BAY_DOOR_THUMP_PROFILE;
     const attenuation = Math.max(0.08, 1 - Math.min(1, Math.max(0, distance) / profile.maximumDistanceM));
+    const destination = this.worldDestination(emitter, Math.max(0, distance), 'door');
     // HF-376: the layer identities and volumes are the authored profile and are
     // pinned by audio-test-bay-door.test.ts; what changed is their shape. A
     // heavy door is a latch releasing, air moving, gear driving and a mass
@@ -2544,7 +2698,7 @@ export class ArenaAudio {
       profile.layers.latch.durationSeconds,
       profile.layers.latch.volume * attenuation,
       profile.layers.latch.wave,
-      this.feedback,
+      destination,
       profile.layers.latch.delaySeconds,
       { attack: 0.0004, punch: 0.18, drive: 0.45 },
     );
@@ -2553,7 +2707,7 @@ export class ArenaAudio {
       profile.layers.pressure.durationSeconds,
       profile.layers.pressure.volume * attenuation,
       profile.layers.pressure.wave,
-      this.feedback,
+      destination,
       profile.layers.pressure.delaySeconds,
       { attack: 0.004, punch: 0.45, drive: 0.3 },
     );
@@ -2563,7 +2717,7 @@ export class ArenaAudio {
       profile.layers.mechanism.durationSeconds,
       profile.layers.mechanism.volume * attenuation,
       profile.layers.mechanism.wave,
-      this.feedback,
+      destination,
       profile.layers.mechanism.delaySeconds,
       { attack: 0.002, punch: 0.5, pitchBias: 0.45 },
     );
@@ -2582,7 +2736,7 @@ export class ArenaAudio {
       resonanceHz: profile.layers.body.frequencyHz * 0.55,
       resonanceQ: 3,
       resonanceGainDb: 8,
-    }, this.feedback);
+    }, destination);
   }
 
   nearMiss(strength: number): void {
@@ -3530,44 +3684,6 @@ export class ArenaAudio {
     return panner;
   }
 
-  /** Optional positional path for world impacts. Legacy callers without a
-   * point retain the dry feedback path, while ballistics callers can opt into
-   * the same inverse falloff, HRTF pan and bounded spatial-chain budget. */
-  private createImpactSpatialDestination(emitter: SpatialPoint, distance: number): PannerNode | null {
-    if (distance > 180 || !this.context || !this.feedback
-      || ![emitter.x, emitter.y, emitter.z, distance].every(Number.isFinite)
-      || this.spatialChains + 1 > AUDIO_RUNTIME_BUDGET.spatialVoices) {
-      this.voicesDropped += 1;
-      return null;
-    }
-    const panner = this.context.createPanner();
-    panner.panningModel = 'HRTF';
-    panner.distanceModel = 'inverse';
-    panner.refDistance = 1.5;
-    panner.maxDistance = 180;
-    panner.rolloffFactor = 0.55;
-    panner.positionX.value = emitter.x;
-    panner.positionY.value = emitter.y;
-    panner.positionZ.value = emitter.z;
-    panner.connect(this.feedback);
-    this.busIdentity.set(panner, 'sfx');
-    this.spatialReportDestinations.add(panner);
-    this.spatialReportDistances.set(panner, distance);
-    this.railgunSpatialNodes.push(panner);
-    this.spatialChains += 1;
-    const cleanup = () => {
-      const index = this.railgunSpatialNodes.indexOf(panner);
-      if (index >= 0) this.railgunSpatialNodes.splice(index, 1);
-      this.busIdentity.delete(panner);
-      try { panner.disconnect(); } catch { /* already disconnected */ }
-      this.spatialChains = Math.max(0, this.spatialChains - 1);
-      const timerIndex = this.railgunSpatialTimers.indexOf(timer);
-      if (timerIndex >= 0) this.railgunSpatialTimers.splice(timerIndex, 1);
-    };
-    const timer = setTimeout(cleanup, 480);
-    this.railgunSpatialTimers.push(timer);
-    return panner;
-  }
 
   syncChopperRotors(sources: readonly Readonly<{
     id: string;
@@ -4085,7 +4201,7 @@ export class ArenaAudio {
       earlyDelay.delayTime.value = SHARED_REVERB_PROFILE.earlyDelaySeconds;
       lateDelay.delayTime.value = SHARED_REVERB_PROFILE.lateDelaySeconds;
       const nodes = [input, earlyDelay, earlyAllpass, earlyFeedback, lateDelay, lateAllpass, lateFeedback, returnGain] as const;
-      this.reverbGraph = Object.freeze({ input, returnGain, nodes });
+      this.reverbGraph = Object.freeze({ input, returnGain, earlyDelay, lateDelay, earlyFeedback, lateFeedback, nodes });
     } catch {
       this.reverbGraph = null;
     }
@@ -4102,9 +4218,9 @@ export class ArenaAudio {
     ducker.gain.setTargetAtTime(1, now + duration, 0.12);
   }
 
-  private createBus(id: Exclude<AudioBusId, 'master'>, gainValue: number): GainNode {
+  private createBus(id: Exclude<AudioBusId, 'master'>): GainNode {
     const bus = this.context!.createGain();
-    bus.gain.value = gainValue;
+    bus.gain.value = audioBusBaseGain(id);
     if (id === 'game-music' && typeof this.context!.createDelay === 'function') {
       // Keep the historical game-music bus coefficient for settings and
       // telemetry, then duck it through a separate gain during combat.
@@ -4175,21 +4291,14 @@ export class ArenaAudio {
     return { weapons, ambience };
   }
 
+  /**
+   * 2026-08-29: a per-id fallthrough here silently REVERTED the chiptune
+   * restage at runtime (configure() overwrote createBus's value), and until
+   * PASS 95 it did the same to menu-music (0.18 here versus 0.045 at
+   * creation). The table is now the only place a coefficient lives.
+   */
   private busBaseGain(id: AudioBusId): number {
-    if (id === 'master') return 0.34;
-    if (id === 'sfx') return 0.78;
-    if (id === 'movement') return 0.3;
-    if (id === 'ui') return 0.45;
-    if (id === 'announcements') return 0.55;
-    if (id === 'ambience') return 0.12;
-    if (id === 'menu-music') return 0.18;
-    // 2026-08-29: this fallthrough silently REVERTED the chiptune restage at
-    // runtime - configure() runs at boot and applyBusSetting overwrote the
-    // createBus(0.45) with 0.16 x slider, which is why the owner still heard
-    // nothing after the "music becomes audible" pass shipped. Single source
-    // of truth now; the contract test pins this file's mapping.
-    if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;
-    return 0.16;
+    return audioBusBaseGain(id);
   }
 
   private applyBusSetting(id: AudioBusId): void {

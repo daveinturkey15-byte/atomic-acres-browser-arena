@@ -318,19 +318,26 @@ export function runtimeSoundCallsiteIdentity(entry: Omit<RuntimeSoundCallsiteCon
  */
 export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCallsiteContractEntry[] = Object.freeze([
   runtimeCallsite('adrenalineState', 'adrenalineActive', 1, ['support.adrenaline-state']),
-  runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position)', 1, ['ordnance.grenade-out-of-bounds-impact']),
-  runtimeCallsite('shedDoorMotion', 'blocker.position.distanceTo(camera.position)', 1, ['shed.door-motion']),
+  // PASS 95 (HF-509): every world one-shot now carries its emitter point so
+  // the runtime positions it through the pooled world panner.
+  runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position),grenade.mesh.position', 1, ['ordnance.grenade-out-of-bounds-impact']),
+  runtimeCallsite('shedDoorMotion', 'blocker.position.distanceTo(camera.position),blocker.position', 1, ['shed.door-motion']),
   runtimeCallsite('shedDoorMotion', 'nearest.distance', 1, ['shed.door-motion']),
-  runtimeCallsite('coverImpact', 'point.distanceTo(player.position)', 1, ['world.projectile-impact']),
-  runtimeCallsite('coverImpact', 'position.distanceTo(player.position)', 1, ['world.projectile-impact']),
+  runtimeCallsite('coverImpact', 'point.distanceTo(player.position),point', 1, ['world.projectile-impact']),
+  runtimeCallsite('coverImpact', 'position.distanceTo(player.position),position', 1, ['world.projectile-impact']),
   runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
   runtimeCallsite('damage', '', 1, ['combat.damage-taken']),
   runtimeCallsite('empty', '', 3, ['weapon.dry-fire']),
-  runtimeCallsite('explosion', 'afterPresentationDetach', 1, ['ordnance.frag-explosion']),
-  runtimeCallsite('explosion', 'detonatedAt', 1, ['ordnance.frag-explosion']),
-  runtimeCallsite('explosion', 'now', 3, ['support.legacy-explosion']),
-  runtimeCallsite('explosion', 'presentedAt', 1, ['support.legacy-explosion']),
-  runtimeCallsite('explosion', 'started', 1, ['support.legacy-explosion']),
+  // PASS 95: detonations are positioned through the HF-351 explosionAt path
+  // (never wired before this pass); the coalesced explosion mix is unchanged.
+  runtimeCallsite('explosionAt', "point,'semtex',afterPresentationDetach", 1, ['ordnance.frag-explosion']),
+  runtimeCallsite('explosionAt', "point,'semtex',detonatedAt", 1, ['ordnance.frag-explosion']),
+  // The crossbow detonation keeps the Pass 64 coalesced support mix until
+  // ordnance.crossbow-explosion leaves 'planned'.
+  runtimeCallsite('explosionAt', "point,'crossbow',now", 1, ['support.legacy-explosion']),
+  runtimeCallsite('explosionAt', "point,'support',now", 2, ['support.legacy-explosion']),
+  runtimeCallsite('explosionAt', "point,'support',presentedAt", 1, ['support.legacy-explosion']),
+  runtimeCallsite('explosionAt', "point,'support',started", 1, ['support.legacy-explosion']),
   runtimeCallsite('flashbang', 'presentation.audioGain', 1, ['ordnance.flash-detonation', 'ordnance.flash-recovery']),
   runtimeCallsite('footstep', 'localSurface,currentSprinting,crouched || prone', 1, ['movement.footstep.local']),
   runtimeCallsite('grenadeBounce', 'impactSpeed', 1, ['ordnance.grenade-bounce']),
@@ -341,11 +348,11 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hunterLaunch', 'index', 1, ['support.hunter-launch']),
-  runtimeCallsite('impact', "'glass',point.distanceTo(camera.position)", 1, ['world.window-break']),
+  runtimeCallsite('impact', "'glass',point.distanceTo(camera.position),point", 1, ['world.window-break']),
   // HF-386: +1 — the possessed chopper gunner's presentation-only world
   // impact now plays the same per-surface world projectile impact.
-  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 4, ['world.projectile-impact']),
-  runtimeCallsite('impact', 'surface,point.distanceTo(player.position)', 1, ['world.projectile-impact']),
+  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position),point', 4, ['world.projectile-impact']),
+  runtimeCallsite('impact', 'surface,point.distanceTo(player.position),point', 1, ['world.projectile-impact']),
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
   runtimeCallsite('matchCountdown', "'engage'", 1, ['announcement.match']),
@@ -366,12 +373,14 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
   runtimeCallsite('setLowHealthFeedback', '{ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 }', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
   runtimeCallsite('setLowHealthFeedback', 'lowHealth.presentation', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
-  runtimeCallsite('shot', 'admitted.weapon,true,origin.distanceTo(camera.position)', 1, ['weapon.report.world']),
-  runtimeCallsite('shot', 'bot.weapon,true', 1, ['weapon.report.world']),
-  runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
-  runtimeCallsite('shot', "'flare-gun',true,new THREE.Vector3(...request.origin).distanceTo(camera.position)", 1, ['weapon.report.world']),
-  runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position)", 1, ['weapon.report.world']),
-  runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
+  // PASS 95 (HF-509): every world report carries its emitter point; bots
+  // report from their muzzle socket (root position before the rig resolves).
+  runtimeCallsite('shot', 'admitted.weapon,true,origin.distanceTo(camera.position),origin', 1, ['weapon.report.world']),
+  runtimeCallsite('shot', 'bot.weapon,true,(botMuzzle ?? bot.root.position).distanceTo(camera.position),botMuzzle ?? bot.root.position', 1, ['weapon.report.world']),
+  runtimeCallsite('shot', "'explosive-crossbow',true,new THREE.Vector3(...request.origin).distanceTo(camera.position),{ x: request.origin[0], y: request.origin[1], z: request.origin[2] }", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', "'flare-gun',true,new THREE.Vector3(...request.origin).distanceTo(camera.position),{ x: request.origin[0], y: request.origin[1], z: request.origin[2] }", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position),origin", 1, ['weapon.report.world']),
+  runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position),origin', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
   // Owner 2026-08-30: chopper missile launch whoosh, host and guest impact loops.
@@ -384,7 +393,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
   runtimeCallsite('syncChopperRotors', '[]', 2, ['support.chopper-rotor']),
   runtimeCallsite('syncChopperRotors', 'activeSupportRotorAudioSources', 1, ['support.chopper-rotor']),
-  runtimeCallsite('testBayDoorThump', 'player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z))', 1, ['test-bay.door-thump']),
+  runtimeCallsite('testBayDoorThump', 'player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z)),trigger', 1, ['test-bay.door-thump']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
   runtimeCallsite('weaponSwitch', '', 7, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
@@ -690,7 +699,7 @@ const events: SoundEventInventoryEntry[] = [
   }),
   existingEvent({
     id: 'ordnance.frag-explosion', family: 'ordnance', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'explosion-world-v1', emitterSymbols: ['explosion'], contractRefs: ['R210', 'R307', 'R308'],
+    spatialProfileId: 'explosion-world-v1', emitterSymbols: ['explosion', 'explosionAt'], contractRefs: ['R210', 'R307', 'R308'],
     concurrency: Object.freeze({ ...WORLD_DENSE_TRANSIENT, cooldownMs: 90, overflow: 'coalesce' as const }),
     lifecycleOwner: 'match-epoch', coverageStatus: 'partial',
     coverageDetail: 'The full mix is coalesced in a 90 ms gate; world position, HRTF, and shared cap enforcement remain planned.',
@@ -726,7 +735,7 @@ const events: SoundEventInventoryEntry[] = [
     id: 'support.legacy-explosion', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'explosion-world-v1', variants: ['yardhawk', 'tri-pass', 'hunter-swarm'],
     genericFallbackRationale: 'Pass 64 intentionally sends all three support damage sources through the same 90 ms coalesced explosion mix; Pass 65 content must author distinct manifested identities.',
-    emitterSymbols: ['explosion'], contractRefs: ['R500', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT,
+    emitterSymbols: ['explosion', 'explosionAt'], contractRefs: ['R500', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT,
     lifecycleOwner: 'support-activation', coverageStatus: 'partial',
     coverageDetail: 'All current support explosion callers are covered, while semantic profiles and world spatialization remain gaps.',
   }),
@@ -1114,7 +1123,9 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
 // neither branch's pin is correct once both the Nuke Town Rebuild's and the
 // Raid Rebuild's bed, event and music rows are present.
-export const SOUND_EVENT_INVENTORY_SHA256 = '6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9';
+// PASS 95 audio-polish (HF-509, 2026-09-05): recomputed after the frag and
+// support explosion events gained the positional `explosionAt` emitter symbol.
+export const SOUND_EVENT_INVENTORY_SHA256 = '9cb2cc80d6393e7458758eb62f0f562d916e998fd890daa68fbaab8f0e9eddc9';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

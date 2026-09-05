@@ -118,11 +118,18 @@ describe('HF-430: music gain halving (-6 dB)', () => {
     expect(dbChange).toBeCloseTo(-6.0206, 2);
   });
 
-  it('keeps the RUNTIME bus coefficient on the halved constant in audio.ts', async () => {
+  it('keeps the RUNTIME bus coefficient on the halved constant through the PASS 95 level table', async () => {
+    // PASS 95 moved every bus coefficient into AUDIO_BUS_LEVEL_TABLE
+    // (audio-buses.ts); audio.ts now reads the table for creation AND for
+    // configure(), so the two-places regression this test guards cannot recur.
+    const { AUDIO_BUS_LEVEL_TABLE, audioBusBaseGain } = await import('./audio-buses');
+    expect(AUDIO_BUS_LEVEL_TABLE['game-music'].gain).toBe(GAME_MUSIC_BUS_GAIN);
+    expect(audioBusBaseGain('game-music')).toBe(GAME_MUSIC_BUS_GAIN);
     const { readFile } = await import('node:fs/promises');
     const source = await readFile('src/audio.ts', 'utf8');
-    expect(source).toContain("if (id === 'game-music') return GAME_MUSIC_BUS_GAIN;");
-    expect(source).toContain("this.createBus('game-music', GAME_MUSIC_BUS_GAIN);");
+    expect(source).toContain('return audioBusBaseGain(id);');
+    expect(source).toContain("this.createBus('game-music');");
+    expect(source).not.toMatch(/createBus\('game-music',\s*[0-9.]+\)/);
   });
 });
 

@@ -309,10 +309,13 @@ describe('HF-376 runtime source synthesis', () => {
 
   it('gives a remote footstep the same heel-then-settle shape as a local one', () => {
     const { audio, context } = startAudio();
-    const before = context.gains.length;
+    // PASS 95: footstep chains are pre-built at unlock, so the step no longer
+    // creates a gain; the chain gain is the one whose automation grew.
+    const callCounts = context.gains.map((gain) => gain.gain.calls.length);
     expect(audio.worldFootstep({ x: 4, y: 0, z: -3 }, 'wood', 'walk')).toBe(true);
-    const chainGain = context.gains.slice(before)[0]!;
-    const scheduled = chainGain.gain.calls.filter((call) => call.kind !== 'cancel');
+    const chainGain = context.gains.find((gain, index) => gain.gain.calls.length > (callCounts[index] ?? 0))!;
+    expect(chainGain).toBeDefined();
+    const scheduled = chainGain.gain.calls.slice(callCounts[context.gains.indexOf(chainGain)] ?? 0).filter((call) => call.kind !== 'cancel');
     expect(scheduled[0]!.kind).toBe('set');
     expect(scheduled[1]!.kind).toBe('linear');
     expect(scheduled.filter((call) => call.kind === 'exponential').length).toBeGreaterThanOrEqual(2);

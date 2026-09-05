@@ -158,6 +158,11 @@ describe('railgun report presentation', () => {
     audio.unlock();
     audio.updateListener({ x: 0, y: 1.7, z: 0 }, 0);
     const context = FakeAudioContext.instances[0];
+    // PASS 95: the world-panner pool is pre-created at unlock (never in
+    // combat). The railgun's two bounded per-report panners are counted
+    // AFTER that baseline; the contract of exactly two per report is unchanged.
+    const pooledPanners = context.panners.length;
+    const reportPanners = () => context.panners.slice(pooledPanners);
 
     audio.railgunReport(true, { x: 20, y: 1.7, z: -48 });
     const firstVoices = [...(audio as unknown as {
@@ -174,17 +179,17 @@ describe('railgun report presentation', () => {
     expect(firstBusCounts.sfx).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.sfx);
     expect(firstBusCounts.ambience).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.perBus.ambience);
     expect(firstVoices.length).toBeLessThanOrEqual(AUDIO_RUNTIME_BUDGET.globalVoices);
-    expect(context.panners).toHaveLength(2);
-    expect(context.panners.every((panner) => !panner.disconnected)).toBe(true);
+    expect(reportPanners()).toHaveLength(2);
+    expect(reportPanners().every((panner) => !panner.disconnected)).toBe(true);
 
     await vi.advanceTimersByTimeAsync(1_100);
     expect(audio.telemetry().runtime).toMatchObject({ voices: 3, spatialChains: 0 });
-    expect(context.panners.every((panner) => panner.disconnected)).toBe(true);
+    expect(reportPanners().every((panner) => panner.disconnected)).toBe(true);
 
     audio.railgunReport(true, { x: -18, y: 2.1, z: 32 });
     expect(audio.telemetry().runtime).toMatchObject({ voices: 13, spatialChains: 2, dropped: 0 });
-    expect(context.panners).toHaveLength(4);
-    expect(context.panners.filter((panner) => !panner.disconnected)).toHaveLength(2);
+    expect(reportPanners()).toHaveLength(4);
+    expect(reportPanners().filter((panner) => !panner.disconnected)).toHaveLength(2);
     audio.dispose();
     expect(audio.telemetry().runtime).toMatchObject({ voices: 0, spatialChains: 0 });
     expect(context.panners.every((panner) => panner.disconnected)).toBe(true);
