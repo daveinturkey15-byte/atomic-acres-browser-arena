@@ -13619,6 +13619,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.awaitingReplacementState = false;
+      // X-2 admission fence: only an accepted state may make a client remote visible.
       if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;
       remote.root.visible = admittedIncoming.hp > 0;
       if (network.role === 'host') {
@@ -34528,6 +34529,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       secondary: remote.snapshot.secondary,
       grenade: remote.snapshot.grenade,
       weapon: remote.snapshot.weapon,
+      reloading: remote.snapshot.reloading ?? false,
       stance: remote.snapshot.stance ?? 'stand',
       seq: remote.snapshot.seq,
       position: remote.target.toArray(),

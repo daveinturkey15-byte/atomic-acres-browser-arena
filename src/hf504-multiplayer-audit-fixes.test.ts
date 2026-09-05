@@ -290,10 +290,19 @@ describe('HF-504 X-2 desync admission fence', () => {
     expect(main).toContain('if (network.role === \'client\' && message.type === \'state\') remote.authoritativeReady = true;');
   });
 
+  it('marks a remote authoritative only after the accepted-state admission checks', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const ready = state.indexOf("if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;");
+    const movement = state.indexOf('const movement = admitRemoteSnapshotMovement(');
+    expect(ready).toBeGreaterThan(movement);
+    expect(state.slice(movement, ready)).toContain('if (!movement.accepted)');
+  });
+
   it('makes the audit ignore only the explicitly withheld, non-authoritative pose', () => {
     const audit = readFileSync(new URL('../scripts/qa/mp-audit.mjs', import.meta.url), 'utf8');
     expect(audit).toContain('authoritativeReady: remote.authoritativeReady ?? true');
     expect(audit).toContain('if (guestPlayer.authoritativeReady === false) continue;');
+    expect(audit).toContain('samplesCompared');
   });
 });
 
