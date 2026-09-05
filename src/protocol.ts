@@ -59,6 +59,10 @@ import {
   type TaserProtocolMessage,
 } from './taser-protocol';
 import {
+  isThinMetalPerforationStateMessage,
+  type ThinMetalPerforationStateMessage,
+} from './thin-metal-perforation';
+import {
   isTimedMapWeaponProtocolMessage,
   type TimedMapWeaponProtocolMessage,
   type TimedMapWeaponStateMessage,
@@ -664,6 +668,10 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage | TaserProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
   | StickyAttachedMessage
+  // HF-467: the plain thin-metal panel state. Host-authored exactly like the
+  // shed's interactive-world-snapshot, so network.ts drops any copy arriving
+  // on a guest connection: a guest may never mint a hole.
+  | ThinMetalPerforationStateMessage
   // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
   | HostSuccessionProtocolMessage;
 
@@ -801,6 +809,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isSmokeProtocolMessage(value)) return true;
   if (isFlashProtocolMessage(value)) return true;
   if (isTaserProtocolMessage(value)) return true; // HF-458
+  if (isThinMetalPerforationStateMessage(value)) return true; // HF-467
   if (isTimedMapWeaponProtocolMessage(value)) return true;
   if (isFlarePresentationProtocolMessage(value)) return true;
   if (isBotWeaponPresentationMessage(value)) return true;
@@ -1325,6 +1334,8 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (!playerId) return false;
   if (isKillstreakProtocolMessage(message)) return killstreakMessageBelongsToPlayer(message, playerId);
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
+  // HF-467: the thin-metal state is authored by its sender (the host).
+  if (isThinMetalPerforationStateMessage(message)) return message.by === playerId;
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
   if (isFlashProtocolMessage(message)) return message.by === playerId;
   if (isTaserProtocolMessage(message)) return message.by === playerId;
@@ -1415,6 +1426,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     // a guest may never mint one and network.ts drops it on a guest connection.
     || isTaserProtocolMessage(message)
     || message.type === 'interactive-world-snapshot'
+    || message.type === 'thin-metal-perforation-state'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'
     || message.type === 'guest-resume-authority'
@@ -1444,9 +1456,10 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'window-break' && message.hostAuthority !== undefined;
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | ThinMetalPerforationStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
   return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state'
     || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state'
+    || message.type === 'thin-metal-perforation-state'
     || message.type === 'timed-map-weapon-state' || message.type === 'flare-presentation-state';
 }
 

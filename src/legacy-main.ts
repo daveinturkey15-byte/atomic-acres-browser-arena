@@ -950,6 +950,7 @@ import {
   type InteractiveWorldSnapshotMessage,
   type ShedInteractionIntentMessage,
 } from './interactive-world-protocol';
+import { broadcastThinMetalPerforationState, buildWorldApertureQuery, commitThinMetalPerforationRuntime, createAndAttachThinMetalPerforationRuntime, disposeThinMetalPerforationRuntime, handleThinMetalPerforationMessage, ownsThinMetalPanel, resetThinMetalPerforationRuntime, rollbackThinMetalPerforationRuntime, routeInteractiveWorldBallisticImpact, type ThinMetalPerforationRuntime } from './thin-metal-perforation-runtime';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
 import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorStanceSample, riggedOperatorTelemetry } from './operator-model';
@@ -3673,6 +3674,7 @@ let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
 let interactiveWorldTick = 0;
 let lastInteractiveWorldBroadcastRevision = -1;
+let thinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
 let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
@@ -4610,9 +4612,11 @@ function traceWeaponPath(
     distance,
     WEAPONS[weapon].penetration,
     activeBallisticSurfaces(),
-    interactiveWorldRuntime?.apertureQuery,
+    worldApertureQuery,
   );
 }
+
+const worldApertureQuery = buildWorldApertureQuery(() => interactiveWorldRuntime?.apertureQuery, () => thinMetalPerforationRuntime);
 
 // Owner 2026-08-29 wall/prone clipping: the camera resolve probes the SAME
 // canonical shot-surface set the eye-clearance sweep measures. The felt
@@ -4692,8 +4696,6 @@ function applyInteractiveWorldBallisticTrace(
   if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
   const spec = WEAPONS[weapon];
   const unitDirection = direction.clone().normalize();
-  // HF-467: perforation and damage now cost the trace's REMAINING energy at
-  // each surface (`impact.energyAtEntryQ`), not a distance-blind muzzle constant.
   const damageQ = Math.max(1, Math.round(applyPenetrationDamage(spec.damage, trace.damageMultiplier)));
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
@@ -4701,7 +4703,8 @@ function applyInteractiveWorldBallisticTrace(
     if (!impact.surface.destructibleSurface
       && !impact.surface.majorDebris
       && !impact.surface.houseFragment
-      && !impact.surface.houseMajorDebris) continue;
+      && !impact.surface.houseMajorDebris
+      && !ownsThinMetalPanel(thinMetalPerforationRuntime, impact.surface)) continue;
     const penetrationEnergyQ = Math.max(0, Math.round(impact.energyAtEntryQ));
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
@@ -4710,23 +4713,7 @@ function applyInteractiveWorldBallisticTrace(
       yQ: Math.round(unitDirection.y * impulseMagnitudeQ),
       zQ: Math.round(unitDirection.z * impulseMagnitudeQ),
     });
-    const result = impact.surface.houseFragment || impact.surface.houseMajorDebris
-      ? interactiveWorldRuntime.applyHouseBulletImpact({
-        surface: impact.surface,
-        damageQ,
-        penetrationEnergyQ,
-        impulseQ,
-      })
-      : interactiveWorldRuntime.applyBulletImpact({
-        surface: impact.surface,
-        point,
-        tick: interactiveWorldTick,
-        damageQ,
-        penetrationEnergyQ,
-        radiusUQ: apertureRadiusQ,
-        radiusVQ: apertureRadiusQ,
-        impulseQ,
-      });
+    const result = routeInteractiveWorldBallisticImpact(thinMetalPerforationRuntime, interactiveWorldRuntime, impact, point, damageQ, penetrationEnergyQ, apertureRadiusQ, impulseQ, interactiveWorldTick);
     if (!result?.accepted) continue;
     changed = true;
     if (impact.surface.majorDebris && characterPhysics) {
@@ -12555,6 +12542,7 @@ function interactiveWorldLineOfSight(
 }
 
 function broadcastInteractiveWorldState(forceReliable = false): void {
+  broadcastThinMetalPerforationState(thinMetalPerforationRuntime, forceReliable, gameStarted, player.id, network, randomNonce);
   if (network.role !== 'host' || !interactiveWorldRuntime || !gameStarted) return;
   const revision = interactiveWorldRuntime.collisions().revision;
   if (!forceReliable && (interactiveWorldTick % 6 !== 0 || revision === lastInteractiveWorldBroadcastRevision)) return;
@@ -12781,6 +12769,7 @@ function replayParkedMatchAdmissionMessages(): void {
   }
 }
 
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
   // Lane J: first proof that the host's own match is LIVE. Restricted to the
@@ -12814,6 +12803,7 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (handleInteractiveWorldMessage(message)) return;
+  if (handleThinMetalPerforationMessage(message, thinMetalPerforationRuntime, network.role, privateLobbySnapshot?.hostId, selectedArena.id, interactiveWorldMatchEpoch)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
   if (handleTaserAuthorityMessage(message)) return;
@@ -17449,6 +17439,7 @@ async function startGame(
   lastFlashDispatch = null;
   interactiveWorldTick = 0;
   lastInteractiveWorldBroadcastRevision = -1;
+  resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, mode !== 'client');
   if (interactiveWorldRuntime) {
     const priorEpoch = interactiveWorldRuntime.telemetry().matchEpoch;
     if (interactiveWorldMatchEpoch > priorEpoch) interactiveWorldRuntime.reset(interactiveWorldMatchEpoch);
@@ -29948,10 +29939,12 @@ async function performArenaSelection(
   const previousArena = arena;
   const previousPhysics = characterPhysics;
   const previousInteractiveWorldRuntime = interactiveWorldRuntime;
+  const previousThinMetalPerforationRuntime = thinMetalPerforationRuntime;
   const hadPreparedArena = gameplayArenaPrepared;
   let nextArena: ArenaMap | null = null;
   let nextPhysics: CharacterPhysics | null = null;
   let nextInteractiveWorldRuntime: InteractiveWorldRuntime | null = null;
+  let nextThinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
   let committed = false;
   let exactScenePassPrecompiled = false;
   const assertAdmission = (): void => {
@@ -30002,6 +29995,7 @@ async function performArenaSelection(
       true,
     );
     nextInteractiveWorldRuntime.root.visible = false;
+    nextThinMetalPerforationRuntime = createAndAttachThinMetalPerforationRuntime(nextArena, interactiveWorldMatchEpoch, true, scene);
     latestArenaPerformanceBudgetSample = null;
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
@@ -30036,6 +30030,7 @@ async function performArenaSelection(
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
+    thinMetalPerforationRuntime = commitThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime);
     syncInteractiveWorldPhysics(true);
     profileArenaTransition('presentation-batching'); if (selectedArena.id !== 'gun-range') batchSelectedArenaPresentation();
     audio.setArena(selectedArena.id);
@@ -30266,6 +30261,7 @@ async function performArenaSelection(
     setBootstrapStage('gameplay-assets-ready');
     document.documentElement.dataset.gameplayArena = selectedArena.id;
     previousInteractiveWorldRuntime?.dispose();
+    disposeThinMetalPerforationRuntime(previousThinMetalPerforationRuntime);
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
@@ -30283,6 +30279,7 @@ async function performArenaSelection(
     lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
+    thinMetalPerforationRuntime = rollbackThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime, scene);
     gameplayArenaPrepared = hadPreparedArena;
     document.documentElement.dataset.gameplayArena = hadPreparedArena
       ? previousArena.id
