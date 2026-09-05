@@ -2700,3 +2700,60 @@ soak bound or publish-plan assertion was weakened, skipped or widened. Receipt:
 - 13:17 Muse review of the Farcrysis dressing @ 67ac705d: SHIP-WITH-FIXES (docs/evidence/pass94/muse-review/v9-farcrysis-dressing-REVIEW.md on the lane branch). First findings: 1. The branch regressed the one red gate it was told to respect: open spawn 2. The two palm re-seats that answer the layout review's FINDING-2 have no 3. Everything else is honest and compatible: the 22 m bound is untouched and  Muse builder 378 is closing the 21st open spawn pair. Fix lane for High Seas still holds the lock (since 13:09; build or 13-arena smoke).
 
 - 13:32 HIGH SEAS FIXED (Opus lane, branch contrib/dave-gaming-pc/claude/fix-high-seas-batching @ 4bdfb17c - the name is stale; the content is the device-limit fix): requestDevice now negotiates requiredLimits from the adapter (maxSampledTexturesPerShaderStage 32 on this adapter vs the spec default 16; High Seas binds 17) with the fallback ladder kept (render-runtime.ts:1040-1115, call ~1390); the caught selection rollback now sets a status matching the deploy-failed contract (legacy-main.ts:30302); the boot smoke spec now asserts the booted arena is the one requested (tests/e2e/pass74-arena-boot-smoke.spec.ts:179 - the hole that let a broken arena pass); 7 new limits tests. Proof: high-seas one-arena smoke PASS (falsified by stashing render-runtime.ts -> FAIL); FULL 13-arena smoke 13/13 in 11.9 min; tsc clean; cold-session, pipeline-metrics, ratchet green; legacy-main 37,390/37,396; cold admission nuketown2 20,919.6 ms (888 ms better than candidate 8; still the override item). Also [MEASURED]: High Seas and src/water were ADDED in 23b140c1 (the bisect first-bad commit) - the arena never had a working 17-sampler device on this path. Fix-and-publish Opus agent launched 13:32 (merge 4bdfb17c into release/pass95 + candidate, full gates incl. 13/13, dry-run, publish_pass94, live checks, PASS 94 record).
+
+## PASS 94 publish record — 2026-09-05 14:15 BST (Opus, release checkout `aa-claude-release84`)
+
+- **Published** by `python scripts/orchestration/publish_pass94.py` (exit 0, after its
+  `--dry-run` exit 0 with every guard green) from head `release/pass95` @ `441b29bd`
+  (publish taken at `67b8ad8e`; merge commit `10fa6141`). gh-pages
+  **`7c9f1033` → `98e3627c`**, channels exactly `['pass93','pass94']` (pass92 retired per
+  HF-400); root chooser generation **`7c9adb8db2b1`**. Live: the canonical root names
+  **PASS 94 → channels/pass94 (`deploymentState: "live"`)** with **PASS 93 · SAFE BACKUP**,
+  confirmed cache-busted twice 33 s apart; `channels/pass94` serves
+  `legacy-main-B7Iio44Z.js` `31aa0de1…` and `index-DJtX3xeS.js` `d2d57995…`, byte-identical
+  to the gated `dist`; `channels/pass93` 200; `channels/pass92` 404.
+- **Content:** candidate 8 (`32d8dcb0`, the build the owner play-tested and approved in
+  HF-522) **plus the High Seas device-limit fix** `4bdfb17c` (branch
+  `contrib/dave-gaming-pc/claude/fix-high-seas-batching`; the name is stale, the content is
+  the device-limit fix from the bisect). The fix makes `requestDevice()` negotiate
+  `requiredLimits` from the adapter (`maxSampledTexturesPerShaderStage` 32 here vs the spec
+  default 16; High Seas binds 17) with the fallback ladder kept; the caught arena-selection
+  rollback now sets a status matching the deploy-failed contract; and the boot smoke was
+  **strengthened** to assert the booted arena is the one requested — the hole that let a
+  rolled-back arena pass as green. 7 new limits tests. Luna's `fix-high-seas-boot` lane was
+  **not** merged. No arena was parked; no budget was moved.
+- **Gates at the cut** (all on the merged head, machine lock held for every heavy step):
+  tsc 0; publish plan test 9/9; **full suite 632 files / 6366 tests** (1 file / 2 tests
+  skipped), no rerun needed; build exit 0; `dist` == `dist-pass94` 606 files with sha256 per
+  path; release-identity OK on both trees; build-freshness OK; `qa:stock-boot` **4/4** in
+  stock-flag installed Chrome; **FULL 13-arena boot smoke 13/13 (13.1 m) with `high-seas`
+  green at 1.5 m**, on the strengthened spec and against the exact published bytes;
+  legacy-main 37,390/37,396.
+- **Override debt (HF-523, carried unchanged, both run once on the published bytes):**
+  (1) cold-admission **RED — 21,713.5 ms** vs the preserved 10,000 ms budget (combined cold
+  prep 22,296.5 ms; in band with candidate 8's 21,807.6 / the cut's 19,324.3 / the fix lane's
+  20,919.6 — machine-noisy, never near budget); follow-up = the queued cold visual-definition
+  lane. (2) `qa:mp-soak` **RED and truncated** — exit 124, duration 131,667 ms of the required
+  180,000, `peersPresent: []` at the end, so **1/8** rows passed and the other seven are
+  downstream of a run that never completed; the cut's completed run on the same build scored
+  5/8, and two rows were already shown non-deterministic on identical bytes. Follow-up =
+  `mp-swap-reload-relay` @ `a9b4b029` (SHIP-WITH-FIXES, F1/F2 open), not in this pass.
+  **[OPEN] re-run `qa:mp-soak` once on a quiet machine** so the debt sits on a completed run.
+- **Harness defects (none worked around by weakening anything):** `qa:stock-boot` still cannot
+  start its own server — `stage-release-topology.mjs` measured **4 m 59 s** (one
+  `git cat-file blob` process per pinned-channel file) inside playwright's
+  `webServer.timeout: 180000`; the 180 s budget was **not** widened, the build was served out
+  of band on 4291. **NEW:** that out-of-band server must serve the **unstaged** app build —
+  serving the staged production topology fails `qa:stock-boot` 2/4 because the staged root
+  chooser keys cards `experimental`/`previous` while the spec clicks the in-build
+  `bootstrap.ts` `latest` card, and both roots expose `#release-channel-gate` so the spec
+  cannot tell them apart. Also reproduced: cold-admission needs a clean tracked worktree.
+  4290 (pid 60876) and `:4300` (the owner's HITL) were occupied and never touched; all browser
+  work was headless, off-screen, one at a time, on 4291/4293 only.
+- **[OPEN]** `src/changelog.ts:111` still reads `PENDING_PRODUCTION_RELEASE` for
+  `pass94ReleasedAt`; the publish script did not rewrite it and it was not edited by hand. The
+  published bundle's identity guard is green (it calls itself PASS 94), so this is a changelog
+  timestamp follow-up, not a mis-identified release.
+- **Rollback** stays one command away: `publish_pass94.py --rollback` re-points the default at
+  PASS 93, which is pinned and serving. Full receipt:
+  `docs/evidence/pass95/publish2/RECEIPT.md` on `release/pass95` @ `441b29bd`.
