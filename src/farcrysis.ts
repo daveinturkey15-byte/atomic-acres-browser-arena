@@ -688,6 +688,9 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // heights need no per-piece ground offset.
   box(builder, 'farcrysis-core-catwalk', [0, 2.5, 0], [7, 0.18, 2.4], standard(0x4c5b64, 0.5, 0.55), { cast: true, ballistic: 'structural-metal' });
   const stairMat = standard(0x4c5b64, 0.5, 0.55);
+  // The arena's one warm emissive: the signal-beacon ember, shared with the
+  // core work-light lenses (PASS 95 L4) so the lamp costs no new material.
+  const warmEmberMat = new THREE.MeshStandardMaterial({ color: 0xffd080, emissive: 0xffa040, emissiveIntensity: 2.2, roughness: 0.4 });
   const stairSteps = 7;
   const stairRise = 2.59 / stairSteps; // top step flush with the catwalk deck
   const stairDepth = 0.5;
@@ -709,11 +712,76 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   // sat at [3.4, 2.2], inside the flight) to the mirrored free corner.
   cover(builder, 'farcrysis-core-crate-a', [-3.4, 0.45, -2.2], [1.5, 0.9, 1.5], crateMat);
   cover(builder, 'farcrysis-core-crate-b', [3.4, 0.45, -2.2], [1.5, 0.9, 1.5], crateMat);
-  // Research station window (breakable presentation)
-  const windowMesh = new THREE.Mesh(new THREE.BoxGeometry(3, 1.4, 0.08), stationGlassMat);
-  windowMesh.name = 'farcrysis-core-window-n';
-  windowMesh.position.set(-3, 2.1, -5.48);
-  root.add(windowMesh);
+  // Research station window. PASS 95 L5 (HF-467): classified as it lands -
+  // glass breaks and passes. Presentation stays exactly where it was; the
+  // pane is registered as a non-solid shot surface so a round through it
+  // reads as glass instead of falling through an unrated mesh.
+  const windowMesh = box(builder, 'farcrysis-core-window-n', [-3, 2.1, -5.48], [3, 1.4, 0.08], stationGlassMat, {
+    solid: false,
+    shots: true,
+    cast: false,
+    ballistic: 'glass',
+  });
+  windowMesh.receiveShadow = false;
+
+  // ---- PASS 95 layout stage, L4: the core interior shell -------------------
+  //
+  // SPEC.md section 3.4 left two things OPEN and section 7 L4 says resolve
+  // them by reading, not assuming. Read at eda54adf: (1) the core has NO
+  // floor distinct from the terrain - the flattened terrain pad at y = 0 is
+  // the floor (farcrysis-terrain-authority); (2) `farcrysis-core-work-lights`
+  // is declared in src/rendering/arenas/farcrysis.ts as a shadowed-local
+  // practical, but NO emissive fixture geometry exists anywhere for it - a
+  // light with no lamp. Both are built here.
+  //
+  // The floor is a poured-concrete slab 10.2 m square, top face 0.04 m above
+  // the pad, inset 0.15 m from every wall's inner face so no slab edge is
+  // coplanar with a wall (the HOUSE-INTERIOR coplanar class stays 0). It is
+  // presentation plus a `concrete` shot surface, NOT a movement collider: the
+  // Rapier capsule keeps standing on the terrain plates, the bot ground
+  // platforms keep their y = 0, and a 0.04 m visual rise is far inside the
+  // controller's support tolerance (the parity ledger records a 0.25 m step as
+  // acceptable). Height 0.08 m is under the parity audit's 0.9 m "substantial"
+  // floor, so it owes no collider by that gate either.
+  //
+  // The practical is a 180-degree PAIR of wall-mounted work lights, one on
+  // the inner face of each long wall at 2.85 m (above the 2.6 m reach line):
+  // a steel bracket, a hooded head, and a warm lens whose emissive is the
+  // fixture the declared light reads as. A dark opening must be a dim lit
+  // box, never a black quad (threejs-webgpu-interior-lighting-look) - this is
+  // what puts a visible source in the box. `corePair` is the arena's
+  // `pair()`: the core is rotationally symmetric about its centre (north
+  // door x 0..4, south door x -4..0), so every interior fixture is authored
+  // once and emitted twice at (x, z) and (-x, -z).
+  // Materials are REUSED, not authored: the G4 ratchet (farcrysis-material-
+  // vocabulary.test.ts) holds the arena at 166 distinct material objects and
+  // a new material is a new pipeline in the fenced admission draw. The slab
+  // takes the ruined-wall stone (weathered warm concrete), the bracket and
+  // hood take the catwalk steel, and the lens takes the beacon ember glow -
+  // the one warm emissive the arena already carries (hoisted below).
+  const coreFloor = box(builder, 'farcrysis-core-floor-slab', [0, 0.0, 0], [10.2, 0.08, 10.2], ruinedWallMat, {
+    solid: false,
+    shots: true,
+    cast: false,
+    ballistic: 'concrete',
+  });
+  coreFloor.receiveShadow = true;
+  const workLightMetalMat = stairMat;
+  const workLightLensMat = warmEmberMat;
+  const corePair = (
+    name: string,
+    position: [number, number, number],
+    size: [number, number, number],
+    material: THREE.Material,
+    options: Parameters<typeof box>[5],
+  ): void => {
+    box(builder, `${name}-w`, position, size, material, options);
+    box(builder, `${name}-e`, [-position[0], position[1], -position[2]], size, material, options);
+  };
+  const lampOptions = { solid: false, shots: true, cast: false, ballistic: 'thin-metal' as BallisticMaterialId };
+  corePair('farcrysis-core-work-light-bracket', [-5.12, 2.85, 1.6], [0.16, 0.08, 0.08], workLightMetalMat, lampOptions);
+  corePair('farcrysis-core-work-light-hood', [-4.9, 2.78, 1.6], [0.32, 0.22, 0.36], workLightMetalMat, lampOptions);
+  corePair('farcrysis-core-work-light-lens', [-4.72, 2.72, 1.6], [0.04, 0.16, 0.3], workLightLensMat, { solid: false, shots: true, cast: false, ballistic: 'glass' });
 
   // ---- Throwbacks (R9): crashed seaplane, signal beacon, warning barrels.
   //
@@ -814,7 +882,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   flame.name = 'farcrysis-throwback-beacon-flame';
   flame.position.y = 3.1;
   beacon.add(flame);
-  const emberGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), new THREE.MeshStandardMaterial({ color: 0xffd080, emissive: 0xffa040, emissiveIntensity: 2.2, roughness: 0.4 }));
+  const emberGlow = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), warmEmberMat);
   emberGlow.position.y = 2.72;
   beacon.add(emberGlow);
   for (const part of beacon.children) {
