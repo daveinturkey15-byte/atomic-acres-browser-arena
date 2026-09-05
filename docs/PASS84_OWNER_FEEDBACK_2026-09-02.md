@@ -2757,3 +2757,5 @@ soak bound or publish-plan assertion was weakened, skipped or widened. Receipt:
 - **Rollback** stays one command away: `publish_pass94.py --rollback` re-points the default at
   PASS 93, which is pinned and serving. Full receipt:
   `docs/evidence/pass95/publish2/RECEIPT.md` on `release/pass95` @ `441b29bd`.
+
+- 14:25 PASS 94 LIVE (orchestrator confirmation): origin/gh-pages @ 98e3627c (was 7c9f1033), channels {pass93, pass94}, pass92 retired; receipt docs/evidence/pass95/publish2/RECEIPT.md on release/pass95 @ 441b29bd; ledger record @ 61b4956b. Override debt carried: cold-admission 21.7 s; the publish-time qa:mp-soak run truncated (exit 124 at 131.7 s, peers gone) - a quiet-machine re-run is the first follow-up. Astra handoff cleared: the owner may start Codex/Astra from the Desktop folder now.
