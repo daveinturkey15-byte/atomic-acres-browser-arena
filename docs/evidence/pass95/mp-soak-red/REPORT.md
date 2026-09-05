@@ -4,7 +4,7 @@
 
 [OPEN] The lane is not a release green: the required complete 180-second WebGPU soak and the after `mp-audit` were both blocked by the machine's existing WebGPU queue/deployment fence. Red rows remain findings.
 
-[VERIFIED] Worktree: `C:\Users\david\projects\aa-claude-soakred`; branch: `contrib/dave-gaming-pc/claude/mp-soak-red`; remote head: `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
+[VERIFIED] Prior Round 1 snapshot: worktree `C:\Users\david\projects\aa-claude-soakred`; branch `contrib/dave-gaming-pc/claude/mp-soak-red`; remote head `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
 
 [VERIFIED] Runtime scope: headless Chrome, WebGPU, three peers, ports 4233/4234, simulated 120 ms RTT and 1% loss for soak runs; port 4300 and the owner's worktrees were not used.
 
@@ -101,7 +101,7 @@ The final retry artifacts are quoted separately because they never entered gamep
 - `fa8bb834c2631c6dc21f1089f5e50e0230c8e643` — harden stair and directional probes
 - `33ef9c2121a42fbd544fd935c7e10de743c3dcd0` — fit authority repair under ratchet
 
-[VERIFIED] Final working tree is clean and the remote branch resolves to `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
+[VERIFIED] Round 2 final working tree is clean and the remote branch resolves to `2d146f13` after the report commit.
 
 ## Round 2 — deterministic soak-red repair
 
