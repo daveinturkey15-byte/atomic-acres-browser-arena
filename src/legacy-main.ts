@@ -790,6 +790,7 @@ import {
   createRemoteAuthoritativeState,
   reconcileLocalAuthoritativeSnapshot,
 } from './remote-snapshot-reconciliation';
+import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
 import {
   createHostTimeMapping,
   hostTimeDiagnostics,
@@ -6103,6 +6104,19 @@ const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const deathDrops: DeathDropEntity[] = [];
 const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
 const verifiedRemoteKills = new Map<string, number>();
+
+function remoteKillCreditKey(playerId: string): string {
+  const connectionEpoch = hostLobbyConnectionEpochs.get(playerId);
+  return connectionEpoch ? sessionBoundCreditKey(playerId, connectionEpoch) : playerId;
+}
+
+function clearRemoteKillCredits(playerId: string): void {
+  const prefix = `${playerId}:`;
+  for (const key of verifiedRemoteKills.keys()) {
+    if (key === playerId || key.startsWith(prefix)) verifiedRemoteKills.delete(key);
+  }
+}
+
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let matchStartPreparing = false;
@@ -9182,7 +9196,50 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
-function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
+function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean {
+  if (network.role !== 'host') return false;
+  const health = remoteHealthAuthorities.get(remote.snapshot.id);
+  const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot;
+  const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot });
+  const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id);
+  const stateSent = network.sendToPlayer(targetPlayerId, {
+    type: 'state', player: playerSnapshot, hostTimeMs: now,
+    continuity: remote.continuity, rateHz: remote.snapshotRateHz,
+    ...(combatInventory ? { combatInventory } : {}),
+  });
+  return joinSent && stateSent;
+}
+
+function broadcastFreshRejoinerSlotToObservers(
+  rejoinerId: string,
+  connectionEpoch: string,
+  remote: RemotePlayer,
+  now = performance.now(),
+): number {
+  if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0;
+  const health = remoteHealthAuthorities.get(rejoinerId);
+  const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot;
+  const plan = buildRejoinReplicationPlan({
+    rejoinerId,
+    connectionEpoch,
+    snapshot: playerSnapshot,
+    continuity: remote.continuity,
+    hostTimeMs: now,
+    rateHz: remote.snapshotRateHz,
+    observerIds: network.connectedPlayerIds(),
+  });
+  let delivered = 0;
+  for (const observer of plan.observers) {
+    // sendToPlayer resolves the current admitted transport; this epoch check
+    // prevents a replacement racing the loop from receiving an old slot.
+    if (hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) break;
+    if (!hostLobbyConnectionEpochs.has(observer.playerId)) continue;
+    const joinSent = network.sendToPlayer(observer.playerId, observer.messages[0]);
+    const stateSent = network.sendToPlayer(observer.playerId, observer.messages[1]);
+    if (joinSent && stateSent) delivered += 1;
+  }
+  return delivered;
+}
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -13450,11 +13507,19 @@ function onNetworkMessage(message: GameMessage): void {
       // so none of these canonical repair snapshots can be dropped merely
       // because their receiving runtime did not exist yet. Run this even when
       // an active channel was replaced before its stale remote timed out.
-      const retainedHealth = remoteHealthAuthorities.get(incoming.id);
-      network.send({
-        type: 'join',
-        player: { ...remote.snapshot, hp: retainedHealth?.hp ?? remote.snapshot.hp },
-      }); network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() }); network.sendToPlayer(incoming.id, createStateMessage()); const repairNow = performance.now(); for (const candidate of remotes.values()) { if (candidate.snapshot.id === incoming.id) continue; sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow); }
+      const repairNow = performance.now();
+      const connectionEpoch = hostLobbyConnectionEpochs.get(incoming.id);
+      // The old path only broadcast a join record here. A guest that had
+      // already retired the old remote therefore received no fresh state
+      // sample, so it never opened the rejoiner's presentation slot.
+      if (connectionEpoch) {
+        sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, remote, repairNow);
+        broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow);
+      }
+      for (const candidate of remotes.values()) {
+        if (candidate.snapshot.id === incoming.id) continue;
+        sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);
+      }
       network.send(createStateMessage());
       broadcastOverdriveState(performance.now());
       broadcastRailgunState();
@@ -16622,7 +16687,8 @@ function processDeath(message: DeathMessage): void {
   } else if (message.victim === player.id && message.killer !== player.id) {
     const remoteKiller = remotes.get(message.killer);
     if (remoteKiller && areCombatantsHostile(remoteKiller.snapshot.id, remoteKiller.snapshot.team, player.id, player.team)) {
-      verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
+      const creditKey = remoteKillCreditKey(message.killer);
+      verifiedRemoteKills.set(creditKey, (verifiedRemoteKills.get(creditKey) ?? 0) + 1);
     }
   }
   const eliminationFeedText = deathOutcome.feedText;
@@ -16703,7 +16769,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
   remotes.delete(id);
-  verifiedRemoteKills.delete(id);
+  clearRemoteKillCredits(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
   const retainedCrossbowActions = admittedRemoteShots.get(id);
@@ -27486,7 +27552,7 @@ function teamScores(): [number, number] {
   let aqua = player.team === 0 ? player.kills : 0;
   let coral = player.team === 1 ? player.kills : 0;
   for (const remote of remotes.values()) {
-    const admittedKills = verifiedRemoteKills.get(remote.snapshot.id) ?? 0;
+    const admittedKills = verifiedRemoteKills.get(remoteKillCreditKey(remote.snapshot.id)) ?? 0;
     if (remote.snapshot.team === 0) aqua += admittedKills;
     else coral += admittedKills;
   }
