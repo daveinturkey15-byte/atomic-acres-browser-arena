@@ -30545,6 +30545,13 @@ function restartSoloMatch(): void {
 function returnToMainMenu(): void {
   invalidateMatchAdmission('Player returned to the main menu');
   const leavingHostedMatch = network.role === 'host';
+  pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client'
+    && network.roomCode
+    && (gameStarted || matchState.phase === 'active' || privateLobbySnapshot?.phase === 'active' || privateMatchActiveAtEpochMs !== null)
+    ? network.roomCode : '';
+  if (network.role === 'client' && network.roomCode && localResumeToken) {
+    try { saveActiveRoomIdentity(network.roomCode); } catch { /* In-memory rejoin identity remains canonical. */ }
+  }
   if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id, voluntary: true });
   network.close();
   if (leavingHostedMatch) {

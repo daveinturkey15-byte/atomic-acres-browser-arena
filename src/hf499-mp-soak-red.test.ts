@@ -29,8 +29,12 @@ describe('HF-499 active-match rejoin authority', () => {
   });
 
   it('re-arms the replacement world handshake for a voluntary active-match rejoin', () => {
+    const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'), main.indexOf('function resumeActiveMatchFromMenu('));
     const join = main.slice(main.indexOf('function sendLobbyJoin(): void {'), main.indexOf('function sendClientWorldRepairReady('));
     const repair = main.slice(main.indexOf('function sendClientWorldRepairReady('), main.indexOf('function rejectLobbyPlayer('));
+    expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role ===');
+    expect(leave).toContain('privateMatchActiveAtEpochMs !== null');
+    expect(leave).toContain('saveActiveRoomIdentity(network.roomCode)');
     expect(join).toContain('resumingVoluntaryActiveMatch');
     expect(join).toContain('resumingVoluntaryActiveMatch || gameStarted');
     expect(repair).toContain('const voluntaryRejoin =');
