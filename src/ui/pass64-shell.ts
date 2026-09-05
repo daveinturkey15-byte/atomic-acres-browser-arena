@@ -654,6 +654,7 @@ export function renderPass64Shell(model: Pass64ShellViewModel): string {
     <div id="color-grade"></div><div id="film-grain"></div>
     <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="taser-shock" hidden aria-hidden="true"></div><div id="killstreak-logo-flash" hidden></div>
     <div id="nuke-flash" hidden></div>
+    <section id="killstreak-alert" hidden aria-live="assertive" data-tone="hostile"><small>KILLSTREAK</small><strong></strong><span></span></section>
     <section id="nuke-warning" hidden aria-live="assertive"><small>ATOMIC EVENT</small><strong>NUKE INBOUND</strong><b>5</b><span>SEEK COVER · HOSTILE EVENT</span></section>
     ${menuMarkup(model)}
     ${deploymentTransitionMarkup()}

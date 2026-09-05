@@ -296,7 +296,10 @@ describe('Pass 65 sound-event inventory', () => {
     // inventory - the Raid rebuild's two bed sources, its one event source and
     // its music variant row now sit alongside the Nuke Town Rebuild's, so
     // neither branch's pin was correct on its own.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9');
+    // (HF-509, 2026-09-05): recomputed over the killstreak-awareness rows -
+    // one new announce event and four planned support loops/bomb events that
+    // now have real emitters (syncSupportFlightLoops, bombRelease).
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });
