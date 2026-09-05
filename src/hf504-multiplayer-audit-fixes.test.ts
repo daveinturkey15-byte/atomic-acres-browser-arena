@@ -271,6 +271,10 @@ describe('HF-504 lobby authority and succession fences', () => {
     expect(main).toContain('pendingVoluntaryActiveMatchRejoinRoomCode');
     expect(main).toContain('const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode');
     expect(main).toContain('if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === \'active\'');
+    const ready = main.slice(main.indexOf('function sendClientWorldRepairReady('));
+    expect(ready).toContain('const voluntaryRejoin = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode');
+    expect(ready).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
+    expect(ready).toContain('if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = \'\';');
     const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'));
     expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role === \'client\'');
     expect(leave).toContain('privateLobbySnapshot?.phase === \'active\'');

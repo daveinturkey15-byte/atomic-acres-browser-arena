@@ -8982,7 +8982,7 @@ function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
   const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode
     && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0;
-  pendingVoluntaryActiveMatchRejoinRoomCode = '';
+  if (!resumingVoluntaryActiveMatch) pendingVoluntaryActiveMatchRejoinRoomCode = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
   clientReconnectWorldRepairAttempts = 0;
@@ -9030,6 +9030,16 @@ function sendLobbyJoin(): void {
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
   if (network.role !== 'client' || !gameStarted) return;
+  // beginPrivateMatch() resets ordinary match admission state while rebuilding
+  // the arena. Carry this explicit same-room intent across that reset, then
+  // arm the exact epoch used by the authenticated world-ready join below.
+  const voluntaryRejoin = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode
+    && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0;
+  if (voluntaryRejoin) {
+    awaitingCanonicalGuestAuthority = true;
+    awaitingAuthoritativeRejoinContinuity = true;
+    pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;
+  }
   const repairReadyNow = performance.now();
   const admission = clientWorldRepairAdmission;
   const reconnectRepair = awaitingCanonicalGuestAuthority
@@ -9049,6 +9059,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
   if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission, repairReadyNow);
   if (reconnectRepair) clientReconnectWorldRepairAttempts += 1;
   if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
+  if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = '';
 }
 
 function rejectLobbyPlayer(
