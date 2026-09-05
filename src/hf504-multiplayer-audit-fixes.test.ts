@@ -42,20 +42,6 @@ describe('HF-504 "sometimes randomly cant shoot ... after picked one up"', () =>
     expect(body.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(body.indexOf('player.weapon = result.inventory.primary;'));
   });
 
-  it('clears the stale fire deadline for an armory pickup and a map-weapon handoff', () => {
-    const armory = functionBody(main, 'function interactWithGunRangeArmory(');
-    expect(armory).toContain('player.weapon = station.weapon;');
-    expect(armory.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(armory.indexOf('player.weapon = station.weapon;'));
-    const railgun = functionBody(main, 'function syncRailgunHolderPresentation(');
-    expect(railgun.match(/player\.nextShotAt = 0;/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-  });
-
-  it('clears the stale fire deadline at the canonical respawn boundary', () => {
-    const body = functionBody(main, 'function respawn(');
-    expect(body).toContain('player.nextShotAt = 0;');
-    expect(body.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(body.indexOf('player.weapon = respawnLoadout.weapon;'));
-  });
-
   it('keeps every weapon-granting path clearing it, so a new one cannot silently skip it', () => {
     // Five paths grant a weapon mid-life: gun-range armory, timed-map acquire,
     // the crimson flamethrower, the QA hook, and now swap + pickup. A sixth that
@@ -199,18 +185,6 @@ describe('HF-504 P-2/P-5 pickup rollback is observable and covers auto-scavenge'
   });
 });
 
-describe('HF-499 P-1 pickup recovery driver', () => {
-  it('runs a rejected host-drop claim followed by a second F press on the same drop', () => {
-    const audit = readFileSync(new URL('../scripts/qa/mp-audit.mjs', import.meta.url), 'utf8');
-    expect(audit).toContain("measuredRows: ['P-1', 'P-6', 'P-8']");
-    expect(audit).toContain('result.firstDropRetained =');
-    expect(audit).toContain('result.firstRejected =');
-    expect(audit).toContain('// Re-broadcast the same local position');
-    expect(audit).toContain('result.retrySucceeded =');
-    expect(audit.match(/interactDrop\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-  });
-});
-
 describe('HF-504 P-6/P-8 death drops are host-authored', () => {
   it('allows a death message to carry the host-canonical drop record', () => {
     expect(protocol).toContain('drop?: PickupResultDropRecord;');
@@ -267,43 +241,6 @@ describe('HF-504 lobby - a guest must never render authority it no longer holds'
 });
 
 describe('HF-504 lobby authority and succession fences', () => {
-  it('re-arms the active-match world-ready handshake after a voluntary menu leave', () => {
-    expect(main).toContain('pendingVoluntaryActiveMatchRejoinRoomCode');
-    expect(main).toContain('const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode');
-    expect(main).toContain('if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === \'active\'');
-    const ready = main.slice(main.indexOf('function sendClientWorldRepairReady('));
-    expect(ready).toContain('const voluntaryRejoin = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode');
-    expect(ready).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
-    expect(ready).toContain('if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = \'\';');
-    const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'));
-    expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role === \'client\'');
-    expect(leave).toContain('privateMatchActiveAtEpochMs !== null');
-  });
-
-  it('sends the rejoiner a direct canonical snapshot for each existing remote', () => {
-    expect(main).toContain('function sendAuthoritativeRemoteSnapshotToPlayer(');
-    const join = main.slice(main.indexOf("if (network.role === 'host' && message.type === 'join') {"));
-    expect(join).toContain('for (const candidate of remotes.values())');
-    expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);');
-    expect(join).toContain("network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() });");
-    expect(join).toContain('network.sendToPlayer(incoming.id, createStateMessage());');
-    expect(main).toContain("const joinSent = network.sendToPlayer(targetPlayerId, {");
-    expect(main).toContain("const stateSent = network.sendToPlayer(targetPlayerId, {");
-    expect(join).toContain('network.send(createStateMessage());');
-  });
-
-  it('retains an active-match voluntary leave as a host-authoritative rejoin reservation', () => {
-    const leave = main.slice(main.indexOf("if (message.type === 'leave' && privateLobbySnapshot) {"));
-    expect(leave).toContain("const retainActiveMatchRejoin = message.voluntary");
-    expect(leave).toContain("privateLobbySnapshot.phase === 'active'");
-    expect(leave).toContain('const hostMatchIsActive = privateLobbySnapshot.phase === \'active\' || matchState.phase === \'active\' || gameStarted;');
-    expect(leave).toContain('!message.voluntary || retainActiveMatchRejoin');
-    expect(leave).toContain("if (message.voluntary && !retainActiveMatchRejoin) {");
-    expect(leave).toContain('hostLobbyTokens.delete(message.playerId);');
-    expect(leave).toContain('network.forgetPlayerRejoinCredential(message.playerId);');
-    expect(leave).toContain('markLobbyDisconnected(message.playerId);');
-  });
-
   it('requires a second human or a hosted bot and blocks rejoin reservations', () => {
     const predicates = readFileSync(new URL('./private-match.ts', import.meta.url), 'utf8');
     expect(predicates).toContain('const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);');
