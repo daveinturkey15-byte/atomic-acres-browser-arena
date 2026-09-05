@@ -137,13 +137,15 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     titleAccent: 'REBUILD',
     menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
     summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
-    rulesLabel: '5 MIN · HOST UP TO 6 · 4 BOTS SOLO · +1 / 10 DEFEATS · MAX 6 · PREVIEW',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO · PREVIEW',
     soloBotCount: SOLO_BOT_COUNT,
-    // HF-491 (owner, 2026-09-04): "the bots not in there". The original is a
-    // 6v6 map; one bot on this street is an empty map. Four to open, the shared
-    // ten-defeat ladder to six from there.
-    initialSoloBots: 4,
-    maximumSoloBots: MAX_SOLO_BOTS,
+    // HF-533/HF-534 (owner overnight, 2026-09-05): Nuke Town fields exactly two
+    // TOTAL bots in bot-enabled solo/host configurations. Two to open, pinned
+    // by maximum === start through the existing clamp (the raid2 precedent),
+    // so the ten-defeat ladder adds nothing here. Human capacity and every
+    // non-Nuke arena are untouched. Supersedes HF-491's four-to-open on this row.
+    initialSoloBots: 2,
+    maximumSoloBots: 2,
     multiplayer: true,
     fieldSupport: true,
     overdrive: true,

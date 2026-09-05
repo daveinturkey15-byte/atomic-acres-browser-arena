@@ -118,9 +118,9 @@ describe('solo bot presence and spawn spread', () => {
       // agree on it rather than restating the number.
       // HF-491 (owner, 2026-09-04): the opening count is the arena's declared
       // start clamped by its declared maximum, not the Pass 66 default - an
-      // arena may now declare `initialSoloBots` (nuketown2 declares 4). Every
-      // arena that declares nothing still opens on Pass 66's exactly one bot,
-      // which `initialSoloBotCount` returns unchanged.
+      // arena may now declare `initialSoloBots` (nuketown2 declares 2 under
+      // HF-533/HF-534). Every arena that declares nothing still opens on Pass
+      // 66's exactly one bot, which `initialSoloBotCount` returns unchanged.
       expect(activeSoloBotTarget(selection, 0)).toBe(initialSoloBotCount(selection));
       expect(initialSoloBotCount(selection)).toBeGreaterThan(0);
       expect(selection.maximumSoloBots).toBeGreaterThanOrEqual(initialSoloBotCount(selection));

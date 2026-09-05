@@ -277,20 +277,20 @@ describe('opening arena selection', () => {
       .toEqual([1, 1, 2, 6, 6]);
   });
 
-  // HF-491. nuketown2 is the arena the owner played, and the first arena to
-  // declare `initialSoloBots`. Four to open (the original is a 6v6 map, and one
-  // opponent on an 84 m street reads as an empty arena), then the same shared
-  // ladder to its declared six.
-  it('opens Nuke Town Rebuild on its declared four bots and ladders to six', () => {
+  // HF-533/HF-534 (owner overnight, 2026-09-05): Nuke Town fields exactly two
+  // TOTAL bots - two to open, pinned by maximum === start through the existing
+  // clamp, so the ten-defeat ladder adds nothing. Supersedes HF-491's
+  // four-to-open on this row; every other arena's ladder is untouched.
+  it('opens Nuke Town Rebuild on exactly two bots and holds two', () => {
     const rebuild = arenaSelection('nuketown2');
-    expect(rebuild.initialSoloBots).toBe(4);
-    expect(initialSoloBotCount(rebuild)).toBe(4);
-    expect(activeSoloBotTarget(rebuild, 0)).toBe(4);
+    expect(rebuild.initialSoloBots).toBe(2);
+    expect(initialSoloBotCount(rebuild)).toBe(2);
+    expect(activeSoloBotTarget(rebuild, 0)).toBe(2);
     expect([0, 9, 10, 19, 20, 30, 100].map((deaths) => activeSoloBotTarget(rebuild, deaths)))
-      .toEqual([4, 4, 5, 5, 6, 6, 6]);
+      .toEqual([2, 2, 2, 2, 2, 2, 2]);
     // The card states the count the match opens with, not the Pass 66 default.
-    expect(soloLaunchLabel(rebuild)).toBe('4 BOTS SKIRMISH');
-    expect(rebuild.rulesLabel).toContain('4 BOTS SOLO');
+    expect(soloLaunchLabel(rebuild)).toBe('2 BOTS SKIRMISH');
+    expect(rebuild.rulesLabel).toContain('2 BOTS SOLO');
   });
 
   // HF-491. The default is the contract, and it is still the default: an arena
@@ -327,8 +327,9 @@ describe('opening arena selection', () => {
   it('derives the solo launch label from the canonical arena catalog', () => {
     // HF-359: farcrysis has 2-bot solo skirmish launch label
     expect(ARENA_SELECTIONS.map(soloLaunchLabel)).toEqual([
-      // HF-495: first two cards are the rebuild previews.
-      '4 BOTS SKIRMISH',
+      // HF-495: first two cards are the rebuild previews. HF-533/HF-534 pins
+      // the Nuke Town Rebuild at exactly two bots.
+      '2 BOTS SKIRMISH',
       '2 BOTS SKIRMISH',
       '1 BOT SKIRMISH',
       '1 BOT SKIRMISH',

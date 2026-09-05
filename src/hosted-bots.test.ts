@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  coerceHostedBotCountForArena,
   hostedBotIds,
   hostedBotReplicationActive,
   hostedBotSnapshotContinuity,
@@ -15,6 +16,18 @@ describe('hosted lobby bots', () => {
     expect(hostedBotIds(0)).toEqual([]);
     expect(hostedBotIds(2)).toEqual(['host-bot-0', 'host-bot-1']);
     expect(hostedBotIds(4)).toEqual(['host-bot-0', 'host-bot-1', 'host-bot-2', 'host-bot-3']);
+  });
+  it('pins Nuke Town hosts to exactly two bots when bots are enabled', () => {
+    expect(coerceHostedBotCountForArena('nuketown2', 2)).toBe(2);
+    expect(coerceHostedBotCountForArena('nuketown2', 4)).toBe(2);
+    // Disabled stays disabled; invalid keeps the existing fallback to 0.
+    expect(coerceHostedBotCountForArena('nuketown2', 0)).toBe(0);
+    expect(coerceHostedBotCountForArena('nuketown2', 3)).toBe(0);
+    expect(coerceHostedBotCountForArena('nuketown2', '2')).toBe(0);
+    // Every other arena passes through unchanged.
+    expect(coerceHostedBotCountForArena('skyline-terminal', 4)).toBe(4);
+    expect(coerceHostedBotCountForArena('skyline-terminal', 2)).toBe(2);
+    expect(coerceHostedBotCountForArena('atomic-acres', 4)).toBe(4);
   });
 
   it('keeps host-authoritative bot replication active independently of host life', () => {

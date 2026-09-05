@@ -90,6 +90,19 @@ export function isHostedBotCount(value: unknown): value is HostedBotCount {
 export function hostedBotIds(count: HostedBotCount): string[] {
   return Array.from({ length: count }, (_, index) => `host-bot-${index}`);
 }
+/**
+ * HF-533/HF-534 (owner overnight, 2026-09-05): Nuke Town hosts exactly two
+ * TOTAL bots when bots are enabled. A disabled lobby (0) stays disabled; any
+ * other valid request collapses to 2 so the replica invariant
+ * `bots.length === config.hostedBotCount` still holds by construction.
+ * Invalid requests keep the existing fallback to 0. Every other arena passes
+ * through unchanged, and human capacity is never touched here.
+ */
+export function coerceHostedBotCountForArena(arenaId: string, requested: unknown): HostedBotCount {
+  if (!isHostedBotCount(requested)) return 0;
+  if (arenaId === 'nuketown2') return requested === 0 ? 0 : 2;
+  return requested;
+}
 
 /** Hosted bots remain host-authoritative while the host player is waiting to
  * respawn. Their replica heartbeat must therefore not inherit player.alive. */
