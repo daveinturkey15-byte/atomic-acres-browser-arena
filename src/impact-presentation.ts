@@ -18,6 +18,40 @@ export const IMPACT_DECAL_SURFACE_OFFSET_M = 0.006;
 export const IMPACT_DECAL_OPACITY = 0.72;
 const HIDDEN_Y = -10_000;
 
+// ---------------------------------------------------------------------------
+// PASS 95 (HF-513): the pooled impact path is allocation-free per shot AND per
+// frame.
+//
+// The pool itself was always fixed-capacity - one Points, one InstancedMesh,
+// one geometry and one material each, sized at construction - but `impact()`
+// still built ~10 temporaries per call plus ONE Vector3 per emitted particle
+// (up to 20 on a metal hit), and `update()` built a fresh zero Matrix4 for
+// every decal that expired on that frame. At an LMG's 1200 rpm with several
+// actors firing that is thousands of short-lived three objects a second landing
+// in the young generation, and a scavenge lands wherever it lands - which on
+// this renderer means inside a presented frame.
+//
+// These module-scope scratch objects are written before every read on the same
+// synchronous call, and nothing retains a reference to them: `setMatrixAt` and
+// `setColorAt` COPY into the instanced buffers, and every particle write copies
+// into the pooled Float32Array. The one shared value that is never written is
+// HIDDEN_MATRIX (a zero scale), which is only ever read.
+//
+// Measured by `src/weapon-effect-pooling.test.ts`, which counts three
+// constructor calls through a mocked `three` module.
+// ---------------------------------------------------------------------------
+const HIDDEN_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0);
+const IMPACT_MARK_PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
+const impactTangent = new THREE.Vector3();
+const impactBitangent = new THREE.Vector3();
+const impactMarkNormal = new THREE.Vector3();
+const impactMarkPosition = new THREE.Vector3();
+const impactMarkScale = new THREE.Vector3();
+const impactMarkRotation = new THREE.Quaternion();
+const impactMarkSpin = new THREE.Quaternion();
+const impactMarkMatrix = new THREE.Matrix4();
+const impactMarkColor = new THREE.Color();
+
 export type ImpactPresentationSurface = ImpactSurface | BallisticMaterialId;
 
 function resolveImpactProfile(surface: ImpactPresentationSurface): SurfaceImpactProfile {
@@ -128,10 +162,9 @@ export class ImpactPresentation {
     this.marks.name = 'pooled-surface-impact-marks';
     this.marks.frustumCulled = false;
     this.marks.visible = false;
-    const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
     const hiddenColor = new THREE.Color(0, 0, 0);
     for (let index = 0; index < MAX_IMPACT_MARKS; index += 1) {
-      this.marks.setMatrixAt(index, hiddenMatrix);
+      this.marks.setMatrixAt(index, HIDDEN_MATRIX);
       // InstancedMesh lazily creates instanceColor on the first setColorAt().
       // Allocate it with the permanent pool, not on the first live bullet hit.
       this.marks.setColorAt(index, hiddenColor);
@@ -324,8 +357,8 @@ export class ImpactPresentation {
     const [primary, secondary] = profile.particleColors;
     const authoredCount = profile.particleCount;
     const count = Math.max(2, Math.round(authoredCount * this.particleDensityScale));
-    const tangent = new THREE.Vector3(normal.z, 0.35, -normal.x).normalize();
-    const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+    const tangent = impactTangent.set(normal.z, 0.35, -normal.x).normalize();
+    const bitangent = impactBitangent.crossVectors(normal, tangent).normalize();
     for (let index = 0; index < count; index += 1) {
       const slot = this.cursor++ % MAX_IMPACT_PARTICLES;
       const particle = this.particles[slot];
@@ -335,8 +368,8 @@ export class ImpactPresentation {
       const speed = profile.impactSurface === 'metal' ? 2.4 + presentationRandom() * 2.8 : 0.8 + presentationRandom() * 1.9;
       particle.velocity.copy(normal).multiplyScalar(speed)
         .addScaledVector(tangent, spreadA)
-        .addScaledVector(bitangent, spreadB)
-        .add(new THREE.Vector3(0, profile.impactSurface === 'soil' ? 1.2 : 0.55, 0));
+        .addScaledVector(bitangent, spreadB);
+      particle.velocity.y += profile.impactSurface === 'soil' ? 1.2 : 0.55;
       particle.maxLife = profile.impactSurface === 'metal' ? 0.24 : 0.38;
       particle.life = particle.maxLife * (0.72 + presentationRandom() * 0.28);
       particle.color.set(index % 2 === 0 ? primary : secondary);
@@ -349,19 +382,19 @@ export class ImpactPresentation {
     }
     const markCapacity = Math.max(8, Math.round(MAX_IMPACT_MARKS * this.decalCapacityScale));
     const markSlot = this.markCursor++ % markCapacity;
-    const markNormal = normal.clone().normalize();
+    const markNormal = impactMarkNormal.copy(normal).normalize();
     // Polygon offset carries the z-fighting burden; a six-millimetre physical
     // offset keeps the mark attached to the struck surface instead of reading
     // as a floating card at grazing angles.
-    const markPosition = point.clone().addScaledVector(markNormal, IMPACT_DECAL_SURFACE_OFFSET_M);
-    const markRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), markNormal);
-    markRotation.premultiply(new THREE.Quaternion().setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
-    this.marks.setMatrixAt(markSlot, new THREE.Matrix4().compose(
+    const markPosition = impactMarkPosition.copy(point).addScaledVector(markNormal, IMPACT_DECAL_SURFACE_OFFSET_M);
+    const markRotation = impactMarkRotation.setFromUnitVectors(IMPACT_MARK_PLANE_NORMAL, markNormal);
+    markRotation.premultiply(impactMarkSpin.setFromAxisAngle(markNormal, presentationRandom() * Math.PI));
+    this.marks.setMatrixAt(markSlot, impactMarkMatrix.compose(
       markPosition,
       markRotation,
-      new THREE.Vector3(profile.markScale, profile.markScale, 1),
+      impactMarkScale.set(profile.markScale, profile.markScale, 1),
     ));
-    this.marks.setColorAt(markSlot, new THREE.Color(profile.markColor));
+    this.marks.setColorAt(markSlot, impactMarkColor.set(profile.markColor));
     this.markLife[markSlot] = Number.POSITIVE_INFINITY;
     this.marks.visible = true;
     this.marks.instanceMatrix.needsUpdate = true;
@@ -378,7 +411,7 @@ export class ImpactPresentation {
     for (let slot = markCapacity; slot < MAX_IMPACT_MARKS; slot += 1) {
       if (this.markLife[slot] <= 0) continue;
       this.markLife[slot] = 0;
-      this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
+      this.marks.setMatrixAt(slot, HIDDEN_MATRIX);
       changed = true;
     }
     if (changed) this.marks.instanceMatrix.needsUpdate = true;
@@ -389,8 +422,7 @@ export class ImpactPresentation {
     this.cursor = 0;
     this.markCursor = 0;
     this.markLife.fill(0);
-    const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
-    for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) this.marks.setMatrixAt(slot, hiddenMatrix);
+    for (let slot = 0; slot < MAX_IMPACT_MARKS; slot += 1) this.marks.setMatrixAt(slot, HIDDEN_MATRIX);
     for (let slot = 0; slot < this.particles.length; slot += 1) {
       this.particles[slot].life = 0;
       const index = slot * 3;
@@ -436,7 +468,7 @@ export class ImpactPresentation {
       if (!Number.isFinite(this.markLife[slot])) continue;
       this.markLife[slot] -= dt;
       if (this.markLife[slot] <= 0) {
-        this.marks.setMatrixAt(slot, new THREE.Matrix4().makeScale(0, 0, 0));
+        this.marks.setMatrixAt(slot, HIDDEN_MATRIX);
         marksChanged = true;
       }
     }
