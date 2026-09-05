@@ -33,7 +33,11 @@ import {
 import { evaluateMpSoakBundle, formatMpSoakTable, MP_SOAK_THRESHOLDS } from './mp-soak-assertions.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const PORTS = Object.freeze({ dist: 4230, peer: 4231 });
+const PORTS = Object.freeze({
+  dist: Number(process.env.MP_SOAK_DIST_PORT ?? '4194'),
+  peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4195'),
+});
+const ALLOWED_QA_PORTS = new Set([4189, 4193, 4194, 4195]);
 const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate');
 const PLAY_DURATION_MS = MP_SOAK_THRESHOLDS.playDurationMs;
 // Keep the browser lifetime below the five-minute owner fence while allowing
@@ -57,7 +61,7 @@ const TSX_CLI = resolve(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs');
 const ARENA_ROSTER_SCRIPT = resolve(REPO_ROOT, 'scripts/qa/mp-lab/arena-roster.mts');
 
 for (const port of Object.values(PORTS)) {
-  if (port < 4230 || port > 4232) throw new Error(`invalid QA port ${port}`);
+  if (!Number.isInteger(port) || !ALLOWED_QA_PORTS.has(port)) throw new Error(`invalid QA port ${port}`);
 }
 
 const startedAtEpochMs = Date.now();
