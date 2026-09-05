@@ -33,6 +33,7 @@ export function makeShadowedLocal(light: THREE.PointLight | THREE.SpotLight): vo
 export type LightOcclusionAudit = Readonly<{
   activeLocalLights: number;
   shadowedLocalLights: number;
+  clusteredLocalLights: number;
   emissiveOnlySources: number;
   violations: readonly string[];
 }>;
@@ -40,6 +41,7 @@ export type LightOcclusionAudit = Readonly<{
 export function auditLocalLightOcclusion(root: THREE.Object3D, layerMask?: number): LightOcclusionAudit {
   let activeLocalLights = 0;
   let shadowedLocalLights = 0;
+  let clusteredLocalLights = 0;
   let emissiveOnlySources = 0;
   const violations: string[] = [];
   root.traverse((node) => {
@@ -54,8 +56,26 @@ export function auditLocalLightOcclusion(root: THREE.Object3D, layerMask?: numbe
     }
     if (node.intensity <= 0) return;
     activeLocalLights += 1;
+    // Nuketown2's clustered registry is an explicit bounded local-light
+    // volume. It is intentionally unshadowed: tile assignment and the
+    // finite catalog distance provide the occlusion boundary, while the
+    // generic local-light policy remains strict for every untagged light.
+    if (tagged.userData.clusteredLocalLight === true) {
+      const source = tagged.userData.clusteredSource;
+      if (node instanceof THREE.PointLight
+        && Number.isFinite(node.distance)
+        && node.distance > 0
+        && node.decay === 2
+        && typeof source === 'string'
+        && source.length > 0) {
+        clusteredLocalLights += 1;
+      } else {
+        violations.push(`${node.name || '(unnamed)'}:invalid-clustered-local-light`);
+      }
+      return;
+    }
     if (tagged.userData.occlusionPolicy === 'shadowed-local' && node.castShadow) shadowedLocalLights += 1;
     else violations.push(`${node.name || '(unnamed)'}:unoccluded-active-light`);
   });
-  return { activeLocalLights, shadowedLocalLights, emissiveOnlySources, violations };
+  return { activeLocalLights, shadowedLocalLights, clusteredLocalLights, emissiveOnlySources, violations };
 }
