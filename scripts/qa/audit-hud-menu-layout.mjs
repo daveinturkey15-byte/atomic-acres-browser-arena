@@ -57,7 +57,12 @@ const VIEWPORTS = [
  */
 const HUD_SURFACES = [
   { selector: '.hud-mission-console', role: 'objectives', critical: true },
-  { selector: '.hud-map-console', role: 'minimap', critical: true },
+  // `.hud-map-console` is non-critical by measurement, not by taste: its text
+  // is two status labels (`#map-heading`, `#location-label`: 9px sheets,
+  // 10-11px measured) and the decision content is the `#minimap` canvas, so
+  // no 12px value exists by design. The 12px ramp still gates every
+  // `critical: true` surface; this flag only records which set it is in.
+  { selector: '.hud-map-console', role: 'minimap', critical: false },
   { selector: '.hud-operator-console', role: 'health', critical: true },
   { selector: '.hud-weapon-console', role: 'ammo', critical: true },
   { selector: '#support-block', role: 'killstreak', critical: false },

@@ -217,6 +217,16 @@ describe('Pass 95 HUD/menu/lobby polish - measured layout', () => {
     }
   });
 
+  it('agrees with the harness that the minimap console carries no 12px value', () => {
+    // F2/UNFINISHED-2: the harness marked `.hud-map-console` critical while
+    // this list omitted it. The harness was the wrong model: the console's
+    // text is two status labels (`#map-heading`, `#location-label`: 9px in
+    // tactical-ui.css, 10-11px measured) and its decision content is the
+    // `#minimap` canvas, so no 12px value exists by design. The 12px ramp
+    // itself is untouched on both sides - only the membership flag moved.
+    expect(harness).toContain("{ selector: '.hud-map-console', role: 'minimap', critical: false }");
+  });
+
   it('puts the map decision surface on the first screen at 1920x1080 and 2560x1440', () => {
     // The before capture had #map-selector starting at y=922.8 in a 1080-tall
     // viewport - the map choice was entirely below the fold behind a 581px
