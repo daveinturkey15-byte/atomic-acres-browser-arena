@@ -263,6 +263,29 @@ describe('Pass 65 sound-event inventory', () => {
     for (const symbol of emitterSymbols) expect(audioSource).toMatch(new RegExp(`\\n  ${symbol}\\(`));
   });
 
+  it('keeps every world one-shot positional: no 2D world-sound callsite', () => {
+    // PASS 95 finish (HF-509): every world one-shot must carry its emitter
+    // point so the runtime positions it through the pooled world panner. A
+    // distance-only row here is the exact regression the finish round closed
+    // (the second shed-door path). Loop beds (setArena), continuous drivers
+    // (syncChopperRotors, updateArenaAmbience) and listener-local cues are
+    // out of scope by design; the local player report stays dry by design.
+    const WORLD_ONE_SHOT_VOICES = Object.freeze([
+      'impact', 'coverImpact', 'shedDoorMotion', 'shedPerforation',
+      'vehicleHit', 'glassShatter', 'testBayDoorThump', 'bulletImpact',
+      'explosionAt',
+    ]);
+    const rows = CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT.filter((entry) =>
+      (WORLD_ONE_SHOT_VOICES as readonly string[]).includes(entry.emitterSymbol));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const identity = runtimeSoundCallsiteIdentity(row);
+      expect(row.argumentSignature, `2D world sound carries no emitter: ${identity}`).toContain(',');
+      expect(row.argumentSignature, `world voice with no position token: ${identity}`)
+        .toMatch(/point|position|origin|centre|trigger|blocker|emitter|muzzle/i);
+    }
+  });
+
   // HF-359: 5 implemented arena ambience identities
   it('pins current weapon variants and all five implemented arena ambience identities', () => {
     expect(PASS64_WEAPON_AUDIO_VARIANTS).toEqual(WEAPON_IDS);
