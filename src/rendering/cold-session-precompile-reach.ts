@@ -84,7 +84,7 @@ import type { Object3D } from 'three';
  * transition now owns its exact coverage compile behind the loading surface;
  * retaining it here would compile the same arena twice before admission.
  */
-const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis', 'nuketown2']);
+const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis']);
 
 export const COLD_SESSION_PRECOMPILE_ARENAS: readonly ArenaId[] = Object.freeze(
   ARENA_IDS.filter((id) => MEASURED_COLD_SESSION_FENCE_LOSERS.includes(id)),
