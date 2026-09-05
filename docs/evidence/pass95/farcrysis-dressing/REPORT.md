@@ -101,8 +101,10 @@ The after-dressing layout receipt is [layout-after-dressing.json](layout-after-d
   authority was added.
 - OPEN: the existing sightline band remains outside acceptance: maximum open
   line `93.99 m`, p50 `17.03 m`, p90 `45.30 m`, `392/1008` samples over the
-  22 m ceiling, and `21/64` spawn pairs open. This dressing stage does not
-  claim to close that layout-lane issue.
+  22 m ceiling. This dressing stage does not claim to close that layout-lane issue.
+- VERIFIED: the spawn-pair count is back at its ceiling, `20/64` open (see
+  "Spawn-pair fix" below). The `<= 20` bound and `FARCRYSIS_MAX_SIGHTLINE`
+  (22 m) are unchanged.
 - VERIFIED: `npx tsx scripts/qa/find-coplanar-pairs.ts` found 0 HOUSE-INTERIOR
   pairs, 0 STREET pairs, 0 same-material-visible findings, and 0 actionable
   different-material/no-offset findings. Its 4 CONTACT, 274 FENCED, 10
@@ -135,10 +137,38 @@ human-readable [blind-ab/WIN-RATE.md](blind-ab/WIN-RATE.md).
 |---|---|---|
 | `npx tsc --noEmit` | VERIFIED | exit 0 |
 | `npx tsx scripts/qa/find-coplanar-pairs.ts` | VERIFIED | exit 0; actionable findings 0 |
-| bounded expansion of `src/farcrysis*.test.ts`, `src/pipeline-metrics*.test.ts`, `src/graphics-profile-contract.test.ts`, and `src/legacy-main-size-ratchet.test.ts` | OPEN | 29/30 files and 207/208 tests pass; the remaining failure is the unchanged layout assertion `spawnPairsOpen <= 20` receiving 21 |
+| bounded expansion of `src/farcrysis*.test.ts`, `src/pipeline-metrics*.test.ts`, `src/graphics-profile-contract.test.ts`, and `src/legacy-main-size-ratchet.test.ts` | VERIFIED | 30/30 files, 208/208 tests pass, including the layout assertion `spawnPairsOpen <= 20` (see "Spawn-pair fix") |
 | `npx vitest run src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts` | VERIFIED | 2/2 files, 16/16 tests |
 | `npm run build` under the shared heavy lock | VERIFIED | lock acquired/released by this worktree; Vite transformed 571 modules and built successfully in 2.33 s |
 | `npm run pipeline:preflight -- --machine dave-gaming-pc --harness codex` | OPEN | policy expects a `codex/<short-outcome>` branch, while the user-required branch is `claude/v9-farcrysis-dressing`; no branch rename was attempted |
+
+
+## Spawn-pair fix (w5-378)
+
+- VERIFIED cause: the dressing-stage reseat of enhanced palm 37
+  (`(20.22, 0.11)` -> `(29, 13)`, `src/farcrysis-palms-enhanced.ts`) moved its
+  named 0.6 m trunk collider off lane-e and, in doing so, off the
+  `spawn-t0-2 (-26, -8)` -> `spawn-t1-1 (32, 2)` eye line (58.9 m), which that
+  trunk had blocked. Disabling the reseat returns the count to 20; no other
+  pair changes. No trunk seat on that line clears every route: the western
+  stretch is low ground the 2.07 m trunk cannot cover, and the eastern stretch
+  lies inside the lane-e corridor.
+- VERIFIED fix: palm 35 re-seated to `(-20.4, -11.1)`, exactly on the
+  `spawn-t0-5 (-32, -14)` -> `spawn-t1-1 (32, 2)` eye line (66.0 m), closing
+  that pair instead. The seat is 2.64 m clear of every route edge, 6.4 m from
+  any spawn, outside all collider boxes, doorways, corridor strips and the
+  7 m grove keep-outs, inside the jungle shore-edge band, and blocks with
+  either trunk scale. Palm 37 keeps its reviewed lane-e-clearing seat. No
+  test, threshold, fidelity band, or size-ratchet value was changed; no route,
+  spawn, cover, or doorway authority was added or removed.
+- VERIFIED proof: bounded expansion 30/30 files, 208/208 tests
+  (`src/farcrysis-layout.test.ts` 11/11); `npx tsc --noEmit` exit 0;
+  `npx tsx scripts/qa/find-coplanar-pairs.ts` exit 0 with 0 HOUSE-INTERIOR, 0
+  STREET, 0 same-material-visible, and 0 actionable findings; parity gates 2/2
+  files, 16/16 tests.
+- OPEN: the stock-flags browser route probe
+  (`scripts/qa/probe-farcrysis-routes-stock.mjs`) was not run here (no
+  browsers in this lane) and remains for the integrator.
 
 ## Reproduction and source-priority note
 

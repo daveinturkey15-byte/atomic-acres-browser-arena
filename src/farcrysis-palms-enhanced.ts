@@ -100,9 +100,17 @@ const PALM_JUNGLE_BAND: Readonly<[number, number]> = [
  * 4.5 m core loop / lane-e sightline. The collider builder imports this same
  * placement function, so re-seating the visual instance also re-seats its
  * existing named trunk proxy without deleting or adding collision authority.
+ * w5-378: the dressing-stage reseat of 37 opened pair spawn-t0-2 ->
+ * spawn-t1-1 (58.9 m, 21st open pair); no trunk seat on that line clears the
+ * routes (low ground west, lane-e corridor east), so 37 keeps its reviewed
+ * seat and 35 closes pair spawn-t0-5 -> spawn-t1-1 (66.0 m) instead, back at
+ * the <= 20 ceiling. Seat (-20.4, -11.1) sits exactly on that eye line, 2.64 m
+ * clear of every route edge, 6.4 m from any spawn, outside all collider
+ * boxes, doorways, corridor strips and grove keep-outs, and blocks with
+ * either trunk scale.
  */
 export const RESEATED_ENHANCED_PALMS: Readonly<Record<35 | 37, readonly [number, number]>> = Object.freeze({
-  35: [-16, -28],
+  35: [-20.4, -11.1],
   37: [29, 13],
 });
 
