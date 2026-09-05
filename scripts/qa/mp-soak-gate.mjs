@@ -180,7 +180,7 @@ function addReplicationDivergences(views, second) {
     : null;
   for (const playerId of Object.keys(hostPlayers)) {
     const hostPlayer = hostPlayers[playerId];
-    const hostPosition = hostPlayer.position ?? [];
+    const hostPosition = hostPlayer.authoritativePosition ?? hostPlayer.position ?? [];
     for (const to of PEERS.filter((role) => role !== 'host')) {
       const guestPlayer = views[to]?.players?.[playerId] ?? null;
       bundle.replication.pairDirections[`host->${to}`] = true;

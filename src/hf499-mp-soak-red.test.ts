@@ -52,8 +52,10 @@ describe('HF-499 replication evidence', () => {
   });
 
   it('keeps rendered and last-authoritative remote positions distinct', () => {
-    expect(audit).toContain('position: (remote.visualPosition ?? remote.position ?? []).map(round)');
-    expect(audit).toContain('authoritativePosition: (remote.authoritativePosition ?? remote.position ?? []).map(round)');
+    expect(audit).toContain('position: renderedPosition');
+    expect(audit).toContain('visualPosition: (remote.visualPosition ?? remote.position ?? []).map(round)');
+    expect(audit).toContain('const authoritativePosition = (remote.authoritativePosition ?? remote.position ?? []).map(round)');
+    expect(audit).toContain('authoritativePosition,');
     expect(audit).toContain('snapshotAgeMs: round(remote.snapshotAgeMs)');
     expect(audit).toContain('snapshotBuffer: remote.snapshotBuffer ?? null');
   });

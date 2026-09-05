@@ -262,6 +262,11 @@ const viewOf = (page) => page.evaluate(() => {
     score: scoreOf(snapshot.player.id),
   };
   for (const remote of snapshot.remotePlayers ?? []) {
+    const authoritativePosition = (remote.authoritativePosition ?? remote.position ?? []).map(round);
+    const renderedFootPosition = remote.visualPosition ?? remote.position ?? [];
+    const renderedPosition = renderedFootPosition.map((value, index) => index === 1
+      ? round(value + (Number(authoritativePosition[1]) - Number((remote.position ?? [])[1])))
+      : round(value));
     players[remote.id] = {
       self: false,
       hp: remote.hp,
@@ -274,8 +279,12 @@ const viewOf = (page) => page.evaluate(() => {
       reloading: remote.reloading ?? null,
       kills: null,
       deaths: null,
-      position: (remote.visualPosition ?? remote.position ?? []).map(round),
-      authoritativePosition: (remote.authoritativePosition ?? remote.position ?? []).map(round),
+      // Remote roots are rendered at feet while PlayerSnapshot positions are
+      // eye-level. Normalize the rendered view back to the wire coordinate so
+      // a standing player is not reported 1.7 m apart from its authority.
+      position: renderedPosition,
+      visualPosition: (remote.visualPosition ?? remote.position ?? []).map(round),
+      authoritativePosition,
       seq: remote.seq ?? null,
       continuity: remote.continuity ?? null,
       authoritativeReady: remote.authoritativeReady ?? true,
