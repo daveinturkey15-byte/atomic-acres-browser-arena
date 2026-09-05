@@ -1,0 +1,508 @@
+{
+  "contract": "blind-ab-v1",
+  "ranAt": "2026-09-05T11:26:40.316Z",
+  "critic": "omp-muse",
+  "liveness": {
+    "ok": true,
+    "detail": "meta-contributor/muse-spark-1.3 reachable (OMP liveness output received)"
+  },
+  "seed": "pass95-farcrysis-dressing",
+  "candidates": {
+    "A": {
+      "label": "before-dressing",
+      "dir": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis"
+    },
+    "B": {
+      "label": "after-dressing",
+      "dir": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis"
+    }
+  },
+  "references": [
+    {
+      "path": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-rebuild\\captures\\farcrysis\\farcrysis-beach-golden.png",
+      "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-rebuild\\captures\\farcrysis\\farcrysis-core-interior.png",
+      "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-rebuild\\captures\\farcrysis\\farcrysis-island-topdown.png",
+      "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+    },
+    {
+      "path": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-rebuild\\captures\\farcrysis\\farcrysis-jungle-dapple.png",
+      "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+    }
+  ],
+  "stations": [
+    "farcrysis-beach-golden",
+    "farcrysis-core-interior",
+    "farcrysis-island-topdown",
+    "farcrysis-jungle-dapple",
+    "farcrysis-seaplane-throwback",
+    "farcrysis-west-shoreline"
+  ],
+  "aggregate": {
+    "contract": "blind-ab-v1",
+    "stations": 6,
+    "valid": 6,
+    "invalid": 0,
+    "invalidReasons": {},
+    "decisive": 4,
+    "ties": 2,
+    "candidates": {
+      "A": {
+        "label": "before-dressing",
+        "wins": 1,
+        "winRateDecisive": 0.25,
+        "winRateWithHalfTies": 0.3333,
+        "wilson95": {
+          "low": 0.0456,
+          "high": 0.6994
+        }
+      },
+      "B": {
+        "label": "after-dressing",
+        "wins": 3,
+        "winRateDecisive": 0.75,
+        "winRateWithHalfTies": 0.6667,
+        "wilson95": {
+          "low": 0.3006,
+          "high": 0.9544
+        }
+      }
+    },
+    "meanConfidence": 0.8167,
+    "claimState": "VERIFIED-UNDERPOWERED",
+    "separates": false
+  },
+  "rows": [
+    {
+      "station": "farcrysis-beach-golden",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "B",
+      "confidence": 0.82,
+      "probes": {
+        "left": {
+          "expected": "UYWR",
+          "answered": "UYWR"
+        },
+        "right": {
+          "expected": "TMWE",
+          "answered": "TMWE"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-beach-golden.png",
+          "sourceSha256": "b232cec922d28fbd8dfaf73013e50f23ca5ebc4aff5c50cfd91b8f15093ebb80",
+          "shownSha256": "96e2534745670c29c35d115309a4ecb9c13d90a22db5f54c9b00e41ac827d140",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-beach-golden.png",
+          "sourceSha256": "9eead2000c47c6304ef92be4f25a411da31f82c569f887b0c0dea7fb8b1a0ab3",
+          "shownSha256": "d0061042954bec1fdddbd0deec2b12624e01d2347dfb186ae31a840348be4b70",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "LEFT and RIGHT share identical structure and layout, but the rock volumes in r2c1 and r1c0-r1c1 decide against the reference set which shows bright daylight with sunlit light-gray stone; LEFT in r2c1 shows a faceted light-gray boulder with bright top plane and readable stone texture while RIGHT in r2c1 renders the same volume near-black on its sun-facing top, inverting the expected brightest-plane relationship, and the same light-vs-black split repeats for midground boulders in r1c0 and r1c1.",
+      "leftCloser": [
+        "foreground boulder in r2c1 reads as sunlit faceted stone with light top matching daylight value relationships in references",
+        "midground boulders in r1c0 and r1c1 retain light-gray stone material read matching light mountain/stone in references instead of coal-black",
+        "contact shading under trunks in r1c1 stays readable in LEFT rather than crushed to black as in RIGHT"
+      ],
+      "rightCloser": [],
+      "largestDifference": {
+        "region": "r2c1",
+        "what": "foreground large boulder is light gray faceted stone in LEFT versus near-black in RIGHT"
+      },
+      "elapsedMs": 52359,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "farcrysis-core-interior",
+      "assignment": {
+        "left": "A",
+        "right": "B"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "A",
+      "confidence": 0.85,
+      "probes": {
+        "left": {
+          "expected": "CMHH",
+          "answered": "CMHH"
+        },
+        "right": {
+          "expected": "MYWU",
+          "answered": "MYWU"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-core-interior.png",
+          "sourceSha256": "da01ff628b2498a368bf0e876449986a5d634349f51c50838c621b47c4a97661",
+          "shownSha256": "a71653d3cd3039b67f719c047bff966ce664e64244e7de9180f2e5a12434c1eb",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-core-interior.png",
+          "sourceSha256": "7eee23aa57c81a31b93208cb7d4cd6853a349dd5f39def9b9a19b82c89ca7fa8",
+          "shownSha256": "0dbaf73b3654ea8626949e67dd6c38e8a2a7cd5ea05fc3ec6f795f4505eaca1c",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "The decisive cue is the left and center retaining walls and overhang underside: reference-1 in r1c0-r1c1 shows a sunlit vertically-striated golden-brown material with graded falloff into shadow, and reference-4 in r0c1-r1c1 shows a dark graded teal slab with retained texture; LEFT in r1c0-r1c1 preserves that striated texture and graded shadow while RIGHT in r1c0-r1c1 crushes the same walls to flat pure black and lifts the slab in r0c1 to a flat light teal, losing both material read and value relationships.",
+      "leftCloser": [
+        "left retaining wall in r1c0 retains vertical striated golden-brown bark/wood texture matching reference-1 instead of flat black in RIGHT",
+        "far wall and stair buttress in r1c1 retains mottled texture and graded sun-to-shadow falloff matching references instead of crushed black in RIGHT",
+        "overhang underside in r0c1-r1c1 shows dark graded teal with specular variation matching reference-4 shadowed slab instead of flat light wash in RIGHT",
+        "right-edge trunk/bark in r0c2-r2c2 preserves banded brown shading and contact depth matching reference-1 instead of flattened lighter read in RIGHT"
+      ],
+      "rightCloser": [
+        "pedestal cap top in r1c1-r2c1 reads as mid-blue matching reference-1 sunlit cap value better than LEFT near-black crush in r1c1",
+        "overhang underside brightness in r0c1 is lighter matching reference-1 bright-slab state in r0c1"
+      ],
+      "largestDifference": {
+        "region": "r1c0",
+        "what": "left retaining wall is textured striated brown-gold in LEFT versus solid flat black in RIGHT"
+      },
+      "elapsedMs": 33916,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "farcrysis-island-topdown",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "tie",
+      "winner": "tie",
+      "confidence": 0.98,
+      "probes": {
+        "left": {
+          "expected": "RRDN",
+          "answered": "RRDN"
+        },
+        "right": {
+          "expected": "UJXE",
+          "answered": "UJXE"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-island-topdown.png",
+          "sourceSha256": "30423cecfdce0cc6972986b674217355087cb8f9b2b8f531235574a821ae2d7e",
+          "shownSha256": "a82fd442171c95b41beb17281f6657b01d353e60c9b4541ad86c354095fc4080",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-island-topdown.png",
+          "sourceSha256": "c8e55c12e523a6ab3b0bb2ae4ae580f10f9c7e97a96d1ac0dee91a037db28e37",
+          "shownSha256": "1dad2aee87cccf8b08814c545025fdf4cbe885b2e484c53aa46c0cd558b35ea0",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "Both renders match the reference top-down in structure, proportion, material read and value relationships identically across r0c0 through r2c2: same square island with beach and water surround, same tree clusters, same central structure in r1c1, same canopy brightness versus ground and same soft shadows; no layout, proportion or lighting disagreement to the references distinguishes LEFT from RIGHT.",
+      "leftCloser": [],
+      "rightCloser": [],
+      "largestDifference": {
+        "region": "r2c2",
+        "what": "only the corner probe box text differs; the scene pixels are otherwise indistinguishable"
+      },
+      "elapsedMs": 37085,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "farcrysis-jungle-dapple",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "B",
+      "confidence": 0.62,
+      "probes": {
+        "left": {
+          "expected": "UJXM",
+          "answered": "UJXM"
+        },
+        "right": {
+          "expected": "WRTA",
+          "answered": "WRTA"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-jungle-dapple.png",
+          "sourceSha256": "3ef44872a3533a19b5f6f705bdc6f347838d533ca989ca1754ec7d260586f9da",
+          "shownSha256": "3a08525818f0aef65b9ace025ba64c9d2b790100cbc9af03f3c00cfdb303e7aa",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-jungle-dapple.png",
+          "sourceSha256": "f304b445c11a138763e1c78b9e15ea7a55df3dde7856853269ac00d8ba987da4",
+          "shownSha256": "18e98baaafc137d899621edbac7065f6874acf9ac6d8d550f99176583a3be96b",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "LEFT and RIGHT share identical structure, layout and proportion against the references across r1c0-r2c2, but differ decisively in r0c0-r0c1 where the overhead palm fronds meet the sky; the reference jungle view shows those fronds as pale translucent light-blue that blends toward sky value, which LEFT in r0c0-r0c1 preserves as faint desaturated dithered fronds maintaining the bright sky-to-frond value relationship, while RIGHT renders the same fronds in r0c0-r0c1 as solid saturated opaque blue that reads as a different material class and breaks the reference value relationship.",
+      "leftCloser": [
+        "pale translucent dithered palm fronds in r0c0-r0c1 match reference translucent frond material and bright sky value relationship",
+        "sky-frond value hierarchy in r0c1 stays brightest-sky with faint fronds as in reference"
+      ],
+      "rightCloser": [
+        "ground dapple pattern and tree massing in r1c1-r2c1 equally match references, no distinct advantage"
+      ],
+      "largestDifference": {
+        "region": "r0c1",
+        "what": "overhead palm frond opacity and value: faint pale dithered translucent in LEFT versus solid saturated opaque blue in RIGHT"
+      },
+      "elapsedMs": 54500,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "farcrysis-seaplane-throwback",
+      "assignment": {
+        "left": "B",
+        "right": "A"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "left",
+      "winner": "B",
+      "confidence": 0.68,
+      "probes": {
+        "left": {
+          "expected": "UTYY",
+          "answered": "UTYY"
+        },
+        "right": {
+          "expected": "NMDM",
+          "answered": "NMDM"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-seaplane-throwback.png",
+          "sourceSha256": "5411fc3d814e620b0c1a41e0d804a82a94418f796a78c5cdc98ad30e76e4b77e",
+          "shownSha256": "d3fd70e943c26319dbdfbc5afe0a6fc2bad3ef11cb43b66a415beda1486236b4",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-seaplane-throwback.png",
+          "sourceSha256": "18abd21bb04513e30ff81ae7077e7f55cedd522d1a4ed1f7f3ffcc9273df4b3a",
+          "shownSha256": "b8ba1448cb36de69c840e005de24f14efc79202450901f80e0fadf8dba3de1b5",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "Against the reference set the decisive cue is the central wing/fuselage plane in r2c1 and the boulder material in r1c1-r1c2-r2c1: references show a flat matte light blue-grey painted surface and light faceted grey rocks under soft even daylight, which LEFT preserves while RIGHT blows the wing to white with a hard center split and turns the rocks near-black with deep contact shadows.",
+      "leftCloser": [
+        "flat matte light blue-grey wing top in r2c1 reads as same painted-metal class as reference-1 large planes, without blown highlight",
+        "light medium-grey faceted boulders in r1c1, r1c2 and r2c1 match reference light-grey mountain/rock material read",
+        "even diffuse ground/grass illumination in r2c0 and r2c1 matches soft reference daylight without harsh specular split"
+      ],
+      "rightCloser": [
+        "more saturated cyan sky value in r0c0, r0c1 and r0c2 matches reference-3 vivid blue sky better than LEFT washed-out sky",
+        "richer brown trunk value and stronger dappled ground shadow contrast in r0c1 and r2c0 closer to reference-3 mottled sun/shade pattern"
+      ],
+      "largestDifference": {
+        "region": "r2c1",
+        "what": "wing top value/material: flat even light blue-grey in LEFT vs blown white highlight with dark blue-grey shadow split in RIGHT"
+      },
+      "elapsedMs": 44840,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    },
+    {
+      "station": "farcrysis-west-shoreline",
+      "assignment": {
+        "left": "A",
+        "right": "B"
+      },
+      "valid": true,
+      "invalidReason": null,
+      "errors": [],
+      "winnerSide": "tie",
+      "winner": "tie",
+      "confidence": 0.95,
+      "probes": {
+        "left": {
+          "expected": "KAWY",
+          "answered": "KAWY"
+        },
+        "right": {
+          "expected": "XJTM",
+          "answered": "XJTM"
+        }
+      },
+      "images": {
+        "left": {
+          "candidate": "A",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-west-shoreline.png",
+          "sourceSha256": "3e6cd8f351c30a652f2665312febdbc0e68b00052551c51e91325bd0aa54cd15",
+          "shownSha256": "f71cdcaaab719d87b8b0c8e85364b07818210919f42568ced3b1ba33bf9aff1c",
+          "leakedFields": []
+        },
+        "right": {
+          "candidate": "B",
+          "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-west-shoreline.png",
+          "sourceSha256": "f57efb549c613868c1b596b589befef91a3bddc552b83e12e7130a0107ee9a4f",
+          "shownSha256": "7be005163419bb5e00bc8335d634fb486efda1070804149092c5af00b2cbf4a9",
+          "leakedFields": []
+        },
+        "references": [
+          {
+            "shownAs": "reference-1.png",
+            "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+          },
+          {
+            "shownAs": "reference-2.png",
+            "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+          },
+          {
+            "shownAs": "reference-3.png",
+            "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+          },
+          {
+            "shownAs": "reference-4.png",
+            "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+          }
+        ]
+      },
+      "why": "Both LEFT and RIGHT reproduce the reference set equally: dense brown cylindrical trunks with rounded green canopies in r0c0-r1c0, grassy shoreline with dark posts and orange-banded markers in r1c0-r2c0, turquoise-white striped water with mid-water rock in r1c1-r2c1, and pale distant mountains under blue sky in r0c2-r1c2, with matching material read and value relationships and no structural, proportional, or lighting advantage for either.",
+      "leftCloser": [],
+      "rightCloser": [],
+      "largestDifference": {
+        "region": "r1c1",
+        "what": "no discernible disagreement between LEFT and RIGHT; structure, proportion, material and lighting are identical"
+      },
+      "elapsedMs": 53352,
+      "route": "omp-muse",
+      "model": "meta-contributor/muse-spark-1.3"
+    }
+  ]
+}

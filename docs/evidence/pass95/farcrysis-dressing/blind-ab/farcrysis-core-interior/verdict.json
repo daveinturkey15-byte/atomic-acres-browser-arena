@@ -1,0 +1,75 @@
+{
+  "station": "farcrysis-core-interior",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "A",
+  "confidence": 0.85,
+  "probes": {
+    "left": {
+      "expected": "CMHH",
+      "answered": "CMHH"
+    },
+    "right": {
+      "expected": "MYWU",
+      "answered": "MYWU"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-core-interior.png",
+      "sourceSha256": "da01ff628b2498a368bf0e876449986a5d634349f51c50838c621b47c4a97661",
+      "shownSha256": "a71653d3cd3039b67f719c047bff966ce664e64244e7de9180f2e5a12434c1eb",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-core-interior.png",
+      "sourceSha256": "7eee23aa57c81a31b93208cb7d4cd6853a349dd5f39def9b9a19b82c89ca7fa8",
+      "shownSha256": "0dbaf73b3654ea8626949e67dd6c38e8a2a7cd5ea05fc3ec6f795f4505eaca1c",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+      }
+    ]
+  },
+  "why": "The decisive cue is the left and center retaining walls and overhang underside: reference-1 in r1c0-r1c1 shows a sunlit vertically-striated golden-brown material with graded falloff into shadow, and reference-4 in r0c1-r1c1 shows a dark graded teal slab with retained texture; LEFT in r1c0-r1c1 preserves that striated texture and graded shadow while RIGHT in r1c0-r1c1 crushes the same walls to flat pure black and lifts the slab in r0c1 to a flat light teal, losing both material read and value relationships.",
+  "leftCloser": [
+    "left retaining wall in r1c0 retains vertical striated golden-brown bark/wood texture matching reference-1 instead of flat black in RIGHT",
+    "far wall and stair buttress in r1c1 retains mottled texture and graded sun-to-shadow falloff matching references instead of crushed black in RIGHT",
+    "overhang underside in r0c1-r1c1 shows dark graded teal with specular variation matching reference-4 shadowed slab instead of flat light wash in RIGHT",
+    "right-edge trunk/bark in r0c2-r2c2 preserves banded brown shading and contact depth matching reference-1 instead of flattened lighter read in RIGHT"
+  ],
+  "rightCloser": [
+    "pedestal cap top in r1c1-r2c1 reads as mid-blue matching reference-1 sunlit cap value better than LEFT near-black crush in r1c1",
+    "overhang underside brightness in r0c1 is lighter matching reference-1 bright-slab state in r0c1"
+  ],
+  "largestDifference": {
+    "region": "r1c0",
+    "what": "left retaining wall is textured striated brown-gold in LEFT versus solid flat black in RIGHT"
+  },
+  "elapsedMs": 33916,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

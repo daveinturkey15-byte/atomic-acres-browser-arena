@@ -1,0 +1,72 @@
+{
+  "station": "farcrysis-jungle-dapple",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.62,
+  "probes": {
+    "left": {
+      "expected": "UJXM",
+      "answered": "UJXM"
+    },
+    "right": {
+      "expected": "WRTA",
+      "answered": "WRTA"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-jungle-dapple.png",
+      "sourceSha256": "3ef44872a3533a19b5f6f705bdc6f347838d533ca989ca1754ec7d260586f9da",
+      "shownSha256": "3a08525818f0aef65b9ace025ba64c9d2b790100cbc9af03f3c00cfdb303e7aa",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-jungle-dapple.png",
+      "sourceSha256": "f304b445c11a138763e1c78b9e15ea7a55df3dde7856853269ac00d8ba987da4",
+      "shownSha256": "18e98baaafc137d899621edbac7065f6874acf9ac6d8d550f99176583a3be96b",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+      }
+    ]
+  },
+  "why": "LEFT and RIGHT share identical structure, layout and proportion against the references across r1c0-r2c2, but differ decisively in r0c0-r0c1 where the overhead palm fronds meet the sky; the reference jungle view shows those fronds as pale translucent light-blue that blends toward sky value, which LEFT in r0c0-r0c1 preserves as faint desaturated dithered fronds maintaining the bright sky-to-frond value relationship, while RIGHT renders the same fronds in r0c0-r0c1 as solid saturated opaque blue that reads as a different material class and breaks the reference value relationship.",
+  "leftCloser": [
+    "pale translucent dithered palm fronds in r0c0-r0c1 match reference translucent frond material and bright sky value relationship",
+    "sky-frond value hierarchy in r0c1 stays brightest-sky with faint fronds as in reference"
+  ],
+  "rightCloser": [
+    "ground dapple pattern and tree massing in r1c1-r2c1 equally match references, no distinct advantage"
+  ],
+  "largestDifference": {
+    "region": "r0c1",
+    "what": "overhead palm frond opacity and value: faint pale dithered translucent in LEFT versus solid saturated opaque blue in RIGHT"
+  },
+  "elapsedMs": 54500,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

@@ -1,0 +1,67 @@
+{
+  "station": "farcrysis-island-topdown",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.98,
+  "probes": {
+    "left": {
+      "expected": "RRDN",
+      "answered": "RRDN"
+    },
+    "right": {
+      "expected": "UJXE",
+      "answered": "UJXE"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-island-topdown.png",
+      "sourceSha256": "30423cecfdce0cc6972986b674217355087cb8f9b2b8f531235574a821ae2d7e",
+      "shownSha256": "a82fd442171c95b41beb17281f6657b01d353e60c9b4541ad86c354095fc4080",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-island-topdown.png",
+      "sourceSha256": "c8e55c12e523a6ab3b0bb2ae4ae580f10f9c7e97a96d1ac0dee91a037db28e37",
+      "shownSha256": "1dad2aee87cccf8b08814c545025fdf4cbe885b2e484c53aa46c0cd558b35ea0",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+      }
+    ]
+  },
+  "why": "Both renders match the reference top-down in structure, proportion, material read and value relationships identically across r0c0 through r2c2: same square island with beach and water surround, same tree clusters, same central structure in r1c1, same canopy brightness versus ground and same soft shadows; no layout, proportion or lighting disagreement to the references distinguishes LEFT from RIGHT.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c2",
+    "what": "only the corner probe box text differs; the scene pixels are otherwise indistinguishable"
+  },
+  "elapsedMs": 37085,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

@@ -1,0 +1,1763 @@
+{
+  "contract": "farcrysis-layout-receipt-v1",
+  "sha": "a7ed8c5b28b84cb617fd4a58feaefe3c01f97858",
+  "measuredAt": "2026-09-05T11:27:22.350Z",
+  "environment": "vitest-equivalent unit environment (no browser, no GPU)",
+  "ceilings": {
+    "maxSightlineM": 22,
+    "coverMin": 14,
+    "middleRadiusM": 20
+  },
+  "scale": {
+    "eyeHeightM": 1.7,
+    "autostepM": 0.42,
+    "sprintMps": 5.2,
+    "hardCoverM": 0.7,
+    "viewBlockM": 1.8,
+    "spawnCoverReachM": 6,
+    "engagementM": 22,
+    "weaponRangeM": {
+      "localHitscan": 90,
+      "botHitscan": 110,
+      "worldTrace": 220,
+      "flamethrower": 18
+    }
+  },
+  "loops": [
+    {
+      "id": "beach-ring",
+      "chebyshevM": 50,
+      "widthM": 8,
+      "waypoints": [
+        [
+          -50,
+          -50
+        ],
+        [
+          0,
+          -50
+        ],
+        [
+          50,
+          -50
+        ],
+        [
+          50,
+          0
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          0,
+          50
+        ],
+        [
+          -50,
+          50
+        ],
+        [
+          -50,
+          0
+        ]
+      ],
+      "sprintLapS": 76.9,
+      "register": "wide, open-ish, sightline breaks via palms, skiffs and rocks"
+    },
+    {
+      "id": "jungle-band",
+      "chebyshevM": 26,
+      "widthM": 6,
+      "waypoints": [
+        [
+          -26,
+          -26
+        ],
+        [
+          0,
+          -26
+        ],
+        [
+          26,
+          -26
+        ],
+        [
+          26,
+          0
+        ],
+        [
+          26,
+          26
+        ],
+        [
+          0,
+          26
+        ],
+        [
+          -26,
+          26
+        ],
+        [
+          -26,
+          0
+        ]
+      ],
+      "sprintLapS": 40,
+      "register": "dense, cover-heavy, tight turns, short sightlines (~4-8 m)"
+    },
+    {
+      "id": "core-loop",
+      "chebyshevM": 5.5,
+      "widthM": 4.5,
+      "waypoints": [
+        [
+          0,
+          -8
+        ],
+        [
+          6.5,
+          -6.5
+        ],
+        [
+          6.5,
+          0
+        ],
+        [
+          6.5,
+          6.5
+        ],
+        [
+          0,
+          8
+        ],
+        [
+          -6.5,
+          6.5
+        ],
+        [
+          -6.5,
+          0
+        ],
+        [
+          -6.5,
+          -6.5
+        ]
+      ],
+      "sprintLapS": 10.1,
+      "register": "ruined research core: two doors, one catwalk, the one vertical crossing"
+    }
+  ],
+  "crossLanes": [
+    {
+      "id": "lane-n",
+      "from": [
+        0,
+        -50
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 6
+    },
+    {
+      "id": "lane-s",
+      "from": [
+        0,
+        50
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 6
+    },
+    {
+      "id": "lane-w",
+      "from": [
+        -50,
+        0
+      ],
+      "to": [
+        -8,
+        0
+      ],
+      "widthM": 6
+    },
+    {
+      "id": "lane-e",
+      "from": [
+        50,
+        0
+      ],
+      "to": [
+        8,
+        0
+      ],
+      "widthM": 6
+    }
+  ],
+  "routeSegments": [
+    {
+      "routeId": "beach-ring",
+      "segment": 0,
+      "from": [
+        -50,
+        -50
+      ],
+      "to": [
+        0,
+        -50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 1,
+      "from": [
+        0,
+        -50
+      ],
+      "to": [
+        50,
+        -50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 2,
+      "from": [
+        50,
+        -50
+      ],
+      "to": [
+        50,
+        0
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 3,
+      "from": [
+        50,
+        0
+      ],
+      "to": [
+        50,
+        50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 4,
+      "from": [
+        50,
+        50
+      ],
+      "to": [
+        0,
+        50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 5,
+      "from": [
+        0,
+        50
+      ],
+      "to": [
+        -50,
+        50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 6,
+      "from": [
+        -50,
+        50
+      ],
+      "to": [
+        -50,
+        0
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "beach-ring",
+      "segment": 7,
+      "from": [
+        -50,
+        0
+      ],
+      "to": [
+        -50,
+        -50
+      ],
+      "widthM": 8,
+      "distanceM": 50,
+      "sprintSeconds": 9.62
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 0,
+      "from": [
+        -26,
+        -26
+      ],
+      "to": [
+        0,
+        -26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 1,
+      "from": [
+        0,
+        -26
+      ],
+      "to": [
+        26,
+        -26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 2,
+      "from": [
+        26,
+        -26
+      ],
+      "to": [
+        26,
+        0
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 3,
+      "from": [
+        26,
+        0
+      ],
+      "to": [
+        26,
+        26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 4,
+      "from": [
+        26,
+        26
+      ],
+      "to": [
+        0,
+        26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 5,
+      "from": [
+        0,
+        26
+      ],
+      "to": [
+        -26,
+        26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 6,
+      "from": [
+        -26,
+        26
+      ],
+      "to": [
+        -26,
+        0
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "jungle-band",
+      "segment": 7,
+      "from": [
+        -26,
+        0
+      ],
+      "to": [
+        -26,
+        -26
+      ],
+      "widthM": 6,
+      "distanceM": 26,
+      "sprintSeconds": 5
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 0,
+      "from": [
+        0,
+        -8
+      ],
+      "to": [
+        6.5,
+        -6.5
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.67,
+      "sprintSeconds": 1.28
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 1,
+      "from": [
+        6.5,
+        -6.5
+      ],
+      "to": [
+        6.5,
+        0
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.5,
+      "sprintSeconds": 1.25
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 2,
+      "from": [
+        6.5,
+        0
+      ],
+      "to": [
+        6.5,
+        6.5
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.5,
+      "sprintSeconds": 1.25
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 3,
+      "from": [
+        6.5,
+        6.5
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.67,
+      "sprintSeconds": 1.28
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 4,
+      "from": [
+        0,
+        8
+      ],
+      "to": [
+        -6.5,
+        6.5
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.67,
+      "sprintSeconds": 1.28
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 5,
+      "from": [
+        -6.5,
+        6.5
+      ],
+      "to": [
+        -6.5,
+        0
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.5,
+      "sprintSeconds": 1.25
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 6,
+      "from": [
+        -6.5,
+        0
+      ],
+      "to": [
+        -6.5,
+        -6.5
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.5,
+      "sprintSeconds": 1.25
+    },
+    {
+      "routeId": "core-loop",
+      "segment": 7,
+      "from": [
+        -6.5,
+        -6.5
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 4.5,
+      "distanceM": 6.67,
+      "sprintSeconds": 1.28
+    },
+    {
+      "routeId": "lane-n",
+      "segment": 0,
+      "from": [
+        0,
+        -50
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 6,
+      "distanceM": 42,
+      "sprintSeconds": 8.08
+    },
+    {
+      "routeId": "lane-s",
+      "segment": 0,
+      "from": [
+        0,
+        50
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 6,
+      "distanceM": 42,
+      "sprintSeconds": 8.08
+    },
+    {
+      "routeId": "lane-w",
+      "segment": 0,
+      "from": [
+        -50,
+        0
+      ],
+      "to": [
+        -8,
+        0
+      ],
+      "widthM": 6,
+      "distanceM": 42,
+      "sprintSeconds": 8.08
+    },
+    {
+      "routeId": "lane-e",
+      "segment": 0,
+      "from": [
+        50,
+        0
+      ],
+      "to": [
+        8,
+        0
+      ],
+      "widthM": 6,
+      "distanceM": 42,
+      "sprintSeconds": 8.08
+    }
+  ],
+  "spawnZones": [
+    {
+      "id": "spawn-zone-t0",
+      "team": 0,
+      "centre": [
+        -26.25,
+        -22.75
+      ],
+      "bounds": {
+        "minX": -36,
+        "maxX": -8,
+        "minZ": -34,
+        "maxZ": -8
+      },
+      "preferredRoute": "lane-w",
+      "coverReachM": 6,
+      "visibleEnemyFloorM": 30
+    },
+    {
+      "id": "spawn-zone-t1",
+      "team": 1,
+      "centre": [
+        25.75,
+        27.25
+      ],
+      "bounds": {
+        "minX": 2,
+        "maxX": 44,
+        "minZ": 2,
+        "maxZ": 46
+      },
+      "preferredRoute": "lane-e",
+      "coverReachM": 6,
+      "visibleEnemyFloorM": 30
+    }
+  ],
+  "verticalCrossing": {
+    "id": "core-catwalk-stairs",
+    "foot": [
+      2.9,
+      0,
+      4.6
+    ],
+    "top": [
+      2.9,
+      2.59,
+      1.35
+    ],
+    "widthM": 1.2,
+    "purpose": "one core loop crossing from terrain floor to the catwalk lookout"
+  },
+  "reviewStations": [
+    {
+      "id": "farcrysis-beach-golden",
+      "position": [
+        -54,
+        3.2,
+        -54
+      ],
+      "target": [
+        0,
+        1.2,
+        0
+      ],
+      "purpose": "overview",
+      "exposure": 1.08,
+      "far": 190
+    },
+    {
+      "id": "farcrysis-jungle-dapple",
+      "position": [
+        -20,
+        1.9,
+        -24
+      ],
+      "target": [
+        0,
+        1.7,
+        0
+      ],
+      "purpose": "light-occlusion",
+      "exposure": 1.08,
+      "far": 190
+    },
+    {
+      "id": "farcrysis-core-interior",
+      "position": [
+        -4.3,
+        1.65,
+        0
+      ],
+      "target": [
+        3.4,
+        1.9,
+        2.4
+      ],
+      "purpose": "geometry",
+      "exposure": 1.08,
+      "far": 190
+    },
+    {
+      "id": "farcrysis-seaplane-throwback",
+      "position": [
+        48,
+        2.4,
+        -48
+      ],
+      "target": [
+        40,
+        1.2,
+        -40
+      ],
+      "purpose": "overview",
+      "exposure": 1.08,
+      "far": 190
+    },
+    {
+      "id": "farcrysis-island-topdown",
+      "position": [
+        0,
+        95,
+        2
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "purpose": "overview",
+      "exposure": 1.08,
+      "far": 190
+    },
+    {
+      "id": "farcrysis-west-shoreline",
+      "position": [
+        -62,
+        5,
+        -6
+      ],
+      "target": [
+        -50,
+        1.2,
+        12
+      ],
+      "purpose": "overview",
+      "exposure": 1.08,
+      "far": 190
+    }
+  ],
+  "pipelineBudget": {
+    "maximumFoliageNodeGraphs": 16,
+    "minimumMaterialsPerFoliageGraph": 4,
+    "maximumDrawCalls": 460,
+    "maximumTriangles": 1100000,
+    "derivation": "TSL foliage graph ceiling plus the authored visual-definition arena ceilings"
+  },
+  "terrainWater": {
+    "heightAuthority": "farcrysisTerrainHeight(x, z)",
+    "safetyFloorY": -4.5,
+    "waterLevelY": -0.25,
+    "dryFootprint": "rectangular 55.5 m half-extent",
+    "shore": {
+      "descentStartDist": 10,
+      "joinHeight": 0.2,
+      "shelfSlope": 0.38,
+      "approachDist": 12,
+      "outerDropDist": 1.5,
+      "edgeHeight": -3.98
+    }
+  },
+  "coverRhythm": {
+    "minimumPhysicalPieces": 14,
+    "spawnCoverReachM": 6,
+    "bands": [
+      {
+        "id": "beach-ring",
+        "register": "wide gaps broken by palms, skiffs and rocks"
+      },
+      {
+        "id": "jungle-band",
+        "register": "cover-heavy chain with tight turns"
+      },
+      {
+        "id": "core-loop",
+        "register": "hard shell and interior cover at the vertical crossing"
+      }
+    ]
+  },
+  "census": {
+    "solidColliders": 215,
+    "physicalCover": 64,
+    "shotSurfaces": 479,
+    "colliders": 215,
+    "meshes": 981,
+    "materials": 149,
+    "standardMaterials": 130,
+    "nodeMaterials": 0,
+    "otherMaterials": 19
+  },
+  "sightlines": {
+    "eyeHeightM": 1.7,
+    "bearings": 36,
+    "origins": 28,
+    "samples": 1008,
+    "maxOpenM": 93.99,
+    "maxOpenSample": {
+      "origin": "patrol-2",
+      "bearingDeg": 110,
+      "openM": 93.99301489336818,
+      "blockedBy": "bounds"
+    },
+    "p50OpenM": 17.03,
+    "p90OpenM": 45.3,
+    "overCeiling": 392,
+    "underCeilingFraction": 0.6111,
+    "spawnPairs": 64,
+    "spawnPairsOpen": 21,
+    "openSpawnPairs": [
+      {
+        "from": "spawn-t0-0",
+        "to": "spawn-t1-7",
+        "distanceM": 80,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-0",
+        "distanceM": 68.96375859826668,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-1",
+        "distanceM": 48.82622246293481,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-2",
+        "distanceM": 72.69112738154499,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-4",
+        "distanceM": 54.405882034941776,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-5",
+        "distanceM": 72.1110255092798,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-1",
+        "to": "spawn-t1-7",
+        "distanceM": 63.245553203367585,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-2",
+        "to": "spawn-t1-1",
+        "distanceM": 58.85575587824865,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-2",
+        "to": "spawn-t1-4",
+        "distanceM": 56.356011214421486,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-2",
+        "to": "spawn-t1-5",
+        "distanceM": 65.29931086925804,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-2",
+        "to": "spawn-t1-7",
+        "distanceM": 63.81222453417527,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-3",
+        "to": "spawn-t1-5",
+        "distanceM": 86.83317338436964,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-4",
+        "to": "spawn-t1-1",
+        "distanceM": 56.46237685397242,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-4",
+        "to": "spawn-t1-4",
+        "distanceM": 58.137767414994535,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-4",
+        "to": "spawn-t1-5",
+        "distanceM": 71.6937933157397,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-4",
+        "to": "spawn-t1-7",
+        "distanceM": 66.48308055437865,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-5",
+        "to": "spawn-t1-1",
+        "distanceM": 65.96969000988257,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-5",
+        "to": "spawn-t1-4",
+        "distanceM": 64.4980619863884,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-5",
+        "to": "spawn-t1-7",
+        "distanceM": 72.11102550927978,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-7",
+        "to": "spawn-t1-4",
+        "distanceM": 68.11754546370561,
+        "blocked": false,
+        "blockedBy": "open"
+      },
+      {
+        "from": "spawn-t0-7",
+        "to": "spawn-t1-5",
+        "distanceM": 80.99382692526635,
+        "blocked": false,
+        "blockedBy": "open"
+      }
+    ],
+    "perOrigin": [
+      {
+        "id": "spawn-t0-0",
+        "kind": "spawn",
+        "x": -36,
+        "z": -22,
+        "maxOpenM": 44,
+        "worstBearingDeg": 340,
+        "blockedBy": "terrain",
+        "over22": 7
+      },
+      {
+        "id": "spawn-t0-1",
+        "kind": "spawn",
+        "x": -8,
+        "z": -26,
+        "maxOpenM": 76.83,
+        "worstBearingDeg": 120,
+        "blockedBy": "bounds",
+        "over22": 34
+      },
+      {
+        "id": "spawn-t0-2",
+        "kind": "spawn",
+        "x": -26,
+        "z": -8,
+        "maxOpenM": 46,
+        "worstBearingDeg": 100,
+        "blockedBy": "terrain",
+        "over22": 14
+      },
+      {
+        "id": "spawn-t0-3",
+        "kind": "spawn",
+        "x": -26,
+        "z": -34,
+        "maxOpenM": 88.12,
+        "worstBearingDeg": 110,
+        "blockedBy": "bounds",
+        "over22": 17
+      },
+      {
+        "id": "spawn-t0-4",
+        "kind": "spawn",
+        "x": -20,
+        "z": -20,
+        "maxOpenM": 57,
+        "worstBearingDeg": 40,
+        "blockedBy": "terrain",
+        "over22": 18
+      },
+      {
+        "id": "spawn-t0-5",
+        "kind": "spawn",
+        "x": -32,
+        "z": -14,
+        "maxOpenM": 58,
+        "worstBearingDeg": 50,
+        "blockedBy": "terrain",
+        "over22": 10
+      },
+      {
+        "id": "spawn-t0-6",
+        "kind": "spawn",
+        "x": -34,
+        "z": -32,
+        "maxOpenM": 82.96,
+        "worstBearingDeg": 110,
+        "blockedBy": "farcrysis-palm-trunk-44--60",
+        "over22": 26
+      },
+      {
+        "id": "spawn-t0-7",
+        "kind": "spawn",
+        "x": -28,
+        "z": -26,
+        "maxOpenM": 70,
+        "worstBearingDeg": 110,
+        "blockedBy": "terrain",
+        "over22": 12
+      },
+      {
+        "id": "spawn-t1-0",
+        "kind": "spawn",
+        "x": 26,
+        "z": 34,
+        "maxOpenM": 51,
+        "worstBearingDeg": 280,
+        "blockedBy": "terrain",
+        "over22": 12
+      },
+      {
+        "id": "spawn-t1-1",
+        "kind": "spawn",
+        "x": 32,
+        "z": 2,
+        "maxOpenM": 64.59,
+        "worstBearingDeg": 30,
+        "blockedBy": "bounds",
+        "over22": 25
+      },
+      {
+        "id": "spawn-t1-2",
+        "kind": "spawn",
+        "x": 2,
+        "z": 46,
+        "maxOpenM": 41,
+        "worstBearingDeg": 170,
+        "blockedBy": "terrain",
+        "over22": 15
+      },
+      {
+        "id": "spawn-t1-3",
+        "kind": "spawn",
+        "x": 44,
+        "z": 18,
+        "maxOpenM": 58.69,
+        "worstBearingDeg": 160,
+        "blockedBy": "bounds",
+        "over22": 16
+      },
+      {
+        "id": "spawn-t1-4",
+        "kind": "spawn",
+        "x": 24,
+        "z": 18,
+        "maxOpenM": 66,
+        "worstBearingDeg": 300,
+        "blockedBy": "terrain",
+        "over22": 16
+      },
+      {
+        "id": "spawn-t1-5",
+        "kind": "spawn",
+        "x": 16,
+        "z": 42,
+        "maxOpenM": 41.82,
+        "worstBearingDeg": 210,
+        "blockedBy": "farcrysis-core-wall-s-west",
+        "over22": 13
+      },
+      {
+        "id": "spawn-t1-6",
+        "kind": "spawn",
+        "x": 34,
+        "z": 32,
+        "maxOpenM": 60,
+        "worstBearingDeg": 280,
+        "blockedBy": "terrain",
+        "over22": 9
+      },
+      {
+        "id": "spawn-t1-7",
+        "kind": "spawn",
+        "x": 28,
+        "z": 26,
+        "maxOpenM": 70,
+        "worstBearingDeg": 290,
+        "blockedBy": "terrain",
+        "over22": 19
+      },
+      {
+        "id": "patrol-0",
+        "kind": "patrol",
+        "x": -52,
+        "z": -52,
+        "maxOpenM": 69.23,
+        "worstBearingDeg": 100,
+        "blockedBy": "bounds",
+        "over22": 12
+      },
+      {
+        "id": "patrol-1",
+        "kind": "patrol",
+        "x": -36,
+        "z": -40,
+        "maxOpenM": 43,
+        "worstBearingDeg": 100,
+        "blockedBy": "terrain",
+        "over22": 8
+      },
+      {
+        "id": "patrol-2",
+        "kind": "patrol",
+        "x": -24,
+        "z": -32,
+        "maxOpenM": 93.99,
+        "worstBearingDeg": 110,
+        "blockedBy": "bounds",
+        "over22": 19
+      },
+      {
+        "id": "patrol-3",
+        "kind": "patrol",
+        "x": -8,
+        "z": -24,
+        "maxOpenM": 80.81,
+        "worstBearingDeg": 120,
+        "blockedBy": "bounds",
+        "over22": 33
+      },
+      {
+        "id": "patrol-4",
+        "kind": "patrol",
+        "x": 0,
+        "z": 0,
+        "maxOpenM": 6.77,
+        "worstBearingDeg": 320,
+        "blockedBy": "farcrysis-core-wall-s-west",
+        "over22": 0
+      },
+      {
+        "id": "patrol-5",
+        "kind": "patrol",
+        "x": 24,
+        "z": 32,
+        "maxOpenM": 60,
+        "worstBearingDeg": 290,
+        "blockedBy": "terrain",
+        "over22": 17
+      },
+      {
+        "id": "patrol-6",
+        "kind": "patrol",
+        "x": 36,
+        "z": 40,
+        "maxOpenM": 18,
+        "worstBearingDeg": 160,
+        "blockedBy": "terrain",
+        "over22": 0
+      },
+      {
+        "id": "patrol-7",
+        "kind": "patrol",
+        "x": 52,
+        "z": 52,
+        "maxOpenM": 69.23,
+        "worstBearingDeg": 280,
+        "blockedBy": "bounds",
+        "over22": 15
+      },
+      {
+        "id": "patrol-8",
+        "kind": "patrol",
+        "x": -40,
+        "z": 36,
+        "maxOpenM": 52.36,
+        "worstBearingDeg": 190,
+        "blockedBy": "farcrysis-cover-rock-01",
+        "over22": 4
+      },
+      {
+        "id": "patrol-9",
+        "kind": "patrol",
+        "x": 40,
+        "z": -36,
+        "maxOpenM": 30,
+        "worstBearingDeg": 260,
+        "blockedBy": "terrain",
+        "over22": 2
+      },
+      {
+        "id": "patrol-10",
+        "kind": "patrol",
+        "x": -16,
+        "z": -48,
+        "maxOpenM": 46.96,
+        "worstBearingDeg": 110,
+        "blockedBy": "bounds",
+        "over22": 7
+      },
+      {
+        "id": "patrol-11",
+        "kind": "patrol",
+        "x": 16,
+        "z": 48,
+        "maxOpenM": 46.99,
+        "worstBearingDeg": 290,
+        "blockedBy": "bounds",
+        "over22": 12
+      }
+    ]
+  },
+  "middle": {
+    "radiusM": 20,
+    "massCount": 44,
+    "unjustified": [],
+    "masses": [
+      {
+        "id": "farcrysis-core-catwalk",
+        "centre": [
+          0,
+          0
+        ],
+        "chebyshevM": 0,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-desk",
+        "centre": [
+          0,
+          0
+        ],
+        "chebyshevM": 0,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-0",
+        "centre": [
+          2.9,
+          1.45
+        ],
+        "chebyshevM": 2.9,
+        "justification": "core-structure",
+        "linesFirstBlocked": 2,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-1",
+        "centre": [
+          2.9,
+          1.95
+        ],
+        "chebyshevM": 2.9,
+        "justification": "core-structure",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-2",
+        "centre": [
+          2.9,
+          2.45
+        ],
+        "chebyshevM": 2.9,
+        "justification": "core-structure",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-3",
+        "centre": [
+          2.9,
+          2.95
+        ],
+        "chebyshevM": 2.95,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-crate-a",
+        "centre": [
+          -3.4,
+          -2.2
+        ],
+        "chebyshevM": 3.4,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-crate-b",
+        "centre": [
+          3.4,
+          -2.2
+        ],
+        "chebyshevM": 3.4,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-4",
+        "centre": [
+          2.9,
+          3.45
+        ],
+        "chebyshevM": 3.45,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-n",
+        "centre": [
+          0,
+          -3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-s",
+        "centre": [
+          0,
+          3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-n-seg-0",
+        "centre": [
+          0,
+          3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-n-seg-1",
+        "centre": [
+          0,
+          3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-n-seg-2",
+        "centre": [
+          0,
+          3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-n-seg-3",
+        "centre": [
+          0,
+          3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 3,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-s-seg-0",
+        "centre": [
+          0,
+          -3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-s-seg-1",
+        "centre": [
+          0,
+          -3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-s-seg-2",
+        "centre": [
+          0,
+          -3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-door-sandbag-s-seg-3",
+        "centre": [
+          0,
+          -3.6
+        ],
+        "chebyshevM": 3.6,
+        "justification": "core-structure",
+        "linesFirstBlocked": 3,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-5",
+        "centre": [
+          2.9,
+          3.95
+        ],
+        "chebyshevM": 3.95,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-stair-6",
+        "centre": [
+          2.9,
+          4.45
+        ],
+        "chebyshevM": 4.45,
+        "justification": "core-structure",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-wall-e",
+        "centre": [
+          5.5,
+          0
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 8,
+        "linesLengthenedPastCeiling": 3
+      },
+      {
+        "id": "farcrysis-core-wall-n-east",
+        "centre": [
+          4,
+          -5.5
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 4,
+        "linesLengthenedPastCeiling": 2
+      },
+      {
+        "id": "farcrysis-core-wall-n-west",
+        "centre": [
+          -4,
+          -5.5
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 3,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-core-wall-s-east",
+        "centre": [
+          4,
+          5.5
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 4,
+        "linesLengthenedPastCeiling": 3
+      },
+      {
+        "id": "farcrysis-core-wall-s-west",
+        "centre": [
+          -4,
+          5.5
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 4,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-core-wall-w",
+        "centre": [
+          -5.5,
+          0
+        ],
+        "chebyshevM": 5.5,
+        "justification": "core-structure",
+        "linesFirstBlocked": 17,
+        "linesLengthenedPastCeiling": 8
+      },
+      {
+        "id": "farcrysis-art-tower-leg-collider-1.3-1.3",
+        "centre": [
+          -7.2,
+          -7.2
+        ],
+        "chebyshevM": 7.2,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-39",
+        "centre": [
+          -8.47,
+          -6.81
+        ],
+        "chebyshevM": 8.47,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-art-tower-dish-collider",
+        "centre": [
+          -8.5,
+          -8.5
+        ],
+        "chebyshevM": 8.5,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-art-tower-platform-collider",
+        "centre": [
+          -8.5,
+          -8.5
+        ],
+        "chebyshevM": 8.5,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-48",
+        "centre": [
+          9.12,
+          3.74
+        ],
+        "chebyshevM": 9.12,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-46",
+        "centre": [
+          9.79,
+          9.59
+        ],
+        "chebyshevM": 9.79,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-art-tower-leg-collider--1.3--1.3",
+        "centre": [
+          -9.8,
+          -9.8
+        ],
+        "chebyshevM": 9.8,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-art-tower-leg-collider--1.3-1.3",
+        "centre": [
+          -9.8,
+          -7.2
+        ],
+        "chebyshevM": 9.8,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-art-tower-leg-collider-1.3--1.3",
+        "centre": [
+          -7.2,
+          -9.8
+        ],
+        "chebyshevM": 9.8,
+        "justification": "vertical-route",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-43",
+        "centre": [
+          11.52,
+          -7.81
+        ],
+        "chebyshevM": 11.52,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-47",
+        "centre": [
+          7.15,
+          -13.33
+        ],
+        "chebyshevM": 13.33,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-36",
+        "centre": [
+          1.69,
+          15.14
+        ],
+        "chebyshevM": 15.14,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-40",
+        "centre": [
+          1.18,
+          -15.44
+        ],
+        "chebyshevM": 15.44,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-44",
+        "centre": [
+          16.93,
+          -18.61
+        ],
+        "chebyshevM": 18.61,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-42",
+        "centre": [
+          -13.03,
+          -19.44
+        ],
+        "chebyshevM": 19.44,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 0,
+        "linesLengthenedPastCeiling": 0
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-34",
+        "centre": [
+          0.76,
+          19.64
+        ],
+        "chebyshevM": 19.64,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      },
+      {
+        "id": "farcrysis-enhanced-palm-trunk-collider-45",
+        "centre": [
+          -6.17,
+          -19.99
+        ],
+        "chebyshevM": 19.99,
+        "justification": "vegetation-collider",
+        "linesFirstBlocked": 1,
+        "linesLengthenedPastCeiling": 1
+      }
+    ]
+  }
+}

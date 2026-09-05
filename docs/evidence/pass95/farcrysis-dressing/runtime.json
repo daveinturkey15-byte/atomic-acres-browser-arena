@@ -1,0 +1,309 @@
+{
+  "contract": "farcrysis-dressing-stock-runtime-v1",
+  "measuredAt": "2026-09-05T11:16:04.301Z",
+  "url": "http://127.0.0.1:4268",
+  "arena": "farcrysis",
+  "flags": [
+    "--mute-audio"
+  ],
+  "env": {
+    "PASS73_NATIVE_WEBGPU": "1"
+  },
+  "pageErrors": [],
+  "consoleErrors": [],
+  "outcome": "admitted-and-sampled",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "selectToActiveMs": 59690,
+  "card": {
+    "exists": false
+  },
+  "sceneBeforeCombat": {
+    "visibleDrawObjects": 250,
+    "visibleMeshes": 237,
+    "instancedMeshes": 114,
+    "instances": 93221,
+    "triangles": 869109,
+    "distinctMaterials": 212,
+    "geometries": 217,
+    "dressingObjects": [
+      {
+        "name": "farcrysis-dressing-field-sign-boards",
+        "count": 3
+      },
+      {
+        "name": "farcrysis-dressing-field-sign-poles",
+        "count": 3
+      }
+    ]
+  },
+  "presentationBeforeCombat": {
+    "counters": {
+      "submissionSequence": 385,
+      "completedSequence": 384,
+      "inFlightSubmissions": 1,
+      "maximumInFlightSubmissions": 3,
+      "skippedSubmissions": 19,
+      "starvationRecoveries": 0,
+      "consecutiveRefusedSubmissions": 0,
+      "outstandingCompletionProbes": 1,
+      "lastSubmittedAt": 66557.59999990463,
+      "lastCompletedAt": 66559.89999997616,
+      "lastCompletionLatencyMs": 0.10000002384185791,
+      "calls": 237,
+      "triangles": 790701
+    },
+    "telemetry": {
+      "status": "healthy",
+      "submissionMode": "warmed-live",
+      "maximumInFlightSubmissions": 3,
+      "inFlightSubmissions": 1,
+      "completionProbeTargetSequence": 385,
+      "outstandingCompletionProbes": 1,
+      "completionProbeCount": 385,
+      "submissionSequence": 385,
+      "completedSequence": 384,
+      "lastSubmittedAt": 66557.59999990463,
+      "lastCompletedAt": 66559.89999997616,
+      "pendingSince": 66559.89999997616,
+      "pendingForMs": 0.2999999523162842,
+      "lastCompletionLatencyMs": 0.10000002384185791,
+      "completionFailures": 0,
+      "lastFailure": null,
+      "backpressureActive": false,
+      "skippedSubmissions": 19,
+      "progress": {
+        "windowStartedAt": 58212.59999990463,
+        "elapsedMs": 8347.600000023842,
+        "submissionAdvances": 251,
+        "completionAdvances": 250,
+        "submittedHz": 30.068522689070285,
+        "completedHz": 29.94872777795845,
+        "currentSubmissionGapMs": 2.600000023841858,
+        "currentCompletionGapMs": 0.2999999523162842,
+        "maximumSubmissionGapMs": 211.39999997615814,
+        "maximumCompletionGapMs": 250.5,
+        "maximumPendingForMs": 168.39999997615814,
+        "maximumCompletionLatencyMs": 168.39999997615814,
+        "submissionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 43.98074620742926,
+          "cadenceHz": 44.05286334358572,
+          "meanMs": 22.737222221824858,
+          "p05Ms": 18.5,
+          "medianMs": 22.700000047683716,
+          "p95Ms": 27.5,
+          "p99Ms": 30.5,
+          "maxMs": 33.200000047683716,
+          "longFrames": {
+            "over20Ms": 145,
+            "over33Ms": 1,
+            "over50Ms": 0,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        },
+        "completionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 40.96961420168796,
+          "cadenceHz": 43.8596492145347,
+          "meanMs": 24.408333333995607,
+          "p05Ms": 18.600000023841858,
+          "medianMs": 22.799999952316284,
+          "p95Ms": 44.799999952316284,
+          "p99Ms": 48.89999997615814,
+          "maxMs": 50.699999928474426,
+          "longFrames": {
+            "over20Ms": 140,
+            "over33Ms": 16,
+            "over50Ms": 1,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        }
+      }
+    }
+  },
+  "combat": {
+    "seconds": 60,
+    "frames": 2952,
+    "meanFrameMs": 20.33,
+    "p50FrameMs": 16.8,
+    "p95FrameMs": 27.9,
+    "p99FrameMs": 44.5,
+    "worstFrameMs": 99.8,
+    "longFramesOver33ms": 44,
+    "gapsOver1000ms": 0,
+    "pipelinesBefore": 229,
+    "pipelinesAfter": 229,
+    "pipelinesDuringSample": 0
+  },
+  "sceneAfterCombat": {
+    "visibleDrawObjects": 250,
+    "visibleMeshes": 237,
+    "instancedMeshes": 114,
+    "instances": 93221,
+    "triangles": 869109,
+    "distinctMaterials": 212,
+    "geometries": 217,
+    "dressingObjects": [
+      {
+        "name": "farcrysis-dressing-field-sign-boards",
+        "count": 3
+      },
+      {
+        "name": "farcrysis-dressing-field-sign-poles",
+        "count": 3
+      }
+    ]
+  },
+  "presentationAfterCombat": {
+    "counters": {
+      "submissionSequence": 3341,
+      "completedSequence": 3339,
+      "inFlightSubmissions": 2,
+      "maximumInFlightSubmissions": 3,
+      "skippedSubmissions": 19,
+      "starvationRecoveries": 0,
+      "consecutiveRefusedSubmissions": 0,
+      "outstandingCompletionProbes": 2,
+      "lastSubmittedAt": 126647.89999997616,
+      "lastCompletedAt": 126651.69999992847,
+      "lastCompletionLatencyMs": 23.299999952316284,
+      "calls": 260,
+      "triangles": 777152
+    },
+    "telemetry": {
+      "status": "healthy",
+      "submissionMode": "warmed-live",
+      "maximumInFlightSubmissions": 3,
+      "inFlightSubmissions": 2,
+      "completionProbeTargetSequence": 3340,
+      "outstandingCompletionProbes": 2,
+      "completionProbeCount": 3341,
+      "submissionSequence": 3341,
+      "completedSequence": 3339,
+      "lastSubmittedAt": 126647.89999997616,
+      "lastCompletedAt": 126651.69999992847,
+      "pendingSince": 126651.69999992847,
+      "pendingForMs": 0.30000007152557373,
+      "lastCompletionLatencyMs": 23.299999952316284,
+      "completionFailures": 0,
+      "lastFailure": null,
+      "backpressureActive": false,
+      "skippedSubmissions": 19,
+      "progress": {
+        "windowStartedAt": 58212.59999990463,
+        "elapsedMs": 68439.40000009537,
+        "submissionAdvances": 3207,
+        "completionAdvances": 3205,
+        "submittedHz": 46.85897304762361,
+        "completedHz": 46.829750114634756,
+        "currentSubmissionGapMs": 4.100000023841858,
+        "currentCompletionGapMs": 0.30000007152557373,
+        "maximumSubmissionGapMs": 211.39999997615814,
+        "maximumCompletionGapMs": 250.5,
+        "maximumPendingForMs": 168.39999997615814,
+        "maximumCompletionLatencyMs": 168.39999997615814,
+        "submissionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 54.434935130917324,
+          "cadenceHz": 57.142857142857146,
+          "meanMs": 18.370555555820467,
+          "p05Ms": 14,
+          "medianMs": 17.5,
+          "p95Ms": 23.5,
+          "p99Ms": 29.5,
+          "maxMs": 81.89999997615814,
+          "longFrames": {
+            "over20Ms": 41,
+            "over33Ms": 2,
+            "over50Ms": 1,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        },
+        "completionPacing": {
+          "ready": true,
+          "sampleCount": 180,
+          "rateHz": 49.32047347622317,
+          "cadenceHz": 55.55555555555556,
+          "meanMs": 20.275555555688012,
+          "p05Ms": 14.200000047683716,
+          "medianMs": 18,
+          "p95Ms": 36.800000071525574,
+          "p99Ms": 55.200000047683716,
+          "maxMs": 75.80000007152557,
+          "longFrames": {
+            "over20Ms": 50,
+            "over33Ms": 13,
+            "over50Ms": 3,
+            "over100Ms": 0
+          },
+          "lastResetReason": "animation frame eligibility · recovery 1"
+        }
+      }
+    }
+  },
+  "retirementBefore": {
+    "roots": 0,
+    "auxiliaryRoots": 0,
+    "geometries": 0,
+    "materials": 0,
+    "shadowMaps": 0,
+    "texturesDeferredToSharedCache": 0
+  },
+  "retirementSwitches": [
+    {
+      "arenaId": "atomic-acres",
+      "elapsedMs": 29117,
+      "selected": "atomic-acres",
+      "residentArenaIds": [
+        "farcrysis",
+        "atomic-acres"
+      ],
+      "retirement": {
+        "roots": 0,
+        "auxiliaryRoots": 0,
+        "geometries": 0,
+        "materials": 0,
+        "shadowMaps": 0,
+        "texturesDeferredToSharedCache": 0
+      }
+    },
+    {
+      "arenaId": "rustworks-1v1",
+      "elapsedMs": 36588,
+      "selected": "rustworks-1v1",
+      "residentArenaIds": [
+        "atomic-acres",
+        "rustworks-1v1"
+      ],
+      "retirement": {
+        "roots": 1,
+        "auxiliaryRoots": 0,
+        "geometries": 992,
+        "materials": 166,
+        "shadowMaps": 1,
+        "texturesDeferredToSharedCache": 45
+      }
+    }
+  ],
+  "retirementAfter": {
+    "roots": 1,
+    "auxiliaryRoots": 0,
+    "geometries": 992,
+    "materials": 166,
+    "shadowMaps": 1,
+    "texturesDeferredToSharedCache": 45
+  },
+  "finalArena": "rustworks-1v1"
+}

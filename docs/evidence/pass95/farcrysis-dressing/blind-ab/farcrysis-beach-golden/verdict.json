@@ -1,0 +1,71 @@
+{
+  "station": "farcrysis-beach-golden",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.82,
+  "probes": {
+    "left": {
+      "expected": "UYWR",
+      "answered": "UYWR"
+    },
+    "right": {
+      "expected": "TMWE",
+      "answered": "TMWE"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-beach-golden.png",
+      "sourceSha256": "b232cec922d28fbd8dfaf73013e50f23ca5ebc4aff5c50cfd91b8f15093ebb80",
+      "shownSha256": "96e2534745670c29c35d115309a4ecb9c13d90a22db5f54c9b00e41ac827d140",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-beach-golden.png",
+      "sourceSha256": "9eead2000c47c6304ef92be4f25a411da31f82c569f887b0c0dea7fb8b1a0ab3",
+      "shownSha256": "d0061042954bec1fdddbd0deec2b12624e01d2347dfb186ae31a840348be4b70",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+      }
+    ]
+  },
+  "why": "LEFT and RIGHT share identical structure and layout, but the rock volumes in r2c1 and r1c0-r1c1 decide against the reference set which shows bright daylight with sunlit light-gray stone; LEFT in r2c1 shows a faceted light-gray boulder with bright top plane and readable stone texture while RIGHT in r2c1 renders the same volume near-black on its sun-facing top, inverting the expected brightest-plane relationship, and the same light-vs-black split repeats for midground boulders in r1c0 and r1c1.",
+  "leftCloser": [
+    "foreground boulder in r2c1 reads as sunlit faceted stone with light top matching daylight value relationships in references",
+    "midground boulders in r1c0 and r1c1 retain light-gray stone material read matching light mountain/stone in references instead of coal-black",
+    "contact shading under trunks in r1c1 stays readable in LEFT rather than crushed to black as in RIGHT"
+  ],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "foreground large boulder is light gray faceted stone in LEFT versus near-black in RIGHT"
+  },
+  "elapsedMs": 52359,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

@@ -1,0 +1,74 @@
+{
+  "station": "farcrysis-seaplane-throwback",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.68,
+  "probes": {
+    "left": {
+      "expected": "UTYY",
+      "answered": "UTYY"
+    },
+    "right": {
+      "expected": "NMDM",
+      "answered": "NMDM"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\after-captures\\farcrysis\\farcrysis-seaplane-throwback.png",
+      "sourceSha256": "5411fc3d814e620b0c1a41e0d804a82a94418f796a78c5cdc98ad30e76e4b77e",
+      "shownSha256": "d3fd70e943c26319dbdfbc5afe0a6fc2bad3ef11cb43b66a415beda1486236b4",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-m-farcrysis-dressing\\docs\\evidence\\pass95\\farcrysis-dressing\\before-captures\\farcrysis\\farcrysis-seaplane-throwback.png",
+      "sourceSha256": "18abd21bb04513e30ff81ae7077e7f55cedd522d1a4ed1f7f3ffcc9273df4b3a",
+      "shownSha256": "b8ba1448cb36de69c840e005de24f14efc79202450901f80e0fadf8dba3de1b5",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "8ef4fa8b19ce6607a5532fd1dbb0d998c8981457774613bae84dfa6a6112f697"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "3b6cdbe736772afa1f59871c595a37d3737f12424f08bc19c5a25febc2385eae"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "456c49861e4ba4d8d286b28314b3230c11486da09f2153f67924672b5f2c0f76"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "d20468e0bba64bc27f41c5c88446b0c00c39f292c5500477c86c16e5757e0576"
+      }
+    ]
+  },
+  "why": "Against the reference set the decisive cue is the central wing/fuselage plane in r2c1 and the boulder material in r1c1-r1c2-r2c1: references show a flat matte light blue-grey painted surface and light faceted grey rocks under soft even daylight, which LEFT preserves while RIGHT blows the wing to white with a hard center split and turns the rocks near-black with deep contact shadows.",
+  "leftCloser": [
+    "flat matte light blue-grey wing top in r2c1 reads as same painted-metal class as reference-1 large planes, without blown highlight",
+    "light medium-grey faceted boulders in r1c1, r1c2 and r2c1 match reference light-grey mountain/rock material read",
+    "even diffuse ground/grass illumination in r2c0 and r2c1 matches soft reference daylight without harsh specular split"
+  ],
+  "rightCloser": [
+    "more saturated cyan sky value in r0c0, r0c1 and r0c2 matches reference-3 vivid blue sky better than LEFT washed-out sky",
+    "richer brown trunk value and stronger dappled ground shadow contrast in r0c1 and r2c0 closer to reference-3 mottled sun/shade pattern"
+  ],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "wing top value/material: flat even light blue-grey in LEFT vs blown white highlight with dark blue-grey shadow split in RIGHT"
+  },
+  "elapsedMs": 44840,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}
