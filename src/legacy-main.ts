@@ -1228,6 +1228,7 @@ import {
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
 import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, clampAdmittedHeldWeapon, createCanonicalRemoteState } from './multiplayer-relay';
+import { isOrdinaryWeapon, remoteReloadResultCacheKey } from './remote-combat-helpers';
 import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
 import { isGuestCombatInventory } from './protocol';
 import {
@@ -6274,10 +6275,6 @@ function remoteCombatInventoryProjection(playerId: string): GuestCombatInventory
     remoteLoadoutSidearm(remote.snapshot),
   );
 }
-function isOrdinaryWeapon(weapon: WeaponId): weapon is OrdinaryWeaponId {
-  return ORDINARY_WEAPON_IDS.some((candidate) => candidate === weapon);
-}
-
 function applyLocalCombatInventoryProjection(
   projection: GuestCombatInventoryProjection,
   allowEqualRevision = false,
@@ -6302,10 +6299,6 @@ function applyLocalCombatInventoryProjection(
 function resetRemoteCombatInventory(snapshot: PlayerSnapshot, grenades = 1): GuestCombatInventory {
   const inventory = createGuestCombatInventory(snapshot.primary, remoteLoadoutSidearm(snapshot), grenades);
   return setRemoteCombatInventory(snapshot.id, inventory);
-}
-
-function remoteReloadResultCacheKey(playerId: string, connectionEpoch: string, lifeId: number, requestId: string): string {
-  return `${playerId}:${connectionEpoch}:${lifeId}:${requestId}`;
 }
 
 function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number], 'atMs' | 'role'>): void {
