@@ -905,7 +905,7 @@ import {
   type HostedBotSnapshot,
 } from './hosted-bots';
 import { admitHostedBotDamage } from './hosted-bot-damage-admission';
-import { botStanceEyeHeightM, botStanceSpeedCap, resolveBotStance } from './bot-stance';
+import { botStanceEyeHeightM, botStanceSpeedCap, countOtherProneBots, resolveBotStance } from './bot-stance';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import { MATCH_DIAGNOSTICS_ENDPOINT, MatchDiagnosticUploader } from './match-diagnostics-upload';
@@ -21091,7 +21091,7 @@ function updateBots(dt: number, now: number): void {
     const stanceDecision = resolveBotStance({
       hp: bot.hp, alive: bot.alive, lastDamagedAt: bot.lastDamagedAt, now,
       hasLineOfSight: lineOfSight, travelling: routeMovement === 'advance' || routeMovement === 'retreat',
-      stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil,
+      stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil, proneOccupancy: countOtherProneBots(bots.values(), bot), // HF-509
     });
     bot.stance = stanceDecision.stance;
     bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;

@@ -7,6 +7,12 @@ import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
+import { // HF-509
+  clampFootDistanceM,
+  crouchPlantAuthority,
+  legSettleWeight,
+  separateLegLateralTargets,
+} from './operator-leg-pose';
 import { stanceTransitionDurationMs } from './prone-transition'; // HF-412
 import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
 import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
@@ -450,6 +456,15 @@ type RiggedOperatorRuntime = {
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
+  /**
+   * HF-509. The six leg bones' AUTHORED local rotations, captured once before
+   * the mixer has ever run. `legSettleWeight` slerps toward these while the body
+   * is prone or moving between crouch and prone. Optional because several call
+   * sites (the Gun Range training dummy among them) hand-build a runtime object,
+   * and a runtime authored before this field existed must degrade to "no settle"
+   * rather than to a crash.
+   */
+  legBindPose?: Array<{ bone: THREE.Bone; quaternion: THREE.Quaternion }>;
 };
 
 export type RiggedOperatorCanonicalBoneIdentity = Readonly<{
@@ -779,9 +794,22 @@ function plantCrouchLeg(
   const upperLength = hip.distanceTo(knee);
   const lowerLength = knee.distanceTo(ankle);
   const footWorldRotation = foot.getWorldQuaternion(new THREE.Quaternion());
-  const kneeTarget = solveTwoBoneElbow(hip, footTarget, upperLength, lowerLength, bendHint);
+  // HF-509 mechanism 2: the knee had no limit. `solveTwoBoneElbow` clamps a
+  // target onto the reachable sphere at |upper - lower|, which for two equal
+  // segments is ZERO - a leg folded flat against itself. Pull the target out to
+  // the closest distance a 140-degree knee can reach before solving, so the
+  // orientation this writes can never describe a collapsed or inverted joint.
+  const toTarget = footTarget.clone().sub(hip);
+  const rawDistance = toTarget.length();
+  const constrainedTarget = rawDistance > 1e-6
+    ? hip.clone().addScaledVector(
+      toTarget.multiplyScalar(1 / rawDistance),
+      clampFootDistanceM(rawDistance, upperLength, lowerLength),
+    )
+    : footTarget.clone();
+  const kneeTarget = solveTwoBoneElbow(hip, constrainedTarget, upperLength, lowerLength, bendHint);
   orientBoneTowardWorld(upper, lower, kneeTarget);
-  orientBoneTowardWorld(lower, foot, footTarget);
+  orientBoneTowardWorld(lower, foot, constrainedTarget);
   const parentWorld = foot.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
   foot.quaternion.copy(parentWorld.invert().multiply(footWorldRotation));
   foot.updateWorldMatrix(false, true);
@@ -907,18 +935,36 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   const crouch = runtimeState.crouchBlend;
   const prone = runtimeState.proneBlend;
   const bones = runtimeState.poseBones;
-  const leftFootTarget = crouch > 0.001 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
-  const rightFootTarget = crouch > 0.001 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  // HF-509 mechanism 3. The plant is withdrawn for every frame carrying ANY
+  // prone weight, because its targets are WORLD positions snapshotted before the
+  // pelvis pivot rotates up to 1.42 rad: through a crouch<->prone transition it
+  // was dragging both ankles onto positions the body had already left.
+  // `legSettleWeight` below covers exactly the region this withdraws from.
+  const plantAuthority = crouchPlantAuthority(crouch, prone);
+  const leftFootTarget = plantAuthority > 0 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  const rightFootTarget = plantAuthority > 0 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
   if (bones.hips) bones.hips.position.y -= 0.44 * crouch;
   addLocalPose(bones.hips, 0.05, 0, 0, crouch);
   addLocalPose(bones.abdomen, 0.08, 0, 0, crouch);
   addLocalPose(bones.torso, 0.12, 0, 0, crouch);
   addLocalPose(bones.chest, -0.05, 0, 0, crouch);
-  if (crouch > 0.001) {
+  if (plantAuthority > 0 && leftFootTarget && rightFootTarget) {
     runtimeState.visual.updateWorldMatrix(true, true);
     const bodyRotation = runtimeState.stancePivot.getWorldQuaternion(new THREE.Quaternion());
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bodyRotation);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(bodyRotation);
+    // HF-509 mechanism 1. `Run_Left` and `Run_Right` hand over mid-cycle ankles
+    // that have CROSSED the body midline; planting a crossed pair on a leg
+    // shortened by 0.44 m swaps the two shins. Correct the pair on the body's
+    // own lateral axis, about the body's own origin, BEFORE solving. The mean is
+    // preserved, so a stride genuinely shifted to one side stays shifted and
+    // only the crossing is removed.
+    const bodyOrigin = runtimeState.stancePivot.getWorldPosition(new THREE.Vector3());
+    const leftLateral = leftFootTarget.clone().sub(bodyOrigin).dot(right);
+    const rightLateral = rightFootTarget.clone().sub(bodyOrigin).dot(right);
+    const separated = separateLegLateralTargets(leftLateral, rightLateral);
+    leftFootTarget.addScaledVector(right, separated.left - leftLateral);
+    rightFootTarget.addScaledVector(right, separated.right - rightLateral);
     plantCrouchLeg(
       bones.upperLegLeft, bones.lowerLegLeft, bones.footLeft, leftFootTarget,
       forward.clone().addScaledVector(right, -0.18),
@@ -929,9 +975,21 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
     );
   }
 
-  // The whole-pelvis pivot supplies the prone silhouette. Keep the authored
-  // idle legs intact: layering walk-knee offsets here produced a raised foot
-  // and twisted hip that read as a broken ragdoll.
+  // HF-509 mechanism 4. The whole-pelvis pivot supplies the prone silhouette,
+  // but the legs kept playing a STANDING walk or run underneath it - at up to
+  // 3.3x cadence, because PASS 94's posture layer correctly speeds a crawl's
+  // cycle up. A scissoring standing stride rotated 81 degrees is a pair of legs
+  // swinging through each other, and it is also what the withdrawn plant above
+  // stops covering. Settling the leg chain toward its BIND pose fixes both: the
+  // bind legs are straight and parallel at the rig's own 0.36 m hip width, so
+  // the blend cannot cross, and the quarter of the clip left behind is the drag
+  // the crawl reads by. Layering walk-KNEE offsets here is what produced the
+  // raised foot and twisted hip previously reported; this is a settle toward a
+  // captured pose, not an offset on top of one.
+  const settle = legSettleWeight(crouch, prone);
+  if (settle > 0) {
+    for (const entry of runtimeState.legBindPose ?? []) entry.bone.quaternion.slerp(entry.quaternion, settle);
+  }
   addLocalPose(bones.chest, -0.025, 0, 0, prone);
 }
 
@@ -2181,6 +2239,18 @@ export function createRiggedOperator(
     // Measured by the runtime each frame; the authored pose is used until then.
     proneClearance: null,
   } satisfies RiggedOperatorRuntime;
+  // HF-509. Captured HERE, after the runtime exists and before `mixer.update`
+  // has ever been called, so these are the authored bind rotations rather than
+  // frame 0 of whatever clip happens to be bound.
+  {
+    const built = root.userData.riggedOperatorRuntime as RiggedOperatorRuntime;
+    built.legBindPose = [
+      built.poseBones.upperLegLeft, built.poseBones.lowerLegLeft, built.poseBones.footLeft,
+      built.poseBones.upperLegRight, built.poseBones.lowerLegRight, built.poseBones.footRight,
+    ]
+      .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
+      .map((bone) => ({ bone, quaternion: bone.quaternion.clone() }));
+  }
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
     assetUrl: operatorAsset.source,

@@ -7,6 +7,9 @@ import {
   BOT_UNDER_FIRE_MS,
   botStanceEyeHeightM,
   botStanceSpeedCap,
+  MAX_PRONE_BOTS_PER_MAP,
+  admittedBotStance,
+  countOtherProneBots,
   preferredBotStance,
   resolveBotStance,
 } from './bot-stance';
@@ -189,5 +192,105 @@ describe('the shipped bot paths read the stance field (Lane AR item 3)', () => {
 
   it('respawn clears the stance so a new life never inherits a crawl', () => {
     expect(LEGACY).toMatch(/function respawnBot\([\s\S]{0,1400}?bot\.stance = 'stand';/u);
+  });
+});
+
+describe('HF-509 - at most two bots prone per map', () => {
+  const base = {
+    hp: 10,
+    alive: true,
+    lastDamagedAt: 0,
+    now: 10_000,
+    hasLineOfSight: true,
+    travelling: false,
+    stance: 'stand' as const,
+    stanceHeldUntil: 0,
+  };
+
+  it('caps the roster at the owner-stated two', () => {
+    expect(MAX_PRONE_BOTS_PER_MAP).toBe(2);
+  });
+
+  it('lets the first two wounded bots go prone', () => {
+    expect(resolveBotStance({ ...base, proneOccupancy: 0 }).stance).toBe('prone');
+    expect(resolveBotStance({ ...base, proneOccupancy: 1 }).stance).toBe('prone');
+  });
+
+  it('sends the third wounded bot to crouch instead of prone', () => {
+    // The rules still WANT prone - low health is the prone trigger - so this is
+    // the cap substituting, not the rules changing their mind.
+    expect(preferredBotStance({ ...base, proneOccupancy: 2 })).toBe('prone');
+    expect(resolveBotStance({ ...base, proneOccupancy: 2 }).stance).toBe('crouch');
+    expect(resolveBotStance({ ...base, proneOccupancy: 7 }).stance).toBe('crouch');
+  });
+
+  it('never takes the floor away from a bot that is already on it', () => {
+    const decision = resolveBotStance({ ...base, stance: 'prone', proneOccupancy: 5 });
+    expect(decision.stance).toBe('prone');
+    expect(admittedBotStance({ ...base, stance: 'prone', proneOccupancy: 5 }, 'prone')).toBe('prone');
+  });
+
+  it('holds the substituted crouch for the full hysteresis window', () => {
+    // Applied BEFORE hysteresis, so a refused bot commits to its crouch rather
+    // than re-asking every frame and stealing the slot from whoever stands up.
+    const first = resolveBotStance({ ...base, proneOccupancy: 2 });
+    expect(first.stance).toBe('crouch');
+    expect(first.stanceHeldUntil).toBe(base.now + BOT_STANCE_MIN_HOLD_MS);
+    const next = resolveBotStance({
+      ...base, stance: 'crouch', stanceHeldUntil: first.stanceHeldUntil, now: base.now + 100, proneOccupancy: 0,
+    });
+    expect(next.stance).toBe('crouch');
+  });
+
+  it('leaves every non-prone preference untouched', () => {
+    const healthy = { ...base, hp: 90, proneOccupancy: 0 };
+    expect(admittedBotStance(healthy, 'crouch')).toBe('crouch');
+    expect(admittedBotStance({ ...healthy, proneOccupancy: 9 }, 'stand')).toBe('stand');
+  });
+
+  it('behaves exactly as it did before the cap when no occupancy is supplied', () => {
+    expect(resolveBotStance(base).stance).toBe('prone');
+  });
+
+  it('counts occupancy without counting the bot itself, and skips the dead', () => {
+    const roster = [
+      { alive: true, stance: 'prone' as const },
+      { alive: true, stance: 'prone' as const },
+      { alive: false, stance: 'prone' as const },
+      { alive: true, stance: 'crouch' as const },
+    ];
+    expect(countOtherProneBots(roster, roster[3])).toBe(2);
+    // The self-exclusion is the half of the cap that is easy to get wrong:
+    // counting yourself permanently blocks your own slot.
+    expect(countOtherProneBots(roster, roster[0])).toBe(1);
+    expect(countOtherProneBots(new Map(roster.map((bot, index) => [index, bot])).values(), roster[0])).toBe(1);
+  });
+
+  it('is wired into the shipped bot loop, with the bot excluded from its own count', () => {
+    const legacy = readFileSync(resolve(__dirname, 'legacy-main.ts'), 'utf8');
+    expect(legacy).toContain('proneOccupancy: countOtherProneBots(bots.values(), bot)');
+  });
+
+  it('settles a whole wounded roster on exactly two prone bots', () => {
+    // The end-to-end shape of the rule: run every bot through the same funnel
+    // the host does, in roster order, and count what is left on the floor.
+    const roster = Array.from({ length: 6 }, () => ({
+      alive: true, stance: 'stand' as Parameters<typeof resolveBotStance>[0]['stance'], stanceHeldUntil: 0,
+    }));
+    for (let tick = 0; tick < 4; tick += 1) {
+      for (const bot of roster) {
+        const decision = resolveBotStance({
+          ...base,
+          now: base.now + tick * (BOT_STANCE_MIN_HOLD_MS + 1),
+          stance: bot.stance,
+          stanceHeldUntil: bot.stanceHeldUntil,
+          proneOccupancy: countOtherProneBots(roster, bot),
+        });
+        bot.stance = decision.stance;
+        bot.stanceHeldUntil = decision.stanceHeldUntil;
+      }
+    }
+    expect(roster.filter((bot) => bot.stance === 'prone')).toHaveLength(MAX_PRONE_BOTS_PER_MAP);
+    expect(roster.filter((bot) => bot.stance === 'crouch')).toHaveLength(4);
   });
 });
