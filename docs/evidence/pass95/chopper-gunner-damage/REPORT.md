@@ -186,6 +186,10 @@ expectations from `supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, ...)`.
 
 `[VERIFIED]` `npx tsc --noEmit` - exit 0, no output.
 
+`[VERIFIED]` `npm run build` (under the heavy-work lock) - exit 0,
+`built in 9.37s`. `src/combat-damage-table.ts` is imported only by the new test,
+so it does not enter the shipped bundle; `legacy-main` remains 1,947.65 kB.
+
 `[VERIFIED]` Targeted run:
 
 ```
