@@ -411,8 +411,9 @@ try {
       }
       const effectPrewarmProfile = after.bootstrap.effectPrewarmProfile;
       const expectedEffectPrewarmGroups = [
-        'tracers-impacts', 'explosions', 'death-drops', 'world-ordnance',
-        'nuke-overdrive-bolts', 'smoke-volumes', 'bot-world-weapons', 'killstreak-vocabulary',
+        'tracers-impacts', 'explosions', 'death-drops-glass', 'world-ordnance',
+        'nuke-overdrive-bolts', 'smoke-volumes', 'bot-world-weapons',
+        'flare-first-shot', 'flamethrower-first-shot', 'killstreak-vocabulary',
       ];
       if (JSON.stringify(effectPrewarmProfile?.groups.map(({ name }) => name) ?? [])
         !== JSON.stringify(expectedEffectPrewarmGroups)) {
