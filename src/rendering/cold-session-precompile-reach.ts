@@ -79,10 +79,11 @@ import { ARENA_IDS, type ArenaId } from '../arena-identity';
  * baked graph constants (`uniformSwatch`, and the same fix in
  * `vehicle-forge/materials.ts`), which took the arena from 55 distinct node
  * graphs to 52 over the same 96 node materials, pinned by
- * `src/nuketown2-pipeline-budget.test.ts`. When that work has taken enough out
- * of the cold set, this entry is a candidate for removal - with a measurement.
+ * `src/nuketown2-pipeline-budget.test.ts`. Nuke Town's measured cold
+ * transition now owns its exact coverage compile behind the loading surface;
+ * retaining it here would compile the same arena twice before admission.
  */
-const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis', 'nuketown2']);
+const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis']);
 
 export const COLD_SESSION_PRECOMPILE_ARENAS: readonly ArenaId[] = Object.freeze(
   ARENA_IDS.filter((id) => MEASURED_COLD_SESSION_FENCE_LOSERS.includes(id)),
@@ -96,4 +97,15 @@ export const COLD_SESSION_PRECOMPILE_ARENAS: readonly ArenaId[] = Object.freeze(
  */
 export function arenaNeedsColdSessionPrecompile(arena: { readonly id: string }): boolean {
   return (COLD_SESSION_PRECOMPILE_ARENAS as readonly string[]).includes(arena.id);
+}
+
+export async function withColdArenaRootHidden<T>(root: { visible: boolean }, cold: boolean, operation: () => Promise<T>): Promise<T> {
+  if (!cold) return operation();
+  const visible = root.visible;
+  root.visible = false;
+  try { return await operation(); } finally { root.visible = visible; }
+}
+
+export function coldArenaOperation(cold: boolean, operation: () => Promise<unknown>): () => Promise<unknown> {
+  return cold ? () => Promise.resolve() : operation;
 }

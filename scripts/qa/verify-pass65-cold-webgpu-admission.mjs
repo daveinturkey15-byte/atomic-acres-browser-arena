@@ -310,7 +310,7 @@ try {
       const decodedAllVariantBytes = after.weaponAssetCache.runtimeCorpus.allVariantsResidency.estimatedDecodedBytes;
       const menuPrewarmProfile = after.bootstrap.menuDeploymentAssetsProfile;
       if (!menuPrewarmProfile?.completed || menuPrewarmProfile.error !== null
-        || menuPrewarmProfile.phases.length !== 3) {
+        || menuPrewarmProfile.phases.length !== 4) {
         failures.push(`menu deployment prewarm did not complete: ${JSON.stringify(menuPrewarmProfile)}`);
       } else if (menuPrewarmProfile.durationMs > maximumMenuDeploymentPrewarmMs) {
         failures.push(`menu deployment prewarm ${menuPrewarmProfile.durationMs}ms exceeded ${maximumMenuDeploymentPrewarmMs}ms`);

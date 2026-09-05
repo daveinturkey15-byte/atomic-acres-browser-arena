@@ -4567,3 +4567,13 @@ export class KillstreakPresentation {
     this.root.removeFromParent();
   }
 }
+
+const authoredSupportAssetsByPresentation = new WeakMap<KillstreakPresentation, Promise<void>>();
+export function ensureAuthoredSupportPresentationAssets(presentation: KillstreakPresentation): Promise<void> {
+  const existing = authoredSupportAssetsByPresentation.get(presentation);
+  if (existing) return existing;
+  const operation = Promise.all([loadHunterDronePresentation(), loadSupportVehiclePresentations()])
+    .then(() => presentation.prewarmAuthoredAssets());
+  authoredSupportAssetsByPresentation.set(presentation, operation);
+  return operation;
+}

@@ -79,7 +79,7 @@ import {
 } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
-import { arenaNeedsColdSessionPrecompile } from './rendering/cold-session-precompile-reach';
+import { arenaNeedsColdSessionPrecompile, coldArenaOperation, withColdArenaRootHidden } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -339,7 +339,7 @@ import {
   type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
+import { KillstreakPresentation, ensureAuthoredSupportPresentationAssets, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
 import {
   chopperExteriorReviewCameraPose,
@@ -17381,7 +17381,7 @@ async function startGame(
     clearStoredHostMatchCheckpoint();
     throw new Error('Stored host recovery no longer matches the authoritative room and arena');
   }
-  setBootstrapStage('prewarming-weapon-catalog');
+  await ensureAuthoredSupportPresentationAssets(killstreakPresentation); assertMatchAdmissionCurrent(token); setBootstrapStage('prewarming-weapon-catalog');
   const matchStartWeapon = selectedArena.id === 'gun-range'
     ? gunRangeSidearmForWeaponPrewarm()
     : activeLoadoutSelection().primary;
@@ -29974,7 +29974,7 @@ async function performArenaSelection(
   setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
     setBootstrapStage('loading-gameplay-assets');
-    await prepareMenuDeploymentAssets();
+    await prepareMenuDeploymentAssets(); if (hadPreparedArena) await ensureAuthoredSupportPresentationAssets(killstreakPresentation);
     assertAdmission();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
@@ -30147,10 +30147,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      requestStaticShadowRefresh(true);
-      await submitForegroundWebGpuFrame(true);
-      await flushWebGpuFrames(12_000);
-      assertAdmission();
+      await withColdArenaRootHidden(arena.root, !hadPreparedArena, async () => { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); });
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -30167,11 +30164,7 @@ async function performArenaSelection(
     await waitForPendingArtTextures();
     assertAdmission();
     setBootstrapStage('prewarming-weapon-catalog');
-    profileArenaTransition('weapon-catalog-prewarm');
-    await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
-      nextSelection.id,
-      gunRangeSidearmForWeaponPrewarm(),
-    ));
+    profileArenaTransition('weapon-catalog-prewarm'); if (hadPreparedArena) await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
     assertAdmission();
     profileArenaTransition('presentation-batching');
     setBootstrapStage('batching-static-meshes');
@@ -36953,7 +36946,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
 let menuWeaponAssetPromise: Promise<void> | null = null;
 let sharedGameplayAssetsPromise: Promise<void> | null = null;
 let menuDeploymentAssetsPromise: Promise<void> | null = null;
-
 function yieldMenuPreparationIdleSlice(): Promise<void> {
   // The shared idle scheduler preserves requestIdleCallback while visible and
   // transfers ownership to a timer if the tab hides before that callback runs.
@@ -37020,13 +37012,10 @@ async function prepareSharedGameplayAssets(): Promise<void> {
       operatorPromise,
       prepareMenuWeaponAsset(),
       loadGrenadePresentation(),
-      loadHunterDronePresentation(),
-      loadSupportVehiclePresentations(),
     ]);
     // Every streamed viewmodel must inherit the camera's isolated compositing
     // layer before any match-boundary GPU prewarm can stage it.
     weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
-    await killstreakPresentation.prewarmAuthoredAssets();
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
@@ -37203,7 +37192,6 @@ function finalizeMatchAdmissionProfile(mode: string): void {
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
   await yieldBrowserPreparationFrame();
 }
-
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
   if (renderRuntime.backend === 'webgpu') {
     setBootstrapStage('prewarming-batched-presentations');
@@ -37255,7 +37243,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // their first exact roots into one masked TSL/HDR submission, while
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
-    const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
+    const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, coldArenaOperation(!gameplayArenaPrepared, operation))));
     // LOAD-CUT (pass 85, lane H): these two rehearsals are SERIALIZED after the
     // concurrent families above - they stage a transient world PointLight and
     // three r185 folds the visible light graph into every render object's cache
@@ -37272,7 +37260,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // compositions against the complete match scene on every arena before
     // admission. This only drops the duplicate arena-side rehearsal on arenas
     // whose own authority can never produce the weapon.
-    groups.push(await runGroup('flare-first-shot', () => (
+    groups.push(await runGroup('flare-first-shot', () => !gameplayArenaPrepared ? Promise.resolve() : (
       !arenaCanAcquireFlareGun(selectedArena) ? Promise.resolve() : flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
@@ -37280,7 +37268,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
         )
       ))
     )));
-    groups.push(await runGroup('flamethrower-first-shot', () => (
+    groups.push(await runGroup('flamethrower-first-shot', () => !gameplayArenaPrepared ? Promise.resolve() : (
       !arenaCanAcquireFlamethrower(selectedArena) ? Promise.resolve() : flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
@@ -37294,14 +37282,14 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // fill plus zero-intensity muzzle light that coexist with world support in
     // gameplay. Its internal CPU yields still bound the exact LOD, 24-drone
     // formation and possessed-cockpit submissions.
-    groups.push(await runGroup('killstreak-vocabulary', async () => {
+    groups.push(await runGroup('killstreak-vocabulary', coldArenaOperation(!gameplayArenaPrepared, async () => {
       weaponView.setPresentationVisible(true);
       try {
         await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
       } finally {
         weaponView.setPresentationVisible(false);
       }
-    }));
+    })));
     lastArenaEffectPrewarmProfile = Object.freeze({
       sceneGeneration,
       durationMs: Number((performance.now() - startedAt).toFixed(3)),
