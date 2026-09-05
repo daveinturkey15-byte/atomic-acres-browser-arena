@@ -24,6 +24,7 @@ import type { Team } from './protocol';
 import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
 import { applyBotEmissiveBrightness } from './operator-model';
+import { TERMINAL_ALBEDO_VARIATION_STRENGTH, sampleTerminalAlbedo, terminalAlbedoMultiplier } from './terminal-albedo-lut';
 
 export type Builder = {
   root: THREE.Group;
@@ -2618,6 +2619,44 @@ function terminalSurfaceTexture(
     context.globalAlpha = 1;
   }
 
+  // Skyline-terminal look pass: metre-scale albedo drift on the largest flat
+  // surfaces, sampled from the shared tileable noise table
+  // (src/terminal-albedo-lut.ts — the noise-lut.ts pattern, re-implemented for
+  // a CPU-canvas consumer). One strength for every surface, baked into the
+  // texture at build time: zero per-frame cost, no new pipeline. Small
+  // patterns (rubber, fabric, aircraft, cargo, timber) keep their crisp print.
+  if (pattern === 'terrazzo' || pattern === 'concrete' || pattern === 'panel') {
+    const cells = 16;
+    const cell = 256 / cells;
+    // Apply the actual multiplier to the already-authored pixels. A white
+    // alpha overlay would lighten toward white rather than multiply the base
+    // colour when the sample is above 1, making the documented albedo contract
+    // false for coloured surfaces. This is arena-build work, never per-frame.
+    const image = context.getImageData(0, 0, 256, 256);
+    if (image) {
+      for (let gy = 0; gy < cells; gy += 1) {
+        for (let gx = 0; gx < cells; gx += 1) {
+          const multiplier = terminalAlbedoMultiplier(
+            sampleTerminalAlbedo((gx + 0.5) / cells, (gy + 0.5) / cells),
+          );
+          const startX = Math.floor(gx * cell);
+          const endX = Math.floor((gx + 1) * cell);
+          const startY = Math.floor(gy * cell);
+          const endY = Math.floor((gy + 1) * cell);
+          for (let y = startY; y < endY; y += 1) {
+            for (let x = startX; x < endX; x += 1) {
+              const offset = (y * 256 + x) * 4;
+              image.data[offset] = Math.min(255, Math.round(image.data[offset]! * multiplier));
+              image.data[offset + 1] = Math.min(255, Math.round(image.data[offset + 1]! * multiplier));
+              image.data[offset + 2] = Math.min(255, Math.round(image.data[offset + 2]! * multiplier));
+            }
+          }
+        }
+      }
+      context.putImageData(image, 0, 0);
+    }
+  }
+
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
@@ -2639,6 +2678,12 @@ function terminalSurfaceMaterial(
   material.userData.assetOwner = 'skyline-terminal';
   material.userData.assetKind = 'runtime-generated-surface';
   material.userData.surfacePattern = pattern;
+  // Skyline-terminal look pass: the albedo drift above runs at one uniform
+  // strength on the largest flat surfaces. Pinned here so a test can prove
+  // every one of them carries the same value.
+  if (pattern === 'terrazzo' || pattern === 'concrete' || pattern === 'panel') {
+    material.userData.terminalAlbedoVariation = TERMINAL_ALBEDO_VARIATION_STRENGTH;
+  }
   const base = `#${color.toString(16).padStart(6, '0')}`;
   const texture = terminalSurfaceTexture(pattern, base, accent, repeat);
   if (texture) material.map = texture;
@@ -3214,6 +3259,15 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const flightDisplay = box(builder, 'skyline-flight-display-board', [0, 4.8, -27.8], [6.5, 1.4, 0.25], terminalWayfindingMaterial('DEPARTURES', 'AERO 86  •  BOARDING', '#4d9b98'), { solid: false, shots: false, detail: 'quality' });
   flightDisplay.userData.label = 'DEPARTURES - FLIGHT AERO 86';
   flightDisplay.userData.skylineCluster = 'terminal-story';
+
+  // Skyline-terminal look pass, emissive signage: the two hero signs read as
+  // light sources, not printed boards. Each gets a luminous crown in the same
+  // idiom as the overhead gate-sign crowns below — a thin emissive bar just
+  // above the board that throws the wayfinding colour onto the surrounding
+  // trim. practicalMat (cyan, emissive 1.9) carries the terminal's wayfinding
+  // language; both crowns ride the terminal-story cluster with their boards.
+  detailBox('terminal-story', 'skyline-terminal-main-sign-crown', [0, 6.87, -33.8], [14.7, 0.12, 0.26], practicalMat);
+  detailBox('terminal-story', 'skyline-flight-display-crown', [0, 5.57, -27.8], [7.2, 0.12, 0.31], practicalMat);
 
   // Suspended portal signs establish an unmistakable terminal identity at the
   // player-height sightline, without adding route obstructions.
