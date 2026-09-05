@@ -24385,7 +24385,7 @@ function requestKillstreakActivation(
 
 /** HF-509: host-only, once per admitted activation; the whole lobby hears and sees it. */
 function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: string, ownerTeam: Team, now: number): void {
-  if (network.role !== 'host' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
+  if (network.role === 'client' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
   if (!killstreakAnnouncements.admit(admission.activationId)) return;
   const entry = killstreakRuntime.snapshotFor(null, now).entities.find((entity) => entity.activationId === admission.activationId)?.position;
   const owner = ownerId === player.id ? player.position : remotes.get(ownerId)?.target ?? player.position;
@@ -24393,7 +24393,7 @@ function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: s
     type: 'killstreak-announce', by: player.id, matchEpoch: killstreakMatchEpoch, activationId: admission.activationId,
     ownerId, ownerTeam, source: admission.activatedId, position: entry ?? [owner.x, owner.y, owner.z], nonce: randomNonce(),
   };
-  network.send(message);
+  if (network.role === 'host') network.send(message);
   presentKillstreakAnnouncement(message, now);
 }
 
