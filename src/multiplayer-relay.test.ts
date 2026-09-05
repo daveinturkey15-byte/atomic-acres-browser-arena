@@ -6,6 +6,7 @@ import {
 import {
   applyRemoteInventoryProjectionToMaps,
   applyRemoteReloadResult,
+  clampAdmittedHeldWeapon,
   createCanonicalRemoteState,
 } from './multiplayer-relay';
 import { MULTIPLAYER_PROTOCOL_VERSION, type PlayerSnapshot, type ReloadResultMessage } from './protocol';
@@ -58,5 +59,32 @@ describe('host-authoritative multiplayer relay', () => {
 
     expect(started?.snapshot).toMatchObject({ weapon: 'm4a1', reloading: true });
     expect(started?.inventory).toMatchObject({ ammo: { m4a1: 30, pistol: 12 }, reserve: { m4a1: 67, pistol: 48 } });
+  });
+});
+
+describe('F1 host allow-lists the guest-claimed equipped weapon', () => {
+  it('clamps a forged ordinary weapon to the admitted primary before rebroadcast', () => {
+    const forged = snapshot('guest-a', 'sniper');
+    const admitted = clampAdmittedHeldWeapon(forged, 'pistol');
+
+    expect(admitted.weapon).toBe('m4a1');
+    // The forged claim can never become another peer's held weapon: guest B
+    // renders exactly the host-admitted snapshot.
+    const hostState = createCanonicalRemoteState(admitted, 500, 1, 40, null);
+    const guestBView = snapshot('guest-a', 'm4a1');
+    guestBView.weapon = hostState.player.weapon;
+    expect(guestBView.weapon).toBe('m4a1');
+  });
+
+  it('keeps a legitimate swap within the admitted pair', () => {
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'pistol'), 'pistol').weapon).toBe('pistol');
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'm4a1'), 'pistol').weapon).toBe('m4a1');
+  });
+
+  it('preserves host-authorized specials and the personal crimson grant', () => {
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'railgun'), 'pistol').weapon).toBe('railgun');
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'flamethrower'), 'pistol').weapon).toBe('flamethrower');
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'flare-gun'), 'pistol').weapon).toBe('flare-gun');
+    expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'crimson-flamethrower'), 'pistol').weapon).toBe('crimson-flamethrower');
   });
 });

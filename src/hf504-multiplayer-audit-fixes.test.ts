@@ -149,7 +149,10 @@ describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () 
 
     const guestView = functionBody(main, 'function onNetworkMessage(');
     expect(guestView).toContain('applyRemoteInventoryProjectionToMaps(');
-    expect(guestView).toContain('remote.snapshot = { ...remote.snapshot, weapon:');
+    // F1: the host allow-lists the guest-claimed equipped weapon before it can
+    // be stored or rebroadcast. The previous weapon-spread pin matched 3
+    // railgun paths on base and was green without this fix.
+    expect(guestView).toContain('clampAdmittedHeldWeapon(admittedIncoming, remoteLoadoutSidearm(admittedIncoming))');
   });
 
   it('fans a host reload result out and applies it to the non-claimant peer view', () => {

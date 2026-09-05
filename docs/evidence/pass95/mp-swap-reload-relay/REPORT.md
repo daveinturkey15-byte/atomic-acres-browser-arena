@@ -18,7 +18,7 @@
 ### Reload
 
 - [VERIFIED] `reload-intent` is admitted only by the host (`src/network.ts:1310-1322`). Before this fix, `sendRemoteReloadResult()` ended with `network.sendToPlayer(playerId, result)` at candidate 8 `src/legacy-main.ts:6362`, so the claimant received the result and every other peer did not. That is the exact RELAY-GAP.
-- [VERIFIED] The host now sends the `ReloadResultMessage` through `network.send(result)` (`src/legacy-main.ts:6337-6362`), which fans it to every admitted peer except the claimant. Cache-hit retransmission uses the same host broadcast lane (`src/legacy-main.ts:6487-6500`).
+- [VERIFIED] The host now sends the `ReloadResultMessage` through `network.send(result)` (`src/legacy-main.ts:6337-6362`), which fans it to every admitted peer, claimant included — necessarily, since `acceptLocalReloadResult` is the claimant's own commit path. Cache-hit retransmission uses the same host broadcast lane (`src/legacy-main.ts:6487-6500`).
 - [VERIFIED] A non-claimant client now consumes the host result in `acceptRemoteReloadResult()` (`src/legacy-main.ts:6535-6544`), applies the host projection, and updates the remote snapshot’s weapon and reload presentation. The protocol validator continues to require a complete canonical projection (`src/protocol.ts:578-596`, `src/protocol.ts:1220-1245`).
 - [VERIFIED] Reload start also emits a state boundary packet (`src/legacy-main.ts:19242-19255`) so state-lane observers do not wait for heartbeat coalescing.
 

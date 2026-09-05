@@ -1,6 +1,9 @@
 import {
   applyGuestCombatInventoryProjection,
 } from './guest-combat-inventory-authority';
+import {
+  ORDINARY_WEAPON_IDS,
+} from './protocol';
 import type {
   GuestCombatInventory,
   GuestCombatInventoryProjection,
@@ -55,4 +58,26 @@ export function applyRemoteReloadResult(
     inventory,
     snapshot: { ...snapshot, ...(accepted ? { weapon: message.weapon } : {}), reloading: message.status === 'started' },
   };
+}
+/**
+ * F1: allow-list a guest-claimed equipped weapon against the admitted pair.
+ *
+ * Runs on the host after the railgun/timed-map holder fences (which drop
+ * non-holder special claims) and after the primary/secondary gates, and clamps
+ * a forged ordinary weapon (e.g. `sniper` over an `m4a1/pistol` loadout) to the
+ * admitted primary BEFORE the host stores (`remote.snapshot`) or rebroadcasts
+ * (`createCanonicalRemoteState`) it. Legitimate holds pass through untouched:
+ * either admitted-pair member, a holder-gated special that survived its fence,
+ * or `crimson-flamethrower`, a personal care-package grant with no host holder
+ * registry (cf. `canonicalRetainedGuestSnapshot`, which likewise passes it
+ * through instead of clamping it to primary).
+ */
+export function clampAdmittedHeldWeapon(
+  snapshot: PlayerSnapshot,
+  sidearm: PlayerSnapshot['secondary'],
+): PlayerSnapshot {
+  const claimed = snapshot.weapon;
+  if (claimed === snapshot.primary || claimed === sidearm) return snapshot;
+  if (!ORDINARY_WEAPON_IDS.some((candidate) => candidate === claimed)) return snapshot;
+  return { ...snapshot, weapon: snapshot.primary };
 }

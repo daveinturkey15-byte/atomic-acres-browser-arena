@@ -1227,7 +1227,7 @@ import {
   setGuestCombatInventoryGrenades,
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
-import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, createCanonicalRemoteState } from './multiplayer-relay';
+import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, clampAdmittedHeldWeapon, createCanonicalRemoteState } from './multiplayer-relay';
 import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
 import { isGuestCombatInventory } from './protocol';
 import {
@@ -13558,8 +13558,7 @@ function onNetworkMessage(message: GameMessage): void {
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
       if (admittedIncoming.team !== remote.snapshot.team) return;
       if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
-      if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon)
-        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
+      if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon) && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
       if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) {
         if (network.role === 'host') {
           const canonicalInventory = remoteCombatInventoryProjection(admittedIncoming.id);
@@ -13576,6 +13575,7 @@ function onNetworkMessage(message: GameMessage): void {
       }
       if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
         && !respawned) return;
+      if (network.role === 'host') admittedIncoming = clampAdmittedHeldWeapon(admittedIncoming, remoteLoadoutSidearm(admittedIncoming));
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       if (network.role === 'host') {
