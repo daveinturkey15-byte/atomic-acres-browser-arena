@@ -1,0 +1,62 @@
+{
+  "contract": "farcrysis-stock-station-capture-v1",
+  "sha": "de910d2f0211282c55b4ebad5108a8be95a29eb1",
+  "url": "http://127.0.0.1:4267",
+  "startedAt": "2026-09-05T06:58:07.798Z",
+  "flags": [
+    "--mute-audio"
+  ],
+  "env": {
+    "PASS73_NATIVE_WEBGPU": "1"
+  },
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "arena": "farcrysis",
+  "shots": [
+    {
+      "cameraId": "farcrysis-beach-golden",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-beach-golden.png",
+      "frame": 130
+    },
+    {
+      "cameraId": "farcrysis-jungle-dapple",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-jungle-dapple.png",
+      "frame": 159
+    },
+    {
+      "cameraId": "farcrysis-core-interior",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-core-interior.png",
+      "frame": 187
+    },
+    {
+      "cameraId": "farcrysis-seaplane-throwback",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-seaplane-throwback.png",
+      "frame": 213
+    },
+    {
+      "cameraId": "farcrysis-island-topdown",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-island-topdown.png",
+      "frame": 252
+    },
+    {
+      "cameraId": "farcrysis-west-shoreline",
+      "ok": true,
+      "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-west-shoreline.png",
+      "frame": 284
+    }
+  ],
+  "errors": [],
+  "ok": true,
+  "selectToActiveMs": 138197,
+  "elapsedMs": 155872
+}

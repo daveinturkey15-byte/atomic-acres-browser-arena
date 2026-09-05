@@ -1,0 +1,37 @@
+{
+  "contract": "farcrysis-route-probe-v1",
+  "sha": "de910d2f0211282c55b4ebad5108a8be95a29eb1",
+  "measuredAt": "2026-09-05T07:01:46.854Z",
+  "url": "http://127.0.0.1:4267",
+  "backend": null,
+  "flags": [
+    "--mute-audio"
+  ],
+  "env": {
+    "PASS73_NATIVE_WEBGPU": "1"
+  },
+  "method": {
+    "walkMs": 3500,
+    "blockerNearM": 1.2,
+    "slopeStepM": 0.6,
+    "routes": [
+      "beach-ring",
+      "jungle-band",
+      "core-loop",
+      "lane-n",
+      "lane-s",
+      "lane-w",
+      "lane-e"
+    ]
+  },
+  "planned": 32,
+  "attempted": 0,
+  "skipped": 0,
+  "counts": {},
+  "invisibleWalls": [],
+  "rows": [],
+  "notes": [
+    "fatal: Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4267/?release=latest&renderer=webgpu&render=quality&seed=pass95-routes&previewTime=0\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:4267/?release=latest&renderer=webgpu&render=quality&seed=pass95-routes&previewTime=0\", waiting unti"
+  ],
+  "elapsedMs": 18527
+}
