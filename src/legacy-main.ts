@@ -1075,7 +1075,7 @@ import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } fr
 // scene.environmentIntensity off the live scene rather than proving the code
 // exists, which is the difference between this and the evidence row that let
 // the null-environment defect hide behind nine passing unit tests.
-import { assertArenaEnvironmentLive } from './rendering/arena-environment-ibl';
+import { assertArenaEnvironmentLive, prewarmArenaEnvironmentIbl } from './rendering/arena-environment-ibl';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -4090,6 +4090,33 @@ function ensureAtomicWorldPresentation(): void {
 
 const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt | null = null;
+let menuArenaEnvironmentPrewarmPromise: Promise<void> | null = null;
+
+function prepareMenuArenaEnvironment(): Promise<void> {
+  if (renderRuntime.backend !== 'webgpu') return Promise.resolve();
+  const arenaId = selectedArena.id;
+  const operation = loadArenaVisualModule(arenaId)
+    .then((module) => {
+      applySkyBackdrop(scene, module.definition.atmosphere.preset, (url) => {
+        arenaVisualStream.recordSelectedAssetRequest(arenaId, url);
+      });
+      return waitForSkyBackdropAdmission(scene);
+    })
+    .then(() => prewarmArenaEnvironmentIbl(
+      renderRuntime.renderer,
+      scene,
+      arenaId,
+      graphicsRuntime.reflectionQuality,
+      graphicsRuntime.environmentIntensity,
+      graphicsRuntime.reflectionScale,
+    ));
+  menuArenaEnvironmentPrewarmPromise = operation.catch((error: unknown) => {
+    // Menu prewarm is an optimization. The admitted transition remains the
+    // fallback authority if a backdrop or PMREM asset cannot be prepared here.
+    console.warn(`[${arenaId} menu environment prewarm skipped]`, error);
+  });
+  return menuArenaEnvironmentPrewarmPromise;
+}
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
 let appliedTslArenaDefinitions = 0;
 let activeArenaReviewCameraId: string | null = null;
@@ -29975,6 +30002,9 @@ async function performArenaSelection(
   try {
     setBootstrapStage('loading-gameplay-assets');
     await prepareMenuDeploymentAssets(); if (hadPreparedArena) await ensureAuthoredSupportPresentationAssets(killstreakPresentation);
+    if (!hadPreparedArena && selectedArena.id === nextSelection.id && menuArenaEnvironmentPrewarmPromise) {
+      await menuArenaEnvironmentPrewarmPromise;
+    }
     assertAdmission();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
@@ -37392,12 +37422,22 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
 }
 function bootstrapMenuPreview(): void {
   document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
-  arenaSelectionReady = true;
+  arenaSelectionReady = false;
   syncArenaSelectionUi();
   setArenaMenuCamera();
-  setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
-  bootstrapStage = 'ready';
-  requestAnimationFrame(frame); void prepareMenuDeploymentAssets('idle');
+  setStatus(`${selectedArena.displayName} preview loading deployment assets…`);
+  bootstrapStage = 'loading-module-assets';
+  requestAnimationFrame(frame);
+  void Promise.all([
+    prepareMenuDeploymentAssets('idle'),
+    prepareMenuArenaEnvironment(),
+  ]).then(() => {
+    if (gameStarted || matchStartPreparing) return;
+    arenaSelectionReady = true;
+    syncArenaSelectionUi();
+    setStatus(`${selectedArena.displayName} preview ready · deployment assets retained.`);
+    bootstrapStage = 'ready';
+  }).catch(showFatalError);
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
     return prepareMenuDeploymentAssets('idle').then(() => {

@@ -65,6 +65,17 @@ export type ArenaIblState = Readonly<{
   sourceTexture: THREE.Texture | null;
 }>;
 
+const prewarmedArenaIbl = new Map<string, ArenaIblState>();
+const pendingArenaIblPrewarms = new Map<string, Promise<void>>();
+
+function arenaIblCacheKey(
+  arenaId: ArenaId,
+  resolution: PmremResolutionTier,
+  sourceTexture: THREE.Texture,
+): string {
+  return `${arenaId}:${resolution}:${sourceTexture.uuid}`;
+}
+
 /** Creates a new empty IBL state. */
 function createEmptyIblState(): ArenaIblState {
   return Object.freeze({
@@ -148,6 +159,44 @@ export async function generateArenaEnvironmentMap(
     sourceTexture: backgroundTexture,
     generatedCubeSize: pmremTarget.height,
   });
+}
+
+/**
+ * Builds the selected menu arena's environment before deployment. The menu has
+ * already admitted the sky, so this GPU bake does not compete with the first
+ * gameplay submission. The transition consumes the result by the exact
+ * source-texture identity; a different selected sky never receives a stale
+ * probe.
+ */
+export async function prewarmArenaEnvironmentIbl(
+  renderer: WebGPURenderer,
+  scene: THREE.Scene,
+  arenaId: ArenaId,
+  reflectionQuality: IblReflectionQuality,
+  budgetEnvironmentIntensity: number,
+  reflectionScale: number,
+): Promise<void> {
+  const sourceTexture = scene.background as THREE.Texture | null;
+  if (!sourceTexture || reflectionQuality === 'off') return;
+  const resolution = pmremResolutionForReflectionQuality(reflectionQuality);
+  const key = arenaIblCacheKey(arenaId, resolution, sourceTexture);
+  if (prewarmedArenaIbl.has(key)) return;
+  const pending = pendingArenaIblPrewarms.get(key);
+  if (pending) return pending;
+  const operation = generateArenaEnvironmentMap(
+    renderer,
+    scene,
+    arenaId,
+    reflectionQuality,
+    budgetEnvironmentIntensity,
+    reflectionScale,
+  ).then((state) => {
+    prewarmedArenaIbl.set(key, state);
+  }).finally(() => {
+    if (pendingArenaIblPrewarms.get(key) === operation) pendingArenaIblPrewarms.delete(key);
+  });
+  pendingArenaIblPrewarms.set(key, operation);
+  return operation;
 }
 
 /**
@@ -243,6 +292,21 @@ export async function applyArenaEnvironmentIbl(
   if (needsIblRegeneration(currentIblState, arenaId, targetResolution, sourceTexture)) {
     // Dispose previous arena's IBL resources
     disposeArenaIbl(currentIblState);
+
+    if (sourceTexture) {
+      const key = arenaIblCacheKey(arenaId, targetResolution, sourceTexture);
+      const prewarmed = prewarmedArenaIbl.get(key);
+      if (prewarmed) {
+        prewarmedArenaIbl.delete(key);
+        scene.environment = prewarmed.environmentTexture;
+        scene.environmentIntensity = budgetEnvironmentIntensity * prewarmed.arenaEnvironmentScale * reflectionScale;
+        return Object.freeze({
+          ...prewarmed,
+          budgetEnvironmentIntensity,
+          reflectionScale,
+        });
+      }
+    }
 
     // Generate new PMREM environment map
     return await generateArenaEnvironmentMap(
