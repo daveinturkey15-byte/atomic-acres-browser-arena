@@ -118,7 +118,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
-import { cycleMatchFixedHour, isSkyTimePresetId, skyBackdropIntensity, skyTimePresetHour, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
+import { arenaConfiguredSkyPreset, cycleMatchFixedHour, isSkyTimePresetId, skyBackdropIntensity, skyTimePresetHour, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
 import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
@@ -4234,6 +4234,10 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     // refreshes stay sun-gated in `reaimConditionedSun` (>= 0.35 deg).
     ...(lightingCaptureFixedHour !== null || privateLobbySnapshot || isSkyTimePresetId(lightingQuerySkyPreset) || activeLightingTimeChoice() !== 'cycle'
       ? {} : { fixedHour: cycleMatchFixedHour(selectedArena.id, lightingConditionsElapsedSeconds, currentMatchRules().durationMs) }),
+    // PASS 95 finish: every other solo/capture mode boots at the arena's
+    // configured preset; same local-only rule, so `?sky=` still wins.
+    ...(lightingCaptureFixedHour !== null || privateLobbySnapshot || isSkyTimePresetId(lightingQuerySkyPreset) || activeLightingTimeChoice() === 'cycle'
+      ? {} : { fixedHour: skyTimePresetHour(selectedArena.id, arenaConfiguredSkyPreset(selectedArena.id).time) }),
   });
 }
 

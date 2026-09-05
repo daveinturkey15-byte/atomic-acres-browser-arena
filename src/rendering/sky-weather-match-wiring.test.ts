@@ -15,10 +15,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { ARENA_IDS } from '../arena-identity';
 import { ARENA_DAYLIGHT_PROFILES } from './lighting-conditions';
 import {
   arenaConfiguredSkyPreset,
   cycleMatchFixedHour,
+  isSkyTimePresetId,
+  isWeatherPresetId,
   matchTimeSkyPreset,
   matchTimeSkyPresetHour,
   skyTimePresetHour,
@@ -89,5 +92,47 @@ describe('the cycle branch is wired into the match clock in source', () => {
     expect(region.slice(sky, walk)).toMatch(/privateLobbySnapshot/);
     expect(region.slice(sky, walk)).toMatch(/isSkyTimePresetId\(lightingQuerySkyPreset\)/);
     expect(region.slice(sky, walk)).toMatch(/!== 'cycle'/);
+  });
+});
+
+describe('the arena configured default applies for every registry arena', () => {
+  it('derives a valid time x clear preset from the roster, never a hand list', () => {
+    expect(ARENA_IDS.length).toBeGreaterThan(0);
+    for (const arenaId of ARENA_IDS) {
+      const configured = arenaConfiguredSkyPreset(arenaId);
+      expect(isSkyTimePresetId(configured.time)).toBe(true);
+      expect(isWeatherPresetId(configured.weather)).toBe(true);
+      expect(configured.weather).toBe('clear');
+      const hour = skyTimePresetHour(arenaId, configured.time);
+      expect(Number.isFinite(hour)).toBe(true);
+      const daylight = ARENA_DAYLIGHT_PROFILES[arenaId];
+      if (arenaId === 'nuketown2') continue;
+      if (daylight.pinned) {
+        expect(hour).toBe(daylight.authoredHour);
+      } else {
+        expect(hour).toBeGreaterThanOrEqual(daylight.hourRange[0]);
+        expect(hour).toBeLessThanOrEqual(daylight.hourRange[1]);
+      }
+    }
+  });
+});
+
+describe('the arena-default branch keeps the ?sky= override winning in source', () => {
+  const region = lightingRegion();
+
+  it('applies the configured preset after the ?sky= spread', () => {
+    const sky = region.indexOf('fixedHour: skyTimePresetHour(selectedArena.id, lightingQuerySkyPreset)');
+    const def = region.indexOf('arenaConfiguredSkyPreset(selectedArena.id).time');
+    expect(sky).toBeGreaterThan(-1);
+    expect(def).toBeGreaterThan(sky);
+  });
+
+  it('lets ?todhour= win, ignores hosted lobbies, and yields to cycle', () => {
+    const def = region.indexOf('arenaConfiguredSkyPreset(selectedArena.id).time');
+    const guard = region.slice(region.lastIndexOf('...(', def), def);
+    expect(guard).toMatch(/lightingCaptureFixedHour !== null/);
+    expect(guard).toMatch(/privateLobbySnapshot/);
+    expect(guard).toMatch(/isSkyTimePresetId\(lightingQuerySkyPreset\)/);
+    expect(guard).toMatch(/=== 'cycle'/);
   });
 });
