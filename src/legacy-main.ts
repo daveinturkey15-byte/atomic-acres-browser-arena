@@ -30059,6 +30059,7 @@ async function performArenaSelection(
     // real before anything compiles against it. Explicit-force call forms
     // keep the pinned coverage-frame sequence in the committing phase below
     // untouched; its resetRenderInfo still scopes readiness to real coverage.
+    const coldOptionalRoots = !hadPreparedArena ? [overdriveRoot, nukeShockwave, nukeEvent.root, explosiveBoltPresentationRoot, railgunPresentation.root, timedMapWeaponPresentation.root, flareProjectileSystem.root, flamethrowerStreamPresentation.root, tracerPool.lines, impactPresentation.root, grenadeExplosionPresentation.root, supportExplosionPresentation.root, deathDropPresentationPool.root, grenadeWorldPresentationPool.root, smokeVolumePresentationPool.root, killstreakPresentation.root, botWeaponGpuVocabulary.root, weaponView.root] : [];
     if (renderRuntime.backend === 'webgpu') {
       // FARCRYSIS-LOAD (pass 84, lane C): the warm frame below is the FIRST
       // WebGPU submission of a cold session, and it is fenced at 12 s. For
@@ -30147,7 +30148,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission();
+      await withDetachedRoots(!hadPreparedArena ? [...coldOptionalRoots, arena.root] : [], async () => { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); });
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -30210,7 +30211,6 @@ async function performArenaSelection(
       if (!exactScenePass) {
         throw new Error('WebGPU arena coverage requires the exact Pass 64 ScenePass graph');
       }
-      const coldOptionalRoots = !hadPreparedArena ? [overdriveRoot, nukeShockwave, nukeEvent.root, explosiveBoltPresentationRoot, railgunPresentation.root, timedMapWeaponPresentation.root, flareProjectileSystem.root, flamethrowerStreamPresentation.root, tracerPool.lines, impactPresentation.root, grenadeExplosionPresentation.root, supportExplosionPresentation.root, deathDropPresentationPool.root, grenadeWorldPresentationPool.root, smokeVolumePresentationPool.root, killstreakPresentation.root, botWeaponGpuVocabulary.root] : [];
       await withDetachedRoots(coldOptionalRoots, () => withArenaFrustumCullingDisabled(scene, async () => {
         // Three yields between node shader stages/render objects during this
         // exact HDR/MRT compile, preventing one monolithic first-coverage CPU
@@ -37383,7 +37383,7 @@ function bootstrapMenuPreview(): void {
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
   bootstrapStage = 'ready';
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); void prepareMenuDeploymentAssets('idle');
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
     return prepareMenuDeploymentAssets('idle').then(() => {
