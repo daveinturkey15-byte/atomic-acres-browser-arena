@@ -849,6 +849,7 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   propBlade.rotation.x = 0.9; // bent from the crash
   seaplane.add(propBlade);
   const wing = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.12, 1.15), standard(0xc7d4d9, 0.45, 0.4));
+  wing.name = 'farcrysis-throwback-seaplane-wing';
   wing.position.set(-0.4, 1.28, 0);
   wing.rotation.z = -0.06; // one wingtip dug into the sand
   seaplane.add(wing);
@@ -880,6 +881,20 @@ export function buildFarcrysis(scene: THREE.Scene): ArenaMap {
   root.add(seaplane);
   // Hull collider matches the fuselage box, yawed with the wreck.
   colliderProxy('farcrysis-throwback-seaplane-collider', [48, seaplaneGround + 0.6, -48], [4.6, 1.2, 1.5], 'thin-metal', [0, 0.7, 0]);
+  // The wing is a player-scale steel surface, not paper dressing: keep its
+  // collision proxy in the exact composed parent/child transform so the
+  // walkable-surface audit cannot find a fall-through deck at the wreck.
+  const wingWorldCentre = wing.position.clone().applyQuaternion(seaplane.quaternion).add(seaplane.position);
+  const wingWorldRotation = new THREE.Euler().setFromQuaternion(
+    seaplane.quaternion.clone().multiply(wing.quaternion),
+  );
+  colliderProxy(
+    'farcrysis-throwback-seaplane-wing-collider',
+    [wingWorldCentre.x, wingWorldCentre.y, wingWorldCentre.z],
+    [5.6, 0.12, 1.15],
+    'thin-metal',
+    [wingWorldRotation.x, wingWorldRotation.y, wingWorldRotation.z],
+  );
 
   // Pass 76: the beacon was an orange box with a floating flame cube. Same
   // collider envelope, but it now reads as a castaway signal pyre: a lashed
