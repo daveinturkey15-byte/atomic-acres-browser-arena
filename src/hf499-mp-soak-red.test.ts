@@ -27,7 +27,7 @@ describe('HF-499 active-match rejoin authority', () => {
     expect(join).toContain('broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow);');
     expect(join).toContain('for (const candidate of remotes.values())');
     expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);');
-    expect(main).toContain('sessionBoundCreditKey(playerId, connectionEpoch)');
+    expect(main).toContain('sessionBoundCreditKey(playerId, epoch)');
     expect(main).toContain('verifiedRemoteKills.set(creditKey,');
   });
 
@@ -70,10 +70,10 @@ describe('HF-499 replication evidence', () => {
   });
 
   it('applies continuity before the remote sequence fence and reconciles guest prediction to host authority', () => {
-    expect(main).toContain('applyRemoteAuthoritativeSnapshot(');
+    expect(main).toContain('admitRemoteSnapshot(');
     expect(main).toContain('continuity: message.type === \'state\' ? message.continuity : remote.continuity');
     expect(main).toContain('reconcileLocalAuthoritativeSnapshot({');
-    expect(main).toContain("if (reconciliation.correction === 'snap')");
+    expect(main).toContain("reconciliation.correction === 'snap'");
     expect(main).toContain('lastAcknowledgedLocalInputSeq = incoming.seq;');
   });
 });

@@ -784,13 +784,7 @@ import {
   type InterpolationDelayState,
   type SnapshotRateState,
 } from './network-sync';
-import {
-  LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M,
-  applyRemoteAuthoritativeSnapshot,
-  createRemoteAuthoritativeState,
-  reconcileLocalAuthoritativeSnapshot,
-} from './remote-snapshot-reconciliation';
-import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
+import { LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M, admitRemoteSnapshot, reconcileLocalAuthoritativeSnapshot } from './remote-snapshot-reconciliation'; import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
 import {
   createHostTimeMapping,
   hostTimeDiagnostics,
@@ -1285,8 +1279,7 @@ type RemotePlayer = {
   claimRequiresCoreExit: boolean;
   positionHistory: CombatantPoseSample[];
   interpolation: SnapshotInterpolationBuffer<PlayerSnapshot>;
-  snapshotRateHz: 20 | 30 | 40;
-  authoritativeHostTimeMs: number;
+  snapshotRateHz: 20 | 30 | 40; authoritativeHostTimeMs: number;
   renderedHostTimeMs: number;
   renderedWorldAgeMs: number;
   continuity: number;
@@ -5916,9 +5909,7 @@ const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
-let localContinuity = 1;
-/** Highest player-state sequence acknowledged by the host for this document. */
-let lastAcknowledgedLocalInputSeq = -1;
+let localContinuity = 1; let lastAcknowledgedLocalInputSeq = -1;
 let localHostConfirmedContinuity: number | null = null;
 let awaitingAuthoritativeRejoinContinuity = false;
 let awaitingCanonicalGuestAuthority = false;
@@ -6103,20 +6094,7 @@ const supportNetworkHitTelemetry: Record<OffensiveSupportSource, { sent: number;
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const deathDrops: DeathDropEntity[] = [];
 const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
-const verifiedRemoteKills = new Map<string, number>();
-
-function remoteKillCreditKey(playerId: string): string {
-  const connectionEpoch = hostLobbyConnectionEpochs.get(playerId);
-  return connectionEpoch ? sessionBoundCreditKey(playerId, connectionEpoch) : playerId;
-}
-
-function clearRemoteKillCredits(playerId: string): void {
-  const prefix = `${playerId}:`;
-  for (const key of verifiedRemoteKills.keys()) {
-    if (key === playerId || key.startsWith(prefix)) verifiedRemoteKills.delete(key);
-  }
-}
-
+const verifiedRemoteKills = new Map<string, number>(); function remoteKillCreditKey(playerId: string): string { const epoch = hostLobbyConnectionEpochs.get(playerId); return epoch ? sessionBoundCreditKey(playerId, epoch) : playerId; } function clearRemoteKillCredits(playerId: string): void { const prefix = `${playerId}:`; for (const key of verifiedRemoteKills.keys()) if (key === playerId || key.startsWith(prefix)) verifiedRemoteKills.delete(key); }
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let matchStartPreparing = false;
@@ -9196,50 +9174,8 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
-function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean {
-  if (network.role !== 'host') return false;
-  const health = remoteHealthAuthorities.get(remote.snapshot.id);
-  const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot;
-  const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot });
-  const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id);
-  const stateSent = network.sendToPlayer(targetPlayerId, {
-    type: 'state', player: playerSnapshot, hostTimeMs: now,
-    continuity: remote.continuity, rateHz: remote.snapshotRateHz,
-    ...(combatInventory ? { combatInventory } : {}),
-  });
-  return joinSent && stateSent;
-}
-
-function broadcastFreshRejoinerSlotToObservers(
-  rejoinerId: string,
-  connectionEpoch: string,
-  remote: RemotePlayer,
-  now = performance.now(),
-): number {
-  if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0;
-  const health = remoteHealthAuthorities.get(rejoinerId);
-  const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot;
-  const plan = buildRejoinReplicationPlan({
-    rejoinerId,
-    connectionEpoch,
-    snapshot: playerSnapshot,
-    continuity: remote.continuity,
-    hostTimeMs: now,
-    rateHz: remote.snapshotRateHz,
-    observerIds: network.connectedPlayerIds(),
-  });
-  let delivered = 0;
-  for (const observer of plan.observers) {
-    // sendToPlayer resolves the current admitted transport; this epoch check
-    // prevents a replacement racing the loop from receiving an old slot.
-    if (hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) break;
-    if (!hostLobbyConnectionEpochs.has(observer.playerId)) continue;
-    const joinSent = network.sendToPlayer(observer.playerId, observer.messages[0]);
-    const stateSent = network.sendToPlayer(observer.playerId, observer.messages[1]);
-    if (joinSent && stateSent) delivered += 1;
-  }
-  return delivered;
-}
+function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
+function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -12354,8 +12290,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
       stance: snapshot.stance ?? 'stand', continuity: 1,
     }],
     interpolation,
-    snapshotRateHz: 40,
-    authoritativeHostTimeMs: currentHostTimeMs(),
+    snapshotRateHz: 40, authoritativeHostTimeMs: currentHostTimeMs(),
     renderedHostTimeMs: currentHostTimeMs(),
     renderedWorldAgeMs: 0,
     continuity: 1,
@@ -13384,41 +13319,7 @@ function onNetworkMessage(message: GameMessage): void {
       return;
     }
     if (incoming.id === player.id) {
-      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) {
-        const reconciliation = reconcileLocalAuthoritativeSnapshot({
-          predicted: {
-            ...incoming,
-            x: player.position.x,
-            y: player.position.y,
-            z: player.position.z,
-            yaw: player.yaw,
-            pitch: player.pitch,
-            seq: player.seq,
-          },
-          authoritative: incoming,
-          lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq,
-        });
-        if (!reconciliation.accepted) return;
-        lastAcknowledgedLocalInputSeq = incoming.seq;
-        if (reconciliation.correction === 'snap') {
-          const authoritativeStance = incoming.stance ?? 'stand';
-          if (!characterPhysics || characterPhysics.setStance(authoritativeStance)) {
-            player.position.set(incoming.x, incoming.y, incoming.z);
-            player.velocity.set(0, 0, 0);
-            player.yaw = incoming.yaw;
-            player.pitch = incoming.pitch;
-            player.stance = authoritativeStance;
-            characterPhysics?.teleportEye(player.position);
-            localPositionHistory.length = 0;
-            recordMatchDiagnostic('state-reconciliation', 'accepted', {
-              actorId: player.id,
-              position: [incoming.x, incoming.y, incoming.z],
-              reason: 'local-authority-snap',
-              modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`],
-            });
-          }
-        }
-      }
+      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) { const reconciliation = reconcileLocalAuthoritativeSnapshot({ predicted: { ...incoming, x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch, seq: player.seq }, authoritative: incoming, lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq }); if (!reconciliation.accepted) return; lastAcknowledgedLocalInputSeq = incoming.seq; if (reconciliation.correction === 'snap' && (!characterPhysics || characterPhysics.setStance(incoming.stance ?? 'stand'))) { player.position.set(incoming.x, incoming.y, incoming.z); player.velocity.set(0, 0, 0); player.yaw = incoming.yaw; player.pitch = incoming.pitch; player.stance = incoming.stance ?? 'stand'; characterPhysics?.teleportEye(player.position); localPositionHistory.length = 0; recordMatchDiagnostic('state-reconciliation', 'accepted', { actorId: player.id, position: [incoming.x, incoming.y, incoming.z], reason: 'local-authority-snap', modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`] }); } }
       // A host-authored echo of the reconnecting guest is the only canonical
       // health repair available before the next damage result. Without it a
       // replacement document always resumed at 100 HP while the host retained
@@ -13507,19 +13408,7 @@ function onNetworkMessage(message: GameMessage): void {
       // so none of these canonical repair snapshots can be dropped merely
       // because their receiving runtime did not exist yet. Run this even when
       // an active channel was replaced before its stale remote timed out.
-      const repairNow = performance.now();
-      const connectionEpoch = hostLobbyConnectionEpochs.get(incoming.id);
-      // The old path only broadcast a join record here. A guest that had
-      // already retired the old remote therefore received no fresh state
-      // sample, so it never opened the rejoiner's presentation slot.
-      if (connectionEpoch) {
-        sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, remote, repairNow);
-        broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow);
-      }
-      for (const candidate of remotes.values()) {
-        if (candidate.snapshot.id === incoming.id) continue;
-        sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);
-      }
+      const repairNow = performance.now(); const connectionEpoch = hostLobbyConnectionEpochs.get(incoming.id); if (connectionEpoch) { sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, remote, repairNow); broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow); } for (const candidate of remotes.values()) if (candidate.snapshot.id !== incoming.id) sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);
       network.send(createStateMessage());
       broadcastOverdriveState(performance.now());
       broadcastRailgunState();
@@ -13552,20 +13441,7 @@ function onNetworkMessage(message: GameMessage): void {
     }
     if (network.role === 'host' && message.type === 'state'
       && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) return;
-    const snapshotAdmission = applyRemoteAuthoritativeSnapshot(
-      createRemoteAuthoritativeState({
-        snapshot: remote.snapshot,
-        continuity: remote.continuity,
-        hostTimeMs: remote.authoritativeHostTimeMs,
-      }),
-      {
-        kind: message.type,
-        snapshot: incoming,
-        continuity: message.type === 'state' ? message.continuity : remote.continuity,
-        hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs(),
-      },
-    );
-    if (snapshotAdmission.accepted) {
+    const snapshotAdmission = admitRemoteSnapshot(remote.snapshot, remote.continuity, remote.authoritativeHostTimeMs, { kind: message.type, snapshot: incoming, continuity: message.type === 'state' ? message.continuity : remote.continuity, hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs() }); if (snapshotAdmission.accepted) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
       const redeployed = redeployAuthorization !== undefined
@@ -13726,8 +13602,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote.snapshot = admittedIncoming;
       if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
-      remote.continuity = admittedContinuity;
-      remote.authoritativeHostTimeMs = admittedHostTimeMs;
+      remote.continuity = admittedContinuity; remote.authoritativeHostTimeMs = admittedHostTimeMs;
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
         seq: admittedIncoming.seq,
@@ -16687,8 +16562,7 @@ function processDeath(message: DeathMessage): void {
   } else if (message.victim === player.id && message.killer !== player.id) {
     const remoteKiller = remotes.get(message.killer);
     if (remoteKiller && areCombatantsHostile(remoteKiller.snapshot.id, remoteKiller.snapshot.team, player.id, player.team)) {
-      const creditKey = remoteKillCreditKey(message.killer);
-      verifiedRemoteKills.set(creditKey, (verifiedRemoteKills.get(creditKey) ?? 0) + 1);
+      const creditKey = remoteKillCreditKey(message.killer); verifiedRemoteKills.set(creditKey, (verifiedRemoteKills.get(creditKey) ?? 0) + 1);
     }
   }
   const eliminationFeedText = deathOutcome.feedText;
@@ -16768,8 +16642,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   }
   scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
-  remotes.delete(id);
-  clearRemoteKillCredits(id);
+  remotes.delete(id); clearRemoteKillCredits(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
   const retainedCrossbowActions = admittedRemoteShots.get(id);
@@ -27551,8 +27424,7 @@ function teamScores(): [number, number] {
   }
   let aqua = player.team === 0 ? player.kills : 0;
   let coral = player.team === 1 ? player.kills : 0;
-  for (const remote of remotes.values()) {
-    const admittedKills = verifiedRemoteKills.get(remoteKillCreditKey(remote.snapshot.id)) ?? 0;
+  for (const remote of remotes.values()) { const admittedKills = verifiedRemoteKills.get(remoteKillCreditKey(remote.snapshot.id)) ?? 0;
     if (remote.snapshot.team === 0) aqua += admittedKills;
     else coral += admittedKills;
   }

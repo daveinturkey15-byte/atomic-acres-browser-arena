@@ -68,6 +68,15 @@ export function applyRemoteAuthoritativeSnapshot(
   return { accepted: false, reason: 'older-sequence', state: current };
 }
 
+export function admitRemoteSnapshot(
+  snapshot: PlayerSnapshot,
+  continuity: number,
+  hostTimeMs: number,
+  incoming: RemoteSnapshotApplyInput,
+): RemoteSnapshotApplyResult {
+  return applyRemoteAuthoritativeSnapshot(createRemoteAuthoritativeState({ snapshot, continuity, hostTimeMs }), incoming);
+}
+
 export type LocalAuthoritativeReconciliationInput = Readonly<{
   predicted: PlayerSnapshot;
   authoritative: PlayerSnapshot;
