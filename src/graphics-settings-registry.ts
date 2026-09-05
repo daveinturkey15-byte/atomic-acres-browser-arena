@@ -88,8 +88,6 @@ export type AdvancedGraphicsValues = Readonly<{
   depthOfField: boolean;
   depthOfFieldStrength: number;
   motionBlur: number;
-  /** Quality/Max opt-in temporal resolve; Balanced stays bit-for-bit off. */
-  taaResolve: boolean;
   spatialUpscaling: SpatialUpscalingMode;
   /**
    * WEATHER — Pass 78. These four are presentation clamps on a simulation that
@@ -137,7 +135,6 @@ export type GraphicsRuntimeConsumer =
   | 'ray-tracing'
   | 'depth-of-field'
   | 'motion-blur'
-  | 'temporal-anti-aliasing'
   | 'spatial-upscaling'
   | 'weather-presentation'
   | 'rain-presentation'
@@ -481,11 +478,6 @@ export const ADVANCED_GRAPHICS_CONTROLS: readonly GraphicsControlDefinition[] = 
     kind: 'range', minimum: 0, maximum: 1, step: 0.05, unit: 'percent',
     applyMode: 'pipeline-rebuild', runtimeConsumer: 'motion-blur',
   }),
-  control({
-    key: 'taaResolve', id: 'graphics-taa-resolve', category: 'post', label: 'Temporal anti-aliasing',
-    description: 'Reduces fine shimmer during camera motion with a short, depth-aware image history.',
-    kind: 'toggle', applyMode: 'pipeline-rebuild', runtimeConsumer: 'temporal-anti-aliasing',
-  }),
   // FSR 1 is a real, vendor-published SPATIAL upscaler and the second sentence
   // of the description is load-bearing: the `ai-upscaling-frame-generation`
   // capability notice says DLSS and frame generation do not exist in a browser,
@@ -611,8 +603,8 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
     'render.atomicSignal.advancedGraphics.screenSpace.bakedIndirect',
     'documentElement.dataset.bakedIndirect (publishBakedIndirectReceipt)',
   ),
-  screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
-  screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
+  screenSpaceReflections: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.reflections'),
+  screenSpaceGi: runtimeEvidence('src/rendering/screen-space-post.ts', 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal', 'render.atomicSignal.advancedGraphics.screenSpace.globalIllumination'),
   // The telemetry probe is a receipt written BY THE GRAPH THAT WAS BUILT, not a
   // field echoing the requested tier. The scene assembler rebuilds the linear
   // stage list from a hard-coded order this lane does not own, so the trace can
@@ -624,8 +616,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   volumetricLightShafts: runtimeEvidence('src/rendering/screen-space-post.ts', 'godrays(sources.sceneDepth, sources.camera, sources.volumetricLight)', 'render.atomicSignal.advancedGraphics.screenSpace.godrays'),
   depthOfField: runtimeEvidence('src/rendering/screen-space-post.ts', 'dof(linearHdr, sources.sceneViewZ, focusDistance, focalLength, bokehScale)', 'render.atomicSignal.advancedGraphics.screenSpace.depthOfField'),
   depthOfFieldStrength: runtimeEvidence('src/rendering/screen-space-post-profile.ts', 'assertDepthOfFieldCombatSafety', 'settings.graphics.depthOfFieldStrength + screenSpace.depthOfField.bokehScale'),
-  motionBlur: runtimeEvidence('src/rendering/screen-space-post.ts', 'motionBlur(sceneColor, limited, int(runtime.motionBlur.samples))', 'render.atomicSignal.advancedGraphics.screenSpace.motionBlur'),
-  taaResolve: runtimeEvidence('src/rendering/taa-resolve.ts', 'buildTaaResolveNode', 'render.atomicSignal.advancedGraphics.screenSpace.taaResolve'),
+  motionBlur: runtimeEvidence('src/rendering/screen-space-post.ts', 'motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))', 'render.atomicSignal.advancedGraphics.screenSpace.motionBlur'),
   spatialUpscaling: runtimeEvidence('src/rendering/filmic-grade-chain.ts', 'display-fsr1-easu-rcas-upscale', 'settings.graphics.spatialUpscaling + grade chain stage receipt'),
   // The receipt publishes BOTH numbers side by side - `resolutionTier` (what the
   // setting asked for) and `generatedCubeSize` (what the generator produced) -
@@ -655,7 +646,7 @@ export const ADVANCED_GRAPHICS_RUNTIME_EVIDENCE: Readonly<Record<GraphicsAdvance
   particleQuality: runtimeEvidence('src/legacy-main.ts', 'budget.particleDensityScale * graphicsRuntime.particleScale', 'settings.graphics.particleScale + render.graphicsRefinement.budget'),
   anisotropy: runtimeEvidence('src/graphics-refinement.ts', 'texture.anisotropy = anisotropy', 'render.graphicsRefinement.requestedAnisotropy'),
   decalQuality: runtimeEvidence('src/legacy-main.ts', 'budget.decalLifetimeScale * graphicsRuntime.decalScale', 'settings.graphics.decalScale + impact presentation budget'),
-  bloomQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'bloom(screenSpace.sceneColor, graphics.post.bloomStrength', 'render.atomicSignal.advancedGraphics.bloomStrength'),
+  bloomQuality: runtimeEvidence('src/rendering/pass64-tsl-scene.ts', 'bloom(sceneColor, graphics.post.bloomStrength', 'render.atomicSignal.advancedGraphics.bloomStrength'),
   exposure: runtimeEvidence('src/legacy-main.ts', 'authoredExposure * graphicsRuntime.post.exposureScale', 'settings.graphics.post.exposureScale + renderer exposure'),
   toneMapping: runtimeEvidence('src/legacy-main.ts', 'graphicsRuntime.post.toneMapping', 'settings.graphics.post.toneMapping + documentElement.dataset.graphicsToneMapping'),
   filmicProfile: runtimeEvidence('src/legacy-main.ts', 'effectiveGradeProfileId', 'settings.graphics.filmicProfile + render.gradeProfileId'),
@@ -762,7 +753,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     environmentIntensity: 1, volumetricQuality: 'low', volumetricLightShafts: 'off', smokeQuality: 'low',
     particleQuality: 'low', anisotropy: 4, decalQuality: 'low', bloomQuality: 'subtle',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.1, vignette: 0.08,
-    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: false, spatialUpscaling: 'off',
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
     // Weather is the one family where the low-spec preset caps the CEILING as
     // well as the density: the streak count is the cost, but a storm is also
     // the state that leans hardest on fill rate on the machines this preset
@@ -872,7 +863,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'off', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.24, vignette: 0.14,
-    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: false, spatialUpscaling: 'off',
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
     weatherIntensity: 'storm', rainDensity: 0.75, windStrength: 1, lightning: true,
     wetSurfaces: true, ambientLife: 0.8,
   }),
@@ -911,7 +902,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     environmentIntensity: 1, volumetricQuality: 'high', volumetricLightShafts: 'low', smokeQuality: 'high',
     particleQuality: 'high', anisotropy: 8, decalQuality: 'high', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.32, vignette: 0.16,
-    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, taaResolve: true, spatialUpscaling: 'off',
+    depthOfField: false, depthOfFieldStrength: 0.3, motionBlur: 0, spatialUpscaling: 'off',
     // Uncapped weather at the authored density. The ceiling is not a
     // performance dial - the instance count is - so there is no reason for the
     // default preset to hide a state the arenas were authored to reach.
@@ -964,7 +955,7 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
     environmentIntensity: 1, volumetricQuality: 'ultra', volumetricLightShafts: 'high', smokeQuality: 'ultra',
     particleQuality: 'ultra', anisotropy: 16, decalQuality: 'ultra', bloomQuality: 'cinematic',
     exposure: 1, toneMapping: 'aces', filmicProfile: 'arena-default', sharpness: 0, filmGrain: 0.4, vignette: 0.18,
-    depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, taaResolve: true, spatialUpscaling: 'off',
+    depthOfField: true, depthOfFieldStrength: 0.6, motionBlur: 0.35, spatialUpscaling: 'off',
     // Max pushes density to 1.35x the authored figure and leaves the ceiling
     // open. Even at 1.5x the whole volume removes under 3% of the light along
     // a sightline (rain-presentation.ts -> rainSightlineObscuration), and the

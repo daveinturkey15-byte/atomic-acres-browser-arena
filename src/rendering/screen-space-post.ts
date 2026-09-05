@@ -61,12 +61,6 @@ import {
   buildBakedIndirectRuntime,
   type BakedIndirectRuntime,
 } from './lighting/baked-indirect-runtime';
-import {
-  buildTaaResolveNode,
-  TAA_RESOLVE_STAGE,
-  type TaaPrecompileRenderer,
-  type TaaResolveGraph,
-} from './taa-resolve';
 
 /** Stage names this module contributes, matching `LINEAR_SOURCE_STAGE_ORDER`. */
 export const MOTION_BLUR_STAGE = 'motion-blur-velocity-smear';
@@ -161,14 +155,13 @@ export function screenSpaceMrtRequirement(runtime: ScreenSpacePostRuntime): Scre
     normal: runtime.reflections.enabled || runtime.globalIllumination.enabled || runtime.rayTracing.enabled
       || runtime.bakedIndirect.enabled,
     material: runtime.reflections.enabled || runtime.rayTracing.enabled,
-    velocity: runtime.motionBlur.enabled || runtime.taaResolve.enabled,
+    velocity: runtime.motionBlur.enabled,
   });
 }
 
 /** The stage receipt a runtime will produce, without building any node. */
 export function screenSpacePostStages(runtime: ScreenSpacePostRuntime): readonly string[] {
   const stages: string[] = [];
-  if (runtime.taaResolve.enabled) stages.push(TAA_RESOLVE_STAGE);
   if (runtime.motionBlur.enabled) stages.push(MOTION_BLUR_STAGE);
   if (runtime.bakedIndirect.enabled) stages.push(BAKED_INDIRECT_STAGE);
   if (runtime.globalIllumination.enabled) stages.push(SSGI_STAGE);
@@ -311,12 +304,8 @@ export type ScreenSpacePostGraph = Readonly<{
   applyDepthOfField(linearHdr: Node<'vec4'>): Node<'vec4'>;
   /** Pushes a new runtime into the live uniforms. Topology is unchanged. */
   applyRuntime(next: ScreenSpacePostRuntime): void;
-  /** Compiles the unattached TAA resolve quad during scene admission. */
-  precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void>;
   /** Call once per presented frame, before submission. */
   beforeRender(): void;
-  /** Freeze Halton jitter for deterministic review captures. */
-  setReviewCamera(active: boolean): void;
   dispose(): void;
 }>;
 
@@ -334,34 +323,16 @@ export function buildScreenSpacePostGraph(
   const disposables: DisposableNode[] = [];
   let active = runtime;
 
-  // --- temporal resolve ---------------------------------------------------
-  // TAA is the first linear stage. The velocity MRT is sampled at the closest
-  // depth in the 3x3 neighbourhood, so a foreground edge cannot borrow the
-  // motion vector of the background behind it. Motion blur consumes this
-  // resolved colour below; it never smears the history target itself.
-  let taaGraph: TaaResolveGraph | null = null;
-  let sceneColor: Node<'vec4'> = sources.sceneColor;
-  if (runtime.taaResolve.enabled && sources.sceneVelocity) {
-    taaGraph = buildTaaResolveNode({
-      beauty: sources.sceneColor,
-      depth: sources.sceneDepth,
-      velocity: sources.sceneVelocity,
-      camera: sources.camera as Parameters<typeof buildTaaResolveNode>[0]['camera'],
-    }, runtime.taaResolve);
-    disposables.push(taaGraph);
-    sceneColor = taaGraph.node.getTextureNode() as unknown as Node<'vec4'>;
-    stages.push(TAA_RESOLVE_STAGE);
-  }
-
   // --- motion blur ---------------------------------------------------------
-  // Applied after TAA so the history resolve is never smeared. The velocity is
-  // gated below its dead zone: an aim adjustment at
+  // Applied to the raw scene colour so every later stage reads one consistent
+  // image. The velocity is gated below its dead zone: an aim adjustment at
   // 240 Hz moves a few thousandths of NDC, and smearing that is how a blur
   // setting turns into a target-acquisition hazard.
   const motionBlurStrength = uniform(runtime.motionBlur.strength);
   const motionBlurDeadZone = uniform(runtime.motionBlur.deadZoneNdc);
   const motionBlurKnee = uniform(runtime.motionBlur.kneeNdc);
   const motionBlurCeiling = uniform(runtime.motionBlur.maximumUvOffset);
+  let sceneColor: Node<'vec4'> = sources.sceneColor;
   if (runtime.motionBlur.enabled && sources.sceneVelocity) {
     const ndcVelocity = nodeObject(sources.sceneVelocity).xy.mul(motionBlurStrength);
     const ndcSpeed = ndcVelocity.length();
@@ -374,7 +345,7 @@ export function buildScreenSpacePostGraph(
       .mul(0.5)
       .mul(min(uvSpeed, motionBlurCeiling).div(max(uvSpeed, float(1e-5))))
       .mul(gate);
-    sceneColor = motionBlur(sceneColor, limited, int(runtime.motionBlur.samples)) as unknown as Node<'vec4'>;
+    sceneColor = motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples)) as unknown as Node<'vec4'>;
     stages.push(MOTION_BLUR_STAGE);
   }
 
@@ -402,19 +373,18 @@ export function buildScreenSpacePostGraph(
   }
   let ssgiNode: (DisposableNode & Record<string, { value: number }>) | null = null;
   if (runtime.globalIllumination.enabled && sources.sceneNormal) {
-    const node = ssgi(sceneColor, sources.sceneDepth, sources.sceneNormal, sources.camera as THREE.PerspectiveCamera);
+    const node = ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal, sources.camera as THREE.PerspectiveCamera);
     node.sliceCount.value = runtime.globalIllumination.sliceCount;
     node.stepCount.value = runtime.globalIllumination.stepCount;
     node.giIntensity.value = runtime.globalIllumination.giIntensity;
     node.radius.value = runtime.globalIllumination.radius;
     node.thickness.value = runtime.globalIllumination.thickness;
     node.expFactor.value = runtime.globalIllumination.expFactor;
-    // The r185 temporal filter rotates its sample pattern per frame. It is
-    // admitted only under our TAA resolve, which supplies the history that
-    // makes that rotation stable; without TAA the source comments correctly
-    // describe this chain as non-temporal and the spatial denoise remains the
-    // safe fallback.
-    node.useTemporalFiltering = runtime.taaResolve.enabled;
+    // Upstream's temporal filter needs a TRAA resolve this chain does not run;
+    // without one it reads as crawling noise, which is worse than the noise it
+    // removes. The depth/normal-aware spatial denoise stands in, exactly as it
+    // does for the High and Ultra GTAO tiers.
+    node.useTemporalFiltering = false;
     ssgiNode = node as unknown as DisposableNode & Record<string, { value: number }>;
     disposables.push(ssgiNode);
     const rawGi = node.getGINode();
@@ -446,7 +416,7 @@ export function buildScreenSpacePostGraph(
     // The upstream typing narrows `normalNode` to Node<'vec3'>, but the node
     // body reads `.rgb` AND calls `.sample()` on it, so what it actually needs
     // is the MRT texture node this pass publishes.
-    const node = ssr(sceneColor, sources.sceneDepth, sources.sceneNormal as unknown as Node<'vec3'>, {
+    const node = ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal as unknown as Node<'vec3'>, {
       camera: sources.camera,
       // Water and wet decking are dielectrics. Discarding non-metals is the
       // upstream fast path, and it would skip precisely the surfaces this tier
@@ -694,7 +664,6 @@ export function buildScreenSpacePostGraph(
       motionBlurDeadZone.value = next.motionBlur.deadZoneNdc;
       motionBlurKnee.value = next.motionBlur.kneeNdc;
       motionBlurCeiling.value = next.motionBlur.maximumUvOffset;
-      if (taaGraph) taaGraph.strength.value = next.taaResolve.enabled ? next.taaResolve.strength : 0;
       giGain.value = next.globalIllumination.enabled ? 1 : 0;
       if (ssgiNode && next.globalIllumination.enabled) {
         ssgiNode.sliceCount.value = next.globalIllumination.sliceCount;
@@ -726,9 +695,6 @@ export function buildScreenSpacePostGraph(
       // on the pipeline-rebuild path, exactly like turning a march on or off.
       rayTracedGraph?.applyTuning(next.rayTracing);
     },
-    precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void> {
-      return taaGraph?.precompile(renderer, targetScene) ?? Promise.resolve();
-    },
     beforeRender(): void {
       // HF-481. The camera moves every frame and the sun moves with the arena's
       // time of day, so the inscatter's direction and radiance are refreshed
@@ -738,9 +704,6 @@ export function buildScreenSpacePostGraph(
       // intensity the arena authored.
       if (atmosphereReady) aerialPerspective?.update(atmosphereSkyColor, atmosphereSunWhite);
       rayTracedGraph?.beforeRender();
-      // TaaResolveNode's frame update owns target copies and the actual resolve;
-      // there is no per-frame CPU work here. Its jitter callbacks are installed
-      // at admission and are intentionally left on the render pipeline.
       // Advances the arena's bake by at most a few milliseconds and republishes
       // the receipt, so what a headless check reads is what the frame just used
       // rather than what was true when the graph was built.
@@ -784,9 +747,6 @@ export function buildScreenSpacePostGraph(
       else shaftTint.setRGB(1, 1, 1);
       shaftColor.value.copy(shaftTint).multiplyScalar(shaftGain);
     },
-    setReviewCamera(review: boolean): void {
-      taaGraph?.setJitterFrozen(review);
-    },
     dispose(): void {
       for (const node of disposables) node.dispose?.();
       disposables.length = 0;
@@ -799,7 +759,6 @@ export function buildScreenSpacePostGraph(
       depthOfFieldNode = null;
       ssgiNode = null;
       ssrNode = null;
-      taaGraph = null;
       godraysNode = null;
       shaftLight = null;
     },
@@ -829,8 +788,7 @@ export function packedMaterialMrtNode(
 
 /** Convenience for callers that only need to know whether anything is on. */
 export function screenSpacePostActive(runtime: ScreenSpacePostRuntime): boolean {
-  return runtime.taaResolve.enabled
-    || runtime.motionBlur.enabled
+  return runtime.motionBlur.enabled
     || runtime.globalIllumination.enabled
     || runtime.reflections.enabled
     || runtime.godrays.enabled

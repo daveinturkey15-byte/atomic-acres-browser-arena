@@ -41,7 +41,6 @@ import {
 import type { ArenaReviewCamera, ArenaVisualDefinition } from './arena-visual-definition';
 import { createGrassPlacements } from '../grass-placement';
 import { TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
-import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
 import type { GraphicsRuntime } from '../pass65-settings';
 // HF-358: WebGPU water presentation comes from the ocean-tsl factory driven by
 // the shared frozen ocean-spectrum band table — one table for CPU buoyancy and
@@ -67,16 +66,10 @@ import {
   screenSpacePostStages,
   type ScreenSpacePostGraph,
 } from './screen-space-post';
-import type { TaaPrecompileRenderer } from './taa-resolve';
 import {
   adaptScreenSpacePostForPressure,
   SCREEN_SPACE_POST_DISABLED,
 } from './screen-space-post-profile';
-import {
-  censusTaaColdSessionPrecompileReach,
-  precompileTaaVelocityMrtCandidates,
-  type TaaColdSessionPrecompileCensus,
-} from './cold-session-precompile-reach';
 // Lane L — per-arena art direction. The scene assembler owns two of its three
 // consumption points: the pre-tone-map scene grade uniforms and the
 // atmosphere particle mood; the third (the display grade composition) is
@@ -141,7 +134,6 @@ export function pass64LinearSourceStages(
   const screenSpace = graphics.screenSpace ?? SCREEN_SPACE_POST_DISABLED;
   const optional = builtOptionalStages ?? screenSpacePostStages(screenSpace);
   const stages = ['scene-pass-linear-hdr'];
-  if (optional.includes('taa-temporal-resolve')) stages.push('taa-temporal-resolve');
   if (optional.includes('motion-blur-velocity-smear')) stages.push('motion-blur-velocity-smear');
   // HF-418. Derived from LINEAR_SOURCE_STAGE_ORDER rather than appended by
   // hand, because that is how the ray-traced stage came to be missing from this
@@ -211,7 +203,7 @@ export type Pass64TslSceneSystems = Readonly<{
    * HDR target/MRT used by the live ScenePass. The caller still owns the final
    * forced RenderPipeline submission and completion fence.
    */
-  precompileExactScenePass(root: THREE.Object3D, velocityRoot?: THREE.Object3D): Promise<void>;
+  precompileExactScenePass(root: THREE.Object3D): Promise<void>;
   applyDefinition(definition: ArenaVisualDefinition): Promise<void>;
   /**
    * Generates (or refreshes) the arena's PMREM environment against whatever sky
@@ -954,7 +946,6 @@ function configureHdrPipeline(
   linearSourceStages: readonly string[];
   applyDefinition(next: ArenaVisualDefinition): void;
   applyGraphics(next: Pass65TslGraphicsOptions): void;
-  precompile(renderer: TaaPrecompileRenderer, targetScene: THREE.Scene): Promise<void>;
   beforeRender(): void;
   dispose(): void;
 }> {
@@ -1005,11 +996,10 @@ function configureHdrPipeline(
     gtaoPass.thickness.value = 1;
     gtaoPass.distanceExponent.value = 1;
     gtaoPass.distanceFallOff.value = 1;
-    // r185 rotates the GTAO sample pattern per frame. It is stable only when
-    // our TAA resolve owns the history; BALANCED/PERFORMANCE therefore retain
-    // the source's non-temporal path, while QUALITY/MAX turn it on together
-    // with TAA.
-    gtaoPass.useTemporalFiltering = screenSpaceRuntime.taaResolve.enabled;
+    // Temporal filtering stays OFF: it rotates the sample pattern per frame
+    // and is only stable underneath a TRAA resolve this chain does not run;
+    // without one it reads as shimmer and breaks deterministic review frames.
+    gtaoPass.useTemporalFiltering = false;
   }
   // High/Ultra AO tiers run the upstream depth/normal-aware spatial denoise
   // over the raw GTAO target (the documented non-TRAA path). Low keeps the
@@ -1059,12 +1049,12 @@ function configureHdrPipeline(
   // energy on the visible side of roofs, walls and portal frames rather than
   // allowing the low-resolution bloom chain to smear across their silhouettes.
   const depthEdgeGuard = float(1).sub(smoothstep(0.00035, 0.0035, depthDiscontinuity));
-  const emissiveBloom = bloom(screenSpace.sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
+  const emissiveBloom = bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92);
   const contactOcclusion = occlusionSample
       ? mix(float(1), occlusionSample, contactOcclusionStrength)
       : float(1);
     // HF-364 linear composite order, matching LINEAR_SOURCE_STAGE_ORDER:
-    //   [TAA] -> [motion blur] -> [+SSGI bounce] -> *contact occlusion
+    //   [motion blur] -> [+SSGI bounce] -> *contact occlusion
     //   -> +bloom -> [+godray shafts] -> [depth of field]
     // GI is added BEFORE the occlusion multiply so GTAO darkens bounced light
     // exactly as it darkens direct light; reflections and shafts are added
@@ -1171,9 +1161,6 @@ function configureHdrPipeline(
         },
         beforeRender() {
           screenSpace.beforeRender();
-        },
-        precompile(renderer, targetScene) {
-          return screenSpace.precompile(renderer, targetScene);
         },
         dispose() {
           screenSpace.dispose();
@@ -1313,7 +1300,6 @@ export function createPass64TslSceneSystems(
   // that follows. Without that split, the next attempt at the MAX admission
   // budget has to guess which half to attack. Published into the same
   // userData block QA already reads.
-  let taaPrecompileCensus: TaaColdSessionPrecompileCensus | null = null;
   let lastPrecompile: Readonly<{ durationMs: number; runs: number }> = Object.freeze({ durationMs: 0, runs: 0 });
   const publishActualGraphics = (): void => {
     const mist = root.getObjectByName('Pass 64 TSL mist');
@@ -1389,12 +1375,10 @@ export function createPass64TslSceneSystems(
         ),
         depthOfField: screenSpaceTelemetry(constructedScreenSpace.depthOfField, liveScreenSpace().depthOfField),
         motionBlur: screenSpaceTelemetry(constructedScreenSpace.motionBlur, liveScreenSpace().motionBlur),
-        taaResolve: screenSpaceTelemetry(constructedScreenSpace.taaResolve, liveScreenSpace().taaResolve),
         upscaling: Object.freeze({ ...constructedScreenSpace.upscaling }),
       }),
       linearSourceStages: hdr.linearSourceStages,
       exactScenePassPrecompile: lastPrecompile,
-      ...(taaPrecompileCensus ? { taaPrecompileReach: taaPrecompileCensus } : {}),
       // Observed, not requested: read straight off `scene.environment` and
       // `scene.environmentIntensity`. The environmentIntensity control used to
       // publish nothing a probe could read, so its only "evidence" was a grep
@@ -1432,7 +1416,7 @@ export function createPass64TslSceneSystems(
       publishActualGraphics();
     },
     compiledPipelineIds,
-    precompileExactScenePass: async (precompileRoot, velocityRoot) => {
+    precompileExactScenePass: async (precompileRoot) => {
       let attachmentRoot = precompileRoot;
       while (attachmentRoot.parent) attachmentRoot = attachmentRoot.parent;
       if (attachmentRoot !== scene) {
@@ -1450,24 +1434,6 @@ export function createPass64TslSceneSystems(
         // the ScenePass target and MRT preserves the live pipeline cache keys;
         // a default-canvas compile would not warm the HDR/MRT path.
         await renderer.compileAsync(precompileRoot, camera, scene);
-        // The TAA resolve owns an admission-only fullscreen NodeMaterial and
-        // is deliberately not attached to the gameplay scene. Compile it now,
-        // against a single-target render context, after the exact ScenePass
-        // build has materialised the velocity-MRT graph and its variants.
-        await hdr.precompile(renderer, scene);
-        if (constructedScreenSpace.taaResolve.enabled) {
-          // The scene compile selects only the current LOD/visibility branch
-          // for the menu camera. Compile every census-derived geometry/material
-          // identity from the active arena and the Pass 64 atmosphere root so
-          // the first gameplay camera cannot admit a late velocity-MRT path.
-          await precompileTaaVelocityMrtCandidates(renderer, camera, scene, [
-            velocityRoot ?? precompileRoot,
-            root,
-          ]);
-        }
-        taaPrecompileCensus = constructedScreenSpace.taaResolve.enabled
-          ? censusTaaColdSessionPrecompileReach([velocityRoot ?? precompileRoot, root])
-          : null;
       } finally {
         renderer.setRenderTarget(previousRenderTarget);
         renderer.setMRT(previousMrt);
@@ -1517,14 +1483,12 @@ export function createPass64TslSceneSystems(
     },
     setReviewCamera: (reviewCamera) => {
       activeReviewCamera = reviewCamera;
-      hdr.screenSpace.setReviewCamera(true);
       applyArenaSystemLayout(root, activeDefinition, reviewCamera.seed, activeGraphics);
       setAnimationTime(root, reviewCamera.fixedTimeMs);
       root.userData.tslReviewCameraId = reviewCamera.id;
     },
     clearReviewCamera: () => {
       activeReviewCamera = null;
-      hdr.screenSpace.setReviewCamera(false);
       delete root.userData.tslReviewCameraId;
     },
     update: (timeMs) => {
@@ -1584,16 +1548,7 @@ export function assertRuntimeTslTraversal(audit: RuntimeTslTraversal): void {
     throw new Error(`WebGPU TSL review failed closed: compiled pipeline ledger mismatch (${compiled.join(', ')})`);
   }
   const materialPipelines = new Set(audit.nodeMaterialPipelineIds);
-  // TAA is an admission-only fullscreen NodeMaterial. It is compiled through
-  // the exact ScenePass output graph, but it is intentionally not attached to
-  // a scene mesh, so the mesh traversal cannot observe it. The pipeline ledger
-  // and exact precompile fence still require its ID; only this mesh-material
-  // projection excludes it.
-  const missingMaterials = expected.filter((id) => (
-    id !== PIPELINE.hdr
-    && id !== TAA_RESOLVE_PIPELINE_ID
-    && !materialPipelines.has(id)
-  ));
+  const missingMaterials = expected.filter((id) => id !== PIPELINE.hdr && !materialPipelines.has(id));
   if (missingMaterials.length > 0) {
     throw new Error(`WebGPU TSL review failed closed: node-material traversal missing ${missingMaterials.join(', ')}`);
   }

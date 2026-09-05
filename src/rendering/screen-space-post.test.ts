@@ -36,7 +36,6 @@ const EVERYTHING_ON = resolveScreenSpacePostRuntime({
   depthOfField: true,
   depthOfFieldStrength: 0.4,
   motionBlur: 0.5,
-  taaResolve: true,
   spatialUpscaling: 'fsr1-quality',
   rayTracing: 'refractions',
 }, { shadowsEnabled: true });
@@ -114,7 +113,6 @@ describe('HF-364 scene-pass assembly', () => {
     expect(renderPipeline.outputNode).not.toBeNull();
     expect(systems.linearSourceStages).toEqual([
       'scene-pass-linear-hdr',
-      'taa-temporal-resolve',
       'motion-blur-velocity-smear',
       // HF-418 / Lane AL. Two stages were BEING BUILT and not being reported:
       // the ray-traced layer's, missing since HF-398 landed, and the baked

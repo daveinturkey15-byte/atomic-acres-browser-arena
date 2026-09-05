@@ -3,7 +3,6 @@ import { normalizePass65Settings, resolveGraphicsRuntime, type GraphicsPreset } 
 import { PASS65_SETTING_DEFINITIONS } from './pass65-settings-inventory';
 import { renderProfileConfig } from './render-profile';
 import { TSL_MIGRATION_INVENTORY } from './rendering/tsl-migration-inventory';
-import { TAA_RESOLVE_PIPELINE_ID } from './rendering/taa-resolve';
 
 export type RendererFeatureControlKind = 'setting' | 'preset' | 'fixed' | 'unsupported';
 
@@ -152,7 +151,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   }),
   feature({
     id: 'depth-aware-bloom', title: 'Depth-aware full-scene bloom', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts',
-    sourceProbes: [{ path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'bloom(screenSpace.sceneColor, graphics.post.bloomStrength, 0.32, 0.92)' }],
+    sourceProbes: [{ path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'bloom(sceneColor, graphics.post.bloomStrength, 0.32, 0.92)' }],
     pipelineIds: ['pass64.hdr-grade-grain.tsl.v1'],
     control: control('setting', ['graphics.bloomQuality'], 'Off, subtle or cinematic TSL bloom with scene-depth occlusion', 'The selected tier changes the actual bloom-node strength while preserving the verified depth-aware graph and bounded transient allocation.'),
     budget: 'Arena maximum post-texture samples and transient-byte limits.',
@@ -356,7 +355,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'screen-space-gi', title: 'Screen-space global illumination (ray-marched bounce light)', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
-      { path: 'src/rendering/screen-space-post.ts', symbol: 'ssgi(sceneColor, sources.sceneDepth, sources.sceneNormal' },
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'ssgi(sources.sceneColor, sources.sceneDepth, sources.sceneNormal' },
       { path: 'src/rendering/screen-space-post-profile.ts', symbol: 'SSGI_MAXIMUM_GI_INTENSITY' },
     ],
     pipelineIds: [],
@@ -367,7 +366,7 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'screen-space-reflections', title: 'Screen-space reflections', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
-      { path: 'src/rendering/screen-space-post.ts', symbol: 'ssr(sceneColor, sources.sceneDepth, sources.sceneNormal' },
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'ssr(sources.sceneColor, sources.sceneDepth, sources.sceneNormal' },
       { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'packedMaterialMrtNode(metalness, roughness)' },
     ],
     pipelineIds: [],
@@ -401,25 +400,13 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'motion-blur', title: 'Motion blur', availability: 'active', owner: 'src/rendering/screen-space-post.ts',
     sourceProbes: [
-      { path: 'src/rendering/screen-space-post.ts', symbol: 'motionBlur(sceneColor, limited, int(runtime.motionBlur.samples))' },
+      { path: 'src/rendering/screen-space-post.ts', symbol: 'motionBlur(sources.sceneColor, limited, int(runtime.motionBlur.samples))' },
       { path: 'src/rendering/screen-space-post-profile.ts', symbol: 'MOTION_BLUR_DEAD_ZONE_NDC' },
     ],
     pipelineIds: [],
     control: control('setting', ['graphics.motionBlur'], 'Off by default; a bounded per-pixel camera and object smear from the scene pass velocity MRT', 'The velocity buffer is a real MRT attachment allocated only when the control is non-zero. A dead zone holds the smear at exactly zero below a real angular rate, so aim adjustments and slow strafes never smear, and the total screen offset is capped at 2.5% of the screen so a fast flick cannot erase a target from the frame.'),
     budget: 'One velocity MRT attachment and eight taps; zero allocations while the control reads zero.',
     verifier: 'src/rendering/screen-space-post-profile.test.ts + src/rendering/screen-space-post.test.ts',
-  }),
-  feature({
-    id: 'taa-resolve', title: 'Temporal anti-aliasing resolve', availability: 'active', owner: 'src/rendering/taa-resolve.ts + src/rendering/screen-space-post.ts',
-    sourceProbes: [
-      { path: 'src/rendering/taa-resolve.ts', symbol: 'export function buildTaaResolveNode' },
-      { path: 'src/rendering/screen-space-post.ts', symbol: 'if (runtime.taaResolve.enabled && sources.sceneVelocity)' },
-      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'precompileExactScenePass' },
-    ],
-    pipelineIds: [TAA_RESOLVE_PIPELINE_ID],
-    control: control('setting', ['graphics.taaResolve'], 'Off on BALANCED; on for QUALITY and MAX; admission-only fullscreen resolve with velocity and depth history', 'The resolve is a single in-repo r185 TSL NodeMaterial with two RGBA16F targets. It is admitted before motion blur, disables principal MSAA, and owns the temporal filtering prerequisite for GTAO and SSGI.'),
-    budget: 'Two RGBA16F history/resolve targets, one velocity RG16F MRT attachment, and one resolve/copy pair per frame; no in-combat pipeline creation.',
-    verifier: 'src/rendering/taa-resolve.test.ts + src/rendering/pass64-tsl-scene.test.ts + scripts/qa/perf-hitl5-bisect-cdp.mjs',
   }),
   feature({
     id: 'spatial-upscaling', title: 'FSR 1 spatial upscaling', availability: 'active', owner: 'src/rendering/filmic-grade-chain.ts',

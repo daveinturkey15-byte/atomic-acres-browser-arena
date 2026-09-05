@@ -61,16 +61,6 @@ What changed, mechanically:
 
 ---
 
-## REVISION - HF-472 (2026-09-04): QUALITY/MAX adopt the opt-in TAA resolve
-
-The rendering lane added `taaResolve` as a real registry control: it is off on
-PERFORMANCE and BALANCED, on for QUALITY and MAX, and off in the retired
-RAY TRACED historical column. The resolve is a single in-repo r185 TSL
-NodeMaterial with velocity reprojection, depth rejection, a YCoCg neighbourhood
-clamp and no sharpening. It owns two RGBA16F targets and disables principal
-MSAA on the two enabled profiles. **VERIFIED** by the registry, resolver,
-precompile-reach and post-graph tests in the HF-472 worktree.
-
 ## 0. The three answers, first
 
 **Q: Is RTX above or below MAX?**
@@ -181,7 +171,7 @@ it is the default), which made PERFORMANCE below it read as a step *up*.
 
 ## 2. The control sets, in rendering terms
 
-All 41 controls, per profile. The "what it does" column is the rendering
+All 40 controls, per profile. The "what it does" column is the rendering
 meaning, not the label.
 
 **RETIRED COLUMN (HF-438).** The RAY TRACED column below is the historical
@@ -225,7 +215,6 @@ unchanged; only the presets' control sets moved.
 | `vignette` | Display-side falloff | 0.08 | 0.14 | 0.16 | 0.17 | 0.18 |
 | `depthOfField` / `…Strength` | Bokeh on the linear side (replaces pixels) | off / 0.3 | off / 0.3 | off / 0.3 | off / 0.3 | **on / 0.6** |
 | `motionBlur` | Velocity smear (removes information) | 0 | 0 | 0 | 0 | **0.35** |
-| `taaResolve` | Velocity/depth-aware temporal resolve; principal MSAA is off when active | off | off | **on** | off | **on** |
 | `spatialUpscaling` | FSR 1 EASU+RCAS; renders BELOW native | off | off | off | off | off |
 | `weatherIntensity` | Presentation CEILING on the rolled weather | **light** (caps) | storm | storm | storm | storm |
 | `rainDensity` | Streak instance count multiplier | 0.5 | **0.75** | 1.0 | 1.15 | 1.35 |
@@ -240,17 +229,12 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `e38ede29` |
-| `balanced` | `9d461537` |
-| `high` (QUALITY, HF-438 light tier) | `2f8b5453` |
-| `max` (HF-438 full tier) | `b71a9c4e` |
+| `performance` | `8b9050cb` |
+| `balanced` | `09c22d33` |
+| `high` (QUALITY, HF-438 light tier) | `7ca68dea` |
+| `max` (HF-438 full tier) | `2ec0fa43` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
-> **PASS 96 re-measurement (HF-472).** The four current pins changed from
-> `445a9754` -> `e38ede29`, `0753ee34` -> `9d461537`,
-> `430da2ad` -> `2f8b5453`, and `03ee2e10` -> `b71a9c4e` after adding the
-> `taaResolve` control. The hashes were recomputed from the complete preset
-> values and then written here; they were not merely re-pinned.
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
 > changed because the fold moved real values into those presets; `performance`
 > and `balanced` are untouched. The retired `raytraced` row and the pre-fold

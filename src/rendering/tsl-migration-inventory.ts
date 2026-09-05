@@ -1,5 +1,3 @@
-import { TAA_RESOLVE_PIPELINE_ID } from './taa-resolve';
-
 export type TslMigrationStatus = 'legacy-isolated' | 'tsl-authored' | 'verified';
 
 export type TslMigrationEntry = Readonly<{
@@ -115,18 +113,6 @@ export const TSL_MIGRATION_INVENTORY: readonly TslMigrationEntry[] = Object.free
     descriptor: descriptor(
       ['MeshStandardNodeMaterial positionNode', 'view-independent water colorNode'],
       ['bounded wave displacement', 'presentation-only perimeter plane', 'no recursive reflection pass'],
-    ),
-  }),
-  Object.freeze({
-    id: 'taa-resolve',
-    owner: 'src/rendering/taa-resolve.ts',
-    legacyMaterial: 'RawShaderMaterial',
-    replacementPipelineId: TAA_RESOLVE_PIPELINE_ID,
-    status: 'verified',
-    verification: 'velocity reprojection, depth rejection, YCoCg clamp and sharpen-free history blend',
-    descriptor: descriptor(
-      ['TaaResolveNode TempNode', 'TAA ours.resolve NodeMaterial', 'two RGBA16F history targets'],
-      ['velocity reprojection', 'depth-aware rejection', 'YCoCg neighbourhood clamp', 'no sharpening'],
     ),
   }),
 ]);

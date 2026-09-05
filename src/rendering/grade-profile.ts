@@ -69,9 +69,6 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
  */
 export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
   'scene-pass-linear-hdr',
-  // TAA resolves the principal scene before any stage that intentionally
-  // smears or filters it. Motion blur consumes the resolved colour.
-  'taa-temporal-resolve',
   'motion-blur-velocity-smear',
   // HF-418 - baked indirect light. It sits with SSGI, immediately BEFORE the
   // contact-occlusion multiply, for the reason the comment above gives for
@@ -107,7 +104,6 @@ export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
 
 /** The linear-side stages the assembler may omit. Everything else is mandatory. */
 export const OPTIONAL_LINEAR_SOURCE_STAGES: readonly string[] = Object.freeze([
-  'taa-temporal-resolve',
   'motion-blur-velocity-smear',
   'baked-indirect-probe-add',
   'ssgi-screen-space-bounce-add',

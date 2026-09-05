@@ -442,23 +442,6 @@ try {
   report.determinantFlips = (raw.detTrack ?? []).slice(0, 60);
   report.determinantFlipCount = (raw.detTrack ?? []).length;
   report.samplePipelineLabels = windowPipelines.slice(0, 60);
-  // Admission census. The six-pipeline TAA miss was previously only a number;
-  // retain the descriptor label and first call path for every pipeline created
-  // before the combat window so a new reach item is named from evidence.
-  const admissionByLabel = new Map();
-  for (const entry of raw.pipelines.slice(0, raw.pipelinesAtWindowStart)) {
-    const key = `${entry.label ?? '<unlabelled>'}|${entry.stack ?? '<no-stack>'}`;
-    const existing = admissionByLabel.get(key);
-    if (existing) existing.count += 1;
-    else admissionByLabel.set(key, { label: entry.label, stack: entry.stack, count: 1 });
-  }
-  report.admissionPipelineCensus = {
-    total: raw.pipelinesAtWindowStart,
-    unique: admissionByLabel.size,
-    entries: [...admissionByLabel.values()].sort((a, b) => (
-      b.count - a.count || String(a.label).localeCompare(String(b.label))
-    )),
-  };
   report.stalls = stalls.slice(0, 120);
 
   console.error(`[pipeline] hooked=${raw.hooked} ${report.window.stallCount} stalls, ${report.window.frozenFractionPercent}% frozen over ${report.window.windowS}s`);
