@@ -4,6 +4,7 @@ import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
+import { selectArtAssertions } from './cold-admission-art-assertions.mjs';
 
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
 const COLD_ARENA_ID = 'nuketown2';
@@ -38,11 +39,10 @@ const SECOND_ARENA_ID = 'raid2';
  * F3 that was a real loss: the smoke stopped checking that ANY arena's real art
  * loaded, and said nothing.
  *
- * [OPEN, for the arena owner] nuketown2 exposes no cold-session art-ready
- * signal of its own. Closing this properly is a runtime change - a nuketown2
- * equivalent of `originalArtLoaded` in the debug snapshot - not an edit here.
+ * The runtime now publishes the generic per-arena contract in the debug
+ * snapshot. This smoke consumes that contract and retains the coverage note
+ * only for arenas that genuinely do not publish one.
  */
-const ARENAS_WITH_ART_LOADED_SIGNAL = new Set(['atomic-acres']);
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
 const maximumPreparedSwitchFrameMs = 50;
@@ -328,6 +328,7 @@ try {
           playableScene: state.render.playableScene,
           atomicQualityStreaming: state.render.qualityAssetStreaming.atomicAcres,
           blenderEnvironment: state.render.blenderEnvironment,
+          arenaArtReady: state.render.arenaArtReady,
           originalArtLoaded: state.originalArtLoaded,
           arenaStoryReady: state.arenaStoryReady,
           arenaId: state.arenaSelection.id,
@@ -384,25 +385,15 @@ try {
         failures.push(`runtime weapon corpus residency was incomplete: ${JSON.stringify(after.weaponAssetCache.resident)}`);
       }
       if (!after.gameStarted || after.arenaId !== COLD_ARENA_ID) failures.push('Nuke Town Rebuild did not become the playable arena');
-      // RESTORED (gate audit F3). Asserted where the signal is defined, and
-      // loudly absent where it is not, so "no arena's real art is checked by
-      // this smoke" can never again be an invisible property of the file.
-      if (ARENAS_WITH_ART_LOADED_SIGNAL.has(COLD_ARENA_ID)) {
-        if (!after.originalArtLoaded) {
-          failures.push(`${COLD_ARENA_ID} became playable without its authored art loaded (originalArtLoaded=false)`);
-        }
-        if (after.atomicQualityStreaming !== 'ready') {
-          failures.push(`${COLD_ARENA_ID} Quality art did not stream to ready: ${after.atomicQualityStreaming}`);
-        }
-        if (!after.blenderEnvironment.qualityArtRootVisible) {
-          failures.push(`${COLD_ARENA_ID} Quality art root was not visible: ${JSON.stringify(after.blenderEnvironment)}`);
+      const artAssertions = selectArtAssertions(after.arenaArtReady);
+      if (artAssertions.kind === 'contract') {
+        for (const field of artAssertions.fields) {
+          if (after.arenaArtReady[field] !== true) {
+            failures.push(`${COLD_ARENA_ID} authored-art contract field ${field} was false: ${JSON.stringify(after.arenaArtReady)}`);
+          }
         }
       } else {
-        coverageNotes.push(
-          `cold subject '${COLD_ARENA_ID}' exposes no art-loaded signal, so this run asserts that no `
-          + "arena's real art loaded; originalArtLoaded/qualityArtRootVisible/qualityAssetStreaming are "
-          + 'atomic-acres-only (see ARENAS_WITH_ART_LOADED_SIGNAL). Gate audit F3 remains OPEN.',
-        );
+        coverageNotes.push(`cold subject '${COLD_ARENA_ID}' ${artAssertions.coverageNote}`);
       }
       if (after.playableScene?.authoritativeArenaRoots !== 1
         || after.playableScene?.authoritativeArenaRootIsGameplayRoot !== true
@@ -547,6 +538,7 @@ try {
       receipts.push(receipt);
       if (trial === 1) await page.screenshot({ path: `${artifactRoot}/atomic-quality-active.png`, animations: 'disabled' });
       await context.close();
+      process.stdout.write(`[cold-admission][art] trial ${trial}: ${JSON.stringify(after.arenaArtReady)}\n`);
       for (const note of coverageNotes) process.stdout.write(`[cold-admission][coverage] trial ${trial}: ${note}
 `);
       if (failures.length > 0) throw new Error(`cold Atomic trial ${trial} failed: ${failures.join('; ')}`);
