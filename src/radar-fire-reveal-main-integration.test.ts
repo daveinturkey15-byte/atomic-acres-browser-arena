@@ -33,7 +33,9 @@ describe('HF-378: unsuppressed gunfire reveals the shooter on enemy radar', () =
   });
 
   it('paints hostile remotes on the minimap through the shared gunfire-reveal policy', () => {
-    const loop = block('minimapLandmarksRendered = renderedLandmarks;', '\n  for (const bot of bots.values()) {');
+    // HF-510 renamed the assignment source (the structural layer replaced the
+    // per-arena landmark lists). Same block, same assertions.
+    const loop = block('minimapLandmarksRendered = structure.records;', '\n  for (const bot of bots.values()) {');
     expect(loop).toContain(
       '!shouldRevealEnemy(remote.target.distanceTo(player.position), now, remoteRadarFireRevealAt.get(remote.snapshot.id) ?? 0)',
     );
