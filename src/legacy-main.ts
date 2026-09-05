@@ -30313,7 +30313,13 @@ async function performArenaSelection(
       lastBotSpawnAudit.clear();
       respawn(false);
       setArenaMenuCamera();
-      setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+      // Say "deployment preparation failed" on BOTH rollback paths. A GPU that
+      // rejects the requested arena (an over-limit bind group, a driver pipeline
+      // failure) used to land here and report only that the OLD map "remains
+      // selected", which is indistinguishable from a hang: the boot gate cannot
+      // match it, so it went on to boot the rolled-back arena and passed, and a
+      // real player's menu click appeared to do nothing at all.
+      setStatus(`${nextSelection.displayName} deployment preparation failed — ${selectedArena.displayName} remains selected.`, 'warn');
     } catch (rollbackError) {
       arenaTransitionPhase = 'failed';
       arenaTransitionFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);

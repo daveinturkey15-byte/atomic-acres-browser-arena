@@ -947,12 +947,17 @@ type GpuDeviceShape = Readonly<{
 
 type GpuAdapterInfoShape = Readonly<Record<string, string | number | boolean | undefined>>;
 type GpuFeatureSetShape = Readonly<{ has(name: string): boolean }>;
+type GpuLimitsShape = Readonly<Record<string, number | undefined>>;
 type GpuAdapterShape = Readonly<{
   info?: GpuAdapterInfoShape;
   isFallbackAdapter?: boolean;
   features?: GpuFeatureSetShape;
+  limits?: GpuLimitsShape;
   requestAdapterInfo?: () => Promise<GpuAdapterInfoShape>;
-  requestDevice(descriptor?: Readonly<{ requiredFeatures: readonly string[] }>): Promise<GpuDeviceShape>;
+  requestDevice(descriptor?: Readonly<{
+    requiredFeatures?: readonly string[];
+    requiredLimits?: Readonly<Record<string, number>>;
+  }>): Promise<GpuDeviceShape>;
   constructor?: { name?: string };
 }>;
 
@@ -1035,6 +1040,91 @@ export function selectOptionalDeviceFeatures(
   return Object.freeze(allowList.filter((feature) => {
     try { return adapterFeatures.has(feature) === true; } catch { return false; }
   }));
+}
+
+const EMPTY_DEVICE_LIMITS: Readonly<Record<string, number>> = Object.freeze({});
+
+/**
+ * Per-stage binding limits this renderer asks the DEVICE to inherit from the
+ * adapter.
+ *
+ * WHY THIS EXISTS, measured rather than assumed. WebGPU does not give a device
+ * the adapter's capabilities: an unrequested limit is granted at the SPEC
+ * DEFAULT, not at what the hardware can do. `requestDevice()` was called here
+ * with no `requiredLimits`, so every device this game has ever created was
+ * capped at the default 16 sampled textures per stage while the adapter on this
+ * machine advertises more. High Seas' fragment stage binds 17:
+ *   "The number of sampled textures (17) in the Fragment stage exceeds the
+ *    maximum per-stage limit (16). This adapter supports a higher
+ *    maxSampledTexturesPerShaderStage"
+ * The rejected bind group cascades into an invalid CommandBuffer, the queue
+ * submit fails, `performArenaSelection` throws and rolls the player back to the
+ * previously prepared arena. This is the exact same defect class as the
+ * optional-features one documented above, on the limits axis instead of the
+ * feature axis.
+ *
+ * Requesting the adapter's own value can never be rejected for being too high
+ * (per spec a device request only fails when it asks for MORE than the adapter
+ * exposes), so this widens nothing and lowers nothing - it stops the device
+ * from being built weaker than the hardware it is built on.
+ */
+export const INHERITED_WEBGPU_DEVICE_LIMITS: readonly string[] = Object.freeze([
+  // Consumer: the High Seas fragment stage (shared-ocean water + ship material
+  // families) binds 17 sampled textures; the spec default is 16.
+  'maxSampledTexturesPerShaderStage',
+  // Same axis, same stage, same failure mode once a material family adds one
+  // more sampler than the default 16.
+  'maxSamplersPerShaderStage',
+]);
+
+/**
+ * Reads the named limits off the adapter. Pure and exported so the contract is
+ * testable without a GPU, mirroring `selectOptionalDeviceFeatures`.
+ *
+ * A limit the adapter does not report is OMITTED rather than guessed: requesting
+ * a limit the adapter lacks makes `requestDevice` reject outright, which would
+ * turn extra headroom into a dead renderer.
+ */
+export function selectInheritedDeviceLimits(
+  adapterLimits: GpuLimitsShape | undefined,
+  limitNames: readonly string[] = INHERITED_WEBGPU_DEVICE_LIMITS,
+): Readonly<Record<string, number>> {
+  if (!adapterLimits || typeof adapterLimits !== 'object') return EMPTY_DEVICE_LIMITS;
+  const requested: Record<string, number> = {};
+  for (const name of limitNames) {
+    let value: unknown;
+    try { value = (adapterLimits as Record<string, unknown>)[name]; } catch { continue; }
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) continue;
+    requested[name] = value;
+  }
+  return Object.freeze(requested);
+}
+
+/**
+ * Asks for the negotiated device, then degrades one axis at a time rather than
+ * killing the renderer - the courtesy the feature request already extended.
+ *
+ * Limits are dropped BEFORE features: a device short of binding headroom loses
+ * the arenas that need it, while a device short of `rg11b10ufloat-renderable`
+ * loses SSGI on every arena at pipeline creation.
+ */
+async function requestNegotiatedDevice(
+  adapter: GpuAdapterShape,
+  requiredFeatures: readonly string[],
+  requiredLimits: Readonly<Record<string, number>>,
+): Promise<GpuDeviceShape> {
+  const hasFeatures = requiredFeatures.length > 0;
+  const hasLimits = Object.keys(requiredLimits).length > 0;
+  if (hasFeatures && hasLimits) {
+    try { return await adapter.requestDevice({ requiredFeatures, requiredLimits }); } catch { /* degrade below */ }
+  }
+  if (hasLimits) {
+    try { return await adapter.requestDevice({ requiredLimits }); } catch { /* degrade below */ }
+  }
+  if (hasFeatures) {
+    try { return await adapter.requestDevice({ requiredFeatures }); } catch { /* degrade below */ }
+  }
+  return adapter.requestDevice();
 }
 
 function adapterInfoLabel(info: GpuAdapterInfoShape): string {
@@ -1320,11 +1410,13 @@ export class WebGpuRenderRuntime {
       ? `${adapterInfoLabel(adapterInfo)} (default adapter; high-performance hint unavailable)`
       : adapterInfoLabel(adapterInfo);
     const requiredFeatures = selectOptionalDeviceFeatures(adapter.features);
-    // Ask with the intersected list, and fall back to a bare device rather than
-    // killing the whole renderer if a driver rejects a feature it advertised.
-    const device = requiredFeatures.length > 0
-      ? await adapter.requestDevice({ requiredFeatures }).catch(() => adapter.requestDevice())
-      : await adapter.requestDevice();
+    // Limits are NOT inherited from the adapter; an unrequested one is granted
+    // at the spec default. See INHERITED_WEBGPU_DEVICE_LIMITS for the High Seas
+    // 17-sampled-texture rejection this exists to stop.
+    const requiredLimits = selectInheritedDeviceLimits(adapter.limits);
+    // Ask with the intersected list, and fall back a step at a time rather than
+    // killing the whole renderer if a driver rejects what it advertised.
+    const device = await requestNegotiatedDevice(adapter, requiredFeatures, requiredLimits);
     // Chrome 153 Tint chained-swizzle workaround (PASS 93): wrap createShaderModule
     // on the device this runtime negotiated, before the renderer builds its first
     // pipeline. Applied to the DEVICE, not to navigator.gpu, so the feature

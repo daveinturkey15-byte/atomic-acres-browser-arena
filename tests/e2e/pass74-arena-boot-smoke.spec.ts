@@ -176,6 +176,18 @@ test.describe('arena boot smoke — every canonical arena', () => {
       expect(canvasInfo!.width, `${arenaId}: canvas must have real size`).toBeGreaterThan(0);
       expect(canvasInfo!.backend, `${arenaId}: renderer backend must be stamped`).toBeTruthy();
 
+      // The arena that actually booted must be the arena that was asked for.
+      //
+      // Without this the gate could not tell a boot from a ROLLBACK. When
+      // performArenaSelection throws (an over-limit bind group, a driver
+      // pipeline failure) it restores the previously prepared arena, and the
+      // sentinel above tests matchPhase === 'active' BEFORE it looks at
+      // #status - so the fallback arena reaching active returned 'active' and
+      // this test passed while the arena named in its own title never loaded.
+      // That is how a GPU-rejected High Seas sat behind a green 13/13.
+      const bootedArena = await page.evaluate(() => document.documentElement.dataset.arenaId ?? null);
+      expect(bootedArena, `${arenaId}: the booted arena must be the one selected, not a rollback`).toBe(arenaId);
+
       expect(pageErrors, `${arenaId}: no uncaught page errors`).toEqual([]);
       expect(consoleErrors, `${arenaId}: no console errors`).toEqual([]);
     });
