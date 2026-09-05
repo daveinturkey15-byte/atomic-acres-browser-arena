@@ -2368,3 +2368,15 @@ Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled ta
 - 07:20 machine pressure: 31.6 GB total, 1.8 GB free, Chrome 9.2 GB across 8 headless Playwright browsers (launched 07:06-07:10, more than the one-at-a-time rule), node 3.5 GB across 41 processes, CPU 100%. :4300 (pid 173372) alive but slow; ComfyUI :8188 and cockpit :47821 healthy. Action: forward-port workflow wf_786cc3a3-787 PAUSED (resumable with resumeFromRunId; ports/branches fp-* keep); no new launches until free RAM recovers; the two Luna lanes hard-stop by 08:30.
 
 - 07:25 Antigravity: third audit run refused - "Individual quota reached ... Resets in 4h32m" (the two dropped sessions consumed the Opus 4.6 quota). Gate audit reassigned to a Claude Opus agent (same brief; report GATE-AUDIT-OPUS.md on branch contrib/dave-gaming-pc/claude/c7-gate-audit). No Antigravity launches until about 11:55.
+
+### Independent gate audit of candidate 7 (Claude Opus, 07:55) - branch contrib/dave-gaming-pc/claude/c7-gate-audit @ 91b7afa3, docs/evidence/pass94/candidate7/GATE-AUDIT-OPUS.md
+
+Range HITL 5 (3e2fd273) -> candidate 7 (452d7aba): 651 commits, 85 test/QA files. No .skip/.only added. Byte-identical: 12 s WebGPU fence (4 sites), both 10,000 ms cold budgets, pipeline ceiling 54, LINE_CEILING 37,396, corridor band, parity gate. TIGHTER: verge furniture 43->36 (aggregate 43->51 at zero headroom), plan tolerance 0.35->0.20. NEW: MP soak gate, SAME-MATERIAL-VISIBLE coplanar class.
+
+- F1 LOOSER: src/nuketown2-pipeline-budget.test.ts lost the graph-TOPOLOGY variants test (eight-pair mustDiffer lower bound). Fix lane `v7-gate-audit-fixes` restores it (must be green or reported before PASS 95).
+- F2 LOWERED, resolved: roster floors 9->8 because the original Raid was parked - owner-directed (HF-495 "kill off old raid"). No action.
+- F3 LOOSER: cold-admission smoke changed subject atomic-acres->nuketown2 (f74f25bf) and dropped originalArtLoaded + two quality-art assertions. Fix lane restores them for the current subject.
+- F4 LOOSER: hardcoded-roster allowlist net +3 exemptions. Fix lane derives rosters and removes what it can.
+- F5 OPEN: graphics control-set hashes re-pinned without re-measuring the contract rows (tests pass, 14/14). Candidate 8 integrator re-measures.
+- F6 review gap: scripts/qa/mp-evidence-analyse.mjs has a NUL byte, so 19 KB entered as a binary diff. Fix lane removes it.
+- REPORT framing mismatches: "no assertion changed" is untrue over the HITL-5 range (F3); the soak bounds are new, not preserved; no gate the REPORT calls green is contradicted.
