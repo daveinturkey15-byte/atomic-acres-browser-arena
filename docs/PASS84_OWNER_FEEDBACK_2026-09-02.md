@@ -2364,3 +2364,5 @@ Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled ta
 - thin-metal-perforation @ df1326dd: SHIP (review 2; cold-path texture cost bounded and inventoried) - eligible for candidate 8.
 - Antigravity Opus 4.6 gate audit: first run rejected --effort (fixed), second run dropped at 06:54 (Antigravity connection interrupted while it spawned a sub-agent); third run started 07:10 with a resume note and incremental commits.
 - Machine: 18 lane worktrees active, CPU 100%, 6.4 GB free; heavy steps serialised by the machine lock.
+
+- 07:20 machine pressure: 31.6 GB total, 1.8 GB free, Chrome 9.2 GB across 8 headless Playwright browsers (launched 07:06-07:10, more than the one-at-a-time rule), node 3.5 GB across 41 processes, CPU 100%. :4300 (pid 173372) alive but slow; ComfyUI :8188 and cockpit :47821 healthy. Action: forward-port workflow wf_786cc3a3-787 PAUSED (resumable with resumeFromRunId; ports/branches fp-* keep); no new launches until free RAM recovers; the two Luna lanes hard-stop by 08:30.
