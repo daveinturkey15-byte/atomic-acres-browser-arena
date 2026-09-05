@@ -32742,7 +32742,7 @@ const debugWindow = window as Window & {
       direction: number[];
       run: number;
     } | null;
-    teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number) => void;
+    teleportPlayer: (x: number, y: number, z: number, yaw?: number, pitch?: number, broadcastState?: boolean) => void;
     setCaptureCameraPose: (
       x: number | null,
       y?: number,
@@ -35782,7 +35782,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       run,
     };
   },
-  teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch) => {
+  teleportPlayer: (x, y, z, yaw = player.yaw, pitch = player.pitch, broadcastState = true) => {
     if (![x, y, z, yaw, pitch].every(Number.isFinite)) return;
     localContinuity += 1;
     localPositionHistory.length = 0;
@@ -35810,7 +35810,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
-    if (gameStarted) network.send(createStateMessage());
+    // QA may deliberately hold one local teleport back to make a host-side
+    // sender-distance rejection reproducible. Production calls keep the
+    // default broadcast and therefore retain the normal authoritative path.
+    if (gameStarted && broadcastState) network.send(createStateMessage());
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
     resetDebugChopperExteriorReviewTracker();

@@ -199,6 +199,18 @@ describe('HF-504 P-2/P-5 pickup rollback is observable and covers auto-scavenge'
   });
 });
 
+describe('HF-499 P-1 pickup recovery driver', () => {
+  it('runs a rejected host-drop claim followed by a second F press on the same drop', () => {
+    const audit = readFileSync(new URL('../scripts/qa/mp-audit.mjs', import.meta.url), 'utf8');
+    expect(audit).toContain("measuredRows: ['P-1', 'P-6', 'P-8']");
+    expect(audit).toContain('result.firstDropRetained =');
+    expect(audit).toContain('result.firstRejected =');
+    expect(audit).toContain('// Re-broadcast the same local position');
+    expect(audit).toContain('result.retrySucceeded =');
+    expect(audit.match(/interactDrop\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('HF-504 P-6/P-8 death drops are host-authored', () => {
   it('allows a death message to carry the host-canonical drop record', () => {
     expect(protocol).toContain('drop?: PickupResultDropRecord;');
