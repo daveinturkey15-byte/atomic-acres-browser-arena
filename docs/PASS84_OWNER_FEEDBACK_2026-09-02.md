@@ -2356,3 +2356,11 @@ Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled ta
 | HF-511 | 2026-09-05 06:59 | Owner: "a MASSIVELY polished pass, spinning up an additional 5 opus highs and 2 fable highs". | Workflow `massive-polish-pass`: Opus - minimap-simplify (all arenas), hud-menu-polish, weapon-feel, bot-behaviour, draw-call-instancing-audit; Fable - audio-polish (proximity, layers, reverb zones), time-of-day-weather-lighting. Each Opus-verified, Muse-reviewed, ledger table + candidate 8 guidance. |
 
 | HF-512 | 2026-09-05 07:05 | Owner: increase the parallelism; rebuild Farcrysis to the owner spec; make the Raid layout more accurate to the original game and add assets and textures similar and true to the original map; additional Opus/Fable highs allowed. | Workflow `rebuild-farcrysis-raid`: per map a research stage (Opus: spec/reference extraction with sources, no fabrication), a layout stage (Fable), a dressing stage (Opus: assets, textures, vegetation, props) chained on the layout branch, Opus verification after each build stage; Muse reviews queued; ledger table. Also noted: Muse review of sh-l2 = SHIP-WITH-FIXES with a 2,452 ms cold-path bake at legacy-main.ts:4424 - must move to menu time before merge (fed to the cold-path lane). |
+
+### Muse verdicts 07:12 (lanes with no prior verdict at head)
+
+- sh-l2-irradiance-volume @ 2c45818f: SHIP-WITH-FIXES; cold-path cost ~2,452 ms at src/legacy-main.ts:4424 (the L2 bake runs on the Nuke Town transition). Muse builder fix job queued: move the bake to chunked menu-time work or a digest cache; not mergeable into candidate 8 until that lands.
+- all-arenas-air-and-coplanar @ 96819787: SHIP-WITH-FIXES; Muse builder fix job queued to apply the findings.
+- thin-metal-perforation @ df1326dd: SHIP (review 2; cold-path texture cost bounded and inventoried) - eligible for candidate 8.
+- Antigravity Opus 4.6 gate audit: first run rejected --effort (fixed), second run dropped at 06:54 (Antigravity connection interrupted while it spawned a sub-agent); third run started 07:10 with a resume note and incremental commits.
+- Machine: 18 lane worktrees active, CPU 100%, 6.4 GB free; heavy steps serialised by the machine lock.
