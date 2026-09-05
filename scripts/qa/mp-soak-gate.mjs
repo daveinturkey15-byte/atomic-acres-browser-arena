@@ -34,10 +34,10 @@ import { evaluateMpSoakBundle, formatMpSoakTable, MP_SOAK_THRESHOLDS } from './m
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
-  dist: Number(process.env.MP_SOAK_DIST_PORT ?? '4194'),
-  peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4195'),
+  dist: Number(process.env.MP_SOAK_DIST_PORT ?? '4233'),
+  peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4234'),
 });
-const ALLOWED_QA_PORTS = new Set([4189, 4193, 4194, 4195]);
+const ALLOWED_QA_PORTS = new Set([4189, 4193, 4194, 4195, 4233, 4234, 4235]);
 const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate');
 const PLAY_DURATION_MS = MP_SOAK_THRESHOLDS.playDurationMs;
 // Keep the browser lifetime below the five-minute owner fence while allowing
