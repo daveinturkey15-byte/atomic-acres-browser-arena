@@ -265,7 +265,9 @@ function addReplicationDivergences(views, second) {
 async function sampleReplication(playStart) {
   let second = 0;
   while (Date.now() - playStart < PLAY_DURATION_MS) {
-    await sleep(Math.max(0, playStart + (second + 1) * MP_SOAK_THRESHOLDS.sampleIntervalMs - Date.now()));
+    // Sample t=0..179s inside the unchanged 180s window. Starting at t=1
+    // and excluding t=180 made the required 180 samples impossible (179 max).
+    await sleep(Math.max(0, playStart + second * MP_SOAK_THRESHOLDS.sampleIntervalMs - Date.now()));
     if (Date.now() - playStart >= PLAY_DURATION_MS) break;
     const views = await peerViews();
     bundle.replication.samples.push({ second, atEpochMs: Date.now(), peers: Object.fromEntries(PEERS.map((role) => [role, evidenceView(views[role])])) });
