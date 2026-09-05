@@ -311,11 +311,15 @@ async function runGuestScenarios(role) {
 }
 
 async function runStairScenarios() {
-  await Promise.all(PEERS.filter((role) => role !== 'host').map(async (role) => {
+  // The authored stair probe deliberately teleports the local player. Running
+  // both probes at once makes their host-authoritative poses race on the same
+  // staircase, so the second guest can never prove its own pose was accepted.
+  // Keep the probes serialized; this is setup evidence before the timed soak.
+  for (const role of PEERS.filter((candidate) => candidate !== 'host')) {
     const stair = await runScenario(role, 'stairFire', () => scenarioStairFire(role));
     bundle.scenarios.guests[role].stairFireResult = summarizeScenario(stair);
     bundle.scenarios.guests[role].stairFire = stair?.ok === true;
-  }));
+  }
 }
 
 async function damageAfterRejoin() {

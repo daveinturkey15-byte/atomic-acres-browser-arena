@@ -28,6 +28,8 @@ test('stair probe uses returned arena anchors and preserves fire evidence', () =
   assert.match(source, /uphill: stair\.uphill/);
   assert.doesNotMatch(source, /uphill: staged\.uphill/);
   assert.match(source, /stairFireResult/);
+  assert.match(source, /for \(const role of PEERS\.filter\(\(candidate\) => candidate !== 'host'\)\)/);
+  assert.doesNotMatch(source, /Promise\.all\(PEERS\.filter\(\(role\) => role !== 'host'\)\.map/);
 });
 
 test('scoreboard is sampled after an explicit RTT propagation wait', () => {
