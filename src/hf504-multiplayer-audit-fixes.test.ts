@@ -42,6 +42,20 @@ describe('HF-504 "sometimes randomly cant shoot ... after picked one up"', () =>
     expect(body.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(body.indexOf('player.weapon = result.inventory.primary;'));
   });
 
+  it('clears the stale fire deadline for an armory pickup and a map-weapon handoff', () => {
+    const armory = functionBody(main, 'function interactWithGunRangeArmory(');
+    expect(armory).toContain('player.weapon = station.weapon;');
+    expect(armory.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(armory.indexOf('player.weapon = station.weapon;'));
+    const railgun = functionBody(main, 'function syncRailgunHolderPresentation(');
+    expect(railgun.match(/player\.nextShotAt = 0;/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it('clears the stale fire deadline at the canonical respawn boundary', () => {
+    const body = functionBody(main, 'function respawn(');
+    expect(body).toContain('player.nextShotAt = 0;');
+    expect(body.indexOf('player.nextShotAt = 0;')).toBeGreaterThan(body.indexOf('player.weapon = respawnLoadout.weapon;'));
+  });
+
   it('keeps every weapon-granting path clearing it, so a new one cannot silently skip it', () => {
     // Five paths grant a weapon mid-life: gun-range armory, timed-map acquire,
     // the crimson flamethrower, the QA hook, and now swap + pickup. A sixth that

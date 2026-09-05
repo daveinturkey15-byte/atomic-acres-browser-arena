@@ -9532,6 +9532,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.secondaryWeapon = canonical.secondary;
   player.selectedGrenade = canonical.grenade;
   player.weapon = canonical.weapon;
+  player.nextShotAt = 0;
   player.stance = stance;
   // HF-412: an authority restore is a teleport, not a player-initiated stance
   // change. Drop any drop-shot transition still in flight so the rendered eye
@@ -15221,6 +15222,7 @@ function interactWithGunRangeArmory(now = performance.now(), expectedWeapon?: Pr
   player.weapon = station.weapon;
   player.ammo[station.weapon] = WEAPONS[station.weapon].mag;
   player.reserve[station.weapon] = WEAPONS[station.weapon].reserve;
+  player.nextShotAt = 0;
   player.switchingUntil = now + 360;
   player.sustainedShots = 0;
   rangePrimaryUnlocked = true;
@@ -17292,6 +17294,7 @@ function respawn(
     player.switchingUntil = 0;
     weaponView.setWeapon(respawnLoadout.weapon, true);
   }
+  player.nextShotAt = 0;
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
   if (startsNewLife) {
@@ -18391,6 +18394,7 @@ function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: Ra
   if (next.holderId === player.id && previous.holderId !== player.id) {
     interruptReload(true);
     player.weapon = 'railgun';
+    player.nextShotAt = 0;
     player.ammo.railgun = next.roundsRemaining;
     player.reserve.railgun = 0;
     player.switchingUntil = performance.now() + 420;
@@ -18399,6 +18403,7 @@ function syncRailgunHolderPresentation(previous: RailgunAuthorityState, next: Ra
     addFeed(`${WEAPONS.railgun.name.toUpperCase()} ACQUIRED · ${RAILGUN_TOTAL_ROUNDS} FINITE ROUNDS`, 'gold');
   } else if (previous.holderId === player.id && next.holderId !== player.id && player.weapon === 'railgun') {
     player.weapon = player.primaryWeapon;
+    player.nextShotAt = 0;
     player.switchingUntil = performance.now() + 280;
     weaponView.setWeapon(player.weapon);
   }
