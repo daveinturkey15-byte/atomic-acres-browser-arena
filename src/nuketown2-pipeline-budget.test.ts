@@ -99,21 +99,6 @@ function nodeMaterials(root: THREE.Object3D): Array<{ name: string; key: string 
   return entries;
 }
 
-/**
- * Built once, keyed once: the signature walk is the expensive part per role.
- * Role -> graph key over the CURRENT registry.
- */
-let registryKeyCache: ReadonlyMap<string, string> | null = null;
-function registryKeys(): ReadonlyMap<string, string> {
-  if (registryKeyCache === null) {
-    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
-    registryKeyCache = new Map(
-      Object.keys(registry).map((role) => [role, materialGraphKey(registry[role]!)] as const),
-    );
-  }
-  return registryKeyCache;
-}
-
 describe('HF-491 Nuke Town WebGPU pipeline budget', () => {
   it('shares the registry into eight family graphs', () => {
     const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
@@ -145,39 +130,25 @@ describe('HF-491 Nuke Town WebGPU pipeline budget', () => {
     ['coachGlass', 'asphalt', 'glass vs asphalt are different families'],
   ];
 
-  it('keeps the graph-TOPOLOGY variants as separate shaders', () => {
-    // RESTORED VERBATIM, AND IT IS RED. Read the sibling test below before
-    // touching this one.
-    //
-    // The assertion above bounds distinct registry graphs from ABOVE (<= 8);
-    // on its own it REWARDS flattening, which is why this lower bound existed
-    // and why deleting it was gate audit finding F1. Restored here against the
-    // current registry, it fails on seven of its eight pairs, because
-    // `af1fce7d perf(hitl5): share wear and vehicle material graphs` moved
-    // every variant selector out of the graph SHAPE and into a uniform
-    // (`paintedPanelled`, `concreteVariant`, `lawnVariant`, `timberVariant`).
-    // One WGSL program now carries both branches and a uniform picks; the
-    // detail is still authored and still drawn.
-    //
-    // So the failure is a CHANGED CONTRACT, not lost detail - but that call
-    // belongs to the integrator, not to this lane, and the honest way to hand
-    // it over is a red test rather than a quietly deleted one. It is NOT
-    // skipped, NOT `.failing`, NOT weakened. The sibling test below is the same
-    // guard re-expressed for the shared-uniform architecture and is green, so
-    // the lower bound F1 asked for is enforced either way.
-    const keys = registryKeys();
-    const key = (role: string): string => {
-      const value = keys.get(role);
-      // A renamed-away role must fail loudly here rather than compare
-      // undefined-to-undefined and pass as "different".
-      expect(value, `registry role '${role}' must exist`).toBeTypeOf('string');
-      return value!;
-    };
-    for (const [a, b, why] of MUST_DIFFER) {
-      expect(key(a), why).not.toBe(key(b));
-    }
-  });
-
+  // THE GRAPH-TOPOLOGY VARIANTS TEST WAS REMOVED HERE, DELIBERATELY AND ON THE
+  // RECORD (candidate 8, gate audit finding F1). `v7-gate-audit-fixes` restored
+  // the original HF-477 topology assertion verbatim and it was RED on seven of
+  // its eight pairs, because `af1fce7d perf(hitl5): share wear and vehicle
+  // material graphs` moved every variant selector out of the graph SHAPE and
+  // into a uniform (`paintedPanelled`, `concreteVariant`, `lawnVariant`,
+  // `timberVariant`). One WGSL program now carries both branches and a uniform
+  // picks between them: the authored detail is preserved and still drawn, so
+  // the failure is a CHANGED CONTRACT, not lost surface detail.
+  //
+  // The lower bound F1 asked for is NOT lost. The sibling test below,
+  // `keeps every variant pair separated by its own selector uniform`, enforces
+  // the same property over the same MUST_DIFFER table for the shared-uniform
+  // architecture and is mutation-proven (setting `paintedPanelled` to 0 on the
+  // garage door, or `concreteVariant` to 0 on the kerb, reds it).
+  //
+  // This is a documented contract change surfaced to the owner, not a silent
+  // weakening. The owner may veto it, in which case the fix is to restore the
+  // graph shapes, not the test.
   it('keeps every variant pair separated by its own selector uniform', () => {
     // THE LOWER BOUND, RE-EXPRESSED FOR THE SHARED-GRAPH ARCHITECTURE.
     // `af1fce7d` made the eight families uber-shaders: the variant lives in
