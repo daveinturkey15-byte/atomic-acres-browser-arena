@@ -10,6 +10,9 @@ import {
   windowDebrisPoolKey,
 } from './legacy-pure-helpers'; // HF-355 round 1
 import {
+  DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS,
+  DOMINATION_TEAM_COLORS,
+  createWeaponCapacityRegistry as createWeaponCapacityRegistryPure,
   isTimedCombatMessage,
   majorDebrisDefinitionFromSnapshot,
   recoveryRemainingMs,
@@ -322,6 +325,11 @@ import {
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import { CRIMSON_FLAMETHROWER_KILLSTREAK_ID } from './killstreak-catalog'; // HF-334
+// HF-509: a care package grants its contents exactly once per package instance.
+import {
+  advanceCareRewardQueue, createCarePackageGrantLedger, createCareRewardQueueTracker,
+  headCarePackageId, redeemCarePackageWeaponGrant,
+} from './care-package-grant-once';
 import type { KillstreakLoadoutV1, Pass65KillstreakId, SelectableKillstreakId } from './killstreak-catalog';
 import {
   CARPET_BOMBER_BLAST_RADIUS_M,
@@ -630,6 +638,7 @@ import {
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
   FIELD_SUPPORT,
+  GAMEPAD_SUPPORT_LABELS,
   NUKE_WARNING_MS,
   SCOUT_SWEEP_DURATION_MS,
   SCOUT_SWEEP_PULSE_INTERVAL_MS,
@@ -5166,12 +5175,8 @@ function retireAtomicPresentation(): void {
   qualityAssetStreaming.atomicAcres = 'idle';
 }
 
-function createWeaponCapacityRegistry(kind: 'mag' | 'reserve'): Record<WeaponId, number> {
-  return Object.fromEntries(WEAPON_IDS.map((weapon) => [
-    weapon,
-    SPECIAL_WEAPON_IDS.includes(weapon as (typeof SPECIAL_WEAPON_IDS)[number]) ? 0 : WEAPONS[weapon][kind],
-  ])) as Record<WeaponId, number>;
-}
+const createWeaponCapacityRegistry = (kind: 'mag' | 'reserve'): Record<WeaponId, number> =>
+  createWeaponCapacityRegistryPure(kind, WEAPON_IDS, SPECIAL_WEAPON_IDS, WEAPONS) as Record<WeaponId, number>;
 
 const player = {
   id: createPlayerId(),
@@ -5633,6 +5638,9 @@ const supportShotReplay = new SupportShotReplayGuard();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
+// HF-509: epoch-scoped queue mirror + grant ledger (package id + claimant).
+let careRewardQueueTracker = createCareRewardQueueTracker();
+const carePackageGrantLedger = createCarePackageGrantLedger();
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
@@ -23923,10 +23931,6 @@ function killstreakLineOfSight(
 // Domination (owner 2026-08-30, Test2): host/solo-authoritative zone truth.
 // ---------------------------------------------------------------------------
 let dominationState: DominationState | null = null;
-const DOMINATION_TEAM_COLORS: Readonly<Record<'aqua' | 'coral' | 'neutral', number>> = Object.freeze({
-  aqua: 0x37d6d6, coral: 0xe4574f, neutral: 0xcccccc,
-});
-
 /** Domination is Test2's headline: always in solo, host-selected in lobbies. */
 function dominationModeActive(): boolean {
   if (selectedArena.id !== 'test2' || !gameStarted) return false;
@@ -24201,6 +24205,10 @@ function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): 
   }
   const actor = localKillstreakActorSnapshot();
   const reward = actor?.revealedCareRewards[0] ?? null;
+  // HF-509: a consumed head advances the package-instance id.
+  careRewardQueueTracker = advanceCareRewardQueue(
+    careRewardQueueTracker, actor?.revealedCareRewards ?? [], killstreakMatchEpoch,
+  );
   let hudChanged = false;
   if (reward && displayedCareReward !== reward) {
     addFeed(`CARE PACKAGE SECURED · ${GAMEPAD_SUPPORT_LABELS[reward]} READY`, 'gold');
@@ -24293,15 +24301,17 @@ function applyKillstreakEntityShot(
   return applied;
 }
 
-function killstreakSlotFor(id: SelectableKillstreakId): 1 | 2 | 3 | 4 | 5 | null {
+function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
   const careReward = localKillstreakActorSnapshot()?.revealedCareRewards[0];
   if (careReward === id) return 1;
-  const index = localFieldSupportProjection().loadout.slots.indexOf(id);
+  const index = (localFieldSupportProjection().loadout.slots as readonly Pass65KillstreakId[]).indexOf(id);
   return index < 0 ? null : (index + 1) as 1 | 2 | 3 | 4 | 5;
 }
 
+// HF-509: any catalog id. The care-only crimson reward has no loadout slot but
+// is redeemed through slot one, the only path that shifts the host's queue.
 function requestKillstreakActivation(
-  id: SelectableKillstreakId,
+  id: Pass65KillstreakId,
   now: number,
   anchor?: [number, number, number],
   facing?: [number, number, number],
@@ -26456,6 +26466,19 @@ function grantCrimsonFlamethrower(now = performance.now()): void {
   renderFieldKitSelection();
 }
 
+/** HF-509: claim the package instance, have the host consume the queued reward,
+ * then grant — exactly once per package. Rationale in care-package-grant-once.ts. */
+function redeemCarePackageWeaponReward(id: Pass65KillstreakId, now = performance.now()): void {
+  redeemCarePackageWeaponGrant({
+    packageId: headCarePackageId(careRewardQueueTracker, player.id),
+    claimantId: player.id,
+    lifeId: localContinuity,
+    ledger: carePackageGrantLedger,
+    requestHostConsumption: () => requestKillstreakActivation(id, now) !== null,
+    grant: () => grantCrimsonFlamethrower(now),
+  });
+}
+
 function activateFieldSupport(id: FieldSupportId): void {
   if ((!selectedArena.fieldSupport && selectedArena.id !== 'gun-range')
     || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
@@ -26465,7 +26488,7 @@ function activateFieldSupport(id: FieldSupportId): void {
   // is a separate weapon instance from the arena-bound map flamethrower, so it
   // never touches that authority and never consumes the world pickup.
   if (revealedCareReward === CRIMSON_FLAMETHROWER_KILLSTREAK_ID) {
-    grantCrimsonFlamethrower();
+    redeemCarePackageWeaponReward(CRIMSON_FLAMETHROWER_KILLSTREAK_ID);
     return;
   }
   const activatedId = (revealedCareReward ?? id) as FieldSupportId;
@@ -29082,21 +29105,6 @@ window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
 // Display labels for every care-pool reward, not only slot-selectable ones:
 // the kill feed has to name a crimson flamethrower grant when it drops.
-const GAMEPAD_SUPPORT_LABELS: Record<Pass65KillstreakId, string> = {
-  'crimson-flamethrower': 'CRIMSON FLAMETHROWER',
-  'scout-sweep': 'SCOUT SWEEP',
-  adrenaline: 'ADRENALINE BOOST',
-  'care-package': 'CARE PACKAGE',
-  yardhawk: 'YARDHAWK',
-  'piloted-drone': 'PILOTED DRONE',
-  'tri-pass': 'TRI-PASS',
-  'carpet-bomber': 'CARPET BOMBER',
-  'hunter-swarm': 'HUNTER SWARM',
-  chopper: 'CHOPPER GUNNER',
-  'drone-swarm': 'DRONE SWARM',
-  nuke: 'NUKE',
-};
-
 function selectFieldSupport(direction: -1 | 1, source: 'PAD' | 'TOUCH'): void {
   gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction, localFieldSupportProjection().loadout);
   addFeed(`${source} SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
@@ -33349,15 +33357,6 @@ function debugCapturePresentationReceipt(frame: number): DebugCapturePresentatio
 }
 
 const DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M = 0.025;
-const DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS = Object.freeze([
-  Object.freeze({ name: 'head', aliases: Object.freeze(['Head']) }),
-  Object.freeze({ name: 'shoulder-left', aliases: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
-  Object.freeze({ name: 'shoulder-right', aliases: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
-  Object.freeze({ name: 'pelvis', aliases: Object.freeze(['Hips']) }),
-  Object.freeze({ name: 'wrist-left', aliases: Object.freeze(['WristL', 'Wrist.L']) }),
-  Object.freeze({ name: 'wrist-right', aliases: Object.freeze(['WristR', 'Wrist.R']) }),
-] as const);
-
 function debugRiggedEvidenceActorRoot(
   actorKind: 'bot' | 'training-dummy',
   actorId: string,

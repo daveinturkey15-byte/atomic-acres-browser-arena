@@ -1,0 +1,13 @@
+{
+  "presses": 25,
+  "before": {
+    "grants": 25,
+    "hostConsumptionRequests": 0,
+    "magazineRefills": 25
+  },
+  "after": {
+    "grants": 1,
+    "hostConsumptionRequests": 1,
+    "magazineRefills": 1
+  }
+}

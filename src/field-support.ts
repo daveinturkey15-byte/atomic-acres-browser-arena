@@ -241,3 +241,25 @@ export function hunterSwarmDamage(distance: number, stance: Stance): number {
 export function nukeDamageForTarget(ownerTeam: 0 | 1, targetTeam: 0 | 1, alive: boolean): number {
   return alive && targetTeam !== ownerTeam ? NUKE_DAMAGE : 0;
 }
+
+/**
+ * HF-509: hoisted out of `legacy-main.ts`, which sits exactly on its size
+ * ratchet, so the care-package grant-once wiring could land without raising it.
+ * Pure display labels keyed by the canonical catalog id and exhaustive by
+ * construction, so a new killstreak fails the build here rather than reaching
+ * the HUD unnamed.
+ */
+export const GAMEPAD_SUPPORT_LABELS: Record<Pass65KillstreakId, string> = Object.freeze({
+  'crimson-flamethrower': 'CRIMSON FLAMETHROWER',
+  'scout-sweep': 'SCOUT SWEEP',
+  adrenaline: 'ADRENALINE BOOST',
+  'care-package': 'CARE PACKAGE',
+  yardhawk: 'YARDHAWK',
+  'piloted-drone': 'PILOTED DRONE',
+  'tri-pass': 'TRI-PASS',
+  'carpet-bomber': 'CARPET BOMBER',
+  'hunter-swarm': 'HUNTER SWARM',
+  chopper: 'CHOPPER GUNNER',
+  'drone-swarm': 'DRONE SWARM',
+  nuke: 'NUKE',
+});

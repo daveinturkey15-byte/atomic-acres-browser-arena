@@ -81,3 +81,36 @@ export function majorDebrisDefinitionFromSnapshot(
 export function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, nowEpochMs = Date.now()): number {
   return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
 }
+
+/**
+ * HF-509 pure move out of `src/legacy-main.ts`, which sits exactly on its size
+ * ratchet. Behaviour unchanged: special weapons start with no stored capacity
+ * (they are granted with an explicit magazine and reserve), everything else
+ * starts at its catalog capacity.
+ */
+export function createWeaponCapacityRegistry(
+  kind: 'mag' | 'reserve',
+  weaponIds: readonly string[],
+  specialWeaponIds: readonly string[],
+  weapons: Readonly<Record<string, Readonly<Record<'mag' | 'reserve', number>>>>,
+): Record<string, number> {
+  return Object.fromEntries(weaponIds.map((weapon) => [
+    weapon,
+    specialWeaponIds.includes(weapon) ? 0 : weapons[weapon][kind],
+  ]));
+}
+
+/** HF-509 pure move: Domination zone tints, previously inline in legacy-main. */
+export const DOMINATION_TEAM_COLORS: Readonly<Record<'aqua' | 'coral' | 'neutral', number>> = Object.freeze({
+  aqua: 0x37d6d6, coral: 0xe4574f, neutral: 0xcccccc,
+});
+
+/** HF-509 pure move: rigged-evidence sentinel joints, previously inline. */
+export const DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS = Object.freeze([
+  Object.freeze({ name: 'head', aliases: Object.freeze(['Head']) }),
+  Object.freeze({ name: 'shoulder-left', aliases: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
+  Object.freeze({ name: 'shoulder-right', aliases: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
+  Object.freeze({ name: 'pelvis', aliases: Object.freeze(['Hips']) }),
+  Object.freeze({ name: 'wrist-left', aliases: Object.freeze(['WristL', 'Wrist.L']) }),
+  Object.freeze({ name: 'wrist-right', aliases: Object.freeze(['WristR', 'Wrist.R']) }),
+] as const);
