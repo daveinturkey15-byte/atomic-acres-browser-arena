@@ -1236,7 +1236,15 @@ export function createPass64TslSceneSystems(
    * both how `reflectionQuality: off -> high` failed to come back and why a
    * settings change could not rescue the null first arena.
    */
-  const canSyncArenaEnvironmentIbl = (): boolean => Boolean(renderer && scene.background);
+  const canSyncArenaEnvironmentIbl = (): boolean => Boolean(renderer && scene.background)
+    // Generated skies are installed as a procedural texture first and may
+    // replace it with the authored equirectangular asset while the arena
+    // definition is being committed. Do not convolve that known-intermediate
+    // texture: configurePlayableArenaVisuals seals the sky and drives the one
+    // required PMREM generation below it. This keeps the cold path from doing
+    // the same expensive bake once for the placeholder and again for the
+    // admitted asset.
+    && scene.userData.pass66SkyBackdropStatus !== 'asset-loading';
   const syncArenaEnvironmentIbl = async (): Promise<void> => {
     if (!renderer) return;
     activeIblState = await applyArenaEnvironmentIbl(
