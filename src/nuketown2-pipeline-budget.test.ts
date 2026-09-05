@@ -99,12 +99,144 @@ function nodeMaterials(root: THREE.Object3D): Array<{ name: string; key: string 
   return entries;
 }
 
+/**
+ * Built once, keyed once: the signature walk is the expensive part per role.
+ * Role -> graph key over the CURRENT registry.
+ */
+let registryKeyCache: ReadonlyMap<string, string> | null = null;
+function registryKeys(): ReadonlyMap<string, string> {
+  if (registryKeyCache === null) {
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
+    registryKeyCache = new Map(
+      Object.keys(registry).map((role) => [role, materialGraphKey(registry[role]!)] as const),
+    );
+  }
+  return registryKeyCache;
+}
+
 describe('HF-491 Nuke Town WebGPU pipeline budget', () => {
   it('shares the registry into eight family graphs', () => {
     const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
     const keys = Object.values(registry).map(materialGraphKey);
     expect(new Set(keys).size).toBeLessThanOrEqual(8);
     expect(keys.length).toBeGreaterThanOrEqual(18);
+  });
+
+  /**
+   * THE VARIANT TABLE. Twelve registry roles in eight pairs; each pair is two
+   * surfaces that must stay VISIBLY DIFFERENT: a panelled door stamps joints an
+   * unpanelled sign does not have, a slab is jointed where a wall is coursed, a
+   * backdrop swaps lattice noise for three sines. Collapsing any of them is
+   * deleting a surface, not sharing a pipeline.
+   *
+   * This is the original HF-477 `mustDiffer` table verbatim (candidate-7 gate
+   * audit F1). Every one of the twelve roles still exists under the same name
+   * in `createNuketown2MaterialRegistry()` at this commit - checked role by
+   * role - so no pair was renamed and none is dropped.
+   */
+  const MUST_DIFFER: ReadonlyArray<readonly [string, string, string]> = [
+    ['garageDoor', 'roofGlazing', 'painted metal: panelled vs plain'],
+    ['drive', 'kerb', 'concrete: apron vs kerb'],
+    ['drive', 'block', 'concrete: apron vs blockwork'],
+    ['kerb', 'block', 'concrete: kerb vs blockwork'],
+    ['fence', 'trim', 'timber: fence boards vs painted trim'],
+    ['lawn', 'planter', 'lawn: mown turf vs hedge'],
+    ['lawn', 'ground', 'lawn: turf vs the backdrop scrub plain'],
+    ['coachGlass', 'asphalt', 'glass vs asphalt are different families'],
+  ];
+
+  it('keeps the graph-TOPOLOGY variants as separate shaders', () => {
+    // RESTORED VERBATIM, AND IT IS RED. Read the sibling test below before
+    // touching this one.
+    //
+    // The assertion above bounds distinct registry graphs from ABOVE (<= 8);
+    // on its own it REWARDS flattening, which is why this lower bound existed
+    // and why deleting it was gate audit finding F1. Restored here against the
+    // current registry, it fails on seven of its eight pairs, because
+    // `af1fce7d perf(hitl5): share wear and vehicle material graphs` moved
+    // every variant selector out of the graph SHAPE and into a uniform
+    // (`paintedPanelled`, `concreteVariant`, `lawnVariant`, `timberVariant`).
+    // One WGSL program now carries both branches and a uniform picks; the
+    // detail is still authored and still drawn.
+    //
+    // So the failure is a CHANGED CONTRACT, not lost detail - but that call
+    // belongs to the integrator, not to this lane, and the honest way to hand
+    // it over is a red test rather than a quietly deleted one. It is NOT
+    // skipped, NOT `.failing`, NOT weakened. The sibling test below is the same
+    // guard re-expressed for the shared-uniform architecture and is green, so
+    // the lower bound F1 asked for is enforced either way.
+    const keys = registryKeys();
+    const key = (role: string): string => {
+      const value = keys.get(role);
+      // A renamed-away role must fail loudly here rather than compare
+      // undefined-to-undefined and pass as "different".
+      expect(value, `registry role '${role}' must exist`).toBeTypeOf('string');
+      return value!;
+    };
+    for (const [a, b, why] of MUST_DIFFER) {
+      expect(key(a), why).not.toBe(key(b));
+    }
+  });
+
+  it('keeps every variant pair separated by its own selector uniform', () => {
+    // THE LOWER BOUND, RE-EXPRESSED FOR THE SHARED-GRAPH ARCHITECTURE.
+    // `af1fce7d` made the eight families uber-shaders: the variant lives in
+    // `material.userData.nuketown2Uniforms`, is uploaded per draw by
+    // `materialUniform()`'s `onObjectUpdate`, and selects a branch that is
+    // compiled into the one shared program. That is a legitimate way to buy
+    // pipeline budget - it costs no detail - but it means a future pass can
+    // now flatten a surface by simply giving two roles the SAME selector value,
+    // which no upper bound would ever notice.
+    //
+    // This closes that hole with exactly the pairs the deleted test named: two
+    // roles that must read differently must still be driven apart by some
+    // authored value. Setting `paintedPanelled` to 0 on the garage door, or
+    // `concreteVariant` to 0 on the kerb, reds this line.
+    const registry = createNuketown2MaterialRegistry() as unknown as Record<string, THREE.Material>;
+    const values = (role: string): Record<string, unknown> => {
+      const material = registry[role];
+      expect(material, `registry role '${role}' must exist`).toBeDefined();
+      const bound = (material as unknown as { userData?: Record<string, unknown> }).userData
+        ?.nuketown2Uniforms as Record<string, unknown> | undefined;
+      expect(bound, `role '${role}' must carry bound family uniforms`).toBeDefined();
+      return bound!;
+    };
+    const describeValue = (value: unknown): string =>
+      value instanceof THREE.Color ? `#${value.getHexString()}` : String(value);
+
+    for (const [a, b, why] of MUST_DIFFER) {
+      const left = values(a);
+      const right = values(b);
+      const differing = Object.keys(left).filter((name) => {
+        const l = left[name];
+        const r = right[name];
+        if (l instanceof THREE.Color && r instanceof THREE.Color) return !l.equals(r);
+        return l !== r;
+      });
+      // `baseColor` and its `sidingWainscotColor` echo are pure tint: two roles
+      // that differ ONLY by colour are exactly the sharing this budget wants,
+      // so they do not count as keeping a surface distinct.
+      const structural = differing.filter((name) => name !== 'baseColor' && name !== 'sidingWainscotColor');
+      expect(
+        structural,
+        `${why}: '${a}' and '${b}' share one shader graph, so the only thing keeping them `
+        + 'distinct surfaces is an authored uniform - and every non-colour uniform now matches. '
+        + `bound values: ${a}=${JSON.stringify(Object.fromEntries(Object.entries(left).map(([k, v]) => [k, describeValue(v)])))}`,
+      ).not.toEqual([]);
+    }
+
+    // And the selector each pair actually turns on is still READ by its family
+    // shader - a uniform nothing samples separates nothing.
+    const family = (file: string): string =>
+      readFileSync(new URL(`./nuketown2-materials/families/${file}`, import.meta.url), 'utf8');
+    expect(family('painted-metal.ts'), 'the panelled branch must still be in the shader')
+      .toContain('uniforms.paintedPanelled');
+    expect(family('concrete.ts'), 'the apron/kerb/block branch must still be in the shader')
+      .toContain('uniforms.concreteVariant');
+    expect(family('lawn.ts'), 'the turf/scrub/hedge branch must still be in the shader')
+      .toContain('uniforms.lawnVariant');
+    expect(family('timber.ts'), 'the fence/deck/trim branch must still be in the shader')
+      .toContain('uniforms.timberVariant');
   });
 
   it('keeps the complete built arena below the measured 40-graph ceiling', () => {

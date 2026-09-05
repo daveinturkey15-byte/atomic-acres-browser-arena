@@ -5,6 +5,7 @@
 import sharp from 'sharp';
 import { readdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { allArenaIds } from './arena-roster.mjs';
 
 const ROOT = 'docs/evidence/pass86/hf410-prep/frames';
 // --a / --b name capture directories under frames/. The default pair is the
@@ -17,7 +18,20 @@ const LABEL_B = arg('--b', 'near008');
 const OUT = arg('--out', 'docs/evidence/pass86/hf410-prep/near-plane-ab-numeric.json');
 const A = join(ROOT, LABEL_A);
 const B = join(ROOT, LABEL_B);
-const arenas = ['high-seas', 'map3', 'skyline-terminal'];
+// The subjects are whatever was CAPTURED in both builds - "the arenas with
+// paired baseline and candidate evidence" is a fact about the frame tree, so it
+// is read from the frame tree rather than restated as a literal here (gate audit
+// F4). A frozen list quietly ignores an arena somebody captured, which on an A/B
+// whose whole claim is "same commit, same arenas" is the one error that looks
+// like a clean result. Ids are validated against the registry so a stray
+// directory cannot invent an arena.
+const known = new Set(allArenaIds());
+const captured = (dir) => new Set(
+  readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name),
+);
+const inB = captured(B);
+const arenas = [...captured(A)].filter((id) => inB.has(id) && known.has(id)).sort();
+if (arenas.length === 0) throw new Error(`no arena captured in both ${A} and ${B}`);
 const rows = [];
 
 for (const arena of arenas) {

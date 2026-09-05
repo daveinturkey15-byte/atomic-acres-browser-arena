@@ -48,6 +48,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MAP_SELECTION = resolve(HERE, '../../src/map-selection.ts');
 const ARENA_IDENTITY = resolve(HERE, '../../src/arena-identity.ts');
+const LIGHTING_CONDITIONS = resolve(HERE, '../../src/rendering/lighting-conditions.ts');
 
 /**
  * Every arena the game can name, selectable or not. Ratchet these when the
@@ -134,6 +135,49 @@ export function arenaRegistryEntries() {
     );
   }
   return entries;
+}
+
+/**
+ * The arenas whose daylight profile is PINNED, in registry order, scraped from
+ * `src/rendering/lighting-conditions.ts`.
+ *
+ * A pinned arena resolves every time-of-day choice to the identity write, so a
+ * lane-AB sweep's excursion deltas over these arenas must be zero to within the
+ * noise floor. That makes them the sweep's NULL EXPERIMENT - the check on the
+ * instrument rather than on the lane - which is why two capture tools each held
+ * their own copy of the list.
+ *
+ * The registry that owns this fact is `ARENA_DAYLIGHT_PROFILES`, whose third
+ * positional argument to `profile()` is the pinned flag, and
+ * `src/rendering/lighting-conditions.test.ts` asserts the pinned set exactly.
+ * Deriving it here means promoting an arena out of PREVIEW updates the capture
+ * tools in the same commit, instead of leaving them measuring a null against an
+ * arena that now moves.
+ *
+ * The scrape's floor is COVERAGE, not count: every canonical arena must appear
+ * in the table. A regex that stops matching yields a short list, and a short
+ * list here would silently reclassify a pinned arena as a moving one.
+ */
+export function pinnedDaylightArenaIds() {
+  const source = readFileSync(LIGHTING_CONDITIONS, 'utf8');
+  const start = source.indexOf('ARENA_DAYLIGHT_PROFILES');
+  if (start < 0) {
+    throw new Error(
+      `arena roster: ARENA_DAYLIGHT_PROFILES not found in ${LIGHTING_CONDITIONS}; the scrape is stale`,
+    );
+  }
+  const body = source.slice(start, source.indexOf('});', start));
+  const rows = [...body.matchAll(/'?([a-z0-9-]+)'?:\s*profile\(\s*'([a-z0-9-]+)'\s*,\s*'[^']*'\s*,\s*(true|false)\s*,/gu)];
+  const covered = rows.map((match) => match[2]);
+  const missing = allArenaIds().filter((id) => !covered.includes(id));
+  if (missing.length > 0) {
+    throw new Error(
+      `arena roster: the daylight-profile scrape saw ${covered.length} rows and missed `
+      + `${missing.join(', ')}; the scrape is stale`,
+    );
+  }
+  const pinned = new Set(rows.filter((match) => match[3] === 'true').map((match) => match[2]));
+  return allArenaIds().filter((id) => pinned.has(id));
 }
 
 /** The ids the registry marks `selectable: false`. */

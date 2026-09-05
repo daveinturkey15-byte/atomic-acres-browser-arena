@@ -353,50 +353,26 @@ const BOUNDED_SUBSET_ALLOWANCES = Object.freeze([
       + 'machine (routed to Lane H). Widening it needs a measured CI budget first.',
   },
   {
-    file: 'scripts/qa/capture-lane-ab-time-of-day.mjs',
-    kind: 'PINNED SET',
-    reason:
-      'This is a bounded time-of-day capture experiment, not a selectable-arena sweep: '
-      + 'the four ids are the retained Lane AB comparison subjects whose paired daylight '
-      + 'and dusk artifacts are already comparable. Widening it requires recapturing the '
-      + 'full matrix and its receipt, so HF-495 leaves this historical measurement set '
-      + 'fixed while derived QA rosters follow selectability.',
-  },
-  {
-    file: 'scripts/qa/hf410-near-plane-ab-diff.mjs',
-    kind: 'PINNED SET',
-    reason:
-      'This is the HF-410 near-plane A/B comparison set, deliberately limited to the '
-      + 'three arenas with paired baseline and candidate evidence. It is not a coverage '
-      + 'roster and cannot be widened by menu ordering; doing so requires new captures '
-      + 'and a new diff baseline, so HF-495 preserves the measured experiment.',
-  },
-  {
-    file: 'scripts/qa/publish-lane-ab-frames.mjs',
-    kind: 'PINNED SET',
-    reason:
-      'This publish-lane frame comparison intentionally repeats the four retained Lane '
-      + 'AB subjects whose frame artifacts and expected labels are versioned together. It '
-      + 'is not a selectable QA roster; widening it requires a fresh capture family and '
-      + 'receipt review, so HF-495 changes derived coverage without rewriting this baseline.',
-  },
-  {
     file: 'scripts/qa/raid2-layout-metrics.ts',
     kind: 'BEHAVIOUR MAP',
     reason:
-      'The five ids are a layout-metrics comparison map, including the parked original '
-      + 'Raid as the HF-466 compatibility baseline beside the Raid Rebuild. It measures '
-      + 'specific authored geometry relationships rather than selectable coverage; HF-495 '
-      + 'must not erase that historical comparison when the old card leaves the picker.',
+      'KEPT (gate audit F4): the DEFAULT_ROSTER is an authored comparison set - the '
+      + 'parked original Raid (test2) read against the four shipped arenas whose layout '
+      + 'the rebuild is being judged against - and no registry property selects those '
+      + 'five, so there is nothing to derive it from. Note it does NOT contain raid2: '
+      + 'the tool takes ids on argv and the rebuild is passed in beside this baseline, '
+      + 'which is what the earlier wording here got wrong. Deriving from selectability '
+      + 'would drop test2, which is the one row the comparison exists for.',
   },
   {
     file: 'scripts/qa/scan-lane-ab-band-readability.mjs',
     kind: 'TIMING BOUNDED',
     reason:
-      'This scan-lane experiment is capped to three measured arena bands because each '
-      + 'band requires paired A/B readability captures and review. It is not the shared '
-      + 'selectable roster; widening it needs a new timing and evidence budget, so HF-495 '
-      + 'updates the derived QA paths while retaining this bounded lane.',
+      'KEPT (gate audit F4): the literal is the --arenas DEFAULT, and each of the three '
+      + 'bands costs a paired A/B readability capture plus review, so the cap is a '
+      + 'measured cost and not a coverage claim. Widening it needs that budget measured, '
+      + 'which is the debt a TIMING BOUNDED entry records. Any arena in the registry can '
+      + 'already be scanned by naming it on --arenas; nothing here filters the roster.',
   },
 ]);
 

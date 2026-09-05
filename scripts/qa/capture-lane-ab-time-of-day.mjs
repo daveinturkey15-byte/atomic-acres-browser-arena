@@ -98,6 +98,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import sharp from 'sharp';
+import { pinnedDaylightArenaIds } from './arena-roster.mjs';
 
 const execFileAsync = promisify(execFile);
 const argv = process.argv.slice(2);
@@ -153,13 +154,21 @@ const ARENA_HEAVY_WEATHER = Object.freeze({
 });
 
 /**
- * The NULL EXPERIMENT. These three arenas are `pinned: true` in
+ * The NULL EXPERIMENT. These arenas are `pinned: true` in
  * `ARENA_DAYLIGHT_PROFILES`, so every choice resolves to the identity write and
  * their excursion deltas must be zero to within the noise floor. They are the
  * only rows in this sweep whose correct answer is known in advance, which makes
  * them the check on the instrument rather than on the lane.
+ *
+ * DERIVED, not written out (gate audit F4). This list was a frozen four-id
+ * literal, and it had already drifted from its own comment ("these three"). A
+ * lane promoting its map out of PREVIEW clears the pinned flag in
+ * `src/rendering/lighting-conditions.ts`; had that not reached this copy, the
+ * sweep would have gone on demanding a null result from an arena whose sun now
+ * moves - i.e. the instrument check would fail for the one reason that is not
+ * an instrument fault.
  */
-const PINNED_ARENAS = new Set(['gun-range', 'map3', 'nuketown2', 'raid2']);
+const PINNED_ARENAS = new Set(pinnedDaylightArenaIds());
 
 /**
  * How far a PINNED arena is allowed to move before this run stops being
