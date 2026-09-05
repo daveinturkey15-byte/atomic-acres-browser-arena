@@ -287,6 +287,7 @@ import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell
 // MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
 // current arena's mode IS. See src/ui/hud-mode-banner.ts.
 import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
+import { railgunStatusCopy, setHudStyle, setHudText } from './ui/hud-write-cache';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
 // HF-418 — the RTX explainer is information, not a preset. See the change
 // handler on #graphics-profile: it restores the select and opens the dialog.
@@ -6935,6 +6936,7 @@ function syncMatchReportDownloads(): void {
 let respawnEndsAt = 0;
 let respawnTimer: ReturnType<typeof setTimeout> | null = null;
 let previousHudScores: [number, number] = [0, 0];
+let lastNetworkStripAt = 0;
 let adsHeld = false;
 let sniperScopeActive = false;
 let dmrThermalActive = false;
@@ -17748,14 +17750,14 @@ async function startGame(
   element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
     : mode === 'solo' ? (initialSoloBotCount(selectedArena) === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
-  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  setHudText(element<HTMLElement>('#match-mode-label'), startBanner.label);
   element<HTMLElement>('#timer').hidden = !startBanner.clock;
   element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
   element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
-  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
+  if (startBanner.objective !== null) setHudText(element<HTMLElement>('#objective'), startBanner.objective);
   element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
-  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
-  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
+  setHudText(element<HTMLElement>('#aqua-label'), selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA');
+  setHudText(element<HTMLElement>('#coral-label'), selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL');
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
   element<HTMLElement>('#room-hud').textContent = network.roomCode ? `ROOM ${network.roomCode.slice(0, 8).toUpperCase()}` : '';
   respawn(false, false, undefined, 'match-start', false);
@@ -28284,7 +28286,7 @@ function updateHud(now: number): void {
   });
   const crosshairGap = THREE.MathUtils.clamp(5 + spread * 320, 5, 23);
   const crosshair = element<HTMLElement>('#crosshair');
-  crosshair.style.setProperty('--spread', `${crosshairGap}px`);
+  setHudStyle(crosshair, '--spread', `${crosshairGap}px`);
   // The physical viewmodel sight/full-screen optic is the complete ADS picture.
   // Hide the HUD crosshair the moment ADS is held: the coloured marker must
   // never layer over the real sight, not even during the transition.
@@ -28314,32 +28316,25 @@ function updateHud(now: number): void {
   const localFfaScore = authoritativeScores.get(player.id)?.kills ?? player.kills;
   const leaderFfaScore = orderedFfa[0]?.kills ?? 0;
   const arenaZone = classifyArenaZone(player.position.x, player.position.z);
-  element<HTMLElement>('#location-label').textContent = selectedArena.id === 'atomic-acres'
+  setHudText(element<HTMLElement>('#location-label'), selectedArena.id === 'atomic-acres'
     ? arenaZoneLabel(arenaZone)
-    : arena.label.toUpperCase();
+    : arena.label.toUpperCase());
   audio.setArenaZone(arenaZone);
-  element<HTMLElement>('#health').textContent = String(Math.ceil(player.hp));
-  element<HTMLElement>('#health-fill').style.width = `${player.hp}%`;
+  setHudText(element<HTMLElement>('#health'), String(Math.ceil(player.hp)));
+  setHudStyle(element<HTMLElement>('#health-fill'), 'width', `${player.hp}%`);
   const localScore = authoritativeScores.get(player.id) ?? emptyPlayerScore(player.id);
-  element<HTMLElement>('#damage-dealt').textContent = String(gameMode === 'solo' ? Math.round(roundDamageDealt) : localScore.damageDealt);
-  element<HTMLElement>('#damage-taken').textContent = String(gameMode === 'solo' ? Math.round(roundDamageTaken) : localScore.damageTaken);
+  setHudText(element<HTMLElement>('#damage-dealt'), String(gameMode === 'solo' ? Math.round(roundDamageDealt) : localScore.damageDealt));
+  setHudText(element<HTMLElement>('#damage-taken'), String(gameMode === 'solo' ? Math.round(roundDamageTaken) : localScore.damageTaken));
   renderMatchNetworkStrip();
-  element<HTMLElement>('#weapon-name').textContent = spec.name.toUpperCase();
-  element<HTMLElement>('#ammo').textContent = String(player.ammo[player.weapon]);
-  element<HTMLElement>('#reserve').textContent = reserveHudValue(selectedArena.id, player.reserve[player.weapon]);
+  setHudText(element<HTMLElement>('#weapon-name'), spec.name.toUpperCase());
+  setHudText(element<HTMLElement>('#ammo'), String(player.ammo[player.weapon]));
+  setHudText(element<HTMLElement>('#reserve'), reserveHudValue(selectedArena.id, player.reserve[player.weapon]));
   const railgunStatus = element<HTMLElement>('#railgun-status');
   railgunStatus.hidden = !localHoldsRailgun();
   const railgunRechamberRemainingMs = Math.max(0, railgunState.chamberReadyAtHostTimeMs - currentHostTimeMs());
   if (!railgunStatus.hidden) {
-    railgunStatus.textContent = railgunState.roundsRemaining <= 0
-      ? `${WEAPONS.railgun.name.toUpperCase()} DEPLETED · NO RESUPPLY`
-      : player.weapon !== 'railgun'
-        ? `SIDEARM ACTIVE · ${WEAPONS.railgun.name.toUpperCase()} ${railgunState.roundsRemaining} ROUNDS`
-        : railgunRechamberRemainingMs > 0
-          ? `${WEAPONS.railgun.name.toUpperCase()} RECHAMBER ${Math.ceil(railgunRechamberRemainingMs / 100) / 10}s`
-          : railgunAdsResetRequired
-            ? `${WEAPONS.railgun.name.toUpperCase()} RELEASE ADS`
-            : `${WEAPONS.railgun.name.toUpperCase()} THERMAL READY`;
+    const railgunCopy = railgunStatusCopy({ roundsRemaining: railgunState.roundsRemaining, weapon: player.weapon, rechamberRemainingMs: railgunRechamberRemainingMs, adsResetRequired: railgunAdsResetRequired, railgunName: WEAPONS.railgun.name.toUpperCase() });
+    setHudText(railgunStatus, railgunCopy);
   }
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
@@ -28354,13 +28349,13 @@ function updateHud(now: number): void {
     arena: selectedArena, site: 'frame',
     domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
   });
-  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  setHudText(element<HTMLElement>('#match-mode-label'), banner.label);
   element<HTMLElement>('#timer').hidden = !banner.clock;
   element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
-  element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
-  element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
-  aquaScore.textContent = String(hudScores[0]);
-  coralScore.textContent = String(hudScores[1]);
+  setHudText(element<HTMLElement>('#aqua-label'), selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA');
+  setHudText(element<HTMLElement>('#coral-label'), selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL');
+  setHudText(aquaScore, String(hudScores[0]));
+  setHudText(coralScore, String(hudScores[1]));
   hudScores.forEach((score, team) => {
     if (score === previousHudScores[team]) return;
     const scoreElement = team === 0 ? aquaScore : coralScore;
@@ -28368,32 +28363,35 @@ function updateHud(now: number): void {
     requestAnimationFrame(() => scoreElement.classList.add('score-pulse'));
   });
   previousHudScores = hudScores;
-  element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
+  setHudText(element<HTMLElement>('#timer'), presentation.timer);
+  setHudText(element<HTMLElement>('#objective'), banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective);
+      : presentation.objective));
   if (!player.alive && respawnEndsAt > 0) {
-    element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
+    setHudText(element<HTMLElement>('#respawn-countdown'), respawnPresentation(respawnEndsAt, now));
   }
   const reloadStateElement = element<HTMLElement>('#reload-state');
-  reloadStateElement.textContent = player.weapon === 'railgun' && railgunRechamberRemainingMs > 0
+  setHudText(reloadStateElement, player.weapon === 'railgun' && railgunRechamberRemainingMs > 0
     ? `RECHAMBERING ${(railgunRechamberRemainingMs / 1_000).toFixed(1)}s`
     : player.reloadState
     ? `RELOADING ${Math.max(0, (player.reloadState.endsAt - now) / 1000).toFixed(1)}s`
     : selectedArena.id === 'gun-range'
       ? `SCORE ${rangeScore} · ${targetHits} TARGETS HIT`
-      : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`;
+      : gameMode === 'solo' ? `${player.kills} K / ${player.deaths} D · ${targetHits} TARGETS` : `${player.kills} K / ${player.deaths} D`);
   reloadStateElement.classList.toggle('active', player.reloadState !== null || player.weapon === 'railgun' && railgunRechamberRemainingMs > 0);
-  element<HTMLElement>('#stance').textContent = player.stance.toUpperCase();
-  element<HTMLElement>('#grenades').textContent = `${player.selectedGrenade.toUpperCase()} ×${player.grenades}`;
+  setHudText(element<HTMLElement>('#stance'), player.stance.toUpperCase());
+  setHudText(element<HTMLElement>('#grenades'), `${player.selectedGrenade.toUpperCase()} ×${player.grenades}`);
   updateFieldSupportHud();
   element<HTMLElement>('#health-block').classList.toggle('critical', player.hp <= 30);
   if (!element<HTMLElement>('#roster').hidden) updateRoster();
 }
 
 function renderMatchNetworkStrip(): void {
+  const stripNow = performance.now();
+  if (stripNow - lastNetworkStripAt < 500) return;
+  lastNetworkStripAt = stripNow;
   const strip = element<HTMLElement>('#network-strip');
   if (gameMode === 'solo') {
     strip.hidden = true;
