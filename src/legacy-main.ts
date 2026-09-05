@@ -334,6 +334,7 @@ import type { KillstreakLoadoutV1, Pass65KillstreakId, SelectableKillstreakId } 
 import {
   CARPET_BOMBER_BLAST_RADIUS_M,
   CHOPPER_MISSILE_BLAST_RADIUS_M,
+  CHOPPER_MISSILE_CAPACITY,
   CHOPPER_MISSILE_MAX_DAMAGE,
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
@@ -342,8 +343,6 @@ import {
   type KillstreakDamageEvent,
   type KillstreakTaserStunEvent,
   type KillstreakEntitySnapshot,
-  type KillstreakAdmission,
-  type KillstreakImpactEvent,
   type KillstreakRecipientSnapshot,
   type KillstreakTarget,
   type KillstreakWorld,
@@ -371,10 +370,7 @@ import {
   type KillstreakDamageResultMessage,
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
-  type KillstreakAnnounceMessage,
 } from './killstreak-protocol';
-import { KillstreakActivityTracker, KillstreakAnnouncementDeduper, KillstreakFlightAudioCollector, admitKillstreakAnnounceMessage, bindKillstreakBannerElement, createKillstreakBannerState, expireKillstreakBanner, killstreakAnnouncementBanner, killstreakDamageSourceCue, showKillstreakBanner, supportDropCue, type KillstreakDamageSourceCue } from './killstreak-awareness';
-import { hideGunnerCockpitHudElements, syncGunnerCockpitHudElements } from './gunner-cockpit-hud';
 import {
   isOwnerSupportDamageFeedback,
   presentSupportShotAudioPositional,
@@ -1120,7 +1116,7 @@ import {
   type TaserStunResult,
 } from './taser-stun';
 import { isTaserStunMessage, type TaserStunMessage } from './taser-protocol';
-import { TASER_PRESENTATION, TASER_STUN_DURATION_MS } from './killstreak-tuning';
+import { PILOTED_DRONE_TASER_CHARGES, TASER_PRESENTATION, TASER_STUN_DURATION_MS } from './killstreak-tuning';
 import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
@@ -5636,14 +5632,6 @@ let lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
 const SUPPORT_ROTOR_AUDIO_REFRESH_INTERVAL_MS = 50;
 const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
-// HF-509: every peer's killstreak awareness (announce de-dup, public shot/drop
-// ledger for the firing/dropping phases, flight-loop pool, banner, QA mirror).
-const killstreakAnnouncements = new KillstreakAnnouncementDeduper();
-const killstreakActivity = new KillstreakActivityTracker();
-const supportFlightAudioCollector = new KillstreakFlightAudioCollector();
-const killstreakBanner = bindKillstreakBannerElement(element<HTMLElement>('#killstreak-alert'));
-let killstreakBannerState = createKillstreakBannerState();
-const killstreakAwarenessQa: { announcements: { activationId: string; source: string; ownerId: string; headline: string; tone: string }[]; damageSource: KillstreakDamageSourceCue | null } = { announcements: [], damageSource: null };
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const supportShotReplay = new SupportShotReplayGuard();
@@ -12882,7 +12870,7 @@ function onNetworkMessage(message: GameMessage): void {
           now,
         }));
       }
-      announceKillstreakActivation(admission, message.by, remotes.get(message.by)?.snapshot.team ?? player.team, now);
+      addFeed(`${combatantLabel(message.by).name} CALLED ${GAMEPAD_SUPPORT_LABELS[admission.activatedId!]}`, 'gold');
       broadcastKillstreakState();
     }
     return;
@@ -12937,13 +12925,6 @@ function onNetworkMessage(message: GameMessage): void {
       localCareCaptureRequiresHold = false;
       addFeed(`CARE PACKAGE - CLAIM REJECTED (${message.reason.replaceAll('-', ' ').toUpperCase()})`, 'coral');
     }
-    return;
-  }
-  if (message.type === 'killstreak-announce') {
-    if (network.role !== 'client' || !admitKillstreakAnnounceMessage(message, {
-      expectedHostId: privateLobbySnapshot?.hostId ?? null, expectedMatchEpoch: killstreakMatchEpoch, deduper: killstreakAnnouncements,
-    }).accepted) return;
-    presentKillstreakAnnouncement(message, performance.now());
     return;
   }
   if (message.type === 'killstreak-state') {
@@ -13062,7 +13043,6 @@ function onNetworkMessage(message: GameMessage): void {
       (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
-    killstreakActivity.recordShots(message.shots, performance.now());
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
@@ -13073,8 +13053,12 @@ function onNetworkMessage(message: GameMessage): void {
     }
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
-      // Owner 2026-08-30: guests hear the launch too. HF-509: and the bomb bay.
-      presentSupportDropCue(impact, presentedAt);
+      // Owner 2026-08-30: guests hear the launch too.
+      if (impact.phase === 'drop' && impact.source === 'chopper') {
+        audio.missileLaunch(impact.launchPosition
+          ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] }
+          : undefined);
+      }
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
@@ -14954,7 +14938,6 @@ function updateSensoryFeedback(now: number): void {
   // presentation gate below — a stiff spring stepped at 30 Hz reads as lag.
   // Writes nothing while settled (see advanceHudImpact).
   hudImpactState = advanceHudImpact(hudRoot, hudImpactState, now);
-  killstreakBannerState = expireKillstreakBanner(killstreakBanner, killstreakBannerState, now);
   // HF-350: the explosion ambience duck is armed by every blast and is only released
   // here. Without this call the ambience bed stays at 40% for the rest of the match
   // after the first grenade, on every map. Idempotent and self-guarding, so it is
@@ -14987,8 +14970,6 @@ function updateSensoryFeedback(now: number): void {
     marker.style.setProperty('--damage-opacity', direction.opacity.toFixed(4));
     marker.dataset.sector = String(direction.sector);
     marker.dataset.sourceType = direction.sourceType;
-    if (direction.sourceLabel) marker.dataset.sourceLabel = direction.sourceLabel;
-    else delete marker.dataset.sourceLabel;
   });
   const lowHealth = sampleLowHealthFeedback(lowHealthFeedbackState, {
     health: player.hp,
@@ -15049,7 +15030,7 @@ function applyDamage(
   lastDamageAt = now;
   audio.damage();
   gamepadRuntime.rumble('damage', now); // GAMEPAD: damage-taken pulse
-  if (cause.kind !== 'killstreak') showDamageDirection(attacker, appliedDamage, now);
+  showDamageDirection(attacker, appliedDamage, now);
   // HF-352: Camera shake impulse from taking damage
   if (appliedDamage > 0) {
     // HF-370: the owner wants hits FELT. Trauma scales with how hard the hit
@@ -17484,10 +17465,6 @@ async function startGame(
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
-  killstreakAnnouncements.reset();
-  killstreakActivity.reset();
-  killstreakBanner.hidden = true;
-  killstreakBannerState = createKillstreakBannerState();
   supportShotReplay.clear();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
@@ -24380,43 +24357,7 @@ function requestKillstreakActivation(
   // and before the earliest support fire gate.
   lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   broadcastKillstreakState(now);
-  announceKillstreakActivation(admission, player.id, player.team, now);
   return activationRequestId;
-}
-
-/** HF-509: host-only, once per admitted activation; the whole lobby hears and sees it. */
-function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: string, ownerTeam: Team, now: number): void {
-  if (network.role !== 'host' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
-  if (!killstreakAnnouncements.admit(admission.activationId)) return;
-  const entry = killstreakRuntime.snapshotFor(null, now).entities.find((entity) => entity.activationId === admission.activationId)?.position;
-  const owner = ownerId === player.id ? player.position : remotes.get(ownerId)?.target ?? player.position;
-  const message: KillstreakAnnounceMessage = {
-    type: 'killstreak-announce', by: player.id, matchEpoch: killstreakMatchEpoch, activationId: admission.activationId,
-    ownerId, ownerTeam, source: admission.activatedId, position: entry ?? [owner.x, owner.y, owner.z], nonce: randomNonce(),
-  };
-  network.send(message);
-  presentKillstreakAnnouncement(message, now);
-}
-
-function presentKillstreakAnnouncement(message: KillstreakAnnounceMessage, now: number): void {
-  const banner = killstreakAnnouncementBanner({
-    source: message.source, ownerId: message.ownerId, ownerName: combatantLabel(message.ownerId).name, ownerTeam: message.ownerTeam,
-    localId: player.id, localTeam: player.team, freeForAll: gameMode !== 'solo' && privateMatchMode === 'ffa',
-  });
-  killstreakBannerState = showKillstreakBanner(killstreakBanner, banner, message.activationId, message.source, now);
-  audio.killstreakAnnounce(banner.tone);
-  addFeed(`${combatantLabel(message.ownerId).name} CALLED ${banner.label}`, banner.tone === 'hostile' ? 'coral' : 'gold');
-  killstreakAwarenessQa.announcements.push({ activationId: message.activationId, source: message.source, ownerId: message.ownerId, headline: banner.headline, tone: banner.tone });
-  if (killstreakAwarenessQa.announcements.length > 8) killstreakAwarenessQa.announcements.shift();
-}
-
-/** HF-509: one drop cue for host and guests - missile off the rail or bomb out of the bay, at the source. */
-function presentSupportDropCue(impact: KillstreakImpactEvent, now: number): void {
-  const drop = supportDropCue(impact);
-  if (!drop) return;
-  killstreakActivity.recordImpacts([impact], now);
-  if (drop.kind === 'missile') audio.missileLaunch(drop.emitter);
-  else audio.bombRelease(drop.emitter);
 }
 
 function requestKillstreakControl(
@@ -24719,13 +24660,6 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
     // death bookkeeping until the killstreak update has fully settled.
     applyDamage(event.damage, attributionId, 1, true, cause);
     const applied = Math.max(0, before - player.hp);
-    // HF-509: the indicator points at the killstreak itself and names it.
-    const cue = killstreakDamageSourceCue({ ...event, damage: Math.max(1, applied) }, performance.now());
-    killstreakAwarenessQa.damageSource = cue;
-    directionalDamageState = recordDirectionalDamage(directionalDamageState, {
-      sourceId: cue.sourceId, sourceType: 'killstreak', sourceLabel: cue.label, damage: cue.damage, now: cue.atMs,
-      angleRadians: sourceScreenAngle(player.position, player.yaw, { x: cue.position[0], z: cue.position[2] }), cameraYawRadians: player.yaw,
-    });
     if (player.hp <= 0 && player.alive) {
       deferredLocalKillstreakDeath = { attacker: attributionId, cause };
     }
@@ -24797,9 +24731,6 @@ function syncActiveSupportRotorAudio(now: number): void {
     if (activeSupportRotorAudioSources.length >= supportRotorAudioSourcePool.length) break;
   }
   audio.syncChopperRotors(activeSupportRotorAudioSources);
-  // HF-509: aircraft and drones get the same positional treatment on every peer.
-  killstreakActivity.retain(killstreakSnapshot.entities);
-  audio.syncSupportFlightLoops(supportFlightAudioCollector.collect(killstreakSnapshot.entities, camera.position, killstreakActivity, now));
 }
 
 const killstreakPossessionCameraScratch = new THREE.Vector3();
@@ -24812,19 +24743,93 @@ let nextLocalSupportGunReportAt = 0;
 let gunnerTargetConfirmUntil = 0;
 const GUNNER_TARGET_CONFIRM_DURATION_MS = 650;
 
+/**
+ * First-person cockpit HUD for the Chopper Gunner and Piloted Drone. Values
+ * mirror the authoritative entity snapshot; the disconnected reticle leaves
+ * the exact centre ray unobstructed on desktop and mobile.
+ */
 function syncGunnerCockpitHud(
   entity: KillstreakEntitySnapshot,
   possessionKind: 'chopper-gunner' | 'piloted-drone',
   now: number,
 ): void {
-  syncGunnerCockpitHudElements(element, {
-    entity, possessionKind, now, arenaMinY: arena.bounds.minY ?? 0,
-    damageDealt: supportDamageDealtByActivation.get(entity.activationId) ?? 0, targetConfirmUntil: gunnerTargetConfirmUntil,
-  });
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = false;
+  hud.setAttribute('aria-hidden', 'false');
+  hud.dataset.supportKind = possessionKind;
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = possessionKind !== 'chopper-gunner';
+  controlStrip.setAttribute('aria-hidden', String(possessionKind !== 'chopper-gunner'));
+  element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
+  const gunAmmo = entity.magazine === null ? '∞' : String(entity.magazine);
+  element<HTMLElement>('#gunner-ammo').textContent = gunAmmo;
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = gunAmmo;
+  element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
+  element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
+  element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
+  element<HTMLElement>('#gunner-damage').textContent = String(Math.round(
+    supportDamageDealtByActivation.get(entity.activationId) ?? 0,
+  ));
+  element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
+  element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  const chopperGunner = possessionKind === 'chopper-gunner';
+  missileStatus.hidden = !chopperGunner;
+  missileStatus.setAttribute('aria-hidden', String(!chopperGunner));
+  if (chopperGunner) {
+    const ammo = Math.max(0, Math.min(CHOPPER_MISSILE_CAPACITY, entity.missileAmmo ?? 0));
+    const cooldownMs = Math.max(0, entity.missileCooldownMs ?? 0);
+    element<HTMLElement>('#gunner-missile-ammo').textContent = `×${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
+    element<HTMLElement>('#gunner-missile-cooldown').textContent = ammo <= 0
+      ? 'EMPTY'
+      : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
+    missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
+  }
+  // HF-458: the drone's taser counter, same RMB slot, same lifecycle contract.
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  const dronePilot = possessionKind === 'piloted-drone';
+  taserStatus.hidden = !dronePilot;
+  taserStatus.setAttribute('aria-hidden', String(!dronePilot));
+  if (dronePilot) {
+    const charges = Math.max(0, Math.min(PILOTED_DRONE_TASER_CHARGES, entity.taserCharges ?? 0));
+    element<HTMLElement>('#gunner-taser-charges').textContent = `×${charges} / ${PILOTED_DRONE_TASER_CHARGES}`;
+    element<HTMLElement>('#gunner-taser-state').textContent = charges > 0 ? 'READY' : 'EMPTY';
+    taserStatus.dataset.ready = String(charges > 0);
+  }
+  if (now >= gunnerTargetConfirmUntil) {
+    element<HTMLElement>('#gunner-target-confirm').hidden = true;
+    hud.dataset.hitConfirm = 'false';
+  }
 }
 
 function hideGunnerCockpitHud(): void {
-  hideGunnerCockpitHudElements(element);
+  const hud = element<HTMLElement>('#gunner-cockpit-hud');
+  hud.hidden = true;
+  hud.setAttribute('aria-hidden', 'true');
+  hud.dataset.supportKind = 'none';
+  hud.dataset.hitConfirm = 'false';
+  const controlStrip = element<HTMLElement>('#gunner-control-strip');
+  controlStrip.hidden = true;
+  controlStrip.setAttribute('aria-hidden', 'true');
+  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
+  targetConfirm.hidden = true;
+  targetConfirm.style.removeProperty('left');
+  targetConfirm.style.removeProperty('top');
+  delete targetConfirm.dataset.targetId;
+  element<HTMLElement>('#chopper-thermal').hidden = true;
+  const missileStatus = element<HTMLElement>('#gunner-missile-status');
+  missileStatus.hidden = true;
+  missileStatus.setAttribute('aria-hidden', 'true');
+  missileStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-control-gun-ammo').textContent = '∞';
+  element<HTMLElement>('#gunner-missile-ammo').textContent = `×0 / ${CHOPPER_MISSILE_CAPACITY}`;
+  element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
+  const taserStatus = element<HTMLElement>('#gunner-taser-status');
+  taserStatus.hidden = true;
+  taserStatus.setAttribute('aria-hidden', 'true');
+  taserStatus.dataset.ready = 'false';
+  element<HTMLElement>('#gunner-taser-charges').textContent = `×0 / ${PILOTED_DRONE_TASER_CHARGES}`;
+  element<HTMLElement>('#gunner-taser-state').textContent = 'OFFLINE';
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;
 }
@@ -24997,7 +25002,6 @@ function updatePass65KillstreakRuntime(now: number): void {
   synchronizeDebugChopperExteriorReviewHold();
   if (!gameStarted) {
     audio.syncChopperRotors([]);
-    audio.syncSupportFlightLoops([]);
     killstreakPresentation.clear();
     resetKillstreakPossessionPresentation();
     return;
@@ -25037,10 +25041,13 @@ function updatePass65KillstreakRuntime(now: number): void {
       maximumDamage: number;
       shedBlastClass: 'carpet-bomber-obliteration';
     }> = [];
-    killstreakActivity.recordShots(result.shotEvents, now);
     for (const impact of result.impactEvents) {
       // Owner 2026-08-30: the missile leaving the rail is audible, not silent.
-      presentSupportDropCue(impact, now);
+      if (impact.phase === 'drop' && impact.source === 'chopper') {
+        audio.missileLaunch(impact.launchPosition
+          ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] }
+          : undefined);
+      }
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
@@ -34638,7 +34645,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lowHealthOpacity: Number(lowHealthVignette.style.getPropertyValue('--low-health-opacity') || 0),
     },
     killstreak: killstreakSnapshot,
-    killstreakAwareness: killstreakAwarenessQa,
     killstreakControlAdmission: lastLocalKillstreakControlAdmission,
     adrenalineRuntime: adrenalineRuntimeDebugSnapshot(),
     killstreakPresentation: killstreakPresentation.telemetry(camera),

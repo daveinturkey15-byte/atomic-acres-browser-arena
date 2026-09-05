@@ -6,9 +6,7 @@ export const LOW_HEALTH_EXIT_HP = 38;
 
 export type DirectionalDamagePulse = Readonly<{
   sourceId: string;
-  sourceType: 'local' | 'remote' | 'bot' | 'world' | 'killstreak';
-  /** HF-509: optional on-screen source name (e.g. CHOPPER GUNNER) for a killstreak hit. */
-  sourceLabel: string | null;
+  sourceType: 'local' | 'remote' | 'bot' | 'world';
   worldBearingRadians: number;
   angleRadians: number;
   sector: number;
@@ -23,7 +21,6 @@ export type DirectionalDamageState = Readonly<{
 export type DirectionalDamagePresentation = Readonly<{
   sourceId: string;
   sourceType: DirectionalDamagePulse['sourceType'];
-  sourceLabel: string | null;
   angleRadians: number;
   sector: number;
   opacity: number;
@@ -53,7 +50,6 @@ export function recordDirectionalDamage(
   input: Readonly<{
     sourceId: string;
     sourceType?: DirectionalDamagePulse['sourceType'];
-    sourceLabel?: string | null;
     angleRadians: number;
     cameraYawRadians?: number;
     damage: number;
@@ -72,7 +68,6 @@ export function recordDirectionalDamage(
   const pulse: DirectionalDamagePulse = Object.freeze({
     sourceId: input.sourceId,
     sourceType: input.sourceType ?? 'world',
-    sourceLabel: input.sourceLabel ?? null,
     worldBearingRadians,
     angleRadians,
     sector: angleSector(angleRadians),
@@ -99,7 +94,6 @@ export function directionalDamagePresentation(
     return [Object.freeze({
       sourceId: pulse.sourceId,
       sourceType: pulse.sourceType,
-      sourceLabel: pulse.sourceLabel,
       angleRadians,
       sector: angleSector(angleRadians),
       opacity: clamp01(pulse.strength * remaining * remaining),

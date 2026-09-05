@@ -85,7 +85,6 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   // Owner 2026-08-30: possessed chopper missile launch whoosh.
   'match.domination-cue',
   'support.missile-launch.positional',
-  'support.killstreak-announce',
   'support.chopper-damage',
   'support.carpet-aircraft',
   'support.carpet-bomb',
@@ -376,13 +375,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
   runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
   // Owner 2026-08-30: chopper missile launch whoosh, host and guest impact loops.
-  // HF-509: one shared drop-cue helper plays the missile or the bomb release
-  // on host and guests alike, so both callsites collapsed into it.
-  runtimeCallsite('missileLaunch', 'drop.emitter', 1, ['support.missile-launch.positional']),
-  runtimeCallsite('bombRelease', 'drop.emitter', 1, ['support.carpet-bomb']),
-  runtimeCallsite('killstreakAnnounce', 'banner.tone', 1, ['support.killstreak-announce']),
-  runtimeCallsite('syncSupportFlightLoops', '[]', 1, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
-  runtimeCallsite('syncSupportFlightLoops', 'supportFlightAudioCollector.collect(killstreakSnapshot.entities, camera.position, killstreakActivity, now)', 1, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
+  runtimeCallsite('missileLaunch', 'impact.launchPosition ? { x: impact.launchPosition[0], y: impact.launchPosition[1], z: impact.launchPosition[2] } : undefined', 2, ['support.missile-launch.positional']),
   // Owner 2026-08-30: Domination zone ownership cues (friendly rise / loss fall).
   runtimeCallsite('dominationCue', 'false', 1, ['match.domination-cue']),
   runtimeCallsite('dominationCue', 'zone.owner === player.team', 1, ['match.domination-cue']),
@@ -878,12 +871,11 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: LOCAL_CRITICAL, lifecycleOwner: 'player-life',
     coverageDetail: 'Adrenaline state cues must track the frozen modifier lifecycle without becoming the only state indication.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.care-aircraft', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['inbound', 'drop', 'outbound'],
-    emitterSymbols: ['syncSupportFlightLoops'],
     contractRefs: ['R500', 'R502', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-509: one HRTF flight loop per replicated care aircraft on every peer (syncSupportFlightLoops), gain from the shared killstreakAudioGain distance+altitude curve, phase from the replicated entity phase; stopped on expiry, match end or disposal.',
+    coverageDetail: 'The aircraft voice is owned by its host-spawned support entity and ends on outbound/expiry/disposal.',
   }),
   plannedEvent({
     id: 'support.care-crate-descent', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -931,31 +923,23 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Owner 2026-08-30: possessed Chopper Gunner missile leaving the wing rail - ignition thump + rising rocket-motor whoosh, spatial at the launch socket via the railgun spatial-chain pattern, flat weapons bus when the origin is unknown (older peers). Fires on drop-phase impacts for host and guests alike.',
   }),
-  existingEvent({
-    id: 'support.killstreak-announce', family: 'support', bus: 'announcements', delivery: 'global-nonspatial',
-    variants: ['own', 'friendly', 'hostile'], emitterSymbols: ['killstreakAnnounce'],
-    contractRefs: ['R500', 'R506', 'R508', 'R308'], concurrency: GLOBAL_CUE, lifecycleOwner: 'support-activation',
-    coverageDetail: 'HF-509: host broadcasts one killstreak-announce per admitted activation; every peer plays the sting once (de-duplicated by activation id) with a hostile klaxon or a friendly rise.',
-  }),
   plannedEvent({
     id: 'support.chopper-damage', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['hit', 'critical', 'destroyed'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Damage and destruction variants follow host-owned health transitions.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.carpet-aircraft', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'drop-run', 'depart'],
-    emitterSymbols: ['syncSupportFlightLoops'],
     contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-509: the Carpet Bomber is heard coming on every peer - one HRTF flight loop follows the replicated route (syncSupportFlightLoops), louder on the drop run (public drop reports), thinner on departure; disposed after the run.',
+    coverageDetail: 'The aircraft loop follows the seeded host route and is disposed after the run.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.carpet-bomb', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'explosion-world-v1', variants: ['release', 'fall', 'impact'],
-    emitterSymbols: ['bombRelease'],
     contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-509: Carpet Bomber bay release (clunk + falling whistle) at the drop point on host and guests alike, via the public drop-phase impact report (bombRelease).',
+    coverageDetail: 'Twenty-bomb presentation uses capped/coalesced voices without altering host-authored impact order.',
   }),
   existingEvent({
     id: 'support.drone-gun.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -964,12 +948,11 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'HF-337: positional piloted-drone/swarm gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.drone-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-drone-world-v1', variants: ['piloted', 'hunter', 'swarm'],
-    emitterSymbols: ['syncSupportFlightLoops'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'HF-509: every replicated Piloted Drone / Drone Swarm entity owns at most one pooled positional rotor voice on every peer (nearest six admitted by syncSupportFlightLoops), louder while its public shot reports say it is firing; released on death/expiry/rematch.',
+    coverageDetail: 'Every active drone owns at most one pooled positional rotor voice and releases it on death/expiry/rematch.',
   }),
   plannedEvent({
     id: 'support.drone-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -1131,7 +1114,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
 // neither branch's pin is correct once both the Nuke Town Rebuild's and the
 // Raid Rebuild's bed, event and music rows are present.
-export const SOUND_EVENT_INVENTORY_SHA256 = '8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a';
+export const SOUND_EVENT_INVENTORY_SHA256 = '6a202a8f362805782602ec302d5a1bc6e601da43aff056fb282708080701d2b9';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

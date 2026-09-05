@@ -34,9 +34,6 @@ import {
   CARPET_GROUND_FIRE_STATE_MAX_CHUNKS,
 } from './carpet-ground-fire-multiplayer';
 import type { CarpetGroundFirePresentationSnapshot } from './flamethrower-stream-system';
-import type { KillstreakAnnounceMessage } from './killstreak-awareness';
-
-export type { KillstreakAnnounceMessage } from './killstreak-awareness';
 
 export type KillstreakLoadoutIntentMessage = Readonly<{
   type: 'killstreak-loadout-intent';
@@ -132,8 +129,7 @@ export type KillstreakProtocolMessage = KillstreakLoadoutIntentMessage
   | KillstreakCareCaptureResultMessage
   | KillstreakStateMessage
   | KillstreakDamageResultMessage
-  | KillstreakCarpetFireStateMessage
-  | KillstreakAnnounceMessage;
+  | KillstreakCarpetFireStateMessage;
 
 export type KillstreakStateAdmission = Readonly<{
   accepted: boolean;
@@ -579,16 +575,6 @@ export function isKillstreakProtocolMessage(value: unknown): value is Killstreak
       })).size !== value.fires.length) return false;
     return finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
   }
-  if (value.type === 'killstreak-announce') {
-    // HF-509: host-only, once per admitted activation, public to every peer.
-    return exactKeys(value, ['type', 'by', 'matchEpoch', 'activationId', 'ownerId', 'ownerTeam', 'source', 'position', 'nonce'])
-      && actorId(value.by) && safeCounter(value.matchEpoch)
-      && activationId(value.activationId)
-      && String(value.activationId).startsWith(`ks-activation-${Number(value.matchEpoch)}-`)
-      && actorId(value.ownerId) && (value.ownerTeam === 0 || value.ownerTeam === 1)
-      && ids.has(String(value.source)) && vec3(value.position)
-      && finite(value.nonce, 0, Number.MAX_SAFE_INTEGER);
-  }
   if (value.type === 'killstreak-damage-result') {
     return exactKeys(value, ['type', 'by', 'matchEpoch', 'revision', 'events', 'shots', 'impacts', 'nonce'])
       && actorId(value.by) && safeCounter(value.matchEpoch) && safeCounter(value.revision)
@@ -619,8 +605,6 @@ export function killstreakMessageBelongsToPlayer(message: KillstreakProtocolMess
   if (message.type === 'killstreak-care-capture-result') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-state') return message.by === playerId || message.forPlayerId === playerId;
   if (message.type === 'killstreak-carpet-fire-state') return message.by === playerId || message.forPlayerId === playerId;
-  // HF-509: the whole lobby is the audience of an activation announcement.
-  if (message.type === 'killstreak-announce') return true;
   if (message.type === 'killstreak-damage-result') return message.shots.length > 0
     || message.impacts.length > 0
     || message.by === playerId
@@ -632,8 +616,7 @@ export function isKillstreakHostAuthorityMessage(message: KillstreakProtocolMess
   return message.type === 'killstreak-care-capture-result'
     || message.type === 'killstreak-state'
     || message.type === 'killstreak-carpet-fire-state'
-    || message.type === 'killstreak-damage-result'
-    || message.type === 'killstreak-announce';
+    || message.type === 'killstreak-damage-result';
 }
 
 export function isPass65KillstreakId(value: unknown): value is Pass65KillstreakId {
