@@ -184,6 +184,28 @@ export function matchTimeSkyPreset(elapsedSeconds: number, matchSeconds: number)
   const quarter = Math.min(3, Math.floor((elapsed / length) * 4));
   return SKY_TIME_PRESET_IDS[quarter];
 }
+/**
+ * The match-time preset as an HOUR on an arena: the documented quarters of
+ * `matchTimeSkyPreset()` addressed through `skyTimePresetHour()`. Pure in all
+ * three arguments so every peer derives the same sun with zero traffic; the
+ * existing sun-movement gate (`LIGHTING_CONDITION_SUN_STEP_DEGREES` in
+ * legacy-main.ts) means the static shadow map refreshes only when the sun
+ * actually moves between quarters.
+ */
+export function matchTimeSkyPresetHour(arenaId: ArenaId, elapsedSeconds: number, matchSeconds: number): number {
+  return skyTimePresetHour(arenaId, matchTimeSkyPreset(elapsedSeconds, matchSeconds));
+}
+/**
+ * The `cycle` match-clock hour for an arena: quarters walk with the match
+ * length already resolved. `durationMs` is the replicated match length (null
+ * on explore arenas, which run no clock); anything non-positive falls back to
+ * the 300 s default `matchTimeSkyPreset()` itself uses, so the walk stays
+ * defined everywhere and every peer agrees with zero traffic.
+ */
+export function cycleMatchFixedHour(arenaId: ArenaId, elapsedSeconds: number, durationMs: unknown): number {
+  const matchSeconds = typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 300;
+  return matchTimeSkyPresetHour(arenaId, elapsedSeconds, matchSeconds);
+}
 
 /**
  * A weather preset clamped to what the arena can reach: the highest available

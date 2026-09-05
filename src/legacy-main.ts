@@ -118,7 +118,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
-import { isSkyTimePresetId, skyBackdropIntensity, skyTimePresetHour, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
+import { cycleMatchFixedHour, isSkyTimePresetId, skyBackdropIntensity, skyTimePresetHour, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
 import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
@@ -4229,6 +4229,11 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     // `?sky=` names a PASS 95 catalogue preset for the selected arena; same local-only rule, `?todhour=` wins.
     ...(lightingCaptureFixedHour !== null || privateLobbySnapshot || !isSkyTimePresetId(lightingQuerySkyPreset)
       ? {} : { fixedHour: skyTimePresetHour(selectedArena.id, lightingQuerySkyPreset) }),
+    // PASS 95 finish: `cycle` walks the catalogue quarters (peer-identical, zero
+    // traffic); `?todhour=`/`?sky=` win, hosted lobbies ignore it, and shadow
+    // refreshes stay sun-gated in `reaimConditionedSun` (>= 0.35 deg).
+    ...(lightingCaptureFixedHour !== null || privateLobbySnapshot || isSkyTimePresetId(lightingQuerySkyPreset) || activeLightingTimeChoice() !== 'cycle'
+      ? {} : { fixedHour: cycleMatchFixedHour(selectedArena.id, lightingConditionsElapsedSeconds, currentMatchRules().durationMs) }),
   });
 }
 
