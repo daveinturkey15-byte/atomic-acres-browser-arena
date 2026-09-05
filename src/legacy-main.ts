@@ -679,8 +679,6 @@ import {
   type SmokeVolume,
 } from './combat/ordnance';
 import {
-  DEATH_DROP_INTERACTION_RANGE,
-  DEATH_DROP_SCAVENGE_RANGE,
   MAX_DEATH_DROPS,
   consumeDeathDropWeapon,
   createDeathDrop,
@@ -842,7 +840,7 @@ import {
   registerRemoteSupportActivation,
   type RemoteSupportAuthorityState,
 } from './remote-support-authority';
-import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, recordRemoteGrenadeDeath, recordRemoteGrenadeRespawn, remoteGrenadeForAction, remoteGrenadeLifeForAction, replenishRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, recordRemoteGrenadeDeath, recordRemoteGrenadeRespawn, remoteGrenadeForAction, remoteGrenadeLifeForAction, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitHostCanonicalHitResult } from './host-canonical-hit-admission';
 import {
   createRemoteStickyAttachmentAuthorityState,
@@ -997,6 +995,8 @@ import {
 } from './systems/thermal-reveal-selection';
 import { createSupportFlightWorld } from './systems/support-flight-world';
 import { createRemoteReloadResultCache } from './remote-reload-result-cache';
+import { acceptRemotePickup as acceptRemotePickupAuthority } from './mp-remote-pickup-authority';
+import { applyCanonicalPickupDrop as applyCanonicalPickupDropPresentation, restorePendingLocalPickup as restorePendingLocalPickupPresentation } from './mp-pickup-presentation';
 import { viewmodelMuzzleFireBlockReason, viewmodelMuzzleInsideSurfaceClip, viewmodelSurfaceClipPlanes } from './systems/viewmodel-surface-clip';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
@@ -5775,7 +5775,6 @@ const remoteCombatInventoryRevisions = new Map<string, number>();
 const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
 const remoteReloadResultCache = createRemoteReloadResultCache();
-let localReloadRetryTimer: number | null = null;
 const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
 const retainedRemoteAuthorities = new Map<string, Readonly<{
@@ -15593,45 +15592,24 @@ function rejectRemotePickup(
   trimNonceSet();
 }
 
+function pickupPresentationContext() {
+  return {
+    player,
+    ordinaryWeaponIds: ORDINARY_WEAPON_IDS,
+    deathDrops,
+    removeDeathDrop,
+    updateDeathDropPresentation,
+    setWeaponPresentation: (weapon: WeaponId, force: boolean) => weaponView.setWeapon(weapon, force),
+    renderFieldKitSelection,
+  } as const;
+}
+
 function restorePendingLocalPickup(pending: PendingLocalPickup): void {
-  player.primaryWeapon = pending.priorPrimaryWeapon;
-  player.weapon = pending.priorWeapon;
-  player.switchingUntil = pending.priorSwitchingUntil;
-  for (const weapon of ORDINARY_WEAPON_IDS) {
-    player.ammo[weapon] = pending.priorInventory.ammo[weapon];
-    player.reserve[weapon] = pending.priorInventory.reserve[weapon];
-  }
-  player.grenades = pending.priorInventory.grenades;
-  const entity = deathDrops.find((candidate) => candidate.drop.id === pending.dropId);
-  if (entity) {
-    entity.drop = { ...pending.priorDrop, position: { ...pending.priorDrop.position } };
-    entity.root.position.set(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
-    updateDeathDropPresentation(entity);
-  }
-  weaponView.setWeapon(player.weapon, true);
-  renderFieldKitSelection();
+  restorePendingLocalPickupPresentation(pickupPresentationContext(), pending);
 }
 
 function applyCanonicalPickupDrop(message: PickupResultMessage, now: number): void {
-  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
-  if (message.drop === 'removed') {
-    if (entity) removeDeathDrop(entity);
-    return;
-  }
-  if (!entity) return;
-  const canonical = message.drop;
-  entity.drop = {
-    ...entity.drop,
-    weapon: canonical.weapon,
-    ammo: canonical.ammo,
-    reserve: canonical.reserve,
-    position: { x: canonical.position[0], y: canonical.position[1], z: canonical.position[2] },
-    expiresAt: canonical.expiresAt,
-    ammoConsumedAt: null,
-    weaponConsumedAt: null,
-  };
-  entity.root.position.set(canonical.position[0], canonical.position[1], canonical.position[2]);
-  updateDeathDropPresentation(entity, now);
+  applyCanonicalPickupDropPresentation(pickupPresentationContext(), message, now);
 }
 
 function acceptLocalPickupResult(message: PickupResultMessage): void {
@@ -15673,147 +15651,24 @@ function expirePendingLocalPickup(now: number): void {
 
 
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
-  if (message.by === player.id) return;
-  if (processedNonces.has(message.nonce)) {
-    const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
-    rejectRemotePickup(message, 'duplicate', entity?.drop, now);
-    return;
-  }
-  const remote = remotes.get(message.by);
-  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
-  if (!remote) {
-    rejectRemotePickup(message, 'unknown-sender', entity?.drop, now);
-    return;
-  }
-  if (!entity) {
-    rejectRemotePickup(message, 'unknown-drop', undefined, now);
-    return;
-  }
-  if (entity.drop.weapon !== message.weapon) {
-    rejectRemotePickup(message, 'weapon-mismatch', entity.drop, now);
-    return;
-  }
-  const position = new THREE.Vector3(...message.position);
-  const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
-  const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
-  const horizontalDropDistance = Math.hypot(position.x - dropPosition.x, position.z - dropPosition.z);
-  const validDropDistance = message.mode === 'scavenge'
-    ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
-    : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
-  const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
-  const expectedGrenadeGranted = message.mode === 'scavenge' && grenadeAuthority?.remaining === 0 ? 1 : 0;
-  if (!pointInsideBounds(position, arena.bounds, 0.44)) {
-    rejectRemotePickup(message, 'out-of-bounds', entity.drop, now);
-    return;
-  }
-  if (position.distanceTo(senderPosition) > 2.8) {
-    rejectRemotePickup(message, 'sender-distance', entity.drop, now);
-    return;
-  }
-  if (!validDropDistance) {
-    rejectRemotePickup(message, 'drop-distance', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)) {
-    rejectRemotePickup(message, entity.drop.expiresAt <= now ? 'expired' : 'payload-consumed', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'weapon' && !isPrimaryWeaponId(message.weapon)) {
-    rejectRemotePickup(message, 'not-consumable', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'weapon' && !deathDropWeaponAvailable(entity.drop, now)) {
-    rejectRemotePickup(message, entity.drop.expiresAt <= now ? 'expired' : 'payload-consumed', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'scavenge' && message.selectedGrenade !== remote.snapshot.grenade) {
-    rejectRemotePickup(message, 'grenade-state', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'scavenge' && message.grenadeGranted !== expectedGrenadeGranted) {
-    rejectRemotePickup(message, 'grenade-grant', entity.drop, now);
-    return;
-  }
-  const inventory = remoteCombatInventories.get(message.by);
-  if (!inventory) {
-    rejectRemotePickup(message, 'no-inventory', entity.drop, now);
-    return;
-  }
-  if (message.mode === 'scavenge') {
-    const activeWeapon = remote.snapshot.weapon;
-    const ordinary = ORDINARY_WEAPON_IDS.find((weapon) => weapon === activeWeapon);
-    if (!ordinary) {
-      rejectRemotePickup(message, 'not-consumable', entity.drop, now);
-      return;
-    }
-    const result = scavengeDeathDrop(
-      entity.drop,
-      { weapon: ordinary, reserve: inventory.reserve[ordinary], grenades: inventory.grenades },
-      WEAPONS[ordinary].reserve,
-      now,
-    );
-    if (!result.scavenged) {
-      rejectRemotePickup(message, 'nothing-to-scavenge', entity.drop, now);
-      return;
-    }
-    if (result.grenadeGranted !== message.grenadeGranted) {
-      rejectRemotePickup(message, 'grenade-grant', entity.drop, now);
-      return;
-    }
-    const replenished = setGuestCombatInventoryWeapon(
-      inventory,
-      ordinary,
-      inventory.ammo[ordinary],
-      result.inventory.reserve,
-    );
-    setRemoteCombatInventory(
-      message.by,
-      setGuestCombatInventoryGrenades(replenished, result.inventory.grenades),
-    );
-    entity.drop = result.drop;
-    if (grenadeAuthority && result.grenadeGranted === 1) {
-      remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
-    }
-  } else {
-    if (!isPrimaryWeaponId(message.weapon)) {
-      rejectRemotePickup(message, 'not-consumable', entity.drop, now);
-      return;
-    }
-    const result = consumeDeathDropWeapon(
-      entity.drop,
-      {
-        primary: remote.snapshot.primary,
-        ammo: inventory.ammo[remote.snapshot.primary],
-        reserve: inventory.reserve[remote.snapshot.primary],
-      },
-      WEAPONS[remote.snapshot.primary].reserve,
-      now,
-    );
-    if (!result.consumed) {
-      rejectRemotePickup(message, 'payload-consumed', entity.drop, now);
-      return;
-    }
-    const relinquished = setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0);
-    setRemoteCombatInventory(message.by, setGuestCombatInventoryWeapon(
-      relinquished,
-      result.inventory.primary,
-      result.inventory.ammo,
-      result.inventory.reserve,
-    ));
-    const floorY = position.y - stanceEyeHeight(remote.snapshot.stance) + 0.18;
-    entity.drop = result.mode === 'pickup'
-      ? placeSwappedDeathDrop(result.drop, position, floorY, now)
-      : result.drop;
-    if (result.mode === 'pickup') entity.root.position.set(position.x, floorY, position.z);
-    remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary };
-    authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
-    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
-  }
-  processedNonces.add(message.nonce);
-  sendRemotePickupResult(message, 'accepted', 'accepted', entity.drop, now);
-  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
-  else removeDeathDrop(entity);
-  trimNonceSet();
+  acceptRemotePickupAuthority({
+    playerId: player.id,
+    arenaBounds: arena.bounds,
+    processedNonces,
+    remotes,
+    deathDrops,
+    remoteGrenadeAuthorities,
+    remoteCombatInventories,
+    authorizedRemotePickups,
+    rejectRemotePickup,
+    sendRemotePickupResult,
+    setRemoteCombatInventory,
+    setRemoteGrenadeAuthority: (playerId, state) => remoteGrenadeAuthorities.set(playerId, state),
+    setRemoteWeapon: (remote, weapon) => setOperatorWeapon(remote.root.userData.operator as THREE.Group, weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement),
+    updateDeathDropPresentation,
+    removeDeathDrop,
+    trimNonceSet,
+  }, message, now);
 }
 
 
