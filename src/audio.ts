@@ -4039,6 +4039,9 @@ export class ArenaAudio {
     flashbang: { plays: number; lastAudioGain: number; immediateOnsets: number; scheduledBeeps: number; maximumTailMs: number };
     outputProbe: AudioOutputProbe;
     runtime: { voices: number; spatialChains: number; spatialPoolSize: number; stolen: number; dropped: number; globalCap: number; spatialCap: number };
+    // PASS 95 (HF-509): the pooled world-panner pool, so a headless browser probe
+    // can prove world sounds pan through pre-built panners in combat.
+    worldPanners: ReturnType<ArenaAudio['worldPannerTelemetry']>;
     buses: Record<AudioBusId, { configuredGain: number; muted: boolean; effectiveGain: number }>;
   } {
     const buses = Object.fromEntries(AUDIO_BUS_IDS.map((id) => {
@@ -4162,6 +4165,7 @@ export class ArenaAudio {
         globalCap: AUDIO_RUNTIME_BUDGET.globalVoices,
         spatialCap: AUDIO_RUNTIME_BUDGET.spatialVoices,
       },
+      worldPanners: this.worldPannerTelemetry(),
       buses,
     };
   }
