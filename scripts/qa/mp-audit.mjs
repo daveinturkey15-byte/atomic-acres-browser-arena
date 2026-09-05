@@ -1307,6 +1307,21 @@ async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
     return result;
   }
 
+  // Lobby membership is authenticated before each replacement world has
+  // rebuilt its remote table. Wait for the host-authoritative full-state
+  // repair to become observable on every peer before checking two-way
+  // replication or issuing the damage probe. This is a bounded convergence
+  // assertion, not a relaxed success condition: a peer that never reaches
+  // two remotes still fails the one-way replication check below.
+  const remoteReplicationSettled = await Promise.allSettled(settledRoles.map((role) => peers[role].page.waitForFunction(
+    () => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2,
+    undefined,
+    { timeout: JOIN_TIMEOUT_MS },
+  )));
+  result.remoteReplicationAfterRejoin = Object.fromEntries(
+    settledRoles.map((role, index) => [role, remoteReplicationSettled[index].status]),
+  );
+
   const afterId = (await viewOf(guest.page)).selfId;
   result.identityAfter = afterId;
   // Two-way replication after a rejoin: the rejoined guest must see the others
