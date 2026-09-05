@@ -1,3 +1,7 @@
+# Provenance (muse review finding 2): instrument base `465ae6b7` — the `# head`
+# lines below record `git rev-parse --short HEAD` at generation time. The raid2-0
+# geometry scanned here is the COPLANAR_CLEARANCE sweep now committed as `a5c51eae`.
+
 # nuketown2: boxes=687 · FINDINGS 0 · FENCED 165 · SAME-MATERIAL 26 · HOUSE-INTERIOR 0 · STREET 0 · UNAUDITED 198
 # raid2: boxes=216 · FINDINGS 0 · FENCED 0 · SAME-MATERIAL 103 · HOUSE-INTERIOR 0 · STREET 0 · UNAUDITED 0
 # atomic-acres: boxes=235 · FINDINGS 25 · FENCED 0 · SAME-MATERIAL 26 · HOUSE-INTERIOR 0 · STREET 0 · UNAUDITED 108

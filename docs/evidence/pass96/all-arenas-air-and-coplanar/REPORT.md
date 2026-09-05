@@ -189,7 +189,8 @@ the measured value, and pins raid2 + farcrysis AT zero:
 | test2 | 33 | 0 / 0 |
 | map3 | 1 | 0 / 0 |
 
-Measured 2026-09-04 at base `465ae6b7` with the pass 96 raid2 clearance; ceilings are
+Measured 2026-09-04 at instrument base `465ae6b7` with the pass 96 raid2 clearance
+present as uncommitted edits (geometry now committed as `a5c51eae`); ceilings are
 never above the measured value, so any new flush pair fails its arena's row.
 
 ### Task 2 gates (claim-state: VERIFIED, quoted)

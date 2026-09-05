@@ -28,7 +28,8 @@ import { scanArena, type CoplanarScan } from '../scripts/qa/find-coplanar-pairs'
 
 /**
  * MEASURED 2026-09-04, `npx tsx scripts/qa/find-coplanar-pairs.ts --all` at
- * head 465ae6b7 with the pass 96 raid2 clearance applied (full outputs:
+ * instrument base 465ae6b7 with the pass 96 raid2 clearance present as uncommitted
+ * edits (geometry now committed as a5c51eae; full outputs:
  * `docs/evidence/pass96/all-arenas-air-and-coplanar/{before,after}-sweep.txt`).
  * HOUSE-INTERIOR and STREET are authored-footprint classes and their tables
  * exist only on nuketown2; they measured 0 everywhere.
