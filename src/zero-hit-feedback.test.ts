@@ -107,8 +107,8 @@ describe('HF-386 zero-damage world-hit feedback', () => {
     expect(pullEnd).toBeGreaterThan(pullStart);
     const pullBlock = mainSource.slice(pullStart, pullEnd);
     expect(pullBlock).toContain('spawnImpactFlash(point, impact.surface.material, normal)');
-    // PASS 95 (HF-509): the world impact carries its point so it is positioned.
-    expect(pullBlock).toContain('audio.impact(surface, point.distanceTo(camera.position), point);');
+    // PASS 95 finish (HF-509): bullet strikes route by material, keeping the point.
+    expect(pullBlock).toContain('audio.bulletImpact(impact.surface.material, surface, point.distanceTo(camera.position), point);');
     expect(pullBlock.match(/zeroHitWorldImpact \?\?= \{ point, normal \};/g)?.length).toBe(2);
     expect(pullBlock).toContain('hitDamage.size === 0 && !zeroHitDamagedTarget');
 
@@ -128,7 +128,7 @@ describe('HF-386 zero-damage world-hit feedback', () => {
     const traceAt = gunnerBlock.indexOf("traceWeaponPath(rayOrigin, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg')");
     const tracerAt = gunnerBlock.indexOf('spawnTracer(muzzle, rayOrigin.clone().addScaledVector(aim, chopperTrace.travelDistance)');
     const markerAt = gunnerBlock.indexOf('spawnImpactFlash(point, firstImpact.surface.material, normal)');
-    const audioAt = gunnerBlock.indexOf('audio.impact(surface, point.distanceTo(camera.position), point);');
+    const audioAt = gunnerBlock.indexOf('audio.bulletImpact(firstImpact.surface.material, surface, point.distanceTo(camera.position), point);');
     const cueAt = gunnerBlock.indexOf('presentZeroDamageHit(now)');
     expect(traceAt).toBeGreaterThan(rayAt);
     expect(tracerAt).toBeGreaterThan(traceAt);

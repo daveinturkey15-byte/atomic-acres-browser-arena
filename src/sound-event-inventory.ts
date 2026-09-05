@@ -348,11 +348,16 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('hit', "hit.zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hunterLaunch', 'index', 1, ['support.hunter-launch']),
-  runtimeCallsite('impact', "'glass',point.distanceTo(camera.position),point", 1, ['world.window-break']),
+  runtimeCallsite('glassShatter', 'point.distanceTo(camera.position),point', 1, ['world.window-break']),
   // HF-386: +1 — the possessed chopper gunner's presentation-only world
   // impact now plays the same per-surface world projectile impact.
-  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position),point', 4, ['world.projectile-impact']),
-  runtimeCallsite('impact', 'surface,point.distanceTo(player.position),point', 1, ['world.projectile-impact']),
+  // PASS 95 finish (HF-509): bullet strikes route by ballistic material, so
+  // vehicle body, glass and thin-sheet perforation reach their dedicated
+  // positional voices; all other materials keep the generic impact.
+  runtimeCallsite('bulletImpact', 'impact.surface.material,surface,point.distanceTo(camera.position),point', 2, ['world.projectile-impact']),
+  runtimeCallsite('bulletImpact', "result.impactMaterial ?? 'concrete',surface,point.distanceTo(camera.position),point", 1, ['world.projectile-impact']),
+  runtimeCallsite('bulletImpact', 'firstImpact.surface.material,surface,point.distanceTo(camera.position),point', 1, ['world.projectile-impact']),
+  runtimeCallsite('bulletImpact', 'impact.surface.material,surface,point.distanceTo(player.position),point', 1, ['world.projectile-impact']),
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
   runtimeCallsite('matchCountdown', "'engage'", 1, ['announcement.match']),
@@ -652,17 +657,17 @@ const events: SoundEventInventoryEntry[] = [
   existingEvent({
     id: 'world.projectile-impact', family: 'world-impact', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'impact-world-v1', variants: IMPACT_SURFACE_VARIANTS,
-    emitterSymbols: ['impact', 'coverImpact'], contractRefs: ['R101', 'R307', 'R308'],
+    emitterSymbols: ['bulletImpact', 'coverImpact'], contractRefs: ['R101', 'R307', 'R308'],
     concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'match-epoch', coverageStatus: 'partial',
-    coverageDetail: 'Five surface identities exist with scalar attenuation; pooled HRTF/occlusion and global voice enforcement remain planned.',
+    coverageDetail: 'Five surface identities exist with scalar attenuation; bullet strikes route by ballistic material so vehicle, glass and thin-metal reach their dedicated positional voices.',
   }),
   existingEvent({
     id: 'world.window-break', family: 'world-impact', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'impact-world-v1', variants: ['glass'],
     genericFallbackRationale: 'Pass 64 represents a broken window with the existing glass-impact profile; Pass 65 may add a manifested fracture tail without changing break authority.',
-    emitterSymbols: ['impact'], contractRefs: ['R308'], concurrency: WORLD_DENSE_TRANSIENT,
+    emitterSymbols: ['glassShatter'], contractRefs: ['R308'], concurrency: WORLD_DENSE_TRANSIENT,
     lifecycleOwner: 'match-epoch', coverageStatus: 'partial',
-    coverageDetail: 'The semantic window-break caller is inventoried separately even though it currently reuses the glass impact synthesis.',
+    coverageDetail: 'The semantic window-break caller routes through the dedicated glassShatter voice (same glass synthesis, now positional).',
   }),
   existingEvent({
     id: 'movement.footstep.local', family: 'movement', bus: 'movement', delivery: 'listener-local',
@@ -1125,7 +1130,10 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // Raid Rebuild's bed, event and music rows are present.
 // PASS 95 audio-polish (HF-509, 2026-09-05): recomputed after the frag and
 // support explosion events gained the positional `explosionAt` emitter symbol.
-export const SOUND_EVENT_INVENTORY_SHA256 = '9cb2cc80d6393e7458758eb62f0f562d916e998fd890daa68fbaab8f0e9eddc9';
+// PASS 95 finish (HF-509, 2026-09-05): recomputed after bullet strikes gained
+// the `bulletImpact` material router, the window break gained `glassShatter`,
+// and the second shed-door path gained its emitter.
+export const SOUND_EVENT_INVENTORY_SHA256 = '869f782626840bcaa04415f4faea92386e416f1b60a73ddbc269aadcc421aec8';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

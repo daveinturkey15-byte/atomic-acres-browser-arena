@@ -1,4 +1,5 @@
 import { combatConfirmEnvelope, type FootstepSurface, type ImpactSurface } from './combat-feedback';
+import type { BallisticMaterialId } from './ballistics';
 import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
 import type { WeaponId } from './protocol';
@@ -2617,6 +2618,20 @@ export class ArenaAudio {
         punchSeconds: profile.debrisSeconds * 0.25,
       }, destination);
     }
+  }
+
+  /**
+   * PASS 95 finish (HF-509): bullet-strike voice router. The strike's
+   * ballistic material selects the dedicated positional voice - vehicle body,
+   * glass, thin-sheet perforation - and everything else keeps the generic
+   * per-surface impact. Distance and emitter pass through untouched, so each
+   * caller keeps its camera listener and the family attenuation.
+   */
+  bulletImpact(material: BallisticMaterialId, surface: ImpactSurface, distance = 0, emitter?: SpatialPoint): void {
+    if (material === 'vehicle') { this.vehicleHit(distance, emitter); return; }
+    if (material === 'glass') { this.glassShatter(distance, emitter); return; }
+    if (material === 'thin-metal') { this.shedPerforation(distance, emitter); return; }
+    this.impact(surface, distance, emitter);
   }
 
   coverImpact(distance = 0, emitter?: SpatialPoint): void {

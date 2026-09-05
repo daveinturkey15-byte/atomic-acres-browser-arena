@@ -298,7 +298,9 @@ describe('Pass 65 sound-event inventory', () => {
     // neither branch's pin was correct on its own.
     // PASS 95 audio-polish (HF-509, 2026-09-05): recomputed after the frag and
     // support explosion events gained the positional `explosionAt` emitter.
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('9cb2cc80d6393e7458758eb62f0f562d916e998fd890daa68fbaab8f0e9eddc9');
+    // PASS 95 finish (HF-509, 2026-09-05): recomputed after the `bulletImpact`
+    // router, `glassShatter` window break and positional shed-door rows above.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('869f782626840bcaa04415f4faea92386e416f1b60a73ddbc269aadcc421aec8');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

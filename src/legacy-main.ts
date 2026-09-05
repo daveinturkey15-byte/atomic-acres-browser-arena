@@ -14913,7 +14913,7 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
     ));
     if (!impactAudioPlayed) {
       impactAudioPlayed = true;
-      audio.impact(surface, point.distanceTo(camera.position), point);
+      audio.bulletImpact(impact.surface.material, surface, point.distanceTo(camera.position), point);
     }
   }
   if (player.alive) audio.nearMiss(nearMissStrength(player.position, origin, visibleEnd));
@@ -15945,7 +15945,7 @@ function breakHouseWindow(
   // deferred physics sync. Visual effects still happen immediately.
   scheduleBrowserPreparationIdleTask(() => syncInteractiveWorldPhysics());
   spawnImpactFlash(point, 'glass', normal);
-  audio.impact('glass', point.distanceTo(camera.position), point);
+  audio.glassShatter(point.distanceTo(camera.position), point);
   return true;
 }
 
@@ -19614,7 +19614,7 @@ function tryFire(now: number): void {
       spawnImpactFlash(point, impact.surface.material, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
-        audio.impact(surface, point.distanceTo(camera.position), point);
+        audio.bulletImpact(impact.surface.material, surface, point.distanceTo(camera.position), point);
       }
       // HF-386: this is the branch most floor and wall strikes actually take
       // (the ground is a ballistic surface, so the pure-world fallback below
@@ -19635,7 +19635,7 @@ function tryFire(now: number): void {
       spawnImpactFlash(point, result.impactMaterial ?? surface, normal);
       if (!impactAudioPlayed) {
         impactAudioPlayed = true;
-        audio.impact(surface, point.distanceTo(camera.position), point);
+        audio.bulletImpact(result.impactMaterial ?? 'concrete', surface, point.distanceTo(camera.position), point);
       }
       // HF-386: remember the first pure-world strike of this trigger pull so
       // the post-loop pass can decide whether the pull deserves an explicit
@@ -21263,7 +21263,7 @@ function updateBots(dt: number, now: number): void {
           ));
           if (!impactAudioPlayed) {
             impactAudioPlayed = true;
-            audio.impact(surface, point.distanceTo(player.position), point);
+            audio.bulletImpact(impact.surface.material, surface, point.distanceTo(player.position), point);
           }
         }
         if (resolution.hitTarget) {
@@ -24954,7 +24954,7 @@ function updateKillstreakPossession(now: number): void {
         );
         spawnImpactFlash(point, firstImpact.surface.material, normal);
         const surface = ballisticImpactSurface(firstImpact.surface.material);
-        audio.impact(surface, point.distanceTo(camera.position), point);
+        audio.bulletImpact(firstImpact.surface.material, surface, point.distanceTo(camera.position), point);
         // HF-386 truth gate: a world-hit round cannot know its own host
         // outcome synchronously, so while showGunnerTargetConfirm is still
         // presenting a CONFIRMED damage event (gunnerTargetConfirmUntil is

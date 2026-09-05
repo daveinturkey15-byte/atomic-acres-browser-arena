@@ -36,7 +36,7 @@ import { isHostAuthorityMessage, type WindowBreakMessage } from './protocol';
  *   on a guest connection);
  * - shard burst: the breach consumes the existing presentation catalogue
  *   (`spawnPersistentWindowDebris` pooled instanced shards,
- *   `spawnImpactFlash(..., 'glass')`, `audio.impact('glass')` in
+ *   `spawnImpactFlash(..., 'glass')`, `audio.glassShatter(...)` in
  *   `breakHouseWindow`); the inputs that path reads — `paneVisible: false`
  *   and `apertureOpen: true` — are asserted here.
  */
