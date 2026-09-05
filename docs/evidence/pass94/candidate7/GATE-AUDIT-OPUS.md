@@ -348,4 +348,79 @@ weakened gate.
 
 ## 4. Final table and overall verdict
 
-_(in progress)_
+| Gate | Value at HEAD | file:line | Changed in `3e2fd273..452d7aba`? | Verdict |
+|---|---|---|---|---|
+| WebGPU completion fence | 12,000 ms (4 flush sites + `PRESENTATION_STALL_MS`) | `src/rendering/render-runtime.ts:1175, 1873, 1898`; `src/legacy-main.ts:11090, 30151, 30208, 30237` | no | **SAME** |
+| In-combat pipeline tripwire | 0, measured only | `scripts/qa/audit-graphics-profiles.mjs:224-227, 274-275` | no (script byte-identical) | **SAME** (unenforced at both ends) |
+| nuketown2 pipeline budget | 54 | `src/rendering/clustered-lights.ts:29`; `src/nuketown2-pipeline-budget.test.ts:118, 173`; `src/nuketown2-materials/index.ts:142` | ceiling no, structure yes | **SAME value, REFACTORED** |
+| Registry graph-TOPOLOGY distinctness | *absent* | (deleted from `src/nuketown2-pipeline-budget.test.ts`) | **yes - removed** | **LOOSER (F1)** |
+| `LINE_CEILING` legacy-main ratchet | 37,396 (slack 250) | `src/legacy-main-size-ratchet.test.ts:78, 86` | no | **SAME** |
+| Coplanar SAME-MATERIAL-VISIBLE class | 0 | `src/nuketown2-fidelity.test.ts:3119` | added | **NEW (tighter)** |
+| Coplanar STREET / HOUSE-INTERIOR / different-material findings | 0 | `scripts/qa/find-coplanar-pairs.ts` | core extracted, classes kept | **SAME + NEW class** |
+| Collider/visual parity - invisible colliders | 0 | `src/collider-visual-parity-gate.test.ts:120` | no (empty diff) | **SAME** |
+| Collider/visual parity - walk-through beyond ledger | 0, ledger 17 entries | `src/collider-visual-parity-gate.test.ts:137`, ledger `:28-99` | no | **SAME** |
+| Corridor width band | ratio +-3 %, absolute +-5 % | `src/nuketown2-fidelity.test.ts:2768, 2769, 2778` | no | **SAME** |
+| Verge furniture ceiling | <= 36 | `src/nuketown2-fidelity.test.ts:2825` | yes (`6d3e1ad8`) | **TIGHTER** (effective 43 -> 36) |
+| Verge aggregate ceiling | <= 51 | `src/nuketown2-fidelity.test.ts:2827` | yes (`6d3e1ad8`) | **RAISED 43 -> 51**, zero headroom, +8 matches +8 lawn decals |
+| Nuketown2 plan-tolerance band | `< 0.20` | `src/nuketown2-fidelity.test.ts` | yes | **TIGHTER** (was `< 0.35`) |
+| Cold-admission budgets | 10,000 ms x2 | `scripts/qa/verify-pass65-cold-webgpu-admission.mjs:14, 15` | no | **SAME** |
+| Cold-admission smoke coverage | nuketown2 + raid2 | same file, `f74f25bf` | yes - subject changed, 3 assertions dropped | **LOOSER (F3)** |
+| Cold-session precompile root | 2 calls, cold scoped to `arena.root` | `src/presentation-prewarm-contract.test.ts:673-676` | yes | **NARROWED, re-pinned (F7)** |
+| MP soak: 180 s / 120 ms / 1 % / 1.5 m / one-RTT | as stated | `scripts/qa/mp-soak-assertions.mjs:6, 8, 9, 79-86`; `mp-soak-gate.mjs:82` | added | **NEW** |
+| Selectable-arena roster floors | 8 (x5 sites) | `scripts/qa/arena-roster.mjs:59`; `eye-clearance-roster.mjs`; `sweep-eye-clearance-spots.ts`; `cross-browser-gate-contract.test.mjs:114`; `eye-clearance-sweep-contract.test.mjs:113, 165, 468, 476` | **yes, 9 -> 8** | **LOWERED in lockstep with the derived roster; exclusion asserted (F2)** |
+| Registry arena-id floor | 11 | `scripts/qa/arena-roster.mjs:56` | no | **SAME** |
+| Hardcoded-roster allowlist | -2 / +5 entries | `scripts/qa/arena-roster-contract.test.mjs:183-400` | yes, net +3 exemptions | **LOOSER by 3 files (F4)** |
+| Graphics control-set hash pins | 4 hashes re-pinned | `src/graphics-profile-contract.test.ts:47-53` | yes | **REGENERATED, verified by running the test (14 passed); doc not re-measured (F5)** |
+| `MULTIPLAYER_PROTOCOL_VERSION` | 19 | 3 test files | yes, 18 -> 19 | **SAME shape** (version bump) |
+| Release topology pins | PASS 94 live / PASS 93 backup | `src/release-topology.test.ts` | yes, rotation | **SAME shape** |
+| `.skip` / `.only` / `.todo` | none added | whole diff | **no** | **SAME** |
+
+### Overall verdict
+
+**No gate was weakened to get green, with one real exception and two that need the owner's word.**
+[VERIFIED] Across 651 commits and 85 changed test/QA files, every headline threshold the owner cares
+about is byte-identical to the last build he tested: the 12 s WebGPU fence, the two 10,000 ms
+cold-admission budgets, the 54-pipeline ceiling, the 37,396-line ratchet with its 250-line slack, the
+corridor +-3 % band, and the collider/visual parity gate with its 17-entry ledger (that file, its core
+and the ballistic ledger produce a completely empty diff over the range). No `.skip`, `.only`, `.todo`
+or `.failing` was added anywhere. Two gates got materially **stronger**: the HF-497
+same-material-visible coplanar class is now a hard zero where it used to be dismissed as benign, and
+the verge furniture line is capped at 36 where it was effectively 43. Two whole gates are **new**: the
+MP soak bundle and the coplanar audit core. And the strongest evidence of good faith is in what was
+*not* done - [VERIFIED] `capture-harness-warmup` and `mp-rejoin` were both excluded because they broke
+the `legacy-main.ts` size ratchet, and `taa-resolve` was reverted on stale fingerprints, rather than
+any of those three limits being moved to accommodate them.
+
+**The one genuine loosening is F1** [VERIFIED]: `src/nuketown2-pipeline-budget.test.ts` lost
+`it('keeps the graph-TOPOLOGY variants as separate shaders')` and its eight-pair `mustDiffer` table
+with no replacement anywhere in the repository. That test was the *only* lower bound on distinct
+shader graphs, and its stated purpose was to stop a future pass buying pipeline budget by flattening
+the arena's real detail. Its replacement (`<= 8 registry families`) bounds the same quantity from the
+opposite side. In a range whose dominant pressure was cold-admission time - the gate that is still red
+at 24.07 s - deleting the guard against flattening detail to save pipelines is exactly the wrong guard
+to lose. It should be restored before publish; it costs nothing at runtime.
+
+**Two more need Dave, not me.** F2 [OPEN]: five roster floors dropped 9 -> 8 because the original Raid
+was parked. Everything around that change is done correctly - the exclusion is positively asserted in
+three places, the registry floor of 11 did not move, and a dedicated test pins the flag - but the
+in-code attribution "owner, 2026-09-04" rests on a one-line commit body with a Codex trailer and no
+quoted directive. If parking the original Raid was Dave's call, F2 is clean; if it was not, five gate
+floors moved down on an agent's judgement. F5 [OPEN]: all four graphics control-set fingerprints
+changed and their final values were written by a revert's conflict resolution, not a deliberate
+re-pin. I ran that test - 14 passed, so the pins are honest - but the pin's own contract says a moved
+hash obliges a re-measurement of the audit doc's rows, and only the hash column was edited.
+
+Three smaller items for the record: the cold-admission smoke silently changed subject from Atomic
+Acres to Nuke Town Rebuild and dropped `originalArtLoaded`, so the 24.07 s reading is not
+like-for-like with the budget's origin (F3); the hardcoded-roster allowlist gained three net
+exemptions (F4); and `scripts/qa/mp-evidence-analyse.mjs` carries a raw NUL byte that makes git treat
+19 KB of new QA logic as binary, so it entered the branch with no reviewable diff (F6). None of those
+is a threshold change.
+
+**[OPEN] - what this audit did not prove.** I did not run the full suite (another lane owns it) or any
+browser gate, so every "zero headroom" claim (verge 36/51 in particular), the in-combat pipeline count,
+and the cold-admission and soak numbers are read from lane evidence rather than measured here. The
+in-combat pipeline tripwire is [OPEN] as a gate at *both* ends of the range: it is written into
+evidence and read by a human, never asserted by a test. Only one test was executed for this audit
+(`src/graphics-profile-contract.test.ts`, 14 passed), chosen because it was the one finding where the
+difference between "regenerated" and "hand-edited" could not be settled by reading.
