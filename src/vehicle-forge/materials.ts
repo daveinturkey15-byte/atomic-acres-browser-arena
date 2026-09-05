@@ -110,6 +110,17 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   });
   material.name = options.name;
   material.specularIntensity = 0.08;
+  // The authored swatch mirrored onto `material.color` for every path that
+  // reads colour off the material instead of the node graph:
+  // `batchDisplayColor`/`materialBatchKey` in art-kit.ts (static batching in
+  // every simplify mode, and the batch key in preserve mode), the fidelity
+  // gates, and the WebGL2 compatibility route that never evaluates colorNode.
+  // Every other Nuke Town family does the same; forge paint was the only one
+  // that left the default white, so all liveries read white and keyed as one.
+  // WebGPU is unaffected: per r185 NodeMaterial, colorNode OVERWRITES the
+  // diffuse inferred from `color`, and the graph (hence the pipeline budget)
+  // is unchanged.
+  material.color.copy(base);
   material.userData.forgeRole = 'paint';
   material.userData.forgePaintSrgb = options.color;
   material.userData.forgePaintUniform = true;

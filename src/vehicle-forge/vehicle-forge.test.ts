@@ -25,6 +25,7 @@ import {
   classifyQuad,
   collectStations,
   createForgeMaterialSet,
+  createForgePaintMaterial,
   FORGED_VEHICLE_TRIANGLE_BUDGETS,
   flankHalfWidth,
   latheGeometry,
@@ -418,5 +419,41 @@ describe('vehicle-forge assembly', () => {
     // Importing twice must not accumulate anything.
     const again = await import('./index');
     expect(Object.keys(again).sort()).toEqual(Object.keys(forge).sort());
+  });
+});
+
+describe('vehicle-forge paint batch contract', () => {
+  // Candidate 21efd6c1 quality captures: every vehicle WHITE (navy saloons,
+  // cream/maroon coach, white/dark truck, red coupe). The node graphs were
+  // correct - the pipeline-budget gate proves the uniform values - but the
+  // colour lived ONLY in the TSL uniform while material.color stayed default
+  // white. Every colour-reading path (art-kit batchDisplayColor and
+  // materialBatchKey, the fidelity gates, the WebGL2 compat route) therefore
+  // saw white, and all liveries shared one batch key. The factory must mirror
+  // the authored swatch onto material.color, exactly like every Nuke Town
+  // material family already does.
+  const PASS95_LIVERIES = [0x173451, 0xe7dec6, 0xa8382c, 0xf2ede2, 0x2b3138, 0x9e1c1c] as const;
+
+  it('mirrors the authored swatch onto material.color without touching the graph', () => {
+    for (const hex of PASS95_LIVERIES) {
+      const material = createForgePaintMaterial({ color: hex, name: `batch-probe-${hex.toString(16)}` });
+      const expected = new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
+      const tag = hex.toString(16);
+      expect(material.color.r, tag).toBeCloseTo(expected.r, 10);
+      expect(material.color.g, tag).toBeCloseTo(expected.g, 10);
+      expect(material.color.b, tag).toBeCloseTo(expected.b, 10);
+      // The WebGPU path is untouched: the colour still rides the uniform graph.
+      expect(material.colorNode, tag).toBeTruthy();
+      expect(material.userData.forgePaintUniform, tag).toBe(true);
+      expect(material.userData.forgePaintSrgb, tag).toBe(hex);
+      expect(material.userData.forgeRole, tag).toBe('paint');
+    }
+  });
+
+  it('keeps distinct liveries distinct under the batch key colour read', () => {
+    const reads = PASS95_LIVERIES.map((hex) =>
+      createForgePaintMaterial({ color: hex, name: `batch-key-${hex.toString(16)}` }).color.getHexString(),
+    );
+    expect(new Set(reads).size).toBe(PASS95_LIVERIES.length);
   });
 });
