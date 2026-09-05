@@ -185,7 +185,10 @@ export const FARCRYSIS_LOOPS: readonly FarcrysisLoop[] = Object.freeze([
     'wide, open-ish, sightline breaks via palms, skiffs and rocks', 8),
   loop('jungle-band', 26, ring(26),
     'dense, cover-heavy, tight turns, short sightlines (~4-8 m)', 6),
-  loop('core-loop', 5.5, [[0, -8], [4, -5.5], [5.5, 0], [4, 5.5], [0, 8], [-4, 5.5], [-5.5, 0], [-4, -5.5]],
+  // The core loop is an outside-shell octagon. Corner waypoints sit beyond
+  // the 5.5 m wall square so every edge is a real route, not a chord through
+  // the shell collider at an adjacent wall corner.
+  loop('core-loop', 5.5, [[0, -8], [6.5, -6.5], [6.5, 0], [6.5, 6.5], [0, 8], [-6.5, 6.5], [-6.5, 0], [-6.5, -6.5]],
     'ruined research core: two doors, one catwalk, the one vertical crossing', 4.5),
 ]);
 
