@@ -1,0 +1,3676 @@
+{
+  "contract": "pass95-audio-polish-hitch-probe-v1",
+  "measuredAt": "2026-09-05T07:27:13.320Z",
+  "label": "candidate-run1",
+  "dist": "C:\\Users\\david\\projects\\aa-p-audio-polish\\dist",
+  "port": 4265,
+  "seconds": 45,
+  "warmupSeconds": 10,
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "beforeDeploy": {
+    "panners": 18,
+    "buffers": 5,
+    "decodes": 0,
+    "convolvers": 0,
+    "bufferSources": 0,
+    "oscillators": 5,
+    "starts": 5,
+    "pipelines": 0,
+    "shaderModules": 0,
+    "atMs": 3722
+  },
+  "backend": "webgpu",
+  "afterDeploy": {
+    "panners": 19,
+    "buffers": 5,
+    "decodes": 0,
+    "convolvers": 0,
+    "bufferSources": 5,
+    "oscillators": 24,
+    "starts": 24,
+    "pipelines": 316,
+    "shaderModules": 378,
+    "atMs": 102098
+  },
+  "afterDeployAudio": {
+    "context": {
+      "source": "standard",
+      "state": "running"
+    },
+    "immersion": {
+      "space": "urban-yard",
+      "arenaSpace": "urban-yard",
+      "overridden": false,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "worldPanners": {
+      "pooled": 12,
+      "busy": 0,
+      "acquisitions": 0,
+      "starved": 0,
+      "spatialChains": 0
+    },
+    "runtime": {
+      "voices": 5,
+      "spatialChains": 2,
+      "spatialPoolSize": 4,
+      "stolen": 0,
+      "dropped": 0,
+      "globalCap": 48,
+      "spatialCap": 12
+    },
+    "buses": {
+      "master": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.3400000035762787
+      },
+      "sfx": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.7799999713897705
+      },
+      "movement": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.30000001192092896
+      },
+      "ui": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.44999998807907104
+      },
+      "announcements": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.550000011920929
+      },
+      "ambience": {
+        "configuredGain": 82,
+        "muted": false,
+        "effectiveGain": 0.09839999675750732
+      },
+      "menu-music": {
+        "configuredGain": 72,
+        "muted": false,
+        "effectiveGain": 0.03240000084042549
+      },
+      "game-music": {
+        "configuredGain": 50,
+        "muted": false,
+        "effectiveGain": 0.013500000350177288
+      }
+    },
+    "combatPrewarm": {
+      "prepared": true,
+      "runs": 1,
+      "sources": 3,
+      "nodes": 5,
+      "broadbandLoopSources": 0
+    },
+    "explosionMix": {
+      "lastMixAt": null,
+      "requests": 0,
+      "mixes": 0,
+      "coalesced": 0,
+      "coalesceMs": 90
+    }
+  },
+  "windowStart": {
+    "panners": 19,
+    "buffers": 5,
+    "decodes": 0,
+    "convolvers": 0,
+    "bufferSources": 74,
+    "oscillators": 24,
+    "starts": 24,
+    "pipelines": 316,
+    "shaderModules": 378,
+    "atMs": 112365
+  },
+  "windowStartAudio": {
+    "context": {
+      "source": "standard",
+      "state": "running"
+    },
+    "immersion": {
+      "space": "urban-yard",
+      "arenaSpace": "urban-yard",
+      "overridden": false,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "worldPanners": {
+      "pooled": 12,
+      "busy": 0,
+      "acquisitions": 0,
+      "starved": 0,
+      "spatialChains": 0
+    },
+    "runtime": {
+      "voices": 5,
+      "spatialChains": 2,
+      "spatialPoolSize": 4,
+      "stolen": 0,
+      "dropped": 0,
+      "globalCap": 48,
+      "spatialCap": 12
+    },
+    "buses": {
+      "master": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.3400000035762787
+      },
+      "sfx": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.7799999713897705
+      },
+      "movement": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.30000001192092896
+      },
+      "ui": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.44999998807907104
+      },
+      "announcements": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.550000011920929
+      },
+      "ambience": {
+        "configuredGain": 82,
+        "muted": false,
+        "effectiveGain": 0.09839999675750732
+      },
+      "menu-music": {
+        "configuredGain": 72,
+        "muted": false,
+        "effectiveGain": 0.03240000084042549
+      },
+      "game-music": {
+        "configuredGain": 50,
+        "muted": false,
+        "effectiveGain": 0.013500000350177288
+      }
+    },
+    "combatPrewarm": {
+      "prepared": true,
+      "runs": 1,
+      "sources": 3,
+      "nodes": 5,
+      "broadbandLoopSources": 0
+    },
+    "explosionMix": {
+      "lastMixAt": null,
+      "requests": 0,
+      "mixes": 0,
+      "coalesced": 0,
+      "coalesceMs": 90
+    }
+  },
+  "interior": {
+    "house": {
+      "x": 1.25,
+      "y": 1.7,
+      "z": -16.5
+    },
+    "street": {
+      "x": 0,
+      "y": 1.7,
+      "z": 0
+    },
+    "before": {
+      "space": "interior-room",
+      "arenaSpace": "urban-yard",
+      "overridden": true,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "inside": {
+      "space": "interior-room",
+      "arenaSpace": "urban-yard",
+      "overridden": true,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "after": {
+      "space": "urban-yard",
+      "arenaSpace": "urban-yard",
+      "overridden": false,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "holdMs": 4000,
+    "seen": [
+      {
+        "atMs": 207,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 447,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 646,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 832,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 1028,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 1235,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 1421,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 1627,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 1833,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 2011,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 2227,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 2429,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 2627,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 2831,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 3027,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 3247,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 3427,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 3630,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 3845,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      },
+      {
+        "atMs": 4043,
+        "space": "interior-room",
+        "arenaSpace": "urban-yard",
+        "overridden": true,
+        "occlusionHook": false,
+        "occludedReports": 0,
+        "busReturn": null
+      }
+    ]
+  },
+  "windowEnd": {
+    "panners": 23,
+    "buffers": 5,
+    "decodes": 0,
+    "convolvers": 0,
+    "bufferSources": 491,
+    "oscillators": 74,
+    "starts": 74,
+    "pipelines": 316,
+    "shaderModules": 378,
+    "atMs": 158996
+  },
+  "windowEndAudio": {
+    "context": {
+      "source": "standard",
+      "state": "running"
+    },
+    "immersion": {
+      "space": "interior-room",
+      "arenaSpace": "urban-yard",
+      "overridden": true,
+      "occlusionHook": false,
+      "occludedReports": 0
+    },
+    "worldPanners": {
+      "pooled": 12,
+      "busy": 0,
+      "acquisitions": 0,
+      "starved": 0,
+      "spatialChains": 2
+    },
+    "runtime": {
+      "voices": 7,
+      "spatialChains": 4,
+      "spatialPoolSize": 4,
+      "stolen": 0,
+      "dropped": 0,
+      "globalCap": 48,
+      "spatialCap": 12
+    },
+    "buses": {
+      "master": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.3400000035762787
+      },
+      "sfx": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.7799999713897705
+      },
+      "movement": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.30000001192092896
+      },
+      "ui": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.44999998807907104
+      },
+      "announcements": {
+        "configuredGain": 100,
+        "muted": false,
+        "effectiveGain": 0.550000011920929
+      },
+      "ambience": {
+        "configuredGain": 82,
+        "muted": false,
+        "effectiveGain": 0.09839999675750732
+      },
+      "menu-music": {
+        "configuredGain": 72,
+        "muted": false,
+        "effectiveGain": 0.03240000084042549
+      },
+      "game-music": {
+        "configuredGain": 50,
+        "muted": false,
+        "effectiveGain": 0.013500000350177288
+      }
+    },
+    "combatPrewarm": {
+      "prepared": true,
+      "runs": 1,
+      "sources": 3,
+      "nodes": 5,
+      "broadbandLoopSources": 0
+    },
+    "explosionMix": {
+      "lastMixAt": null,
+      "requests": 0,
+      "mixes": 0,
+      "coalesced": 0,
+      "coalesceMs": 90
+    }
+  },
+  "result": {
+    "windowMs": 46631,
+    "frames": 1706,
+    "fps": 36.6,
+    "frameGapMs": {
+      "p50": 22.4,
+      "p95": 38.9,
+      "p99": 111.1,
+      "max": 149.9
+    },
+    "hitches50": 29,
+    "hitches100": 19,
+    "stalledShare": 4.96,
+    "audioInWindow": {
+      "panners": 4,
+      "buffers": 0,
+      "decodes": 0,
+      "convolvers": 0,
+      "sourcesStarted": 50,
+      "pannerStacks": [
+        "at <anonymous>:16:106 <- at globalThis.<computed>.patched [as createPanner] (<anonymous>:14:53) <- at e.playAmbientEvent (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:185310) <- at e.updateArenaAmbience (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:183691) <- at y9 (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:767:3242)",
+        "at <anonymous>:16:106 <- at globalThis.<computed>.patched [as createPanner] (<anonymous>:14:53) <- at e.playAmbientEvent (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:185310) <- at e.updateArenaAmbience (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:183691) <- at y9 (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:767:3242)",
+        "at <anonymous>:16:106 <- at globalThis.<computed>.patched [as createPanner] (<anonymous>:14:53) <- at e.playAmbientEvent (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:185310) <- at e.updateArenaAmbience (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:183691) <- at y9 (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:767:3242)",
+        "at <anonymous>:16:106 <- at globalThis.<computed>.patched [as createPanner] (<anonymous>:14:53) <- at e.playAmbientEvent (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:185310) <- at e.updateArenaAmbience (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:712:183691) <- at y9 (http://127.0.0.1:4265/assets/legacy-main-BprB55T9.js:767:3242)"
+      ],
+      "bufferStacks": []
+    },
+    "audioTotal": {
+      "panners": 23,
+      "buffers": 5,
+      "decodes": 0,
+      "convolvers": 0
+    },
+    "pipelineTripwire": {
+      "hooked": true,
+      "pipelinesInWindow": 0,
+      "shaderModulesInWindow": 0,
+      "pipelinesTotal": 316,
+      "inWindowLabels": []
+    },
+    "worldPanners": {
+      "pooled": 12,
+      "acquisitionsInWindow": 0,
+      "starvedInWindow": 0,
+      "busyAtEnd": 0
+    },
+    "spacesSeen": [
+      "urban-yard",
+      "interior-room"
+    ],
+    "interior": {
+      "before": "interior-room",
+      "inside": "interior-room",
+      "insideOverridden": true,
+      "after": "urban-yard"
+    },
+    "maxVoices": 10,
+    "maxSpatialChains": 5,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "audioState": {
+      "source": "standard",
+      "state": "running"
+    }
+  },
+  "samples": [
+    {
+      "atMs": 113003,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -5.84,
+      "z": -23.38
+    },
+    {
+      "atMs": 113277,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -5.37,
+      "z": -21.2
+    },
+    {
+      "atMs": 113543,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -4.79,
+      "z": -18.88
+    },
+    {
+      "atMs": 113784,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -4.92,
+      "z": -17.99
+    },
+    {
+      "atMs": 114032,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 9,
+      "spatialChains": 3,
+      "x": -5.71,
+      "z": -16.68
+    },
+    {
+      "atMs": 114297,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 9,
+      "spatialChains": 5,
+      "x": -5.85,
+      "z": -15.22
+    },
+    {
+      "atMs": 114514,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 9,
+      "spatialChains": 3,
+      "x": -5.28,
+      "z": -14.1
+    },
+    {
+      "atMs": 114800,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -4.66,
+      "z": -13.18
+    },
+    {
+      "atMs": 115045,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -5.29,
+      "z": -13.41
+    },
+    {
+      "atMs": 115284,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -6.09,
+      "z": -14.76
+    },
+    {
+      "atMs": 115520,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 2,
+      "x": -5.92,
+      "z": -16.14
+    },
+    {
+      "atMs": 115748,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 8,
+      "spatialChains": 2,
+      "x": -6.31,
+      "z": -17.36
+    },
+    {
+      "atMs": 116050,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -6.99,
+      "z": -18.18
+    },
+    {
+      "atMs": 116289,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -6.99,
+      "z": -18.48
+    },
+    {
+      "atMs": 116543,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 3
+      },
+      "voices": 8,
+      "spatialChains": 5,
+      "x": -6.99,
+      "z": -19
+    },
+    {
+      "atMs": 116795,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 8,
+      "spatialChains": 2,
+      "x": -6.99,
+      "z": -20.26
+    },
+    {
+      "atMs": 117055,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -6.99,
+      "z": -21.36
+    },
+    {
+      "atMs": 117300,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -7.85,
+      "z": -22.03
+    },
+    {
+      "atMs": 117517,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 117771,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 118049,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 118308,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -22.29
+    },
+    {
+      "atMs": 118518,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.25
+    },
+    {
+      "atMs": 118822,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 119067,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 119305,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 119572,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 119784,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -22.11
+    },
+    {
+      "atMs": 120049,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.16
+    },
+    {
+      "atMs": 120294,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 120497,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 120814,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 121026,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 121325,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -22.15
+    },
+    {
+      "atMs": 121524,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22.3
+    },
+    {
+      "atMs": 121792,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.98
+    },
+    {
+      "atMs": 122023,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 122290,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 122539,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 122790,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -22.08
+    },
+    {
+      "atMs": 123013,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22.29
+    },
+    {
+      "atMs": 123266,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 123531,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 123788,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 124032,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.23
+    },
+    {
+      "atMs": 124302,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.01
+    },
+    {
+      "atMs": 124517,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 124783,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 125022,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.98
+    },
+    {
+      "atMs": 125267,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -22.27
+    },
+    {
+      "atMs": 125529,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 125775,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 126040,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.96
+    },
+    {
+      "atMs": 126280,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.29
+    },
+    {
+      "atMs": 126516,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -22
+    },
+    {
+      "atMs": 126786,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 127027,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 127269,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.98
+    },
+    {
+      "atMs": 127535,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.27
+    },
+    {
+      "atMs": 127781,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 128023,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 128262,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 128524,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22.29
+    },
+    {
+      "atMs": 128850,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.94
+    },
+    {
+      "atMs": 129035,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 129281,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 129528,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -22.14
+    },
+    {
+      "atMs": 129786,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -22.13
+    },
+    {
+      "atMs": 130030,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 130280,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 130526,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22.04
+    },
+    {
+      "atMs": 130795,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -22.18
+    },
+    {
+      "atMs": 131032,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 131268,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 131523,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 131791,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -22.2
+    },
+    {
+      "atMs": 132035,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -22.19
+    },
+    {
+      "atMs": 132267,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 132529,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -21.91
+    },
+    {
+      "atMs": 132756,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22
+    },
+    {
+      "atMs": 133014,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -22.27
+    },
+    {
+      "atMs": 133273,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -21.91
+    },
+    {
+      "atMs": 133497,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 1.34,
+      "z": -16.3
+    },
+    {
+      "atMs": 133751,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.37,
+      "z": -16.19
+    },
+    {
+      "atMs": 134045,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 1.65,
+      "z": -16.18
+    },
+    {
+      "atMs": 134280,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.77,
+      "z": -16.18
+    },
+    {
+      "atMs": 134541,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 9,
+      "spatialChains": 3,
+      "x": 1.56,
+      "z": -15.29
+    },
+    {
+      "atMs": 134776,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.31,
+      "z": -14.17
+    },
+    {
+      "atMs": 135026,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 8,
+      "spatialChains": 2,
+      "x": 1.52,
+      "z": -14.63
+    },
+    {
+      "atMs": 135291,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 2.08,
+      "z": -15.81
+    },
+    {
+      "atMs": 135593,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 2.07,
+      "z": -15.79
+    },
+    {
+      "atMs": 135764,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 1.65,
+      "z": -14.89
+    },
+    {
+      "atMs": 136026,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 3,
+      "x": 1.24,
+      "z": -14.03
+    },
+    {
+      "atMs": 136273,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 1.61,
+      "z": -14.81
+    },
+    {
+      "atMs": 136498,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.91,
+      "z": -15.55
+    },
+    {
+      "atMs": 136777,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.57,
+      "z": -14.64
+    },
+    {
+      "atMs": 137028,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": 1.18,
+      "z": -13.62
+    },
+    {
+      "atMs": 137244,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 1.29,
+      "z": -13.9
+    },
+    {
+      "atMs": 137529,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": 0.05,
+      "z": -0.18
+    },
+    {
+      "atMs": 137760,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": 0.22,
+      "z": -0.7
+    },
+    {
+      "atMs": 138020,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -0.45,
+      "z": -0.35
+    },
+    {
+      "atMs": 138275,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -1.83,
+      "z": -0.11
+    },
+    {
+      "atMs": 138553,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -2.32,
+      "z": -1.8
+    },
+    {
+      "atMs": 138799,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -1.88,
+      "z": -3.22
+    },
+    {
+      "atMs": 139036,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -1.97,
+      "z": -4.59
+    },
+    {
+      "atMs": 139280,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -3.15,
+      "z": -5.32
+    },
+    {
+      "atMs": 139493,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -4.06,
+      "z": -6.15
+    },
+    {
+      "atMs": 139769,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -4.15,
+      "z": -7.64
+    },
+    {
+      "atMs": 140028,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -4.09,
+      "z": -9.16
+    },
+    {
+      "atMs": 140277,
+      "space": "urban-yard",
+      "overridden": false,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 10,
+      "spatialChains": 4,
+      "x": -4.89,
+      "z": -9.81
+    },
+    {
+      "atMs": 140510,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -5.89,
+      "z": -10.54
+    },
+    {
+      "atMs": 140776,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -5.62,
+      "z": -12.08
+    },
+    {
+      "atMs": 141023,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -5.21,
+      "z": -13.52
+    },
+    {
+      "atMs": 141261,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -5.97,
+      "z": -14.63
+    },
+    {
+      "atMs": 141531,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -7.33,
+      "z": -15.17
+    },
+    {
+      "atMs": 141788,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.02,
+      "z": -16.62
+    },
+    {
+      "atMs": 141999,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 8,
+      "spatialChains": 5,
+      "x": -7.61,
+      "z": -17.09
+    },
+    {
+      "atMs": 142248,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.03,
+      "z": -17.09
+    },
+    {
+      "atMs": 142530,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -16.92
+    },
+    {
+      "atMs": 142769,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.73
+    },
+    {
+      "atMs": 143019,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 143275,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 143520,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.07
+    },
+    {
+      "atMs": 143765,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -16.78
+    },
+    {
+      "atMs": 144021,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 144263,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 144552,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 144778,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.78
+    },
+    {
+      "atMs": 145023,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 8,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.05
+    },
+    {
+      "atMs": 145255,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 145513,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 145771,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.95
+    },
+    {
+      "atMs": 146035,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 3
+      },
+      "voices": 8,
+      "spatialChains": 5,
+      "x": -8.55,
+      "z": -16.79
+    },
+    {
+      "atMs": 146290,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 146538,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 146846,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 147031,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -16.87
+    },
+    {
+      "atMs": 147254,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.8
+    },
+    {
+      "atMs": 147524,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 147749,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 147994,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.96
+    },
+    {
+      "atMs": 148290,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.85
+    },
+    {
+      "atMs": 148531,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 148773,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 149033,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.06
+    },
+    {
+      "atMs": 149277,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -16.71
+    },
+    {
+      "atMs": 149522,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 149766,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 149996,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.08
+    },
+    {
+      "atMs": 150279,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.71
+    },
+    {
+      "atMs": 150526,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -16.89
+    },
+    {
+      "atMs": 150743,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 151015,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 8,
+      "spatialChains": 5,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 151249,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.05
+    },
+    {
+      "atMs": 151499,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -16.78
+    },
+    {
+      "atMs": 151769,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 152022,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 152283,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.06
+    },
+    {
+      "atMs": 152493,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.78
+    },
+    {
+      "atMs": 152785,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 153040,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 153282,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 153533,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -16.96
+    },
+    {
+      "atMs": 153791,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -16.77
+    },
+    {
+      "atMs": 154043,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 154275,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 154520,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 154789,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 8,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.9
+    },
+    {
+      "atMs": 155040,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 3
+      },
+      "voices": 8,
+      "spatialChains": 5,
+      "x": -8.54,
+      "z": -16.73
+    },
+    {
+      "atMs": 155290,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 155530,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 155784,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 156037,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -16.92
+    },
+    {
+      "atMs": 156280,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.78
+    },
+    {
+      "atMs": 156520,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 156787,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 7,
+      "spatialChains": 4,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 157032,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.05
+    },
+    {
+      "atMs": 157269,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 2
+      },
+      "voices": 10,
+      "spatialChains": 4,
+      "x": -8.54,
+      "z": -16.83
+    },
+    {
+      "atMs": 157536,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 157782,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -17.09
+    },
+    {
+      "atMs": 158085,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.54,
+      "z": -17.09
+    },
+    {
+      "atMs": 158271,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.54,
+      "z": -16.84
+    },
+    {
+      "atMs": 158528,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 0
+      },
+      "voices": 5,
+      "spatialChains": 2,
+      "x": -8.55,
+      "z": -16.98
+    },
+    {
+      "atMs": 158760,
+      "space": "interior-room",
+      "overridden": true,
+      "pool": {
+        "pooled": 12,
+        "busy": 0,
+        "acquisitions": 0,
+        "starved": 0,
+        "spatialChains": 1
+      },
+      "voices": 6,
+      "spatialChains": 3,
+      "x": -8.55,
+      "z": -17.09
+    }
+  ],
+  "rafGapsOver50": [
+    {
+      "index": 9,
+      "gap": 50.1
+    },
+    {
+      "index": 11,
+      "gap": 50.1
+    },
+    {
+      "index": 30,
+      "gap": 50.2
+    },
+    {
+      "index": 60,
+      "gap": 50
+    },
+    {
+      "index": 61,
+      "gap": 50
+    },
+    {
+      "index": 87,
+      "gap": 149.9
+    },
+    {
+      "index": 90,
+      "gap": 66.4
+    },
+    {
+      "index": 167,
+      "gap": 144.3
+    },
+    {
+      "index": 244,
+      "gap": 55.6
+    },
+    {
+      "index": 255,
+      "gap": 127.6
+    },
+    {
+      "index": 340,
+      "gap": 122.2
+    },
+    {
+      "index": 423,
+      "gap": 127.6
+    },
+    {
+      "index": 509,
+      "gap": 111.1
+    },
+    {
+      "index": 594,
+      "gap": 116.8
+    },
+    {
+      "index": 687,
+      "gap": 115.6
+    },
+    {
+      "index": 781,
+      "gap": 116.4
+    },
+    {
+      "index": 870,
+      "gap": 122.3
+    },
+    {
+      "index": 965,
+      "gap": 111.1
+    },
+    {
+      "index": 1023,
+      "gap": 50.4
+    },
+    {
+      "index": 1053,
+      "gap": 122.1
+    },
+    {
+      "index": 1140,
+      "gap": 122.1
+    },
+    {
+      "index": 1236,
+      "gap": 111.1
+    },
+    {
+      "index": 1326,
+      "gap": 116.6
+    },
+    {
+      "index": 1416,
+      "gap": 116.5
+    },
+    {
+      "index": 1508,
+      "gap": 122.3
+    },
+    {
+      "index": 1558,
+      "gap": 50.1
+    },
+    {
+      "index": 1599,
+      "gap": 122.2
+    },
+    {
+      "index": 1682,
+      "gap": 116.8
+    },
+    {
+      "index": 1703,
+      "gap": 50
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": []
+}
