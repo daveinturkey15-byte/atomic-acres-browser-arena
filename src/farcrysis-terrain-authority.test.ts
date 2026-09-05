@@ -250,7 +250,8 @@ describe('farcrysis terrain authority', () => {
 
     // Elevated BY DESIGN (each earns its exemption): world-boundary walls
     // span the full water column; the catwalk is an upper deck reached by the
-    // stair flight; -c1 crates and the vantage plank stack on ground-seated
+    // stair flight; the seaplane wing is a physical wreck deck; -c1 crates and
+    // the vantage plank stack on ground-seated
     // bases; sandbag segments 1+ stack on segment 0.
     const elevatedByDesign = [
       /^farcrysis-bound-/,
@@ -267,11 +268,15 @@ describe('farcrysis terrain authority', () => {
       //   tower-platform     the radio-tower lookout deck, on the tower legs
       //   tower-dish         the dish, on that platform
       //   cave-arch-top      the crown of the cave arch, on the arch
+      // The seaplane wing is the fifth elevated surface: its proxy is derived
+      // from the visual parent/child transform and supports the authored wreck
+      // deck, so it earns a named exemption rather than a loose prefix.
       // Listed one family at a time rather than as a loose prefix, so a NEW
       // floating collider in any of these areas still fails this case.
       /^farcrysis-crate-[ns][we]-stack-top$/,
       /^farcrysis-art-tower-(platform|dish)-collider$/,
       /^farcrysis-art-cave-arch-top-collider$/,
+      /^farcrysis-throwback-seaplane-wing-collider$/,
     ];
 
     const failures: string[] = [];
