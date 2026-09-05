@@ -30148,7 +30148,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      await withDetachedRoots(!hadPreparedArena ? [...coldOptionalRoots, arena.root] : [], async () => { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); });
+      await withDetachedRoots(coldOptionalRoots, async () => { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); });
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
