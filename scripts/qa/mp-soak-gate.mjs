@@ -468,6 +468,7 @@ async function main() {
   }
   await peers.host.page.selectOption('#lobby-arena', arena.id);
   await Promise.all(PEERS.map((role) => peers[role].page.waitForFunction((id) => document.querySelector('#lobby-ready')?.disabled === false && window.__ATOMIC_ACRES_DEBUG__?.snapshot().arenaSelection?.id === id, arena.id, { timeout: 160_000 })));
+  await peers.host.page.click('#lobby-ready');
   await peers.guestA.page.click('#lobby-ready');
   await peers.guestB.page.click('#lobby-ready');
   await peers.host.page.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 60_000 });
