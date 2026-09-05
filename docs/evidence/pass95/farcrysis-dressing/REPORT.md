@@ -137,7 +137,7 @@ human-readable [blind-ab/WIN-RATE.md](blind-ab/WIN-RATE.md).
 | `npx tsx scripts/qa/find-coplanar-pairs.ts` | VERIFIED | exit 0; actionable findings 0 |
 | bounded expansion of `src/farcrysis*.test.ts`, `src/pipeline-metrics*.test.ts`, `src/graphics-profile-contract.test.ts`, and `src/legacy-main-size-ratchet.test.ts` | OPEN | 29/30 files and 207/208 tests pass; the remaining failure is the unchanged layout assertion `spawnPairsOpen <= 20` receiving 21 |
 | `npx vitest run src/collider-visual-parity-gate.test.ts src/walkable-surface-parity-gate.test.ts` | VERIFIED | 2/2 files, 16/16 tests |
-| `npm run build` under the shared heavy lock | OPEN until final rerun | wrapper was blocked by an active owner-side heavy operation and timed out without touching it |
+| `npm run build` under the shared heavy lock | VERIFIED | lock acquired/released by this worktree; Vite transformed 571 modules and built successfully in 2.33 s |
 | `npm run pipeline:preflight -- --machine dave-gaming-pc --harness codex` | OPEN | policy expects a `codex/<short-outcome>` branch, while the user-required branch is `claude/v9-farcrysis-dressing`; no branch rename was attempted |
 
 ## Reproduction and source-priority note
