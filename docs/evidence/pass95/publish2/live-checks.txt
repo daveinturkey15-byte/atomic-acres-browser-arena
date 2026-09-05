@@ -1,0 +1,37 @@
+expected published root chooser generation: 7c9adb8db2b1
+[propagated] 13:12:29 after 5 polls: {"generation":"7c9adb8db2b1","manifest":"release-manifest.7c9adb8db2b1.json"}
+
+=== root check 1 at 13:12:30 (cache-busted cb=1788613950) ===
+http_code=200
+release-index.json: {"generation":"7c9adb8db2b1","manifest":"release-manifest.7c9adb8db2b1.json"}
+chooser channels:
+"label":"PASS 94"
+"pass":"PASS 94"
+"path":"channels/pass94"
+"deploymentState":"live"
+"label":"PASS 93 \u00b7 SAFE BACKUP"
+"pass":"PASS 93"
+"path":"channels/pass93"
+
+=== root check 2 at 13:13:03 (cache-busted cb=1788613982) ===
+http_code=200
+release-index.json: {"generation":"7c9adb8db2b1","manifest":"release-manifest.7c9adb8db2b1.json"}
+chooser channels:
+"label":"PASS 94"
+"pass":"PASS 94"
+"path":"channels/pass94"
+"deploymentState":"live"
+"label":"PASS 93 \u00b7 SAFE BACKUP"
+"pass":"PASS 93"
+"path":"channels/pass93"
+
+=== channels/pass94 bundle identity ===
+live legacy-main sha256: 31aa0de1eabc5304c7c1b5d7bf64f7834f6e71a329e1fa7989b344dcc33b0b94
+dist legacy-main sha256: 31aa0de1eabc5304c7c1b5d7bf64f7834f6e71a329e1fa7989b344dcc33b0b94
+live index      sha256: d2d57995a1546128c7c0700a47d7eee988ae66d0c184eb57733cc7c8ced667a9
+dist index      sha256: d2d57995a1546128c7c0700a47d7eee988ae66d0c184eb57733cc7c8ced667a9
+channels/pass94/index.html http_code=200
+
+=== channels/pass93 still serves ===
+channels/pass93/index.html http_code=200
+channels/pass92 (retired, expect 404): http_code=404

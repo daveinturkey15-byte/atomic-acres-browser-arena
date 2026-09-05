@@ -1,0 +1,18 @@
+  build freshness guard: OK (build newer than newest source)
+  farcrysis-admission guard: OK (3 paired runs, uncontended, all admitted, 0 in-match pipelines, worst pair ratio 1.2833x <= 1.6x)
+  farcrysis-admission guard: OK (parked - 1 registry entry, none selectable)
+  farcrysis-admission guard: OK (parked - 1 registry entry, none selectable)
+  release-identity guard: OK (RELEASE IDENTITY OK: C:\Users\david\projects\aa-claude-release84\dist-pass94 calls itself PASS 94, opens its notes on Pass 94, ships no HITL string)
+gh-pages at 7c9f1033
+  channel trees on gh-pages: ['pass92', 'pass93']
+  channels/pass94 <- dist-pass94
+  retired channels/pass92/
+  post-state guard: OK (channels/ is exactly ['pass93', 'pass94'])
+  predecessor guard: OK (offering PASS 94, PASS 93)
+  in-build fallback guard: OK (pass93Backup -> channels/pass93 is the HF-400 safe backup and is on gh-pages)
+  root chooser published as generation 7c9adb8db2b1 (2 channels inlined, 3 superseded asset(s) swept, keeping ['2ff646727518', '7c9adb8db2b1'])
+  channels now: PASS 94, PASS 93
+  post-state guard: OK (channels/ is exactly ['pass93', 'pass94'])
+
+PUBLISHED: https://daveinturkey15-byte.github.io/atomic-acres-browser-arena/
+PUBLISH_EXIT=0

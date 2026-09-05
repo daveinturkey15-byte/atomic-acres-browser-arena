@@ -1,9 +1,4 @@
-[harness-defect] playwright's own webServer TIMED OUT: 'Error: Timed out waiting 180000ms from config.webServer'
-[harness-defect] cause: scripts/qa/playwright-web-server.mjs runs scripts/release/stage-release-topology.mjs,
-[harness-defect] whose stagePinned() spawns one 'git cat-file blob' PER FILE of the pinned stable channel.
-[harness-defect] remedy per the publish brief: stage ONCE, serve externally, run the spec against it.
-[harness-defect] NOTHING was widened: the 180000ms webServer budget is untouched.
-[cmd] PASS73_NATIVE_WEBGPU=1 QA_EXTERNAL_PREVIEW=1 BASE_URL=http://127.0.0.1:4293 npm run qa:stock-boot
+[cmd] PASS73_NATIVE_WEBGPU=1 QA_EXTERNAL_PREVIEW=1 QA_PREVIEW_PORT=4291 npm run qa:stock-boot (unstaged app build, matching the PASS 95 cut)
 
 > atomic-acres-browser-arena@1.0.0 qa:stock-boot
 > playwright test tests/e2e/pass93-stock-flags-boot.spec.ts --project=chromium --workers=1 --retries=0
@@ -11,82 +6,12 @@
 
 Running 4 tests using 1 worker
 
-(node:180360) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:107284) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ok 1 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:93:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › launch arguments carry none of the flags that mask Tint lowering bugs (14ms)
-  ok 2 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:101:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › stock-flag Chrome exposes a WebGPU device, or the arena boots skip by name (731ms)
-  x  3 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors (15.4s)
-(node:100476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-(Use `node --trace-warnings ...` to show where the warning was created)
-  x  4 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › raid2: the real menu reaches a live frame with zero pipeline errors (16.1s)
+  ok 1 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:93:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › launch arguments carry none of the flags that mask Tint lowering bugs (9ms)
+  ok 2 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:101:7 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › stock-flag Chrome exposes a WebGPU device, or the arena boots skip by name (2.3s)
+  ok 3 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors (1.3m)
+  ok 4 [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › raid2: the real menu reaches a live frame with zero pipeline errors (51.1s)
 
-
-  1) [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors 
-
-    TimeoutError: locator.click: Timeout 15000ms exceeded.
-    Call log:
-      - waiting for locator('[data-release-choice="latest"]')
-
-
-      135 |         await dismissStaleUi(page);
-      136 |         if (await visible(page, '#release-channel-gate')) {
-    > 137 |           await page.locator('[data-release-choice="latest"]').click();
-          |                                                                ^
-      138 |         }
-      139 |         await page.waitForSelector('#menu', { state: 'visible', timeout: 60_000 });
-      140 |         const card = page.locator(`.map-card[data-arena-id="${arenaId}"]:not([disabled])`);
-        at C:\Users\david\projects\aa-claude-release84\tests\e2e\pass93-stock-flags-boot.spec.ts:137:64
-
-    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
-    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\test-failed-1.png
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\error-context.md
-
-    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\error-context.md
-
-    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
-    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\trace.zip
-    Usage:
-
-        npx playwright show-trace artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-2374b-e-with-zero-pipeline-errors-chromium\trace.zip
-
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-  2) [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › raid2: the real menu reaches a live frame with zero pipeline errors 
-
-    TimeoutError: locator.click: Timeout 15000ms exceeded.
-    Call log:
-      - waiting for locator('[data-release-choice="latest"]')
-
-
-      135 |         await dismissStaleUi(page);
-      136 |         if (await visible(page, '#release-channel-gate')) {
-    > 137 |           await page.locator('[data-release-choice="latest"]').click();
-          |                                                                ^
-      138 |         }
-      139 |         await page.waitForSelector('#menu', { state: 'visible', timeout: 60_000 });
-      140 |         const card = page.locator(`.map-card[data-arena-id="${arenaId}"]:not([disabled])`);
-        at C:\Users\david\projects\aa-claude-release84\tests\e2e\pass93-stock-flags-boot.spec.ts:137:64
-
-    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
-    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-43a76-e-with-zero-pipeline-errors-chromium\test-failed-1.png
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-43a76-e-with-zero-pipeline-errors-chromium\error-context.md
-
-    Error Context: artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-43a76-e-with-zero-pipeline-errors-chromium\error-context.md
-
-    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
-    artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-43a76-e-with-zero-pipeline-errors-chromium\trace.zip
-    Usage:
-
-        npx playwright show-trace artifacts\pass25a\playwright-results\pass93-stock-flags-boot-PA-43a76-e-with-zero-pipeline-errors-chromium\trace.zip
-
-    ────────────────────────────────────────────────────────────────────────────────────────────────
-
-  2 failed
-    [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › nuketown2: the real menu reaches a live frame with zero pipeline errors 
-    [chromium] › tests\e2e\pass93-stock-flags-boot.spec.ts:122:9 › PASS 93 stock-flags boot - installed Chrome without the unsafe WebGPU flag › raid2: the real menu reaches a live frame with zero pipeline errors 
-  2 passed (37.1s)
-STOCK_BOOT_EXIT=1
+  4 passed (2.2m)
+STOCK_BOOT_EXIT=0

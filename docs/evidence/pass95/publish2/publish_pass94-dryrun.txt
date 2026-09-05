@@ -1,0 +1,34 @@
+gh-pages at 7c9f1033
+DRY RUN PUBLISH (HF-400) against C:\Users\david\projects\aa-claude-release84\.gh-pages-publish - nothing will be written, added, committed or pushed
+  build freshness guard: OK (build newer than newest source)
+  farcrysis-admission guard: OK (3 paired runs, uncontended, all admitted, 0 in-match pipelines, worst pair ratio 1.2833x <= 1.6x)
+  farcrysis-admission guard: OK (parked - 1 registry entry, none selectable)
+  farcrysis-admission guard: OK (parked - 1 registry entry, none selectable)
+  release-identity guard: OK (RELEASE IDENTITY OK: C:\Users\david\projects\aa-claude-release84\dist-pass94 calls itself PASS 94, opens its notes on Pass 94, ships no HITL string)
+
+PLAN
+  channel trees on gh-pages now: ['pass92', 'pass93']
+  would delete channels/pass92/
+  would keep   ['channels/pass93/']
+  would write channels/pass94/ <- dist-pass94/ (replacing any existing tree)
+  channels/ post-state would be: ['pass93', 'pass94']
+  chooser keys live now: ['experimental', 'previous']; would become: ['experimental', 'previous'] (dropped/re-keyed: ['experimental', 'previous'])
+    experimental: PASS 94 -> channels/pass94  "PASS 94"
+    previous: PASS 93 -> channels/pass93  "PASS 93 · SAFE BACKUP"
+  predecessor guard: OK (offering PASS 94, PASS 93)
+  in-build fallback guard: OK (pass93Backup -> channels/pass93 is the HF-400 safe backup and is on gh-pages)
+  root chooser would be published as generation 7c9adb8db2b1 (2 channels inlined, 3 superseded asset(s) swept, keeping ['2ff646727518', '7c9adb8db2b1'])
+  would write index.html
+  would write release-shell.7c9adb8db2b1.js
+  would write release-shell.7c9adb8db2b1.css
+  would write release-manifest.7c9adb8db2b1.json
+  would write release-index.json
+  would write release-shell.js
+  would write release-shell.css
+  would write release-channel-config.js
+  would sweep release-manifest.f45765ee9b4f.json
+  would sweep release-shell.f45765ee9b4f.css
+  would sweep release-shell.f45765ee9b4f.js
+
+DRY RUN: every guard green; a real run would commit and push the publish plan above
+DRYRUN_EXIT=0

@@ -60,10 +60,10 @@ dist/assets/vendor-three-DBgW9i60.js                 1,574.44 kB │ gzip: 447.1
 dist/assets/legacy-main-B7Iio44Z.js                  1,966.04 kB │ gzip: 605.16 kB
 dist/assets/rapier-USIc5Cek.js                       2,236.65 kB │ gzip: 842.25 kB
 
-✓ built in 2.19s
+✓ built in 2.46s
 [plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-BUILD_EXIT=0
+BUILD2_EXIT=0
