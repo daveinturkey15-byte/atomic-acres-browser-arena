@@ -222,4 +222,8 @@ describe('a local time-of-day override never wins inside a hosted lobby', () => 
   it('ignores a pinned capture hour inside a hosted lobby too', () => {
     expect(region).toMatch(/lightingCaptureFixedHour === null \|\| privateLobbySnapshot \? \{\}/);
   });
+
+  it('ignores a named ?sky= catalogue preset inside a hosted lobby too, and lets ?todhour= win (PASS 95)', () => {
+    expect(region).toMatch(/lightingCaptureFixedHour !== null \|\| privateLobbySnapshot \|\| !isSkyTimePresetId\(lightingQuerySkyPreset\)/);
+  });
 });

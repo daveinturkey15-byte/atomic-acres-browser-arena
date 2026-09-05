@@ -118,7 +118,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
-import { skyBackdropIntensity, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
+import { isSkyTimePresetId, skyBackdropIntensity, skyTimePresetHour, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
 import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
@@ -4133,6 +4133,8 @@ const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 
 const lightingQueryParams = new URLSearchParams(window.location.search);
 const lightingQueryChoice = lightingQueryParams.get('tod');
 const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
+/** `?sky=dawn|day|dusk|night` names a PASS 95 catalogue preset; `?todhour=` wins when both are given. */
+const lightingQuerySkyPreset = lightingQueryParams.get('sky');
 /**
  * `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode.
  * It is also writable through the QA hook, because the readability question
@@ -4224,6 +4226,9 @@ function resolveActiveLightingConditions(): LightingConditionWrites {
     // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby
     // so guests cannot select a different sky and desync the shared match.
     ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
+    // `?sky=` names a PASS 95 catalogue preset for the selected arena; same local-only rule, `?todhour=` wins.
+    ...(lightingCaptureFixedHour !== null || privateLobbySnapshot || !isSkyTimePresetId(lightingQuerySkyPreset)
+      ? {} : { fixedHour: skyTimePresetHour(selectedArena.id, lightingQuerySkyPreset) }),
   });
 }
 
