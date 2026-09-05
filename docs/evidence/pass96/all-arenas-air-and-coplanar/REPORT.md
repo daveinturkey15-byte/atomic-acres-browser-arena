@@ -229,6 +229,42 @@ They pass with it present and their failure mode is identical on the pristine ba
 
 ---
 
+## Review fixes (muse review `all-arenas-air-and-coplanar-REVIEW.md`, verdict SHIP-WITH-FIXES)
+
+No geometry rework: the reviewer asked for words and provenance only, and every
+geometry/placement claim below was re-verified against the code before editing
+(`src/raid2-arena.ts`, `src/additional-maps.ts`, `scripts/qa/find-coplanar-pairs.ts`).
+`git diff 96819787..HEAD -- src scripts` is empty apart from this lane's own review-fix
+commits, so the reviewed geometry still stands.
+
+- Finding 1 (VERIFIED, applied): "keeps collider/shot authority" overstated —
+  `rect()` delegates to `box()` with the same extents (`src/raid2-arena.ts:308-320`),
+  and `box()` derives colliders + shot surfaces from those extents
+  (`src/additional-maps.ts:122-160`), so collider/shot tops move WITH the visual by
+  the same 0.04 m. Reworded in place: inside the 0.06 m parity tolerance, buried in
+  the mating solid, no hidden/decoupled collider.
+- Finding 2 (VERIFIED, applied): evidence headers recorded instrument base `465ae6b7`
+  while the raid2-0 geometry existed only as uncommitted edits (`COPLANAR_CLEARANCE`
+  absent at `465ae6b7`, present 14x at `a5c51eae` — verified via `git show`). Annotated
+  `after-sweep.txt` (provenance header, generated `# head` lines byte-identical),
+  this REPORT's measured line, and the pinning-test comment as "instrument base
+  `465ae6b7`, geometry now committed as `a5c51eae`".
+- Finding 3 (VERIFIED, applied): the "riser to coping still 0.26 m" claim now quotes
+  its measurement — coping top `y1 = 0.3` (`src/raid2-arena.ts:484`) against step top
+  `y1 = -0.28 + 0.28 + 0.04 = 0.04` (`src/raid2-arena.ts:488-489`), i.e. `0.30 - 0.04`,
+  under the 0.42 m autostep.
+- Finding 4 (VERIFIED, TODO — follow-up lane, not a ship-blocker): the invisible
+  exclusion (`scripts/qa/find-coplanar-pairs.ts:115-135`) names UNAUDITED meshes but
+  nothing pins per-arena UNAUDITED counts, so a future `visible = false` regression
+  would exit the audit silently. Exact fix: extend `MEASURED_FINDING_CLASSES` in
+  `src/arena-coplanar-findings.test.ts` with a per-arena `unaudited` ceiling pinned AT
+  the `after-sweep.txt` summary values (nuketown2 198, raid2 0, atomic-acres 108,
+  skyline-terminal 94, rustworks-1v1 33, gun-range 70, farcrysis 912, high-seas 52,
+  test1 67, test2 39, map3 117) and assert `counts.unaudited` at-or-under, same shape
+  as the existing FINDINGS/HOUSE-INTERIOR/STREET rows.
+
+---
+
 ## Claim-state summary
 
 - VERIFIED (measured): every table and gate quote above; instrument outputs at named
