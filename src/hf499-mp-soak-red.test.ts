@@ -48,6 +48,13 @@ describe('HF-499 active-match rejoin authority', () => {
 });
 
 describe('HF-499 replication evidence', () => {
+  it('records rejoin damage from the post-mutation host baseline and broadcasts the canonical remote state', () => {
+    const damageHook = main.slice(main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {'), main.indexOf('\n  earnSupport:', main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {')));
+    expect(damageHook).toContain('broadcastCanonicalRemoteState(targetId);');
+    expect(soak).toContain('firstSeen.host = 0;');
+    expect(soak).toContain('applied?.storedAfter');
+  });
+
   it('compares host authority with each guest presentation and records the required forensic fields', () => {
     expect(soak).toContain("const hostPlayers = views.host?.players ?? {};");
     expect(soak).toContain("source: 'host-authoritative'");

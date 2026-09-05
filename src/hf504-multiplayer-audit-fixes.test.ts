@@ -135,6 +135,29 @@ describe('HF-504 P-3/P-4 pickup authority - claims stay host-only and results ar
 });
 
 describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () => {
+  it('drives guest A weapon swap through host admission to guest B', () => {
+    const swap = functionBody(main, 'function switchWeapon(index: number): void {');
+    expect(swap).toContain('network.send(createStateMessage());');
+
+    const stateStart = main.indexOf('const canonicalState: StateMessage = {');
+    const stateEnd = main.indexOf('\n        network.send(canonicalState, admittedIncoming.id);', stateStart);
+    const canonicalState = main.slice(stateStart, stateEnd);
+    expect(canonicalState).toMatch(/combatInventory:/);
+    expect(main).toContain('network.send(canonicalState, admittedIncoming.id);');
+
+    const guestView = functionBody(main, 'function onNetworkMessage(');
+    expect(guestView).toContain('applyRemoteCombatInventoryProjection(');
+    expect(guestView).toContain('remote.snapshot = { ...remote.snapshot, weapon:');
+  });
+
+  it('fans a host reload result out and applies it to the non-claimant peer view', () => {
+    const sender = functionBody(main, 'function sendRemoteReloadResult(');
+    expect(sender).toContain('network.send(result);');
+    expect(sender).not.toContain('network.sendToPlayer(playerId, result);');
+    expect(main).toContain('function acceptRemoteReloadResult(');
+    expect(main).toContain('acceptRemoteReloadResult(message);');
+  });
+
   it('does not invent a new life id for a bounded movement resynchronization', () => {
     const state = functionBody(main, 'function onNetworkMessage(');
     const continuityDecision = state.indexOf('const admittedContinuity');
