@@ -6,6 +6,10 @@ const bootstrap = readFileSync(new URL('./bootstrap.ts', import.meta.url), 'utf8
 const shell = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
 const hudCss = readFileSync(new URL('./ui/pass65-hud.css', import.meta.url), 'utf8');
 const presentation = readFileSync(new URL('./killstreak-presentation.ts', import.meta.url), 'utf8');
+// HF-509: the cockpit HUD writers were hoisted verbatim into their own module
+// (legacy-main size ratchet). Every pin below that read them from legacy-main
+// now reads them from there; the assertions themselves are unchanged.
+const cockpitHud = readFileSync(new URL('./gunner-cockpit-hud.ts', import.meta.url), 'utf8');
 const authoring = readFileSync(new URL('../scripts/blender/create-pass65-support-vehicles.py', import.meta.url), 'utf8');
 const authoringRunner = readFileSync(new URL('../scripts/blender/run-authoring.mjs', import.meta.url), 'utf8');
 const e2e = readFileSync(new URL('../tests/e2e/pass70-chopper-gunner.spec.ts', import.meta.url), 'utf8');
@@ -156,9 +160,9 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
     const outsideTheReadout = glyphs(missilePanel.replace(readout![0], ''));
     expect(outsideTheReadout + glyphs(readout![1]!), 'static markup renders one glyph').toBe(1);
 
-    const runtimeWrites = [...legacy.matchAll(/#gunner-missile-ammo'\)\.textContent = `([^`]*)`/gu)]
+    const runtimeWrites = [...`${legacy}\n${cockpitHud}`.matchAll(/#gunner-missile-ammo'\)\.textContent = `([^`]*)`/gu)]
       .map((match) => match[1]!);
-    expect(runtimeWrites.length, 'legacy-main must still be the only writer of the readout').toBeGreaterThanOrEqual(2);
+    expect(runtimeWrites.length, 'the cockpit HUD module (ex legacy-main) must still be the only writer of the readout').toBeGreaterThanOrEqual(2);
     for (const write of runtimeWrites) {
       expect(
         outsideTheReadout + glyphs(write),
@@ -243,15 +247,18 @@ describe('Pass 70 complete Chopper Gunner contract', () => {
   });
 
   it('cleans the cockpit, thermal overlay, target marker, cadence, and camera on every exit path', () => {
-    const hideStart = legacy.indexOf('function hideGunnerCockpitHud(');
-    const hideEnd = legacy.indexOf('\nfunction showGunnerTargetConfirm(', hideStart);
-    const hide = legacy.slice(hideStart, hideEnd);
+    const hideStart = cockpitHud.indexOf('function hideGunnerCockpitHudElements(');
+    expect(hideStart).toBeGreaterThan(-1);
+    const hide = cockpitHud.slice(hideStart);
+    const legacyHideStart = legacy.indexOf('function hideGunnerCockpitHud(');
+    const legacyHide = legacy.slice(legacyHideStart, legacy.indexOf('\nfunction showGunnerTargetConfirm(', legacyHideStart));
+    expect(legacyHide).toContain('hideGunnerCockpitHudElements(element)');
+    expect(legacyHide).toContain('nextLocalSupportGunReportAt = 0');
     expect(hide).toContain("hud.dataset.supportKind = 'none'");
     expect(hide).toContain("hud.dataset.hitConfirm = 'false'");
     expect(hide).toContain("element<HTMLElement>('#chopper-thermal').hidden = true");
     expect(hide).toContain("element<HTMLElement>('#gunner-missile-status')");
     expect(hide).toContain("missileStatus.dataset.ready = 'false'");
-    expect(hide).toContain('nextLocalSupportGunReportAt = 0');
     expect(legacy).toContain('if (!possession || !player.alive)');
     // RE-PINNED FOR HF-410: same restore contract, now expressed through the
     // named on-foot near plane instead of a literal that three call sites had
