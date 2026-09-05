@@ -1,101 +1,131 @@
-export type MinimapBounds = { minX: number; maxX: number; minZ: number; maxZ: number };
+/** Footprint plus, where the arena authored it, the vertical extent the structural rule reads. */
+export type MinimapBounds = { minX: number; maxX: number; minZ: number; maxZ: number; minY?: number; maxY?: number };
 
-export type MinimapStructuralClass = 'house' | 'garage' | 'perimeter' | 'road' | 'vehicle';
+/**
+ * HF-510 (owner, repeated from HF-491): "The mini map also still feels very
+ * cluttered on Nuke Town ... and the same on all levels. We shouldn't have this
+ * crazy busy mini map. It should be very simple. Just mainly showing where the
+ * walls are, not all the tiny components within, like cover."
+ *
+ * THE MINIMAP THEREFORE DRAWS THREE STRUCTURAL CLASSES AND NOTHING ELSE:
+ *
+ *   - `building`  authored building footprints (`arena.houses`)
+ *   - `wall`      structural blockers: walls, hangar shells, major boundaries
+ *   - `road`      the drivable/walkable street or apron surface
+ *
+ * Everything else - cover, props, furniture, vehicles used as scenery,
+ * vegetation, small colliders, interior fixtures - is excluded. Players, bots,
+ * objectives and killstreak pings stay, but they are MARKERS painted after this
+ * layer, never structural elements.
+ *
+ * WHY THE RULE IS GEOMETRIC AND NOT A NAME TABLE. HF-491 classified by authored
+ * surface name. That worked on Nuke Town and silently produced an EMPTY minimap
+ * on six of the eleven catalog arenas, because their authors never used the
+ * blessed words - and it was never wired into the renderer at all, which is why
+ * the owner still saw every collider rectangle on Nuke Town. A geometric rule
+ * reads the same authored data the collision world already trusts, so a new
+ * arena is classified correctly the day it is built, with no roster to update.
+ */
+export type MinimapStructuralClass = 'building' | 'wall' | 'road';
+
 export type MinimapSurfaceDescriptor = Readonly<{
   id: string;
   name: string;
   bounds: MinimapBounds;
-  /** Authoring may pin a class; absent means the name table/override must decide. */
-  minimapClass?: MinimapStructuralClass;
 }>;
 export type MinimapHouseDescriptor = Readonly<{
   id: string;
   origin: Readonly<{ x: number; z: number }>;
   dimensions: Readonly<{ width: number; depth: number }>;
-  team?: number;
-}>;
-export type MinimapPhysicalCoverDescriptor = Readonly<{
-  id: string;
-  bounds: MinimapBounds;
-  minimapClass?: MinimapStructuralClass;
 }>;
 export type MinimapElement = Readonly<{
   id: string;
   className: MinimapStructuralClass;
   bounds: MinimapBounds;
+  /** How many authored pieces were merged into this silhouette. */
   sourceCount: number;
 }>;
 
-type MinimapClassRule = Readonly<{
-  name: string;
-  className: MinimapStructuralClass;
-  pattern: RegExp;
-}>;
-
 /**
- * The shared name rules are deliberately narrow. A surface is hidden unless it
- * is a recognizable macro silhouette; words such as prop, trim, rail, window,
- * decal and furniture never grant minimap visibility by themselves.
+ * A blocker is structural when a player reads it as a WALL rather than as
+ * something to hide behind:
+ *
+ *   - it is at least chest-high, so waist-high cover, crates, planters,
+ *     benches, bins, low fences and kerbs never qualify, and
+ *   - its longer footprint side spans at least a room's width, so barrels,
+ *     appliances, furniture, debris and interior fixtures never qualify.
+ *
+ * Both numbers are world metres, not minimap pixels, so a 192 m arena and a
+ * 36 m arena classify the same physical wall identically. The pixel fence
+ * (`MINIMAP_MIN_SEGMENT_PX`) is applied separately, after merging, purely for
+ * readability at HUD size.
  */
-export const MINIMAP_CLASS_TABLE: readonly MinimapClassRule[] = Object.freeze([
-  Object.freeze({ name: 'vehicle-body', className: 'vehicle', pattern: /\b(?:vehicle|bus|coach|truck|car)\s+(?:body|cab|box|hull)\b/iu }),
-  Object.freeze({ name: 'road-surface', className: 'road', pattern: /\b(?:road|asphalt|tarmac|carriageway|turning head)\b|\bstreet\s+(?:asphalt|road|surface|turning|kerb)\b/iu }),
-  Object.freeze({ name: 'perimeter', className: 'perimeter', pattern: /\b(?:perimeter|compound|boundary)\s+(?:wall|fence)\b/iu }),
-  Object.freeze({ name: 'garage', className: 'garage', pattern: /\bgarage\s+(?:floor|roof|wall|link pier|front pier|back pier|door head)\b/iu }),
-  Object.freeze({ name: 'house-footprint', className: 'house', pattern: /\bhouse\s+(?:floor|roof deck|wall|front pier|upper front pier|back pier|upper back pier)\b/iu }),
-]);
-
-export type MinimapArenaOverride = Readonly<{
-  rules: readonly MinimapClassRule[];
-  exclusive?: boolean;
-  group?: (surface: MinimapSurfaceDescriptor, className: MinimapStructuralClass) => string | undefined;
-}>;
-
+export const MINIMAP_STRUCTURAL_MIN_HEIGHT_M = 1.6;
+export const MINIMAP_STRUCTURAL_MIN_SPAN_M = 4;
 /**
- * Hooks are data-owned by the arena, not a second renderer roster. Nuke Town's
- * detailed authoring names need a bounded allow-list so a house's furniture,
- * trim and dressing remain hidden while its footprint survives.
+ * Authored walls arrive as many abutting segments. Segments whose footprints
+ * touch or overlap within this slack are one silhouette, which is what turns a
+ * house's wall boxes into one building outline.
  */
-export const MINIMAP_ARENA_OVERRIDES: Readonly<Record<string, MinimapArenaOverride>> = Object.freeze({
-  'atomic-acres': Object.freeze({
-    exclusive: true,
-    rules: Object.freeze([
-      Object.freeze({ name: 'atomic-acres-road', className: 'road', pattern: /^atomic-acres-road$/iu }),
-    ]),
-  }),
-  nuketown2: Object.freeze({
-    exclusive: true,
-    rules: Object.freeze([
-      Object.freeze({ name: 'nuketown2-house-footprint', className: 'house', pattern: /^nuketown2 (?:north|south) house (?:floor|roof deck|wall\b|front pier\b|upper front pier\b|back pier\b|upper back pier\b)/iu }),
-      Object.freeze({ name: 'nuketown2-garage-footprint', className: 'garage', pattern: /^nuketown2 (?:north|south) garage (?:floor|roof|wall\b|link pier\b|front pier\b|back pier\b|door head\b)/iu }),
-      // HITL 5: HF-477's lollipop renamed the road bodies `carriageway stem` /
-      // `carriageway turning head` (+ kerbs, dashes, head kerb islands); the
-      // older `street ...` spellings stay so a rollback of that lane still maps.
-      Object.freeze({ name: 'nuketown2-road', className: 'road', pattern: /^nuketown2 (?:carriageway (?:stem|turning head|head kerb island)\b|(?:north |south )?street (?:asphalt|turning head|kerb))/iu }),
-      Object.freeze({ name: 'nuketown2-perimeter', className: 'perimeter', pattern: /^nuketown2 (?:north|south) perimeter wall/iu }),
-      // HITL 5: HF-477 retired the single head car for the reference's two street
-      // cars (`stem saloon`, `stem classic`), so the authored vehicle set is six.
-      Object.freeze({ name: 'nuketown2-vehicle', className: 'vehicle', pattern: /^nuketown2 (?:street-vehicle (?:truck (?:cab|deck|box)|coach body|head car body|stem (?:saloon|classic) body)|(?:north|south) car body)/iu }),
-    ]),
-    group: (surface: MinimapSurfaceDescriptor, className: MinimapStructuralClass) => {
-      if (className === 'road') return 'road';
-      if (className === 'perimeter') return 'perimeter';
-      const side = /\bnorth\b/iu.test(surface.name) ? 'north' : /\bsouth\b/iu.test(surface.name) ? 'south' : undefined;
-      if (className === 'house' || className === 'garage') return `${className}:${side ?? 'unknown'}`;
-      if (className === 'vehicle') {
-        if (/\bcoach\b/iu.test(surface.name)) return 'vehicle:coach';
-        if (/\btruck\b/iu.test(surface.name)) return 'vehicle:truck';
-        if (/\bhead car\b/iu.test(surface.name)) return 'vehicle:head-car';
-        if (/\bstem saloon\b/iu.test(surface.name)) return 'vehicle:saloon';
-        if (/\bstem classic\b/iu.test(surface.name)) return 'vehicle:classic';
-        if (side) return `vehicle:${side}-car`;
-      }
-      return undefined;
-    },
-  }),
-});
-
+export const MINIMAP_STRUCTURAL_MERGE_EPSILON_M = 0.35;
 export const MINIMAP_MIN_SEGMENT_PX = 2;
+
+/**
+ * PER-ARENA ELEMENT BUDGET.
+ *
+ * Derived, not guessed: `scripts/qa/minimap-structural-audit.mts` builds every
+ * arena in the catalog roster and counts the merged structural silhouettes.
+ * Measured 2026-09-05 on this head (256 px minimap):
+ *
+ *   nuketown2 13, raid2 14, atomic-acres 10, skyline-terminal 10,
+ *   rustworks-1v1 24, gun-range 10, farcrysis 3, high-seas 18,
+ *   test1 22, test2 27, map3 11
+ *
+ * The busiest arena is `test2` at 27, so the ceiling is 32: enough headroom for
+ * an author to add a building without tripping the gate, and still an order of
+ * magnitude below what these maps drew before HF-510 (test2 drew 307
+ * rectangles, Nuke Town 359).
+ */
+export const MINIMAP_ELEMENT_CEILING = 32;
+
+/**
+ * The only name-driven rule left. Road/apron surfaces are flat, so geometry
+ * alone cannot tell a carriageway from a lawn; the authored surface name can.
+ * Kerbs are deliberately NOT matched - they are trim, and matching them put 36
+ * slivers on Nuke Town's minimap.
+ */
+export const MINIMAP_ROAD_NAME_PATTERN = /\b(?:road|asphalt|tarmac|carriageway|turning head)\b/iu;
+/** Road TRIM: kerbs, lane dashes, kerb islands and markings are not the surface. */
+export const MINIMAP_ROAD_TRIM_PATTERN = /\b(?:kerb|curb|dash|island|marking|line)\b/iu;
+
+function boundsSpanX(bounds: MinimapBounds): number { return bounds.maxX - bounds.minX; }
+function boundsSpanZ(bounds: MinimapBounds): number { return bounds.maxZ - bounds.minZ; }
+
+/** The documented source rule, exported so the per-arena budget test can quote it. */
+export function isMinimapStructuralCollider(bounds: MinimapBounds): boolean {
+  const height = Number.isFinite(bounds.maxY)
+    ? (bounds.maxY as number) - (Number.isFinite(bounds.minY) ? (bounds.minY as number) : 0)
+    : Number.POSITIVE_INFINITY;
+  if (height < MINIMAP_STRUCTURAL_MIN_HEIGHT_M) return false;
+  return Math.max(boundsSpanX(bounds), boundsSpanZ(bounds)) >= MINIMAP_STRUCTURAL_MIN_SPAN_M;
+}
+
+export function isMinimapRoadSurface(name: string): boolean {
+  return MINIMAP_ROAD_NAME_PATTERN.test(name) && !MINIMAP_ROAD_TRIM_PATTERN.test(name);
+}
+
+/**
+ * `arena.physicalCover` is the arena's own declaration that a piece exists to
+ * be hidden behind. A cargo stack or a coach is big enough to pass the wall
+ * rule on geometry alone, so cover is subtracted explicitly: a blocker whose
+ * footprint sits inside an authored cover footprint is cover, whatever its
+ * size. This is why the owner's "not ... cover" is enforced at the source
+ * rather than by a renderer that decides what to skip.
+ */
+function containedIn(inner: MinimapBounds, outer: MinimapBounds, epsilon: number): boolean {
+  return inner.minX >= outer.minX - epsilon && inner.maxX <= outer.maxX + epsilon
+    && inner.minZ >= outer.minZ - epsilon && inner.maxZ <= outer.maxZ + epsilon;
+}
 
 function unionBounds(a: MinimapBounds, b: MinimapBounds): MinimapBounds {
   return {
@@ -106,101 +136,99 @@ function unionBounds(a: MinimapBounds, b: MinimapBounds): MinimapBounds {
   };
 }
 
-export function classifyMinimapSurface(
-  arenaId: string,
-  surface: MinimapSurfaceDescriptor,
-  override: MinimapArenaOverride | undefined = MINIMAP_ARENA_OVERRIDES[arenaId],
-): MinimapStructuralClass | null {
-  if (surface.minimapClass) return surface.minimapClass;
-  for (const rule of override?.rules ?? []) if (rule.pattern.test(surface.name)) return rule.className;
-  if (override?.exclusive) return null;
-  for (const rule of MINIMAP_CLASS_TABLE) if (rule.pattern.test(surface.name)) return rule.className;
-  return null;
+function touches(a: MinimapBounds, b: MinimapBounds, epsilon: number): boolean {
+  return a.minX - epsilon <= b.maxX && b.minX - epsilon <= a.maxX
+    && a.minZ - epsilon <= b.maxZ && b.minZ - epsilon <= a.maxZ;
 }
 
-function minimapGroup(
-  surface: MinimapSurfaceDescriptor,
-  className: MinimapStructuralClass,
-  override: MinimapArenaOverride | undefined,
-): string {
-  return override?.group?.(surface, className) ?? `${className}:${surface.id}`;
+/** Merge every touching/overlapping footprint into one silhouette (union-find). */
+function mergeFootprints(
+  pieces: readonly MinimapBounds[],
+  epsilon: number,
+): Array<{ bounds: MinimapBounds; sourceCount: number }> {
+  const parent = pieces.map((_, index) => index);
+  const find = (index: number): number => {
+    let node = index;
+    while (parent[node] !== node) { parent[node] = parent[parent[node]!]!; node = parent[node]!; }
+    return node;
+  };
+  for (let i = 0; i < pieces.length; i += 1) {
+    for (let j = i + 1; j < pieces.length; j += 1) {
+      if (!touches(pieces[i]!, pieces[j]!, epsilon)) continue;
+      const rootI = find(i);
+      const rootJ = find(j);
+      if (rootI !== rootJ) parent[rootI] = rootJ;
+    }
+  }
+  const merged = new Map<number, { bounds: MinimapBounds; sourceCount: number }>();
+  pieces.forEach((piece, index) => {
+    const key = find(index);
+    const previous = merged.get(key);
+    merged.set(key, previous
+      ? { bounds: unionBounds(previous.bounds, piece), sourceCount: previous.sourceCount + 1 }
+      : { bounds: { minX: piece.minX, maxX: piece.maxX, minZ: piece.minZ, maxZ: piece.maxZ }, sourceCount: 1 });
+  });
+  return [...merged.values()];
 }
 
 /**
- * Builds only macro map silhouettes. Grouping is the semantic merge pass: all
- * authored pieces of one house/garage/vehicle become one footprint, and the
- * final pixel fence drops remnants that cannot be read at the HUD resolution.
+ * Builds the complete structural element set for one arena's minimap.
+ *
+ * Deterministic: elements are ordered by class, then by world position, then
+ * numbered, so the same arena always yields the same ids and the per-arena
+ * budget test can compare runs.
  */
 export function buildMinimapStructuralElements(input: Readonly<{
-  arenaId: string;
   bounds: MinimapBounds;
   width: number;
   height: number;
   houses?: readonly MinimapHouseDescriptor[];
-  physicalCover?: readonly MinimapPhysicalCoverDescriptor[];
+  colliders?: readonly MinimapBounds[];
+  /** Authored cover footprints, subtracted from the structural set. */
+  cover?: readonly MinimapBounds[];
   surfaces?: readonly MinimapSurfaceDescriptor[];
   minSegmentPx?: number;
-  override?: MinimapArenaOverride;
 }>): readonly MinimapElement[] {
-  const override = input.override ?? MINIMAP_ARENA_OVERRIDES[input.arenaId];
-  const grouped = new Map<string, MinimapElement>();
-  const add = (id: string, className: MinimapStructuralClass, bounds: MinimapBounds, group: string): void => {
-    const previous = grouped.get(group);
-    grouped.set(group, previous
-      ? { ...previous, bounds: unionBounds(previous.bounds, bounds), sourceCount: previous.sourceCount + 1 }
-      : { id, className, bounds, sourceCount: 1 });
-  };
-
-  for (const [index, house] of (input.houses ?? []).entries()) {
-    add(house.id || `house-${index}`, 'house', {
-      minX: house.origin.x - house.dimensions.width / 2,
-      maxX: house.origin.x + house.dimensions.width / 2,
-      minZ: house.origin.z - house.dimensions.depth / 2,
-      maxZ: house.origin.z + house.dimensions.depth / 2,
-    }, `house:${house.id || index}`);
-  }
-  for (const cover of input.physicalCover ?? []) {
-    const className = cover.minimapClass ?? (/\b(?:bus|coach|truck|car|vehicle)\b/iu.test(cover.id) ? 'vehicle' : null);
-    if (className) {
-      const descriptor = { id: cover.id, name: cover.id, bounds: cover.bounds };
-      add(cover.id, className, cover.bounds, minimapGroup(descriptor, className, override));
-    }
-  }
-  for (const surface of input.surfaces ?? []) {
-    const className = classifyMinimapSurface(input.arenaId, surface, override);
-    if (!className) continue;
-    add(surface.id, className, surface.bounds, minimapGroup(surface, className, override));
-  }
+  const epsilon = MINIMAP_STRUCTURAL_MERGE_EPSILON_M;
+  const roadPieces = (input.surfaces ?? [])
+    .filter((surface) => isMinimapRoadSurface(surface.name))
+    .map((surface) => surface.bounds);
+  const cover = input.cover ?? [];
+  const wallPieces = (input.colliders ?? []).filter((collider) => isMinimapStructuralCollider(collider)
+    && !cover.some((piece) => containedIn(collider, piece, epsilon)));
+  const housePieces = (input.houses ?? []).map((house) => ({
+    minX: house.origin.x - house.dimensions.width / 2,
+    maxX: house.origin.x + house.dimensions.width / 2,
+    minZ: house.origin.z - house.dimensions.depth / 2,
+    maxZ: house.origin.z + house.dimensions.depth / 2,
+  }));
 
   const minSegmentPx = input.minSegmentPx ?? MINIMAP_MIN_SEGMENT_PX;
-  return Object.freeze([...grouped.values()]
-    .filter((element) => {
-      const widthPx = ((element.bounds.maxX - element.bounds.minX) / Math.max(0.001, input.bounds.maxX - input.bounds.minX)) * input.width;
-      const heightPx = ((element.bounds.maxZ - element.bounds.minZ) / Math.max(0.001, input.bounds.maxZ - input.bounds.minZ)) * input.height;
-      return Math.max(widthPx, heightPx) >= minSegmentPx;
-    })
-    .sort((a, b) => a.id.localeCompare(b.id)));
-}
+  const arenaSpanX = Math.max(0.001, boundsSpanX(input.bounds));
+  const arenaSpanZ = Math.max(0.001, boundsSpanZ(input.bounds));
+  const readable = (bounds: MinimapBounds): boolean => Math.max(
+    (boundsSpanX(bounds) / arenaSpanX) * input.width,
+    (boundsSpanZ(bounds) / arenaSpanZ) * input.height,
+  ) >= minSegmentPx;
 
-export type MinimapLandmarkKind =
-  | 'bus'
-  | 'cargo-stack'
-  | 'pipe-stack'
-  | 'service-skip'
-  | 'generator-trailer'
-  | 'jetliner'
-  | 'terminal'
-  | 'fuel';
-
-export function minimapLandmarkLabel(kind: MinimapLandmarkKind): 'BUS' | 'CRGO' | 'PIPE' | 'SKIP' | 'GEN' | 'JET' | 'TERM' | 'FUEL' {
-  if (kind === 'cargo-stack') return 'CRGO';
-  if (kind === 'pipe-stack') return 'PIPE';
-  if (kind === 'service-skip') return 'SKIP';
-  if (kind === 'generator-trailer') return 'GEN';
-  if (kind === 'jetliner') return 'JET';
-  if (kind === 'terminal') return 'TERM';
-  if (kind === 'fuel') return 'FUEL';
-  return 'BUS';
+  const elements: MinimapElement[] = [];
+  const layers: ReadonlyArray<readonly [MinimapStructuralClass, readonly MinimapBounds[]]> = [
+    ['road', roadPieces],
+    ['building', housePieces],
+    ['wall', wallPieces],
+  ];
+  for (const [className, pieces] of layers) {
+    mergeFootprints(pieces, epsilon)
+      .filter((group) => readable(group.bounds))
+      .sort((a, b) => (a.bounds.minX - b.bounds.minX) || (a.bounds.minZ - b.bounds.minZ))
+      .forEach((group, index) => elements.push(Object.freeze({
+        id: className + '-' + String(index + 1).padStart(2, '0'),
+        className,
+        bounds: group.bounds,
+        sourceCount: group.sourceCount,
+      })));
+  }
+  return Object.freeze(elements);
 }
 
 export type MinimapLandmarkFootprint = {
@@ -209,19 +237,6 @@ export type MinimapLandmarkFootprint = {
   width: number;
   height: number;
 };
-
-export function physicalCoverMinimapKind(
-  id: string,
-  performanceVisualKind?: Exclude<MinimapLandmarkKind, 'bus'>,
-): MinimapLandmarkKind | null {
-  if (performanceVisualKind) return performanceVisualKind;
-  if (id.endsWith('-bus')) return 'bus';
-  if (id.includes('jetliner')) return 'jetliner';
-  if (id.includes('terminal')) return 'terminal';
-  if (id.includes('fuel')) return 'fuel';
-  if (id.includes('cargo-stack')) return 'cargo-stack';
-  return null;
-}
 
 export function worldToMinimap(
   x: number,

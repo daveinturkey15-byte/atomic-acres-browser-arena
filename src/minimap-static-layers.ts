@@ -1,62 +1,70 @@
 /**
- * HF-491 (perf lane 4): the retained minimap layers for every arena that does
- * NOT take the atomic-acres branch - Nuke Town Rebuild included.
+ * The retained minimap structure layer, shared by EVERY arena.
  *
- * WHAT IT COSTS WITHOUT THIS. HF-399 pre-rendered atomic-acres' road, houses
- * and cover landmarks into an offscreen layer and left every other arena
- * repainting, at the 30 Hz minimap rate, one `fillRect` + one `strokeRect` per
- * world collider and one `drawMinimapLandmark` + label mapping per physical
- * cover. Measured on the PASS 94 HITL 5 head (headless installed Chrome, real
- * WebGPU device, 2560x1440, HIGH, Solo, nuketown2, CDP CPU profile in
+ * HF-510 (owner): the minimap must show "mainly where the walls are, not all
+ * the tiny components within, like cover". This module is the single place the
+ * structural silhouettes are rasterised, so the HUD look - line weight, fill,
+ * contrast - is identical on Nuke Town, Terminal, RustRig, the Gun Range and
+ * every other catalog arena. `src/minimap.ts` owns WHICH elements exist;
+ * this module owns HOW they are drawn.
+ *
+ * WHAT IT COSTS WITHOUT A CACHE. HF-399 pre-rendered atomic-acres' road and
+ * houses into an offscreen layer and left every other arena repainting, at the
+ * 30 Hz minimap rate, one `fillRect` + one `strokeRect` per world collider and
+ * one landmark path per physical cover. Measured on the PASS 94 HITL 5 head
+ * (headless installed Chrome, real WebGPU device, 2560x1440, HIGH, Solo,
+ * nuketown2, CDP CPU profile in
  * `docs/evidence/pass94/perf-hitl5/bisect/lane4-pre-*-nuketown2.json`),
  * `updateMinimap` held **0.87 ms of SELF time per rendered frame at the spawn
  * pose and 0.65 ms at the street pose** - the largest single application
- * function in both profiles, about half the renderer's own full-scene matrix
- * walk. After this module it is absent from the top-25 self-time list at both
- * poses.
+ * function in both profiles. After the layer cache it is absent from the
+ * top-25 self-time list at both poses.
  *
- * WHY A CACHE IS CORRECT. Neither list is per-frame data:
+ * WHY A CACHE IS CORRECT. Neither input is per-frame data:
  *
- *   - `arena.physicalCover` is authored by the arena builder and never mutated
- *     at runtime (every `physicalCover` push in `src/` is build-time). The
- *     cover layer is keyed on arena identity plus a cover-count tripwire, the
- *     same invariant the existing atomic-acres layer documents.
+ *   - `arena.houses` and the authored surface list are built by the arena
+ *     factory and never mutated at runtime.
  *   - the world collider list IS dynamic (glass breaks, doors move, houses
  *     collapse), but `activeWorldColliders()` is revision-keyed and returns a
- *     STABLE ARRAY IDENTITY while nothing has changed. The collider layer is
- *     keyed on that identity, so a break, a door or a collapse repaints it
- *     exactly once.
+ *     STABLE ARRAY IDENTITY while nothing has changed, so a break, a door or a
+ *     collapse repaints the layer exactly once.
  *
- * Both layers repaint into their own retained canvas instead of allocating a
- * new one, so the worst case - an arena whose collider array identity changes
- * on every call, e.g. the gun range's patrolling dummies - costs what it costs
+ * The layer repaints into its own retained canvas instead of allocating a new
+ * one, so the worst case - an arena whose collider array identity changes on
+ * every call, e.g. the gun range's patrolling dummies - costs what it costs
  * today plus one `drawImage`, and never a per-frame canvas allocation.
- *
- * DRAW ORDER IS LOAD-BEARING, which is why this is two layers and not one:
- * colliders, then the live Domination zones, then the cover landmarks, then
- * the live targets.
  */
 import {
+  buildMinimapStructuralElements,
   minimapLandmarkFootprint,
-  minimapLandmarkLabel,
-  physicalCoverMinimapKind,
   type MinimapBounds,
-  type MinimapLandmarkFootprint,
-  type MinimapLandmarkKind,
+  type MinimapElement,
+  type MinimapHouseDescriptor,
+  type MinimapSurfaceDescriptor,
 } from './minimap';
 
 type CachedCanvas = { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D };
 
-/** A physical cover entry, as far as the minimap is concerned. */
-export type MinimapCoverSource = Readonly<{
-  id: string;
-  bounds: MinimapBounds;
-  performanceVisualKind?: Exclude<MinimapLandmarkKind, 'bus'>;
+/**
+ * ONE palette for every arena (HF-510 asked for a consistent, readable map).
+ * Values are read against the minimap's own `rgba(7, 15, 18, .86)` ground:
+ * the road reads as a dim slab, structure as a bright outline over a faint
+ * fill. Nothing here is per-arena, so no map can drift into its own look.
+ */
+export const MINIMAP_STRUCTURE_STYLE = Object.freeze({
+  road: Object.freeze({ fill: 'rgba(126, 137, 132, .30)', stroke: 'rgba(126, 137, 132, .30)', lineWidth: 0 }),
+  building: Object.freeze({ fill: 'rgba(226, 240, 244, .16)', stroke: 'rgba(238, 248, 252, .95)', lineWidth: 2.5 }),
+  wall: Object.freeze({ fill: 'rgba(226, 240, 244, .12)', stroke: 'rgba(226, 240, 244, .88)', lineWidth: 2 }),
+});
+
+export type MinimapStructureRecord = { id: string; kind: string; label: string };
+
+export type MinimapStructureLayer = Readonly<{
+  canvas: HTMLCanvasElement;
+  elements: readonly MinimapElement[];
+  /** Diagnostics projection: one row per drawn element, no cover landmarks. */
+  records: readonly MinimapStructureRecord[];
 }>;
-
-export type MinimapLandmarkRecord = { id: string; kind: MinimapLandmarkKind; label: string };
-
-export type MinimapLabelAnchor = Readonly<{ label: string; x: number; y: number }>;
 
 /** Reuse the retained canvas when its backing size still matches. */
 function layerCanvas(cached: CachedCanvas | null, width: number, height: number): CachedCanvas {
@@ -72,110 +80,86 @@ function layerCanvas(cached: CachedCanvas | null, width: number, height: number)
   return { canvas, context };
 }
 
-type ColliderLayer = {
+type StructureLayerCache = {
   arena: object;
   colliders: readonly MinimapBounds[];
+  coverCount: number;
+  houseCount: number;
+  surfaceCount: number;
   width: number;
   height: number;
-  fillStyle: string;
-  strokeStyle: string;
   cached: CachedCanvas;
+  layer: MinimapStructureLayer;
 };
-let colliderLayer: ColliderLayer | null = null;
+let structureLayer: StructureLayerCache | null = null;
 
-/** The world-collider footprints, repainted only when the collider revision changes. */
-export function activeMinimapColliderLayer(request: Readonly<{
+/** Test/teardown hook: forget the retained layer so a new arena cannot inherit it. */
+export function resetMinimapStructureLayer(): void {
+  structureLayer = null;
+}
+
+/**
+ * The structural silhouettes for the active arena, repainted only when the
+ * arena, its collider revision, its authored lists or the canvas size change.
+ */
+export function activeMinimapStructureLayer(request: Readonly<{
   arena: object;
-  colliders: readonly MinimapBounds[];
   bounds: MinimapBounds;
   width: number;
   height: number;
-  fillStyle: string;
-  strokeStyle: string;
-}>): HTMLCanvasElement {
-  const previous = colliderLayer;
+  colliders: readonly MinimapBounds[];
+  cover: readonly MinimapBounds[];
+  houses: readonly MinimapHouseDescriptor[];
+  surfaces: readonly MinimapSurfaceDescriptor[];
+}>): MinimapStructureLayer {
+  const previous = structureLayer;
   if (
     previous
     && previous.arena === request.arena
     && previous.colliders === request.colliders
-    && previous.width === request.width
-    && previous.height === request.height
-    && previous.fillStyle === request.fillStyle
-    && previous.strokeStyle === request.strokeStyle
-  ) return previous.cached.canvas;
-  const cached = layerCanvas(previous?.cached ?? null, request.width, request.height);
-  const context = cached.context;
-  context.lineWidth = 1.5;
-  context.fillStyle = request.fillStyle;
-  context.strokeStyle = request.strokeStyle;
-  for (const collider of request.colliders) {
-    const footprint = minimapLandmarkFootprint(collider, request.bounds, request.width, request.height);
-    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
-  }
-  colliderLayer = { ...request, cached };
-  return cached.canvas;
-}
-
-export type MinimapCoverLayer = Readonly<{
-  canvas: HTMLCanvasElement;
-  /** Landmark label anchors in minimap pixel space, before the player transform. */
-  labelAnchors: readonly MinimapLabelAnchor[];
-  landmarks: MinimapLandmarkRecord[];
-}>;
-
-type CoverLayerCache = {
-  arena: object;
-  coverCount: number;
-  width: number;
-  height: number;
-  cached: CachedCanvas;
-  layer: MinimapCoverLayer;
-};
-let coverLayer: CoverLayerCache | null = null;
-
-/** The authored cover landmarks, repainted only when the arena or its cover list changes. */
-export function activeMinimapCoverLayer(request: Readonly<{
-  arena: object;
-  cover: readonly MinimapCoverSource[];
-  bounds: MinimapBounds;
-  width: number;
-  height: number;
-  draw: (
-    context: CanvasRenderingContext2D,
-    id: string,
-    kind: MinimapLandmarkKind,
-    footprint: MinimapLandmarkFootprint,
-  ) => void;
-}>): MinimapCoverLayer {
-  const previous = coverLayer;
-  if (
-    previous
-    && previous.arena === request.arena
     && previous.coverCount === request.cover.length
+    && previous.houseCount === request.houses.length
+    && previous.surfaceCount === request.surfaces.length
     && previous.width === request.width
     && previous.height === request.height
   ) return previous.layer;
+
   const cached = layerCanvas(previous?.cached ?? null, request.width, request.height);
-  const labelAnchors: MinimapLabelAnchor[] = [];
-  const landmarks: MinimapLandmarkRecord[] = [];
-  for (const cover of request.cover) {
-    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-    if (!kind) continue;
-    const footprint = minimapLandmarkFootprint(cover.bounds, request.bounds, request.width, request.height);
-    request.draw(cached.context, cover.id, kind, footprint);
-    const label = minimapLandmarkLabel(kind);
-    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
-    landmarks.push({ id: cover.id, kind, label });
-  }
-  const layer: MinimapCoverLayer = Object.freeze({
-    canvas: cached.canvas,
-    labelAnchors: Object.freeze(labelAnchors),
-    landmarks,
+  const context = cached.context;
+  const elements = buildMinimapStructuralElements({
+    bounds: request.bounds,
+    width: request.width,
+    height: request.height,
+    colliders: request.colliders,
+    cover: request.cover,
+    houses: request.houses,
+    surfaces: request.surfaces,
   });
-  coverLayer = {
+  for (const element of elements) {
+    const style = MINIMAP_STRUCTURE_STYLE[element.className];
+    const footprint = minimapLandmarkFootprint(element.bounds, request.bounds, request.width, request.height);
+    context.fillStyle = style.fill;
+    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    if (style.lineWidth <= 0) continue;
+    context.lineWidth = style.lineWidth;
+    context.strokeStyle = style.stroke;
+    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+  }
+  const layer: MinimapStructureLayer = Object.freeze({
+    canvas: cached.canvas,
+    elements,
+    records: Object.freeze(elements.map((element) => ({
+      id: element.id,
+      kind: element.className,
+      label: element.className.toUpperCase(),
+    }))),
+  });
+  structureLayer = {
     arena: request.arena,
+    colliders: request.colliders,
     coverCount: request.cover.length,
+    houseCount: request.houses.length,
+    surfaceCount: request.surfaces.length,
     width: request.width,
     height: request.height,
     cached,

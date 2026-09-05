@@ -1,0 +1,132 @@
+{
+  "generatedFor": "HF-510",
+  "minimapSize": 256,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "colliders": 359,
+      "coverLandmarks": 0,
+      "before": 359,
+      "after": 13,
+      "byClass": {
+        "road": 1,
+        "wall": 12
+      },
+      "mergedSourcePieces": 43
+    },
+    {
+      "arena": "raid2",
+      "colliders": 212,
+      "coverLandmarks": 0,
+      "before": 212,
+      "after": 14,
+      "byClass": {
+        "wall": 14
+      },
+      "mergedSourcePieces": 66
+    },
+    {
+      "arena": "atomic-acres",
+      "colliders": 205,
+      "coverLandmarks": 5,
+      "before": 210,
+      "after": 10,
+      "byClass": {
+        "road": 1,
+        "building": 2,
+        "wall": 7
+      },
+      "mergedSourcePieces": 45
+    },
+    {
+      "arena": "skyline-terminal",
+      "colliders": 154,
+      "coverLandmarks": 6,
+      "before": 160,
+      "after": 10,
+      "byClass": {
+        "road": 1,
+        "wall": 9
+      },
+      "mergedSourcePieces": 25
+    },
+    {
+      "arena": "rustworks-1v1",
+      "colliders": 63,
+      "coverLandmarks": 0,
+      "before": 63,
+      "after": 24,
+      "byClass": {
+        "wall": 24
+      },
+      "mergedSourcePieces": 24
+    },
+    {
+      "arena": "gun-range",
+      "colliders": 36,
+      "coverLandmarks": 0,
+      "before": 36,
+      "after": 10,
+      "byClass": {
+        "wall": 10
+      },
+      "mergedSourcePieces": 24
+    },
+    {
+      "arena": "farcrysis",
+      "colliders": 236,
+      "coverLandmarks": 0,
+      "before": 236,
+      "after": 3,
+      "byClass": {
+        "wall": 3
+      },
+      "mergedSourcePieces": 10
+    },
+    {
+      "arena": "high-seas",
+      "colliders": 213,
+      "coverLandmarks": 0,
+      "before": 213,
+      "after": 18,
+      "byClass": {
+        "wall": 18
+      },
+      "mergedSourcePieces": 30
+    },
+    {
+      "arena": "test1",
+      "colliders": 122,
+      "coverLandmarks": 0,
+      "before": 122,
+      "after": 22,
+      "byClass": {
+        "wall": 22
+      },
+      "mergedSourcePieces": 40
+    },
+    {
+      "arena": "test2",
+      "colliders": 307,
+      "coverLandmarks": 0,
+      "before": 307,
+      "after": 27,
+      "byClass": {
+        "wall": 27
+      },
+      "mergedSourcePieces": 113
+    },
+    {
+      "arena": "map3",
+      "colliders": 232,
+      "coverLandmarks": 0,
+      "before": 232,
+      "after": 11,
+      "byClass": {
+        "wall": 11
+      },
+      "mergedSourcePieces": 12
+    }
+  ],
+  "worstAfter": 27
+}
