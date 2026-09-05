@@ -81,6 +81,14 @@ export function loadedArenaVisualDefinitionIds(): readonly ArenaId[] {
   return Object.freeze([...LOADED_ARENA_VISUAL_DEFINITIONS.keys()]);
 }
 
+/** Read-only QA telemetry for the authored review-camera registry. */
+export function loadedArenaVisualDefinitionReviewCameraIds(): Readonly<Record<string, readonly string[]>> {
+  return Object.freeze(Object.fromEntries([...LOADED_ARENA_VISUAL_DEFINITIONS.entries()].map(([arenaId, definition]) => [
+    arenaId,
+    Object.freeze(definition.reviewCameras.map((camera) => camera.id)),
+  ])));
+}
+
 export type ArenaVisualSwitchReceipt = Readonly<{
   arenaId: ArenaId;
   generation: number;

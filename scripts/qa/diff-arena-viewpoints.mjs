@@ -195,8 +195,17 @@ export function validateManifests(baseManifest, candManifest) {
   if (candManifest.verdict !== 'PASS') {
     problems.push(`candidate capture did not pass (verdict='${candManifest.verdict}')`);
   }
+  for (const manifest of [baseManifest, candManifest]) {
+    if (!/^[0-9a-f]{64}$/u.test(manifest.bundleSha256 ?? '')) {
+      problems.push(`${manifest.label ?? manifest.url}: served bundle SHA-256 missing or malformed`);
+    }
+  }
   if (baseManifest.bundleAtStart === candManifest.bundleAtStart) {
     problems.push(`both runs served the same bundle '${baseManifest.bundleAtStart}' - harness mistake, not a code regression`);
+  }
+  if (/^[0-9a-f]{64}$/u.test(baseManifest.bundleSha256 ?? '')
+    && baseManifest.bundleSha256 === candManifest.bundleSha256) {
+    problems.push(`both runs served the same bundle SHA-256 '${baseManifest.bundleSha256}' - harness mistake, not a code regression`);
   }
   return problems;
 }
