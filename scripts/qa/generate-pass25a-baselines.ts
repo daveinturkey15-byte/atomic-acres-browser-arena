@@ -64,6 +64,8 @@ const contract = {
       'pass68-flare-gun-five-second-burn',
       'pass68-adrenaline-instant-regen-restart-plus-one-hp-per-second',
       'pass72-m14-ebr-forty-percent-base-and-minimum-damage-reduction',
+      'pass84-ebr-40-percent-damage-25-percent-fire-rate',
+      'pass94-hf497-ground-stick-floor',
     ],
     generatedBy: 'scripts/qa/generate-pass25a-baselines.ts',
     dependencies,
