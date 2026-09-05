@@ -2342,3 +2342,10 @@ Candidate 7 (runtime ae795724, pushed 452d7aba) is served on :4300 for the owner
 Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled task). PASS 95 waits for the owner verdict plus green cold admission and soak.
 
 | HF-508 | 2026-09-05 06:5x | Owner: use more Claude (about 90% usage left); OpenAI at 14% so transition away from Luna entirely (running lanes finish, no new ones); keep Muse Spark 1.3 contributor; Gemini has plenty (Flash 3.8 high); Opus 4.6 via Antigravity on a separate quota. Two owner-started sessions: P-3/P-4 pickup relay, R-1 reload falsifier (both already covered by mp-audit-todos on candidate 7; flagged to owner). | Fleet shift: Claude Opus workflows for forward-ports + adversarial verification; Gemini for mechanical checks; Antigravity Opus 4.6 for a bounded lane. |
+
+### Fleet after HF-508 (06:58)
+
+- Claude Opus workflow `forward-port-lanes-c7` (run wf_786cc3a3-787): 11 reviewed lanes candidate 7 left out (interior look, transmission glass, lobby countdown, lobby overhaul, ground-projected env, volume fire, SSR denoise, TAA, Raid 2 slice 2, Farcrysis slice 2, Raid 2 generator detail) each forward-ported onto 452d7aba in its own worktree `aa-fp-<lane>` (branch `contrib/dave-gaming-pc/claude/fp-<lane>`), gated, cold-measured on ports 4240-4250 under a machine lock, adversarially verified; results table lands in docs/pass84-lanes/FORWARD-PORTS-2026-09-05.md. Chunked 3 at a time for machine load.
+- Antigravity Opus 4.6 (`claude-opus-4-6-thinking`, separate quota): independent gate audit of the whole 3e2fd273..452d7aba merge range (any weakened test/threshold/fence/fixture; constants table; full suite re-run) -> docs/evidence/pass94/candidate7/GATE-AUDIT-OPUS46.md on branch `contrib/dave-gaming-pc/agy/c7-gate-audit`.
+- Muse Spark 1.3 reviews queued for the three lanes with no current verdict: sh-l2-irradiance-volume @ 2c45818f, all-arenas-air-and-coplanar @ 96819787, thin-metal-perforation @ df1326dd (review 2).
+- Luna: the two running lanes (cold-path-2, mp-soak-red) finish under their 120 min caps; no new Luna work (OpenAI at 14%).
