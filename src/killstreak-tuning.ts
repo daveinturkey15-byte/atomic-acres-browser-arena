@@ -72,9 +72,32 @@ export const CHOPPER_GUN_DAMAGE_MULTIPLIER = 0.75;
 /** Pass 66.1 autocannon numbers this multiplier is applied to. */
 export const CHOPPER_GUN_DAMAGE_BEFORE = 34;
 export const CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE = 22;
-export const CHOPPER_GUN_DAMAGE_AFTER = roundToMilli(CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER);
-export const CHOPPER_GUN_MINIMUM_DAMAGE_AFTER = roundToMilli(
+/** The HF-458 result. Kept named so HF-509's halving is a readable ratio, not a new literal. */
+export const CHOPPER_GUN_DAMAGE_HF458 = roundToMilli(CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER);
+export const CHOPPER_GUN_MINIMUM_DAMAGE_HF458 = roundToMilli(
   CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER,
+);
+
+/**
+ * HF-509 (owner 2026-09-05): "half the damage of the helicopter's machine gun,
+ * the chopper gunner. Keep everything else the same."
+ *
+ * This is a second, independent halving stacked on HF-458's -25%, expressed as
+ * its own ratio so the request stays traceable: the owner asked to halve what
+ * is IN THE GAME TODAY (25.5 / 16.5), not to re-derive from the Pass 66.1
+ * baseline. Cadence, range, falloff start, splash, penetration and the missile
+ * payload are deliberately untouched - only these two numbers move.
+ */
+export const CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER = 0.5;
+export const CHOPPER_GUN_DAMAGE_AFTER = roundToMilli(
+  CHOPPER_GUN_DAMAGE_HF458 * CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
+);
+export const CHOPPER_GUN_MINIMUM_DAMAGE_AFTER = roundToMilli(
+  CHOPPER_GUN_MINIMUM_DAMAGE_HF458 * CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
+);
+/** Total scaling from the Pass 66.1 (v2) autocannon: 0.75 x 0.5. */
+export const CHOPPER_GUN_DAMAGE_MULTIPLIER_FROM_V2 = roundToMilli(
+  CHOPPER_GUN_DAMAGE_MULTIPLIER * CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
 );
 
 // ---------------------------------------------------------------------------
