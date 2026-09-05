@@ -1,0 +1,74 @@
+{
+  "station": "nuketown2-south-yard",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.84,
+  "probes": {
+    "left": {
+      "expected": "RARW",
+      "answered": "RARW"
+    },
+    "right": {
+      "expected": "JYKH",
+      "answered": "JYKH"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-yard.png",
+      "sourceSha256": "bc8fec94903fb4a52f5cbaa19944ca9f1b8023b2249b752d5cbe9ae707ab04d4",
+      "shownSha256": "d91ee2a3dade7fa61aeff7fd7f81186d754589a84759cef31c309f761cf29f76",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-south-yard.png",
+      "sourceSha256": "b40c553c070f3aee0f77b80bd314111c2076e008d14f553ac6e5cdfdb65a1334",
+      "shownSha256": "6407a63641b2a7b574e87c5daa61439dca7eab3b87bffd40acb024febf15ea87",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "The reference set shows dawn as low sun with deep long shadows and dark sides on the foreground plinth, with sunlit stepping-stone grass only in r1c2-r2c2 and near-black shadow in r2c0-r2c1. LEFT in r2c0-r2c1 keeps that deep shadowed grass and in r1c1-r2c1 keeps the plinth top bright with sides near-black like reference-1, while RIGHT in the same regions lifts shadows to bright lime grass and bright green plinth sides, breaking the value relationship. LEFT also preserves the black silhouette left edge in r0c0-r2c0 seen in the reference, where RIGHT shows a lit wall.",
+  "leftCloser": [
+    "Deep contact/shadow grass in r2c0-r2c1 matching reference-1 near-black shadow vs RIGHT bright wash",
+    "Foreground plinth in r1c1-r2c1 with bright top and near-black sides matching reference-1 vs RIGHT bright green sides",
+    "Dark silhouette left edge in r0c0-r2c0 and shadowed west wall in r1c0 matching reference-1 vs RIGHT lit"
+  ],
+  "rightCloser": [
+    "Siding courses on upper west wall in r0c1-r1c1 remain readable vs LEFT crush to black",
+    "Sky gradient in r0c2 stays pale luminous vs LEFT slightly greyer"
+  ],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "grass and shadow exposure: LEFT near-black shadow cover, RIGHT bright sunlit lime grass"
+  },
+  "elapsedMs": 46159,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

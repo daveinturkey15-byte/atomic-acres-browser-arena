@@ -1,0 +1,49 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "map3-night-light-rain",
+  "sha": "e749989be748c2898f18ba928e4da9456527a15c",
+  "url": "http://127.0.0.1:4266",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-D6JpSxWg.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 4000,
+  "samples": 1,
+  "capturedAt": "2026-09-05T07:00:43.272Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "map3",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "map3-hub-vista",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\map3-night-light-rain\\map3\\map3-hub-vista.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\map3-night-light-rain\\map3\\map3-hub-vista.png"
+          ],
+          "committedFrame": 228,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.02,
+          "frame": 251
+        }
+      ],
+      "ms": 108707,
+      "errors": []
+    }
+  ]
+}

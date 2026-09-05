@@ -1,0 +1,194 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "nuketown2-dawn",
+  "sha": "e749989be748c2898f18ba928e4da9456527a15c",
+  "url": "http://127.0.0.1:4266",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-D6JpSxWg.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 4000,
+  "samples": 1,
+  "capturedAt": "2026-09-05T06:48:30.463Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-overhead.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-overhead.png"
+          ],
+          "committedFrame": 173,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 191
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-yard.png"
+          ],
+          "committedFrame": 194,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 210
+        },
+        {
+          "cameraId": "nuketown2-south-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-yard.png"
+          ],
+          "committedFrame": 213,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 230
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-street-centre.png"
+          ],
+          "committedFrame": 233,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 249
+        },
+        {
+          "cameraId": "nuketown2-north-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-upper-window.png"
+          ],
+          "committedFrame": 252,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 271
+        },
+        {
+          "cameraId": "nuketown2-south-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-upper-window.png"
+          ],
+          "committedFrame": 282,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 300
+        },
+        {
+          "cameraId": "nuketown2-into-sun-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-into-sun-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-into-sun-street.png"
+          ],
+          "committedFrame": 303,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 321
+        },
+        {
+          "cameraId": "nuketown2-north-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-interior.png"
+          ],
+          "committedFrame": 324,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 340
+        },
+        {
+          "cameraId": "nuketown2-south-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-south-interior.png"
+          ],
+          "committedFrame": 343,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 361
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-garage.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-garage.png"
+          ],
+          "committedFrame": 364,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 381
+        },
+        {
+          "cameraId": "nuketown2-north-balcony",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-balcony.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-balcony.png"
+          ],
+          "committedFrame": 384,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 404
+        },
+        {
+          "cameraId": "nuketown2-front-porch",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-front-porch.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-front-porch.png"
+          ],
+          "committedFrame": 419,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 438
+        }
+      ],
+      "ms": 145848,
+      "errors": [
+        "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion exceeded 12000 ms for submission 1 (completed 0, mode serialized, in-flight 1, pending 12014 ms, probes 1, prior latency none, fenced draws 577)\n    at http://127.0.0.1"
+      ]
+    }
+  ]
+}

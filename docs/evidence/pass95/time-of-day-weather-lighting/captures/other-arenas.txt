@@ -1,0 +1,10 @@
+atomic-acres nuke-town-overview 18
+farcrysis farcrysis-beach-golden 17
+gun-range gun-range-overview 12
+map3 map3-hub-vista 10
+high-seas high-seas-starboard-overview 19
+rustworks-1v1 rustrig-overview 22
+skyline-terminal terminal-overview 10.5
+test1 test1-tower-overview 13
+test2 test2-estate-overview 18.5
+raid2 raid2-estate-overview 10.5

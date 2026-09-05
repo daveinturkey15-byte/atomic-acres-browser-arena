@@ -1,0 +1,75 @@
+{
+  "station": "nuketown2-street-centre",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "A",
+  "confidence": 0.68,
+  "probes": {
+    "left": {
+      "expected": "AWRW",
+      "answered": "AWRW"
+    },
+    "right": {
+      "expected": "TWEY",
+      "answered": "TWEY"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "60c01e4a2a0a38dc6ae5036958198bf92d9bec3420cdac982ba75f27580061fe",
+      "shownSha256": "44f5da35bb063cd148dc819ba8468f9f567629dce114db56aec1fe2444febf0f",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "d262ba7fe660b561775a3f1e5b442aeaafb80de0b5531cd1592a27facf82c2f3",
+      "shownSha256": "76bc9edcd45a4a8b95cab8c24c77f3f7c8dd1b8dffb4e22321fe939c085b11eb",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Structure and proportion are identical in both renders, so the decision rests on material read versus value relationships against the references. LEFT preserves the deep red upper siding seen in r0c2-r1c2 of the house reference, but crushes the road in r2c0-r2c1 to near-black and blows the bus roof rim in r1c1 to white, losing the siding, asphalt and bus-side detail that the references retain in both sun and shadow. RIGHT keeps the same volumes and openings while holding readable gray road with lane marking, a contained soft contact shadow under the bus, and visible siding and foliage texture, matching the reference value behavior where shadow areas remain detailed.",
+  "leftCloser": [
+    "Deep red upper cladding in r0c2 and r1c2 reads as the same dark red painted siding shown in the house reference, versus orange in RIGHT",
+    "Slightly hazier pale sky in r0c0-r0c1 closer to the overcast reference sky"
+  ],
+  "rightCloser": [
+    "Road plane in r2c0-r2c1 reads as visible gray asphalt with lane line and soft bus contact shadow in r2c1, versus crushed black in LEFT, matching reference shadow detail retention",
+    "White left building in r0c0-r1c0 retains horizontal siding lines and window reveal instead of clipping to black-white",
+    "Bus rear and side in r1c1-r2c1 retains volume, wheel and panel read instead of blown rim highlight",
+    "Green hedge/planting boxes in r2c2 read as lit foliage material rather than blown yellow-green"
+  ],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "road brightness and bus contact shadow depth: pitch-black crushed road in LEFT versus medium-gray readable road with soft contained shadow in RIGHT"
+  },
+  "elapsedMs": 97557,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

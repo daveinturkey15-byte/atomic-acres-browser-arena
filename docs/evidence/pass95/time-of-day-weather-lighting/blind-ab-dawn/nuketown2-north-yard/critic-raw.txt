@@ -1,0 +1,2 @@
+{"contract": "blind-ab-v1", "station": "nuketown2-north-yard", "probes": {"left": "NONE", "right": "NONE"}, "winner": "tie", "confidence": "0.10", "why": "Without pixel access no decisive structural, proportional, material or lighting difference against the reference set can be verified in any region from r0c0 through r2c2, so no winner can be claimed.", "leftCloser": [], "rightCloser": [], "largestDifference": {"region": "r1c1", "what": "no verifiable disagreement between LEFT and RIGHT without pixels"}}
+

@@ -1,0 +1,72 @@
+{
+  "station": "nuketown2-garage",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "B",
+  "confidence": 0.72,
+  "probes": {
+    "left": {
+      "expected": "WYTC",
+      "answered": "WYTC"
+    },
+    "right": {
+      "expected": "UEMX",
+      "answered": "UEMX"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "722c1a35d1e05d0ae35f34ece82efde2b3f1d8d9970021be8e2c3ccce2431863",
+      "shownSha256": "638655be144cb5b8684ba14a0e4a57b67279de80d2daa1aa07f75cc1181a96d4",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "77da2d2ff7beb1b4af91643e2629dfd389a6389c95a4546b73b944d122bed8ee",
+      "shownSha256": "a6b27fa4f3f245abc3c11dd4ec942c2d269358dee445bb8cad138c315737f6a5",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "The geometry is identical, the decisive difference is exterior driveway exposure in r1c1 and r2c1 against the references: LEFT clips the sunlit concrete to near-white and erases drain/material detail, while RIGHT retains gray concrete value, drain spots and the interior-to-exterior value step that matches the muted road and paving values in the reference set in r1c1 and r2c1.",
+  "leftCloser": [
+    "LEFT keeps the exterior driveway in r1c1 and r2c1 brighter, closer to the bright sunlit paving seen in reference exterior views in r2c1"
+  ],
+  "rightCloser": [
+    "RIGHT retains concrete material read with visible drains and gray value in the driveway in r1c1 and r2c1 instead of clipping to white, agreeing with reference road/paving values",
+    "RIGHT preserves the interior foreground to exterior value relationship and contact shadowing in r2c0 and r2c1 without washout, agreeing with reference soft-shadow relationships"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "exterior driveway brightness and detail: LEFT is blown-out near-white, RIGHT is darker gray with visible drain details"
+  },
+  "elapsedMs": 51537,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

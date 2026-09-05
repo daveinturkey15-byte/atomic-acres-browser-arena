@@ -1,0 +1,1872 @@
+{
+  "nuketown2": {
+    "nightClear": {
+      "arenaId": "nuketown2",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 20.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "nuketown2",
+        "hour": 20.5,
+        "deviation": 0.12195121951219512,
+        "sunIntensityScale": 0.55,
+        "sunTint": [
+          0.92,
+          0.88,
+          1.12
+        ],
+        "sunElevationDeltaDegrees": -5,
+        "sunAzimuthDeltaDegrees": -12,
+        "ambientIntensityScale": 1.5175,
+        "ambientTint": [
+          0.85,
+          0.92,
+          1.2
+        ],
+        "hemisphereIntensityScale": 1.5175,
+        "hemisphereSkyTint": [
+          0.85,
+          0.92,
+          1.2
+        ],
+        "hemisphereGroundTint": [
+          0.9560000000000001,
+          0.934,
+          1.066
+        ],
+        "fillIntensityScale": 1.5175,
+        "fillTint": [
+          0.85,
+          0.92,
+          1.2
+        ],
+        "fogTint": [
+          0.86,
+          0.9,
+          1.12
+        ],
+        "exposureScale": 1.108,
+        "shadowFloorScale": 1.5175
+      },
+      "backdropIntensity": 0.5478172717244054,
+      "localLightFade": 1,
+      "captureQuery": "todhour=20.5&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "nuketown2",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "clear",
+      "hour": 6.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "nuketown2",
+        "hour": 6.5,
+        "deviation": 0.07317073170731707,
+        "sunIntensityScale": 0.7293843808852908,
+        "sunTint": [
+          1.16,
+          0.9,
+          0.78
+        ],
+        "sunElevationDeltaDegrees": -3,
+        "sunAzimuthDeltaDegrees": 40,
+        "ambientIntensityScale": 1.3112079619819155,
+        "ambientTint": [
+          0.9,
+          0.95,
+          1.14
+        ],
+        "hemisphereIntensityScale": 1.3112079619819155,
+        "hemisphereSkyTint": [
+          0.9,
+          0.95,
+          1.14
+        ],
+        "hemisphereGroundTint": [
+          1.0879999999999999,
+          0.9450000000000001,
+          0.879
+        ],
+        "fillIntensityScale": 1.3112079619819155,
+        "fillTint": [
+          0.9,
+          0.95,
+          1.14
+        ],
+        "fogTint": [
+          1.08,
+          0.97,
+          0.98
+        ],
+        "exposureScale": 1.0649477485875303,
+        "shadowFloorScale": 1.3112079619819155
+      },
+      "backdropIntensity": 0.7293843808852908,
+      "localLightFade": 0.8960000000000001,
+      "captureQuery": "todhour=6.5&weather=clear"
+    },
+    "dayOvercast": {
+      "arenaId": "nuketown2",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "clear",
+      "hour": 10.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "nuketown2",
+        "hour": 10.5,
+        "deviation": 1,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.96,
+          1,
+          1.16
+        ],
+        "sunElevationDeltaDegrees": 41,
+        "sunAzimuthDeltaDegrees": -34,
+        "ambientIntensityScale": 1.3780945113927907,
+        "ambientTint": [
+          0.95,
+          1,
+          1.08
+        ],
+        "hemisphereIntensityScale": 1.3780945113927907,
+        "hemisphereSkyTint": [
+          0.95,
+          1,
+          1.08
+        ],
+        "hemisphereGroundTint": [
+          0.978,
+          1,
+          1.0879999999999999
+        ],
+        "fillIntensityScale": 1.3780945113927907,
+        "fillTint": [
+          0.95,
+          1,
+          1.08
+        ],
+        "fogTint": [
+          1.02,
+          1.04,
+          1.1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1.3780945113927907
+      },
+      "backdropIntensity": 1.15,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10.5&weather=clear"
+    }
+  },
+  "raid2": {
+    "nightClear": {
+      "arenaId": "raid2",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 10.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "raid2",
+        "hour": 10.5,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10.5&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "raid2",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "clear",
+      "hour": 10.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "raid2",
+        "hour": 10.5,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10.5&weather=clear"
+    },
+    "dayOvercast": {
+      "arenaId": "raid2",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "clear",
+      "hour": 10.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "raid2",
+        "hour": 10.5,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10.5&weather=clear"
+    }
+  },
+  "atomic-acres": {
+    "nightClear": {
+      "arenaId": "atomic-acres",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 18,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "atomic-acres",
+        "hour": 18,
+        "deviation": 0.16666666666666666,
+        "sunIntensityScale": 0.8719339084969329,
+        "sunTint": [
+          1.0073423442364466,
+          1,
+          0.9860455046092675
+        ],
+        "sunElevationDeltaDegrees": -5.30001021948004,
+        "sunAzimuthDeltaDegrees": 1.6428571428571423,
+        "ambientIntensityScale": 1.1472760052285271,
+        "ambientTint": [
+          0.9808970102847209,
+          0.9905887737320531,
+          1.0167741708336138
+        ],
+        "hemisphereIntensityScale": 1.1472760052285271,
+        "hemisphereSkyTint": [
+          0.9808970102847209,
+          0.9905887737320531,
+          1.0167741708336138
+        ],
+        "hemisphereGroundTint": [
+          1.0040574014760786,
+          1,
+          0.9923685075577066
+        ],
+        "fillIntensityScale": 1.1472760052285271,
+        "fillTint": [
+          0.9808970102847209,
+          0.9905887737320531,
+          1.0167741708336138
+        ],
+        "fogTint": [
+          0.9904485051423604,
+          0.9952943868660266,
+          1.0083870854168069
+        ],
+        "exposureScale": 1.030735861960736,
+        "shadowFloorScale": 1.1472760052285271
+      },
+      "backdropIntensity": 0.8719339084969329,
+      "localLightFade": 0,
+      "captureQuery": "todhour=18&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "atomic-acres",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "light-rain",
+      "hour": 15,
+      "skyDarkenAmount": 0.3,
+      "wetnessTarget": 0.55,
+      "rainRate": 0.34,
+      "writes": {
+        "arenaId": "atomic-acres",
+        "hour": 15,
+        "deviation": 0.5833333333333334,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9864761656908261,
+          1,
+          1.0257027289180511
+        ],
+        "sunElevationDeltaDegrees": 13.945810714431715,
+        "sunAzimuthDeltaDegrees": -5.749999999999998,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0208661464487991,
+          1.010279858205268,
+          0.9816776164156438
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0208661464487991,
+          1.010279858205268,
+          0.9816776164156438
+        ],
+        "hemisphereGroundTint": [
+          0.9925266885450689,
+          1,
+          1.0140564152262137
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0208661464487991,
+          1.010279858205268,
+          0.9816776164156438
+        ],
+        "fogTint": [
+          1.0104330732243996,
+          1.0051399291026342,
+          0.9908388082078219
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 0.992431314604451,
+      "localLightFade": 0,
+      "captureQuery": "todhour=15&weather=light-rain"
+    },
+    "dayOvercast": {
+      "arenaId": "atomic-acres",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 16.5,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "atomic-acres",
+        "hour": 16.5,
+        "deviation": 0.27999999999999997,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9907586850965148,
+          1,
+          1.01756358488136
+        ],
+        "sunElevationDeltaDegrees": 7.941388603886125,
+        "sunAzimuthDeltaDegrees": -2.759999999999999,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0240436484414104,
+          1.0118452775801945,
+          0.978887479267343
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0240436484414104,
+          1.0118452775801945,
+          0.978887479267343
+        ],
+        "hemisphereGroundTint": [
+          0.9948932216302004,
+          1,
+          1.0096052463044054
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0240436484414104,
+          1.0118452775801945,
+          0.978887479267343
+        ],
+        "fogTint": [
+          1.0120218242207053,
+          1.0059226387900972,
+          0.9894437396336715
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.0296329778394335,
+      "localLightFade": 0,
+      "captureQuery": "todhour=16.5&weather=overcast"
+    }
+  },
+  "skyline-terminal": {
+    "nightClear": {
+      "arenaId": "skyline-terminal",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 10.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "skyline-terminal",
+        "hour": 10.5,
+        "deviation": 0.9459459459459459,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9619503727705803,
+          1.0029149029811166,
+          1.076832232626528
+        ],
+        "sunElevationDeltaDegrees": 26.009979150731283,
+        "sunAzimuthDeltaDegrees": 10.5,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0588192658714073,
+          1.028569416872302,
+          0.9509465896098512
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0588192658714073,
+          1.028569416872302,
+          0.9509465896098512
+        ],
+        "hemisphereGroundTint": [
+          0.9788507793169036,
+          1.0016010964712196,
+          1.0415054219196345
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0588192658714073,
+          1.028569416872302,
+          0.9509465896098512
+        ],
+        "fogTint": [
+          1.0294096329357036,
+          1.014284708436151,
+          0.9754732948049256
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.15,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10.5&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "skyline-terminal",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "light-rain",
+      "hour": 6.8,
+      "skyDarkenAmount": 0.3,
+      "wetnessTarget": 0.55,
+      "rainRate": 0.34,
+      "writes": {
+        "arenaId": "skyline-terminal",
+        "hour": 6.8,
+        "deviation": 0.03783783783783787,
+        "sunIntensityScale": 0.953993953597741,
+        "sunTint": [
+          1.0044322201172537,
+          0.9965865487075689,
+          0.9893781380180203
+        ],
+        "sunElevationDeltaDegrees": -1.458655856451756,
+        "sunAzimuthDeltaDegrees": -0.420000000000001,
+        "ambientIntensityScale": 1.0529069533625979,
+        "ambientTint": [
+          0.9962160903384363,
+          0.9981620972154822,
+          1.0031556611725438
+        ],
+        "hemisphereIntensityScale": 1.0529069533625979,
+        "hemisphereSkyTint": [
+          0.9962160903384363,
+          0.9981620972154822,
+          1.0031556611725438
+        ],
+        "hemisphereGroundTint": [
+          1.0024635721346404,
+          0.9981250611583314,
+          0.9942619803165531
+        ],
+        "fillIntensityScale": 1.0529069533625979,
+        "fillTint": [
+          0.9962160903384363,
+          0.9981620972154822,
+          1.0031556611725438
+        ],
+        "fogTint": [
+          0.9981080451692181,
+          0.999081048607741,
+          1.001577830586272
+        ],
+        "exposureScale": 1.0110414511365422,
+        "shadowFloorScale": 1.0529069533625979
+      },
+      "backdropIntensity": 0.7319436368120598,
+      "localLightFade": 0,
+      "captureQuery": "todhour=6.8&weather=light-rain"
+    },
+    "dayOvercast": {
+      "arenaId": "skyline-terminal",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 8.65,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "skyline-terminal",
+        "hour": 8.65,
+        "deviation": 0.3745945945945946,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9832270186867201,
+          1.002448518504138,
+          1.0345085065947635
+        ],
+        "sunElevationDeltaDegrees": 12.707165318357745,
+        "sunAzimuthDeltaDegrees": 4.158,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0395564988738493,
+          1.0192131963837565,
+          0.9670111290219346
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0395564988738493,
+          1.0192131963837565,
+          0.9670111290219346
+        ],
+        "hemisphereGroundTint": [
+          0.990677031310474,
+          1.0013449210358245,
+          1.0186417871389255
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0395564988738493,
+          1.0192131963837565,
+          0.9670111290219346
+        ],
+        "fogTint": [
+          1.0197782494369245,
+          1.0096065981918783,
+          0.9835055645109674
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.15,
+      "localLightFade": 0,
+      "captureQuery": "todhour=8.65&weather=overcast"
+    }
+  },
+  "rustworks-1v1": {
+    "nightClear": {
+      "arenaId": "rustworks-1v1",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 22,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "rustworks-1v1",
+        "hour": 22,
+        "deviation": 0.5,
+        "sunIntensityScale": 0.7151569881610508,
+        "sunTint": [
+          1.032013155114893,
+          0.974607010469641,
+          0.918747671854965
+        ],
+        "sunElevationDeltaDegrees": -7.498077000584157,
+        "sunAzimuthDeltaDegrees": 1.5789473684210513,
+        "ambientIntensityScale": 1.3275694636147914,
+        "ambientTint": [
+          0.9718112813242898,
+          0.9864093859899407,
+          1.0229011201984366
+        ],
+        "hemisphereIntensityScale": 1.3275694636147914,
+        "hemisphereSkyTint": [
+          0.9718112813242898,
+          0.9864093859899407,
+          1.0229011201984366
+        ],
+        "hemisphereGroundTint": [
+          1.0179247100197566,
+          0.9861335697476257,
+          0.9569322466652446
+        ],
+        "fillIntensityScale": 1.3275694636147914,
+        "fillTint": [
+          0.9718112813242898,
+          0.9864093859899407,
+          1.0229011201984366
+        ],
+        "fogTint": [
+          0.9859056406621449,
+          0.9932046929949703,
+          1.0114505600992183
+        ],
+        "exposureScale": 1.068362322841348,
+        "shadowFloorScale": 1.3275694636147914
+      },
+      "backdropIntensity": 0.7151569881610508,
+      "localLightFade": 0,
+      "captureQuery": "todhour=22&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "rustworks-1v1",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "light-rain",
+      "hour": 20,
+      "skyDarkenAmount": 0.3,
+      "wetnessTarget": 0.55,
+      "rainRate": 0.34,
+      "writes": {
+        "arenaId": "rustworks-1v1",
+        "hour": 20,
+        "deviation": 0.35,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9857452555933417,
+          1.0111860548991343,
+          1.0361123171683997
+        ],
+        "sunElevationDeltaDegrees": 4.880491844573768,
+        "sunAzimuthDeltaDegrees": -1.1052631578947383,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0128436088501822,
+          1.0061922832459007,
+          0.9895655764476738
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0128436088501822,
+          1.0061922832459007,
+          0.9895655764476738
+        ],
+        "hemisphereGroundTint": [
+          0.992018526165944,
+          1.0061084044425976,
+          1.019141314515677
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0128436088501822,
+          1.0061922832459007,
+          0.9895655764476738
+        ],
+        "fogTint": [
+          1.006421804425091,
+          1.0030961416229505,
+          0.9947827882238369
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 0.9026664149917609,
+      "localLightFade": 0,
+      "captureQuery": "todhour=20&weather=light-rain"
+    },
+    "dayOvercast": {
+      "arenaId": "rustworks-1v1",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 21,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "rustworks-1v1",
+        "hour": 21,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 0.8758620689655172,
+      "localLightFade": 0,
+      "captureQuery": "todhour=21&weather=overcast"
+    }
+  },
+  "gun-range": {
+    "nightClear": {
+      "arenaId": "gun-range",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 12,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "gun-range",
+        "hour": 12,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=12&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "gun-range",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "clear",
+      "hour": 12,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "gun-range",
+        "hour": 12,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=12&weather=clear"
+    },
+    "dayOvercast": {
+      "arenaId": "gun-range",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "clear",
+      "hour": 12,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "gun-range",
+        "hour": 12,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=12&weather=clear"
+    }
+  },
+  "farcrysis": {
+    "nightClear": {
+      "arenaId": "farcrysis",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 17,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "farcrysis",
+        "hour": 17,
+        "deviation": 0.5625,
+        "sunIntensityScale": 0.5754525240126288,
+        "sunTint": [
+          1.042457938844515,
+          1,
+          0.9291966539246692
+        ],
+        "sunElevationDeltaDegrees": -40.31373924758998,
+        "sunAzimuthDeltaDegrees": 19.439999999999998,
+        "ambientIntensityScale": 1.4882295973854769,
+        "ambientTint": [
+          0.9599598998013679,
+          0.9799799499006839,
+          1.0371800930415869
+        ],
+        "hemisphereIntensityScale": 1.4882295973854769,
+        "hemisphereSkyTint": [
+          0.9599598998013679,
+          0.9799799499006839,
+          1.0371800930415869
+        ],
+        "hemisphereGroundTint": [
+          1.0230711785579654,
+          1,
+          0.9601412544100865
+        ],
+        "fillIntensityScale": 1.4882295973854769,
+        "fillTint": [
+          0.9599598998013679,
+          0.9799799499006839,
+          1.0371800930415869
+        ],
+        "fogTint": [
+          0.9799799499006839,
+          0.989989974950342,
+          1.0185900465207935
+        ],
+        "exposureScale": 1.101891394236969,
+        "shadowFloorScale": 1.4882295973854769
+      },
+      "backdropIntensity": 0.5754525240126288,
+      "localLightFade": 0,
+      "captureQuery": "todhour=17&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "farcrysis",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "light-rain",
+      "hour": 9,
+      "skyDarkenAmount": 0.3,
+      "wetnessTarget": 0.55,
+      "rainRate": 0.34,
+      "writes": {
+        "arenaId": "farcrysis",
+        "hour": 9,
+        "deviation": 0.30624999999999997,
+        "sunIntensityScale": 0.8999478336463101,
+        "sunTint": [
+          1.0060579021648777,
+          1,
+          0.9906718225698894
+        ],
+        "sunElevationDeltaDegrees": -14.043887087981318,
+        "sunAzimuthDeltaDegrees": -10.584,
+        "ambientIntensityScale": 1.1150599913067434,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1.1150599913067434,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1.0032917976316373,
+          1,
+          0.9947487022631845
+        ],
+        "fillIntensityScale": 1.1150599913067434,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1.0240125199248855,
+        "shadowFloorScale": 1.1150599913067434
+      },
+      "backdropIntensity": 0.6904772171941517,
+      "localLightFade": 0,
+      "captureQuery": "todhour=9&weather=light-rain"
+    },
+    "dayOvercast": {
+      "arenaId": "farcrysis",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 13,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "farcrysis",
+        "hour": 13,
+        "deviation": 0.0525,
+        "sunIntensityScale": 0.9956211501608176,
+        "sunTint": [
+          1.000437991567008,
+          1,
+          0.9993255647023104
+        ],
+        "sunElevationDeltaDegrees": -0.8461543211295748,
+        "sunAzimuthDeltaDegrees": 1.8144000000000016,
+        "ambientIntensityScale": 1.0050356773150597,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1.0050356773150597,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1.0002379998163908,
+          1,
+          0.9996203266309072
+        ],
+        "fillIntensityScale": 1.0050356773150597,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1.0010509239614038,
+        "shadowFloorScale": 1.0050356773150597
+      },
+      "backdropIntensity": 0.8720268004856816,
+      "localLightFade": 0,
+      "captureQuery": "todhour=13&weather=overcast"
+    }
+  },
+  "high-seas": {
+    "nightClear": {
+      "arenaId": "high-seas",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 19,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "high-seas",
+        "hour": 19,
+        "deviation": 0.5217391304347826,
+        "sunIntensityScale": 0.55,
+        "sunTint": [
+          1.0610384951678618,
+          0.9864099522458232,
+          0.8883650638025521
+        ],
+        "sunElevationDeltaDegrees": -40.07701432625305,
+        "sunAzimuthDeltaDegrees": 23.200000000000003,
+        "ambientIntensityScale": 1.5175,
+        "ambientTint": [
+          0.9332304498581143,
+          0.9666152249290572,
+          1.0620002965603224
+        ],
+        "hemisphereIntensityScale": 1.5175,
+        "hemisphereSkyTint": [
+          0.9332304498581143,
+          0.9666152249290572,
+          1.0620002965603224
+        ],
+        "hemisphereGroundTint": [
+          1.0332409373555134,
+          0.9925254737352027,
+          0.9373611832689048
+        ],
+        "fillIntensityScale": 1.5175,
+        "fillTint": [
+          0.9332304498581143,
+          0.9666152249290572,
+          1.0620002965603224
+        ],
+        "fogTint": [
+          0.9666152249290572,
+          0.9833076124645286,
+          1.0310001482801612
+        ],
+        "exposureScale": 1.108,
+        "shadowFloorScale": 1.5175
+      },
+      "backdropIntensity": 0.4785340786947054,
+      "localLightFade": 0,
+      "captureQuery": "todhour=19&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "high-seas",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "light-rain",
+      "hour": 7.5,
+      "skyDarkenAmount": 0.3,
+      "wetnessTarget": 0.55,
+      "rainRate": 0.34,
+      "writes": {
+        "arenaId": "high-seas",
+        "hour": 7.5,
+        "deviation": 0.3347826086956522,
+        "sunIntensityScale": 0.7312258035349452,
+        "sunTint": [
+          1.0178298880266763,
+          1,
+          0.9698686271798824
+        ],
+        "sunElevationDeltaDegrees": -24.08649229112251,
+        "sunAzimuthDeltaDegrees": -14.886666666666667,
+        "ambientIntensityScale": 1.309090325934813,
+        "ambientTint": [
+          0.9924380938867499,
+          0.9962190469433749,
+          1.0070217699623036
+        ],
+        "hemisphereIntensityScale": 1.309090325934813,
+        "hemisphereSkyTint": [
+          0.9924380938867499,
+          0.9962190469433749,
+          1.0070217699623036
+        ],
+        "hemisphereGroundTint": [
+          1.0097099738340638,
+          1,
+          0.983093164163256
+        ],
+        "fillIntensityScale": 1.309090325934813,
+        "fillTint": [
+          0.9924380938867499,
+          0.9962190469433749,
+          1.0070217699623036
+        ],
+        "fogTint": [
+          0.9962190469433749,
+          0.9981095234716875,
+          1.0035108849811518
+        ],
+        "exposureScale": 1.0645058071516131,
+        "shadowFloorScale": 1.309090325934813
+      },
+      "backdropIntensity": 0.5610266940914664,
+      "localLightFade": 0,
+      "captureQuery": "todhour=7.5&weather=light-rain"
+    },
+    "dayOvercast": {
+      "arenaId": "high-seas",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 13.25,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "high-seas",
+        "hour": 13.25,
+        "deviation": 0.01826086956521739,
+        "sunIntensityScale": 0.9994804782888788,
+        "sunTint": [
+          1.0000343945315266,
+          1,
+          0.9999463804817629
+        ],
+        "sunElevationDeltaDegrees": -0.06676906675716054,
+        "sunAzimuthDeltaDegrees": 0.8120000000000025,
+        "ambientIntensityScale": 1.0005974499677894,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1.0005974499677894,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1.000018730908498,
+          1,
+          0.9999699138702409
+        ],
+        "fillIntensityScale": 1.0005974499677894,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1.000124685210669,
+        "shadowFloorScale": 1.0005974499677894
+      },
+      "backdropIntensity": 0.8754070396047421,
+      "localLightFade": 0,
+      "captureQuery": "todhour=13.25&weather=overcast"
+    }
+  },
+  "test1": {
+    "nightClear": {
+      "arenaId": "test1",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 13,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test1",
+        "hour": 13,
+        "deviation": 0.8333333333333334,
+        "sunIntensityScale": 1.0282063385218212,
+        "sunTint": [
+          0.9978671619587078,
+          1,
+          1.0033371387337957
+        ],
+        "sunElevationDeltaDegrees": 3.4828995421935787,
+        "sunAzimuthDeltaDegrees": 8.5,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          0.9988377257925897,
+          1,
+          1.0018706557820949
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.0282063385218212,
+      "localLightFade": 0,
+      "captureQuery": "todhour=13&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "test1",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "clear",
+      "hour": 10,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test1",
+        "hour": 10,
+        "deviation": 0.16666666666666666,
+        "sunIntensityScale": 0.955546047810365,
+        "sunTint": [
+          1.002912080119224,
+          1,
+          0.9954436224534466
+        ],
+        "sunElevationDeltaDegrees": -4.755392729178382,
+        "sunAzimuthDeltaDegrees": -1.7000000000000002,
+        "ambientIntensityScale": 1.0511220450180803,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1.0511220450180803,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1.001586916374783,
+          1,
+          0.9974458916207022
+        ],
+        "fillIntensityScale": 1.0511220450180803,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1.0106689485255125,
+        "shadowFloorScale": 1.0511220450180803
+      },
+      "backdropIntensity": 0.955546047810365,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10&weather=clear"
+    },
+    "dayOvercast": {
+      "arenaId": "test1",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "clear",
+      "hour": 11.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test1",
+        "hour": 11.5,
+        "deviation": 0.3333333333333333,
+        "sunIntensityScale": 1.0435536780627732,
+        "sunTint": [
+          0.9965660835464075,
+          1,
+          1.0053728672238793
+        ],
+        "sunElevationDeltaDegrees": 5.6075453515926625,
+        "sunAzimuthDeltaDegrees": 3.400000000000001,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          0.9981287128009052,
+          1,
+          1.003011797213281
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.0435536780627732,
+      "localLightFade": 0,
+      "captureQuery": "todhour=11.5&weather=clear"
+    }
+  },
+  "test2": {
+    "nightClear": {
+      "arenaId": "test2",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 18.5,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test2",
+        "hour": 18.5,
+        "deviation": 0.6,
+        "sunIntensityScale": 0.5737678372753493,
+        "sunTint": [
+          1.0531107708412686,
+          0.966640084262023,
+          0.881294580973077
+        ],
+        "sunElevationDeltaDegrees": -16.582441581075024,
+        "sunAzimuthDeltaDegrees": 2.888888888888891,
+        "ambientIntensityScale": 1.4901669871333483,
+        "ambientTint": [
+          0.9401979293168352,
+          0.9705464438851129,
+          1.0524565191809434
+        ],
+        "hemisphereIntensityScale": 1.4901669871333483,
+        "hemisphereSkyTint": [
+          0.9401979293168352,
+          0.9705464438851129,
+          1.0524565191809434
+        ],
+        "hemisphereGroundTint": [
+          1.0293519955049693,
+          0.9816520463441126,
+          0.9350939147727785
+        ],
+        "fillIntensityScale": 1.4901669871333483,
+        "fillTint": [
+          0.9401979293168352,
+          0.9705464438851129,
+          1.0524565191809434
+        ],
+        "fogTint": [
+          0.9700989646584176,
+          0.9852732219425564,
+          1.0262282595904717
+        ],
+        "exposureScale": 1.1022957190539162,
+        "shadowFloorScale": 1.4901669871333483
+      },
+      "backdropIntensity": 0.5737678372753493,
+      "localLightFade": 0,
+      "captureQuery": "todhour=18.5&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "test2",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "clear",
+      "hour": 16,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test2",
+        "hour": 16,
+        "deviation": 0.4,
+        "sunIntensityScale": 1.15,
+        "sunTint": [
+          0.9871897487211182,
+          1,
+          1.0243617243273127
+        ],
+        "sunElevationDeltaDegrees": 9.248962502116619,
+        "sunAzimuthDeltaDegrees": -1.9259259259259256,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1.0303854125423662,
+          1.0149653422225482,
+          0.9733468597718941
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1.0303854125423662,
+          1.0149653422225482,
+          0.9733468597718941
+        ],
+        "hemisphereGroundTint": [
+          0.9929203355176479,
+          1,
+          1.0133205726278762
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1.0303854125423662,
+          1.0149653422225482,
+          0.9733468597718941
+        ],
+        "fogTint": [
+          1.0151927062711832,
+          1.007482671111274,
+          0.986673429885947
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1.15,
+      "localLightFade": 0,
+      "captureQuery": "todhour=16&weather=clear"
+    },
+    "dayOvercast": {
+      "arenaId": "test2",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "clear",
+      "hour": 17.25,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "test2",
+        "hour": 17.25,
+        "deviation": 0.1,
+        "sunIntensityScale": 0.9384524671753525,
+        "sunTint": [
+          1.003565758578233,
+          1,
+          0.9932188662338052
+        ],
+        "sunElevationDeltaDegrees": -2.5744668596819196,
+        "sunAzimuthDeltaDegrees": 0.4814814814814845,
+        "ambientIntensityScale": 1.0707796627483446,
+        "ambientTint": [
+          0.990715574159485,
+          0.9954272593847641,
+          1.008144010008739
+        ],
+        "hemisphereIntensityScale": 1.0707796627483446,
+        "hemisphereSkyTint": [
+          0.990715574159485,
+          0.9954272593847641,
+          1.008144010008739
+        ],
+        "hemisphereGroundTint": [
+          1.0019706384995408,
+          1,
+          0.9962921924729822
+        ],
+        "fillIntensityScale": 1.0707796627483446,
+        "fillTint": [
+          0.990715574159485,
+          0.9954272593847641,
+          1.008144010008739
+        ],
+        "fogTint": [
+          0.9953577870797425,
+          0.9977136296923821,
+          1.0040720050043697
+        ],
+        "exposureScale": 1.0147714078779153,
+        "shadowFloorScale": 1.0707796627483446
+      },
+      "backdropIntensity": 0.9384524671753525,
+      "localLightFade": 0,
+      "captureQuery": "todhour=17.25&weather=clear"
+    }
+  },
+  "map3": {
+    "nightClear": {
+      "arenaId": "map3",
+      "time": "night",
+      "weather": "clear",
+      "weatherState": "clear",
+      "hour": 10,
+      "skyDarkenAmount": 0,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "map3",
+        "hour": 10,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 1,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10&weather=clear"
+    },
+    "dawnLightRain": {
+      "arenaId": "map3",
+      "time": "dawn",
+      "weather": "light-rain",
+      "weatherState": "overcast",
+      "hour": 10,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "map3",
+        "hour": 10,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 0.8758620689655172,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10&weather=overcast"
+    },
+    "dayOvercast": {
+      "arenaId": "map3",
+      "time": "day",
+      "weather": "overcast",
+      "weatherState": "overcast",
+      "hour": 10,
+      "skyDarkenAmount": 0.16,
+      "wetnessTarget": 0,
+      "rainRate": 0,
+      "writes": {
+        "arenaId": "map3",
+        "hour": 10,
+        "deviation": 0,
+        "sunIntensityScale": 1,
+        "sunTint": [
+          1,
+          1,
+          1
+        ],
+        "sunElevationDeltaDegrees": 0,
+        "sunAzimuthDeltaDegrees": 0,
+        "ambientIntensityScale": 1,
+        "ambientTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereIntensityScale": 1,
+        "hemisphereSkyTint": [
+          1,
+          1,
+          1
+        ],
+        "hemisphereGroundTint": [
+          1,
+          1,
+          1
+        ],
+        "fillIntensityScale": 1,
+        "fillTint": [
+          1,
+          1,
+          1
+        ],
+        "fogTint": [
+          1,
+          1,
+          1
+        ],
+        "exposureScale": 1,
+        "shadowFloorScale": 1
+      },
+      "backdropIntensity": 0.8758620689655172,
+      "localLightFade": 0,
+      "captureQuery": "todhour=10&weather=overcast"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "station": "nuketown2-overhead",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.9,
+  "probes": {
+    "left": {
+      "expected": "AHAC",
+      "answered": "AHAC"
+    },
+    "right": {
+      "expected": "YEKD",
+      "answered": "YEKD"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "1ee079ecac28031e6d20af821598eb2a2274c6de28acda55a92877b3cc826240",
+      "shownSha256": "9d29eb9c1d42c1236b07e6893d38dd2a38555dcbfb1e7733f7cf87fcbae08ea7",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-overhead.png",
+      "sourceSha256": "db80a2df1cffb1f344ab8ff834e5e7cd50e18ecddbea0194eb55d29c9d5cd06e",
+      "shownSha256": "0b6d3756628c38416f01fe9827ee7036d80bb27d51dfada789401f798c3086eb",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both renders show the same overhead compound, road, vehicles and surrounding forest as the overhead references in r1c1, r0c1 and r0c2 with identical volumes, openings and proportions, the same white, black-roof and green material reads in r1c1 and r2c1, and the same brightest-sand versus darker-forest value hierarchy with matching contact shadows in r1c1 and r2c1; the only visible separation is absolute warm-hazy versus cool-clear colour grade in r0c1 and r0c2 which is excluded as a criterion, so neither is closer on judged structure, proportion, material or value-relationship grounds.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r0c2",
+    "what": "RIGHT has a warm hazy wash over the sky and distant treeline where LEFT is cooler and higher-contrast, an absolute colour-grade difference with no geometry change"
+  },
+  "elapsedMs": 93343,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

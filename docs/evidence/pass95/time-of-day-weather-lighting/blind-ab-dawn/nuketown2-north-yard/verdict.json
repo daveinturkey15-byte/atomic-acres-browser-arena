@@ -1,0 +1,67 @@
+{
+  "station": "nuketown2-north-yard",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": false,
+  "invalidReason": "probe-mismatch-both",
+  "errors": [],
+  "winnerSide": null,
+  "winner": null,
+  "confidence": null,
+  "probes": {
+    "left": {
+      "expected": "AXXK",
+      "answered": "NONE"
+    },
+    "right": {
+      "expected": "MKMU",
+      "answered": "NONE"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "4d262e8c4b176975045d05c2a3b32d1c4bd106001a579455a1d7ad8c5b034705",
+      "shownSha256": "85672ff59ccb572214b911e430293a9ed8decf859c0eb8d536af59b0475064b8",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-north-yard.png",
+      "sourceSha256": "bca0d1360c0b5d6edc27f12bff34b0ec95e631bf5b1ac96cdfea4c7c3c4b8c84",
+      "shownSha256": "aad80a9dd3e9466df6fb82582bd66c62cb47ac78df354660e641ba7c63e32a88",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Without pixel access no decisive structural, proportional, material or lighting difference against the reference set can be verified in any region from r0c0 through r2c2, so no winner can be claimed.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "no verifiable disagreement between LEFT and RIGHT without pixels"
+  },
+  "elapsedMs": 69720,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

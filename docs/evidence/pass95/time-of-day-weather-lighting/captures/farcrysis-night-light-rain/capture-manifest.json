@@ -1,0 +1,49 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "farcrysis-night-light-rain",
+  "sha": "e749989be748c2898f18ba928e4da9456527a15c",
+  "url": "http://127.0.0.1:4266",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-D6JpSxWg.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 4000,
+  "samples": 1,
+  "capturedAt": "2026-09-05T06:55:16.269Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "farcrysis",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "farcrysis-beach-golden",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\farcrysis-night-light-rain\\farcrysis\\farcrysis-beach-golden.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\farcrysis-night-light-rain\\farcrysis\\farcrysis-beach-golden.png"
+          ],
+          "committedFrame": 92,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 109
+        }
+      ],
+      "ms": 168661,
+      "errors": []
+    }
+  ]
+}

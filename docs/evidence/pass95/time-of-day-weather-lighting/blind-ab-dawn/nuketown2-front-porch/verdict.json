@@ -1,0 +1,75 @@
+{
+  "station": "nuketown2-front-porch",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "B",
+  "confidence": 0.82,
+  "probes": {
+    "left": {
+      "expected": "HJHM",
+      "answered": "HJHM"
+    },
+    "right": {
+      "expected": "JJUX",
+      "answered": "JJUX"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-front-porch.png",
+      "sourceSha256": "fcb1ab128d93c3bb3dfbfa76d7e853e965baafe0caa8341e167303b31071df59",
+      "shownSha256": "cfc830ce8b00290ba97a93a97a03e096742e9595ebadb8c037d21795d1ee8e20",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-p-time-of-day-weather-lighting\\docs\\evidence\\pass95\\time-of-day-weather-lighting\\captures\\nuketown2-dawn\\nuketown2\\nuketown2-front-porch.png",
+      "sourceSha256": "04b9f3e7f8ea1200ba7c364e2ab5ed762cfc19f1b598493fd7ed7117466eb06c",
+      "shownSha256": "65ecd57b81d98586d12005198e9ba1331dbfe640b31137cd512fb6d430d3faac",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both share identical structure and camera, but RIGHT matches reference-1 material and dawn lighting: the upper siding in r0c1-r1c1 reads as saturated red siding as in reference-1 r0c1-r1c0 versus LEFT orange, and the strong low-sun bloom and warm wash in r0c0-r1c0 with headlight glare in r1c1 gives the expected dawn value relationship versus LEFT flat overcast, while lower white siding and trim in r1c1-r2c1 agree in both.",
+  "leftCloser": [
+    "LEFT keeps the pale overcast sky value in r0c0 closer to reference-1 r0c0 without sun blowout",
+    "LEFT keeps the truck side panel in r2c0 readable as dark gray material versus blown to white in RIGHT r2c0",
+    "LEFT keeps distant tree and mountain separation in r1c0 more legible versus washed by glare in RIGHT r1c0"
+  ],
+  "rightCloser": [
+    "RIGHT upper siding color in r0c1 and r1c1 reads as deep red siding matching reference-1 r0c1-r1c0 versus LEFT orange",
+    "RIGHT dawn sun bloom and warm grade in r0c0-r1c0 matches a dawn front-porch condition versus LEFT flat daylight",
+    "RIGHT hedge/dumpster green saturation and shadow depth in r2c1 reads as sunlit foliage with contact shadow versus LEFT lime-flat"
+  ],
+  "largestDifference": {
+    "region": "r1c0",
+    "what": "RIGHT has intense dawn sun bloom washing sky, mountains, trees and truck to near-white while LEFT shows dark readable truck and pale gray sky with clear trees"
+  },
+  "elapsedMs": 45086,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}
