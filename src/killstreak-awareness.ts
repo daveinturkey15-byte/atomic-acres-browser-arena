@@ -415,3 +415,14 @@ export function killstreakDamageSourceCue(event: KillstreakDamageEvent, nowMs: n
     atMs: nowMs,
   });
 }
+
+/** Select the receipt addressed to this victim before the HUD renders it. */
+export function killstreakDamageSourceCueForVictim(
+  message: Readonly<{ events: readonly KillstreakDamageEvent[] }>,
+  victimId: string,
+  lifeId: number,
+  nowMs: number,
+): KillstreakDamageSourceCue | null {
+  const event = message.events.find((candidate) => candidate.targetId === victimId && candidate.targetLifeId === lifeId);
+  return event ? killstreakDamageSourceCue(event, nowMs) : null;
+}

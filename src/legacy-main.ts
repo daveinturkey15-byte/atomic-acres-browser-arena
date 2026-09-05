@@ -373,7 +373,7 @@ import {
   type KillstreakStateMessage,
   type KillstreakAnnounceMessage,
 } from './killstreak-protocol';
-import { KillstreakActivityTracker, KillstreakAnnouncementDeduper, KillstreakFlightAudioCollector, admitKillstreakAnnounceMessage, bindKillstreakBannerElement, createKillstreakBannerState, expireKillstreakBanner, killstreakAnnouncementBanner, killstreakDamageSourceCue, showKillstreakBanner, supportDropCue, type KillstreakDamageSourceCue } from './killstreak-awareness';
+import { KillstreakActivityTracker, KillstreakAnnouncementDeduper, KillstreakFlightAudioCollector, admitKillstreakAnnounceMessage, bindKillstreakBannerElement, createKillstreakBannerState, expireKillstreakBanner, killstreakAnnouncementBanner, killstreakDamageSourceCue, killstreakDamageSourceCueForVictim, showKillstreakBanner, supportDropCue, type KillstreakDamageSourceCue } from './killstreak-awareness';
 import { hideGunnerCockpitHudElements, syncGunnerCockpitHudElements } from './gunner-cockpit-hud';
 import {
   isOwnerSupportDamageFeedback,
@@ -1227,6 +1227,7 @@ import {
   setGuestCombatInventoryGrenades,
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
+import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, createCanonicalRemoteState } from './multiplayer-relay';
 import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
 import { isGuestCombatInventory } from './protocol';
 import {
@@ -6273,7 +6274,6 @@ function remoteCombatInventoryProjection(playerId: string): GuestCombatInventory
     remoteLoadoutSidearm(remote.snapshot),
   );
 }
-
 function isOrdinaryWeapon(weapon: WeaponId): weapon is OrdinaryWeaponId {
   return ORDINARY_WEAPON_IDS.some((candidate) => candidate === weapon);
 }
@@ -6359,7 +6359,7 @@ function sendRemoteReloadResult(
   recordReloadProtocolTrace({
     direction: 'send', actorId: playerId, requestId, action: 'result', status, reason, actionSequence,
   });
-  network.sendToPlayer(playerId, result);
+  network.send(result);
 }
 
 function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
@@ -6480,7 +6480,7 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
       action: message.action, status: cached.status, reason: cached.reason,
       actionSequence: message.actionSequence,
     });
-    network.sendToPlayer(message.by, cached);
+    network.send(cached);
     return;
   }
   if (!isOrdinaryWeapon(remote.snapshot.weapon)) {
@@ -6530,6 +6530,17 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
   const completesAt = admission.state.pending?.completesAtHostTimeMs ?? null;
   sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'started', 'accepted', completesAt);
   scheduleRemoteReloadCommit(message.by, admission.state);
+}
+
+function acceptRemoteReloadResult(message: ReloadResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId === player.id) return;
+  const id = message.forPlayerId, remote = remotes.get(id), authority = remoteCombatInventories.get(id);
+  if (!remote || !authority || message.lifeId !== remote.continuity) return;
+  const outcome = applyRemoteReloadResult(remote.snapshot, authority, message, remoteLoadoutSidearm(remote.snapshot));
+  if (!outcome) return;
+  remote.snapshot = outcome.snapshot;
+  remoteCombatInventories.set(id, outcome.inventory); remoteCombatInventoryRevisions.set(id, message.combatInventory.revision);
+  recordReloadProtocolTrace({ direction: 'receive', actorId: id, requestId: message.requestId, action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence });
 }
 
 function acceptLocalReloadResult(message: ReloadResultMessage): void {
@@ -13055,6 +13066,7 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
+    const victimCue = killstreakDamageSourceCueForVictim(message, player.id, localContinuity, performance.now()); if (victimCue) killstreakAwarenessQa.damageSource = victimCue;
     presentSupportShotAudioPositional(
       message.shots,
       { playerId: player.id, team: player.team, mode: privateMatchMode },
@@ -13201,7 +13213,7 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'reload-result') {
-    acceptLocalReloadResult(message);
+    acceptRemoteReloadResult(message); acceptLocalReloadResult(message);
     return;
   }
   if (message.type === 'pickup-result') {
@@ -13614,7 +13626,9 @@ function onNetworkMessage(message: GameMessage): void {
         ? network.role === 'host' ? Math.max(now - 250, Math.min(now + 50, message.hostTimeMs)) : message.hostTimeMs
         : currentHostTimeMs();
       remote.snapshot = admittedIncoming;
-      if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
+      if (message.type === 'state') remote.snapshotRateHz = message.rateHz; if (network.role === 'client' && message.type === 'state' && message.combatInventory) {
+        applyRemoteInventoryProjectionToMaps(remoteCombatInventories, remoteCombatInventoryRevisions, incoming.id, message.combatInventory, admittedIncoming, remoteLoadoutSidearm(admittedIncoming));
+      }
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
       remote.continuity = admittedContinuity; remote.authoritativeHostTimeMs = admittedHostTimeMs;
       const priorBufferStats = remote.interpolation.stats;
@@ -13647,12 +13661,7 @@ function onNetworkMessage(message: GameMessage): void {
           snapshot: Object.freeze({ ...admittedIncoming }),
           continuity: admittedContinuity,
         }));
-        const canonicalState: StateMessage = {
-          type: 'state', player: admittedIncoming,
-          hostTimeMs: admittedHostTimeMs,
-          continuity: admittedContinuity,
-          rateHz: message.type === 'state' ? message.rateHz : 40,
-        };
+        const canonicalState = createCanonicalRemoteState(admittedIncoming, admittedHostTimeMs, admittedContinuity, message.type === 'state' ? message.rateHz : 40, remoteCombatInventoryProjection(admittedIncoming.id));
         network.send(canonicalState, admittedIncoming.id);
         if (now - remote.lastFeedbackAt >= 1_000) {
           network.sendStateCommitReliablyToPlayer(admittedIncoming.id, canonicalState);
@@ -19209,6 +19218,7 @@ function switchWeapon(index: number): void {
   player.nextShotAt = 0;
   weaponView.setWeapon(id);
   audio.weaponSwitch();
+  if (network.role === 'client') network.send(createStateMessage());
 }
 
 function reload(): void {
@@ -19242,6 +19252,7 @@ function reload(): void {
       expectedCompletionMs: player.reloadState.endsAt,
     });
     localReloadRetryRuntime.send(pendingLocalReloadAuthority, 'start');
+    network.send(createStateMessage());
   }
   weaponActionHistory.length = 0;
   audio.reload();
@@ -24700,6 +24711,7 @@ function finishDeferredLocalKillstreakDeath(now = performance.now()): void {
 }
 
 function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDamageEvent | null {
+  if (event.targetId === player.id && event.targetLifeId !== localContinuity) return null;
   if (appliedKillstreakDamageResults.has(event.resultId)) return null;
   appliedKillstreakDamageResults.add(event.resultId);
   if (appliedKillstreakDamageResults.size > 512) {
@@ -24709,7 +24721,6 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   const cause = killCauseFromKillstreak(event.source);
   const attributionId = killAttributionId(event.ownerId, cause);
   if (event.targetId === player.id) {
-    if (event.targetLifeId !== localContinuity) return null;
     const before = player.hp;
     // A lethal hit from the player's OWN killstreak (e.g. standing in a carpet
     // bomb) used to run the full death sequence re-entrantly inside the damage
@@ -36553,6 +36564,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ...retained,
       snapshot: Object.freeze({ ...retained.snapshot, hp: result.state.hp }),
     }));
+    if (remote) network.send(createCanonicalRemoteState(remote.snapshot, currentHostTimeMs(), remote.continuity, remote.snapshotRateHz, remoteCombatInventoryProjection(targetId)));
     if (result.died && remote) {
       // HF-504 QA seam: const canonicalDeath = canonicalDeathMessage(death); network.send(canonicalDeath); processDeath(canonicalDeath);
       // The QA damage hook must use the same host-authored death/drop path as

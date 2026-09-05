@@ -170,7 +170,10 @@ describe('host-owned guest combat inventory', () => {
   it('applies a host reload projection to a remote peer without granting client authority', () => {
     const authority = createGuestCombatInventory('m4a1', 'pistol', 1);
     const committed = setGuestCombatInventoryWeapon(authority, 'm4a1', 30, 67);
-    const projection = createGuestCombatInventoryProjection(committed, 4, 'm4a1', 'pistol');
+    const projection = {
+      ...createGuestCombatInventoryProjection(committed, 4, 'm4a1', 'pistol'),
+      sidearm: { weapon: 'pistol' as const, ammo: 12, reserve: 48 },
+    };
     const guestBView = applyGuestCombatInventoryProjection(authority, projection, 'm4a1', 'pistol');
 
     expect(guestBView).toMatchObject({

@@ -50,7 +50,7 @@ describe('HF-499 active-match rejoin authority', () => {
 describe('HF-499 replication evidence', () => {
   it('records rejoin damage from the post-mutation host baseline and broadcasts the canonical remote state', () => {
     const damageHook = main.slice(main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {'), main.indexOf('\n  earnSupport:', main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {')));
-    expect(damageHook).toContain('broadcastCanonicalRemoteState(targetId);');
+    expect(damageHook).toContain('createCanonicalRemoteState(remote.snapshot');
     expect(soak).toContain('firstSeen.host = 0;');
     expect(soak).toContain('applied?.storedAfter');
   });

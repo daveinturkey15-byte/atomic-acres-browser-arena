@@ -403,6 +403,7 @@ async function damageAfterRejoin() {
   bundle.rejoin.damage.triggered = Boolean(applied);
   bundle.rejoin.damage.credited = Boolean(applied?.storedAfter < applied?.storedBefore);
   const firstSeen = Object.fromEntries(PEERS.map((role) => [role, null]));
+  if (beforeHp !== null && applied?.storedAfter < beforeHp) firstSeen.host = 0;
   const byPeer = {};
   while (Date.now() - triggeredAt <= DAMAGE_RTT_MS) {
     const views = await peerViews();

@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const network = readFileSync(new URL('./network.ts', import.meta.url), 'utf8');
 const protocol = readFileSync(new URL('./protocol.ts', import.meta.url), 'utf8');
+const relay = readFileSync(new URL('./multiplayer-relay.ts', import.meta.url), 'utf8');
 
 /** The body of a top-level `function name(` declaration, up to the next one. */
 function functionBody(source: string, declaration: string): string {
@@ -139,14 +140,15 @@ describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () 
     const swap = functionBody(main, 'function switchWeapon(index: number): void {');
     expect(swap).toContain('network.send(createStateMessage());');
 
-    const stateStart = main.indexOf('const canonicalState: StateMessage = {');
+    const stateStart = main.indexOf('const canonicalState = createCanonicalRemoteState(');
     const stateEnd = main.indexOf('\n        network.send(canonicalState, admittedIncoming.id);', stateStart);
     const canonicalState = main.slice(stateStart, stateEnd);
-    expect(canonicalState).toMatch(/combatInventory:/);
+    expect(relay).toMatch(/combatInventory \? \{ combatInventory \} : \{\}/);
+    expect(canonicalState).toContain('createCanonicalRemoteState(');
     expect(main).toContain('network.send(canonicalState, admittedIncoming.id);');
 
     const guestView = functionBody(main, 'function onNetworkMessage(');
-    expect(guestView).toContain('applyRemoteCombatInventoryProjection(');
+    expect(guestView).toContain('applyRemoteInventoryProjectionToMaps(');
     expect(guestView).toContain('remote.snapshot = { ...remote.snapshot, weapon:');
   });
 
