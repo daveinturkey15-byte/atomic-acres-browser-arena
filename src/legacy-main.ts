@@ -25003,6 +25003,7 @@ function updatePass65KillstreakRuntime(now: number): void {
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
+    audio.syncSupportFlightLoops([]);
     killstreakPresentation.clear();
     resetKillstreakPossessionPresentation();
     return;
