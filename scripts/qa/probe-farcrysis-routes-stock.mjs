@@ -95,14 +95,37 @@ try {
   for (const walk of walks) {
     if (Date.now() - startedAt > HARD_KILL_MS - 12_000) { rows.push({ ...walk, skipped: 'time box' }); continue; }
     const [sx, sz] = walk.from;
-    const ground = groundAt(sx, sz);
-    const startBlocked = await page.evaluate(([px, pz]) => Boolean(window.__ATOMIC_ACRES_DEBUG__.collisionProbe(px, pz)), [sx, sz]);
-    if (startBlocked || ground === null || ground <= FARCRYSIS_WATER_LEVEL) {
-      rows.push({ ...walk, skipped: startBlocked ? 'start inside a collider' : ground === null ? 'no ground' : 'start in water' });
-      continue;
-    }
     const dx = walk.to[0] - sx;
     const dz = walk.to[1] - sz;
+    const distance = Math.hypot(dx, dz);
+    const ux = distance > 0 ? dx / distance : 0;
+    const uz = distance > 0 ? dz / distance : 0;
+    let probeSx = sx;
+    let probeSz = sz;
+    let startAdjustmentM = 0;
+    const startBlocked = await page.evaluate(([px, pz]) => Boolean(window.__ATOMIC_ACRES_DEBUG__.collisionProbe(px, pz)), [sx, sz]);
+    if (startBlocked) {
+      // Closed-loop vertices can coincide with the shell collider at a corner.
+      // Walk a short distance into the segment so the probe tests the authored
+      // edge instead of discarding it as an invalid spawn point.
+      for (const adjustmentM of [0.75, 1.25, 1.75, 2.25, 2.75]) {
+        const candidateX = sx + ux * adjustmentM;
+        const candidateZ = sz + uz * adjustmentM;
+        const candidateGround = groundAt(candidateX, candidateZ);
+        const candidateBlocked = await page.evaluate(([px, pz]) => Boolean(window.__ATOMIC_ACRES_DEBUG__.collisionProbe(px, pz)), [candidateX, candidateZ]);
+        if (!candidateBlocked && candidateGround !== null && candidateGround > FARCRYSIS_WATER_LEVEL) {
+          probeSx = candidateX;
+          probeSz = candidateZ;
+          startAdjustmentM = adjustmentM;
+          break;
+        }
+      }
+    }
+    const ground = groundAt(probeSx, probeSz);
+    if ((startBlocked && startAdjustmentM === 0) || ground === null || ground <= FARCRYSIS_WATER_LEVEL) {
+      rows.push({ ...walk, skipped: startBlocked ? 'start inside a collider; no clear segment entry' : ground === null ? 'no ground' : 'start in water' });
+      continue;
+    }
     const yaw = Math.atan2(-dx, -dz); // controller walks along (-sin h, 0, -cos h)
     const phase = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase);
     if (phase !== 'active') {
@@ -112,7 +135,7 @@ try {
       await sleep(2_000);
       await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true)).catch(() => {});
     }
-    await page.evaluate(({ x, y, z, h }) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, h, 0), { x: sx, y: ground + 1.7, z: sz, h: yaw });
+    await page.evaluate(({ x, y, z, h }) => window.__ATOMIC_ACRES_DEBUG__.teleportPlayer(x, y, z, h, 0), { x: probeSx, y: ground + 1.7, z: probeSz, h: yaw });
     await sleep(400);
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setMovement(true));
     const deadline = Date.now() + WALK_MS;
@@ -130,7 +153,7 @@ try {
     }
     await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setMovement(false));
     const end = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().player.position);
-    const walkedM = Math.hypot(end[0] - sx, end[2] - sz);
+    const walkedM = Math.hypot(end[0] - probeSx, end[2] - probeSz);
     let classification = outcome;
     let blocker = null;
     let slope = null;
@@ -160,7 +183,7 @@ try {
       else if (movementBlocked && movementBlocked.some(Boolean)) classification = 'INVISIBLE-WALL';
       else classification = 'stopped-no-cause-found';
     }
-    rows.push({ ...walk, yaw: Number(yaw.toFixed(3)), outcome, classification, walkedM: Number(walkedM.toFixed(2)), end: end.map((v) => Number(v.toFixed(2))), blocker, groundStepAheadM: slope, movementBlockedAt: movementBlocked });
+    rows.push({ ...walk, yaw: Number(yaw.toFixed(3)), probeFrom: [Number(probeSx.toFixed(2)), Number(probeSz.toFixed(2))], startAdjustmentM, outcome, classification, walkedM: Number(walkedM.toFixed(2)), end: end.map((v) => Number(v.toFixed(2))), blocker, groundStepAheadM: slope, movementBlockedAt: movementBlocked });
     console.error(`[route-probe] ${walk.route}#${walk.segment} ${classification} ${walkedM.toFixed(1)} m${blocker ? ` (${blocker.name} @ ${blocker.distanceM} m)` : ''}`);
   }
 } catch (error) {
