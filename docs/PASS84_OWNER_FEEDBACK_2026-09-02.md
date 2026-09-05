@@ -2331,3 +2331,12 @@ Do not publish PASS 95 from candidate 7. The build is playable and served for
 the 06:00 owner test, but the preserved cold-admission fence and three required
 multiplayer soak rows are red. No threshold, fence, timeout, or budget was
 widened.
+
+## Morning follow-up lanes 2026-09-05 06:30
+
+Candidate 7 (runtime ae795724, pushed 452d7aba) is served on :4300 for the owner test; not published. Two Luna lanes launched from that head, 120 min each, hard stop, push per step:
+
+- `cold-path-2` (worktree aa-claude-coldpath2, branch contrib/dave-gaming-pc/claude/cold-path-2, port 4189): root-cause the fatal AttributeNode position-missing error that forced six reviewed lanes out of candidate 7, and profile/fix the 24.1 s cold transition against the preserved 10 s budget. Report: docs/evidence/pass95/cold-path-2/REPORT.md.
+- `mp-soak-red` (worktree aa-claude-soakred, branch contrib/dave-gaming-pc/claude/mp-soak-red, ports 4233-4235): the three red soak rows on candidate 7 (replication 606 divergences, rejoin damage seenByEveryoneAfter=false, stair fire) at cause; full soak table before/after. Report: docs/evidence/pass95/mp-soak-red/REPORT.md.
+
+Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled task). PASS 95 waits for the owner verdict plus green cold admission and soak.
