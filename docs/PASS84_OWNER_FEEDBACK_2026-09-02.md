@@ -2396,3 +2396,5 @@ Range HITL 5 (3e2fd273) -> candidate 7 (452d7aba): 651 commits, 85 test/QA files
 | HF-513 | 2026-09-05 08:20 | Owner: "I do not think I need to be using ComfyUI for anything? or are you using it?" | Answer: no lane uses ComfyUI; its python (pid 58932) is idle since 09-03 18:28, ~15 MB RAM, no VRAM (the 5.2 GB VRAM in use is the headless WebGPU lanes). Closing it is the owner's call; small gain. |
 
 | HF-514 | 2026-09-05 08:22 | Owner: "yes close it, I am not using it" (ComfyUI). | Closed: python pid 58932 stopped, :8188 down, no ComfyUI processes remain. The GPU is now shared only by the lanes and the :4300 preview. |
+
+| HF-515 | 2026-09-05 08:27 | Owner: "ETA until next HITL?" | Answer given: candidate 8 on :4300 about 10:00-10:30 (verdict lanes all have reports pushed, verifiers running; Opus integrator brief ready to launch when the verdict workflow completes; integration + gates ~60-90 min under load). Polish lanes land as candidate 9 around 12:00-13:00. |
