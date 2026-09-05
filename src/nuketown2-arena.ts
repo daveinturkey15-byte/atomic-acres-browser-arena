@@ -1495,6 +1495,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       { solid: false, shots: false, cast: false });
     pair(builder, `house front window apron ${index}`, [wx, 0.93, zFront + WALL_T / 2 + 0.015], [width + 0.06, 0.08, 0.03], m.trim,
       { solid: false, shots: false, cast: false });
+    // W4-374 window depth: interior light strip above each ground window, on
+    // the room face of the head band. Same warmLight emissive hook as the
+    // ceiling lenses (always-on practical, strongest read at golden-hour and
+    // overcast), so the ground rooms glow through their panes after dark.
+    // Back 5 mm beds into the head band (construction contact, never a depth
+    // race); glass family untouched, no new material, no authority change.
+    pair(builder, `house front interior glow strip ${index}`, [wx, 2.68, zFront + WALL_T / 2 + 0.02], [width - 0.10, 0.10, 0.05], m.warmLight,
+      { solid: false, shots: false, cast: false });
   }
   pair(builder, 'house front door lintel',
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
@@ -1630,6 +1638,14 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   const backUpperW = BACK_UPPER_WINDOW[1] - BACK_UPPER_WINDOW[0];
   const backUpperWx = (BACK_UPPER_WINDOW[0] + BACK_UPPER_WINDOW[1]) / 2;
   pair(builder, 'house upper back sill nose', [backUpperWx, UPPER_Y0 + 0.86, -23.05], [backUpperW + 0.12, 0.08, 0.10], m.trim,
+    { solid: false, shots: false, cast: true });
+  // W4-374 window depth: jamb reveals the upper front window already carries
+  // (HF-440 Cycle 1), mirrored here so the back power window has the same
+  // real frame depth. Same trim, same recipe, same depths; the opening, sill
+  // and head already match the front, only the reveals were missing.
+  pair(builder, 'house upper back window jamb 0', [BACK_UPPER_WINDOW[0] + 0.035, UPPER_Y0 + 1.35, zBack], [0.07, 2.70, WALL_T + 0.02], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house upper back window jamb 1', [BACK_UPPER_WINDOW[1] - 0.035, UPPER_Y0 + 1.35, zBack], [0.07, 2.70, WALL_T + 0.02], m.trim,
     { solid: false, shots: false, cast: true });
   // HF-440 Cycle 2: Glazed double-hung upper back window with glass pane on upper sash
   pair(builder, 'house upper back window glass',
