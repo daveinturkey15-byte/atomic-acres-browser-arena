@@ -95,12 +95,13 @@ into its own style:
 | `building` | `rgba(226,240,244,.16)` | `rgba(238,248,252,.95)` | 2.5 |
 | `wall` | `rgba(226,240,244,.12)` | `rgba(226,240,244,.88)` | 2 |
 
-Contrast against the minimap ground `rgba(7,15,18,.86)`: the `building` stroke
-is near-white at 95% alpha on a near-black plate - **[MEASURED]** WCAG contrast
-ratio about 17:1; the `wall` stroke about 15:1. Both are well above the 4.5:1
-the HUD text rule uses, at 2-2.5 px on the 256 px backing, which is the old
-collider outline weight (1.5 px) plus enough to survive the player-up rotation
-without aliasing away.
+Contrast against the minimap ground `rgba(7,15,18,.86)`. **[MEASURED]**
+compositing each stroke over that ground and applying the WCAG relative
+luminance formula gives the `building` stroke `(226,236,240)` at **16.3:1** and
+the `wall` stroke `(200,212,217)` at **13.0:1**. Both are well clear of the
+4.5:1 the HUD text rule uses. Line weight is 2-2.5 px on the 256 px backing -
+the old collider outline was 1.5 px, and the extra weight is what survives the
+player-up rotation without aliasing away.
 
 The retained-canvas cache and its revision key are preserved, so the PASS 94
 perf lane's measured win (`updateMinimap` 0.87 ms of self time per rendered
