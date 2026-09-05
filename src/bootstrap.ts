@@ -18,6 +18,9 @@ import './ui/pass75-menu-redesign.css';
 import './ui/pass77-instrument-hud.css';
 import './ui/pass77-command-shell.css';
 import './ui/pass94-hud-chat.css';
+// PASS 95 HUD/menu/lobby polish. Last, unlayered, and driven by the measured
+// layout in docs/evidence/pass95/hud-menu-polish/ - see the sheet's header.
+import './ui/pass95-hud-menu-polish.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,

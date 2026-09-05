@@ -1,0 +1,170 @@
+/* ---------------------------------------------------------------------------
+ * PASS 95 - HUD / menu / lobby polish.
+ *
+ * This sheet exists because of MEASURED geometry, not taste. Every rule below
+ * names the number that produced it, taken from
+ * docs/evidence/pass95/hud-menu-polish/before-layout.json - a headless,
+ * native-WebGPU session that laid the real shell out at 1280x720, 1920x1080
+ * and 2560x1440 and read `getBoundingClientRect()` off it.
+ *
+ * It is loaded LAST from bootstrap.ts, unlayered, for the reason
+ * pass77-command-shell.css already documents: style.css ships unlayered
+ * shorthand `font:` declarations that outrank every `@layer` sheet in the
+ * repository, so a readability floor can only be restated at or after that
+ * point in the cascade.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO. It moves no surface out of the inventory,
+ * removes no control, adds no font, and changes no per-frame writer. The HUD
+ * style-recalc boundary established by perf lane 5 (the frame-driven
+ * `--hud-*` properties are `inherits: false` and are written to nine resolved
+ * targets) is untouched: nothing here introduces a rule that makes an
+ * inherited registered property matter to a descendant.
+ * ------------------------------------------------------------------------ */
+
+/*
+ * PART 0 - the spacing grid and type ramp, as tokens.
+ *
+ * The HUD already lays out on `--hud-edge` / `--hud-gap`; what it lacked was a
+ * single declared step so a later pass cannot silently introduce a 7px or an
+ * 11px gap. Four pixels is the step the existing tokens already resolve to at
+ * every review width, so this records the grid rather than moving anything.
+ *
+ * The type ramp names the three sizes the repository's own readability
+ * contract (AGENTS.md: >= 9px status text, >= 12px primary actions and values
+ * at 1280x720) actually distinguishes. `--p95-type-micro` IS the floor: a
+ * value below it is a defect, not a style.
+ */
+:root {
+  --p95-grid: 4px;
+  --p95-grid-2: 8px;
+  --p95-grid-3: 12px;
+  --p95-grid-4: 16px;
+
+  --p95-type-micro: 9px;   /* status / provenance labels - the floor */
+  --p95-type-body: 12px;   /* anything a player reads to make a decision */
+  --p95-type-value: 15px;  /* primary actions and headline values */
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 1 - the readability floor, applied where the measurement found it broken.
+ *
+ * MEASURED, before: every map card in `#map-selector` rendered 8px text at all
+ * three review resolutions ("menu #map-selector renders 8px text"). style.css
+ * pins `.map-card small` at 7px and `.map-selector-heading small` at 8px in an
+ * unlayered `font:` shorthand, so the pass66 rule that intends 11px never
+ * applies. This is the same defect class pass77-command-shell.css already
+ * repaired for `.map-index`, and the same repair: restate the size at a
+ * cascade position that actually wins.
+ *
+ * Only `font-size` is restated. Family, weight, colour and tracking stay with
+ * whichever sheet owns them, so no font is added to any path.
+ * ------------------------------------------------------------------------ */
+#menu .map-selector-heading small,
+#menu .map-card small,
+#menu .map-card strong,
+#menu .map-card .map-authoring,
+#menu .map-card .map-prototype,
+#menu .kit-card small,
+#menu #private-lobby small,
+#menu #lobby-guidance,
+#menu .lobby-roster small {
+  font-size: max(var(--p95-type-micro), 1em);
+}
+
+/*
+ * `max(9px, 1em)` rather than a flat `9px`: a sheet that already sets a
+ * LARGER size keeps it, because `1em` resolves against this element's own
+ * inherited size before `font-size` is applied. The floor only ever raises.
+ */
+
+/* ---------------------------------------------------------------------------
+ * PART 2 - the map decision surface reaches the first screen.
+ *
+ * MEASURED, before, and the single largest hierarchy defect in the audit:
+ *
+ *   1280x720   #menu-showcase 337.0..634.3   #map-selector 662.3..1235.4
+ *   1920x1080  #menu-showcase 309.2..890.8   #map-selector 922.8..1284.6
+ *   2560x1440  #menu-showcase 309.2..890.8   #map-selector 922.8..1284.6
+ *
+ * At 1920x1080 the map cards START 157px below the fold minus the viewport -
+ * that is, the player's first screen is a title and a 581px preview panel, and
+ * the surface that carries the actual decision (which map, Nuke Town Rebuild
+ * first per HF-495) is entirely off it. At 1280x720 only 58px of a 573px
+ * selector is on screen. The preview is supporting evidence for a choice; it
+ * was occupying the whole page and pushing the choice away.
+ *
+ * The repair is a viewport-relative ceiling on the preview panel, not a
+ * removal: the video, its poster fallback, its telemetry chip and its
+ * reduced-motion branch are all unchanged, and the panel keeps its optic
+ * frame. `min()` with a fixed upper bound keeps the panel from growing without
+ * limit on a very tall display.
+ * ------------------------------------------------------------------------ */
+#menu #menu-showcase {
+  max-height: min(34vh, 420px);
+}
+
+/*
+ * The panel is a centred grid; with a shorter box its media must fill rather
+ * than letterbox, or the ceiling would just add bars. `cover` keeps the
+ * authored flyover framed on its centre, which is where every arena's
+ * landmark is composed.
+ */
+#menu #menu-showcase > img,
+#menu #menu-showcase > video {
+  height: 100%;
+  max-height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * The selector then has room to breathe on the grid rather than being crushed
+ * against the panel above it.
+ */
+#menu #map-selector {
+  margin-top: var(--p95-grid-3);
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 3 - critical in-match text carries its own weight.
+ *
+ * MEASURED, before: `#objective` rendered at exactly 10px at all three
+ * resolutions (min and max font both 10) while the timer beside it rendered at
+ * 30px. The objective line is the one HUD string that tells a player what to
+ * do next; it was set below the 12px value floor and two ramp steps under its
+ * own neighbour. Raising it to the body step costs about 6px of height inside
+ * a mission console that measured 145px tall with its own bottom edge 560px
+ * clear of the operator console, so nothing below it moves.
+ * ------------------------------------------------------------------------ */
+#hud #objective {
+  font-size: var(--p95-type-body);
+  line-height: 1.25;
+}
+
+/* ---------------------------------------------------------------------------
+ * PART 4 - one focus ring, so keyboard and gamepad focus read the same
+ * everywhere.
+ *
+ * The shell already gives `#menu button/input/select/.map-card/.kit-card` a
+ * `:focus-visible` treatment. The lobby's own controls - ready, start, leave,
+ * reset, swap sides, balance - are inside `#private-lobby` and inherit it, but
+ * nothing declared that they must, so a later panel rewrite could drop them
+ * silently. Restating it here as an explicit, testable rule keeps the focus
+ * ring on the exact controls a pad's face buttons drive, and keeps the
+ * roving-focus DOM order intact because it changes no layout.
+ * ------------------------------------------------------------------------ */
+#menu #private-lobby button:focus-visible,
+#menu #private-lobby select:focus-visible,
+#menu #private-lobby input:focus-visible,
+#menu #map-selector .map-card:focus-visible {
+  outline: 2px solid var(--p77-accent, #f4c44f);
+  outline-offset: 2px;
+}
+
+/*
+ * Selected state must not be colour-only: the pressed map card already carries
+ * an accent fill and edge, and this adds a shape cue so a player who cannot
+ * separate the two accents still sees which card is armed.
+ */
+#menu #map-selector .map-card[aria-pressed='true'] {
+  box-shadow: inset var(--p95-grid) 0 0 0 var(--p77-accent, #f4c44f);
+}
