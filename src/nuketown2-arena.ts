@@ -2586,21 +2586,35 @@ function retireSupersededPresentation(builder: Builder): { retired: number; mism
 function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   const { retired, mismatches } = retireSupersededPresentation(builder);
 
-  // Cream lower shell / maroon upper shell: the reference's coach, and the
-  // only saturated body left on the map now the truck is a dark mover.
+  // Cream lower shell / maroon upper shell: the reference's cream-and-maroon
+  // tour coach (FINDINGS Q4, VERIFIED on the BO2-2025 aerial), with chrome
+  // bumpers, grille and divider. The split is a procedural surface band in the
+  // shared accent bucket (glass quads skipped by construction), and paint and
+  // accent share one uniform-carried graph, so the livery costs no new pipeline
+  // (see the forge graph-shape budget test).
   // PERF (HITL 5, HF-491): one shared set of colourless bucket materials, so
   // every vehicle's tyres/chrome/glass/lamps merge into one draw each below.
   const sharedMaterials = createForgeSharedMaterials();
   const coachMaterials = createForgeMaterialSet(0xe7dec6, 'nuketown2-forge-coach', 0xa8382c, 0.2, sharedMaterials);
-  const truckMaterials = createForgeMaterialSet(0x243139, 'nuketown2-forge-truck', 0x243139, 0.2, sharedMaterials);
+  // Two-tone white over dark: the reference's box moving truck (white body,
+  // dark cab, FINDINGS Q4). Same mechanism as the coach - a white base with a
+  // dark accent band and a chrome divider on the cab, one shared paint graph.
+  const truckMaterials = createForgeMaterialSet(0xf2ede2, 'nuketown2-forge-truck', 0x2b3138, 0.2, sharedMaterials);
   // The 1950s saloon is dark navy with a light sidewall/rim contrast. The
   // paint uniform keeps this navy navy under the clearcoat (candidate 4b's
   // purple result came from lifting dark channels toward a common floor).
   const carMaterials = createForgeMaterialSet(0x173451, 'nuketown2-forge-saloon', 0xf4eee0, 0.2, sharedMaterials);
+  // Vintage cherry-red classic coupe for the two driveway aprons (FINDINGS Q4:
+  // the red car on the reference drive; critic: red coupe with chrome by the
+  // garage). Same SEDAN_SPEC envelope the colliders own - the proportions move
+  // in the dressing (lamp heights, bumper line, chrome side spear, grille)
+  // rather than in the spec, so the parity envelope is untouched - with trim
+  // from the shared chrome bucket: trim, not a new material.
+  const coupeMaterials = createForgeMaterialSet(0x9e1c1c, 'nuketown2-forge-coupe', 0x9e1c1c, 0.2, sharedMaterials);
 
   // The cargo geometry stays authored because its three walk-through mouths
   // are gameplay cover. It is presentation-only material dressing here: the
-  // same dark forge paint as the lofted cab gives it a coherent box-truck body
+  // same white forge paint as the lofted cab gives it a coherent box-truck body
   // without changing a collider, shot surface or box extent.
   for (const child of builder.root.children) {
     if (!(child instanceof THREE.Mesh) || !/^nuketown2 street-vehicle truck (deck|box )/.test(child.name)) continue;
@@ -2635,6 +2649,11 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       wheelStyle: 'steel',
       headLamps: { x: 0.92, y: 0.95, radius: 0.12 },
       bumperY: 0.42,
+      // Two-tone split: dark upper cab over the white base, divided by a chrome
+      // moulding - the same paint/accent bucket pair the coach uses, so no new
+      // material family and no new pipeline.
+      surfaceBands: [{ y0: 2.02, y1: 2.88, bucket: 'accent', z0: 0.5, z1: 4.7, proud: 0.01 }],
+      stripe: { y: 1.99, bucket: 'chrome', z0: 0.4, z1: 4.8, height: 0.05, proud: 0.014 },
       grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
       mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
       panelSeams: [
@@ -2675,6 +2694,18 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
   };
+  // The driveway coupe: same SEDAN_SPEC envelope (the collider boxes own it),
+  // dressed down into a classic coupe - lamps tucked lower and smaller, bumper
+  // line dropped, chrome side spear and upright grille from the shared chrome
+  // bucket. No new spec, no new material family.
+  const coupeDressing = {
+    wheelStyle: 'whitewall' as const,
+    headLamps: { x: 0.62, y: 0.78, radius: 0.10 },
+    tailLamps: { x: 0.64, y: 0.80, radius: 0.095 },
+    bumperY: 0.40,
+    stripe: { y: 0.90, bucket: 'chrome' as const, z0: 0.35, z1: 4.05, height: 0.06, proud: 0.014 },
+    grille: { y: 0.70, width: 1.10, height: 0.26, depth: 0.10, barCount: 4 },
+  };
   // HF-477's two street cars are dressed by the shared forge paint graph. Both
   // nose to +x, so the vehicle frame's +z maps to world -x, as the retired head
   // car did; paint remains a uniform-carried value rather than a new graph.
@@ -2691,13 +2722,13 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   // to their boxes, so the two skins stay as symmetric as the two colliders.
   const { x: carX, z: carZ } = NUKETOWN2_DRIVEWAY_CAR;
   placements.push({
-    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
+    built: buildForgedVehicle(SEDAN_SPEC, coupeDressing, coupeMaterials),
     x: carX,
     z: carZ + SEDAN_SPEC.length / 2,
     yaw: Math.PI,
   });
   placements.push({
-    built: buildForgedVehicle(SEDAN_SPEC, sedanDressing, carMaterials),
+    built: buildForgedVehicle(SEDAN_SPEC, coupeDressing, coupeMaterials),
     x: -carX,
     z: -(carZ + SEDAN_SPEC.length / 2),
     yaw: 0,

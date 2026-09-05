@@ -142,13 +142,22 @@ describe('HF-477 vehicle forge graph-shape budget', () => {
   it('keeps forge paint colours in one uniform-carried graph', () => {
     const coach = createForgeMaterialSet(0xe7dec6, 'budget-coach', 0xa8382c);
     const navy = createForgeMaterialSet(0x173451, 'budget-navy', 0xf4eee0);
+    // Pass 95 liveries: the two-tone white/dark truck and the cherry-red
+    // driveway coupe. Same uniform-carried family, so neither livery compiles a
+    // new pipeline - this assertion is the proof, and it fails the moment a
+    // livery bakes its colour back into the graph as a constant.
+    const truck = createForgeMaterialSet(0xf2ede2, 'budget-truck', 0x2b3138);
+    const coupe = createForgeMaterialSet(0x9e1c1c, 'budget-coupe', 0x9e1c1c);
     expect(materialGraphKey(navy.paint)).toBe(materialGraphKey(coach.paint));
     expect(materialGraphKey(coach.paint)).toBe(materialGraphKey(coach.accent));
-    for (const material of [navy.paint, coach.paint, coach.accent]) {
+    expect(materialGraphKey(truck.paint)).toBe(materialGraphKey(coach.paint));
+    expect(materialGraphKey(truck.accent)).toBe(materialGraphKey(coach.paint));
+    expect(materialGraphKey(coupe.paint)).toBe(materialGraphKey(coach.paint));
+    for (const material of [navy.paint, coach.paint, coach.accent, truck.paint, truck.accent, coupe.paint]) {
       expect(material.userData.forgePaintUniform).toBe(true);
       expect(material.userData.forgeRole).toBe('paint');
     }
-    for (const [material, hex] of [[navy.paint, 0x173451], [coach.paint, 0xe7dec6], [coach.accent, 0xa8382c]] as const) {
+    for (const [material, hex] of [[navy.paint, 0x173451], [coach.paint, 0xe7dec6], [coach.accent, 0xa8382c], [truck.paint, 0xf2ede2], [truck.accent, 0x2b3138], [coupe.paint, 0x9e1c1c]] as const) {
       const expected = new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
       expect(uniformValues(material)).toEqual([
         expect.closeTo(expected.r, 12),
