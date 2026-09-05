@@ -2,11 +2,20 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { chromeArgs } from './mp-audit.mjs';
 
 const gatePath = fileURLToPath(new URL('./mp-soak-gate.mjs', import.meta.url));
 const auditPath = fileURLToPath(new URL('./mp-audit.mjs', import.meta.url));
 const source = await readFile(gatePath, 'utf8');
 const audit = await readFile(auditPath, 'utf8');
+
+test('multiplayer browser launch uses the stock GPU route and stays silent', () => {
+  const args = chromeArgs();
+  assert.ok(args.includes('--mute-audio'));
+  for (const prefix of ['--enable-unsafe-webgpu', '--enable-features', '--ignore-gpu-blocklist', '--use-angle']) {
+    assert.equal(args.some((arg) => arg.startsWith(prefix)), false, `${prefix} must not mask a GPU failure`);
+  }
+});
 
 test('soak gate stays inside the dedicated QA port range', () => {
   assert.match(source, /dist: Number\(process\.env\.MP_SOAK_DIST_PORT \?\? '4233'\)/);

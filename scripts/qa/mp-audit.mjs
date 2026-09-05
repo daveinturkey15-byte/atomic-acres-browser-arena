@@ -167,9 +167,10 @@ function multiplayerArenaRoster() {
 function chromeArgs() {
   return [
     ...SILENT_ARGS,
-    '--use-angle=d3d11', '--ignore-gpu-blocklist',
+    // Match the stock-boot GPU route: backend overrides and blocklist bypasses
+    // can conceal precisely the device/compiler failures this audit must see.
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
-    '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion',
+    '--disable-renderer-backgrounding',
     '--autoplay-policy=no-user-gesture-required',
     '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
