@@ -185,7 +185,10 @@ test.describe('arena boot smoke — every canonical arena', () => {
         const arenaSelection = state.arenaSelection as { id?: unknown } | undefined;
         return arenaSelection?.id ?? null;
       });
-      expect(selectedArenaId, `${arenaId}: debug selection must commit the requested arena before solo start`).toBe(arenaId);
+      if (selectedArenaId !== arenaId) {
+        const diagnostic = await captureDeploymentDiagnostic(page);
+        throw new Error(`${arenaId}: debug selection rolled back before solo start; last phase snapshot=${JSON.stringify(diagnostic)}`);
+      }
       await page.evaluate(() => {
         (window as unknown as { __ATOMIC_ACRES_DEBUG__: DebugApi }).__ATOMIC_ACRES_DEBUG__.startSolo();
       });
