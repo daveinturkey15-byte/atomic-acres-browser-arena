@@ -2380,3 +2380,5 @@ Range HITL 5 (3e2fd273) -> candidate 7 (452d7aba): 651 commits, 85 test/QA files
 - F5 OPEN: graphics control-set hashes re-pinned without re-measuring the contract rows (tests pass, 14/14). Candidate 8 integrator re-measures.
 - F6 review gap: scripts/qa/mp-evidence-analyse.mjs has a NUL byte, so 19 KB entered as a binary diff. Fix lane removes it.
 - REPORT framing mismatches: "no assertion changed" is untrue over the HITL-5 range (F3); the soak bounds are new, not preserved; no gate the REPORT calls green is contradicted.
+
+- 07:55 memory 0.5 GB free, 10 headless browsers, 85 node processes: polish workflow wf_d7dcbcc3-0ab PAUSED as well (resumable; lanes pushed per step so branch work survives). Still running: HF-509 verdict lanes, Farcrysis/Raid chains, gate-audit fix lane, the two Luna lanes (hard stop ~08:27), Muse fix jobs. Resume order once memory recovers: polish workflow, then forward-ports.
