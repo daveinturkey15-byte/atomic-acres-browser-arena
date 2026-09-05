@@ -240,17 +240,18 @@ this document does not):
 
 | Profile | Control-set hash |
 |---|---|
-| `performance` | `e38ede29` |
-| `balanced` | `9d461537` |
-| `high` (QUALITY, HF-438 light tier) | `2f8b5453` |
-| `max` (HF-438 full tier) | `b71a9c4e` |
+| `performance` | `72ad4b3c` |
+| `balanced` | `ee7d10b6` |
+| `high` (QUALITY, HF-438 light tier) | `308b6810` |
+| `max` (HF-438 full tier) | `467af549` |
 | `raytraced` (RETIRED — historical) | `d65fbd25` |
 | `max` (pre-fold, historical) | `2be3a371` |
-> **PASS 96 re-measurement (HF-472).** The four current pins changed from
-> `445a9754` -> `e38ede29`, `0753ee34` -> `9d461537`,
-> `430da2ad` -> `2f8b5453`, and `03ee2e10` -> `b71a9c4e` after adding the
-> `taaResolve` control. The hashes were recomputed from the complete preset
-> values and then written here; they were not merely re-pinned.
+> **PASS 95 forward-port re-measurement (HF-472).** The four current pins
+> were recomputed from the complete candidate-7 preset values after restoring
+> the TAA control and current profile authority: `performance=72ad4b3c`,
+> `balanced=ee7d10b6`, `high=308b6810`, and `max=467af549`. These values were
+> generated from `graphicsControlSetHashes()` and synchronized here; they were
+> not hand-edited to make a red test green.
 > **PASS 92 re-fingerprint (HF-438).** The `high` and `max` fingerprints above
 > changed because the fold moved real values into those presets; `performance`
 > and `balanced` are untouched. The retired `raytraced` row and the pre-fold
