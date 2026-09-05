@@ -1,6 +1,6 @@
 import {
   CHOPPER_GUN_DAMAGE_AFTER,
-  CHOPPER_GUN_DAMAGE_MULTIPLIER,
+  CHOPPER_GUN_DAMAGE_MULTIPLIER_FROM_V2,
   CHOPPER_GUN_MINIMUM_DAMAGE_AFTER,
   DRONE_SWARM_FIRE_RATE_MULTIPLIER,
   DRONE_SWARM_SPEED_MULTIPLIER,
@@ -117,10 +117,13 @@ export const CHOPPER_GUN_PROFILE = Object.freeze({
   // hostile, cadence tightened to keep the heavy-thump rhythm.
   // HF-458 item 1 (owner 2026-09-02): "machine-gun damage -25%". v2's 34/22
   // stays recorded in killstreak-tuning.ts as the value this scales.
-  id: 'chopper-gun-standard-v3-hf458',
+  // HF-509 (owner 2026-09-05): "half the damage of the helicopter's machine
+  // gun, the chopper gunner. Keep everything else the same." 25.5/16.5 ->
+  // 12.75/8.25. Cadence, range, falloff and splash are untouched.
+  id: 'chopper-gun-standard-v4-hf509',
   damage: CHOPPER_GUN_DAMAGE_AFTER,
   minimumDamage: CHOPPER_GUN_MINIMUM_DAMAGE_AFTER,
-  damageMultiplierFromV2: CHOPPER_GUN_DAMAGE_MULTIPLIER,
+  damageMultiplierFromV2: CHOPPER_GUN_DAMAGE_MULTIPLIER_FROM_V2,
   falloffStartM: 28,
   maximumRangeM: 78,
   cadenceMs: 240,

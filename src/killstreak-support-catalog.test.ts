@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHOPPER_GUN_DAMAGE_BEFORE,
+  CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
   CHOPPER_GUN_DAMAGE_MULTIPLIER,
   CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE,
   DRONE_SWARM_FIRE_RATE_MULTIPLIER,
@@ -76,17 +77,21 @@ describe('Pass 65 support catalog', () => {
     // HF-458 item 1 (owner 2026-09-02): "machine-gun damage -25%". The Pass
     // 66.1 numbers this scales are 34/22; the ratio is pinned rather than the
     // decimal so the owner's stated percentage is what the gate protects.
+    // HF-509 (owner 2026-09-05) halves that result again, so the shipped
+    // number is 34 x 0.75 x 0.5 and 22 x 0.75 x 0.5.
     expect(CHOPPER_GUN_PROFILE).toMatchObject({
-      damage: CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER,
-      minimumDamage: CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER,
+      damage: CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER * CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
+      minimumDamage: CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE
+        * CHOPPER_GUN_DAMAGE_MULTIPLIER
+        * CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
       criticalHits: false,
       penetration: 'solid-occluded',
     });
-    expect(CHOPPER_GUN_PROFILE.damage).toBe(25.5);
-    expect(CHOPPER_GUN_PROFILE.minimumDamage).toBe(16.5);
+    expect(CHOPPER_GUN_PROFILE.damage).toBe(12.75);
+    expect(CHOPPER_GUN_PROFILE.minimumDamage).toBe(8.25);
     // The shared oracle still rounds each admitted shell to an integer.
-    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 0)).toBe(26);
-    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, CHOPPER_GUN_PROFILE.maximumRangeM)).toBe(17);
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, 0)).toBe(13);
+    expect(supportGunDamageAtDistance(CHOPPER_GUN_PROFILE, CHOPPER_GUN_PROFILE.maximumRangeM)).toBe(8);
   });
 
   it('isolates the piloted sensor from gun and ballistic authority', () => {

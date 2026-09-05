@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CHOPPER_AUTOPILOT_MISSILE_BUDGET,
   CHOPPER_GUN_DAMAGE_BEFORE,
+  CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER,
+  CHOPPER_GUN_DAMAGE_HF458,
   CHOPPER_GUN_DAMAGE_MULTIPLIER,
   CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE,
+  CHOPPER_GUN_MINIMUM_DAMAGE_HF458,
   CHOPPER_MISSILE_CAPACITY_AFTER,
   CHOPPER_MISSILE_CAPACITY_BEFORE,
   DRONE_SWARM_FIRE_RATE_MULTIPLIER,
@@ -47,14 +50,24 @@ describe('HF-458 killstreak tuning', () => {
     expect(CHOPPER_MISSILE_CAPACITY - CHOPPER_AUTOPILOT_MISSILE_BUDGET).toBe(6);
   });
 
-  it('cuts Chopper machine-gun damage by exactly a quarter', () => {
+  it('cuts Chopper machine-gun damage by exactly a quarter (HF-458), then halves it (HF-509)', () => {
+    // HF-458's ratio is still pinned against the value it produced, so the
+    // owner's "-25%" remains the thing the gate protects.
     expect(CHOPPER_GUN_DAMAGE_MULTIPLIER).toBe(0.75);
-    expect(CHOPPER_GUN_PROFILE.damage).toBe(CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER);
-    expect(CHOPPER_GUN_PROFILE.minimumDamage)
+    expect(CHOPPER_GUN_DAMAGE_HF458).toBe(CHOPPER_GUN_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER);
+    expect(CHOPPER_GUN_MINIMUM_DAMAGE_HF458)
       .toBe(CHOPPER_GUN_MINIMUM_DAMAGE_BEFORE * CHOPPER_GUN_DAMAGE_MULTIPLIER);
-    expect(CHOPPER_GUN_PROFILE.damage).toBe(25.5);
-    expect(CHOPPER_GUN_PROFILE.minimumDamage).toBe(16.5);
-    // Range, cadence and penetration were NOT part of the request.
+    expect(CHOPPER_GUN_DAMAGE_HF458).toBe(25.5);
+    expect(CHOPPER_GUN_MINIMUM_DAMAGE_HF458).toBe(16.5);
+
+    // HF-509: "half the damage of the helicopter's machine gun".
+    expect(CHOPPER_GUN_DAMAGE_HALVING_MULTIPLIER).toBe(0.5);
+    expect(CHOPPER_GUN_PROFILE.damage).toBe(CHOPPER_GUN_DAMAGE_HF458 * 0.5);
+    expect(CHOPPER_GUN_PROFILE.minimumDamage).toBe(CHOPPER_GUN_MINIMUM_DAMAGE_HF458 * 0.5);
+    expect(CHOPPER_GUN_PROFILE.damage).toBe(12.75);
+    expect(CHOPPER_GUN_PROFILE.minimumDamage).toBe(8.25);
+
+    // Range, cadence and penetration were NOT part of either request.
     expect(CHOPPER_GUN_PROFILE.cadenceMs).toBe(240);
     expect(CHOPPER_GUN_PROFILE.maximumRangeM).toBe(78);
   });
