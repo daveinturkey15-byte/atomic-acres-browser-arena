@@ -117,13 +117,21 @@ describe('HF-334 grant wiring', () => {
 
   it('diverts a rolled crimson reward to the weapon grant, not streak activation', () => {
     expect(main).toContain('if (revealedCareReward === CRIMSON_FLAMETHROWER_KILLSTREAK_ID) {');
-    expect(main).toContain('grantCrimsonFlamethrower();');
+    // HF-509 narrowed this: the divert now goes through the grant-once
+    // redemption, which claims the package instance and has the host consume the
+    // queued reward before `grantCrimsonFlamethrower` ever runs. A bare
+    // `grantCrimsonFlamethrower()` at this site is the defect, not the contract.
+    expect(main).toContain('redeemCarePackageWeaponReward(CRIMSON_FLAMETHROWER_KILLSTREAK_ID);');
+    expect(main).toContain('grant: () => grantCrimsonFlamethrower(now),');
+    expect(main).not.toContain(['    grantCrimsonFlamethrower();', '    return;'].join('\n'));
   });
 
   it('grants finite personal ammo without touching timed-map-weapon authority', () => {
     const start = main.indexOf('function grantCrimsonFlamethrower(');
     expect(start).toBeGreaterThan(-1);
-    const body = main.slice(start, main.indexOf('function activateFieldSupport(', start));
+    // HF-509 inserted redeemCarePackageWeaponReward between the grant and
+    // activateFieldSupport; pin the grant function alone.
+    const body = main.slice(start, main.indexOf(`${'\n'}function `, start + 1));
     expect(body).toContain("player.ammo[weapon] = WEAPONS[weapon].mag");
     expect(body).toContain("player.reserve[weapon] = WEAPONS[weapon].reserve");
     expect(body).not.toContain('claimTimedMapWeapon');
