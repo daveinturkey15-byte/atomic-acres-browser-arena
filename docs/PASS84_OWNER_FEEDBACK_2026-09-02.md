@@ -2494,3 +2494,119 @@ Full detail, claim-states and the owner's test order: `docs/evidence/pass94/cand
 - 10:38 Luna mp-swap-reload-relay DONE @ a9b4b029 (branch contrib/dave-gaming-pc/claude/mp-swap-reload-relay, from candidate 8): host-authoritative broadcast of canonical swap/reload/damage state (the missing relay path), observer ammo/reload state projection, killstreak victim source label on non-controller peers, rejoin latency sampling (the null damageLatencyMs); RED coverage first (9507b10f) then fixes; tsc green, 72 files / 683 tests, soak contracts 8/8, ratchet exactly 37,396. [OPEN] browser mp-audit not run (machine fence). Not in PASS 95 (cut already started from 32d8dcb0); first candidate for PASS 96 after re-verification and a quiet-machine soak. Muse review queued.
 
 - 10:47 Muse review of mp-swap-reload-relay @ a9b4b029: SHIP-WITH-FIXES (docs/evidence/pass94/muse-review/mp-swap-reload-relay-REVIEW.md on the lane branch). First findings: 1. Both replication defects are genuinely fixed under host authority: swap 2. The biomass is honest: all 13 deletions sit in `src/legacy-main.ts`; 3. Two findings should land before publish — F1 (host rebroadcasts a 
+
+## PASS 95 cut - 2026-09-05 11:20 BST (Opus, release checkout `aa-claude-release84`, branch `release/pass95` @ `9c61b6f3`)
+
+**Status: BLOCKED, nothing published.** No `publish_pass*.py` ran without `--dry-run`, no
+gh-pages push, no `npm run deploy`. No test, threshold, fence, budget, timeout, soak bound,
+the legacy-main ratchet or a publish-plan assertion was weakened, skipped or widened.
+Full report: `docs/evidence/pass95/cut/REPORT.md` on `release/pass95`.
+
+**The blocker: PASS 94 was never published, so PASS 95 has nothing to pin.**
+`[VERIFIED]` `origin/gh-pages` @ `7c9f1033` carries exactly `['pass92','pass93']`; its tip is
+the PASS 93 publish and `release-index.json` is generation `2ff646727518`. There is no
+`channels/pass94`. `[VERIFIED]` the source agrees: `src/changelog.ts:111` still reads
+`const pass94ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)` while
+every shipped pass carries a real literal. The "this pass is ALREADY PUBLISHED" line in
+`publish_pass94.py` is rolled-forward boilerplate and is **false for pass94**.
+
+Consequences, both mechanical:
+1. `roll_pass.py --pass 95` needs `--previous-released-at` = PASS 94's gh-pages publish
+   time, which does not exist. The roll (executed, then **reverted** - nothing committed)
+   wrote `pass94ReleasedAt = '2026-09-04T08:08:44+01:00'`, **byte-identical to
+   `pass93ReleasedAt`** - a fabricated production receipt shipped in the changelog UI.
+2. `[MEASURED]` `publish_pass95.py --dry-run` **exit 2, 5 red guards**, four structural:
+   `backup-present` ("gh-pages has no ['pass94'] tree to pin as the safe backup (present:
+   ['pass92','pass93'])"), `chooser-matches-post-state`, `post-state-exact` ("post-state
+   would be ['pass95'], expected ['pass94','pass95']") and `in-build-fallback` ("Every
+   visitor opening a channel URL directly would be offered PASS 94 and get a 404").
+
+**The plan that IS asserted.** `[MEASURED]` `publish_pass94.py --dry-run` with the build
+present: **exit 0, every guard green**. Channels are exactly the HF-400 two-channel policy -
+live `channels/pass94`, pinned safe backup `channels/pass93`; **the retired pass is
+`pass92`**. Freshness OK, farcrysis-admission OK (worst pair ratio 1.2833x <= 1.6x),
+release-identity OK, in-build fallback `pass93Backup -> channels/pass93` OK.
+
+**Build provenance.** `[VERIFIED]` this checkout rebuilds candidate 8 byte-for-byte:
+`legacy-main-B26NsPEA.js` SHA-256 `6ae9c5785c380af3f6ddfa5d9d2508fa92868248be0f848f4bad8559befd9071`
+and `index-Z7H2fNDC.js` `eaebf4ea2360fe8ff26856c76c2c84bbb696eee68add03dfb0409f5f2ac61824`,
+both identical to the candidate-8 REPORT - the exact bytes the owner played on `:4300`.
+
+| Gate | Result |
+| --- | --- |
+| `npx tsc --noEmit` | `[VERIFIED]` exit 0, no output |
+| `publish_pass94_plan.test.mjs` | `[VERIFIED]` 9/9, exit 0 |
+| Full `npx vitest run` | `[VERIFIED]` 631 files / 6,359 tests passed, 1 file + 2 tests skipped, 91.61 s, exit 0, no rerun |
+| `npm run build` | `[VERIFIED]` exit 0, 1.88 s, legacy-main 1,965.47 kB / gzip 604.97 kB |
+| `qa:release-identity --dist dist-pass94` | `[VERIFIED]` exit 0, "calls itself PASS 94" |
+| build freshness guard | `[VERIFIED]` OK |
+| `PASS73_NATIVE_WEBGPU=1 qa:stock-boot` | `[VERIFIED]` 4/4, 2.1 m, exit 0 |
+| **Arena boot smoke (13 arenas)** | **`[MEASURED]` 12 passed, 1 FAILED, exit 1 - `high-seas`** |
+| **Cold-admission smoke** | **`[MEASURED]` RED - 19,324.3 ms vs 10,000 ms** (owner override) |
+| **`qa:mp-soak`** | **`[MEASURED]` RED - 5/8** (owner override) |
+| `publish_pass95.py --dry-run` | `[MEASURED]` exit 2, plan NOT assertable |
+| `publish_pass94.py --dry-run` | `[VERIFIED]` exit 0, all green |
+
+**THIRD red gate, outside the owner's two overrides: `high-seas` does not boot.**
+`[MEASURED]` `page.waitForFunction: Timeout 120000ms exceeded` in
+`tests/e2e/pass74-arena-boot-smoke.spec.ts`; **deterministic** (failed in the 13-arena run
+and again on an isolated rerun on an idle machine); the other 12 arenas pass. It is
+**player-selectable** (`src/map-selection.ts:355`, no `selectable: false`, so it is in
+`SELECTABLE_ARENAS`), so a visitor picking HIGH SEAS gets a hang. `[MEASURED]` it fails
+**silently** - a direct probe on the gated bundle logged 0 console errors and 0 page errors
+over 120 s, with the app still on the deployment menu. `[OPEN]` root cause not established;
+no source fix attempted. `[MEASURED]` **a regression since the last publish**: the PASS 93
+cut record above says "boot smoke 13/13 (8.0 min)", and candidate 8 never ran this gate.
+
+**Cold admission `[MEASURED]`:** cold Nuke Town transition **19,324.3 ms** (candidate 8:
+21,807.6 ms - **2,483.3 ms / 11.4 % faster on identical bytes**) against the preserved,
+unwidened **10,000 ms** budget; combined cold preparation 19,795.6 ms; menu prewarm 2 tasks
+>=50 ms (max 419.0 ms); cold admission 174 tasks >=50 ms (max 1,688.0 ms); foreground match
+admission degraded (waited 5,018.8 ms, stable window 0, 80 samples / 77 resets,
+`drained:false`). `[OPEN]` F3 reproduced verbatim - nuketown2 exposes no cold-session
+art-loaded signal.
+
+**`qa:mp-soak` `[MEASURED]`:** 180,401 ms, three real peers, contract 3/3 first, no bound
+loosened. PASS: duration, respawn-reset, **stair-fire**, console-clean (0 errors on all
+three peers), scoreboard. FAIL: replication (**91** divergences, `missingDirections []`,
+1.5 m bound), rejoin-damage (`seenByEveryoneAfter true`, **`damageLatencyMs null`**),
+**reload-after-death** (`guestA false`). **The failing set is not stable:** candidate 8's
+three failures were replication, rejoin-damage and **stair-fire**; this run passes
+stair-fire and fails reload-after-death instead - two rows flipped on identical bytes, so
+`MP-SOAK-STAIR-FIRE` and `MP-SOAK-RELOAD-AFTER-DEATH` are **non-deterministic** and the
+owner's override should be read as covering both. **35 findings, all high, 0 critical**
+(candidate 8: 40 / 6 critical / 34 high - the FIRE-REFUSED and RELOAD-NO-EFFECT criticals
+did not reproduce). Dominant finding unchanged: `SWAP-NOT-REPLICATED` in every peer
+direction (HF-504) - which Luna's `mp-swap-reload-relay` @ `a9b4b029` targets, and which is
+**not** in this cut.
+
+**Harness defects (none worked around by weakening a budget).**
+1. `qa:stock-boot` still cannot start its own server: `scripts/qa/playwright-web-server.mjs`
+   runs `build()` **and** `stage-release-topology.mjs` synchronously inside
+   `webServer.timeout: 180000` (staging alone ~5 m 45 s). The budget was **not** widened -
+   the build was served out of band on **4291** and the spec run with
+   `QA_EXTERNAL_PREVIEW=1 QA_PREVIEW_PORT=4291`; `[VERIFIED]` that server served the gated
+   `index-Z7H2fNDC.js`.
+2. `qa:pass65:cold-webgpu-admission` refuses unless `git status --porcelain` is empty
+   (untracked included), so its own log cannot live under `docs/` while it runs.
+3. **AGENTS.md doc drift:** the Pass 95 gate list says the soak runs "on ports 4227-4228";
+   `scripts/qa/mp-soak-gate.mjs` enforces `ALLOWED_QA_PORTS = {4233, 4234, 4235}` and throws
+   otherwise. Ports 4290 and 4293 were already held by other processes (pids 60876, 8432);
+   all browser work used 4291/4292. `:4300` and `aa-claude-hitl` were never touched.
+
+**Owner decisions needed before anything ships.**
+1. **Number.** Publish the approved build as **PASS 94** (recommended: it is what the tree is
+   stamped, its publish script is all-green, and nothing is invented). Renumbering to 95
+   needs either PASS 94 published first, or a deliberate policy edit pointing `BACKUP_TREE`
+   at `pass93` and dropping PASS 94's changelog entry rather than giving it a fake receipt -
+   a release-policy change that was **not** made here.
+2. **`high-seas`** - fix, mark `selectable: false` for this pass (a real gated content
+   change), or knowingly override. Not covered by the stated two-gate override.
+3. **The two known reds** - cold admission 19,324.3 ms vs 10,000 ms, and `qa:mp-soak` 5/8
+   with two non-deterministic rows. Both fences stay in place, unmodified.
+
+**Exact publish command once the owner decides (PASS 94 route):**
+
+    cd C:/Users/david/projects/aa-claude-release84
+    python scripts/orchestration/publish_pass94.py --dry-run   # re-confirm exit 0, all green
+    python scripts/orchestration/publish_pass94.py             # live pass94, backup pass93, retires pass92
