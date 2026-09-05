@@ -1,0 +1,7 @@
+=== qa:release-identity on dist ===
+
+> atomic-acres-browser-arena@1.0.0 qa:release-identity
+> node scripts/qa/verify-built-release-identity.mjs
+
+RELEASE IDENTITY OK: C:\Users\david\projects\aa-claude-release84\dist calls itself PASS 94, opens its notes on Pass 94, ships no HITL string
+IDENTITY_DIST_EXIT=0

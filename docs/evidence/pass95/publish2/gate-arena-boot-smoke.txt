@@ -1,0 +1,28 @@
+[cmd] PASS73_NATIVE_WEBGPU=1 QA_EXTERNAL_PREVIEW=1 BASE_URL=http://127.0.0.1:4293 npm run qa:pass74:arena-boot-smoke
+
+> atomic-acres-browser-arena@1.0.0 qa:pass74:arena-boot-smoke
+> playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0
+
+
+Running 13 tests using 1 worker
+
+(node:228644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:71:5 › runs on a browser that can actually get a WebGPU device (1.7s)
+  ok  2 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:88:5 › the boot roster names every arena module on disk (18ms)
+  ok  3 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match (1.2m)
+  ok  4 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › raid2: boots a clean visible solo match (58.0s)
+  ok  5 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › atomic-acres: boots a clean visible solo match (1.2m)
+  ok  6 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › skyline-terminal: boots a clean visible solo match (59.8s)
+  ok  7 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › rustworks-1v1: boots a clean visible solo match (1.5m)
+  ok  8 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › gun-range: boots a clean visible solo match (1.4m)
+  ok  9 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › farcrysis: boots a clean visible solo match (1.2m)
+  ok 10 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match (1.5m)
+  ok 11 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test1: boots a clean visible solo match (51.0s)
+  ok 12 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test2: boots a clean visible solo match (50.5s)
+  ok 13 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › map3: boots a clean visible solo match (1.3m)
+
+  Slow test file: [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts (13.1m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  13 passed (13.1m)
+BOOT_SMOKE_EXIT=0
