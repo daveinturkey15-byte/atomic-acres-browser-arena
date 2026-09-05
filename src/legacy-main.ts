@@ -15351,7 +15351,7 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
   if (result?.accepted) {
     syncInteractiveWorldPhysics();
     broadcastInteractiveWorldState(true);
-    audio.shedDoorMotion(nearest.distance);
+    audio.shedDoorMotion(nearest.distance, nearest.centre);
   }
   return true;
 }

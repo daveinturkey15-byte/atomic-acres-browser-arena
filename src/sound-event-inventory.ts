@@ -322,7 +322,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   // the runtime positions it through the pooled world panner.
   runtimeCallsite('coverImpact', 'grenade.mesh.position.distanceTo(player.position),grenade.mesh.position', 1, ['ordnance.grenade-out-of-bounds-impact']),
   runtimeCallsite('shedDoorMotion', 'blocker.position.distanceTo(camera.position),blocker.position', 1, ['shed.door-motion']),
-  runtimeCallsite('shedDoorMotion', 'nearest.distance', 1, ['shed.door-motion']),
+  runtimeCallsite('shedDoorMotion', 'nearest.distance,nearest.centre', 1, ['shed.door-motion']),
   runtimeCallsite('coverImpact', 'point.distanceTo(player.position),point', 1, ['world.projectile-impact']),
   runtimeCallsite('coverImpact', 'position.distanceTo(player.position),position', 1, ['world.projectile-impact']),
   runtimeCallsite('crossbowFuseBeep', 'bolt.mesh.position,remainingMs,now', 1, ['ordnance.crossbow-fuse-beep']),
