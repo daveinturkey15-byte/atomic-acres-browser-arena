@@ -275,7 +275,76 @@ one surface. Same commit adds a full contract test for the overlay. [VERIFIED]
 
 ## 3. Cross-check against the candidate-7 REPORT
 
-_(in progress)_
+Source: `docs/evidence/pass94/candidate7/REPORT.md`. Note the REPORT's implicit baseline is
+**candidate 6**, while this audit's baseline is **HITL 5 (`3e2fd273`)**, the last build the owner
+actually tested. Several of the mismatches below are that difference and nothing worse; they are
+listed anyway because the owner reads the REPORT against the build he last played.
+
+### 3.1 Mismatches
+
+**M1 - "No fence, timeout, budget, or assertion was changed" is not true over the HITL-5 range.**
+The sentence sits under the cold-admission FAIL (`cold transition 24065.5ms exceeded 10000ms`).
+The *numbers* are indeed untouched - both 10,000 ms budgets and the 60 s / 90 s patience are
+byte-identical (section 1, row 9) - but the same script lost three assertions and changed the arena
+it measures, in `f74f25bf fix(hitl6): align cold admission with nuke rebuild`, which is **inside**
+this range and **not** an ancestor of `3e2fd273` (verified with `git merge-base --is-ancestor`).
+So the 24.07 s figure is a **nuketown2** cold transition against a budget that was set and last
+demonstrated on **atomic-acres**, and `originalArtLoaded` is no longer asserted at all in that smoke.
+The blanket wording invites the reader to compare 24.07 s with the old numbers as like-for-like.
+Suggested correction: say the budget is preserved and the subject changed.
+
+**M2 - "the preserved 180 s duration, 120 ms RTT, 1% loss, 1.5 m bound and one-RTT damage bound".**
+"Preserved" is right against candidate 6 and wrong against HITL 5: the entire MP soak gate
+(`scripts/qa/mp-soak-gate.mjs`, `mp-soak-assertions.mjs`, both contract tests and the two fixtures)
+**did not exist at `3e2fd273`** (section 1, row 10). It is a new gate, not a preserved one - which is
+better news than "preserved", and it means the three red rows (replication, rejoin damage, stair fire)
+are newly *visible* failures rather than regressions the owner should read as new breakage.
+
+**M3 - "no pipeline creation in the sample" (perf rung) rests on a measurement nothing enforces.**
+Section 1, row 2: `pipelinesInCombat` is computed by `audit-graphics-profiles.mjs` and written into
+evidence, but **no test asserts it is 0**, at either end of the range. The REPORT's claim is
+consistent with the instrument and I have no reason to doubt the number; the gap is that a future
+regression on this axis would not turn anything red. Not a contradiction - a caveat the REPORT does
+not carry.
+
+### 3.2 Where the REPORT and this audit agree (checked, no mismatch)
+
+* **The 12 s fence.** REPORT: "hit the preserved 12,002 ms queue fence (`687 fenced draws`) ... This
+  is the known cold fence condition, not a widened threshold." Section 1, row 1 confirms `12_000` at
+  every site at both ends of the range, and `waitForSubmittedWork`'s default still `4_000`.
+  **Corroborated.**
+* **The `legacy-main.ts` size ratchet.** REPORT: `capture-harness-warmup` was left out because "its
+  11-line debug registry hook broke the unchanged `legacy-main.ts` size ratchet", and `mp-rejoin` was
+  reverted partly on the same ratchet. Section 1, row 4: `LINE_CEILING` is `37_396` at both ends with
+  `RATCHET_SLACK` still `250`. **Two lanes were dropped rather than the ceiling raised** - the
+  strongest positive signal in this whole audit. **Corroborated.**
+* **The graphics fingerprints.** REPORT: `taa-resolve` was excluded on "16 full-Vitest failures
+  including stale profile fingerprints/inventory". Finding F5: the four control-set hashes did move in
+  this range and their final values were written by that lane's revert (`f597c6b6`) - so I ran
+  `npx vitest run src/graphics-profile-contract.test.ts` and got **14 passed**, i.e. the pins agree
+  with `graphicsControlSetHashes()` at HEAD. The REPORT's account holds and no fingerprint was
+  laundered. **Corroborated by execution.**
+* **The coplanar gate.** REPORT's CLI output shows `HF-497 SAME-MATERIAL-VISIBLE FINDINGS: 0`, which
+  is the class section 1 row 5 records as **NEW** in this range (a class that was previously reported
+  as benign). The CLI and the vitest pin now share one core (`src/nuketown2-coplanar-audit.ts`), so
+  the report line and the gate cannot drift. **Corroborated, and stronger than the REPORT claims.**
+* **The 2 skipped tests in the full run** (`621 passed | 1 skipped`, `6243 passed | 2 skipped`) are
+  the two pre-existing `it.skip`s in `src/killstreak-demo-published-media.test.ts`; both are present
+  at `3e2fd273` (`git show 3e2fd273:... | grep -c "it.skip"` = 2). **No skip was added in this range**
+  (section 2.0). **Corroborated.**
+* **The verge ceiling** does not appear in the REPORT at all, so there is nothing to contradict; the
+  43 -> 36/51 split is recorded in section 1, row 8 for the owner's attention.
+* **SHAs.** The REPORT names runtime candidate `ae795724` while the branch head I audited is
+  `452d7aba` ("build(hitl7): candidate 7 morning evidence"), whose parent is `ae795724`. Consistent -
+  the evidence commit sits on top of the runtime build.
+
+### 3.3 Gates the REPORT calls green that section 1 or 2 contradicts
+
+**None.** Every gate the REPORT reports GREEN (tsc, coplanar, full vitest, build, identity guard,
+capture manifests, blind A/B) is either unchanged in this range or newly added, and the two gates the
+REPORT reports RED (cold admission, MP soak) are red against thresholds this audit confirms were not
+moved. The mismatches above are about **framing and baseline**, not about a green claim standing on a
+weakened gate.
 
 ## 4. Final table and overall verdict
 
