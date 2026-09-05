@@ -368,7 +368,7 @@ weakened gate.
 | Cold-session precompile root | 2 calls, cold scoped to `arena.root` | `src/presentation-prewarm-contract.test.ts:673-676` | yes | **NARROWED, re-pinned (F7)** |
 | MP soak: 180 s / 120 ms / 1 % / 1.5 m / one-RTT | as stated | `scripts/qa/mp-soak-assertions.mjs:6, 8, 9, 79-86`; `mp-soak-gate.mjs:82` | added | **NEW** |
 | Selectable-arena roster floors | 8 (x5 sites) | `scripts/qa/arena-roster.mjs:59`; `eye-clearance-roster.mjs`; `sweep-eye-clearance-spots.ts`; `cross-browser-gate-contract.test.mjs:114`; `eye-clearance-sweep-contract.test.mjs:113, 165, 468, 476` | **yes, 9 -> 8** | **LOWERED in lockstep with the derived roster; exclusion asserted (F2)** |
-| Registry arena-id floor | 11 | `scripts/qa/arena-roster.mjs:56` | no | **SAME** |
+| Registry arena-id floor | 11 | `scripts/qa/arena-roster.mjs:57` | no | **SAME** |
 | Hardcoded-roster allowlist | -2 / +5 entries | `scripts/qa/arena-roster-contract.test.mjs:183-400` | yes, net +3 exemptions | **LOOSER by 3 files (F4)** |
 | Graphics control-set hash pins | 4 hashes re-pinned | `src/graphics-profile-contract.test.ts:47-53` | yes | **REGENERATED, verified by running the test (14 passed); doc not re-measured (F5)** |
 | `MULTIPLAYER_PROTOCOL_VERSION` | 19 | 3 test files | yes, 18 -> 19 | **SAME shape** (version bump) |
