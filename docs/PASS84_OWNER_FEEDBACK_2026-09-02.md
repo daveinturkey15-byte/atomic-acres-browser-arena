@@ -2366,3 +2366,5 @@ Gemini reference critic on the candidate-7 captures fires at 07:20 (scheduled ta
 - Machine: 18 lane worktrees active, CPU 100%, 6.4 GB free; heavy steps serialised by the machine lock.
 
 - 07:20 machine pressure: 31.6 GB total, 1.8 GB free, Chrome 9.2 GB across 8 headless Playwright browsers (launched 07:06-07:10, more than the one-at-a-time rule), node 3.5 GB across 41 processes, CPU 100%. :4300 (pid 173372) alive but slow; ComfyUI :8188 and cockpit :47821 healthy. Action: forward-port workflow wf_786cc3a3-787 PAUSED (resumable with resumeFromRunId; ports/branches fp-* keep); no new launches until free RAM recovers; the two Luna lanes hard-stop by 08:30.
+
+- 07:25 Antigravity: third audit run refused - "Individual quota reached ... Resets in 4h32m" (the two dropped sessions consumed the Opus 4.6 quota). Gate audit reassigned to a Claude Opus agent (same brief; report GATE-AUDIT-OPUS.md on branch contrib/dave-gaming-pc/claude/c7-gate-audit). No Antigravity launches until about 11:55.
