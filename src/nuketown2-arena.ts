@@ -2189,6 +2189,52 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // top, outside the 0.03 coplanar window), under the dining set.
   pair(builder, 'house dining rug', [1.9, 0.10, -12.6], [2.6, 0.04, 2.2], m.interiorFloor,
     { solid: false, shots: false, cast: false });
+  // --- HF-478 follow-up: ground-floor mid-century furnishing, BACK room -----
+  // Same contract as the front room above. Back room (yard side): couch east
+  // of the back-door walk line facing the TV wall, armchair south of the
+  // garage-link walk line, coffee table between couch and bench, TV console
+  // on the partition's east run clear of the internal door.
+  pair(builder, 'house living couch', [0.9, 0.31, -22.05], [2.2, 0.62, 0.9], m.interior,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house living armchair', [2.4, 0.31, -20.6], [0.9, 0.62, 0.8], m.interior,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house living coffee table', [0.8, 0.225, -20.0], [1.2, 0.45, 0.6], m.fence,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house living tv console', [1.1, 0.25, -16.95], [1.8, 0.50, 0.4], m.fence,
+    { ballisticMaterial: 'wood' });
+  // Couch dressing: cushions on the seat top (0.62), backrest and armrests.
+  for (const cushionX of [0.35, 1.45] as const) {
+    pair(builder, `house couch cushion ${cushionX}`, [cushionX, 0.685, -22.05], [1.0, 0.13, 0.8], m.trim,
+      { solid: false, shots: false, cast: true });
+  }
+  pair(builder, 'house couch backrest', [0.9, 0.86, -22.4], [2.2, 0.48, 0.18], m.interior,
+    { solid: false, shots: false, cast: true });
+  for (const armX of [-0.1, 1.9] as const) {
+    pair(builder, `house couch armrest ${armX}`, [armX, 0.77, -22.05], [0.2, 0.3, 0.9], m.interior,
+      { solid: false, shots: false, cast: true });
+  }
+  pair(builder, 'house armchair cushion', [2.4, 0.665, -20.6], [0.7, 0.09, 0.6], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house armchair back', [2.4, 0.87, -20.95], [0.9, 0.5, 0.15], m.interior,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house coffee table top', [0.8, 0.475, -20.0], [1.28, 0.05, 0.68], m.trim,
+    { solid: false, shots: false, cast: true });
+  // TV set on the console: stand plus dark glass screen, plus a side radio.
+  pair(builder, 'house tv stand', [1.1, 0.63, -16.95], [0.5, 0.16, 0.3], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house tv screen', [1.1, 1.08, -16.98], [1.4, 0.8, 0.08], m.windowGlass,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house tv radio', [0.4, 0.62, -16.95], [0.3, 0.14, 0.25], m.sign,
+    { solid: false, shots: false, cast: true });
+  // Corner floor lamp (pole chrome, shade trim), non-blocking:
+  pair(builder, 'house back room lamp pole', [3.4, 0.8, -22.3], [0.1, 1.6, 0.1], m.chrome,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house back room lamp shade', [3.4, 1.66, -22.3], [0.34, 0.22, 0.34], m.trim,
+    { solid: false, shots: false, cast: false });
+  // Living rug decal under the couch set, same 0.12 top as the dining rug
+  // (disjoint plan, so no pair).
+  pair(builder, 'house living rug', [0.3, 0.10, -21.0], [3.0, 0.04, 2.4], m.interiorFloor,
+    { solid: false, shots: false, cast: false });
 
   // Upper floor stairwell guard rail & balustrade:
   pair(builder, 'house stair rail post 0', [STAIR_X1 + 0.04, UPPER_Y0 + 0.50, -16.5], [0.08, 1.00, 0.08], m.trim,
