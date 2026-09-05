@@ -95,6 +95,31 @@ FIXED/TRACED with direct scenario gaps explicitly marked OPEN.
 **OPEN:** P-6/P-8, untouched W/D groups, the direct scenario gaps, and rejoin/X-3
 remain open or other-lane-owned in the register.
 
+## Ratchet hoist
+
+**VERIFIED:** `src/legacy-main.ts` was 37,614 lines before this hoist and is
+37,391 lines after it, 5 lines below the unchanged 37,396 ceiling. No ratchet
+threshold or history row was changed.
+
+**VERIFIED:** the authoritative lobby projection moved to
+`src/mp-lobby-authority-views.ts`; local pickup-result rollback/canonical-drop
+consumption moved to `src/mp-pickup-authority.ts`; and the reliable reload retry
+timer/message seam moved to `src/mp-reload-retry.ts`. Legacy-main retains thin
+state adapters and one-line calls at each runtime hook, with audit marker
+comments kept at the hooks for the existing source-structure verifiers.
+
+**VERIFIED:** repeated host death handling now uses one local
+`broadcastCanonicalDeath` helper, preserving the existing canonicalize, nonce,
+send, and process ordering across all call sites.
+
+**VERIFIED:** `npx tsc --noEmit`, the legacy-main ratchet (5/5), and the explicit
+focused multiplayer selection (54 files, 563 tests) passed. `git diff --check`
+also passed.
+
+**OPEN:** `node scripts/qa/mp-audit.mjs --dry-run` is browser-backed; it was
+bounded and terminated without claiming audit evidence, consistent with this
+lane's no-browser constraint. No browser result is represented as a pass here.
+
 ## Handoff
 
 **CLAIMED:** the lane is ready for review at the pushed branch named above, with the
