@@ -6,6 +6,8 @@ import { createServer } from 'vite';
 import { isFatalWebGpuConsoleWarning } from './pass65-browser-console-contract.mjs';
 
 const port = Number(process.env.PASS65_COLD_ADMISSION_PORT ?? '44175');
+const COLD_ARENA_ID = 'nuketown2';
+const SECOND_ARENA_ID = 'raid2';
 const requestedTrials = Number(process.env.PASS65_COLD_ADMISSION_TRIALS ?? '3');
 const trials = Math.min(5, Math.max(3, Math.floor(requestedTrials)));
 const maximumPreparedSwitchFrameMs = 50;
@@ -152,7 +154,7 @@ try {
       });
       await stubExternalServices(page);
 
-      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=atomic-acres&seed=${65_100 + trial}${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
+      await page.goto(`http://127.0.0.1:${port}/?release=latest&renderer=webgpu&externalServices=off&render=blender&map=${COLD_ARENA_ID}&seed=${65_100 + trial}${traceNodeBuilds ? '&traceNodeBuilds=1' : ''}`);
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
         return state?.bootstrap.stage === 'ready'
@@ -183,19 +185,19 @@ try {
           .every((button) => !(button instanceof HTMLButtonElement) || !button.disabled),
         soloEnabled: !(document.querySelector('#solo')?.disabled ?? true),
       }));
-      await page.locator('.map-card[data-arena-id="skyline-terminal"]').click();
+      await page.locator(`.map-card[data-arena-id="${SECOND_ARENA_ID}"]`).click();
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.arenaSelection.id === 'skyline-terminal'
+        return state.arenaSelection.id === 'raid2'
           && state.arenaSelection.streaming.constructionCount === 0;
       });
-      await page.locator('.map-card[data-arena-id="atomic-acres"]').click();
+      await page.locator(`.map-card[data-arena-id="${COLD_ARENA_ID}"]`).click();
       await page.waitForFunction(() => {
         const state = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        return state.arenaSelection.id === 'atomic-acres'
+        return state.arenaSelection.id === 'nuketown2'
           && state.arenaSelection.streaming.constructionCount === 0;
       });
-      await page.locator('#player-name').fill(`Cold Atomic QA ${trial}`);
+      await page.locator('#player-name').fill(`Cold Nuke QA ${trial}`);
       await page.evaluate(() => {
         window.__PASS65_COLD_TASK_AUDIT__.deploymentStartedAt = performance.now();
       });
@@ -288,9 +290,10 @@ try {
           runtime: state.render.runtime,
           localLightOcclusion: state.render.worldLocalLightOcclusion,
           renderProfile: state.render.profile,
-          atomicQualityStreaming: state.render.qualityAssetStreaming.atomicAcres,
+          playableScene: state.render.playableScene,
           blenderEnvironment: state.render.blenderEnvironment,
           originalArtLoaded: state.originalArtLoaded,
+          arenaStoryReady: state.arenaStoryReady,
           arenaId: state.arenaSelection.id,
           streaming: state.arenaSelection.streaming,
           weaponAssetCache: api.sampleWeaponAssetCache(),
@@ -340,7 +343,12 @@ try {
         || after.weaponAssetCache.resident.drop.assets !== expectedResidentAssetsPerVariant) {
         failures.push(`runtime weapon corpus residency was incomplete: ${JSON.stringify(after.weaponAssetCache.resident)}`);
       }
-      if (!after.gameStarted || after.arenaId !== 'atomic-acres' || !after.originalArtLoaded) failures.push('Atomic Acres did not become the playable arena');
+      if (!after.gameStarted || after.arenaId !== COLD_ARENA_ID) failures.push('Nuke Town Rebuild did not become the playable arena');
+      if (after.playableScene?.authoritativeArenaRoots !== 1
+        || after.playableScene?.authoritativeArenaRootIsGameplayRoot !== true
+        || after.playableScene?.duplicateArenaRoots !== false) {
+        failures.push(`Nuke Town Rebuild playable-scene authority was incomplete: ${JSON.stringify(after.playableScene)}`);
+      }
       const admissionCadence = after.bootstrap.matchAdmissionCadence;
       if (!admissionCadence
         || admissionCadence.backend !== 'webgpu'
@@ -357,17 +365,15 @@ try {
         failures.push(`foreground match admission was degraded: ${JSON.stringify(after.bootstrap.matchAdmissionCadence)}`);
       }
       if (after.renderProfile !== 'blender'
-        || after.atomicQualityStreaming !== 'ready'
-        || !after.blenderEnvironment.qualityArtRootVisible
-        || after.blenderEnvironment.proceduralRootActuallyVisible
-        || after.blenderEnvironment.overlappingPrimaryArenaRoots) {
-        failures.push(`Atomic Acres did not retain its intended Quality presentation: ${JSON.stringify({
+        || after.blenderEnvironment.proceduralRootActuallyVisible !== false
+        || after.blenderEnvironment.overlappingPrimaryArenaRoots !== false) {
+        failures.push(`Nuke Town Rebuild did not retain its intended Quality presentation: ${JSON.stringify({
           renderProfile: after.renderProfile,
-          atomicQualityStreaming: after.atomicQualityStreaming,
+          playableScene: after.playableScene,
           blenderEnvironment: after.blenderEnvironment,
         })}`);
       }
-      if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== 'atomic-acres') failures.push('cold deployment did not construct exactly one Atomic arena');
+      if (after.streaming.constructionCount !== 1 || after.streaming.constructionHistory[0] !== COLD_ARENA_ID) failures.push('cold deployment did not construct exactly one Nuke Town Rebuild arena');
       if (firstSwitchAudit.before.retainedCount !== firstSwitchAudit.before.available
         || firstSwitchAudit.before.loaded !== firstSwitchAudit.before.available
         || firstSwitchAudit.before.gpuReady !== firstSwitchAudit.before.available
