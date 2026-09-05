@@ -17,3 +17,11 @@ Owner direction (HF-497/499/501/502): PASS 94 live tonight; HITL 6 for multiplay
 - Long jobs launch from a background shell, never as a child of a watcher (gotcha 21:00).
 - OMP credential store: if `auth_credentials` is empty, restore from the newest `agent.db.bak-*` and re-probe (gotcha).
 - Every owner request goes in the ledger before action; every lane ships a REPORT with claim-states.
+
+## State at 01:55 (2026-09-05)
+
+- PASS 94 not published (three attempts; HF-507 dropped the urgency). HITL 5 still on :4300.
+- HITL 6 (pass93-candidate @ fad765f4) merged everything but BLOCKED honestly (no soak gate on branch yet, 16 audit findings, 3 vitest fails, stock Nuke Town cold-boot timeout, bot probe timeout). Luna red-gate lane running on that head (merges mp-soak-gate + hoisted mp-audit-todos, profiles the cold boot, fixes the probe and tests; no fence/timeout widened).
+- Landed and reviewed tonight (SHIP or SHIP-WITH-FIXES with fixes applied): perf lanes 1-5 (HUD style recalc 7.2 -> 1.5 ms), geometry 2, gameplay feel (stairs root cause), mp-bugs, mp-audit (+TODOs hoisted), soak gate + triage, chat, SH-L2 irradiance wired + fixed, albedo variation (capture pair delta 61/255 - integrator to judge), TAA pass 2 (-5.2 ms at QUALITY, 0 in-combat pipelines), blind A/B harness, capture-harness warm-up, workflow lanes (lobby overhaul SWF, diagnostics overlay SWF, accuracy 3 SWF, interiors SWF; weapon pickup DO-NOT-SHIP - superseded by the audit TODOs), 14 Muse-built lanes (all SWF after fix rounds), GLM air/coplanar sweep.
+- Candidate 7: Windows scheduled task 'AA candidate7 0500' runs the Luna integrator at 05:00 from the fix lane's pushed head; 'AA gemini candidate7 0645' runs the reference critic on its captures. Morning report lands in this ledger from the integrator.
+- Owner steps at 06:00: play candidate 7 on :4300; run the provider login step once per provider (python scripts/usage_web_poller.py login <provider> from the cockpit delivery checkout); say 'go' for the cockpit fast-forward + restart.
