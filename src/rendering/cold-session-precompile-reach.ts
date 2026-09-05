@@ -51,15 +51,20 @@ function isTaaVelocityMrtRenderable(object: THREE.Object3D): object is TaaVeloci
  * sides are the same identifying fields used by the WebGPU render-object
  * pipeline census; duplicate uses of one material collapse to one variant.
  */
-export function enumerateTaaVelocityMrtMaterialVariants(root: THREE.Object3D): readonly string[] {
+export function enumerateTaaVelocityMrtMaterialVariants(
+  root: THREE.Object3D | readonly THREE.Object3D[],
+): readonly string[] {
   const variants = new Set<string>();
-  root.traverse((object) => {
-    if (!isTaaVelocityMrtRenderable(object)) return;
-    const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
-    for (const material of materials) {
-      if (material.visible) variants.add(materialVariant(material));
-    }
-  });
+  const roots: readonly THREE.Object3D[] = Array.isArray(root) ? root : [root];
+  for (const sceneRoot of roots) {
+    sceneRoot.traverse((object) => {
+      if (!isTaaVelocityMrtRenderable(object)) return;
+      const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
+      for (const material of materials) {
+        if (material.visible) variants.add(materialVariant(material));
+      }
+    });
+  }
   return Object.freeze([...variants].sort());
 }
 
@@ -118,7 +123,9 @@ export async function precompileTaaVelocityMrtCandidates(
   return candidates.length;
 }
 
-export function censusTaaColdSessionPrecompileReach(root: THREE.Object3D): TaaColdSessionPrecompileCensus {
+export function censusTaaColdSessionPrecompileReach(
+  root: THREE.Object3D | readonly THREE.Object3D[],
+): TaaColdSessionPrecompileCensus {
   return Object.freeze({
     ...TAA_COLD_SESSION_PRECOMPILE_REACH,
     velocityMrtMaterialVariants: enumerateTaaVelocityMrtMaterialVariants(root),

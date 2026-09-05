@@ -228,6 +228,10 @@ export class TaaResolveNode extends TempNode<'vec4'> {
   }
 
   setJitterFrozen(frozen: boolean): void {
+    // A deterministic review station can jump a long way from gameplay's
+    // previous camera. Do not blend that unrelated history into the first
+    // station frame; the current beauty target will seed it in updateBefore.
+    if (frozen) this.historyNeedsSeed = true;
     this.jitterFrozen = frozen;
   }
 

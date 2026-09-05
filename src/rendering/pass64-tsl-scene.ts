@@ -1458,7 +1458,7 @@ export function createPass64TslSceneSystems(
           ]);
         }
         taaPrecompileCensus = constructedScreenSpace.taaResolve.enabled
-          ? censusTaaColdSessionPrecompileReach(scene)
+          ? censusTaaColdSessionPrecompileReach([velocityRoot ?? precompileRoot, root])
           : null;
       } finally {
         renderer.setRenderTarget(previousRenderTarget);
