@@ -81,6 +81,7 @@ export const UI_SURFACE_INVENTORY: readonly UiSurfaceDefinition[] = Object.freez
     pointerEvents: 'none',
   },
   { id: 'damage-direction', rootElementId: 'damage-direction', renderer: 'match-hud', critical: true },
+  { id: 'killstreak-alert', rootElementId: 'killstreak-alert', renderer: 'match-hud', critical: false },
   { id: 'nuke-warning', rootElementId: 'nuke-warning', renderer: 'match-hud', critical: true },
   { id: 'refresh-warning', rootElementId: 'refresh-warning', renderer: 'match-hud', critical: false },
   { id: 'match-bar', rootElementId: 'matchbar', renderer: 'match-hud', critical: true },

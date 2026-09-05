@@ -1,3 +1,4 @@
+import { killstreakAudioGain, type KillstreakFlightAudioSource } from './killstreak-awareness';
 import { combatConfirmEnvelope, type FootstepSurface, type ImpactSurface } from './combat-feedback';
 import type { ArenaZone } from './arena-storytelling';
 import type { WeaponActionEvent } from './weapon-actions';
@@ -881,6 +882,11 @@ export class ArenaAudio {
   private lowHealthAutomationWrites = 0;
   private damageFeedbackPulses = 0;
   private spatialChains = 0;
+  private readonly supportFlightLoops = new Map<string, {
+    source: OscillatorNode; filter: BiquadFilterNode; gain: GainNode; panner: PannerNode;
+  }>();
+  private readonly liveSupportFlightIds = new Set<string>();
+  supportFlightLoopStarts = 0;
   private footstepChains: SpatialFootstepChain[] = [];
   private listenerPosition = { x: 0, y: 0, z: 0 };
   /** Pass 75: context time at which the next ambient one-shot may fire. */
@@ -3599,7 +3605,9 @@ export class ArenaAudio {
       );
       // HF-337: altitude-aware attenuation — higher altitude = more attenuation
       const altitude = entry.position.y;
-      const altitudeAttenuation = Math.max(0.25, 1 - Math.min(1, altitude / 80));
+      // HF-509: owner could not hear the live chopper as a non-controller; the
+      // floor and every gain below were raised so a replicated rotor reads.
+      const altitudeAttenuation = Math.max(0.42, 1 - Math.min(1, altitude / 110));
       if (!loop) {
         const source = this.context.createOscillator();
         const filter = this.context.createBiquadFilter();
@@ -3611,7 +3619,7 @@ export class ArenaAudio {
         filter.frequency.value = 230;
         filter.Q.value = 0.62;
         // HF-337: raised base gain with altitude attenuation
-        gain.gain.value = 0.018 * altitudeAttenuation;
+        gain.gain.value = 0.075 * altitudeAttenuation;
         panner.panningModel = 'HRTF';
         panner.distanceModel = 'inverse';
         panner.refDistance = 6;
@@ -3671,7 +3679,7 @@ export class ArenaAudio {
       loop.lastZ = entry.position.z;
       loop.lastUpdateSeconds = this.context.currentTime;
       // HF-337: altitude-aware gain with blade-slap layer
-      loop.gain.gain.value = (entry.phase === 'inbound' ? 0.015 : entry.phase === 'outbound' ? 0.012 : 0.018) * altitudeAttenuation;
+      loop.gain.gain.value = (entry.phase === 'inbound' ? 0.065 : entry.phase === 'outbound' ? 0.05 : 0.075) * altitudeAttenuation;
       const voice = this.activeVoices.get(loop.source);
       if (voice) voice.distance = listenerDistance;
       // HF-337: low-rate blade-slap noise layer for unmistakable rotor presence
@@ -3684,7 +3692,7 @@ export class ArenaAudio {
         slapFilter.type = 'bandpass';
         slapFilter.frequency.value = 380;
         slapFilter.Q.value = 1.8;
-        slapGain.gain.value = 0.008 * altitudeAttenuation;
+        slapGain.gain.value = 0.03 * altitudeAttenuation;
         slapPanner.panningModel = 'HRTF';
         slapPanner.distanceModel = 'inverse';
         slapPanner.refDistance = 6;
@@ -3800,6 +3808,124 @@ export class ArenaAudio {
     }
     this.tone(1_180, 0.09, 0.055, 'square', this.announcements);
     this.sweep(1_600, 240, 0.5, 0.065, 'sawtooth', this.ambience, 0.08);
+  }
+
+  /**
+   * HF-509: activation sting every peer hears, friend or foe. Hostile is a
+   * falling two-pass klaxon under a low thump; own/friendly is a rising pair.
+   */
+  killstreakAnnounce(tone: 'own' | 'friendly' | 'hostile'): void {
+    this.supportCuePlays += 1;
+    if (tone === 'hostile') {
+      this.sweep(720, 205, 0.44, 0.11, 'sawtooth', this.announcements, 0, { attack: 0.004, punch: 0.42, punchSeconds: 0.05 });
+      this.sweep(720, 205, 0.44, 0.09, 'sawtooth', this.announcements, 0.26);
+      this.tone(88, 0.42, 0.075, 'sine', this.feedback, 0.02);
+      this.noise({ duration: 0.32, volume: 0.05, filter: 'highpass', frequency: 1_700, q: 0.7, texture: 'pink' }, this.ui);
+      return;
+    }
+    this.sweep(392, 523, 0.16, 0.09, 'triangle', this.announcements, 0, { attack: 0.003, punch: 0.36, punchSeconds: 0.04 });
+    this.sweep(523, 784, 0.22, 0.085, 'triangle', this.announcements, 0.14);
+    this.tone(110, 0.24, 0.045, 'sine', this.feedback, 0.02);
+  }
+
+  /**
+   * HF-509: positional bomb-bay release for the Carpet Bomber, audible on every
+   * peer at the drop point (falling whistle + bay clunk). Flat bus when the
+   * origin is unknown.
+   */
+  bombRelease(emitter?: SpatialPoint): void {
+    let destination: AudioNode | null = this.weapons;
+    if (emitter) {
+      const distance = Math.hypot(
+        emitter.x - this.listenerPosition.x,
+        emitter.y - this.listenerPosition.y,
+        emitter.z - this.listenerPosition.z,
+      );
+      destination = this.createSupportGunSpatialDestination(emitter, distance) ?? this.weapons;
+    }
+    if (!destination) return;
+    this.tone(140, 0.09, 0.16, 'square', destination, 0, { attack: 0.001, punch: 0.5, punchSeconds: 0.02 });
+    this.sweep(1_650, 420, 0.7, 0.11, 'sine', destination, 0.04);
+    this.noise({ duration: 0.62, volume: 0.14, filter: 'bandpass', frequency: 1_300, q: 0.9, delay: 0.04 }, destination);
+  }
+
+  /**
+   * HF-509: one positional flight loop per replicated aircraft/drone (choppers
+   * keep syncChopperRotors). Every peer runs the same attenuation curve from
+   * killstreak-awareness, so the bomber is heard coming before it drops and the
+   * drone swarm is heard where it actually is.
+   */
+  syncSupportFlightLoops(sources: readonly KillstreakFlightAudioSource[]): void {
+    this.liveSupportFlightIds.clear();
+    for (const entry of sources) {
+      if (entry.id.length > 0 && Number.isFinite(entry.position.x)
+        && Number.isFinite(entry.position.y) && Number.isFinite(entry.position.z)) this.liveSupportFlightIds.add(entry.id);
+    }
+    for (const id of this.supportFlightLoops.keys()) {
+      if (!this.liveSupportFlightIds.has(id)) this.stopSupportFlightLoop(id);
+    }
+    if (!this.context || !this.ambience) return;
+    for (const entry of sources) {
+      if (!this.liveSupportFlightIds.has(entry.id)) continue;
+      let loop = this.supportFlightLoops.get(entry.id);
+      const aircraft = entry.family === 'aircraft';
+      if (!loop) {
+        const source = this.context.createOscillator();
+        const filter = this.context.createBiquadFilter();
+        const gain = this.context.createGain();
+        const panner = this.context.createPanner();
+        source.type = aircraft ? 'sawtooth' : 'triangle';
+        source.frequency.value = aircraft ? 58 : 236;
+        filter.type = aircraft ? 'lowpass' : 'bandpass';
+        filter.frequency.value = aircraft ? 420 : 1_150;
+        filter.Q.value = aircraft ? 0.7 : 1.4;
+        gain.gain.value = 0;
+        // Panning only: the shared killstreakAudioGain curve owns attenuation.
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'linear';
+        panner.refDistance = 1;
+        panner.maxDistance = 100_000;
+        panner.rolloffFactor = 0;
+        source.connect(filter).connect(gain).connect(panner).connect(this.ambience);
+        if (!this.registerVoice(source, this.ambience, 1, true, entry.distanceM)) {
+          filter.disconnect();
+          gain.disconnect();
+          panner.disconnect();
+          continue;
+        }
+        loop = { source, filter, gain, panner };
+        const voiceEnded = source.onended;
+        source.onended = (event) => {
+          this.spatialChains = Math.max(0, this.spatialChains - 1);
+          voiceEnded?.call(source, event);
+          filter.disconnect();
+          gain.disconnect();
+          panner.disconnect();
+          if (this.supportFlightLoops.get(entry.id) === loop) this.supportFlightLoops.delete(entry.id);
+        };
+        source.start(this.context.currentTime);
+        this.spatialChains += 1;
+        this.supportFlightLoops.set(entry.id, loop);
+        this.supportFlightLoopStarts += 1;
+      }
+      loop.panner.positionX.value = entry.position.x;
+      loop.panner.positionY.value = entry.position.y;
+      loop.panner.positionZ.value = entry.position.z;
+      const baseGain = aircraft
+        ? (entry.phase === 'dropping' ? 0.16 : entry.phase === 'leaving' ? 0.09 : 0.13)
+        : (entry.phase === 'firing' ? 0.07 : 0.05);
+      loop.gain.gain.value = baseGain * killstreakAudioGain(entry.distanceM, entry.position.y - this.listenerPosition.y);
+      loop.source.frequency.value = (aircraft ? 58 : 236) * (entry.phase === 'inbound' ? 1.06 : entry.phase === 'leaving' ? 0.94 : 1);
+      const voice = this.activeVoices.get(loop.source);
+      if (voice) voice.distance = entry.distanceM;
+    }
+  }
+
+  private stopSupportFlightLoop(id: string): void {
+    const loop = this.supportFlightLoops.get(id);
+    if (!loop || !this.context) return;
+    this.supportFlightLoops.delete(id);
+    this.stopSource(loop.source);
   }
 
   hunterLaunch(index: number): void {
@@ -4333,6 +4459,7 @@ export class ArenaAudio {
 
   private stopAllChopperRotors(): void {
     for (const id of [...this.chopperRotorLoops.keys()]) this.stopChopperRotor(id);
+    for (const id of [...this.supportFlightLoops.keys()]) this.stopSupportFlightLoop(id);
   }
 
   private stopSources(sources: AudioScheduledSourceNode[]): void {

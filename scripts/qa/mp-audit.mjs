@@ -726,8 +726,114 @@ async function runScenarios(peers, report, step) {
       }
     }
   }
+  // HF-509: the whole lobby must see, hear and be pointed at a live killstreak.
+  report.scenarios.killstreakAwareness = await scenarioKillstreakAwareness(peers, report);
   // Rejoin last: it tears a peer's session down, so everything else has run.
   report.scenarios.rejoin = await scenarioRejoin(peers, report);
+}
+
+/** HF-509 owner brief: "the whole map should be aware if a killstreak ... is
+ *  there". The HOST (controller) activates a Chopper Gunner. Both guests must
+ *  (1) receive the host-broadcast `killstreak-announce` and show the banner,
+ *  (2) replicate the chopper's position/phase every tick, within a bound of
+ *  the host's authoritative view, and (3) when the chopper hits them, get a
+ *  damage-source cue naming CHOPPER GUNNER. Guests never author any of it. */
+async function scenarioKillstreakAwareness(peers, report) {
+  const result = { ok: false, guests: {} };
+  const host = peers.host;
+  const hostId = (await viewOf(host.page)).selfId;
+  const marks = {};
+  for (const role of ['guestA', 'guestB']) marks[role] = await markOf(peers[role]);
+  result.activated = await host.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    if (typeof debug?.earnSupport !== 'function' || typeof debug?.activateKillstreak !== 'function') return { ok: false, reason: 'killstreak QA hooks missing' };
+    try {
+      debug.earnSupport(15);
+      const slots = debug.snapshot().killstreak?.actors?.find((actor) => actor.actorId === debug.snapshot().player.id)?.loadout?.slots ?? null;
+      const accepted = debug.activateKillstreak('chopper');
+      return { ok: accepted === true, slots };
+    } catch (error) { return { ok: false, reason: String(error?.message ?? error) }; }
+  });
+  if (!result.activated.ok) {
+    record('KILLSTREAK-ACTIVATE-FAILED-host', 'critical', 'the host could not activate a Chopper Gunner for the awareness scenario', result.activated);
+    return result;
+  }
+  await sleep(ACK_BUDGET_MS);
+  const hostAwareness = await host.page.evaluate(() => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    return { announcements: snapshot.killstreakAwareness?.announcements ?? null, entities: (snapshot.killstreak?.entities ?? []).map((entity) => ({ id: entity.id, kind: entity.kind, phase: entity.phase, ownerId: entity.ownerId, position: entity.position })) };
+  });
+  result.host = hostAwareness;
+  const chopperId = hostAwareness.entities.find((entity) => entity.kind === 'chopper' && entity.ownerId === hostId)?.id ?? null;
+  if (!chopperId) {
+    record('KILLSTREAK-NO-HOST-ENTITY', 'critical', 'host accepted the activation but its own snapshot has no chopper entity', hostAwareness);
+    return result;
+  }
+  const guestAwareness = (page) => page.evaluate((wantedId) => {
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
+    const banner = document.querySelector('#killstreak-alert');
+    const entity = (snapshot.killstreak?.entities ?? []).find((candidate) => candidate.id === wantedId) ?? null;
+    return {
+      atMs: Math.round(performance.now()),
+      announcements: snapshot.killstreakAwareness?.announcements ?? null,
+      damageSource: snapshot.killstreakAwareness?.damageSource ?? null,
+      banner: banner ? { hidden: banner.hidden, text: banner.textContent?.replace(/\s+/g, ' ').trim() ?? '', tone: banner.dataset.tone ?? null } : null,
+      entity: entity ? { id: entity.id, kind: entity.kind, phase: entity.phase, ownerId: entity.ownerId, position: entity.position } : null,
+      hp: snapshot.player.hp,
+    };
+  }, chopperId);
+  for (const role of ['guestA', 'guestB']) {
+    const guest = peers[role];
+    const row = { announced: false, bannerShown: false, replicated: false, positionSamples: [], damageSource: null };
+    const trace = await traceSince(guest, marks[role]);
+    row.trace = trace.map((entry) => `${entry.direction}:${entry.type}`).filter((entry) => /killstreak/.test(entry)).slice(0, 30);
+    row.announced = trace.some((entry) => entry.direction === 'in' && entry.type === 'killstreak-announce');
+    row.relayedByGuest = trace.some((entry) => entry.direction === 'out' && entry.type === 'killstreak-announce');
+    const first = await guestAwareness(guest.page);
+    row.announcements = first.announcements;
+    row.banner = first.banner;
+    row.bannerShown = Boolean(first.banner && !first.banner.hidden && /CHOPPER GUNNER/.test(first.banner.text))
+      || Boolean(first.announcements?.some((entry) => entry.source === 'chopper' && entry.ownerId === hostId));
+    // Position replication: three samples one tick-window apart, each compared to the host's authority at the same moment.
+    for (let sample = 0; sample < 3; sample += 1) {
+      const [guestView, hostView] = await Promise.all([
+        guestAwareness(guest.page),
+        host.page.evaluate((wantedId) => (window.__ATOMIC_ACRES_DEBUG__.snapshot().killstreak?.entities ?? []).find((entity) => entity.id === wantedId) ?? null, chopperId),
+      ]);
+      const distance = guestView.entity && hostView
+        ? Number(Math.hypot(...guestView.entity.position.map((value, axis) => value - hostView.position[axis])).toFixed(2))
+        : null;
+      row.positionSamples.push({ guestPhase: guestView.entity?.phase ?? null, hostPhase: hostView?.phase ?? null, distanceFromHostM: distance });
+      await sleep(400);
+    }
+    row.replicated = row.positionSamples.every((sample) => sample.distanceFromHostM !== null);
+    if (!row.announced) record(`KILLSTREAK-ANNOUNCE-MISSING-${role}`, 'critical', 'guest never received the host killstreak-announce', { trace: row.trace });
+    if (row.relayedByGuest) record(`KILLSTREAK-ANNOUNCE-RELAYED-${role}`, 'critical', 'a guest authored a killstreak-announce; only the host may', { trace: row.trace });
+    if (!row.bannerShown) record(`KILLSTREAK-BANNER-MISSING-${role}`, 'major', 'guest shows no CHOPPER GUNNER banner after the host activation', { banner: row.banner, announcements: row.announcements });
+    if (!row.replicated) record(`KILLSTREAK-ENTITY-MISSING-${role}`, 'critical', 'guest snapshot has no replica of the host chopper', { samples: row.positionSamples });
+    result.guests[role] = row;
+  }
+  // Damage source: wait for the AI gunner to hit either guest (bounded; not forced).
+  const deadline = Date.now() + 25_000;
+  while (Date.now() < deadline) {
+    for (const role of ['guestA', 'guestB']) {
+      const view = await guestAwareness(peers[role].page);
+      if (view.damageSource) result.guests[role].damageSource = view.damageSource;
+    }
+    if (Object.values(result.guests).some((row) => row.damageSource)) break;
+    await sleep(1_000);
+  }
+  for (const role of ['guestA', 'guestB']) {
+    const row = result.guests[role];
+    row.damageSourceLabelled = Boolean(row.damageSource && row.damageSource.label === 'CHOPPER GUNNER' && Array.isArray(row.damageSource.position));
+  }
+  result.damageObserved = Object.values(result.guests).some((row) => row.damageSourceLabelled);
+  if (!result.damageObserved) {
+    record('KILLSTREAK-DAMAGE-SOURCE-UNOBSERVED', 'info', 'the AI chopper hit neither guest inside the 25 s window, so the damage-source cue row is OPEN in this run',
+      { guests: Object.fromEntries(Object.entries(result.guests).map(([role, row]) => [role, row.damageSource])) });
+  }
+  result.ok = Object.values(result.guests).every((row) => row.announced && !row.relayedByGuest && row.bannerShown && row.replicated);
+  return result;
 }
 
 /** P-3/P-4 negative path: a stale guest-local drop is a rejected claim. The
@@ -1355,6 +1461,13 @@ function printSummary(report) {
   console.log(`findings: ${report.findings.length} (${Object.entries(bySeverity).map(([key, value]) => `${key}=${value}`).join(' ') || 'none'})`);
   for (const finding of report.findings) console.log(`  - [${finding.severity}] ${finding.id}: ${finding.symptom}`);
   console.log(`state-diff divergences by field: ${JSON.stringify(report.stateDiff.byField ?? {})}`);
+  const awareness = report.scenarios.killstreakAwareness;
+  if (awareness) {
+    console.log(`killstreak awareness (HF-509): ok=${awareness.ok} activated=${awareness.activated?.ok ?? null} damageObserved=${awareness.damageObserved ?? null}`);
+    for (const [role, row] of Object.entries(awareness.guests ?? {})) {
+      console.log(`  ${role}: announced=${row.announced} relayedByGuest=${row.relayedByGuest} banner=${row.bannerShown} replicated=${row.replicated} samples=${JSON.stringify(row.positionSamples)} damageSource=${row.damageSource ? `${row.damageSource.label}@${JSON.stringify(row.damageSource.position)}` : null}`);
+    }
+  }
   console.log(`artifact: ${join(OUT_DIR, `${report.label}-audit.json`)}`);
 }
 
@@ -1381,6 +1494,7 @@ export {
   scenarioPickup,
   scenarioReload,
   scenarioDamageDeath,
+  scenarioKillstreakAwareness,
   scenarioRejoin,
   scenarioRespawn,
   scenarioScoreboard,
