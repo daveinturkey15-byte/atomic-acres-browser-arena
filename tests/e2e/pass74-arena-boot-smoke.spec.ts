@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { ARENA_IDS } from '../../src/arena-identity';
 
 // Boot-correctness gate for every canonical arena.
@@ -111,8 +111,46 @@ type DebugApi = {
   snapshot: () => {
     matchPhase: 'warmup' | 'active' | 'ended';
     gameStarted: boolean;
+    [key: string]: unknown;
   };
 };
+
+type DeploymentDiagnostic = {
+  status: string;
+  bootstrap: unknown;
+  transition: unknown;
+  matchPhase: unknown;
+  gameStarted: unknown;
+};
+
+async function captureDeploymentDiagnostic(page: Page): Promise<DeploymentDiagnostic> {
+  return page.evaluate(() => {
+    const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__;
+    const state = api?.snapshot();
+    const bootstrap = state?.bootstrap as Record<string, unknown> | undefined;
+    const transition = state?.transition as Record<string, unknown> | undefined;
+    return {
+      status: document.querySelector('#status')?.textContent ?? '',
+      bootstrap: bootstrap
+        ? {
+            stage: bootstrap.stage,
+            menuDeploymentAssetsProfile: bootstrap.menuDeploymentAssetsProfile,
+            effectPrewarmProfile: bootstrap.effectPrewarmProfile,
+            matchAdmissionProfile: bootstrap.matchAdmissionProfile,
+          }
+        : null,
+      transition: transition
+        ? {
+            phase: transition.phase,
+            failure: transition.failure,
+            profile: transition.profile,
+          }
+        : null,
+      matchPhase: state?.matchPhase ?? null,
+      gameStarted: state?.gameStarted ?? false,
+    };
+  });
+}
 
 test.describe('arena boot smoke — every canonical arena', () => {
   for (const arenaId of ARENAS) {
@@ -156,7 +194,10 @@ test.describe('arena boot smoke — every canonical arena', () => {
         },
         undefined,
         { timeout: 120_000 },
-      );
+      ).catch(async (error) => {
+        const diagnostic = await captureDeploymentDiagnostic(page);
+        throw new Error(`${arenaId}: deployment stalled; last phase snapshot=${JSON.stringify(diagnostic)}; ${String(error)}`);
+      });
       const outcome = await outcomeHandle.jsonValue();
       expect(outcome, `${arenaId}: solo match must reach active phase`).toBe('active');
 
