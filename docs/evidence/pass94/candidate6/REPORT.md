@@ -207,3 +207,42 @@ Tests       1 failed | 6165 passed | 2 skipped (6168)
 `[OPEN]` The required repository preflight remains blocked by the repository's contradictory harness/branch validation: the literal `Codex` harness value fails lowercase-slug validation, while lowercase `codex` fails the pinned branch-name validation. No bypass or branch rewrite was used.
 
 `[VERIFIED]` All browser checks used the owned headless installed-Chrome route with native WebGPU and allowed QA ports only. No process on `:4300` was restarted or touched; PID `1608` remains the HITL5 service. No publish or deployment was performed.
+
+## Cold admission + ancestry
+
+`[VERIFIED]` `git cat-file -t 5075a52d80c6db69a97ed53acc2df5368728371a` returned `commit`. The candidate now contains merge commit `fc3cf948abf60461b7cf987358dd872ecf8f769f`, whose second parent is the released Pass 64 source commit and whose first-parent tree is unchanged from the candidate. `src/pass65-release-foundation-evidence.test.ts` passes 3/3.
+
+`[VERIFIED]` The required focused checks passed on source `0815a492d13d8ca4fc55746b95bca575580c5541`: `npx tsc --noEmit`; Vitest `6` files / `88` tests; `npm run build` (`562` modules, existing large-chunk warnings only); and `git diff --check`.
+
+`[VERIFIED]` The exact cold smoke used the installed headless Chrome/native-WebGPU route with `PASS73_NATIVE_WEBGPU=1`, `PASS65_COLD_ADMISSION_PORT=4189`, stock flags and `--mute-audio`. Its latest receipt is `artifacts/pass65/cold-webgpu-admission/failure-receipt.json`, source `0815a492`; it remains red because the unchanged `10,000 ms` transition bound is exceeded.
+
+`[VERIFIED]` Menu deployment instrumentation improved from the recorded `10,964.9 ms` baseline to `4,997.2 ms`; the current four phases are `shared-assets=303.1 ms`, `first-person-catalog=2,990.3 ms`, `bot-weapon-vocabulary=2,101.0 ms`, and `world-drop-corpus=4,820.6 ms`.
+
+`[VERIFIED]` Latest Nuke Town transition phase table:
+
+| phase | ms |
+| --- | ---: |
+| shared-gameplay-assets | 4,090.9 |
+| previous-webgpu-fence | 0.4 |
+| arena-construction | 509.1 |
+| interactive-world-construction | 5.8 |
+| physics-construction | 120.7 |
+| authority-commit | 1.2 |
+| visual-definition | 11,922.5 |
+| quality-presentation | 3.5 |
+| material-tuning | 98.2 |
+| art-texture-settle | 0.2 |
+| weapon-catalog-prewarm | 3,636.4 |
+| presentation-batching | 93.2 |
+| match-authority-reset | 6.1 |
+| prewarm-batched-effects | 0.2 |
+| coverage-submit-fence | 11,624.7 |
+| retire-previous-arenas | 0.1 |
+| commit-bookkeeping | 0.3 |
+| finalize | 0.0 |
+
+`[VERIFIED]` The transition committed in `32,113.5 ms`; combined cold preparation was `33,019.9 ms`. Cold effect registration now measures `0.1 ms` and retains all ten required evidence groups; the remaining measured offenders are visual definition, coverage submission/fence work, shared assets and the weapon catalog. The foreground cadence audit was still degraded (`drained=false`, `75` samples/resets, maximum frame gap `77.8 ms`), and the admission audit recorded `368` long tasks, including a `2,612 ms` task.
+
+`[CLAIMED]` Controlled sequential receipts identify the removed Nuke cold-session ScenePass precompile as a major historical offender: removing it reduced the earlier visual-definition path from about `22.2 s` to about `9.3 s`; making cold effects lazy likewise removed the earlier roughly `12.4 s` batched-effects block. These are causal direction findings, not a passing gate.
+
+`[OPEN]` The requested complete per-lane bisection for SH-L2 irradiance, clustered lights, Geometry2 tiling/interiors, albedo LUT/gradient tiles, TAA variants, breakable windows, nuke-event volumes and interior fixtures was not completed: the source does not expose a switch/env flag for each lane, and no fabricated flag or weakened verifier was introduced. Cold admission therefore remains the single blocking non-multiplayer red gate. No timeout, threshold, fence, pipeline budget or size ceiling was changed.
