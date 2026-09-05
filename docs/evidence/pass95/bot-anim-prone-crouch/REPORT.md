@@ -213,3 +213,33 @@ the cap of two prone bots on a real map - that is proven by test only.
 
 The second full `npx vitest run` result is recorded in the lane structured
 result.
+
+---
+
+## 8. Second full run - the honest result
+
+**[MEASURED]** `npx vitest run` (second full run, after the rename):
+**3 failed | 619 passed | 1 skipped (623 files); 3 failed | 6271 passed |
+2 skipped (6276 tests)**, exit 1.
+
+All three are the SAME failure shape - `Test timed out in 20000ms` on long
+simulation suites - and they are a DIFFERENT set from the first run, which is
+what a load-induced flake looks like and what a real regression does not.
+
+**[VERIFIED]** each of the three re-run on this branch, one file at a time:
+
+| Suite | Alone, on this branch |
+|---|---|
+| `src/sound-event-inventory.test.ts` | 112 passed, 17.1 s |
+| `src/gameplay-state-property.test.ts` | 2 passed, 34.8 s |
+| `src/audio-music-rotation-runtime.test.ts` | 9 passed (in the 3-file re-run, 31 passed) |
+
+**[VERIFIED]** `src/sound-event-inventory.test.ts` also passes on the BASE
+(`git checkout 452d7aba -- src/`) in 11.2 s, so its 24.5 s reading during the
+full run is wall-clock pressure, not new work this change added.
+
+**[OPEN]** I have not reproduced a clean 623/623 full run. The machine was
+running ComfyUI and other lanes throughout. Nothing was skipped, no timeout was
+raised, and no test was weakened to get a green: the three are reported as
+failed-under-load with per-suite isolation evidence, and a rerun on a quiet
+machine is owed before this lane is called fully green.
