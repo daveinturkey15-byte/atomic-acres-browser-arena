@@ -113,7 +113,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
-import { configureNuketown2ShL2ForArena, setNuketown2ShL2Tier } from './rendering/lighting/sh-l2-irradiance-runtime';
+import { configureNuketown2ShL2ForArena, prewarmNuketown2ShL2ForMenu, setNuketown2ShL2Tier } from './rendering/lighting/sh-l2-irradiance-runtime';
 import { updateNuketown2Presentation } from './rendering/nuketown2-frame-presentation';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
@@ -30316,7 +30316,7 @@ function returnToMainMenu(): void {
   setStatus(`${selectedArena.displayName} ready · choose a map or deploy again.`);
   void menuPreviewVideoController.whenFirstFramePresented()
     .then(() => prepareMenuDeploymentAssets('idle'))
-    .catch(showFatalError);
+    .then(() => prewarmNuketown2ShL2ForMenu({ arenaId: selectedArena.id, matchSeed: weatherMatchSeed, elapsedSeconds: lightingConditionsElapsedSeconds, choice: activeLightingTimeChoice(), skyDarkenAmount: lightingConditionsSkyDarken }, graphicsRuntime.shL2Irradiance), showFatalError);
   if (document.pointerLockElement) void document.exitPointerLock();
   // Pass 65: apply graphics saved mid-match now that we are back at the menu.
   flushPendingGraphics();
@@ -37094,7 +37094,7 @@ function bootstrapMenuPreview(): void {
       if (gameStarted || matchStartPreparing) return;
       setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
     });
-  }).catch(showFatalError);
+  }).then(() => prewarmNuketown2ShL2ForMenu({ arenaId: selectedArena.id, matchSeed: weatherMatchSeed, elapsedSeconds: lightingConditionsElapsedSeconds, choice: activeLightingTimeChoice(), skyDarkenAmount: lightingConditionsSkyDarken }, graphicsRuntime.shL2Irradiance), showFatalError);
 }
 
 bootstrapMenuPreview();

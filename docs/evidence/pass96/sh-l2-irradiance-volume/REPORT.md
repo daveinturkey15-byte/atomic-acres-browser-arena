@@ -305,3 +305,69 @@ focused SH-L2/proxy/raytracing set passed 4 files / 65 tests.
 | `npm run pipeline:preflight -- --machine dave-gaming-pc --harness Codex` | **[OPEN] lockfile passed; guard rejected uppercase harness slug** |
 | Same preflight with lowercase `codex` | **[OPEN] guard rejected the intentional `.../claude/...` branch prefix** |
 | Native capture pair | **[VERIFIED] 4213, WebGPU, QUALITY/blender route, displayed HIGH, SH-L2 OFF vs HIGH; manifest records receipts and mean RGB deltas** |
+
+---
+
+## 8. Cold-path fix (review Finding 1 + Finding 2)
+
+The review held this lane on one required fix: the 128-ray bake (~2,452 ms)
+ran synchronously inside `configurePlayableArenaVisuals`, on a candidate
+already red against the 10 s cold-admission budget. The fix keeps the bake's
+bytes identical and moves the bake's WHEN:
+
+**[VERIFIED] Chunked session.** `beginShL2Bake()` in
+`src/rendering/lighting/sh-l2-irradiance.ts` advances probe by probe under a
+wall-clock budget (one 128-ray probe measures ~0.7 ms, so probe granularity
+honours a 4 ms slice where the L1 lane needed per-ray resumption). The RNG is
+created once and consumed in probe order, so any chunking is byte-identical
+to the one-shot bake — pinned by *"produces byte-identical coefficients to
+the one-shot bake under worst-case chunking"* (`step(0)`, one probe per
+step). `bakeShL2Volume` is now that session drained with `Infinity`.
+
+**[VERIFIED] Digest-guarded persistent cache.**
+`src/rendering/lighting/sh-l2-irradiance-cache.ts` stores one key per digest
+(`atomic-acres.sh-l2.v1.<digest>`: version, condition, grid, and the
+coefficients as base64, ~507 KiB for the 192.5 KiB volume) behind an
+injectable `Storage`. A second cold boot with unchanged inputs binds without
+baking. Reads validate version, digest, dimensions and payload length; any
+mismatch is a miss (null), never a throw — pinned by the round-trip and
+corrupt-entry tests in `sh-l2-irradiance-cold-path.test.ts`.
+
+**[VERIFIED] Transition never waits.**
+`configureNuketown2ShL2[ForArena]` no longer calls the synchronous bake
+(proven by a throwing spy on the bake backend plus a seam-source assertion —
+no wall-clock assertion anywhere, per the PASS 89 lesson). It binds instantly
+when the digest is held in memory or cache (`pending: false`), and otherwise
+parks the shared term on the fallback — the frozen `PhysicalLightingModel` +
+`scene.environment` path with the added term at uniform zero, exactly what
+shipped before this lane — while the session bakes in 4 ms slices behind the
+existing `scheduleBrowserPreparationIdleTask` lane (`pending: true`). The
+finished volume is cached, uploaded into the SAME texture objects
+(uniform-only, zero new pipelines), and enabled at the waiter's tier in one
+uniform flip, so the swap is at most one frame's cutover.
+
+**[VERIFIED] Menu-idle prewarm.** Both menu idle chains (bootstrap
+`bootstrapMenuPreview` and `returnToMainMenu`, after the selected preview's
+first frame and after deployment assets) kick `prewarmNuketown2ShL2ForMenu`
+with the live lighting inputs; it is a no-op unless Nuke Town is selected
+with the feature on, and it never throws into the menu chain (best-effort by
+design — a miss degrades to the pending path). `legacy-main.ts` is unchanged
+at exactly 37,100 lines against the unchanged 37,100 ceiling: the import line
+was extended and two idle-chain lines were rewritten in place, zero lines
+added.
+
+**[VERIFIED] Finding 2 (stale comment).** The `bakeShL2Volume` header no
+longer claims a per-probe driver lives in the runtime; it names the real
+`beginShL2Bake` session and its 4 ms budget.
+
+**[VERIFIED] Gates re-run after the fix.** `npx tsc --noEmit` clean;
+`src/rendering/lighting/` (12 files, 135 tests, including the 6 new cold-path
+tests) + `src/pipeline-metrics.test.ts` +
+`src/legacy-main-size-ratchet.test.ts` all green. Note: the quoted
+`src/cold-session-precompile-reach*.test.ts` path matches no file in this
+branch, so it contributed zero files to the run.
+
+**[OPEN] Cold-admission smoke.** The browser measurement (bake off the
+transition, second boot free, L1 fallback until ready) is for the integrator
+to confirm with the cold-admission smoke; no wall-clock value is asserted in
+any test in this lane.
