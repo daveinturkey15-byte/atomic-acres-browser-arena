@@ -9195,15 +9195,21 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
 function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean {
   if (network.role !== 'host') return false;
   const health = remoteHealthAuthorities.get(remote.snapshot.id);
+  const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot;
+  const joinSent = network.sendToPlayer(targetPlayerId, {
+    type: 'join',
+    player: playerSnapshot,
+  });
   const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id);
-  return network.sendToPlayer(targetPlayerId, {
+  const stateSent = network.sendToPlayer(targetPlayerId, {
     type: 'state',
-    player: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot,
+    player: playerSnapshot,
     hostTimeMs: now,
     continuity: remote.continuity,
     rateHz: remote.snapshotRateHz,
     ...(combatInventory ? { combatInventory } : {}),
   });
+  return joinSent && stateSent;
 }
 
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
@@ -13457,6 +13463,12 @@ function onNetworkMessage(message: GameMessage): void {
         player: { ...remote.snapshot, hp: retainedHealth?.hp ?? remote.snapshot.hp },
       });
       network.send(createStateMessage());
+      // Also address the rejoiner directly with the host's own canonical
+      // snapshot. The broadcast establishes the slot for every peer; these
+      // direct idempotent envelopes make the rejoiner's full-state repair
+      // independent of which transport lane wins the replacement race.
+      network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() });
+      network.sendToPlayer(incoming.id, createStateMessage());
       // The broadcast above creates the rejoined player's fresh replication
       // slot everywhere. The joining guest also needs one direct authoritative
       // snapshot for every other remote, because its reset document has no

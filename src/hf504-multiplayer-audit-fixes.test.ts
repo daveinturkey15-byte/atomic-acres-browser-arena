@@ -285,6 +285,10 @@ describe('HF-504 lobby authority and succession fences', () => {
     const join = main.slice(main.indexOf("if (network.role === 'host' && message.type === 'join') {"));
     expect(join).toContain('for (const candidate of remotes.values())');
     expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);');
+    expect(join).toContain("network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() });");
+    expect(join).toContain('network.sendToPlayer(incoming.id, createStateMessage());');
+    expect(main).toContain("const joinSent = network.sendToPlayer(targetPlayerId, {");
+    expect(main).toContain("const stateSent = network.sendToPlayer(targetPlayerId, {");
     expect(join).toContain('network.send(createStateMessage());');
   });
 
