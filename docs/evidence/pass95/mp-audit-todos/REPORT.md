@@ -1,6 +1,6 @@
 # Pass 95 — HF-504 multiplayer audit TODO lane
 
-Date: 2026-09-04
+Date: 2026-09-05
 Lane: `contrib/dave-gaming-pc/claude/mp-audit-todos`
 Base: `origin/contrib/dave-gaming-pc/claude/mp-audit-hf504`
 Arena: `nuketown2`
@@ -20,10 +20,11 @@ Runtime: three headless Chrome peers, native WebGPU, ports 4217/4218, clean impa
 - **VERIFIED:** guest pickup claims are no longer transport-relayed. The host validates
   the claim, broadcasts the canonical `pickup-result`, and a rejection reaches every
   peer that saw the attempted claim. The three-peer P-3/P-4 row measures are PASS.
-- **VERIFIED:** reload continuity, post-respawn action sequencing, admission ordering,
-  inventory repair, reload replication, host-ready lobby gating, host-clock countdown,
-  revision stability, authority-change snapshot acceptance, and pre-authoritative remote
-  withholding are covered by source tests and/or the driver changes.
+- **VERIFIED:** reload continuity, post-respawn action sequencing, stable request IDs,
+  retry/ack handling, host result idempotency, admission ordering, inventory repair,
+  reload replication, host-ready lobby gating, host-clock countdown, revision stability,
+  authority-change snapshot acceptance, and pre-authoritative remote withholding are
+  covered by source tests and/or the driver changes.
 - **OPEN:** P-6/P-8 are not claimed closed. The audit's real-death pickup attempt still
   produced a rejected staged claim; this proves the host rejection path, not successful
   convergence from a real host-observed death.
@@ -48,23 +49,56 @@ and `stateDiff.byField` were empty.
 | Row | Result | Driver evidence |
 |---|---|---|
 | L-1 | PASS | host-alone START disabled |
-| L-4 | PASS | authoritative phase/revision/arena/member snapshots agreed across all peers |
+| L-4 | FIXED / TRACED; narrow measure | authoritative phase/revision/arena/member snapshots agreed across all peers; the driver compares four fields, not ten DOM surfaces |
 | L-7 | PASS | host, guest A, guest B all showed `DEPLOYING IN 5` |
 | L-9 | PASS | lobby revision remained 10 -> 10 during telemetry |
-| X-2 | PASS | four-second state diff had zero divergences |
+| X-2 | PASS (historical artifact) | four-second state diff had zero divergences; the driver now requires and records `samplesCompared > 0` |
 | P-3/P-4 | PASS | host saw claim; other guest saw no raw claim and did see correction |
 | P-5 | PASS | auto-scavenge result restored ammo/reserve projection |
 | P-6/P-8 | OPEN | attempted host-death pickup remained rejected; no successful convergence claim |
-| R-1/R-2/R-5 | PASS | reload rows ran after respawn; reload field replicated |
+| R-1/R-2 | PASS (historical artifact) | reload rows ran after respawn; intent/result and host ammo continuity agreed |
+| R-5 | OPEN after review correction | the artifact recorded `otherSeesReloading:null` and four `RELOAD-NOT-VISIBLE` findings; the verdict now gates on remote visibility |
 
 **OPEN:** the final driver's L-3 “all-ready” sample did not click guest B's READY
 control, so its `startDisabled` result is not accepted as an all-ready proof. The
 focused predicate tests and partial-ready driver measure remain valid; a corrected
 all-ready runtime scenario is deferred.
 
-**OPEN:** residual findings remain for reload visibility/ack evidence, weapon-swap
-replication, death split, rejoin registration, and non-authoritative relay gaps. They
-were not silently converted to fixed rows.
+**OPEN:** residual findings remain for reload visibility evidence, weapon-swap
+replication, death split, rejoin registration, and the `trigger-state` presentation
+relay gap. Host-arbitrated `pickup`, `reload-intent`, and `shot-request` traffic is no
+longer misclassified as a relay gap.
+
+## Review-fix pass (2026-09-05)
+
+**VERIFIED:** the pickup relay fence is explicitly documented at `src/network.ts:1273`;
+host-authoritative claims enter `onMessage` before the generic broadcast path. The
+reload debug view now exposes the replicated `reloading` field at
+`src/legacy-main.ts:34532`, so the audit can distinguish missing presentation from
+missing protocol state. The existing sequence reset, retry, acknowledgement, and
+request-id cache seams were rechecked and retained.
+
+**VERIFIED:** `scripts/qa/mp-audit.mjs:566` records a fresh all-ready lobby sample;
+`scripts/qa/mp-audit.mjs:664-669` requires a nonzero compared-sample count for X-2;
+`scripts/qa/mp-audit.mjs:958-963` requires ammo growth, intent, result, remote reload
+visibility, and host ammo agreement for R-5; and `scripts/qa/mp-audit.mjs:1223-1251`
+flags only presentation relay gaps while reporting host-arbitrated omissions separately.
+
+**OPEN / TODO (larger fixes, not expanded in this lane):**
+
+- Complete weapon-swap replication and make an in-flight reload commit against its
+  captured weapon, not the current slot: `scripts/qa/mp-audit.mjs:1030-1032`,
+  `src/legacy-main.ts:19374-19380` (W-4 and the `SWAP-NOT-REPLICATED` scenario).
+- Decide and implement guest-to-guest trigger presentation replication, or explicitly
+  remove the presentation requirement and its row: `src/network.ts:1275-1278`,
+  `scripts/qa/mp-audit.mjs:1223-1251` (X-1).
+- Re-register a resumed guest with the host roster and repopulate every peer's remote
+  map after authenticated resume: `scripts/qa/mp-audit.mjs:1175-1218`,
+  `src/legacy-main.ts:9187-9200` (X-3; owned by the desync lane).
+- Exercise the corrected all-ready, post-respawn reload-visibility, real host-death
+  pickup, and direct rejected-shot reload scenarios in a permitted browser run before
+  converting their OPEN evidence rows: `scripts/qa/mp-audit.mjs:557-566`,
+  `scripts/qa/mp-audit.mjs:888-963`, `scripts/qa/mp-audit.mjs:1030-1032`.
 
 ## Gates
 
@@ -87,7 +121,8 @@ were not silently converted to fixed rows.
 row was deleted. It contains 43 unique row IDs despite the historical total saying 42.
 
 **VERIFIED:** rows measured PASS by the complete artifact are L-1, L-7, L-9, X-2,
-P-3, P-4, P-5, R-1, R-2, and R-5.
+P-3, P-4, P-5, R-1, and R-2. R-5 is no longer reported as a measured PASS because
+the same artifact recorded missing remote reload visibility.
 
 **VERIFIED:** P-2, R-3, R-4, L-2, L-3, L-4, L-8, L-10, L-11, and L-12 are marked
 FIXED/TRACED with direct scenario gaps explicitly marked OPEN.
