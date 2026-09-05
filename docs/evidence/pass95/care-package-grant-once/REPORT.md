@@ -100,8 +100,11 @@ absent from the grant body) and re-pinned in the new suite.
 | before (early-return path) | **25** | **0** | **25** |
 | after (`redeemCarePackageWeaponGrant`) | **1** | **1** | **1** |
 
-`[MEASURED]` `src/legacy-main.ts`: 37,396 lines before, **37,396 lines after**,
-exactly on `LINE_CEILING`. The ceiling was **not** raised. Four pure blocks were
+`[MEASURED]` `src/legacy-main.ts`: 37,396 lines before, **37,395 lines after**
+(CORRECTED by the candidate 8 integrator: this section originally claimed 37,396
+after; the ratchet's own metric on `866de9ef` reads 37,395, one line UNDER the
+ceiling - the safe direction, but the quoted number was wrong. Verifier issue
+(c). In the integrated candidate 8 the file measures 37,391.) The ceiling was **not** raised. Four pure blocks were
 hoisted out to pay for the new wiring: `createWeaponCapacityRegistry`,
 `DOMINATION_TEAM_COLORS` and `DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS` to
 `src/legacy-pure-helpers-2.ts`, and `GAMEPAD_SUPPORT_LABELS` to
@@ -148,7 +151,7 @@ lane adds one test file and 26 tests, and loses none.
 | Owner clause | Where it is proven | State |
 |---|---|---|
 | grants exactly once per package instance | `HF-509 redemption press loop`: 25 presses, 1 grant, 1 host request | `[VERIFIED]` |
-| host-authoritative in multiplayer | `redeemCarePackageWeaponReward` requests `killstreakRuntime.activate`; `HF-509 host-authoritative guest claim path`: a second crimson intent is `selection-mismatch`, a replayed sequence is `replayed-sequence` | `[VERIFIED]` |
+| host-authoritative in multiplayer | `redeemCarePackageWeaponReward` requests `killstreakRuntime.activate`; `HF-509 host-authoritative guest claim path`: a second crimson intent is `selection-mismatch`, a replayed sequence is `replayed-sequence` | `[OPEN]` - **DOWNGRADED from [VERIFIED] by the candidate 8 integrator on the verifier's finding (b)**: at `src/legacy-main.ts:24350` a guest's `requestKillstreakActivation` returns a non-null id *before* host admission and there is no activation-rejected message, so on a guest the grant is optimistic and the ledger rollback path is unreachable. The single-machine claim path is verified; guest host-authority is not. |
 | idempotent by package id + claimant | ledger suite: same claimant -> `already-claimed`, other claimant -> `package-consumed`; `headCarePackageId` scoped to epoch + owner | `[VERIFIED]` |
 | package consumed and removed on grant, replicated to every peer | `consumes and removes the crate on the first claim and replicates that to every peer`: the crate is absent from `snapshotFor('owner')`, `snapshotFor('guest-b')` and `snapshotFor(null)` | `[VERIFIED]` |
 | guest cannot double-claim | `refuses a guest double-claim ...`: the second `beginCareCapture` by the same guest is `crate-unavailable` | `[VERIFIED]` |

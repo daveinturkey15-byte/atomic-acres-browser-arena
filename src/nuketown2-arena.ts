@@ -3667,10 +3667,19 @@ export const NUKETOWN2_THIN_METAL_PANELS: readonly ThinMetalPanelSpec[] = Object
   // handedness), so the registry cannot silently half-bind a body.
   Object.freeze({ surfaceName: 'nuketown2 north verge sign board', hitsToOpen: 3, holeRadiusM: 0.11 }),
   Object.freeze({ surfaceName: 'nuketown2 south verge sign board', hitsToOpen: 3, holeRadiusM: 0.11 }),
-  Object.freeze({ surfaceName: 'nuketown2 north verge speed limit sign', hitsToOpen: 3, holeRadiusM: 0.06 }),
-  Object.freeze({ surfaceName: 'nuketown2 south verge speed limit sign', hitsToOpen: 3, holeRadiusM: 0.06 }),
-  Object.freeze({ surfaceName: 'nuketown2 north verge street name blade', hitsToOpen: 3, holeRadiusM: 0.05 }),
-  Object.freeze({ surfaceName: 'nuketown2 south verge street name blade', hitsToOpen: 3, holeRadiusM: 0.05 }),
+  // CANDIDATE 8 INTEGRATION: the speed limit signs and street name blades this
+  // lane also registered NO LONGER EXIST. `thin-metal-perforation` branched
+  // before the verge-furniture cull that took the strip from 43 bodies to 36
+  // (gate audit: a TIGHTENED bound, and the aggregate went 43 -> 51 at zero
+  // headroom), which removed both pairs; `nuketown2-fidelity.test.ts:2877`
+  // records them as gone. Registering a body that is not built made
+  // `thinMetalPanelPlacements()` throw on every `buildNuketown2()`, which red
+  // the coplanar gate outright.
+  //
+  // The four dead rows are removed rather than the registry's missing-surface
+  // throw being softened: that throw is the fence that caught this, and it
+  // stays exactly as authored. If a later lane rebuilds the signs it re-adds
+  // its rows here and gets its holes back.
 ]);
 
 export function buildNuketown2(scene: THREE.Scene): ArenaMap {
