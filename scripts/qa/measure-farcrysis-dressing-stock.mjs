@@ -228,10 +228,13 @@ try {
 
   const retirementBefore = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.streaming.retirement);
   report.retirementBefore = retirementBefore;
+  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.returnToMainMenu());
+  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().gameStarted === false, undefined, { timeout: 30_000 });
   report.retirementSwitches = [];
   for (const arenaId of RETIREMENT_ARENAS) {
     const switchStartedAt = Date.now();
     await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arenaId);
+    await page.waitForFunction((id) => window.__ATOMIC_ACRES_DEBUG__.snapshot().arenaSelection.id === id, arenaId, { timeout: 120_000 });
     await page.waitForTimeout(1000);
     const snapshot = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
     report.retirementSwitches.push({
