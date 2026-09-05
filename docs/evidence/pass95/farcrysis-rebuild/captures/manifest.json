@@ -1,8 +1,8 @@
 {
   "contract": "farcrysis-stock-station-capture-v1",
-  "sha": "de910d2f0211282c55b4ebad5108a8be95a29eb1",
+  "sha": "9548775d",
   "url": "http://127.0.0.1:4267",
-  "startedAt": "2026-09-05T06:58:07.798Z",
+  "startedAt": "2026-09-05T10:11:07.041Z",
   "flags": [
     "--mute-audio"
   ],
@@ -22,41 +22,41 @@
       "cameraId": "farcrysis-beach-golden",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-beach-golden.png",
-      "frame": 130
+      "frame": 317
     },
     {
       "cameraId": "farcrysis-jungle-dapple",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-jungle-dapple.png",
-      "frame": 159
+      "frame": 370
     },
     {
       "cameraId": "farcrysis-core-interior",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-core-interior.png",
-      "frame": 187
+      "frame": 426
     },
     {
       "cameraId": "farcrysis-seaplane-throwback",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-seaplane-throwback.png",
-      "frame": 213
+      "frame": 484
     },
     {
       "cameraId": "farcrysis-island-topdown",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-island-topdown.png",
-      "frame": 252
+      "frame": 543
     },
     {
       "cameraId": "farcrysis-west-shoreline",
       "ok": true,
       "path": "./docs/evidence/pass95/farcrysis-rebuild/captures/farcrysis/farcrysis-west-shoreline.png",
-      "frame": 284
+      "frame": 617
     }
   ],
   "errors": [],
   "ok": true,
-  "selectToActiveMs": 138197,
-  "elapsedMs": 155872
+  "selectToActiveMs": 54169,
+  "elapsedMs": 66373
 }

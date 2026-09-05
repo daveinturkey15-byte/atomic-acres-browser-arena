@@ -1,9 +1,9 @@
 {
   "contract": "farcrysis-route-probe-v1",
-  "sha": "de910d2f0211282c55b4ebad5108a8be95a29eb1",
-  "measuredAt": "2026-09-05T07:01:46.854Z",
+  "sha": "9548775dfc61f0def469690cd9a6116052280106",
+  "measuredAt": "2026-09-05T10:15:36.139Z",
   "url": "http://127.0.0.1:4267",
-  "backend": null,
+  "backend": "webgpu",
   "flags": [
     "--mute-audio"
   ],
@@ -22,16 +22,1059 @@
       "lane-s",
       "lane-w",
       "lane-e"
-    ]
+    ],
+    "routeSegments": 28
   },
   "planned": 32,
-  "attempted": 0,
+  "attempted": 32,
   "skipped": 0,
-  "counts": {},
+  "counts": {
+    "walked": 30,
+    "stopped-at-surface": 2
+  },
   "invisibleWalls": [],
-  "rows": [],
-  "notes": [
-    "fatal: Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4267/?release=latest&renderer=webgpu&render=quality&seed=pass95-routes&previewTime=0\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:4267/?release=latest&renderer=webgpu&render=quality&seed=pass95-routes&previewTime=0\", waiting unti"
+  "rows": [
+    {
+      "route": "beach-ring",
+      "segment": 0,
+      "from": [
+        -50,
+        -50
+      ],
+      "to": [
+        0,
+        -50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": -1.571,
+      "probeFrom": [
+        -50,
+        -50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.93,
+      "end": [
+        -30.08,
+        1.98,
+        -50.4
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 1,
+      "from": [
+        0,
+        -50
+      ],
+      "to": [
+        50,
+        -50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": -1.571,
+      "probeFrom": [
+        0,
+        -50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 21.76,
+      "end": [
+        21.76,
+        1.93,
+        -50.02
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 2,
+      "from": [
+        50,
+        -50
+      ],
+      "to": [
+        50,
+        0
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": -3.142,
+      "probeFrom": [
+        50,
+        -50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.38,
+      "end": [
+        50.67,
+        1.94,
+        -30.63
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 3,
+      "from": [
+        50,
+        0
+      ],
+      "to": [
+        50,
+        50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": -3.142,
+      "probeFrom": [
+        50,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 14.79,
+      "end": [
+        50.01,
+        2.14,
+        14.79
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 4,
+      "from": [
+        50,
+        50
+      ],
+      "to": [
+        0,
+        50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": 1.571,
+      "probeFrom": [
+        50,
+        50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.68,
+      "end": [
+        30.33,
+        1.99,
+        50.4
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 5,
+      "from": [
+        0,
+        50
+      ],
+      "to": [
+        -50,
+        50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": 1.571,
+      "probeFrom": [
+        0,
+        50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.33,
+      "end": [
+        -20.33,
+        2.01,
+        49.99
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 6,
+      "from": [
+        -50,
+        50
+      ],
+      "to": [
+        -50,
+        0
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": 0,
+      "probeFrom": [
+        -50,
+        50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 21.77,
+      "end": [
+        -50.01,
+        1.87,
+        28.23
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "beach-ring",
+      "segment": 7,
+      "from": [
+        -50,
+        0
+      ],
+      "to": [
+        -50,
+        -50
+      ],
+      "widthM": 8,
+      "plannedDistanceM": 50,
+      "plannedSprintSeconds": 9.62,
+      "yaw": 0,
+      "probeFrom": [
+        -50,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 14.79,
+      "end": [
+        -50,
+        1.95,
+        -14.79
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 0,
+      "from": [
+        -26,
+        -26
+      ],
+      "to": [
+        0,
+        -26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": -1.571,
+      "probeFrom": [
+        -26,
+        -26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.75,
+      "end": [
+        -5.26,
+        8.71,
+        -26.76
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 1,
+      "from": [
+        0,
+        -26
+      ],
+      "to": [
+        26,
+        -26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": -1.571,
+      "probeFrom": [
+        0,
+        -26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.35,
+      "end": [
+        20.35,
+        3.24,
+        -26
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 2,
+      "from": [
+        26,
+        -26
+      ],
+      "to": [
+        26,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": -3.142,
+      "probeFrom": [
+        26,
+        -26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 17.67,
+      "end": [
+        26.16,
+        6.98,
+        -8.33
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 3,
+      "from": [
+        26,
+        0
+      ],
+      "to": [
+        26,
+        26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": -3.142,
+      "probeFrom": [
+        26,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.88,
+      "end": [
+        25.85,
+        7.27,
+        19.88
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 4,
+      "from": [
+        26,
+        26
+      ],
+      "to": [
+        0,
+        26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": 1.571,
+      "probeFrom": [
+        26,
+        26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.22,
+      "end": [
+        5.78,
+        2.6,
+        26.01
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 5,
+      "from": [
+        0,
+        26
+      ],
+      "to": [
+        -26,
+        26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": 1.571,
+      "probeFrom": [
+        0,
+        26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.35,
+      "end": [
+        -19.33,
+        9.18,
+        26.79
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 6,
+      "from": [
+        -26,
+        26
+      ],
+      "to": [
+        -26,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": 0,
+      "probeFrom": [
+        -26,
+        26
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.94,
+      "end": [
+        -26.4,
+        5.64,
+        6.06
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "jungle-band",
+      "segment": 7,
+      "from": [
+        -26,
+        0
+      ],
+      "to": [
+        -26,
+        -26
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 26,
+      "plannedSprintSeconds": 5,
+      "yaw": 0,
+      "probeFrom": [
+        -26,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.07,
+      "end": [
+        -26.33,
+        5.23,
+        -20.07
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 0,
+      "from": [
+        0,
+        -8
+      ],
+      "to": [
+        6.5,
+        -6.5
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.67,
+      "plannedSprintSeconds": 1.28,
+      "yaw": -1.798,
+      "probeFrom": [
+        0,
+        -8
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 18.78,
+      "end": [
+        18.39,
+        4.38,
+        -4.22
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 1,
+      "from": [
+        6.5,
+        -6.5
+      ],
+      "to": [
+        6.5,
+        0
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.5,
+      "plannedSprintSeconds": 1.25,
+      "yaw": -3.142,
+      "probeFrom": [
+        6.5,
+        -6.5
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.07,
+      "end": [
+        6.47,
+        1.96,
+        13.57
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 2,
+      "from": [
+        6.5,
+        0
+      ],
+      "to": [
+        6.5,
+        6.5
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.5,
+      "plannedSprintSeconds": 1.25,
+      "yaw": -3.142,
+      "probeFrom": [
+        6.5,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.12,
+      "end": [
+        6.57,
+        2.44,
+        20.12
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 3,
+      "from": [
+        6.5,
+        6.5
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.67,
+      "plannedSprintSeconds": 1.28,
+      "yaw": 1.798,
+      "probeFrom": [
+        6.5,
+        6.5
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.96,
+      "end": [
+        -12.98,
+        2.47,
+        10.85
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 4,
+      "from": [
+        0,
+        8
+      ],
+      "to": [
+        -6.5,
+        6.5
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.67,
+      "plannedSprintSeconds": 1.28,
+      "yaw": 1.344,
+      "probeFrom": [
+        0,
+        8
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 21.54,
+      "end": [
+        -20.92,
+        2.77,
+        2.86
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 5,
+      "from": [
+        -6.5,
+        6.5
+      ],
+      "to": [
+        -6.5,
+        0
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.5,
+      "plannedSprintSeconds": 1.25,
+      "yaw": 0,
+      "probeFrom": [
+        -6.5,
+        6.5
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 17.57,
+      "end": [
+        -6.5,
+        1.68,
+        -11.07
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "core-loop",
+      "segment": 6,
+      "from": [
+        -6.5,
+        0
+      ],
+      "to": [
+        -6.5,
+        -6.5
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.5,
+      "plannedSprintSeconds": 1.25,
+      "yaw": 0,
+      "probeFrom": [
+        -6.5,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "stopped",
+      "classification": "stopped-at-surface",
+      "walkedM": 11.07,
+      "end": [
+        -6.5,
+        1.68,
+        -11.07
+      ],
+      "blocker": {
+        "name": "farcrysis-enhanced-palm-trunk-collider-35",
+        "material": "wood",
+        "distanceM": 0.41
+      },
+      "groundStepAheadM": 0.082,
+      "movementBlockedAt": [
+        true,
+        true,
+        false
+      ]
+    },
+    {
+      "route": "core-loop",
+      "segment": 7,
+      "from": [
+        -6.5,
+        -6.5
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 4.5,
+      "plannedDistanceM": 6.67,
+      "plannedSprintSeconds": 1.28,
+      "yaw": -1.344,
+      "probeFrom": [
+        -6.5,
+        -6.5
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.31,
+      "end": [
+        13.31,
+        1.71,
+        -11
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-n",
+      "segment": 0,
+      "from": [
+        0,
+        -50
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 42,
+      "plannedSprintSeconds": 8.08,
+      "yaw": -3.142,
+      "probeFrom": [
+        0,
+        -50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 16.45,
+      "end": [
+        -0.8,
+        7.2,
+        -33.57
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-s",
+      "segment": 0,
+      "from": [
+        0,
+        50
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 42,
+      "plannedSprintSeconds": 8.08,
+      "yaw": 0,
+      "probeFrom": [
+        0,
+        50
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.91,
+      "end": [
+        0.14,
+        3.15,
+        30.09
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-w",
+      "segment": 0,
+      "from": [
+        -50,
+        0
+      ],
+      "to": [
+        -8,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 42,
+      "plannedSprintSeconds": 8.08,
+      "yaw": -1.571,
+      "probeFrom": [
+        -50,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.5,
+      "end": [
+        -30.5,
+        4.72,
+        -0.27
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-e",
+      "segment": 0,
+      "from": [
+        50,
+        0
+      ],
+      "to": [
+        8,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 42,
+      "plannedSprintSeconds": 8.08,
+      "yaw": 1.571,
+      "probeFrom": [
+        50,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 17.53,
+      "end": [
+        32.5,
+        5.83,
+        -0.91
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-n",
+      "segment": 1,
+      "from": [
+        0,
+        -29
+      ],
+      "to": [
+        0,
+        -8
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 21,
+      "plannedSprintSeconds": 4.04,
+      "yaw": -3.142,
+      "probeFrom": [
+        0,
+        -29
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 20.14,
+      "end": [
+        0,
+        2.04,
+        -8.86
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-s",
+      "segment": 1,
+      "from": [
+        0,
+        29
+      ],
+      "to": [
+        0,
+        8
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 21,
+      "plannedSprintSeconds": 4.04,
+      "yaw": 0,
+      "probeFrom": [
+        0,
+        29
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.24,
+      "end": [
+        0.04,
+        1.95,
+        9.76
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-w",
+      "segment": 1,
+      "from": [
+        -29,
+        0
+      ],
+      "to": [
+        -8,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 21,
+      "plannedSprintSeconds": 4.04,
+      "yaw": -1.571,
+      "probeFrom": [
+        -29,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "walked",
+      "classification": "walked",
+      "walkedM": 19.99,
+      "end": [
+        -9.01,
+        1.71,
+        0
+      ],
+      "blocker": null,
+      "groundStepAheadM": null,
+      "movementBlockedAt": null
+    },
+    {
+      "route": "lane-e",
+      "segment": 1,
+      "from": [
+        29,
+        0
+      ],
+      "to": [
+        8,
+        0
+      ],
+      "widthM": 6,
+      "plannedDistanceM": 21,
+      "plannedSprintSeconds": 4.04,
+      "yaw": 1.571,
+      "probeFrom": [
+        29,
+        0
+      ],
+      "startAdjustmentM": 0,
+      "outcome": "stopped",
+      "classification": "stopped-at-surface",
+      "walkedM": 8.08,
+      "end": [
+        20.92,
+        6.13,
+        0.02
+      ],
+      "blocker": {
+        "name": "farcrysis-enhanced-palm-trunk-collider-37",
+        "material": "wood",
+        "distanceM": 0.41
+      },
+      "groundStepAheadM": -0.369,
+      "movementBlockedAt": [
+        false,
+        false,
+        false
+      ]
+    }
   ],
-  "elapsedMs": 18527
+  "notes": [],
+  "elapsedMs": 199793
 }
