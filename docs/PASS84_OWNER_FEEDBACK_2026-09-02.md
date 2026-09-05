@@ -2617,3 +2617,64 @@ direction (HF-504) - which Luna's `mp-swap-reload-relay` @ `a9b4b029` targets, a
 - 11:27 Muse review of the Farcrysis layout @ 7197e427: SHIP-WITH-FIXES. Dressing-stage notes: keep FARCRYSIS_MAX_SIGHTLINE at 22 m (a ceiling to beat, never to move); re-seat palms 35/37 off the core loop and lane-e (FINDING-2); the card stays parked (selectable false, multiplayer false) until the owner unhides it. Review file docs/evidence/pass94/muse-review/v9-farcrysis-layout-REVIEW.md on the lane branch; the dressing lane (running since 11:25) was told to read it if landed.
 
 | HF-525 | 2026-09-05 11:45 | Orchestrator finding from the cut evidence: the 13-arena boot smoke is RED on candidate 8 - high-seas times out deterministically (12/13; isolated rerun fails; silent: 0 console/page errors, deployment never completes). PASS 93 was 13/13, so this is a regression, and it is NOT covered by the owner override HF-523 (cold + soak only). | Publish agent told to stop before the real publish and write the receipt as BLOCKED-PENDING-OWNER. Luna fix lane fix-high-seas-boot launched from candidate 8 (suspects: cold-path-2 water placeholder / static batching hoist / async precompile). Owner options: (a) wait for the fix (~1 h) then publish; (b) publish now with High Seas parked (selectable false) as a hotfix; (c) override this red too. |
+
+## PASS 94 publish attempt - 2026-09-05 11:50 BST - BLOCKED, nothing published
+
+**Status: BLOCKED-PENDING-OWNER.** `publish_pass94.py` was run **only** with `--dry-run`.
+No gh-pages push, no `npm run deploy`, no `roll_pass.py`. No test, threshold, fence, budget,
+soak bound or publish-plan assertion was weakened, skipped or widened. Receipt:
+`docs/evidence/pass95/publish/RECEIPT.md` on `release/pass95` @ `22f1872a` (pushed).
+
+- **Would have published by** `python scripts/orchestration/publish_pass94.py` from the release
+  checkout `C:/Users/david/projects/aa-claude-release84`, branch `release/pass95` @ `9c61b6f3`
+  (candidate 8 `32d8dcb0` is an ancestor; runtime `4b5cc28b`).
+- **Blocker:** `[MEASURED]` the 13-arena boot smoke is RED - `high-seas` times out
+  (`page.waitForFunction: Timeout 120000ms exceeded`, `tests/e2e/pass74-arena-boot-smoke.spec.ts:148`),
+  deterministically (full run **12 passed / 1 failed, 13.1 m** and an isolated rerun on an idle
+  machine), and **silently** (`FINAL SNAPSHOT: {"failure":null}`, 0 console errors, 0 page errors
+  over 120 s, app still on the deployment menu). `[VERIFIED]` it is **player-selectable in the
+  bytes that would go live**: `src/map-selection.ts:355` has no `selectable: false`, so it is in
+  `SELECTABLE_ARENAS`, and `dist-pass94/assets/legacy-main-B26NsPEA.js` ships the label
+  `HIGH SEAS`. `[MEASURED]` **regression since PASS 93** (that record: "boot smoke 13/13, 8.0
+  min"); candidate 8 never ran this gate, so it was not in front of the owner at HITL.
+  `[VERIFIED]` **not covered by HF-523**, which overrides exactly two gates. HF-525 records the
+  three owner options; the Luna `fix-high-seas-boot` lane is running.
+- **The plan is not the problem.** `[VERIFIED]` `publish_pass94.py --dry-run` **exit 0, every
+  guard green**, and the plan is line-for-line the cut's: channels now `['pass92','pass93']`,
+  would delete `channels/pass92/`, keep `channels/pass93/`, write `channels/pass94/` from
+  `dist-pass94/`, post-state exactly `['pass93','pass94']` - the HF-400 two-channel policy, live
+  `pass94` + pinned safe backup `pass93`, `pass92` retired; predecessor guard OK; in-build
+  fallback `pass93Backup -> channels/pass93` OK; chooser generation would be `7c9adb8db2b1`.
+- **Build provenance.** `[VERIFIED]` `dist` and `dist-pass94` are byte-identical (606 files,
+  sha256 of every path), and this checkout reproduced candidate 8 a **third** time:
+  `legacy-main-B26NsPEA.js` `6ae9c5785c380af3f6ddfa5d9d2508fa92868248be0f848f4bad8559befd9071`,
+  `index-Z7H2fNDC.js` `eaebf4ea2360fe8ff26856c76c2c84bbb696eee68add03dfb0409f5f2ac61824` - the
+  exact bytes the owner played on `:4300`. `qa:release-identity` exit 0 against both trees.
+- **Build-freshness, for the record.** `[MEASURED]` the session's first `--dry-run` exited 2 on
+  `build-freshness` alone: the cut's own browser gates wrote gitignored artifacts **after** the
+  10:28 build (`artifacts/qa/mp-soak-gate/hf499-bundle.json` 11:09:43, cold-admission
+  `failure-receipt.json` 11:04:44, playwright `.last-run.json` 10:55:45) and `artifacts/` is
+  deliberately in the guard's scope. No tracked source was newer. Remedy applied is the guard's
+  own documented one - rebuild (`npm run build` exit 0, 1.82 s) and recopy to `dist-pass94` -
+  after which both bundle SHAs were unchanged and the guard passed. The guard was not touched.
+- **Live state, unchanged.** `[VERIFIED]` gh-pages head **before = after = `7c9f1033`**; channels
+  still `['pass92','pass93']`; the canonical HTTPS root returns 200 and its chooser still names
+  `experimental` **PASS 93** (`deploymentState: "live"`) with `previous` PASS 92 SAFE BACKUP;
+  `release-index.json` generation still `2ff646727518`. `src/changelog.ts:111` still reads
+  `pass94ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)` - that literal is
+  written by the publish script's receipt, never by hand.
+- **Override debt held for the eventual PASS 94 record.** (1) Cold-admission smoke RED,
+  **19,324.3 ms vs the preserved 10,000 ms budget** (candidate 8: 21,807.6 ms) - owner override
+  HF-523, follow-up = the queued cold visual-definition lane. (2) `qa:mp-soak` RED **5/8**
+  (replication 91 divergences; rejoin-damage `damageLatencyMs null`; reload-after-death guestA
+  false), two rows shown non-deterministic across identical bytes - owner override HF-523,
+  follow-up = `mp-swap-reload-relay` @ `a9b4b029` (SHIP-WITH-FIXES, not in this cut).
+  (3) `high-seas` - **no override exists**; this is the blocker, not debt.
+- **Content candidate 8 carries** (for the record when it does ship): the overnight multiplayer
+  and Nuke Town accuracy work, killstreak awareness, care-package grant-once, chopper-gunner
+  damage, bot prone/crouch animation, MP diagnostics overlay, gamepad support, breakable Nuke
+  Town windows and interior accuracy, frame-hitch and cold-path work, gate-audit fixes.
+- **Unblocks with one command** once the owner rules on `high-seas` - the plan is green and the
+  bytes are reproduced: `python scripts/orchestration/publish_pass94.py --dry-run` then
+  `python scripts/orchestration/publish_pass94.py`.
+- `:4300` and the `aa-claude-hitl` worktree were never touched.
