@@ -1,13 +1,10 @@
 /**
  * farcrysis-textures.ts — PBR texture application for the Farcrysis jungle/beach arena.
  *
- * Uses high-quality AI-generated 1024×1024 PBR image textures (color, normal, roughness)
- * loaded asynchronously from public/assets/original/textures/farcrysis-*.png.
- *
- * Immediate synchronous presentation via procedural Canvas textures (the legacy
- * noise-based generators) provides a seamless fallback in headless environments,
- * during network delays, and while images load.  When the image set for a material
- * family finishes loading, registered materials are upgraded in-place.
+ * All PBR textures are generated synchronously from seeded noise and height
+ * fields in this module. This is intentional: the dressing contract permits
+ * no downloaded or copied game imagery, and a synchronous procedural source
+ * keeps browser admission deterministic across cold and warm runs.
  *
  * Exports:
  *   applyFarcrysisTextures(root: THREE.Group): void
@@ -967,152 +964,6 @@ function classifyMesh(mesh: THREE.Mesh): TextureCategory | null {
 }
 
 // ---------------------------------------------------------------------------
-// Material augmentation registry (for async image-texture upgrade)
-// ---------------------------------------------------------------------------
-
-interface ImageTextureSet {
-  color?: THREE.Texture;
-  normal?: THREE.Texture;
-  roughness?: THREE.Texture;
-  alpha?: THREE.Texture;
-}
-
-const REGISTRY = new Map<PbrSlotMaterial, TextureCategory>();
-
-const _imageSets: Partial<Record<TextureCategory, ImageTextureSet>> = {};
-let _imageLoaderInitiated = false;
-
-const TEXTURE_PATH = './assets/original/textures/farcrysis';
-
-/** Wrap a loaded texture for tiled PBR use. */
-function configurePBRTexture(
-  tex: THREE.Texture,
-  colorSpace: THREE.ColorSpace,
-): THREE.Texture {
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = colorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/** Apply loaded image textures to all registered materials of a given category. */
-function upgradeRegistered(category: TextureCategory, set: ImageTextureSet): void {
-  REGISTRY.forEach((cat, mat) => {
-    if (cat !== category) return;
-
-    switch (category) {
-      case 'sand':
-        if (set.color) mat.map = set.color;
-        if (set.normal) {
-          mat.normalMap = set.normal;
-          mat.normalScale = new THREE.Vector2(0.7, 0.7);
-        }
-        if (set.roughness) mat.roughnessMap = set.roughness;
-        break;
-      case 'rock':
-        if (set.color) mat.map = set.color;
-        if (set.normal) {
-          mat.normalMap = set.normal;
-          mat.normalScale = new THREE.Vector2(0.8, 0.8);
-        }
-        if (set.roughness) mat.roughnessMap = set.roughness;
-        break;
-      case 'palm-bark':
-        if (set.color) mat.map = set.color;
-        if (set.roughness) mat.roughnessMap = set.roughness;
-        if (set.normal) {
-          mat.normalMap = set.normal;
-          mat.normalScale = new THREE.Vector2(0.55, 0.55);
-          // Clear procedural bump if present
-          mat.bumpMap = null;
-          mat.bumpScale = 1;
-        }
-        break;
-      case 'frond':
-        if (set.color) {
-          mat.map = set.color;
-          mat.transparent = true;
-          mat.alphaTest = 0.05;
-          // Frond image has embedded alpha channel
-          mat.alphaMap = set.color;
-        }
-        break;
-      case 'water':
-        if (set.color) mat.map = set.color;
-        if (set.normal) {
-          mat.normalMap = set.normal;
-          mat.normalScale = new THREE.Vector2(0.8, 0.8);
-        }
-        if (set.roughness) mat.roughnessMap = set.roughness;
-        if (mat.roughness > 0.3) mat.roughness = 0.22;
-        break;
-      case 'crate':
-        if (set.color) mat.map = set.color;
-        if (set.roughness) mat.roughnessMap = set.roughness;
-        break;
-    }
-
-    mat.needsUpdate = true;
-  });
-}
-
-/** Load a single texture family's image set via THREE.TextureLoader. */
-function loadImageSet(stem: string, category: TextureCategory): void {
-  if (!hasCanvas()) return; // no document → TextureLoader will fail
-
-  const loader = new THREE.TextureLoader();
-  const basePath = `${TEXTURE_PATH}-${stem}`;
-  const set: ImageTextureSet = {};
-
-  let pending = 3;
-  function onDone(): void {
-    pending--;
-    if (pending === 0) {
-      _imageSets[category] = set;
-      upgradeRegistered(category, set);
-    }
-  }
-
-  // Color map (sRGB color space)
-  loader.load(
-    `${basePath}.png`,
-    (tex) => { set.color = configurePBRTexture(tex, THREE.SRGBColorSpace); onDone(); },
-    undefined,
-    () => onDone(),
-  );
-
-  // Normal map (linear)
-  loader.load(
-    `${basePath}-normal.png`,
-    (tex) => { set.normal = configurePBRTexture(tex, THREE.NoColorSpace); onDone(); },
-    undefined,
-    () => onDone(),
-  );
-
-  // Roughness map (linear)
-  loader.load(
-    `${basePath}-roughness.png`,
-    (tex) => { set.roughness = configurePBRTexture(tex, THREE.NoColorSpace); onDone(); },
-    undefined,
-    () => onDone(),
-  );
-}
-
-/** Initiate async loading of all 6 image texture sets. */
-function loadAllImageTextures(): void {
-  if (_imageLoaderInitiated) return;
-  _imageLoaderInitiated = true;
-  if (!hasCanvas()) return;
-
-  loadImageSet('sand', 'sand');
-  loadImageSet('rock', 'rock');
-  loadImageSet('bark', 'palm-bark');
-  loadImageSet('frond', 'frond');
-  loadImageSet('water', 'water');
-  loadImageSet('crate', 'crate');
-}
-
 // ---------------------------------------------------------------------------
 // Procedural augmentation (immediate, synchronous)
 // ---------------------------------------------------------------------------
@@ -1251,20 +1102,8 @@ export function applyFarcrysisTextures(root: THREE.Group): void {
     for (const mat of materials) {
       // Apply immediate procedural textures
       augmentProcedural(mat, category);
-      // Register for async image-texture upgrade — only families that actually
-      // ship an image stem under public/assets/original/textures/farcrysis-*.
-      if (
-        isPbrSlotMaterial(mat)
-        && (category === 'sand' || category === 'rock' || category === 'palm-bark'
-          || category === 'frond' || category === 'water' || category === 'crate')
-      ) {
-        REGISTRY.set(mat, category);
-      }
     }
   });
-
-  // 2. Kick off async loading of high-resolution image textures
-  loadAllImageTextures();
 }
 
 // ---------------------------------------------------------------------------

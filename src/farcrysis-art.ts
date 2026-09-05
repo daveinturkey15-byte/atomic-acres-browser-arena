@@ -1,7 +1,7 @@
 /**
  * farcrysis-art.ts — Pass 69 art/feel lane (spec R9 / C11).
  *
- * Golden-hour beach/jungle presentation: throwback props, instanced
+ * Morning beach/jungle presentation: throwback props, instanced
  * multi-type foliage (≥3 instanced types), lagoon sparkle, and
  * palette/feel constants. Presentation only — never adds colliders,
  * shot surfaces, spawns, patrols, cover or gameplay authority.
@@ -56,6 +56,7 @@ import { bakeFarcrysisWaterDepth, createFarcrysisSeaSurfaceMaterial } from './fa
 // HF-396: the instanced tropical grass FIELD (bezier blades, layered wind,
 // SSS, slope-aware placement, chunk distance LOD).
 import { buildFarcrysisGrassField, animateGrassField } from './farcrysis-grass-field';
+import { buildFarcrysisDressing, setFarcrysisDressingLOD } from './farcrysis-dressing';
 
 // TSL-compatible inline replacements for terrain.ts ShaderMaterial effects.
 // All use standard Three.js materials (MeshStandardMaterial, MeshBasicMaterial).
@@ -95,25 +96,26 @@ function makeMesh(
 // ---------------------------------------------------------------------------
 
 export const FARCRYSIS_ART_FEEL = Object.freeze({
-  // Sun + ambient (mirrors the visual-definition per the golden-hour brief)
-  goldenHourSunTint: 0xffd9a0,
-  goldenHourSunIntensity: 3.1,
-  jungleDappleTint: 0x9fd8a8,
-  ambientColor: 0x9fbfa8,
-  ambientIntensity: 0.42,
+  // Kept under the legacy field names for module compatibility; values are
+  // the clear 07:40 post-rain brief, not golden-hour orange.
+  goldenHourSunTint: 0xfff1d8,
+  goldenHourSunIntensity: 2.7,
+  jungleDappleTint: 0x8bbda2,
+  ambientColor: 0xa7cbd3,
+  ambientIntensity: 0.5,
   // Presentation material tones
-  beachSand: 0xd9c08a,
-  palmTrunk: 0x7a5b36,
-  palmFrond: 0x3f7c31, // pass 76: brightened for daylight grade
-  bushGreen: 0x468a3c,
-  fernGreen: 0x3e8638,
-  towerMetal: 0x6d7a83,
-  antenna: 0x8b9aaa,
-  beaconLight: 0xe8862b,
-  caveRock: 0x5a5550,
-  tikiWood: 0x8b6b4a,
-  tikiBand: 0xd85330,
-  crateStamp: 0xf0a840,
+  beachSand: 0xc8b486,
+  palmTrunk: 0x6b5138,
+  palmFrond: 0x496b42,
+  bushGreen: 0x477a4c,
+  fernGreen: 0x3f7250,
+  towerMetal: 0x64747a,
+  antenna: 0x7f9291,
+  beaconLight: 0xd77b38,
+  caveRock: 0x605d56,
+  tikiWood: 0x76624b,
+  tikiBand: 0xb66b4b,
+  crateStamp: 0xd5aa60,
   // Sparkle / atmosphere
   waterSparkleColor: 0xd4f0ff,
   // Camera-feel constants (advisory — actual camera is engine-managed)
@@ -745,17 +747,17 @@ function buildInlineLighting(scene: THREE.Scene): void {
   // green in a beige golden wash — the audit's "beige golden-hour" P0. The
   // brief is saturated tropical DAYLIGHT: blue sky influence from above, a
   // warm (not orange) sun, and green bounce off the canopy from below.
-  const ambient = new THREE.AmbientLight(0xdcecdf, 0.16);
+  const ambient = new THREE.AmbientLight(0xdcecef, 0.24);
   ambient.name = 'farcrysis-ambient';
   scene.add(ambient);
 
   // Sky/ground hemisphere carries most of the indirect light: pale tropical
   // blue from the sky dome, deep foliage green rising off the jungle floor.
-  const hemi = new THREE.HemisphereLight(0x9fd0e8, 0x3c5f2c, 0.72);
+  const hemi = new THREE.HemisphereLight(0xa4d0df, 0x466c52, 0.78);
   hemi.name = 'farcrysis-hemi';
   scene.add(hemi);
 
-  const sun = new THREE.DirectionalLight(0xfff0d2, 2.1);
+  const sun = new THREE.DirectionalLight(0xfff1d8, 2.25);
   sun.name = 'farcrysis-sun';
   sun.position.set(-18, 22, 25);
   sun.castShadow = true;
@@ -787,12 +789,12 @@ function buildInlineLighting(scene: THREE.Scene): void {
 
   // Green canopy bounce from below softens undersides of rocks and fronds.
   // Deliberately does NOT castShadow so it cannot create secondary shadows.
-  const bounce = new THREE.DirectionalLight(0x9cc76e, 0.2);
+  const bounce = new THREE.DirectionalLight(0x83b497, 0.24);
   bounce.name = 'farcrysis-bounce';
   bounce.position.set(0, -2, 0);
   scene.add(bounce);
 
-  const fill = new THREE.DirectionalLight(0x8fb8d9, 0.3);
+  const fill = new THREE.DirectionalLight(0x8fbdd2, 0.36);
   fill.name = 'farcrysis-fill';
   fill.position.set(6, 10, -20);
   scene.add(fill);
@@ -1150,6 +1152,10 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
 
   // ---- Pass 69 re-authored art layer (dense vegetation, terrain, lighting, water) ----
   buildVegetation(root);
+  // PASS 95 dressing: the outer jungle band gets a restrained mid-story layer
+  // and field signage. It is deliberately after the existing vegetation so
+  // the procedural PBR pass sees every authored family in one traversal.
+  buildFarcrysisDressing(root);
 
   // HF-396: real grass field over the interior plateau. Presentation only —
   // no colliders, no raycast/shot-surface registration (the existing foliage
@@ -1255,6 +1261,7 @@ export function applyFarcrysisArtwork(root: THREE.Group): void {
     if (camera) {
       const dist = camera.position.distanceTo(root.position);
       setVegetationLOD(dist);
+      setFarcrysisDressingLOD(dist);
     }
     // HF-396: chunk-level distance LOD for the grass field.
     animateGrassField(camera);

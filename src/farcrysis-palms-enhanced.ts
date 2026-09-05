@@ -95,6 +95,17 @@ const PALM_JUNGLE_BAND: Readonly<[number, number]> = [
   ARENA_HALF - BOUNDS_MARGIN - 0.5,
 ];
 
+/**
+ * Muse v9 layout review: these two deterministic instances landed on the
+ * 4.5 m core loop / lane-e sightline. The collider builder imports this same
+ * placement function, so re-seating the visual instance also re-seats its
+ * existing named trunk proxy without deleting or adding collision authority.
+ */
+export const RESEATED_ENHANCED_PALMS: Readonly<Record<35 | 37, readonly [number, number]>> = Object.freeze({
+  35: [-16, -28],
+  37: [29, 13],
+});
+
 // HF-360: this module used to carry its own guessed terrain model ("close
 // enough"), which drifted from the rendered ground and left trunk bases
 // floating or buried on every hill. All seating now resolves through the one
@@ -287,6 +298,16 @@ function buildPlacements(): PalmPlacement[] {
       crownTilt: (rng() - 0.5) * 0.14,
       crownScale: scale * (1 + (rng() - 0.5) * 0.16),
     });
+  }
+
+  for (const index of [35, 37] as const) {
+    const seat = RESEATED_ENHANCED_PALMS[index];
+    const palm = placements[index];
+    if (!seat || !palm) continue;
+    palm.x = seat[0];
+    palm.z = seat[1];
+    palm.baseY = farcrysisTerrainHeight(palm.x, palm.z);
+    palm.yaw = Math.atan2(palm.z, palm.x);
   }
 
   return placements;
