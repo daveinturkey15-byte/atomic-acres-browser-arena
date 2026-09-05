@@ -71,4 +71,15 @@ describe('bounded room rejoin identity', () => {
     releaseRoomRejoinIdentityLease('room-a', persistent, 'tab-1');
     expect(loadRoomRejoinIdentity('room-a', secondTab, persistent, 1_500, 'tab-2')).toEqual(identity);
   });
+
+  it('keeps a voluntary-leave identity recoverable after the active tab clears its lease', () => {
+    const activeTab = new MemoryStorage();
+    const menuTab = new MemoryStorage();
+    const persistent = new MemoryStorage();
+    saveRoomRejoinIdentity('room-a', identity, activeTab, persistent, 90_000, 1_000, 'tab-1');
+    // returnToMainMenu persists before resetPrivateLobbyState releases this
+    // lease and clears the in-memory token.
+    releaseRoomRejoinIdentityLease('room-a', persistent, 'tab-1');
+    expect(loadRoomRejoinIdentity('room-a', menuTab, persistent, 1_001, 'tab-1')).toEqual(identity);
+  });
 });

@@ -30505,6 +30505,15 @@ function restartSoloMatch(): void {
 function returnToMainMenu(): void {
   invalidateMatchAdmission('Player returned to the main menu');
   const leavingHostedMatch = network.role === 'host';
+  // A voluntary lobby leave is still inside the host's bounded rejoin grace
+  // window. Preserve the authenticated guest identity before the lobby reset
+  // clears localResumeToken; otherwise the replacement transport sends a fresh
+  // credential and the host correctly rejects it as rejoin-denied. The host
+  // remains the authority for accepting this identity and issuing the new
+  // transport's full-state repair.
+  if (network.role === 'client' && network.roomCode && localResumeToken) {
+    try { saveActiveRoomIdentity(network.roomCode); } catch { /* Rejoin remains best effort under restrictive storage policies. */ }
+  }
   if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id, voluntary: true });
   network.close();
   if (leavingHostedMatch) {
