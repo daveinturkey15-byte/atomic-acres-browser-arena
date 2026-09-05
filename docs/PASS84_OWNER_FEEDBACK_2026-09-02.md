@@ -2678,3 +2678,5 @@ soak bound or publish-plan assertion was weakened, skipped or widened. Receipt:
   bytes are reproduced: `python scripts/orchestration/publish_pass94.py --dry-run` then
   `python scripts/orchestration/publish_pass94.py`.
 - `:4300` and the `aa-claude-hitl` worktree were never touched.
+
+- 12:03 Muse builders DONE: 374 Nuke backdrop ridges + window depth + vehicle roofs @ a2425015 (branch contrib/dave-gaming-pc/muse/nuke-backdrop-and-windows); 375 audio-polish finish round @ 7b099a5b (branch contrib/dave-gaming-pc/claude/v8-audio-polish: second shed-door path positional, new positional APIs wired). Muse reviews queued for both. In flight: Luna fix-high-seas-boot (instrumenting the deployment stall phases, first commit bbcfa6e3 12:01) and Luna Farcrysis dressing (first commit bfdb90eb 11:58). PASS 94 publish blocked pending the owner decision (HF-525).
