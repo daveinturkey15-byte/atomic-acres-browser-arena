@@ -105,6 +105,11 @@ export type PresentationFreshnessTelemetry = Readonly<{
   lastCompletionLatencyMs: number | null;
   completionFailures: number;
   lastFailure: string | null;
+  /** Bounded evidence for the first validation error in a failed cold pass. */
+  uncapturedErrorHistory?: readonly Readonly<{
+    atMs: number;
+    message: string;
+  }>[];
   backpressureActive: boolean;
   skippedSubmissions: number;
   progress: PresentationProgressTelemetry;
@@ -1093,10 +1098,13 @@ export class WebGpuRenderRuntime {
   private lastFailure: string | null = null;
   private uncapturedErrors = 0;
   private lastUncapturedError: string | null = null;
+  private readonly uncapturedErrorHistory: Array<Readonly<{ atMs: number; message: string }>> = [];
   private readonly uncapturedErrorListener = (event: unknown): void => {
     const message = formatWebGpuUncapturedError(event);
     this.uncapturedErrors += 1;
     this.lastUncapturedError = message;
+    this.uncapturedErrorHistory.push(Object.freeze({ atMs: this.clock(), message }));
+    if (this.uncapturedErrorHistory.length > 12) this.uncapturedErrorHistory.shift();
     this.completionFailures += 1;
     this.lastFailure = `WebGPU uncaptured error: ${message}`;
   };
@@ -1489,6 +1497,7 @@ export class WebGpuRenderRuntime {
       lastCompletionLatencyMs: this.lastCompletionLatencyMs,
       completionFailures: this.completionFailures,
       lastFailure: this.lastFailure,
+      uncapturedErrorHistory: Object.freeze(this.uncapturedErrorHistory.map((entry) => Object.freeze({ ...entry }))),
       backpressureActive: shouldBackpressureWebGpuSubmissions(
         this.pendingCompletionStartedAt,
         now,
