@@ -1,0 +1,73 @@
+{
+  "station": "nuketown2-into-sun-street",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "A",
+  "confidence": 0.72,
+  "probes": {
+    "left": {
+      "expected": "WRNH",
+      "answered": "WRNH"
+    },
+    "right": {
+      "expected": "DUNY",
+      "answered": "DUNY"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-into-sun-street.png",
+      "sourceSha256": "ca4faf73824f653e2799d39f4ad0063db283007a114c8430cbe9fcc439acedf1",
+      "shownSha256": "509eed05fff4de6e4ed9603b36901e94927f25db435ca0a91ff4827dc729c15c",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-into-sun-street.png",
+      "sourceSha256": "e8eec30c54f0bcb327985601bfb53863865c6ef505de8e3c3bd1fa128ac7c836",
+      "shownSha256": "97dbfe636b577a8a6879e060f597ea49113e414fb2726f138159331158de1b3f",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both share identical structure from the same camera, so the decision is value/material read against references: the references show bright overcast daylight with retained shadow detail and mid-value ground planes, and RIGHT preserves that while LEFT crushes to black in r2c0, r1c0 and r1c1 with near-silhouette bus and street versus readable gray asphalt and shaded wall.",
+  "leftCloser": [
+    "LEFT deep red upper siding in r0c2 is closer in saturation to the deep red siding in reference-1 r0c1-r1c1"
+  ],
+  "rightCloser": [
+    "RIGHT street asphalt in r2c0-r1c0 reads as mid-gray textured asphalt matching the aerial reference r1c1 rather than LEFT near-black crush",
+    "RIGHT shadow under and beside bus in r1c0-r2c0 retains a separate contact shadow and body highlight matching reference value separation",
+    "RIGHT sunlit white siding in r1c2 and green bins in r1c2 stay bright and differentiated as in reference-1 r1c1-r2c2 rather than LEFT dark olive crush"
+  ],
+  "largestDifference": {
+    "region": "r2c0",
+    "what": "street asphalt is near-black crushed in LEFT versus readable mid-gray asphalt with curb and shadow edge in RIGHT"
+  },
+  "elapsedMs": 44705,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

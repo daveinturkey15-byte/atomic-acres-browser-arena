@@ -1,0 +1,75 @@
+{
+  "station": "nuketown2-garage",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.72,
+  "probes": {
+    "left": {
+      "expected": "THDN",
+      "answered": "THDN"
+    },
+    "right": {
+      "expected": "WCEY",
+      "answered": "WCEY"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "9eca476f8484dcd2c26312c0daecd58903216f452d0e87e4bf6a3d96fabe2038",
+      "shownSha256": "395b7f73aa6867076176bc44cc7daee2a73e857681f794e8bfa4dc14573db909",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "722c1a35d1e05d0ae35f34ece82efde2b3f1d8d9970021be8e2c3ccce2431863",
+      "shownSha256": "37cf26834061d925a403be6ae46539654a09c02d08887ed2d73d3644306bf9c1",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Against the daylight references, LEFT preserves the expected value structure and material read while RIGHT blows out sunlit planes: the center driveway in r1c1 retains gray concrete with manhole rings and shadow gradation in LEFT versus near-white wash in RIGHT, the foreground interior floor in r2c1 keeps deep contact shadow consistent with the dark reference in LEFT versus lifted lavender-gray in RIGHT, and the car roof in r1c1 stays dark vehicle paint matching the dark vehicles in references in LEFT versus light-gray in RIGHT.",
+  "leftCloser": [
+    "Center driveway in r1c1 retains concrete gray, manhole detail and shadow pattern matching reference daylight contrast",
+    "Foreground floor shadow depth in r2c1 matches dark interior reference and preserves interior/exterior hierarchy",
+    "Car rear and roof in r1c1 read as dark paint matching dark vehicles in r0c0-r1c0 references",
+    "Wood deck variation in r2c2 and r2c0 reads as brown plank material rather than oversaturated orange"
+  ],
+  "rightCloser": [
+    "Right siding wall in r0c2 and r1c2 is brighter off-white cream closer to sunlit siding in reference exterior",
+    "Distant grass strip in r1c2 is brighter green closer to sunlit grass in reference exterior"
+  ],
+  "largestDifference": {
+    "region": "r1c1",
+    "what": "exterior driveway brightness and detail: dark textured gray with shadows in LEFT versus blown-out bright cream with lost detail in RIGHT"
+  },
+  "elapsedMs": 58087,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

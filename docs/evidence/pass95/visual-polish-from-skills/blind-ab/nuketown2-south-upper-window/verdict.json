@@ -1,0 +1,73 @@
+{
+  "station": "nuketown2-south-upper-window",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "A",
+  "confidence": 0.81,
+  "probes": {
+    "left": {
+      "expected": "MTJJ",
+      "answered": "MTJJ"
+    },
+    "right": {
+      "expected": "RMEE",
+      "answered": "RMEE"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-south-upper-window.png",
+      "sourceSha256": "c5a76fdd8135d9032f3c8f103c123eb0ca5ea5d509d68d45ede1e6e99ffbb5f8",
+      "shownSha256": "7e536b0970d858e54344da18418d6cba9413816b47a42d1d6f291d51e78378c6",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-south-upper-window.png",
+      "sourceSha256": "86cd8fe6ff577d8e5b9f1385b790f6dfb05c0a282858c3f9911cb981ecc84bd2",
+      "shownSha256": "f15d0aded161df64648652b67e74dcb8d1473556cfa9e6bb45532c1c80d2a567",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Structure and proportion are identical in both, so the decision is lighting/material: the references show flat diffuse daylight with sky/window as brightest and no localized interior bloom, and LEFT in r0c2/r1c2 keeps the right siding wall at an even lower value than the window sky in r0c1 with visible horizontal grooves, while RIGHT in r1c2/r0c2 adds a warm circular hotspot that makes the wall brighter than the window and washes out the siding material, inverting the reference value relationship.",
+  "leftCloser": [
+    "LEFT keeps diffuse even value on right siding wall in r0c2/r1c2 with sky in r0c1 brightest, matching reference diffuse relationship",
+    "LEFT preserves horizontal siding groove read in r1c2/r0c2 without bloom washout, matching reference material read",
+    "LEFT keeps sill and lower wall in r1c1/r2c1 as neutral matte planes without extra glow, matching reference flat interior"
+  ],
+  "rightCloser": [
+    "RIGHT matches opening positions and exterior orange volume/trees in r0c1/r1c1 equally, with marginally punchier exterior foliage contrast in r1c0/r1c1"
+  ],
+  "largestDifference": {
+    "region": "r1c2",
+    "what": "warm circular hotspot bloom on right siding wall in RIGHT absent in LEFT, washing out grooves and making wall brightest"
+  },
+  "elapsedMs": 49984,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

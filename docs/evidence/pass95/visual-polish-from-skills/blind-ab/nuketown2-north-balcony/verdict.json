@@ -1,0 +1,66 @@
+{
+  "station": "nuketown2-north-balcony",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": false,
+  "invalidReason": "route-failed",
+  "errors": [
+    "exit 143"
+  ],
+  "winnerSide": null,
+  "winner": null,
+  "confidence": null,
+  "probes": {
+    "left": {
+      "expected": "YHUK",
+      "answered": null
+    },
+    "right": {
+      "expected": "YTNH",
+      "answered": null
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-north-balcony.png",
+      "sourceSha256": "d8d98d5453ac99c4ee9fed81877547e353ab6f9768cc7a5f00802c7415d95275",
+      "shownSha256": "1e674cd9dfdb544f6d0467b9d94e955abb218a0b1cda72f57678459ce5b3e9d3",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-balcony.png",
+      "sourceSha256": "1df56da74b4b07c6a4667a525ef3c67a36b15250d3a07d267d5994f2a618e280",
+      "shownSha256": "8e45f1d527bd2f49e82babd3241c639eb7f5d6827aa95d984bbf41a77ce01598",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": null,
+  "leftCloser": null,
+  "rightCloser": null,
+  "largestDifference": null,
+  "elapsedMs": 43700,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

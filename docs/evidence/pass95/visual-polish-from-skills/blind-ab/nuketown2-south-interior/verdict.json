@@ -1,0 +1,67 @@
+{
+  "station": "nuketown2-south-interior",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.9,
+  "probes": {
+    "left": {
+      "expected": "KKDE",
+      "answered": "KKDE"
+    },
+    "right": {
+      "expected": "JAUT",
+      "answered": "JAUT"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-south-interior.png",
+      "sourceSha256": "4f2338e4acf847e50b50eb9fed56bdcb35d358614c361c043d49b54ac1a8892d",
+      "shownSha256": "624a613544d08038c36f8b1944b7fbfc33b916e58f6282e354af298892f9b082",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-south-interior.png",
+      "sourceSha256": "702a586dea7a17f5be0676095f8efd3f60ce1617ab35bb392e5a9a30e5752d06",
+      "shownSha256": "b48e0121703bac0515019e9f3dbb92c91428a2e1e9bac933d0af70a71748bc29",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "LEFT and RIGHT are structurally identical and match the references in the same way: doorway and rear room layout in r1c1, side wall with picture and red panel in r1c0, blank wall mass in r1c2, ceiling plane in r0c1, and wood-plank floor in r2c1 all share the same volumes, openings and proportions; the only visible delta is absolute exposure/white-balance grade, which is explicitly not a criterion, so neither is closer on structure, proportion, material-class or value-relationship grounds.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c1",
+    "what": "overall exposure/grade of the wood floor and walls differs, RIGHT darker/warmer than LEFT, with no geometry change"
+  },
+  "elapsedMs": 43638,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

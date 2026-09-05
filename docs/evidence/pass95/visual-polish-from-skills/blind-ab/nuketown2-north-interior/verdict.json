@@ -1,0 +1,67 @@
+{
+  "station": "nuketown2-north-interior",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.9,
+  "probes": {
+    "left": {
+      "expected": "URMU",
+      "answered": "URMU"
+    },
+    "right": {
+      "expected": "XRWC",
+      "answered": "XRWC"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-north-interior.png",
+      "sourceSha256": "4a86cee505c012276e3dabc7a4dde9e78e9cd85aa07b5bf5a6666e4145f60ac7",
+      "shownSha256": "66145f89802290143b6d1c4101711c108abcee8bc72e39e620352ff794763ddc",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-interior.png",
+      "sourceSha256": "1b1ef8651267906154254fdea33fcdadb5475550a4e57e81310749ebd304dda6",
+      "shownSha256": "9270492fd680223c985a671a6076dab273f7f2c663400a7a9409d906296d9a63",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both renders show identical structure, layout and proportion against the interior reference: same doorway in r1c0-r1c1, same island and window in r1c1, same blank wall in r1c2, same wood-plank floor in r2c0-r2c2 and same ceiling plane in r0c0-r0c2 with preserved value order ceiling brightest, walls mid, floor darkest and same contact shadows; the only visible deltas in r1c0 red edge, r0c0 ceiling tint and r2c1 floor brightness are absolute colour grade, which is explicitly not a criterion.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r1c0",
+    "what": "far-left red panel reads dark maroon in LEFT versus bright saturated red in RIGHT"
+  },
+  "elapsedMs": 34469,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

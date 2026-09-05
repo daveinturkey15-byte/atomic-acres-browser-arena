@@ -1,0 +1,73 @@
+{
+  "station": "nuketown2-south-yard",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "A",
+  "confidence": 0.82,
+  "probes": {
+    "left": {
+      "expected": "DNWK",
+      "answered": "DNWK"
+    },
+    "right": {
+      "expected": "UYRW",
+      "answered": "UYRW"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-south-yard.png",
+      "sourceSha256": "26195176ff122ba13801216fe72fe2bdb4249f9e60662238424bd0432990967a",
+      "shownSha256": "bb9027af6879040f80883ea8d193d6b4e7bdbf0312f5672487172d6ef3b4bcd2",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-south-yard.png",
+      "sourceSha256": "b40c553c070f3aee0f77b80bd314111c2076e008d14f553ac6e5cdfdb65a1334",
+      "shownSha256": "e073f17dbe81960ab9bc7d93690b1f0266358d5a90bd2caa6fb7c0cf270b8065",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both share the same structure as the references in r1c1 and r2c1, but RIGHT preserves the reference daylight value structure with bright white siding in r1c1, sun-lit grass and white discs in r2c2, and a left-side cast shadow in r2c0, while LEFT crushes the same areas in r2c0 and r2c1 to near-black and darkens the house walls in r0c1 to tan, disagreeing with the bright overcast sky and lit-versus-shadow relationship seen in the reference set.",
+  "leftCloser": [
+    "Pedestal side in r2c1 reads near-black as in the shadowed pedestal side of the eye-level reference, versus bright green in RIGHT"
+  ],
+  "rightCloser": [
+    "House white siding in r1c1 reads as white sun-lit masonry as in references versus dark tan in LEFT in r1c1",
+    "Grass and white disc path in r2c2 remain bright green with visible blades as in references versus crushed black in LEFT in r2c2",
+    "Shadow falls left in r2c0 with lit right side in r2c2 matching reference shadow direction and depth versus whole-frame darkness in LEFT in r2c0"
+  ],
+  "largestDifference": {
+    "region": "r2c0",
+    "what": "bottom-left grass is near-black crushed shadow in LEFT versus bright sun-lit green grass in RIGHT"
+  },
+  "elapsedMs": 64014,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

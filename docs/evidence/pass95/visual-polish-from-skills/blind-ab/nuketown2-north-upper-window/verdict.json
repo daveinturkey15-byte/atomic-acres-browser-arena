@@ -1,0 +1,73 @@
+{
+  "station": "nuketown2-north-upper-window",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "A",
+  "confidence": 0.76,
+  "probes": {
+    "left": {
+      "expected": "XDXM",
+      "answered": "XDXM"
+    },
+    "right": {
+      "expected": "JHKC",
+      "answered": "JHKC"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\artifacts\\vp\\after\\nuketown2\\nuketown2-north-upper-window.png",
+      "sourceSha256": "8a2bd1fb2e87a8e231846ae658bb81eacc6ac270d91243f3b342e8c8b91636cb",
+      "shownSha256": "43eac91d7b12d5d226b23a9b7815c53f022562b04b06c3fa65820a3a42099c7d",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-v-visual-polish-from-skills\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-north-upper-window.png",
+      "sourceSha256": "71b2492f702d02d68adc43b50c41213e44dd001489c97fbe4135985d4acc61db",
+      "shownSha256": "d668729ea7f701e5853728888cd0e9513c38a6b94ea42efbe4e9b3e7e965d2c6",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both share identical window structure in r0c1-r2c1, but against the daylight reference set RIGHT is closer: LEFT makes the interior red wall in r1c2 the brightest plane with an intense orange hotspot not present in references, while RIGHT keeps the window opening in r0c1-r1c1 brightest and shows window-mullion sunlight patches on the floor in r2c1 consistent with the strong daylight shadows in the references, and renders the siding in r1c2 as flat matte boards without a false emissive.",
+  "leftCloser": [
+    "LEFT deep red siding value in r0c2-r1c2 slightly closer to the saturated upper-facade red in the exterior reference in r0c1-r1c1"
+  ],
+  "rightCloser": [
+    "RIGHT lacks the false hotspot on the right wall in r1c2, matching flat daylight siding in references",
+    "RIGHT floor sunlight patches in r2c1 match daylight shadow projection seen in references, while LEFT floor in r2c0-r2c2 is flat with no light relationship",
+    "RIGHT keeps brightest plane at the window opening in r0c1-r1c1 rather than on the interior wall as LEFT does in r1c2"
+  ],
+  "largestDifference": {
+    "region": "r1c2",
+    "what": "LEFT has an intense yellow-orange radial glow on the red siding while RIGHT shows flat uniform siding with no hotspot"
+  },
+  "elapsedMs": 38394,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}
