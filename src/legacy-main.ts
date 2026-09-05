@@ -1255,7 +1255,7 @@ import {
   reloadRequestId,
   type LocalReloadPending,
 } from './local-reload-authority';
-import { authoredRespawnLoadout } from './respawn-loadout-authority';
+import { admitAuthoritativeRespawnLoadout, authoredRespawnLoadout } from './respawn-loadout-authority';
 import {
   hostLobbyAdmissionAttemptIsCurrent,
   type HostLobbyAdmissionAttempt,
@@ -13501,23 +13501,14 @@ function onNetworkMessage(message: GameMessage): void {
         const authoritativeHealth = respawnAdmission.state;
         remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
         respawned = respawnAdmission.respawned || redeployed;
-        // A death-to-life transition is a host-owned loadout boundary. The
-        // guest's packet may still contain the prior special weapon, swapped
-        // slot, or depleted ammo; only the last canonical class fields retained
-        // by the host may seed this new life. Explicit redeploy is different:
-        // its already-authorized class selection is the new authored loadout.
-        const respawnLoadout = respawnAdmission.respawned
-          ? authoredRespawnLoadout({
-              primary: remote.snapshot.primary,
-              secondary: remote.snapshot.secondary,
-              grenade: remote.snapshot.grenade,
-            })
-          : authoredRespawnLoadout(incoming);
-        admittedIncoming = {
-          ...incoming,
-          ...respawnLoadout,
-          hp: authoritativeHealth.hp,
-        };
+        // A death-to-life transition is a host-owned loadout boundary; only a
+        // real respawn/redeploy resets to the authored primary. Continuous
+        // state preserves the admitted weapon so a secondary swap survives.
+        admittedIncoming = admitAuthoritativeRespawnLoadout(incoming, {
+          primary: remote.snapshot.primary,
+          secondary: remote.snapshot.secondary,
+          grenade: remote.snapshot.grenade,
+        }, { respawned: respawnAdmission.respawned, redeployed }, authoritativeHealth.hp);
         if (respawned) {
           remoteReloadResultCache.clearPlayer(incoming.id); authorizedRemotePickups.delete(incoming.id);
           const grenadeCount = remoteGrenadeAuthorities.get(incoming.id)?.remaining ?? 1;
