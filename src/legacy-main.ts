@@ -74,8 +74,6 @@ import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
 import {
   ArenaVisualStreamController,
   findAuthoredArenaReviewCamera,
-  loadedArenaVisualDefinitionIds,
-  loadedArenaVisualDefinitionReviewCameraIds,
   loadArenaVisualModule,
   type ArenaVisualSwitchReceipt,
 } from './rendering/arena-visual-stream';
@@ -32587,10 +32585,6 @@ const debugWindow = window as Window & {
     sampleViewmodelRigExtent: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
-    sampleArenaReviewCameraRegistry: () => {
-      loadedArenaIds: readonly string[];
-      cameraIdsByArena: Readonly<Record<string, readonly string[]>>;
-    };
     sampleWeather: () => Record<string, unknown>;
     // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
     sampleLightingConditions: () => Record<string, unknown>;
@@ -33835,11 +33829,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
   // and never referenced by gameplay.
   sampleSceneGraph: () => scene,
-  sampleArenaReviewCameraRegistry: () => {
-    const loadedArenaIds = loadedArenaVisualDefinitionIds();
-    const cameraIdsByArena = loadedArenaVisualDefinitionReviewCameraIds();
-    return { loadedArenaIds, cameraIdsByArena };
-  },
   // HF-371: prove rain, weather AND ambient air are actually running, not
   // merely imported.
   sampleWeather: () => ({
