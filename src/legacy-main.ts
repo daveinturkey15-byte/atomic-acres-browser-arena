@@ -1075,7 +1075,7 @@ import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } fr
 // scene.environmentIntensity off the live scene rather than proving the code
 // exists, which is the difference between this and the evidence row that let
 // the null-environment defect hide behind nine passing unit tests.
-import { assertArenaEnvironmentLive, prewarmArenaEnvironmentIbl } from './rendering/arena-environment-ibl';
+import { assertArenaEnvironmentLive } from './rendering/arena-environment-ibl';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -4095,27 +4095,20 @@ let menuArenaEnvironmentPrewarmPromise: Promise<void> | null = null;
 function prepareMenuArenaEnvironment(): Promise<void> {
   if (renderRuntime.backend !== 'webgpu') return Promise.resolve();
   const arenaId = selectedArena.id;
-  const operation = loadArenaVisualModule(arenaId)
+  const operation: Promise<void> = loadArenaVisualModule(arenaId)
     .then((module) => {
       applySkyBackdrop(scene, module.definition.atmosphere.preset, (url) => {
         arenaVisualStream.recordSelectedAssetRequest(arenaId, url);
       });
-      return waitForSkyBackdropAdmission(scene);
-    })
-    .then(() => prewarmArenaEnvironmentIbl(
-      renderRuntime.renderer,
-      scene,
-      arenaId,
-      graphicsRuntime.reflectionQuality,
-      graphicsRuntime.environmentIntensity,
-      graphicsRuntime.reflectionScale,
-    ));
-  menuArenaEnvironmentPrewarmPromise = operation.catch((error: unknown) => {
-    // Menu prewarm is an optimization. The admitted transition remains the
-    // fallback authority if a backdrop or PMREM asset cannot be prepared here.
+      return waitForSkyBackdropAdmission(scene).then(() => undefined);
+    });
+  const settled = operation.catch((error: unknown) => {
+    // Menu sky admission is an optimization. The admitted transition remains
+    // the fallback authority if the backdrop cannot be prepared here.
     console.warn(`[${arenaId} menu environment prewarm skipped]`, error);
   });
-  return menuArenaEnvironmentPrewarmPromise;
+  menuArenaEnvironmentPrewarmPromise = settled;
+  return settled;
 }
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
 let appliedTslArenaDefinitions = 0;
