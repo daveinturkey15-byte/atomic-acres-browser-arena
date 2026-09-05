@@ -16,8 +16,12 @@ export type StickCurve = Readonly<{
 
 export type GamepadSettings = Readonly<{
   version: 1;
+  /** Master switch: false makes the runtime report no pad input (menus stay keyboard-driven). */
+  enabled: boolean;
   moveCurve: StickCurve;
   lookCurve: StickCurve;
+  /** Right-stick look rate multiplier (0.2–4, 1 = unchanged). Applied after the curve. */
+  lookSensitivity: number;
   invertLookY: boolean;
   rumble: boolean;
 }>;
@@ -30,11 +34,15 @@ export const STICK_CURVE_LIMITS = Object.freeze({
   outer: Object.freeze({ min: 0, max: 0.2 }),
 });
 
+export const LOOK_SENSITIVITY_LIMITS = Object.freeze({ min: 0.2, max: 4 });
+
 /** Sensible defaults: the values the legacy poll loop used, plus a small outer deadzone. */
 export const DEFAULT_GAMEPAD_SETTINGS: GamepadSettings = Object.freeze({
   version: 1,
+  enabled: true,
   moveCurve: Object.freeze({ deadzone: 0.14, exponent: 1.6, outer: 0.02 }),
   lookCurve: Object.freeze({ deadzone: 0.1, exponent: 1.6, outer: 0.03 }),
+  lookSensitivity: 1,
   invertLookY: false,
   rumble: true,
 });
@@ -56,8 +64,10 @@ export function normalizeGamepadSettings(value: unknown): GamepadSettings {
   const record = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   return Object.freeze({
     version: 1,
+    enabled: typeof record.enabled === 'boolean' ? record.enabled : DEFAULT_GAMEPAD_SETTINGS.enabled,
     moveCurve: normalizeStickCurve(record.moveCurve, DEFAULT_GAMEPAD_SETTINGS.moveCurve),
     lookCurve: normalizeStickCurve(record.lookCurve, DEFAULT_GAMEPAD_SETTINGS.lookCurve),
+    lookSensitivity: clampNumber(record.lookSensitivity, LOOK_SENSITIVITY_LIMITS.min, LOOK_SENSITIVITY_LIMITS.max, DEFAULT_GAMEPAD_SETTINGS.lookSensitivity),
     invertLookY: typeof record.invertLookY === 'boolean' ? record.invertLookY : DEFAULT_GAMEPAD_SETTINGS.invertLookY,
     rumble: typeof record.rumble === 'boolean' ? record.rumble : DEFAULT_GAMEPAD_SETTINGS.rumble,
   });

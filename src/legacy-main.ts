@@ -35,9 +35,10 @@ import {
   type StanceTransitionSample,
 } from './prone-transition';
 import './style.css';
-// GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
+// GAMEPAD: PASS 84 Lane E runtime + PASS 95 menu nav/sensitivity/enable — pad runtime, tiered aim assist, HUD glyphs, settings panel.
 import {
   GamepadInputRuntime,
+  GamepadMenuNav,
   NO_AIM_ASSIST,
   applyHudInputScheme,
   applyStrikeTargetingCancelGlyph,
@@ -6983,6 +6984,8 @@ let lastGamepadAssist: AimAssistResult = NO_AIM_ASSIST;
 let lastTouchAssist: AimAssistResult = NO_AIM_ASSIST;
 let lastTouchSnapDeg = 0;
 let gamepadSettingsPanel: GamepadSettingsPanel | null = null;
+/** PASS 95 gamepad lane: d-pad/A/B menu navigator so a pad alone can start Solo. */
+const gamepadMenuNav = new GamepadMenuNav();
 /** Aim points sit this far above the body proxy centre (≈ upper chest, 1.28 m standing). */
 const AIM_ASSIST_POINT_LIFT_M = 0.3;
 
@@ -29173,6 +29176,12 @@ function pollGamepad(dt: number): void {
     if (tacticalMapOpen) cancelSupportTargeting(true, false);
     else if (menuLifecycle.surface === 'paused-match') resumeActiveMatchFromMenu(false);
     else if (menuLifecycle.surface === 'hidden') openActiveMatchPause('mobile-pause');
+  }
+  // PASS 95 gamepad lane: d-pad/A/B menu navigation (Solo reachable without mouse).
+  // Runs on the same frame so gameplay edges and menu focus never double-consume:
+  // the navigator only acts while the deployment menu is open.
+  if (!menu.classList.contains('hidden') && menuLifecycle.surface !== 'hidden') {
+    gamepadMenuNav.update(document, frame, now, true);
   }
   if (!padTrigger) gamepadTriggerArmed = true;
   else if (!canControlPlayer) gamepadTriggerArmed = false;
