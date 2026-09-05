@@ -108,6 +108,7 @@ const MENU_URL =
 type DebugApi = {
   startSolo: () => void;
   selectArena: (id: string) => Promise<void>;
+  samplePresentationTelemetry: () => Record<string, unknown>;
   snapshot: () => {
     matchPhase: 'warmup' | 'active' | 'ended';
     gameStarted: boolean;
@@ -127,6 +128,7 @@ async function captureDeploymentDiagnostic(page: Page): Promise<DeploymentDiagno
   return page.evaluate(() => {
     const api = (window as unknown as { __ATOMIC_ACRES_DEBUG__?: DebugApi }).__ATOMIC_ACRES_DEBUG__;
     const state = api?.snapshot();
+    const presentation = api?.samplePresentationTelemetry?.() ?? null;
     const bootstrap = state?.bootstrap as Record<string, unknown> | undefined;
     const arenaSelection = state?.arenaSelection as Record<string, unknown> | undefined;
     const streaming = arenaSelection?.streaming as Record<string, unknown> | undefined;
@@ -148,6 +150,7 @@ async function captureDeploymentDiagnostic(page: Page): Promise<DeploymentDiagno
             profile: transition.profile,
           }
         : null,
+      presentation,
       matchPhase: state?.matchPhase ?? null,
       gameStarted: state?.gameStarted ?? false,
     };
