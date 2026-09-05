@@ -48,7 +48,14 @@
 //     --out-dir docs/evidence/pass95/frame-hitches
 //
 // CONTRACT NOTES
-//   - Headless installed Chrome, stock flags plus --mute-audio, off-screen.
+//   - Headless installed Chrome (channel: 'chrome') under PASS73_NATIVE_WEBGPU=1,
+//     stock flags per tests/e2e/pass93-stock-flags-boot.spec.ts (mute-audio,
+//     backgrounding disables, off-screen) plus --enable-precise-memory-info for
+//     the heap sampler. No --enable-unsafe-webgpu / --ignore-gpu-blocklist /
+//     --use-angle (PASS 92 incident: the unsafe flag hid a real Chrome shader
+//     bug, so measuring under it is dishonest).
+//   - --disable-frame-rate-limit + --disable-gpu-vsync are DISCLOSED measurement
+//     choices: the numbers are frame COST, not a vsync cap.
 //   - This script never widens a budget, fence or threshold; it only reads.
 //   - HITCH_MS is a REPORTING threshold for this instrument, not a gate.
 // ===========================================================================
@@ -81,6 +88,13 @@ const BOOT_TIMEOUT_MS = 240_000;
 const HARD_KILL_MS = Number(arg('--hard-kill-ms', '235000'));
 
 mkdirSync(OUT_DIR, { recursive: true });
+// The run report claims PASS73_NATIVE_WEBGPU=1; enforce it so a bundled-Chromium
+// launch (no native WebGPU adapter on this machine) fails loudly instead of
+// producing adapter-less numbers. This matches pass74-arena-boot-smoke's rule.
+if (process.env.PASS73_NATIVE_WEBGPU !== '1') {
+  console.error('[hitch] REFUSAL: rerun with PASS73_NATIVE_WEBGPU=1 (installed Chrome with a real adapter).');
+  process.exit(2);
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -348,7 +362,12 @@ const TRACE_CAUSE = new Map([
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
-  args: ['--mute-audio', '--window-position=-4000,-4000', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist',
+  // Stock flags per tests/e2e/pass93-stock-flags-boot.spec.ts: mute-audio,
+  // backgrounding disables, off-screen. --enable-precise-memory-info feeds the
+  // heap sampler. --disable-frame-rate-limit + --disable-gpu-vsync are disclosed
+  // above: frame COST, not a vsync cap. Never --enable-unsafe-webgpu,
+  // --ignore-gpu-blocklist, --use-angle (PASS 92 swizzle-view incident).
+  args: ['--mute-audio', '--window-position=-4000,-4000',
     '--disable-frame-rate-limit', '--disable-gpu-vsync', '--enable-precise-memory-info',
     '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding', '--disable-features=CalculateNativeWinOcclusion'],
@@ -424,7 +443,10 @@ try {
       transferMode: 'ReportEvents',
       traceConfig: {
         recordMode: 'recordAsMuchAsPossible',
-        includedCategories: ['devtools.timeline', 'blink.user_timing', 'disabled-by-default-devtools.timeline'],
+        includedCategories: ['devtools.timeline', 'blink.user_timing', 'disabled-by-default-devtools.timeline',
+          // GC attribution: MajorGC/MinorGC/V8.GCFinalizeMC mapped in TRACE_CAUSE
+          // never appeared because no v8/blink GC stream was recorded.
+          'v8', 'disabled-by-default-v8.gc', 'disabled-by-default-blink.gc'],
       },
     }).catch((error) => { console.error(`[hitch] tracing unavailable: ${error}`); });
   }
@@ -576,6 +598,17 @@ for (const frame of hitches) {
   if (causes.length === 0) {
     charge('unattributed-present', jsMs !== null ? Math.max(0, frame.frameMs - jsMs) : frame.frameMs, frame);
     causes.push({ id: 'unattributed-present', ms: round(frame.frameMs - (jsMs ?? 0), 2), count: 1 });
+  } else {
+    // Residual bucket: previously a frame with one small charged cause left the
+    // rest of its milliseconds out of the table (candidate-7 table summed to
+    // 430.8 of 718.6 hitch ms). Charge the remainder so coverage is explicit.
+    // Trace-side ms can overlap the JS task, so clamp at zero, never negative.
+    const accountedAfter = causes.reduce((sum, entry) => sum + entry.ms, 0);
+    const residual = frame.frameMs - accountedAfter;
+    if (residual > HITCH_MS * 0.5) {
+      charge('unattributed-residual', residual, frame);
+      causes.push({ id: 'unattributed-residual', ms: round(residual, 2), count: 1 });
+    }
   }
   frame.causes = causes;
 }
@@ -623,6 +656,10 @@ report.longTasks = {
   worstMs: round(sampled.longTasks.reduce((max, task) => Math.max(max, task.durationMs), 0), 1),
 };
 
+const attributedMs = table.reduce((sum, row) => sum + row.totalMs, 0);
+report.attributionCoverage = { attributedMs: round(attributedMs, 1),
+  hitchTotalMs: report.hitches.totalMs,
+  pct: report.hitches.totalMs > 0 ? round((attributedMs / report.hitches.totalMs) * 100, 1) : 100 };
 const jsonPath = join(OUT_DIR, `${LABEL}.json`);
 writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
 
@@ -645,6 +682,7 @@ lines.push(`| hitches >= ${HITCH_MS} ms | ${report.hitches.count} |`);
 lines.push(`| frames >= 100 ms | ${report.hitches.over100} |`);
 lines.push(`| frames >= 33.4 ms | ${report.hitches.over33} |`);
 lines.push(`| hitch time total ms | ${report.hitches.totalMs} |`);
+lines.push(`| attributed ms (% of hitch total) | ${report.attributionCoverage.attributedMs} (${report.attributionCoverage.pct}%) |`);
 lines.push('');
 lines.push(`## Attribution of the ${hitches.length} frames at or over ${HITCH_MS} ms`);
 lines.push('');
