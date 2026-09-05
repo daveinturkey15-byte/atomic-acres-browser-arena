@@ -1076,19 +1076,35 @@ export function addInteractables(builder: any): void {
     }
   }
 
+  // =====================================================================
+  // PASS 95 layout stage, L2 — THE MIDDLE IS CLEARED (SPEC.md section 7).
+  // =====================================================================
+  //
+  // Owner, 2026-08-31: "remove all the messy clutter in the middle etc".
+  // The rule the layout stage applies is mechanical and lives in
+  // src/farcrysis-layout.ts (measureFarcrysisMidMapMasses): every solid
+  // inside chebyshev 20 m of the island centre either blocks a sightline
+  // the eye-to-eye occlusion metric says needs blocking (removing it would
+  // lengthen a measured line past FARCRYSIS_MAX_SIGHTLINE), sits within
+  // cover reach of a spawn, or is the core / tower / a palm trunk — or it
+  // is not placed. MEASURED at eda54adf before this edit
+  // (docs/evidence/pass95/farcrysis-rebuild/layout-baseline-eda54adf.json):
+  // 67 masses in the middle, 29 with no job, 21 of them the interactables
+  // that used to be placed here — crates 05-12, 23-26, 31, 33; barrels 07,
+  // 08, 20, 23; sandbag-06; cover-jungle-07 and the cover-jungle-08 stack.
+  // None was the first occluder of any line that would otherwise exceed
+  // 22 m, none was within 6 m of a spawn, and every one sat on a core door
+  // approach or the cardinal lanes the comments below claim to keep clear.
+  // They are gone; the ids are retired, not renumbered. The other 8 with no
+  // metric job are enhanced-palm trunk colliders, exempted as vegetation
+  // (their visuals stay; a walk-through palm would be a parity defect).
+  // farcrysis-layout.test.ts holds `unjustified` at 0 from here on.
+  //
   // -- Core approaches (N/S/E/W) — stacked near the entrances -----------
-  placeCrate(builder, 'farcrysis-crate-05',  -4, -10, 0.9);
-  placeCrate(builder, 'farcrysis-crate-06',   4,  10, 0.9);
-  placeCrate(builder, 'farcrysis-crate-07', -10,  -4, 0.9);
-  placeCrate(builder, 'farcrysis-crate-08',  10,   4, 0.9);
 
   // -- Just outside the core building, NW and SE corners -----------------
-  placeCrate(builder, 'farcrysis-crate-09',  -6,  -6, 1.1);
-  placeCrate(builder, 'farcrysis-crate-10',   6,   6, 1.1);
 
   // -- Inside the core, flanking the desk on north and south sides -------
-  placeCrate(builder, 'farcrysis-crate-11',   0, -1.8, 0.85);
-  placeCrate(builder, 'farcrysis-crate-12',   0,  1.8, 0.85);
 
   // -- Beach / lagoon edge, near the skiff cover positions ---------------
   placeCrate(builder, 'farcrysis-crate-13', -44, -20, 1.0);
@@ -1120,8 +1136,6 @@ export function addInteractables(builder: any): void {
   // HF-360: barrel-08 moved from (3, 3.5) — that spot is now inside the
   // catwalk stair flight (farcrysis.ts farcrysis-core-stair-*), and the
   // barrel sat entombed inside the steps. West mirror keeps the pair.
-  placeBarrel(builder, 'farcrysis-barrel-07',  -3, -3.5);
-  placeBarrel(builder, 'farcrysis-barrel-08',  -3,  3.5);
 
   // -- barrels 09/10 are now landmark picket pieces (SW and NE approach
   //    kits, placed in section 1 from the shared landmark frames).
@@ -1259,12 +1273,8 @@ export function addInteractables(builder: any): void {
   // ≥3 m from every spawn and patrol waypoint.
 
   // -- Core door south: west + east flanks ---------------------------------
-  placeCrate(builder, 'farcrysis-crate-23',  -6, -4.0, 0.9);
-  placeCrate(builder, 'farcrysis-crate-24',   6, -4.0, 0.9);
 
   // -- Core door north: west + east flanks ---------------------------------
-  placeCrate(builder, 'farcrysis-crate-25',  -6,  4.0, 0.9);
-  placeCrate(builder, 'farcrysis-crate-26',   6,  4.0, 0.9);
 
   // -- Mid-jungle NW + SE pockets, 8.49 m outboard of the nearest grove
   //    centre on the pure tangential bearing (radial 37.7 m) --------------
@@ -1328,8 +1338,6 @@ export function addInteractables(builder: any): void {
   placeBarrel(builder, 'farcrysis-barrel-19', 48, 27);
 
   // -- Tower approach (NW) — barrel + crate near the research tower --------
-  placeBarrel(builder, 'farcrysis-barrel-20', -11, -11);
-  placeCrate(builder, 'farcrysis-crate-31', -10, -6.5, 0.9);
 
   // -- Beach ring — south, north, west beach interactables -----------------
   placeBarrel(builder, 'farcrysis-barrel-21', -6, -54);
@@ -1340,7 +1348,6 @@ export function addInteractables(builder: any): void {
   placeSandbagWall(builder, 'farcrysis-sandbag-05', 38, 30, 2.2, 0.6, 0.45);
 
   // -- Tower approach sandbag cover ----------------------------------------
-  placeSandbagWall(builder, 'farcrysis-sandbag-06', -13, -8, 2.2, 0.6, 0.45);
 
   // -- SE beach sandbag cover ----------------------------------------------
   placeSandbagWall(builder, 'farcrysis-sandbag-07', 52, -52, 2.2, 0.6, 0.45);
@@ -1356,16 +1363,12 @@ export function addInteractables(builder: any): void {
   // addInteractables pattern.
 
   // -- East jungle mid-ring: crate fills gap between cover-jungle-06 and core
-  placeCrate(builder, 'farcrysis-crate-33', 10, -8, 0.9);
 
   // -- West jungle mid-ring: barrel near cover-jungle-05
-  placeBarrel(builder, 'farcrysis-barrel-23', -12, -4);
 
   // -- East jungle approach: fallen palm trunk cover
-  placeFallenTrunk(builder, 'farcrysis-cover-jungle-07', 12, -10, 3.0, 0.4);
 
   // -- West jungle: crate stack cover near core approach
-  placeCrateCover(builder, 'farcrysis-cover-jungle-08', -14, -4);
 
   // -- SW beach fringe: sandbag wall above lagoon edge
   placeSandbagWall(builder, 'farcrysis-sandbag-08', -40, -52, 2.2, 0.6, 0.45);
