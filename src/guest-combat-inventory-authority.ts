@@ -126,6 +126,37 @@ export function createGuestCombatInventoryProjection(
   });
 }
 
+/**
+ * Apply a host-authored equipped-pair projection to a remote presentation
+ * ledger. The projection never replaces the full ledger and cannot change the
+ * remote loadout; it only refreshes counters for the already admitted pair.
+ */
+export function applyGuestCombatInventoryProjection(
+  authority: GuestCombatInventory,
+  projection: GuestCombatInventoryProjection,
+  expectedPrimary: PrimaryWeaponId,
+  expectedSidearm: SidearmWeaponId,
+): GuestCombatInventory | null {
+  if (!Number.isSafeInteger(projection.revision) || projection.revision < 0
+    || projection.primary.weapon !== expectedPrimary
+    || projection.sidearm.weapon !== expectedSidearm
+    || (projection.grenades !== 0 && projection.grenades !== 1)) return null;
+  const projected = [projection.primary, projection.sidearm] as const;
+  for (const counter of projected) {
+    const spec = WEAPONS[counter.weapon];
+    if (!Number.isSafeInteger(counter.ammo) || !Number.isSafeInteger(counter.reserve)
+      || counter.ammo < 0 || counter.ammo > spec.mag
+      || counter.reserve < 0 || counter.reserve > spec.reserve) return null;
+  }
+  const ammo = { ...authority.ammo };
+  const reserve = { ...authority.reserve };
+  for (const counter of projected) {
+    ammo[counter.weapon] = counter.ammo;
+    reserve[counter.weapon] = counter.reserve;
+  }
+  return freezeInventory(ammo, reserve, projection.grenades);
+}
+
 export function captureGuestCombatInventoryProjection(
   ammo: WeaponCounters,
   reserve: WeaponCounters,

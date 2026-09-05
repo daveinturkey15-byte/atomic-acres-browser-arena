@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const network = readFileSync(new URL('./network.ts', import.meta.url), 'utf8');
 const protocol = readFileSync(new URL('./protocol.ts', import.meta.url), 'utf8');
+const relay = readFileSync(new URL('./multiplayer-relay.ts', import.meta.url), 'utf8');
 
 /** The body of a top-level `function name(` declaration, up to the next one. */
 function functionBody(source: string, declaration: string): string {
@@ -135,6 +136,33 @@ describe('HF-504 P-3/P-4 pickup authority - claims stay host-only and results ar
 });
 
 describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () => {
+  it('drives guest A weapon swap through host admission to guest B', () => {
+    const swap = functionBody(main, 'function switchWeapon(index: number): void {');
+    expect(swap).toContain('network.send(createStateMessage());');
+
+    const stateStart = main.indexOf('const canonicalState = createCanonicalRemoteState(');
+    const stateEnd = main.indexOf('\n        network.send(canonicalState, admittedIncoming.id);', stateStart);
+    const canonicalState = main.slice(stateStart, stateEnd);
+    expect(relay).toMatch(/combatInventory \? \{ combatInventory \} : \{\}/);
+    expect(canonicalState).toContain('createCanonicalRemoteState(');
+    expect(main).toContain('network.send(canonicalState, admittedIncoming.id);');
+
+    const guestView = functionBody(main, 'function onNetworkMessage(');
+    expect(guestView).toContain('applyRemoteInventoryProjectionToMaps(');
+    // F1: the host allow-lists the guest-claimed equipped weapon before it can
+    // be stored or rebroadcast. The previous weapon-spread pin matched 3
+    // railgun paths on base and was green without this fix.
+    expect(guestView).toContain('clampAdmittedHeldWeapon(admittedIncoming, remoteLoadoutSidearm(admittedIncoming))');
+  });
+
+  it('fans a host reload result out and applies it to the non-claimant peer view', () => {
+    const sender = functionBody(main, 'function sendRemoteReloadResult(');
+    expect(sender).toContain('network.send(result);');
+    expect(sender).not.toContain('network.sendToPlayer(playerId, result);');
+    expect(main).toContain('function acceptRemoteReloadResult(');
+    expect(main).toContain('acceptRemoteReloadResult(message);');
+  });
+
   it('does not invent a new life id for a bounded movement resynchronization', () => {
     const state = functionBody(main, 'function onNetworkMessage(');
     const continuityDecision = state.indexOf('const admittedContinuity');

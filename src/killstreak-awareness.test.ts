@@ -24,6 +24,7 @@ import {
   killstreakAudioGain,
   killstreakAwarenessPhase,
   killstreakDamageSourceCue,
+  killstreakDamageSourceCueForVictim,
   showKillstreakBanner,
   supportDropCue,
   type KillstreakAnnounceMessage,
@@ -272,6 +273,18 @@ describe('HF-509 banner and damage source', () => {
       sourceId: 'killstreak:ks-activation-7-1', label: 'CHOPPER GUNNER', source: 'chopper', position: [12, 26, -8], damage: 18, atMs: 900,
     });
     expect(killstreakDamageSourceCue({ ...event, source: 'carpet-bomber' }, 900)).toMatchObject({ label: 'CARPET BOMBER' });
+  });
+
+  it('projects the host damage receipt into a non-controller victim HUD', () => {
+    const event: KillstreakDamageEvent = {
+      resultId: 'ks-result-7-2', activationId: 'ks-activation-7-2', source: 'chopper', ownerId: 'host', targetId: 'guest-b', targetLifeId: 4,
+      targetPosition: [0, 0, 0], damage: 18, origin: [12, 26, -8], endpoint: [0, 1, 0], tracerOrigin: [12, 25, -8], atMs: 500,
+    };
+    const message = { events: [event] };
+    expect(killstreakDamageSourceCueForVictim(message, 'guest-b', 4, 900)).toMatchObject({
+      label: 'CHOPPER GUNNER', source: 'chopper', damage: 18,
+    });
+    expect(killstreakDamageSourceCueForVictim(message, 'guest-a', 4, 900)).toBeNull();
   });
 });
 
