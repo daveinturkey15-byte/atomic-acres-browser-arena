@@ -6176,7 +6176,7 @@ let hostTimeMapping: HostTimeMapping = createHostTimeMapping();
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
-let localResumeToken = '';
+let localResumeToken = ''; let pendingVoluntaryActiveMatchRejoinRoomCode = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
 /**
  * Lane J: performance.now() of the first in-match message this client admitted
@@ -8975,13 +8975,13 @@ function initializeHostLobby(): void {
 }
 
 function sendLobbyJoin(): void {
-  if (network.role !== 'client') return;
+  if (network.role !== 'client') return; const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0; if (!resumingVoluntaryActiveMatch) pendingVoluntaryActiveMatchRejoinRoomCode = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
   clientReconnectWorldRepairAttempts = 0;
   clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
-  if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
+  if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
     pendingGuestResumeAuthority = null;
   } else {
@@ -9022,7 +9022,7 @@ function sendLobbyJoin(): void {
 }
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
-  if (network.role !== 'client' || !gameStarted) return;
+  if (network.role !== 'client' || !gameStarted) return; const voluntaryRejoin = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0; if (voluntaryRejoin) { awaitingCanonicalGuestAuthority = true; awaitingAuthoritativeRejoinContinuity = true; pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch; }
   const repairReadyNow = performance.now();
   const admission = clientWorldRepairAdmission;
   const reconnectRepair = awaitingCanonicalGuestAuthority
@@ -9041,7 +9041,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
   network.send(loadoutMessage);
   if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission, repairReadyNow);
   if (reconnectRepair) clientReconnectWorldRepairAttempts += 1;
-  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
+  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null; if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = '';
 }
 
 function rejectLobbyPlayer(
@@ -9173,7 +9173,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
-
+function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -10905,10 +10905,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     return true;
   }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
-  if (message.type === 'leave' && privateLobbySnapshot) {
-    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary);
+  if (message.type === 'leave' && privateLobbySnapshot) { const hostMatchIsActive = privateLobbySnapshot.phase === 'active' || matchState.phase === 'active' || gameStarted; const retainActiveMatchRejoin = message.voluntary && hostMatchIsActive && hostLobbyMembers.has(message.playerId);
+    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary || retainActiveMatchRejoin);
     if (network.role === 'host') {
-      if (message.voluntary) {
+      if (message.voluntary && !retainActiveMatchRejoin) {
         hostLobbyMembers.delete(message.playerId);
         hostLobbyTokens.delete(message.playerId);
         network.forgetPlayerRejoinCredential(message.playerId);
@@ -13408,7 +13408,7 @@ function onNetworkMessage(message: GameMessage): void {
       network.send({
         type: 'join',
         player: { ...remote.snapshot, hp: retainedHealth?.hp ?? remote.snapshot.hp },
-      });
+      }); network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() }); network.sendToPlayer(incoming.id, createStateMessage()); const repairNow = performance.now(); for (const candidate of remotes.values()) { if (candidate.snapshot.id === incoming.id) continue; sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow); }
       network.send(createStateMessage());
       broadcastOverdriveState(performance.now());
       broadcastRailgunState();
@@ -30509,7 +30509,7 @@ function restartSoloMatch(): void {
 
 function returnToMainMenu(): void {
   invalidateMatchAdmission('Player returned to the main menu');
-  const leavingHostedMatch = network.role === 'host';
+  const leavingHostedMatch = network.role === 'host'; pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client' && network.roomCode && (gameStarted || matchState.phase === 'active' || privateLobbySnapshot?.phase === 'active' || privateMatchActiveAtEpochMs !== null) ? network.roomCode : ''; if (network.role === 'client' && network.roomCode && localResumeToken) { try { saveActiveRoomIdentity(network.roomCode); } catch { /* In-memory rejoin identity remains canonical. */ } }
   if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id, voluntary: true });
   network.close();
   if (leavingHostedMatch) {
@@ -35801,7 +35801,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
-    if (gameStarted) network.send(createStateMessage());
+    if (gameStarted) { const teleportState = createStateMessage(); network.send(teleportState); if (network.role === 'client') network.sendStateCommitReliably(teleportState); }
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
     resetDebugChopperExteriorReviewTracker();

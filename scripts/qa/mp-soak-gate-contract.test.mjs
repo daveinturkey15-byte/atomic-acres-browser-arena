@@ -4,11 +4,14 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const gatePath = fileURLToPath(new URL('./mp-soak-gate.mjs', import.meta.url));
+const auditPath = fileURLToPath(new URL('./mp-audit.mjs', import.meta.url));
 const source = await readFile(gatePath, 'utf8');
+const audit = await readFile(auditPath, 'utf8');
 
 test('soak gate stays inside the dedicated QA port range', () => {
-  assert.match(source, /const PORTS = Object\.freeze\(\{ dist: 4230, peer: 4231 \}\)/);
-  assert.match(source, /port < 4230 \|\| port > 4232/);
+  assert.match(source, /dist: Number\(process\.env\.MP_SOAK_DIST_PORT \?\? '4233'\)/);
+  assert.match(source, /peer: Number\(process\.env\.MP_SOAK_PEER_PORT \?\? '4234'\)/);
+  assert.match(source, /new Set\(\[4233, 4234, 4235\]\)/);
   assert.doesNotMatch(source, /4227|4228/);
 });
 
@@ -20,11 +23,15 @@ test('soak hard stop remains under the five-minute browser fence and starts afte
 });
 
 test('stair probe uses returned arena anchors and preserves fire evidence', () => {
-  assert.match(source, /arenaStairGeometry\(arenaId, team\)/);
+  assert.match(source, /arenaStairGeometry\(bundle\.arena \?\? arenaId, team\)/);
   assert.match(source, /stair\.foot/);
   assert.match(source, /stair\.top/);
   assert.match(source, /debug\.teleportPlayer\(bodyPosition\[0\], bodyPosition\[1\], bodyPosition\[2\]/);
+  assert.match(source, /uphill: stair\.uphill/);
+  assert.doesNotMatch(source, /uphill: staged\.uphill/);
   assert.match(source, /stairFireResult/);
+  assert.match(source, /for \(const role of PEERS\.filter\(\(candidate\) => candidate !== 'host'\)\)/);
+  assert.doesNotMatch(source, /Promise\.all\(PEERS\.filter\(\(role\) => role !== 'host'\)\.map/);
 });
 
 test('scoreboard is sampled after an explicit RTT propagation wait', () => {
@@ -33,4 +40,10 @@ test('scoreboard is sampled after an explicit RTT propagation wait', () => {
   assert.ok(wait >= 0 && sample > wait);
   assert.match(source, /damageDealt: score\.damageDealt/);
   assert.match(source, /damageTaken: score\.damageTaken/);
+});
+
+test('rejoin damage waits for bounded full-state convergence', () => {
+  assert.match(audit, /remoteReplicationSettled = await Promise\.allSettled/);
+  assert.match(audit, /snapshot\(\)\.remotes === 2/);
+  assert.match(audit, /remoteReplicationAfterRejoin/);
 });

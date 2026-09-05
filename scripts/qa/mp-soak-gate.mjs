@@ -34,10 +34,10 @@ import { evaluateMpSoakBundle, formatMpSoakTable, MP_SOAK_THRESHOLDS } from './m
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
-  dist: Number(process.env.MP_SOAK_DIST_PORT ?? '4194'),
-  peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4195'),
+  dist: Number(process.env.MP_SOAK_DIST_PORT ?? '4233'),
+  peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4234'),
 });
-const ALLOWED_QA_PORTS = new Set([4189, 4193, 4194, 4195]);
+const ALLOWED_QA_PORTS = new Set([4233, 4234, 4235]);
 const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate');
 const PLAY_DURATION_MS = MP_SOAK_THRESHOLDS.playDurationMs;
 // Keep the browser lifetime below the five-minute owner fence while allowing
@@ -86,7 +86,7 @@ const bundle = {
     browserPolicy: 'headless Chrome, stock flags, mute-audio, max three peers',
   },
   timing: { startedAtEpochMs, endedAtEpochMs: null, playDurationMs: 0 },
-  replication: { samples: [], divergences: [], pairDirections: Object.fromEntries(
+  replication: { samples: [], divergences: [], classificationCounts: {}, pairDirections: Object.fromEntries(
     PEERS.flatMap((from) => PEERS.filter((to) => to !== from).map((to) => [`${from}->${to}`, false])),
   ) },
   rejoin: {
@@ -164,29 +164,100 @@ function evidenceView(view) {
 }
 
 function addReplicationDivergences(views, second) {
-  const ids = new Set(PEERS.flatMap((role) => Object.keys(views[role]?.players ?? {})));
-  for (const playerId of ids) {
-    for (const from of PEERS) {
-      for (const to of PEERS) {
-        if (from === to) continue;
-        const fromPlayer = views[from]?.players?.[playerId] ?? null;
-        const toPlayer = views[to]?.players?.[playerId] ?? null;
-        if (fromPlayer) bundle.replication.pairDirections[`${to}->${from}`] = true;
-        if (!fromPlayer || !toPlayer) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'presence', from, expected: 'present', actual: toPlayer ? 'present' : 'absent' });
-          continue;
-        }
-        const fromPosition = fromPlayer.position ?? [];
-        const toPosition = toPlayer.position ?? [];
-        if (fromPosition.length !== 3 || toPosition.length !== 3) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'position-shape', from, fromPosition, toPosition });
-          continue;
-        }
-        const distanceM = Math.hypot(fromPosition[0] - toPosition[0], fromPosition[1] - toPosition[1], fromPosition[2] - toPosition[2]);
-        if (distanceM > positionBoundM) {
-          bundle.replication.divergences.push({ second, playerId, peer: to, field: 'position', from, distanceM: Number(distanceM.toFixed(3)), fromPosition, toPosition });
-        }
+  const hostPlayers = views.host?.players ?? {};
+  const classify = (hostPlayer, guestPlayer, distanceM) => {
+    if (!guestPlayer) return 'stale-snapshot-never-applied';
+    if (guestPlayer.self) return 'guest-self-prediction-over-authority';
+    const age = Number(guestPlayer.snapshotAgeMs);
+    if (Number.isFinite(age) && age > Math.max(500, 4 * MP_SOAK_THRESHOLDS.sampleIntervalMs)) return 'stale-snapshot-never-applied';
+    if (guestPlayer.continuity !== null && hostPlayer.continuity !== null && guestPlayer.continuity !== hostPlayer.continuity) return 'interpolation-target-previous-session';
+    if (Number.isFinite(guestPlayer.seq) && Number.isFinite(hostPlayer.seq) && guestPlayer.seq < hostPlayer.seq) return 'ordering-or-coalescing';
+    if (distanceM > positionBoundM) return 'authority-not-relayed';
+    return 'within-bound';
+  };
+  const distance = (left, right) => left.length === 3 && right.length === 3
+    ? Math.hypot(left[0] - right[0], left[1] - right[1], left[2] - right[2])
+    : null;
+  for (const playerId of Object.keys(hostPlayers)) {
+    const hostPlayer = hostPlayers[playerId];
+    const hostPosition = hostPlayer.authoritativePosition ?? hostPlayer.position ?? [];
+    for (const to of PEERS.filter((role) => role !== 'host')) {
+      const guestPlayer = views[to]?.players?.[playerId] ?? null;
+      bundle.replication.pairDirections[`host->${to}`] = true;
+      const guestViewPosition = guestPlayer?.position ?? [];
+      const guestAuthoritativePosition = guestPlayer?.authoritativePosition ?? guestViewPosition;
+      if (!guestPlayer) {
+        bundle.replication.classificationCounts['stale-snapshot-never-applied'] = (bundle.replication.classificationCounts['stale-snapshot-never-applied'] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'presence', source: 'host-authoritative', classification: 'stale-snapshot-never-applied',
+          hostAuthoritativePosition: hostPosition, guestViewPosition: null, guestAuthoritativePosition: null,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: null, hostContinuity: hostPlayer.continuity ?? null, guestContinuity: null,
+          guestSnapshotAgeMs: null,
+        });
+        continue;
       }
+      const distanceM = distance(hostPosition, guestViewPosition);
+      if (distanceM === null) {
+        bundle.replication.classificationCounts['invalid-position-shape'] = (bundle.replication.classificationCounts['invalid-position-shape'] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'position-shape', source: 'host-authoritative', classification: 'invalid-position-shape',
+          hostAuthoritativePosition: hostPosition, guestViewPosition, guestAuthoritativePosition,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: guestPlayer.seq ?? null,
+          hostContinuity: hostPlayer.continuity ?? null, guestContinuity: guestPlayer.continuity ?? null,
+          guestSnapshotAgeMs: guestPlayer.snapshotAgeMs ?? null,
+        });
+        continue;
+      }
+      if (distanceM > positionBoundM) {
+        const classification = classify(hostPlayer, guestPlayer, distanceM);
+        bundle.replication.classificationCounts[classification] = (bundle.replication.classificationCounts[classification] ?? 0) + 1;
+        bundle.replication.divergences.push({
+          second, playerId, peer: to, field: 'position', source: 'host-authoritative', classification,
+          distanceM: Number(distanceM.toFixed(3)),
+          hostAuthoritativePosition: hostPosition, guestViewPosition, guestAuthoritativePosition,
+          hostSeq: hostPlayer.seq ?? null, guestSeq: guestPlayer.seq ?? null,
+          hostContinuity: hostPlayer.continuity ?? null, guestContinuity: guestPlayer.continuity ?? null,
+          guestSnapshotAgeMs: guestPlayer.snapshotAgeMs ?? null,
+          guestSnapshotBuffer: guestPlayer.snapshotBuffer ?? null,
+        });
+      }
+    }
+  }
+  // The host-authoritative loop above proves host -> guest presentation. Mark
+  // and sample the reverse guest-originated directions separately so the
+  // release row cannot silently report only one half of the mesh.
+  for (const from of PEERS.filter((role) => role !== 'host')) {
+    const sourceId = views[from]?.selfId;
+    const source = sourceId ? views[from]?.players?.[sourceId] : null;
+    if (!source) continue;
+    for (const to of PEERS.filter((role) => role !== from)) {
+      const target = views[to]?.players?.[sourceId] ?? null;
+      if (!target || target.self) continue;
+      bundle.replication.pairDirections[`${from}->${to}`] = true;
+      const targetPosition = target.position ?? [];
+      const sourcePosition = source.authoritativePosition ?? source.position ?? [];
+      const distanceM = distance(sourcePosition, targetPosition);
+      if (distanceM === null || distanceM <= positionBoundM) continue;
+      const age = Number(target.snapshotAgeMs);
+      const classification = Number.isFinite(age) && age > Math.max(500, 4 * MP_SOAK_THRESHOLDS.sampleIntervalMs)
+        ? 'stale-snapshot-never-applied'
+        : Number.isFinite(target.seq) && Number.isFinite(source.seq) && target.seq < source.seq
+          ? 'ordering-or-coalescing'
+          : 'authority-not-relayed';
+      bundle.replication.classificationCounts[classification] = (bundle.replication.classificationCounts[classification] ?? 0) + 1;
+      bundle.replication.divergences.push({
+        second, playerId: sourceId, peer: to, field: 'position', source: 'guest-authoritative', classification,
+        distanceM: Number(distanceM.toFixed(3)),
+        hostAuthoritativePosition: views.host?.players?.[sourceId]?.authoritativePosition ?? null,
+        guestViewPosition: targetPosition,
+        guestAuthoritativePosition: sourcePosition,
+        hostSeq: views.host?.players?.[sourceId]?.seq ?? null,
+        guestSeq: target.seq ?? null,
+        hostContinuity: views.host?.players?.[sourceId]?.continuity ?? null,
+        guestContinuity: target.continuity ?? null,
+        guestSnapshotAgeMs: target.snapshotAgeMs ?? null,
+        guestSnapshotBuffer: target.snapshotBuffer ?? null,
+      });
     }
   }
 }
@@ -211,7 +282,7 @@ async function scenarioStairFire(role) {
     const value = snapshot?.player?.team ?? snapshot?.privateMatch?.members?.find((member) => member.id === snapshot?.player?.id)?.team;
     return value === 1 ? 1 : 0;
   });
-  const stair = arenaStairGeometry(arenaId, team);
+  const stair = arenaStairGeometry(bundle.arena ?? arenaId, team);
   if (!stair) return { ok: false, staged: false, reason: `no authored stair geometry for ${arenaId}` };
   const eyeOffset = Number(before?.players?.[before.selfId]?.position?.[1]) - stair.foot[1];
   const bodyPosition = stair.foot.map((value, index) => value + ((stair.top[index] - value) * 0.5));
@@ -222,7 +293,7 @@ async function scenarioStairFire(role) {
     const yaw = Math.atan2(-uphill[0], -uphill[2]);
     debug.teleportPlayer(bodyPosition[0], bodyPosition[1], bodyPosition[2], yaw, 0);
     return { ok: true, yaw };
-  }, { bodyPosition, uphill: staged.uphill });
+  }, { bodyPosition, uphill: stair.uphill });
   if (!placed.ok) return { ok: false, staged: true, placed, reason: placed.reason };
 
   const targetId = before.selfId;
@@ -311,11 +382,15 @@ async function runGuestScenarios(role) {
 }
 
 async function runStairScenarios() {
-  await Promise.all(PEERS.filter((role) => role !== 'host').map(async (role) => {
+  // The authored stair probe deliberately teleports the local player. Running
+  // both probes at once makes their host-authoritative poses race on the same
+  // staircase, so the second guest can never prove its own pose was accepted.
+  // Keep the probes serialized; this is setup evidence before the timed soak.
+  for (const role of PEERS.filter((candidate) => candidate !== 'host')) {
     const stair = await runScenario(role, 'stairFire', () => scenarioStairFire(role));
     bundle.scenarios.guests[role].stairFireResult = summarizeScenario(stair);
     bundle.scenarios.guests[role].stairFire = stair?.ok === true;
-  }));
+  }
 }
 
 async function damageAfterRejoin() {

@@ -254,10 +254,19 @@ const viewOf = (page) => page.evaluate(() => {
     kills: snapshot.player.kills,
     deaths: snapshot.player.deaths,
     position: (snapshot.player.position ?? []).map(round),
+    authoritativePosition: (snapshot.player.position ?? []).map(round),
     seq: snapshot.player.seq ?? null,
+    continuity: snapshot.networkSync?.localContinuity ?? null,
+    snapshotAgeMs: null,
+    snapshotBuffer: null,
     score: scoreOf(snapshot.player.id),
   };
   for (const remote of snapshot.remotePlayers ?? []) {
+    const authoritativePosition = (remote.authoritativePosition ?? remote.position ?? []).map(round);
+    const renderedFootPosition = remote.visualPosition ?? remote.position ?? [];
+    const renderedPosition = renderedFootPosition.map((value, index) => index === 1
+      ? round(value + (Number(authoritativePosition[1]) - Number((remote.position ?? [])[1])))
+      : round(value));
     players[remote.id] = {
       self: false,
       hp: remote.hp,
@@ -270,10 +279,17 @@ const viewOf = (page) => page.evaluate(() => {
       reloading: remote.reloading ?? null,
       kills: null,
       deaths: null,
-      position: (remote.authoritativePosition ?? remote.position ?? []).map(round),
+      // Remote roots are rendered at feet while PlayerSnapshot positions are
+      // eye-level. Normalize the rendered view back to the wire coordinate so
+      // a standing player is not reported 1.7 m apart from its authority.
+      position: renderedPosition,
+      visualPosition: (remote.visualPosition ?? remote.position ?? []).map(round),
+      authoritativePosition,
       seq: remote.seq ?? null,
+      continuity: remote.continuity ?? null,
       authoritativeReady: remote.authoritativeReady ?? true,
       snapshotAgeMs: round(remote.snapshotAgeMs),
+      snapshotBuffer: remote.snapshotBuffer ?? null,
       score: scoreOf(remote.id),
     };
   }
@@ -1290,6 +1306,21 @@ async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
       { missing, rosterAfterRejoin: result.rosterAfterRejoin });
     return result;
   }
+
+  // Lobby membership is authenticated before each replacement world has
+  // rebuilt its remote table. Wait for the host-authoritative full-state
+  // repair to become observable on every peer before checking two-way
+  // replication or issuing the damage probe. This is a bounded convergence
+  // assertion, not a relaxed success condition: a peer that never reaches
+  // two remotes still fails the one-way replication check below.
+  const remoteReplicationSettled = await Promise.allSettled(settledRoles.map((role) => peers[role].page.waitForFunction(
+    () => window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2,
+    undefined,
+    { timeout: JOIN_TIMEOUT_MS },
+  )));
+  result.remoteReplicationAfterRejoin = Object.fromEntries(
+    settledRoles.map((role, index) => [role, remoteReplicationSettled[index].status]),
+  );
 
   const afterId = (await viewOf(guest.page)).selfId;
   result.identityAfter = afterId;
