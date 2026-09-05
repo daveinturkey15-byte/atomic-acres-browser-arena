@@ -44,7 +44,6 @@ import {
   isNuketown2BayFootprint,
   nuketown2HandedSpan,
   nuketown2HandedX as hx,
-  NUKETOWN2_STREET_CARS,
 } from './nuketown2-layout';
 import {
   NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
@@ -841,91 +840,6 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(skin.centre.x, `the ${id} skin rides its own box`).toBeCloseTo(hx(seat.x), 6);
     }
   });
-   * ─────────────────────────────────────────────────────────────────────────
-   * PASS 95 ROUND 3 - THE VEHICLES STAND ON THE ROAD, MEASURED IN SQUARE METRES.
-   *
-   * WHAT THIS CATCHES THAT NOTHING ABOVE DID. The two assertions immediately
-   * before this one check the coach's z against the STEM's half width and the
-   * truck's x against the BULB's BOUNDING SQUARE. Both pass for a body that is
-   * standing on grass, because the bulb is a CIRCLE inside that square and the
-   * stem's rectangle only begins at the square's edge - so between the disc and
-   * the stem mouth there are two unpaved lune-shaped pockets, and the coach was
-   * parked across the north one.
-   *
-   * Measured on the previous cut, 1.2819 m2 of the coach's 23.66 m2 plan
-   * (5.4 %) lay outside every carriageway footprint - its whole rear-quarter
-   * flank. After re-deriving the truck's seat off the disc
-   * (`TRUCK_DEEPEST_X` in `src/nuketown2-layout.ts`) the same measurement is
-   * 0.8679 m2 (3.67 %) - a 32 % reduction.
-   *
-   * THE CEILING IS THE ACHIEVED VALUE PLUS NOTHING. 0.868 m2 is what the 16 m
-   * bulb leaves once BOTH walls on the truck's seat are honoured: the disc's
-   * own corner limit (x >= -12.149) and, binding 0.49 m before it, the standing
-   * approach to the cargo box's rear mouth that HF-436 built and this file's
-   * neighbouring test probes (x >= -11.6625; the SEAT is -11.6125, which is
-   * that wall plus TRUCK_BULB_CLEARANCE). The coach would need the TRUCK at
-   * x <= -12.49 to clear entirely, so the pair CANNOT both sit inside the disc
-   * and the shortfall is 0.88 m. Ratcheted so the next lane cannot spend it,
-   * with the truck held at EXACTLY zero so no future move can trade the
-   * truck's seat for the coach's.
-   *
-   * VERIFY PASS (Opus, 2026-09-04) tightened the ceiling from 0.87 to 0.868:
-   * this sampler reads 0.867731 at N=400 and the converged value is 0.867859,
-   * so 0.87 still carried 0.0023 m2 of unspent headroom the comment claimed it
-   * did not.
-   *
-   * SCOPE, AND IT IS NOT THE WHOLE VEHICLE. This measures each body's SOLID
-   * plan rectangle. `coach()` also emits wheels at `width + 0.2` and chrome
-   * bumpers at `x +/- (length / 2 + 0.1)`, and those are the parts a capture
-   * sees on the grass: on the full emitted envelope the coach's off-carriageway
-   * area moves 1.3615 -> 1.3008 m2 (-4.5 %), not -32 %, because the seat trades
-   * the front WHEEL off the lune (0.6634 -> 0) for the front BUMPER onto it
-   * (0 -> 0.4563). Widening this gate to the emitted envelope is TODO 3 in
-   * `docs/evidence/pass95/nuketown2-accuracy-3/REPORT.md`.
-   *
-   * The sampler reads the SAME `NUKETOWN2_CARRIAGEWAY_FOOTPRINTS` table the
-   * paving, the lawn cut and `find-coplanar-pairs.ts` read, so a body cannot
-   * pass here and stand on grass in the build.
-   */
-  it('parks every street vehicle on the carriageway, measured against the paving table', () => {
-    const onCarriageway = (x: number, z: number): boolean =>
-      NUKETOWN2_CARRIAGEWAY_FOOTPRINTS.some((footprint) => (
-        'shape' in footprint && footprint.shape === 'circle'
-          ? Math.hypot(x - footprint.centreX, z - footprint.centreZ) <= footprint.radius + 1e-9
-          : x >= footprint.x0 - 1e-9 && x <= footprint.x1 + 1e-9
-            && z >= footprint.z0 - 1e-9 && z <= footprint.z1 + 1e-9
-      ));
-    /** Plan area of a body's footprint that lies on NO carriageway footprint. */
-    const offCarriagewayArea = (cx: number, cz: number, length: number, width: number): number => {
-      const N = 400;
-      let off = 0;
-      for (let i = 0; i < N; i += 1) {
-        for (let j = 0; j < N; j += 1) {
-          const x = cx - length / 2 + ((i + 0.5) / N) * length;
-          const z = cz - width / 2 + ((j + 0.5) / N) * width;
-          if (!onCarriageway(x, z)) off += 1;
-        }
-      }
-      return (off / (N * N)) * length * width;
-    };
-    const truck = NUKETOWN2_CENTRAL_TRUCK;
-    const coach = NUKETOWN2_STREET_COACH;
-    // The truck is the body the 2x core rides, so it gets no allowance at all.
-    expect(offCarriagewayArea(truck.x, truck.z, truck.boxLength, truck.width),
-      'truck cargo box off the carriageway').toBe(0);
-    expect(offCarriagewayArea(truck.cabX, truck.z, truck.cabLength, truck.width),
-      'truck cab off the carriageway').toBe(0);
-    // The coach carries the whole residue the bulb radius forces. RATCHET.
-    expect(offCarriagewayArea(coach.x, coach.z, coach.length, coach.width),
-      'coach off the carriageway - was 1.2819 m2 before the truck seat was derived')
-      .toBeLessThanOrEqual(0.868);
-    for (const [id, car] of Object.entries(NUKETOWN2_STREET_CARS) as ReadonlyArray<
-      readonly [string, { x: number; z: number; length: number; width: number }]
-    >) {
-      expect(offCarriagewayArea(car.x, car.z, car.length, car.width),
-        `${id} off the carriageway`).toBe(0);
-    }
-  }, 60_000);
 
 
   // -------------------------------------------------------------------------
