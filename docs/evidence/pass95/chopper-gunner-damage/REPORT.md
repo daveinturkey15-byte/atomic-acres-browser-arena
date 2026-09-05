@@ -251,6 +251,29 @@ move.
    lane that changed cadence in only one place would desync fire audio from
    fire. Not a damage asymmetry, and not touched here.
 
+7. **Control intents are validated hard, and none of them can change a
+   damage number.** `KillstreakRuntime.control` (`src/killstreak-runtime.ts:2029`)
+   rejects on unknown actor, `matchEpoch`/`lifeId` mismatch, a non-increasing
+   `sequence` (replay), a missing or expired or dead entity, an entity the
+   actor does not own, a non-finite aim/thrust value, and a gun controller that
+   is not this actor. Aim pitch is clamped to `[-1.2, 0.5]`, drone axes to
+   `[-1, 1]`. Fire is an assigned held-state, not an OR-latch, so release is
+   authoritative and cadence stays host-applied; missile and taser are
+   edge-only and cannot be queued during cooldown. A guest can therefore change
+   *where* it points and *whether* it is holding the trigger - never how often
+   it fires, how far it reaches, or how much it deals.
+
+8. **Two non-damage observations, reported not fixed.**
+   `[VERIFIED]` (a) There is no turn-rate limit on possessed aim: `aimYaw` is
+   accepted as any finite angle per intent, so a modified guest client could
+   snap-aim the chopper gun. The host player sets aim from the same field, so
+   this is an anti-cheat surface rather than a host/guest asymmetry.
+   `[VERIFIED]` (b) `control` enforces a monotonic sequence but no per-time
+   budget; the 50 ms send interval is client-side only
+   (`src/legacy-main.ts:24976`). A spammy guest costs the host a little work
+   per packet but gains no fire-rate or damage advantage, because
+   `nextShotAtMs` is set inside the host-only advance.
+
 `[VERIFIED]` No guest/host asymmetry was found in the chopper gun damage path
 itself.
 
