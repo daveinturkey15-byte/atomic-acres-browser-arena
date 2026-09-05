@@ -6177,6 +6177,10 @@ let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
 let localResumeToken = '';
+/** Room code whose active-match leave may be resumed from the menu. This is
+ * document-local intent, not authority; the host still authenticates the
+ * retained resume token before any gameplay state is accepted. */
+let pendingVoluntaryActiveMatchRejoinRoomCode = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
 /**
  * Lane J: performance.now() of the first in-match message this client admitted
@@ -8976,12 +8980,15 @@ function initializeHostLobby(): void {
 
 function sendLobbyJoin(): void {
   if (network.role !== 'client') return;
+  const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode
+    && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0;
+  pendingVoluntaryActiveMatchRejoinRoomCode = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
   clientReconnectWorldRepairAttempts = 0;
   clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
-  if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
+  if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
     pendingGuestResumeAuthority = null;
   } else {
@@ -9172,6 +9179,20 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   network.sendToPlayer(playerId, message);
   sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
+}
+
+function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean {
+  if (network.role !== 'host') return false;
+  const health = remoteHealthAuthorities.get(remote.snapshot.id);
+  const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id);
+  return network.sendToPlayer(targetPlayerId, {
+    type: 'state',
+    player: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot,
+    hostTimeMs: now,
+    continuity: remote.continuity,
+    rateHz: remote.snapshotRateHz,
+    ...(combatInventory ? { combatInventory } : {}),
+  });
 }
 
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
@@ -13412,7 +13433,7 @@ function onNetworkMessage(message: GameMessage): void {
       remote.snapshot = { ...remote.snapshot, hp: THREE.MathUtils.clamp(incoming.hp, 0, 100) };
       remote.root.visible = remote.snapshot.hp > 0;
     }
-    if (network.role === 'host' && message.type === 'join') {
+  if (network.role === 'host' && message.type === 'join') {
       // A `lobby-join` only authenticates the reconnect. This later `join`
       // proves the guest has rebuilt its arena, bots and authority replicas,
       // so none of these canonical repair snapshots can be dropped merely
@@ -13424,6 +13445,15 @@ function onNetworkMessage(message: GameMessage): void {
         player: { ...remote.snapshot, hp: retainedHealth?.hp ?? remote.snapshot.hp },
       });
       network.send(createStateMessage());
+      // The broadcast above creates the rejoined player's fresh replication
+      // slot everywhere. The joining guest also needs one direct authoritative
+      // snapshot for every other remote, because its reset document has no
+      // remote table yet and its own broadcast copy is self-addressed.
+      const repairNow = performance.now();
+      for (const candidate of remotes.values()) {
+        if (candidate.snapshot.id === incoming.id) continue;
+        sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);
+      }
       broadcastOverdriveState(performance.now());
       broadcastRailgunState();
       broadcastTimedMapWeaponState();
@@ -30523,6 +30553,12 @@ function restartSoloMatch(): void {
 function returnToMainMenu(): void {
   invalidateMatchAdmission('Player returned to the main menu');
   const leavingHostedMatch = network.role === 'host';
+  pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client'
+    && network.roomCode
+    && gameStarted
+    && privateLobbySnapshot?.phase === 'active'
+    ? network.roomCode
+    : '';
   // A voluntary lobby leave is still inside the host's bounded rejoin grace
   // window. Preserve the authenticated guest identity before the lobby reset
   // clears localResumeToken; otherwise the replacement transport sends a fresh

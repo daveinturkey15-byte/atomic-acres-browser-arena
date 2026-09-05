@@ -267,6 +267,23 @@ describe('HF-504 lobby - a guest must never render authority it no longer holds'
 });
 
 describe('HF-504 lobby authority and succession fences', () => {
+  it('re-arms the active-match world-ready handshake after a voluntary menu leave', () => {
+    expect(main).toContain('pendingVoluntaryActiveMatchRejoinRoomCode');
+    expect(main).toContain('const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode');
+    expect(main).toContain('if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === \'active\'');
+    const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'));
+    expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role === \'client\'');
+    expect(leave).toContain('privateLobbySnapshot?.phase === \'active\'');
+  });
+
+  it('sends the rejoiner a direct canonical snapshot for each existing remote', () => {
+    expect(main).toContain('function sendAuthoritativeRemoteSnapshotToPlayer(');
+    const join = main.slice(main.indexOf("if (network.role === 'host' && message.type === 'join') {"));
+    expect(join).toContain('for (const candidate of remotes.values())');
+    expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);');
+    expect(join).toContain('network.send(createStateMessage());');
+  });
+
   it('retains an active-match voluntary leave as a host-authoritative rejoin reservation', () => {
     const leave = main.slice(main.indexOf("if (message.type === 'leave' && privateLobbySnapshot) {"));
     expect(leave).toContain("const retainActiveMatchRejoin = message.voluntary");
