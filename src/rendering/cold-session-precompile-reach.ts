@@ -67,6 +67,15 @@ import { ARENA_IDS, type ArenaId } from '../arena-identity';
  * `visual-definition` time lane H2 measured, which is the price farcrysis
  * already pays and is worth paying against a rollback.
  *
+ * Candidate 6 remeasured this authority after the geometry/material merge.
+ * The exact cold admission receipt showed that Nuketown2's separate cold
+ * precompile added 25.667 s to visual definition while the required exact
+ * coverage submission still completed in 8.807 s. That is no longer a cold
+ * fence loser on this candidate: keep the unconditional in-session and
+ * deployment precompile, but do not pay for the same vocabulary twice in a
+ * cold menu session. A future candidate must remeasure before changing this
+ * decision again.
+ *
  * The cost side is being attacked in parallel rather than accepted: candidate
  * 4b made the nuketown2 material families' base colours UNIFORMS instead of
  * baked graph constants (`uniformSwatch`, and the same fix in
@@ -75,7 +84,7 @@ import { ARENA_IDS, type ArenaId } from '../arena-identity';
  * `src/nuketown2-pipeline-budget.test.ts`. When that work has taken enough out
  * of the cold set, this entry is a candidate for removal - with a measurement.
  */
-const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis', 'nuketown2']);
+const MEASURED_COLD_SESSION_FENCE_LOSERS: readonly string[] = Object.freeze(['farcrysis']);
 
 export const COLD_SESSION_PRECOMPILE_ARENAS: readonly ArenaId[] = Object.freeze(
   ARENA_IDS.filter((id) => MEASURED_COLD_SESSION_FENCE_LOSERS.includes(id)),
