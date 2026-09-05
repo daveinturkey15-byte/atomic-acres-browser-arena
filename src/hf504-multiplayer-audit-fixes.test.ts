@@ -267,6 +267,17 @@ describe('HF-504 lobby - a guest must never render authority it no longer holds'
 });
 
 describe('HF-504 lobby authority and succession fences', () => {
+  it('retains an active-match voluntary leave as a host-authoritative rejoin reservation', () => {
+    const leave = main.slice(main.indexOf("if (message.type === 'leave' && privateLobbySnapshot) {"));
+    expect(leave).toContain("const retainActiveMatchRejoin = message.voluntary");
+    expect(leave).toContain("privateLobbySnapshot.phase === 'active'");
+    expect(leave).toContain('!message.voluntary || retainActiveMatchRejoin');
+    expect(leave).toContain("if (message.voluntary && !retainActiveMatchRejoin) {");
+    expect(leave).toContain('hostLobbyTokens.delete(message.playerId);');
+    expect(leave).toContain('network.forgetPlayerRejoinCredential(message.playerId);');
+    expect(leave).toContain('markLobbyDisconnected(message.playerId);');
+  });
+
   it('requires a second human or a hosted bot and blocks rejoin reservations', () => {
     const predicates = readFileSync(new URL('./private-match.ts', import.meta.url), 'utf8');
     expect(predicates).toContain('const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);');

@@ -10907,9 +10907,19 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
   if (message.type === 'leave' && privateLobbySnapshot) {
-    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary);
+    // A voluntary menu leave during an active match is still a resumable
+    // session. Keep the host-owned identity and combat snapshot alive for the
+    // bounded grace window; only a waiting-lobby leave is a final departure.
+    const retainActiveMatchRejoin = message.voluntary
+      && privateLobbySnapshot.phase === 'active'
+      && hostLobbyMembers.has(message.playerId);
+    removeRemote(
+      message.playerId,
+      message.voluntary ? 'left the lobby' : 'disconnected',
+      !message.voluntary || retainActiveMatchRejoin,
+    );
     if (network.role === 'host') {
-      if (message.voluntary) {
+      if (message.voluntary && !retainActiveMatchRejoin) {
         hostLobbyMembers.delete(message.playerId);
         hostLobbyTokens.delete(message.playerId);
         network.forgetPlayerRejoinCredential(message.playerId);
@@ -10921,6 +10931,9 @@ function handleLobbyMessage(message: GameMessage): boolean {
         forgetTextChatParticipant(message.playerId);
         broadcastHostLobby(privateLobbySnapshot.phase);
       } else {
+        // `removeRemote` has already marked an active-match reservation
+        // disconnected. This is intentionally the same host-authoritative
+        // path as an involuntary transport loss, including expiry scheduling.
         markLobbyDisconnected(message.playerId);
       }
     }
