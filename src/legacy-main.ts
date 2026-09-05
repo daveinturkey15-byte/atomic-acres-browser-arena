@@ -30037,6 +30037,7 @@ async function performArenaSelection(
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
     syncInteractiveWorldPhysics(true);
+    profileArenaTransition('presentation-batching'); if (selectedArena.id !== 'gun-range') batchSelectedArenaPresentation();
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
     // HF-371: the air is part of the arena. Swap it with the audio so nothing
@@ -30167,8 +30168,6 @@ async function performArenaSelection(
     setBootstrapStage('prewarming-weapon-catalog');
     profileArenaTransition('weapon-catalog-prewarm'); await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
     assertAdmission();
-    profileArenaTransition('presentation-batching');
-    setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
     arena.root.userData.staticMatricesFrozen = freezeStaticArenaMatrices(arena.root); // HF-491: batched arena is static from here on
     setArenaPresentationVisibility();

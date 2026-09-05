@@ -491,10 +491,100 @@ export const NUKETOWN2_RARE_GUN_SITES = Object.freeze(NUKETOWN2_HOUSE_LAYOUT.map
  * The margin is 0.10 m and `nuketown2-fidelity.test.ts` calls `claimOverdrive`
  * to prove it rather than restating the arithmetic.
  */
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * HF-477 ROUND 3 - THE TRUCK'S SEAT IS NOW DERIVED FROM THE DISC, NOT CHOSEN.
+ *
+ * WHAT WAS WRONG. HF-477 authored the cargo-box centre at -10.6 with the
+ * derivation "the only free parameter is how far the nose reaches", and set it
+ * so the NOSE stopped 0.43 m short of the kerb. That reads the constraint off
+ * the wrong end of the vehicle. The truck is nosed down the stem, so its nose
+ * points at the WIDE part of the road and can never be the binding corner; the
+ * binding corners are the cargo box's REAR ones, at the truck's own |z| = 4.05,
+ * where the 16 m disc is only 13.80 m across. Authoring off the nose left the
+ * truck 1.01 m shallower in the bulb than it can sit.
+ *
+ * WHY THAT MATTERED TO THE COACH, WHICH IS THE ACTUAL LANE ITEM. The coach's
+ * position is not free: `NUKETOWN2_STREET_COACH` is authored as the MEASURED
+ * 0.178 L along and 0.150 L across from the truck's cargo box, and this file
+ * refuses to re-type either. So every metre the truck sits short of its own
+ * deepest seat is a metre the coach is pushed out of the turning head and over
+ * the unpaved pocket between the disc and the stem mouth. Measured on the
+ * PREVIOUS cut, 1.2819 m2 of the coach's 23.66 m2 plan - its whole rear-quarter
+ * flank - stood on that pocket rather than on asphalt. After this change,
+ * 0.8679 m2: a 32 % reduction, ratcheted in `nuketown2-fidelity.test.ts`.
+ *
+ * THE DERIVATION. The cargo box's rear corners sit at authored
+ * (x - boxLength/2, z +/- width/2). Both must lie inside the disc, and the
+ * outer one binds:
+ *
+ *   (x - boxLength/2 - centreX)^2 + (|z| + width/2)^2 <= radius^2
+ *
+ * which solves to x >= centreX - sqrt(radius^2 - (|z| + width/2)^2)
+ * + boxLength/2 = -12.149. A SECOND wall, found by the gate and binding 0.49 m
+ * before that one, is the standing approach to the cargo box's rear mouth
+ * (TRUCK_REAR_MOUTH_LIMIT_X, -11.6625): HF-436 made the box a room you enter
+ * from the -x end, and a truck backed into its own kerb ring has lost that
+ * route. The seat takes the LATER of the two and `TRUCK_BULB_CLEARANCE` holds
+ * 0.05 m off it, giving x = -11.6125 - still 1.01 m deeper into the bulb than
+ * the nose-authored -10.6.
+ *
+ * WHAT IS UNCHANGED, DELIBERATELY. `z`, `deckY`, `roofY`, the 0.325 L length
+ * split and `coreHeightOverRoof` - and therefore the whole overdrive
+ * derivation, which reads `x` through `overdrivePositionForArena('nuketown2')`
+ * and so follows the truck rather than being left behind. Moving the truck
+ * moves the 2x core with it by construction; that is the property HF-432 item 5
+ * built and this pass keeps.
+ *
+ * WHAT IS STILL OPEN. Even at the deepest seat the coach's outer rear corner
+ * overhangs the pocket by 0.8679 m2. That residue is not a placement error: at
+ * the authored 16 m bulb the truck can go no deeper than -11.6125 and the coach
+ * would need `x <= -12.49`, so the pair CANNOT both sit entirely inside the
+ * disc - the shortfall is 0.88 m and it is a property of the bulb radius, which
+ * FINDINGS open item 5 grades unmeasured. FALSIFIER: a BO2-2025 orthographic
+ * overhead from which the bulb diameter can be measured against the stem width
+ * to better than 2 %; if the real bulb is larger than 0.444 L the residue goes.
+ */
+const TRUCK_BOX_LENGTH = 6.5;
+const TRUCK_CAB_LENGTH = 5.2;
+const TRUCK_WIDTH = 2.6;
+/** 0.0764 L south of the road centre-line; reference 0.076 L. */
+const TRUCK_Z = 2.75;
+/**
+ * Deepest cargo-box centre whose REAR corners still lie inside the bulb.
+ * This is the GEOMETRIC wall, and it is not the binding one.
+ */
+const TRUCK_CORNER_LIMIT_X = NUKETOWN2_CUL_DE_SAC.centreX
+  - Math.sqrt(NUKETOWN2_CUL_DE_SAC.radius ** 2 - (Math.abs(TRUCK_Z) + TRUCK_WIDTH / 2) ** 2)
+  + TRUCK_BOX_LENGTH / 2;
+/**
+ * THE BINDING CONSTRAINT IS A PLAYER, NOT A CORNER (found by gate, not by
+ * reasoning). HF-436 made the cargo box a real room enterable from THREE
+ * mouths, one of them the -x REAR end, and `nuketown2-fidelity.test.ts` probes
+ * a standing player 0.6 m behind that tail and requires it unblocked. Seated at
+ * the pure corner limit the truck backs its rear mouth into the bulb's own kerb
+ * ring and that probe fails - which is the gate doing exactly its job, because
+ * a truck you cannot walk into from behind has lost the route HF-436 built.
+ *
+ * So the rear approach is authored as a constraint of its own: the mouth's
+ * 0.6 m stand-off plus a standing body's own half-width must still be inside
+ * the disc, measured on the truck's OWN centre-line z (which is where the probe
+ * stands), not at the box's outer flank.
+ */
+const TRUCK_REAR_APPROACH = 0.6 + 0.5;
+const TRUCK_REAR_MOUTH_LIMIT_X = NUKETOWN2_CUL_DE_SAC.centreX
+  - Math.sqrt(NUKETOWN2_CUL_DE_SAC.radius ** 2 - TRUCK_Z ** 2)
+  + TRUCK_BOX_LENGTH / 2 + TRUCK_REAR_APPROACH;
+/** Both walls at once. The rear mouth binds; the corner limit is 0.49 m deeper. */
+const TRUCK_DEEPEST_X = Math.max(TRUCK_CORNER_LIMIT_X, TRUCK_REAR_MOUTH_LIMIT_X);
+/** Held off the disc wall, so the seat is inside the circle and not on it. */
+const TRUCK_BULB_CLEARANCE = 0.05;
+const TRUCK_X = TRUCK_DEEPEST_X + TRUCK_BULB_CLEARANCE;
+
 export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
-  boxLength: 6.5,
-  cabLength: 5.2,
-  width: 2.6,
+  boxLength: TRUCK_BOX_LENGTH,
+  cabLength: TRUCK_CAB_LENGTH,
+  width: TRUCK_WIDTH,
   /**
    * HF-477 - THE TRUCK MOVED INTO THE BULB, because the bulb moved.
    *
@@ -505,23 +595,27 @@ export const NUKETOWN2_CENTRAL_TRUCK = Object.freeze({
    * (`nt2025-aerial-boii.jpg`) is unambiguous - the truck stands IN the bulb,
    * nose pointed down the stem.
    *
-   * -10.6 is derived, not chosen: the truck is 11.7 m end to end and the bulb
-   * is a 16 m disc, so the only free parameter is how far the nose reaches. At
-   * -10.6 the front bumper lands at authored x = -2.03 and the disc at the
-   * bumper's own |z| = 4.05 reaches -1.60, so the nose stops 0.43 m short of
-   * the kerb line instead of parking over it. Everything else about the truck -
-   * its 0.325 L length split, its z, its deck and roof heights and the 2x core
-   * that rides it - is unchanged, and the core's seat is DERIVED from this
-   * field in `src/overdrive.ts` so it cannot be left behind.
+   * ROUND 3 re-derived the seat off the BINDING walls instead of the nose;
+   * see TRUCK_DEEPEST_X above for the two inequalities and for why authoring
+   * off the nose left the truck 1.01 m shallow and pushed the coach out of the
+   * head.
+   * Everything else about the truck - its 0.325 L length split, its z, its deck
+   * and roof heights and the 2x core that rides it - is unchanged, and the
+   * core's seat is DERIVED from this field in `src/overdrive.ts` so it cannot
+   * be left behind.
    */
-  x: -10.6,
+  x: TRUCK_X,
   /** 0.0764 L south of the road centre-line; reference 0.076 L. */
-  z: 2.75,
+  z: TRUCK_Z,
   deckY: 0.05,
   roofY: 3.25,
   cabRoofY: 2.9,
-  /** Cab centre along the street: the box centre plus box half plus cab half. */
-  cabX: -10.6 + 6.5 / 2 + 5.2 / 2,
+  /**
+   * Cab centre along the street: the box centre plus box half plus cab half.
+   * DERIVED, not re-typed - the previous cut spelled the box centre out again
+   * here, which is exactly the transcription this file's header exists to stop.
+   */
+  cabX: TRUCK_X + TRUCK_BOX_LENGTH / 2 + TRUCK_CAB_LENGTH / 2,
   /** Height of the 2x-damage core over the cargo-box roof. */
   coreHeightOverRoof: 0.6,
 });

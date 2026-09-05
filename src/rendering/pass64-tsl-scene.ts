@@ -901,7 +901,13 @@ function makeWater(
     // look the mesh up by name keep working; it stays invisible. It still
     // carries the water pipeline tag so the fail-closed traversal audit keeps
     // counting the full authored pipeline set regardless of arena.
-    const placeholder = new THREE.Mesh(new THREE.BufferGeometry(), new MeshStandardNodeMaterial());
+    // Keep the inert node renderable to the r185 ScenePass compiler even while
+    // it is hidden. A bare BufferGeometry has no `position` attribute, and the
+    // compiler's AttributeNode then reports a swallowed material-build failure
+    // on the cold path. This is a placeholder factory, not an authored water
+    // surface: a one-quad geometry gives it a complete vertex contract while
+    // `visible = false` keeps it out of every live draw.
+    const placeholder = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new MeshStandardNodeMaterial());
     placeholder.name = 'Pass 64 TSL perimeter water';
     placeholder.visible = false;
     tagPipeline(placeholder.material, PIPELINE.water);
