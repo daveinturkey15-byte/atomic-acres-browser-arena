@@ -103,6 +103,11 @@ const percentile = (values, q) => {
 const COMBAT_SAMPLE = async (seconds) => {
   const api = window.__ATOMIC_ACRES_DEBUG__;
   const beforePipelines = window.__FARCRYSIS_DRESSING_PIPELINES__?.renderPipelines ?? null;
+  const percentileInPage = (values, q) => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    return Number(sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))].toFixed(2));
+  };
   const deltas = [];
   let previous = performance.now();
   const endAt = previous + seconds * 1000;
@@ -151,10 +156,10 @@ const COMBAT_SAMPLE = async (seconds) => {
     seconds,
     frames: frames.length,
     meanFrameMs: frames.length ? Number((frames.reduce((sum, value) => sum + value, 0) / frames.length).toFixed(2)) : null,
-    p50FrameMs: percentile(frames, 0.5),
-    p95FrameMs: percentile(frames, 0.95),
-    p99FrameMs: percentile(frames, 0.99),
-    worstFrameMs: percentile(frames, 1),
+    p50FrameMs: percentileInPage(frames, 0.5),
+    p95FrameMs: percentileInPage(frames, 0.95),
+    p99FrameMs: percentileInPage(frames, 0.99),
+    worstFrameMs: percentileInPage(frames, 1),
     longFramesOver33ms: frames.filter((value) => value > 33.4).length,
     gapsOver1000ms: frames.filter((value) => value > 1000).length,
     pipelinesBefore: beforePipelines,
