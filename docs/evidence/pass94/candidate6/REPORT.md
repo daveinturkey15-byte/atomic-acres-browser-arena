@@ -35,6 +35,8 @@ Claim-state convention: `[VERIFIED]` is directly observed in this run; `[CLAIMED
 
 ## Static and contract gates
 
+`[OPEN]` Required `npm run pipeline:preflight -- --machine dave-gaming-pc --harness ...` could not produce a pass: the literal required harness value `Codex` failed harness validation, while lowercase `codex` failed the repository's pinned branch-name validation. No bypass or branch rewrite was used.
+
 ### TypeScript and coplanar audit
 
 `[VERIFIED]` `npx tsc --noEmit` exited `0` with no diagnostics.
