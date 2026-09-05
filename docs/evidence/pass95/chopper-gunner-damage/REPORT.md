@@ -253,3 +253,43 @@ move.
 
 `[VERIFIED]` No guest/host asymmetry was found in the chopper gun damage path
 itself.
+
+---
+
+## 8. Full suite (under the machine heavy-work lock)
+
+`[VERIFIED]` `npx vitest run` (lock held 07:36-07:41, released immediately
+after):
+
+```
+ Test Files  1 failed | 621 passed | 1 skipped (623)
+      Tests  1 failed | 6246 passed | 2 skipped (6249)
+   Duration  262.82s
+```
+
+`[VERIFIED]` The single failure is `src/gameplay-state-property.test.ts >
+replays every generated sequence to the same canonical hash`:
+
+```
+Error: Test timed out in 60000ms.
+```
+
+`[VERIFIED]` It is a wall-clock timeout under full-suite parallel load, not a
+correctness failure, and it is independent of this lane's diff:
+
+- Re-run in isolation on this branch: `Test Files 1 passed (1)`,
+  `Tests 2 passed (2)`, duration `43.81s` against the file's own `60000ms`
+  bound. It is a 10,000-run `fast-check` property whose margin is thin on a
+  loaded machine (other lanes and ComfyUI were running).
+- Its entire import surface is `./gameplay`, `./gameplay-replay`,
+  `./protocol`, `./deterministic-rng`, `./canonical-state` and
+  `./combat/legacy-weapon-adapter`. `[VERIFIED]` by grep, none of those import
+  `killstreak-tuning`, `killstreak-support-catalog` or `combat-damage-table` -
+  the only modules this lane changed or added. The test cannot observe this
+  change.
+
+The timeout was NOT raised and the run count was NOT lowered: no threshold,
+budget or bound was touched anywhere in this lane. `[OPEN]` whether the same
+test also times out at base `452d7aba` under identical load was not measured
+here; the isolation re-run plus the import-surface proof is what this lane
+stands on.
