@@ -1,0 +1,16 @@
+# bad: [452d7aba27ae2cf8ed793cc58d2fb03a6906fa4c] build(hitl7): candidate 7 morning evidence
+# good: [1aad84abd8b5ff5051afdc9e4a42447a2c446733] fix(webgpu): chrome153 tint - keep device-feature negotiation observable
+git bisect start '452d7aba' '1aad84ab' '--first-parent'
+# bad: [94aa2170327671c02cab5db73277f96d0980644c] fix(hitl6): isolate cold coverage roots
+git bisect bad 94aa2170327671c02cab5db73277f96d0980644c
+# bad: [cfc71824c6bde39a1935c94cc8c8cb59309ded01] fix(hitl6): retain stock nuke fence relief
+git bisect bad cfc71824c6bde39a1935c94cc8c8cb59309ded01
+# bad: [0a79f340077e9da0131d0e005483090f74e1c1c8] fix(hitl6): hoist pickup authority from legacy main
+git bisect bad 0a79f340077e9da0131d0e005483090f74e1c1c8
+# bad: [e0d445f93d774795b4ec5e5a2aefe95d4f5edd9e] fix(hitl6): merge multiplayer audit remediation
+git bisect bad e0d445f93d774795b4ec5e5a2aefe95d4f5edd9e
+# bad: [fad765f47d9f7f84dc31c45e84f9eda0107875ea] build(hitl6): record preflight gate outcome
+git bisect bad fad765f47d9f7f84dc31c45e84f9eda0107875ea
+# bad: [23b140c19f4b84b51c8ada047b85a3402ba09a96] build(hitl6): integrate multiplayer-first candidate6 evidence
+git bisect bad 23b140c19f4b84b51c8ada047b85a3402ba09a96
+# first bad commit: [23b140c19f4b84b51c8ada047b85a3402ba09a96] build(hitl6): integrate multiplayer-first candidate6 evidence

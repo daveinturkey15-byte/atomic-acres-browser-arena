@@ -1,0 +1,24 @@
+SELECTED-ARENA-DATASET: nuketown2
+t+0.1s {"status":"","stage":null,"arenaId":"nuketown2","gameplayArena":"deferred-until-deployment","phase":"warmup","started":false}
+CONSOLE ERRORS (15):
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The number of sampled textures (17) in the Fragment stage exceeds the maximum per-stage limit (16). This adapter supports a higher maxSample
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroupLayout (unlabeled)] is invalid due to a previous error.
+ - While validating [BindGroupDescriptor ""bindGroup_object""] aga
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroupLayout (unlabeled)] is invalid due to a previous error.
+ - While validating [BindGroupDescriptor ""bindGroup_object""] aga
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroupLayout (unlabeled)] is invalid due to a previous error.
+ - While calling [Device].CreatePipelineLayout([PipelineLayoutDesc
+   THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_1886): [Invalid PipelineLayout (unlabeled)] is invalid due to a previous error.
+ - While calling [De
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroupLayout (unlabeled)] is invalid due to a previous error.
+ - While validating [BindGroupDescriptor ""bindGroup_object""] aga
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid BindGroupLayout (unlabeled)] is invalid due to a previous error.
+ - While validating [BindGroupDescriptor ""bindGroup_object""] aga
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid RenderPipeline "renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_1886"] is invalid due to a previous error.
+ - While encoding [RenderPa
+   THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder "renderContext_4"] is invalid due to a previous error.
+ - While calling [Queue].Submit([[Invalid 
+   [High Seas map selection failed] Error: WebGPU queue completion failed: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder "renderContext_4"] is invalid due to a previous er
+server killed
+
+[exited with code 0]

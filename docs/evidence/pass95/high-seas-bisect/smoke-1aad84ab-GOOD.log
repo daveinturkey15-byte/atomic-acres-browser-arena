@@ -1,0 +1,76 @@
+=== FAST STEP 1aad84ab start 12:31:13 ===
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 510 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                          1.20 kB │ gzip:   0.62 kB
+dist/map3.html                                           1.84 kB │ gzip:   0.88 kB
+dist/assets/legacy-main-BSThLq4n.css                    17.97 kB │ gzip:   4.28 kB
+dist/assets/style-DnVwtB4j.css                         165.27 kB │ gzip:  33.92 kB
+dist/assets/index-DDJjCrD3.css                         204.12 kB │ gzip:  38.56 kB
+dist/assets/viewmodel-body-fit-BomOnoks.js               0.22 kB │ gzip:   0.15 kB
+dist/assets/map3-arena-Bh5uAbbd.js                       0.25 kB │ gzip:   0.18 kB
+dist/assets/retry-load-DIpB1FEH.js                       0.25 kB │ gzip:   0.21 kB
+dist/assets/webgpu-adapter-diagnostics-BNE2ATWW.js       0.34 kB │ gzip:   0.21 kB
+dist/assets/release-identity-BljZFRzG.js                 0.51 kB │ gzip:   0.36 kB
+dist/assets/rolldown-runtime-QTnfLwEv.js                 0.69 kB │ gzip:   0.42 kB
+dist/assets/modulepreload-polyfill-Dezn_h7o.js           0.69 kB │ gzip:   0.39 kB
+dist/assets/map3-BLCeVI9c.js                             1.18 kB │ gzip:   0.73 kB
+dist/assets/test1-CSioFs6g.js                            1.20 kB │ gzip:   0.73 kB
+dist/assets/webgpu-tint-swizzle-shim-Bn2yF8yy.js         1.24 kB │ gzip:   0.58 kB
+dist/assets/preload-helper-DYl5dUZ5.js                   1.27 kB │ gzip:   0.70 kB
+dist/assets/test2-Cou3m8xa.js                            1.30 kB │ gzip:   0.78 kB
+dist/assets/nuketown2-DF6jwvC_.js                        1.48 kB │ gzip:   0.80 kB
+dist/assets/main-CR3i41zZ.js                             1.64 kB │ gzip:   1.01 kB
+dist/assets/farcrysis-HMegY7va.js                        1.69 kB │ gzip:   0.86 kB
+dist/assets/raid2-BHTL8o5U.js                            1.70 kB │ gzip:   0.90 kB
+dist/assets/atomic-acres-DeyGfnbj.js                     1.70 kB │ gzip:   0.93 kB
+dist/assets/skyline-terminal-Bs1eM7TN.js                 1.74 kB │ gzip:   0.90 kB
+dist/assets/high-seas-BcBcIedh.js                        2.42 kB │ gzip:   1.20 kB
+dist/assets/rustworks-1v1-DbOmawpR.js                    2.83 kB │ gzip:   1.20 kB
+dist/assets/webgpu-diagnostics-screen-BO3QB7N0.js        3.45 kB │ gzip:   1.54 kB
+dist/assets/gun-range-rack-presentation-BegfcPaM.js      3.57 kB │ gzip:   1.49 kB
+dist/assets/index-y7q0quU7.js                            4.24 kB │ gzip:   1.85 kB
+dist/assets/map3-arena-iZD-FVIP.js                       4.31 kB │ gzip:   2.14 kB
+dist/assets/gun-range-95opYBnF.js                        5.04 kB │ gzip:   1.73 kB
+dist/assets/shared-Ct5l7O-9.js                           6.50 kB │ gzip:   2.42 kB
+dist/assets/webgpu-adapter-diagnostics-BK_qrMAJ.js       7.75 kB │ gzip:   3.19 kB
+dist/assets/combat-feedback-T_NMK-AK.js                  9.42 kB │ gzip:   3.70 kB
+dist/assets/sky-backdrop-BayDo8ol.js                     9.52 kB │ gzip:   3.55 kB
+dist/assets/collision-CR4h6GQS.js                        9.82 kB │ gzip:   3.84 kB
+dist/assets/raid2-arena-DbqFaR92.js                     10.85 kB │ gzip:   3.85 kB
+dist/assets/map3-UFFKAsIR.js                            16.91 kB │ gzip:   7.61 kB
+dist/assets/three.webgpu-Sg0nfoGU.js                    19.21 kB │ gzip:   7.47 kB
+dist/assets/nuketown2-arena-BfAy_9yJ.js                 39.85 kB │ gzip:  14.95 kB
+dist/assets/vendor-three-loaders-CecY3dxc.js            42.89 kB │ gzip:  12.72 kB
+dist/assets/map-DvatSFRF.js                             43.75 kB │ gzip:  15.26 kB
+dist/assets/high-seas-BCRH3Ds2.js                       45.42 kB │ gzip:  14.34 kB
+dist/assets/changelog-D6Bt8CH5.js                       52.01 kB │ gzip:  18.80 kB
+dist/assets/test-maps-CEzWVofF.js                       53.00 kB │ gzip:  19.38 kB
+dist/assets/vendor-peer-DW-fpQKQ.js                     86.87 kB │ gzip:  23.17 kB
+dist/assets/corridor-colosseum-cKTTeCmS.js              98.24 kB │ gzip:  36.28 kB
+dist/assets/additional-maps-2KpogM54.js                110.76 kB │ gzip:  33.24 kB
+dist/assets/farcrysis-B3h2j-vH.js                      147.77 kB │ gzip:  47.88 kB
+dist/assets/gameplay-BShRLr-E.js                       505.22 kB │ gzip: 136.77 kB
+dist/assets/vendor-three-tyoDQgfT.js                 1,567.52 kB │ gzip: 444.32 kB
+dist/assets/legacy-main-Dp2aRAzr.js                  1,883.35 kB │ gzip: 578.39 kB
+dist/assets/rapier-USIc5Cek.js                       2,236.65 kB │ gzip: 842.25 kB
+
+✓ built in 1.55s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+--- build done 12:31:18 ---
+  ➜  Local:   http://127.0.0.1:4292/
+--- preview up 12:31:22 ---
+
+Running 1 test using 1 worker
+
+(node:229304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match (1.2m)
+
+  1 passed (1.3m)
+=== RESULT 1aad84ab exit=0 12:32:44 ===
