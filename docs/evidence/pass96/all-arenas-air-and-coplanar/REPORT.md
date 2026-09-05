@@ -147,7 +147,9 @@ tower's rails already use where they lap:
 - pool bar walls x3: same under `raid2 pool bar roof`
 - drive fountain plinth: `HARD_COVER` -> `HARD_COVER - 0.04` against the four planters
 - pool entry steps sw/ne: top raised +0.04 clear of the paving (riser to coping still
-  0.26 m, under the 0.42 m autostep; the "route not a pit" property holds)
+  0.26 m — coping top `y1 = 0.3` (`src/raid2-arena.ts:484`) against step top
+  `y1 = -0.28 + 0.28 + 0.04 = 0.04` (`src/raid2-arena.ts:488-489`), i.e. `0.30 - 0.04`;
+  under the 0.42 m autostep; the "route not a pit" property holds)
 
 No geometry hidden and no collider decoupled: `rect()` delegates to `box()` with the
 same extents (`src/raid2-arena.ts:308-320`), so each shifted body's collider and shot
