@@ -1,0 +1,15 @@
+[lock] acquired 11:02:31
+
+> atomic-acres-browser-arena@1.0.0 qa:pass65:cold-webgpu-admission
+> node scripts/qa/verify-pass65-cold-webgpu-admission.mjs
+
+file:///C:/Users/david/projects/aa-claude-release84/scripts/qa/verify-pass65-cold-webgpu-admission.mjs:82
+  throw new Error('Pass 65 cold admission requires a clean tracked worktree');
+        ^
+
+Error: Pass 65 cold admission requires a clean tracked worktree
+    at file:///C:/Users/david/projects/aa-claude-release84/scripts/qa/verify-pass65-cold-webgpu-admission.mjs:82:9
+
+Node.js v24.12.0
+[exit] 1 at 11:02:37
+[lock] released
