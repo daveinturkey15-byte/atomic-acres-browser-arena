@@ -138,6 +138,24 @@ describe('Pass 95 HUD/menu/lobby polish - source contract', () => {
     // The budget is stated once, in the harness, and is not widened here.
     expect(harness).toContain('budgetMsPerFrame: 1.5');
   });
+  it('keeps the menu column reachable at short viewports instead of clipping it', () => {
+    // F3/UNFINISHED-3: after-layout.json has #map-selector bottom 1513.8 at
+    // 720p behind overflow:hidden ancestors. The sheet answers with a
+    // min-height:0 chain plus column-internal scroll; the harness still gates
+    // the boxes (see measured half), and one browser re-record proves it.
+    expect(sheet).toContain('#menu-panel-deploy');
+    expect(sheet).toMatch(/min-height:\s*0/);
+    expect(sheet).toMatch(/#menu \.arena-command\s*\{[^}]*overflow-y:\s*auto/);
+    expect(sheet).toMatch(/#menu #map-selector\s*\{[^}]*overflow-y:\s*auto/);
+    expect(sheet).toContain('@media (max-height: 800px)');
+  });
+
+  it('gates menu overflow in the harness at every review resolution', () => {
+    // The bounding-box gate for the menu half: every MENU_SURFACES box outside
+    // the viewport rect is an offscreen finding at all three sizes.
+    expect(harness).toContain('for (const [viewportName, measurement] of Object.entries(report.menu))');
+    expect(harness).toContain('menu ${off.selector} extends outside the viewport');
+  });
 });
 
 describe('Pass 95 HUD/menu/lobby polish - measured layout', () => {
@@ -160,6 +178,20 @@ describe('Pass 95 HUD/menu/lobby polish - measured layout', () => {
   it('keeps every HUD surface inside the viewport at every review resolution', () => {
     for (const viewport of REVIEW_VIEWPORTS) {
       expect(after.hud[viewport]!.offscreen.map((entry) => entry.selector), `offscreen at ${viewport}`).toEqual([]);
+    }
+  });
+
+  it('measures the menu column boxes at all three review resolutions', () => {
+    // Shape pin for UNFINISHED-3: the harness gates menu offscreen per
+    // viewport (source half above); this pins that the committed capture
+    // actually contains the three boxes the fix is about, so a future
+    // re-record cannot silently drop them. Strict []-green needs that
+    // browser re-record and stays [OPEN] (REPORT Finish round).
+    for (const viewport of REVIEW_VIEWPORTS) {
+      const measurement = after.menu[viewport]!;
+      for (const selector of ['#map-selector', '#high-score-card', '#menu-showcase']) {
+        expect(measurement.surfaces[selector], `${selector} at ${viewport}`).toBeTruthy();
+      }
     }
   });
 

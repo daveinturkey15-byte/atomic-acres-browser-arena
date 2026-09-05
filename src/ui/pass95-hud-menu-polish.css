@@ -168,3 +168,50 @@
 #menu #map-selector .map-card[aria-pressed='true'] {
   box-shadow: inset var(--p95-grid) 0 0 0 var(--p77-accent, #f4c44f);
 }
+
+/* ---------------------------------------------------------------------------
+ * PART 5 - the menu column fits short viewports instead of clipping.
+ *
+ * MEASURED, after (docs/evidence/pass95/hud-menu-polish/after-layout.json):
+ * `#map-selector` bottom 1513.8 in a 720-tall viewport and 1281.2 in a
+ * 1080-tall one; `#high-score-card` bottom 751.8 at 720p. The ancestors above
+ * both boxes (`.arena-command`, `.command-workspace`) are `overflow: hidden`,
+ * so the excess is clipped with no scroll path - the player cannot reach the
+ * cards the harness cannot see, and AGENTS.md requires every review viewport
+ * free of clipping.
+ *
+ * The repair keeps the grid and moves the scroll boundary: the column that
+ * owns the overflow scrolls inside its own box, so every card stays reachable
+ * and no border box is cut by an `overflow: hidden` ancestor. The
+ * `min-height: 0` chain is the load-bearing part: without it a grid item
+ * refuses to shrink and the `overflow-y` below never engages. Short-viewport
+ * tightening moves the first card row up; the horizontal card rail itself is
+ * a design change and stays [OPEN] (REPORT Finish round).
+ * ------------------------------------------------------------------------ */
+#menu-panel-deploy,
+#menu .arena-command,
+#menu #map-selector {
+  min-height: 0;
+}
+
+#menu .arena-command {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+#menu #map-selector {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  max-height: calc(100vh - 320px);
+  max-height: calc(100dvh - 320px);
+}
+
+@media (max-height: 800px) {
+  #menu #menu-showcase {
+    max-height: min(22vh, 220px);
+  }
+  #menu .arena-command {
+    gap: 8px;
+    padding: 16px;
+  }
+}
