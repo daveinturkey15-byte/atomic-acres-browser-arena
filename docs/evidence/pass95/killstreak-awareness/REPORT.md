@@ -129,7 +129,7 @@ Test Files  3 passed (3)
 Tests       43 passed (43)
 ```
 
-`[VERIFIED]` `src/killstreak-awareness.test.ts` (11 tests): announce shape/authority/audience,
+`[VERIFIED]` `src/killstreak-awareness.test.ts` (12 tests): announce shape/authority/audience,
 malformed rejection, admission (forged host / epoch / duplicate activation), bounded de-dup,
 two-guest replication at three advance times, phase derivation, attenuation curve
 (monotone, 1 at 10 m, 0 at 220 m, altitude halving and floor), bounded nearest-first pool,
