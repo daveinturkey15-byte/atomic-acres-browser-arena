@@ -88,3 +88,49 @@ describe('F1 host allow-lists the guest-claimed equipped weapon', () => {
     expect(clampAdmittedHeldWeapon(snapshot('guest-a', 'crimson-flamethrower'), 'pistol').weapon).toBe('crimson-flamethrower');
   });
 });
+
+describe('remote reload stale-revision guard', () => {
+  function reloadMessage(revision: number, status: ReloadResultMessage['status']): ReloadResultMessage {
+    return {
+      type: 'reload-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+      by: 'host', forPlayerId: 'guest-a', connectionEpoch: 'epoch-1', lifeId: 1,
+      actionSequence: 3, requestId: 'reload-3', weapon: 'm4a1', status, reason: 'accepted',
+      completesAtHostTimeMs: 700, shotSequenceWatermark: 2,
+      combatInventory: {
+        revision,
+        primary: { weapon: 'm4a1', ammo: 30, reserve: 67 },
+        sidearm: { weapon: 'pistol', ammo: 12, reserve: 48 },
+        grenades: 1,
+      },
+      nonce: 4,
+    };
+  }
+
+  it('rejects a stale reload result below the stored revision without touching inventory or presentation', () => {
+    const remote = snapshot('guest-a', 'pistol');
+    const inventories = new Map([['guest-a', createGuestCombatInventory('m4a1', 'pistol', 1)]]);
+    const revisions = new Map([['guest-a', 8]]);
+    const beforeInventory = inventories.get('guest-a');
+    const outcome = applyRemoteReloadResult(remote, beforeInventory!, reloadMessage(7, 'committed'), 'pistol', revisions.get('guest-a') ?? -1);
+    expect(outcome).toBeNull();
+    expect(inventories.get('guest-a')).toBe(beforeInventory);
+    expect(remote).toMatchObject({ weapon: 'pistol', reloading: undefined });
+  });
+
+  it('accepts legitimate same-revision started and committed results', () => {
+    const authority = createGuestCombatInventory('m4a1', 'pistol', 1);
+    const started = applyRemoteReloadResult(snapshot('guest-a', 'pistol'), authority, reloadMessage(8, 'started'), 'pistol', 8);
+    expect(started?.snapshot).toMatchObject({ weapon: 'm4a1', reloading: true });
+    expect(started?.inventory).toMatchObject({ ammo: { m4a1: 30, pistol: 12 }, reserve: { m4a1: 67, pistol: 48 } });
+    const committed = applyRemoteReloadResult(snapshot('guest-a', 'pistol'), authority, reloadMessage(8, 'committed'), 'pistol', 8);
+    expect(committed?.snapshot).toMatchObject({ weapon: 'm4a1', reloading: false });
+    expect(committed?.inventory).toMatchObject({ ammo: { m4a1: 30, pistol: 12 }, reserve: { m4a1: 67, pistol: 48 } });
+  });
+
+  it('accepts a newer reload result above the stored revision', () => {
+    const authority = createGuestCombatInventory('m4a1', 'pistol', 1);
+    const outcome = applyRemoteReloadResult(snapshot('guest-a', 'pistol'), authority, reloadMessage(9, 'committed'), 'pistol', 8);
+    expect(outcome?.snapshot).toMatchObject({ weapon: 'm4a1', reloading: false });
+    expect(outcome?.inventory).toMatchObject({ ammo: { m4a1: 30, pistol: 12 } });
+  });
+});

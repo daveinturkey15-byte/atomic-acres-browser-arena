@@ -50,7 +50,9 @@ export function applyRemoteReloadResult(
   authority: GuestCombatInventory,
   message: ReloadResultMessage,
   sidearm: PlayerSnapshot['secondary'],
+  currentRevision = -1,
 ): { snapshot: PlayerSnapshot; inventory: GuestCombatInventory } | null {
+  if (message.combatInventory.revision < currentRevision) return null;
   const inventory = applyGuestCombatInventoryProjection(authority, message.combatInventory, snapshot.primary, sidearm);
   if (!inventory) return null;
   const accepted = message.status === 'started' || message.status === 'committed';

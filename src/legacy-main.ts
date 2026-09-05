@@ -6529,7 +6529,7 @@ function acceptRemoteReloadResult(message: ReloadResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId === player.id) return;
   const id = message.forPlayerId, remote = remotes.get(id), authority = remoteCombatInventories.get(id);
   if (!remote || !authority || message.lifeId !== remote.continuity) return;
-  const outcome = applyRemoteReloadResult(remote.snapshot, authority, message, remoteLoadoutSidearm(remote.snapshot));
+  const outcome = applyRemoteReloadResult(remote.snapshot, authority, message, remoteLoadoutSidearm(remote.snapshot), remoteCombatInventoryRevisions.get(id) ?? -1);
   if (!outcome) return;
   remote.snapshot = outcome.snapshot;
   remoteCombatInventories.set(id, outcome.inventory); remoteCombatInventoryRevisions.set(id, message.combatInventory.revision);
