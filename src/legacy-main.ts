@@ -10942,8 +10942,9 @@ function handleLobbyMessage(message: GameMessage): boolean {
     // A voluntary menu leave during an active match is still a resumable
     // session. Keep the host-owned identity and combat snapshot alive for the
     // bounded grace window; only a waiting-lobby leave is a final departure.
+    const hostMatchIsActive = privateLobbySnapshot.phase === 'active' || matchState.phase === 'active' || gameStarted;
     const retainActiveMatchRejoin = message.voluntary
-      && privateLobbySnapshot.phase === 'active'
+      && hostMatchIsActive
       && hostLobbyMembers.has(message.playerId);
     removeRemote(
       message.playerId,
@@ -16667,9 +16668,10 @@ function processDeath(message: DeathMessage): void {
 function removeRemote(id: string, reason: string, allowRejoinReservation = true): void {
   const remote = remotes.get(id);
   if (!remote) return;
+  const hostMatchIsActive = privateLobbySnapshot?.phase === 'active' || matchState.phase === 'active' || gameStarted;
   const retainCombatAuthority = allowRejoinReservation && shouldRetainRemoteCombatAuthority(
     network.role,
-    privateLobbySnapshot?.phase ?? null,
+    hostMatchIsActive ? 'active' : privateLobbySnapshot?.phase ?? null,
     hostLobbyMembers.has(id),
   );
   if (network.role === 'host') {
@@ -30566,8 +30568,7 @@ function returnToMainMenu(): void {
   const leavingHostedMatch = network.role === 'host';
   pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client'
     && network.roomCode
-    && gameStarted
-    && privateLobbySnapshot?.phase === 'active'
+    && (gameStarted || matchState.phase === 'active' || privateLobbySnapshot?.phase === 'active')
     ? network.roomCode
     : '';
   // A voluntary lobby leave is still inside the host's bounded rejoin grace

@@ -277,7 +277,7 @@ describe('HF-504 lobby authority and succession fences', () => {
     expect(ready).toContain('if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = \'\';');
     const leave = main.slice(main.indexOf('function returnToMainMenu(): void {'));
     expect(leave).toContain('pendingVoluntaryActiveMatchRejoinRoomCode = network.role === \'client\'');
-    expect(leave).toContain('privateLobbySnapshot?.phase === \'active\'');
+    expect(leave).toContain('matchState.phase === \'active\'');
   });
 
   it('sends the rejoiner a direct canonical snapshot for each existing remote', () => {
@@ -292,6 +292,7 @@ describe('HF-504 lobby authority and succession fences', () => {
     const leave = main.slice(main.indexOf("if (message.type === 'leave' && privateLobbySnapshot) {"));
     expect(leave).toContain("const retainActiveMatchRejoin = message.voluntary");
     expect(leave).toContain("privateLobbySnapshot.phase === 'active'");
+    expect(leave).toContain('const hostMatchIsActive = privateLobbySnapshot.phase === \'active\' || matchState.phase === \'active\' || gameStarted;');
     expect(leave).toContain('!message.voluntary || retainActiveMatchRejoin');
     expect(leave).toContain("if (message.voluntary && !retainActiveMatchRejoin) {");
     expect(leave).toContain('hostLobbyTokens.delete(message.playerId);');
