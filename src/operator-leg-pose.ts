@@ -299,7 +299,7 @@ export type LegPoseSample = Readonly<{
   kneeRightFlexionRadians: number;
 }>;
 
-export type LegPoseVerdict = Readonly<{
+export type LegPoseAssessment = Readonly<{
   kneeSeparationM: number;
   ankleSeparationM: number;
   minimumSeparationM: number;
@@ -315,14 +315,14 @@ function withinKneeLimit(flexion: number): boolean {
 }
 
 /**
- * The verdict a sampled pose gets. `crossing` is the owner's complaint expressed
+ * The assessment a sampled pose gets. `crossing` is the owner's complaint expressed
  * as a number: lateral separation has fallen through the derived threshold, at
  * the knees or at the ankles.
  */
 export function judgeLegPose(
   sample: LegPoseSample,
   threshold = MIN_LEG_LATERAL_SEPARATION_M,
-): LegPoseVerdict {
+): LegPoseAssessment {
   const kneeSeparationM = sample.kneeRightLateralM - sample.kneeLeftLateralM;
   const ankleSeparationM = sample.ankleRightLateralM - sample.ankleLeftLateralM;
   const minimumSeparationM = Math.min(kneeSeparationM, ankleSeparationM);

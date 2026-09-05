@@ -272,7 +272,7 @@ describe('HF-509 pose validity through the crouch and prone transitions', () => 
       );
       expect(worst).toBeGreaterThanOrEqual(MIN_LEG_LATERAL_SEPARATION_M - 1e-9);
       for (const frame of domain) {
-        const verdict = judgeLegPose({
+        const assessment = judgeLegPose({
           kneeLeftLateralM: -frame.kneeSeparationM / 2,
           kneeRightLateralM: frame.kneeSeparationM / 2,
           ankleLeftLateralM: -frame.ankleSeparationM / 2,
@@ -280,7 +280,7 @@ describe('HF-509 pose validity through the crouch and prone transitions', () => 
           kneeLeftFlexionRadians: frame.kneeFlexionRadians,
           kneeRightFlexionRadians: frame.kneeFlexionRadians,
         });
-        expect(verdict.valid).toBe(true);
+        expect(assessment.valid).toBe(true);
       }
     });
 
