@@ -15051,7 +15051,7 @@ function applyDamage(
   lastDamageAt = now;
   audio.damage();
   gamepadRuntime.rumble('damage', now); // GAMEPAD: damage-taken pulse
-  if (cause.kind !== 'killstreak') showDamageDirection(attacker, appliedDamage, now);
+  if (cause.kind !== 'killstreak' || !['chopper', 'piloted-drone', 'drone-swarm'].includes(cause.effect)) showDamageDirection(attacker, appliedDamage, now);
   // HF-352: Camera shake impulse from taking damage
   if (appliedDamage > 0) {
     // HF-370: the owner wants hits FELT. Trauma scales with how hard the hit
