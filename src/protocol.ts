@@ -158,6 +158,8 @@ export type PlayerSnapshot = {
   stance?: 'stand' | 'crouch' | 'prone';
   /** HF-358: true while the swim movement state is engaged (swimmable water). */
   swimming?: boolean;
+  /** HF-504 R-5: host-authored reload presentation state for remote players. */
+  reloading?: boolean;
   seq: number;
 };
 
@@ -350,7 +352,11 @@ export type SupportActivateMessage = {
   timing?: CombatTiming;
   nonce: number;
 };
-export type DeathMessage = { type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number };
+export type DeathMessage = {
+  type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number;
+  /** Host-canonical weapon drop; guests never derive a drop from local state. */
+  drop?: PickupResultDropRecord;
+};
 export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots: HostedBotSnapshot[]; nonce: number };
 export type BotDamageMessage = {
   type: 'bot-damage'; by: string; botId: string; target: string; weapon: WeaponId;
@@ -1037,6 +1043,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
           || (msg.cause as { kind?: unknown }).kind === 'environment'
           || (msg.cause as { kind?: unknown; effect?: unknown }).kind === 'killstreak'
             && isPass65KillstreakId((msg.cause as { effect?: unknown }).effect))
+        && (msg.drop === undefined || isPickupResultDropRecord(msg.drop))
         && Number.isFinite(msg.nonce);
     case 'bot-damage':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80

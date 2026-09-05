@@ -256,11 +256,12 @@ const viewOf = (page) => page.evaluate(() => {
       secondary: remote.secondary,
       ammo: remote.combatInventory?.ammo?.[remote.weapon] ?? null,
       reserve: remote.combatInventory?.reserve?.[remote.weapon] ?? null,
-      reloading: null,
+      reloading: remote.reloading ?? null,
       kills: null,
       deaths: null,
       position: (remote.authoritativePosition ?? remote.position ?? []).map(round),
       seq: remote.seq ?? null,
+      authoritativeReady: remote.authoritativeReady ?? true,
       snapshotAgeMs: round(remote.snapshotAgeMs),
       score: scoreOf(remote.id),
     };
@@ -338,7 +339,8 @@ async function main() {
     ports: { dist: PORT, peer: PEER_PORT },
     flow: [],
     scenarios: {},
-    stateDiff: { samples: [], divergences: [] },
+    rowMeasures: {},
+    stateDiff: { samples: [], divergences: [], samplesCompared: 0 },
     trace: {},
     findings,
     completed: false,
@@ -413,11 +415,21 @@ async function runLobby(peers, arena, report, step) {
   const { host, guestA, guestB } = peers;
   const lobby = { ok: false };
   report.scenarios.lobby = lobby;
+  const measure = (id, caseName, ok, detail = {}) => {
+    report.rowMeasures[id] ??= [];
+    report.rowMeasures[id].push({ case: caseName, ok, ...detail });
+  };
 
   await host.page.click('#host');
   await host.page.waitForFunction(() => (document.querySelector('#room-code')?.textContent ?? '').trim().length > 0, undefined, { timeout: ROOM_TIMEOUT_MS });
   const roomCode = (await host.page.textContent('#room-code')).trim();
   lobby.roomCode = roomCode.length;
+  const hostAlone = await host.page.evaluate(() => ({
+    startDisabled: document.querySelector('#lobby-start')?.disabled ?? null,
+    members: window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [],
+  }));
+  lobby.hostAlone = hostAlone;
+  measure('L-1', 'host-alone', hostAlone.startDisabled === true, { result: hostAlone });
   step('room-open', { codeLength: roomCode.length });
 
   // Guests join one at a time so the second join is observed against a lobby
@@ -476,6 +488,15 @@ async function runLobby(peers, arena, report, step) {
     record('LOBBY-ROSTER-SPLIT', 'high', 'peers disagree about who is in the lobby',
       { disagreeing, views });
   }
+  const lobbyViews = {};
+  for (const role of PEERS) lobbyViews[role] = (await viewOf(peers[role].page).catch(() => null))?.lobby ?? null;
+  const lobbyKeys = PEERS.map((role) => JSON.stringify(lobbyViews[role] && {
+    phase: lobbyViews[role].phase,
+    revision: lobbyViews[role].revision,
+    arenaId: lobbyViews[role].arenaId,
+    members: lobbyViews[role].members,
+  }));
+  measure('L-4', 'authoritative-snapshot-agreement', new Set(lobbyKeys).size === 1, { views: lobbyViews });
 
   // Host picks the arena; every peer must follow the authoritative choice.
   await host.page.selectOption('#lobby-arena', arena.id);
@@ -495,7 +516,10 @@ async function runLobby(peers, arena, report, step) {
   }
   step('arena-synced', lobby.arenaSync);
 
-  // READY: guest A only. START must stay disabled while guest B is unready.
+  // READY: host and guest A only. START must stay disabled while guest B is
+  // unready, and the host's READY bit must be the same authority used by the
+  // commit path (L-3).
+  await host.page.click('#lobby-ready');
   await guestA.page.click('#lobby-ready');
   await sleep(ACK_BUDGET_MS);
   const partial = await host.page.evaluate(() => {
@@ -507,6 +531,7 @@ async function runLobby(peers, arena, report, step) {
     record('LOBBY-START-UNREADY', 'high', 'host START enabled while a joined guest had not readied',
       partial);
   }
+  measure('L-3', 'host-and-one-guest-ready', partial.startDisabled === true, { result: partial });
 
   // The host's own view of guest A's ready must match guest A's view of itself.
   const readyViews = {};
@@ -522,9 +547,32 @@ async function runLobby(peers, arena, report, step) {
 
   await guestB.page.click('#lobby-ready');
   await host.page.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: JOIN_TIMEOUT_MS });
+  const steadyRevision = await host.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.revision ?? null);
+  await sleep(2_300);
+  const telemetryRevision = await host.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.revision ?? null);
+  lobby.telemetryRevision = { before: steadyRevision, after: telemetryRevision };
+  measure('L-9', 'telemetry-does-not-advance-revision', steadyRevision !== null && telemetryRevision === steadyRevision, { result: lobby.telemetryRevision });
   step('all-ready');
 
+  const allReadyStart = await host.page.evaluate(() => {
+    const members = window.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.members ?? [];
+    return {
+      startDisabled: document.querySelector('#lobby-start')?.disabled ?? null,
+      ready: members.filter((member) => member.ready).length,
+      members: members.length,
+    };
+  });
+  const allReadyStartEnabled = allReadyStart.startDisabled === false;
+  measure('L-3', 'all-ready-start-enabled', allReadyStartEnabled, { result: allReadyStart });
   await host.page.click('#lobby-start');
+  await sleep(250);
+  const countdownTitles = Object.fromEntries(await Promise.all(PEERS.map(async (role) => [
+    role,
+    await peers[role].page.textContent('#private-lobby-title').catch(() => null),
+  ])));
+  lobby.countdownTitles = countdownTitles;
+  const countdownValues = Object.values(countdownTitles).filter((title) => /^DEPLOYING IN [0-5]$/.test(String(title).trim()));
+  measure('L-7', 'host-time-countdown', countdownValues.length === PEERS.length, { result: countdownTitles });
   const deployed = await Promise.allSettled(PEERS.map((role) => peers[role].page.waitForFunction(
     (arenaId) => {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
@@ -557,6 +605,7 @@ async function runStateDiff(peers, report, step) {
     const hostView = views.host;
     if (!hostView) { await sleep(1_000); continue; }
     const sample = { second, players: {} };
+    let sampleCompared = false;
     for (const [playerId, hostPlayer] of Object.entries(hostView.players)) {
       const row = { host: hostPlayer };
       for (const role of ['guestA', 'guestB']) {
@@ -566,6 +615,11 @@ async function runStateDiff(peers, report, step) {
           report.stateDiff.divergences.push({ second, playerId, peer: role, field: 'presence', host: 'present', peerValue: 'absent' });
           continue;
         }
+        // A guest-side remote is not comparable until its first state-lane
+        // admission. The object may exist from the join envelope, but its
+        // seed pose is deliberately withheld from presentation.
+        if (guestPlayer.authoritativeReady === false) continue;
+        sampleCompared = true;
         for (const field of FIELDS) {
           // A guest's view of a REMOTE carries no kills/deaths (they are not in
           // the replicated snapshot), so only compare what the peer actually
@@ -593,6 +647,7 @@ async function runStateDiff(peers, report, step) {
       sample.players[playerId] = row;
     }
     report.stateDiff.samples.push(sample);
+    if (sampleCompared) report.stateDiff.samplesCompared += 1;
     await sleep(1_000);
   }
   const byField = {};
@@ -604,6 +659,16 @@ async function runStateDiff(peers, report, step) {
       { field, count, samples: report.stateDiff.divergences.filter((row) => row.field === field).slice(0, 6) });
   }
   if (Object.keys(byField).length === 0) step('state-diff-clean');
+  report.rowMeasures['X-2'] = [{
+    case: 'post-deploy-state-diff',
+    ok: report.stateDiff.samplesCompared > 0
+      && !report.stateDiff.divergences.some((divergence) => divergence.field === 'position'),
+    result: {
+      divergencesByField: byField,
+      samples: report.stateDiff.samples.length,
+      samplesCompared: report.stateDiff.samplesCompared,
+    },
+  }];
 }
 
 // --- the owner's named scenarios, per guest --------------------------------
@@ -615,8 +680,9 @@ async function runScenarios(peers, report, step) {
     report.scenarios[role] = results;
     step('scenarios', { peer: role });
 
-    results.pickup = await scenarioPickup(guest, host, role);
-    results.reload = await scenarioReload(guest, host, role);
+    results.pickup = await scenarioPickup(guest, host, peers, role);
+    results.autoScavenge = await scenarioAutoScavenge(guest, host, peers, role);
+    results.reload = await scenarioReload(guest, host, peers, role);
     results.swap = await scenarioSwap(guest, peers, role);
     results.fireAtHost = await scenarioFire(guest, host, role, 'host');
     results.fireAtGuest = await scenarioFire(guest, peers[role === 'guestA' ? 'guestB' : 'guestA'], role, 'other-guest');
@@ -627,23 +693,39 @@ async function runScenarios(peers, report, step) {
     // and its real respawn. Keep this after the existing death/respawn pair so
     // the scenario is explicit in the evidence rather than inferred from a
     // pre-death reload.
-    results.reloadAfterDeath = await scenarioReloadAfterDeath(guest, host, role);
+    results.reloadAfterDeath = await scenarioReloadAfterDeath(guest, host, peers, role);
     // HITL 6 extension: exercise the W-1 cadence boundary with a real slow
     // shot, a production switch to the fast sidearm, and a shot after the
     // switch's authored presentation window.
     results.swapSlowThenFastThenFire = await scenarioSwapSlowThenFastThenFire(
       guest, host, role,
     );
+    results.reloadAfterRespawn = await scenarioReload(guest, host, peers, role, 'post-respawn');
+    results.pickupAuthority = await scenarioPickupAuthority(guest, host, peers, role);
     results.scoreboard = await scenarioScoreboard(guest, host, role);
+    for (const [caseName, scenario] of [
+      ['pickup-rejected-claim', results.pickup],
+      ['auto-scavenge-rejected-claim', results.autoScavenge],
+      ['pickup-accepted-claim', results.pickupAuthority],
+      ['reload-after-respawn', results.reloadAfterRespawn],
+    ]) {
+      for (const rowId of scenario.measuredRows ?? []) {
+        report.rowMeasures[rowId] ??= [];
+        report.rowMeasures[rowId].push({ role, case: caseName, ok: scenario.ok, result: scenario });
+      }
+    }
   }
   // Rejoin last: it tears a peer's session down, so everything else has run.
   report.scenarios.rejoin = await scenarioRejoin(peers, report);
 }
 
-/** OWNER ITEM "cannot pick up guns". Spawn a ground drop under the guest, press
- *  the real interact, and require the HOST to agree the guest now holds it. */
-async function scenarioPickup(guest, host, role) {
-  const result = { ok: false, steps: [] };
+/** P-3/P-4 negative path: a stale guest-local drop is a rejected claim. The
+ *  request must reach only the host, and the host's correction must be visible
+ *  to the claimant and the other guest. */
+async function scenarioPickup(guest, host, peers, role) {
+  const result = { ok: false, steps: [], measuredRows: ['P-3', 'P-4'] };
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const other = peers[otherRole];
   const before = await viewOf(guest.page);
   const selfId = before.selfId;
   result.weaponBefore = before.players[selfId].weapon;
@@ -680,6 +762,9 @@ async function scenarioPickup(guest, host, role) {
   }
   await sleep(250);
 
+  const hostMark = await markOf(host);
+  const otherMark = await markOf(other);
+
   const interact = await guest.page.evaluate(() => {
     const debug = window.__ATOMIC_ACRES_DEBUG__;
     try { return { ok: true, returned: debug.interactDrop() ?? null }; } catch (error) { return { ok: false, reason: String(error?.message ?? error) }; }
@@ -692,37 +777,143 @@ async function scenarioPickup(guest, host, role) {
   result.weaponAfter = after.players[selfId].weapon;
   result.hostSeesWeapon = hostAfter.players[selfId]?.weapon ?? null;
   const trace = await traceSince(guest, mark);
+  const hostTrace = await traceSince(host, hostMark);
+  const otherTrace = await traceSince(other, otherMark);
   result.trace = trace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.hostTrace = hostTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.otherTrace = otherTrace.map((entry) => `${entry.direction}:${entry.type}`);
 
   const sentPickup = trace.some((entry) => entry.direction === 'out' && /pickup/i.test(entry.type));
   const gotResult = trace.some((entry) => entry.direction === 'in' && /pickup/i.test(entry.type));
   result.sentPickup = sentPickup;
   result.gotPickupResult = gotResult;
   result.hostRejected = gotResult && result.weaponBefore === result.weaponAfter;
+  result.hostSawClaim = hostTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawRawClaim = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawCorrection = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
 
-  if (result.weaponBefore === result.weaponAfter) {
-    record(`PICKUP-NO-EFFECT-${role}`, 'critical', 'guest pressed interact on a ground weapon and its own weapon never changed',
-      { weaponBefore: result.weaponBefore, weaponAfter: result.weaponAfter, sentPickup, gotResult, trace: result.trace.slice(0, 20) });
-    return result;
-  }
   if (!sentPickup) {
-    record(`PICKUP-NOT-REQUESTED-${role}`, 'critical', 'guest changed weapon on a pickup WITHOUT asking the host - guest-authoritative pickup',
+    record(`PICKUP-NOT-REQUESTED-${role}`, 'critical', 'guest-local stale pickup did not send a claim to the host',
       { weaponAfter: result.weaponAfter, trace: result.trace.slice(0, 20) });
   } else if (!gotResult) {
     record(`PICKUP-UNACKNOWLEDGED-${role}`, 'high', 'guest sent a pickup request and applied it without a host result inside the ack budget',
       { ackBudgetMs: ACK_BUDGET_MS, trace: result.trace.slice(0, 20) });
   }
-  if (result.hostSeesWeapon !== result.weaponAfter) {
-    record(`PICKUP-HOST-DISAGREES-${role}`, 'critical', "the host's replica of the guest still holds the old weapon after a pickup",
-      { guestWeapon: result.weaponAfter, hostSeesWeapon: result.hostSeesWeapon });
+  if (!result.hostSawClaim) {
+    record(`PICKUP-HOST-MISSED-CLAIM-${role}`, 'high', 'the host never observed the guest pickup claim', result);
   }
-  result.ok = result.weaponBefore !== result.weaponAfter && result.hostSeesWeapon === result.weaponAfter;
+  if (result.otherSawRawClaim) {
+    record(`PICKUP-RAW-RELAY-${role}`, 'critical', 'the other guest received an unvalidated pickup claim', result);
+  }
+  if (!result.otherSawCorrection) {
+    record(`PICKUP-CORRECTION-MISSED-${role}`, 'critical', 'the other guest did not receive the host pickup correction', result);
+  }
+  // The staged drop is intentionally unknown to the host, so restoration of
+  // the original weapon is the expected rejected-claim outcome.
+  result.restored = result.weaponBefore === result.weaponAfter;
+  result.ok = sentPickup && gotResult && result.hostSawClaim && !result.otherSawRawClaim && result.otherSawCorrection && result.restored;
+  return result;
+}
+
+/** P-5: auto-scavenge is optimistic too. A locally discovered drop must record
+ * its prior ammo/grenade projection and restore it when the host rejects the
+ * guest-only drop. */
+async function scenarioAutoScavenge(guest, host, peers, role) {
+  const result = { ok: false, measuredRows: ['P-5'] };
+  const before = await viewOf(guest.page);
+  const selfId = before.selfId;
+  const mark = await markOf(guest);
+  const staged = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const player = debug.snapshot().player;
+    try {
+      debug.setAmmo(player.weapon, 0, 0);
+      const dropId = debug.spawnDeathDrop();
+      return { ok: Boolean(dropId), dropId, weapon: player.weapon };
+    } catch (error) {
+      return { ok: false, reason: String(error?.message ?? error) };
+    }
+  });
+  result.staged = staged;
+  if (!staged.ok) return result;
+  await sleep(ACK_BUDGET_MS + 250);
+  const after = await viewOf(guest.page);
+  const trace = await traceSince(guest, mark);
+  result.trace = trace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.sentPickup = trace.some((entry) => entry.direction === 'out' && entry.type === 'pickup');
+  result.gotResult = trace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.ammoAfter = after.players[selfId]?.ammo ?? null;
+  result.reserveAfter = after.players[selfId]?.reserve ?? null;
+  // The host never saw this guest-local drop, so rejection must leave the
+  // intentionally empty projection intact rather than silently crediting it.
+  result.ok = result.sentPickup && result.gotResult && result.ammoAfter === 0 && result.reserveAfter === 0;
+  if (!result.ok) record(`SCAVENGE-ROLLBACK-${role}`, 'high', 'auto-scavenge did not receive and apply a host correction', result);
+  return result;
+}
+
+/** OWNER ITEM "cannot pick up guns". A real host-authored death drop is
+ *  consumed after respawn; require the claimant and host to converge, while
+ *  the other guest sees the same canonical post-transaction drop. */
+async function scenarioPickupAuthority(guest, host, peers, role) {
+  const result = { ok: false, measuredRows: ['P-6', 'P-8'] };
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const other = peers[otherRole];
+  const before = await viewOf(guest.page);
+  const selfId = before.selfId;
+  const staged = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const drop = debug.snapshot().deathDrops?.find((candidate) => candidate.weaponAvailable);
+    if (!drop) return { ok: false, reason: 'no host-authored death drop available after respawn' };
+    const current = debug.snapshot().player.primaryWeapon;
+    const alternative = ['carbine', 'smg', 'ak-alpha', 'm14-ebr'].find((weapon) => weapon !== drop.weapon && weapon !== current);
+    if (!alternative) return { ok: false, reason: 'no alternate primary available' };
+    const position = drop.position;
+    const currentPosition = debug.snapshot().player.position;
+    if (Math.hypot(currentPosition[0] - position[0], currentPosition[2] - position[2]) > 2.5) {
+      return { ok: false, reason: 'host-authored drop is not at the post-respawn position', position, currentPosition };
+    }
+    debug.equipWeapon(alternative);
+    return { ok: true, dropId: drop.id, weapon: drop.weapon, holding: alternative, position: currentPosition };
+  });
+  result.staged = staged;
+  if (!staged.ok) return result;
+  await guest.page.waitForTimeout(250);
+  await host.page.waitForFunction(
+    ({ playerId, position }) => {
+      const remote = window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotePlayers?.find((candidate) => candidate.id === playerId);
+      const hostPosition = remote?.authoritativePosition ?? [];
+      return hostPosition.length === 3 && Math.hypot(hostPosition[0] - position[0], hostPosition[2] - position[2]) <= 1.5;
+    },
+    { playerId: selfId, position: staged.position },
+    { timeout: ACK_BUDGET_MS },
+  ).catch(() => {});
+  const marks = { guest: await markOf(guest), host: await markOf(host), other: await markOf(other) };
+  await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.interactDrop());
+  await sleep(ACK_BUDGET_MS);
+  const after = await viewOf(guest.page);
+  const hostAfter = await viewOf(host.page);
+  result.guestWeapon = after.players[selfId]?.weapon ?? null;
+  result.hostWeapon = hostAfter.players[selfId]?.weapon ?? null;
+  const guestTrace = await traceSince(guest, marks.guest);
+  const hostTrace = await traceSince(host, marks.host);
+  const otherTrace = await traceSince(other, marks.other);
+  result.trace = guestTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.otherTrace = otherTrace.map((entry) => `${entry.direction}:${entry.type}`);
+  result.sentPickup = guestTrace.some((entry) => entry.direction === 'out' && entry.type === 'pickup');
+  result.gotResult = guestTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.otherSawRawClaim = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  result.otherSawCanonicalResult = otherTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup-result');
+  result.hostSawClaim = hostTrace.some((entry) => entry.direction === 'in' && entry.type === 'pickup');
+  if (result.otherSawRawClaim) record(`PICKUP-RAW-RELAY-AUTH-${role}`, 'critical', 'the other guest received a raw pickup claim during a real pickup', result);
+  if (!result.otherSawCanonicalResult) record(`PICKUP-CANONICAL-MISSED-${role}`, 'critical', 'the other guest missed the host canonical pickup result', result);
+  result.ok = result.sentPickup && result.gotResult && result.hostSawClaim && !result.otherSawRawClaim
+    && result.otherSawCanonicalResult && result.guestWeapon === result.hostWeapon;
   return result;
 }
 
 /** HITL 6 extension: reload after the guest has completed a death/respawn. */
-async function scenarioReloadAfterDeath(guest, host, role) {
-  const result = await scenarioReload(guest, host, role);
+async function scenarioReloadAfterDeath(guest, host, peers, role) {
+  const result = await scenarioReload(guest, host, peers, role, 'post-death');
   return { ...result, afterDeath: true };
 }
 
@@ -783,8 +974,8 @@ async function scenarioSwapSlowThenFastThenFire(guest, host, role) {
 
 /** OWNER ITEM "cannot reload". Spend the magazine, reload, require both the
  *  local magazine AND the host's replica to refill. */
-async function scenarioReload(guest, host, role) {
-  const result = { ok: false };
+async function scenarioReload(guest, host, peers, role, phase = 'pre-respawn') {
+  const result = { ok: false, phase, measuredRows: phase === 'post-respawn' ? ['R-1', 'R-2', 'R-5'] : ['R-5'] };
   const selfId = (await viewOf(guest.page)).selfId;
   // Drain the magazine to a known low value through the QA ammo hook so the
   // reload has something to do regardless of which weapon is held.
@@ -800,6 +991,15 @@ async function scenarioReload(guest, host, role) {
 
   await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.reload());
   // Reload animations are seconds long; wait for completion, then the ack.
+  await sleep(350);
+  const otherRole = role === 'guestA' ? 'guestB' : 'guestA';
+  const duringOther = await viewOf(peers[otherRole].page).catch(() => null);
+  result.otherSeesReloading = duringOther?.players?.[selfId]?.reloading ?? null;
+  if (result.otherSeesReloading !== true) {
+    record(`RELOAD-NOT-VISIBLE-${role}-${phase}`, 'high', 'the other guest did not observe the host-authored reload state', {
+      phase, otherRole, reloading: result.otherSeesReloading,
+    });
+  }
   await sleep(4_000 + ACK_BUDGET_MS);
 
   const after = await viewOf(guest.page);
@@ -829,7 +1029,11 @@ async function scenarioReload(guest, host, role) {
     record(`RELOAD-HOST-DISAGREES-${role}`, 'high', "the host's replica of the guest carries different ammo after a reload",
       { guestAmmo: result.ammoAfter, hostSeesAmmo: result.hostSeesAmmo });
   }
-  result.ok = result.ammoAfter > result.ammoBefore;
+  result.ok = result.ammoAfter > result.ammoBefore
+    && result.sentIntent
+    && result.gotResult
+    && result.otherSeesReloading === true
+    && result.hostSeesAmmo === result.ammoAfter;
   return result;
 }
 
@@ -1090,6 +1294,8 @@ async function scenarioRejoin(peers, report) {
 
 // --- trace-level audit ------------------------------------------------------
 async function auditTrace(report) {
+  const HOST_ARBITRATED_GUEST_TYPES = new Set(['pickup', 'reload-intent', 'shot-request']);
+  const PRESENTATION_GUEST_TYPES = new Set(['trigger-state']);
   const summary = {};
   for (const role of PEERS) {
     const trace = report.trace[role];
@@ -1115,8 +1321,9 @@ async function auditTrace(report) {
     const sent = new Set(Object.keys(summary[from]?.byType ?? {}).filter((key) => key.startsWith('out:')).map((key) => key.slice(4)));
     const received = new Set(Object.keys(summary[to]?.byType ?? {}).filter((key) => key.startsWith('in:')).map((key) => key.slice(3)));
     const hostReceived = new Set(Object.keys(summary.host?.byType ?? {}).filter((key) => key.startsWith('in:')).map((key) => key.slice(3)));
-    const notRelayed = [...sent].filter((type) => hostReceived.has(type) && !received.has(type));
-    relayed[`${from}->${to}`] = { sent: [...sent], notRelayed };
+    const notRelayed = [...sent].filter((type) => PRESENTATION_GUEST_TYPES.has(type) && hostReceived.has(type) && !received.has(type));
+    const hostArbitrated = [...sent].filter((type) => HOST_ARBITRATED_GUEST_TYPES.has(type) && hostReceived.has(type) && !received.has(type));
+    relayed[`${from}->${to}`] = { sent: [...sent], notRelayed, hostArbitrated };
     if (notRelayed.length > 0) {
       record(`RELAY-GAP-${from}-to-${to}`, 'high', 'the host received a guest message type it never relayed to the other guest',
         { notRelayed, from, to });

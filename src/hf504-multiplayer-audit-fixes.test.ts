@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const network = readFileSync(new URL('./network.ts', import.meta.url), 'utf8');
+const protocol = readFileSync(new URL('./protocol.ts', import.meta.url), 'utf8');
 
 /** The body of a top-level `function name(` declaration, up to the next one. */
 function functionBody(source: string, declaration: string): string {
@@ -98,10 +99,117 @@ describe('HF-504 "cannot pick up guns" - a rejected pickup must repair the guest
 
   it('still rolls the optimistic local application back before adopting the host record', () => {
     const body = functionBody(main, 'function acceptLocalPickupResult(message: PickupResultMessage): void {');
-    const restore = body.indexOf('restorePendingLocalPickup(pending);');
-    const canonical = body.indexOf('applyCanonicalPickupDrop(message,');
+    const rejected = body.indexOf("if (message.status === 'rejected')");
+    const restore = body.indexOf('restorePendingLocalPickup(pending);', rejected);
+    const canonical = body.indexOf('applyCanonicalPickupDrop(message,', rejected);
     expect(restore).toBeGreaterThanOrEqual(0);
     expect(canonical).toBeGreaterThan(restore);
+  });
+});
+
+describe('HF-504 P-3/P-4 pickup authority - claims stay host-only and results are canonical', () => {
+  it('admits pickup claims to the host handler without relaying the untrusted payload', () => {
+    const ingress = network.slice(network.indexOf('private wireGuestEvents'), network.indexOf('private wireGuestState'));
+    expect(ingress).toContain("|| payload.type === 'reload-intent' || payload.type === 'pickup'");
+    expect(ingress).toContain('this.onMessage(payload);\n        return;');
+    const pickupIndex = ingress.indexOf("payload.type === 'pickup'");
+    const hostHandler = ingress.indexOf('this.onMessage(payload);', pickupIndex);
+    const relayIndex = ingress.indexOf('this.broadcast(payload, playerId);', pickupIndex);
+    expect(pickupIndex).toBeGreaterThanOrEqual(0);
+    expect(hostHandler).toBeGreaterThan(pickupIndex);
+    expect(relayIndex).toBeGreaterThan(hostHandler);
+  });
+
+  it('broadcasts the host result and repairs a non-claimant guest drop', () => {
+    const sender = functionBody(main, 'function sendRemotePickupResult(');
+    expect(sender).toContain('network.send(result);');
+    expect(sender).not.toContain('network.sendToPlayer(message.by, result);');
+    const consumer = functionBody(main, 'function acceptLocalPickupResult(');
+    const nonClaimant = consumer.indexOf('if (message.forPlayerId !== player.id)');
+    const canonical = consumer.indexOf('applyCanonicalPickupDrop(message, performance.now());', nonClaimant);
+    const inventory = consumer.indexOf('applyLocalCombatInventoryProjection(message.combatInventory, true);');
+    expect(nonClaimant).toBeGreaterThanOrEqual(0);
+    expect(canonical).toBeGreaterThan(nonClaimant);
+    expect(inventory).toBeGreaterThan(canonical);
+  });
+});
+
+describe('HF-504 R-2..R-5 reload authority stays canonical across recovery', () => {
+  it('does not invent a new life id for a bounded movement resynchronization', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const continuityDecision = state.indexOf('const admittedContinuity');
+    const decision = state.slice(continuityDecision, state.indexOf('remote.positionHistory.length', continuityDecision));
+    expect(decision).toMatch(/movement\.resynchronized\s*\n\s*\? respawned\s*\n\s*\? Math\.max\(remote\.continuity \+ 1, claimedContinuity\)\s*\n\s*:\s*Math\.max\(remote\.continuity, claimedContinuity\)/);
+  });
+
+  it('cancels remote reload only after the pre-resolution shot guards pass', () => {
+    const resolve = functionBody(main, 'function resolveAuthoritativeShot(request: ShotRequestMessage): void {');
+    const cancel = resolve.indexOf("cancelRemoteReloadAuthority(request.by, 'cancelled');");
+    const missingHistory = resolve.indexOf("finish('rejected', reason, admission.appliedRewindMs);");
+    const badOrigin = resolve.indexOf("finish('rejected', 'bad-origin', admission.appliedRewindMs);");
+    const emptyMagazine = resolve.indexOf("finish('rejected', 'empty-magazine', admission.appliedRewindMs);");
+    expect(cancel).toBeGreaterThan(missingHistory);
+    expect(cancel).toBeGreaterThan(badOrigin);
+    expect(cancel).toBeGreaterThan(emptyMagazine);
+  });
+
+  it('applies the host ammo projection on a self state repair', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const selfRepair = state.indexOf('const repairedHealth =');
+    const projection = state.indexOf('applyLocalCombatInventoryProjection(message.combatInventory, true);', selfRepair);
+    expect(selfRepair).toBeGreaterThanOrEqual(0);
+    expect(projection).toBeGreaterThan(selfRepair);
+  });
+
+  it('carries and presents the host-authored remote reload state', () => {
+    expect(main).toContain('reloading: player.reloadState !== null,');
+    expect(main).toContain('operator.userData.reloading = renderedSnapshot.reloading === true;');
+  });
+});
+
+describe('HF-504 P-2/P-5 pickup rollback is observable and covers auto-scavenge', () => {
+  it('signals a timed-out optimistic pickup after restoring its prior state', () => {
+    const body = functionBody(main, 'function expirePendingLocalPickup(');
+    const restore = body.indexOf('restorePendingLocalPickup(pending);');
+    const feed = body.indexOf("addFeed('PICKUP TIMED OUT'");
+    expect(restore).toBeGreaterThanOrEqual(0);
+    expect(feed).toBeGreaterThan(restore);
+  });
+
+  it('records auto-scavenge rollback state before sending its guest claim', () => {
+    const body = functionBody(main, 'function autoScavengeDeathDrop(');
+    expect(body).toContain('network.role === \'client\' && pendingLocalPickup');
+    expect(body).toContain('const priorInventory = localGuestCombatInventory();');
+    expect(body).toContain('pendingLocalPickup = Object.freeze({');
+    expect(body.indexOf('pendingLocalPickup = Object.freeze({')).toBeLessThan(body.indexOf('network.send(pickup);'));
+  });
+});
+
+describe('HF-504 P-6/P-8 death drops are host-authored', () => {
+  it('allows a death message to carry the host-canonical drop record', () => {
+    expect(protocol).toContain('drop?: PickupResultDropRecord;');
+    expect(protocol).not.toContain("type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number }");
+  });
+
+  it('creates and broadcasts one canonical host drop before peers process the death', () => {
+    expect(main).toContain('function canonicalDeathMessage(message: DeathMessage): DeathMessage {');
+    const helper = functionBody(main, 'function canonicalDeathMessage(message: DeathMessage): DeathMessage {');
+    expect(helper).toContain('const entity = spawnDeathDrop(message);');
+    expect(main).toContain('const canonicalDeath = canonicalDeathMessage(death);');
+    expect(main).toContain('network.send(canonicalDeath);');
+    const spawn = functionBody(main, 'function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDropEntity | null {');
+    expect(spawn).toContain('const canonical = message.drop;');
+    expect(spawn).toContain('const bounded = canonical ? victim.position : clampPointToBounds');
+  });
+
+  it('keeps the QA death scenario on the same canonical host drop path', () => {
+    const start = main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {');
+    const hook = main.slice(start, main.indexOf('\n  earnSupport:', start));
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(hook).toContain('if (result.died && remote)');
+    expect(hook).toContain('const canonicalDeath = canonicalDeathMessage(death);');
+    expect(hook).toContain('network.send(canonicalDeath);');
+    expect(hook).toContain('processDeath(canonicalDeath);');
   });
 });
 
@@ -110,7 +218,7 @@ describe('HF-504 lobby - a guest must never render authority it no longer holds'
   // screen for a guest the host had already dropped (grace expired, rejoin
   // denied, room closed): the owner reads that as host and guest disagreeing.
   it('clears the local ready flag when the authoritative roster does not list this player', () => {
-    expect(main).toContain('localLobbyReady = snapshot ? localMember?.ready ?? false : localLobbyReady;');
+    expect(main).toContain('localLobbyReady = localMember?.ready ?? false;');
     expect(main).not.toContain('localLobbyReady = localMember?.ready ?? localLobbyReady;');
   });
 
@@ -129,6 +237,72 @@ describe('HF-504 lobby - a guest must never render authority it no longer holds'
     expect(handled).toContain('renderPrivateLobby();');
     // Only a guest tears down on a farewell; the host is the one that sent it.
     expect(handled).toContain("if (network.role === 'client')");
+  });
+});
+
+describe('HF-504 lobby authority and succession fences', () => {
+  it('requires a second human or a hosted bot and blocks rejoin reservations', () => {
+    const predicates = readFileSync(new URL('./private-match.ts', import.meta.url), 'utf8');
+    expect(predicates).toContain('const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);');
+    expect(predicates).toContain('const hasSecondParticipant = connected.length >= 2 || snapshot.config.hostedBotCount > 0;');
+    expect(predicates).toContain('&& !hasDisconnectedReservation');
+    expect(predicates).toContain('&& connected.every((member) => member.ready);');
+  });
+
+  it('renders lobby fields only from the authoritative snapshot', () => {
+    const render = functionBody(main, 'function renderPrivateLobby(): void {');
+    expect(render).toContain('const members = snapshot?.members ?? [];');
+    expect(render).toContain('const config = snapshot?.config ?? null;');
+    expect(render).toContain("'Waiting for the host to admit this connection…'");
+    expect(render).not.toContain("snapshot?.members ?? (network.role === 'host' ? [...hostLobbyMembers.values()] : [])");
+    expect(render).not.toContain('snapshot?.config.capacity ?? privateMatchConfig.capacity');
+  });
+
+  it('uses the host-time mapping for countdown presentation and suppresses telemetry revisions', () => {
+    const render = functionBody(main, 'function renderPrivateLobby(): void {');
+    expect(render).toContain('hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs');
+    expect(render).not.toContain('snapshot.activeAtEpochMs - Date.now()');
+    expect(main).toContain("broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting', { revisionBump: false, render: false });");
+  });
+
+  it('rejects duplicate equal-revision lobby-start messages by nonce', () => {
+    const branch = functionBody(main, 'function handleLobbyMessage(message: GameMessage): boolean {');
+    const start = branch.indexOf("if (message.type === 'lobby-start')");
+    const tail = branch.slice(start, branch.indexOf("if (message.type === 'lobby-closed')", start));
+    expect(tail).toContain('message.revision >= (privateLobbySnapshot?.revision ?? 0)');
+    expect(tail).toContain('!processedNonces.has(message.nonce)');
+    expect(tail).toContain('processedNonces.add(message.nonce);');
+  });
+
+  it('accepts a lower revision only when the authenticated host identity changed', () => {
+    const accept = functionBody(main, 'function acceptLobbyState(message: LobbyStateMessage): void {');
+    expect(accept).toContain('const authorityChanged = previousSnapshot !== null && message.snapshot.hostId !== previousSnapshot.hostId;');
+    expect(accept).toContain('&& !authorityChanged');
+    expect(accept).toContain('|| authorityChanged');
+  });
+});
+
+describe('HF-504 X-2 desync admission fence', () => {
+  it('withholds a guest remote seed pose until an authoritative state arrives', () => {
+    expect(main).toContain('authoritativeReady: boolean;');
+    expect(main).toContain('authoritativeReady: network.role !== \'client\',');
+    expect(main).toContain('if (network.role === \'client\' && !remote.authoritativeReady)');
+    expect(main).toContain('if (network.role === \'client\' && message.type === \'state\') remote.authoritativeReady = true;');
+  });
+
+  it('marks a remote authoritative only after the accepted-state admission checks', () => {
+    const state = functionBody(main, 'function onNetworkMessage(');
+    const ready = state.indexOf("if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;");
+    const movement = state.indexOf('const movement = admitRemoteSnapshotMovement(');
+    expect(ready).toBeGreaterThan(movement);
+    expect(state.slice(movement, ready)).toContain('if (!movement.accepted)');
+  });
+
+  it('makes the audit ignore only the explicitly withheld, non-authoritative pose', () => {
+    const audit = readFileSync(new URL('../scripts/qa/mp-audit.mjs', import.meta.url), 'utf8');
+    expect(audit).toContain('authoritativeReady: remote.authoritativeReady ?? true');
+    expect(audit).toContain('if (guestPlayer.authoritativeReady === false) continue;');
+    expect(audit).toContain('samplesCompared');
   });
 });
 

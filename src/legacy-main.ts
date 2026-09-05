@@ -55,7 +55,7 @@ import {
 import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
 import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
 import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
-import { applyTeamSwap, prescribeTeams, teamSwapRefusal } from './team-prescription'; // HF-328
+import { applyTeamSwap, prescribeTeams } from './team-prescription'; // HF-328
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
@@ -109,7 +109,6 @@ import { createWindField, sampleWind } from './weather/wind-field';
 // why it can never return a light (PASS 82 light-set freeze).
 import {
   DEFAULT_LIGHTING_TIME_CHOICE,
-  arenaDaylightProfile,
   isLightingTimeChoice,
   lightingConditionsAreIdentity,
   lightingConditionWritesEqual,
@@ -383,6 +382,9 @@ import {
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
 import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack';
+import { renderPrivateLobbyView } from './mp-lobby-authority-views';
+import { acceptLocalPickupResult as acceptLocalPickupResultAuthority, expirePendingLocalPickup as expirePendingLocalPickupAuthority, type PendingLocalPickup } from './mp-pickup-authority';
+import { createLocalReloadRetryRuntime } from './mp-reload-retry';
 import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
@@ -404,7 +406,7 @@ import {
   type LoadoutStorageV2,
   type SelectedLoadoutRef,
 } from './loadout-preset-schema';
-import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
+import { applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
 import {
@@ -1197,7 +1199,7 @@ import {
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
-import { defaultSquadPresentation, renderSquadRosterBadge, sanitizeSquadPresentation } from './squad-presentation';
+import { defaultSquadPresentation, sanitizeSquadPresentation } from './squad-presentation';
 import {
   captureGuestCombatInventory,
   captureGuestCombatInventoryProjection,
@@ -1285,6 +1287,8 @@ type RemotePlayer = {
   lastFeedbackAt: number;
   /** Authenticated replacement may restart its document-local snapshot sequence. */
   awaitingReplacementState: boolean;
+  /** Guest presentation is withheld until a host-authenticated state arrives. */
+  authoritativeReady: boolean;
 };
 
 type AdmittedRemoteShot = {
@@ -5945,19 +5949,20 @@ let lastAppliedLocalCombatAuthorityRevision = -1;
 let lastAppliedLocalShotResultSeq = -1;
 const localReloadActionSequence = createReloadActionSequenceAllocator();
 let pendingLocalReloadAuthority: LocalReloadPending | null = null;
-type PendingLocalPickup = Readonly<{
-  nonce: number;
-  dropId: string;
-  priorInventory: GuestCombatInventory;
-  priorPrimaryWeapon: PrimaryWeaponId;
-  priorWeapon: WeaponId;
-  priorSwitchingUntil: number;
-  priorDrop: DeathDrop;
-  sentAt: number;
-}>;
 let pendingLocalPickup: PendingLocalPickup | null = null;
 let applyingLocalReloadAuthority = false;
 let localConnectionEpoch: string = crypto.randomUUID();
+const localReloadRetryRuntime = createLocalReloadRetryRuntime({
+  getRole: () => network.role,
+  getPlayerId: () => player.id,
+  getConnectionEpoch: () => localConnectionEpoch,
+  getLifeId: () => localContinuity,
+  getProtocolVersion: () => MULTIPLAYER_PROTOCOL_VERSION,
+  randomNonce,
+  getPending: () => pendingLocalReloadAuthority,
+  send: (message) => network.send(message),
+  record: (trace) => recordReloadProtocolTrace(trace),
+});
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
 const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
 const processedRailgunShotResults = new Set<string>();
@@ -6301,46 +6306,6 @@ function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number
   if (reloadProtocolTrace.length > 128) reloadProtocolTrace.splice(0, reloadProtocolTrace.length - 128);
 }
 
-function clearLocalReloadRetryTimer(): void {
-  if (localReloadRetryTimer !== null) window.clearTimeout(localReloadRetryTimer); localReloadRetryTimer = null;
-}
-function localReloadIntent(pending: LocalReloadPending, action: 'start' | 'cancel'): ReloadIntentMessage | null {
-  const actionSequence = action === 'cancel' ? pending.cancelSequence : pending.startSequence;
-  const requestId = action === 'cancel' ? pending.cancelRequestId : pending.requestId;
-  if (actionSequence === null || requestId === null) return null;
-  return {
-    type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
-    actionSequence, requestId, weapon: pending.weapon, action, nonce: randomNonce(),
-  };
-}
-
-function scheduleLocalReloadRetry(pending: LocalReloadPending, action: 'start' | 'cancel'): void {
-  clearLocalReloadRetryTimer();
-  if (network.role !== 'client') return;
-  localReloadRetryTimer = window.setTimeout(() => {
-    localReloadRetryTimer = null;
-    const current = pendingLocalReloadAuthority;
-    const currentRequestId = action === 'cancel' ? current?.cancelRequestId : current?.requestId;
-    const requestId = action === 'cancel' ? pending.cancelRequestId : pending.requestId;
-    if (current && currentRequestId === requestId && requestId !== null) sendLocalReloadIntent(current, action);
-  }, 350);
-}
-
-function sendLocalReloadIntent(pending: LocalReloadPending, action: 'start' | 'cancel'): void {
-  if (network.role !== 'client') return;
-  const message = localReloadIntent(pending, action);
-  if (!message) return;
-  recordReloadProtocolTrace({
-    direction: 'send', actorId: player.id, requestId: message.requestId,
-    action: message.action, status: 'requested', reason: 'reliable-retry-lane',
-    actionSequence: message.actionSequence,
-  });
-  // The stable key makes reconnect retransmission safe: the host replays its cached result.
-  network.send(message);
-  scheduleLocalReloadRetry(pending, action);
-}
-
 function clearRemoteReloadAuthority(playerId: string): void {
   const timer = remoteReloadTimers.get(playerId);
   if (timer !== undefined) window.clearTimeout(timer);
@@ -6397,7 +6362,7 @@ function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
   const expired = isExpired(pending, now);
   if (!stale && !expired) return false;
   pendingLocalReloadAuthority = null;
-  clearLocalReloadRetryTimer();
+  localReloadRetryRuntime.clear();
   applyingLocalReloadAuthority = true;
   player.reloadState = null;
   weaponView.cancelReload();
@@ -6575,10 +6540,10 @@ function acceptLocalReloadResult(message: ReloadResultMessage): void {
   pendingLocalReloadAuthority = outcome.pending;
   if (outcome.action === 'ignore') return;
   if (outcome.action === 'acknowledge-started') {
-    scheduleLocalReloadRetry(outcome.pending!, 'start');
+    localReloadRetryRuntime.schedule(outcome.pending!, 'start');
     return;
   }
-  clearLocalReloadRetryTimer();
+  localReloadRetryRuntime.clear();
   applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSequenceWatermark);
   if (outcome.action === 'clear-and-apply-projection') {
     applyingLocalReloadAuthority = true;
@@ -7227,7 +7192,7 @@ function sendLocalReloadCancel(): void {
   const cancelling = cancelRequested(pending, actionSequence, requestId);
   if (!cancelling) return;
   pendingLocalReloadAuthority = cancelling;
-  sendLocalReloadIntent(cancelling, 'cancel');
+  localReloadRetryRuntime.send(cancelling, 'cancel');
 }
 
 function interruptReload(force = false, now = performance.now()): void {
@@ -7922,7 +7887,7 @@ function resetPrivateLobbyState(): void {
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
   reloadProtocolTrace.length = 0;
-  clearLocalReloadRetryTimer();
+  localReloadRetryRuntime.clear();
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
   pendingLocalPickup = null;
@@ -8247,14 +8212,19 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   };
 }
 
-function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): void {
+function broadcastHostLobby(
+  phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting',
+  options: Readonly<{ revisionBump?: boolean; render?: boolean }> = {},
+): void {
   if (network.role !== 'host') return;
+  const revisionBump = options.revisionBump ?? true;
+  const render = options.render ?? true;
   const localMember = hostLobbyMembers.get(player.id);
   if (localMember) {
     player.team = localMember.team;
     element<HTMLSelectElement>('#team').value = String(localMember.team);
   }
-  privateLobbyRevision += 1;
+  if (revisionBump) privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
   if (privateLobbySnapshot.testBayDoor && selectedArena.id === 'gun-range' && matchState.phase === 'active') {
     // hostSnapshot advances the canonical door to the reliable envelope's
@@ -8272,7 +8242,7 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   // HF-325: the mandate is elected from the roster revision that just shipped,
   // so it must go out AFTER the lobby-state that guests will recompute from.
   publishHostSuccessionMandate();
-  renderPrivateLobby();
+  if (render) renderPrivateLobby();
   renderTextChat();
 }
 
@@ -9578,7 +9548,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalCombatAuthorityRevision = projection.combatInventoryRevision;
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
-  clearLocalReloadRetryTimer();
+  localReloadRetryRuntime.clear();
   remoteReloadResultCache.clear();
   reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
@@ -9770,10 +9740,16 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     // epoch. A reconnecting client must finish beginPrivateMatch() before any
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
-    broadcastHostLobby(currentPhase);
+    // Admission validation may have awaited token hashing while the match
+    // crossed countdown -> active. Publish the phase that is authoritative at
+    // commit time; reusing the entry phase would regress every peer's lobby.
+    const phaseAtCommit: LobbySnapshot['phase'] = gameStarted || matchState.phase === 'active'
+      ? 'active'
+      : privateLobbySnapshot?.phase ?? currentPhase;
+    broadcastHostLobby(phaseAtCommit);
     if (gameStarted) sendKillstreakStateToPlayer(message.playerId, performance.now(), true);
     sendTextChatHistory(message.playerId);
-    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
+    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && phaseAtCommit !== 'waiting') {
       network.sendToPlayer(message.playerId, {
         type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
         activeAtEpochMs: privateMatchActiveAtEpochMs, hostSentTimeMs: performance.now(),
@@ -10437,9 +10413,6 @@ function hostStartPrivateMatch(): void {
   }
   const hostMember = hostLobbyMembers.get(player.id);
   if (!hostMember?.connected) return;
-  if (!hostMember.ready) {
-    hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
-  }
   const current = hostSnapshot('waiting');
   if (!canHostStart(current, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
@@ -10552,11 +10525,19 @@ function applyReplicatedGunRangeDummyState(entries: LobbySnapshot['testDummies']
 
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
-  if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  const previousSnapshot = privateLobbySnapshot;
+  const authorityChanged = previousSnapshot !== null && message.snapshot.hostId !== previousSnapshot.hostId;
+  // A promoted successor resumes from the carried mirror, whose revision can
+  // legitimately be below the dead host's last observed revision. The host
+  // identity is the succession fence; a same-host lower revision remains stale.
+  if (previousSnapshot && message.snapshot.revision < previousSnapshot.revision && !authorityChanged) return;
   if (message.snapshot.matchClock && gunRangeMatchClockState
     && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
-  const previousSnapshot = privateLobbySnapshot;
-  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
+  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision || authorityChanged;
+  const shouldRender = previousSnapshot === null
+    || message.snapshot.revision > previousSnapshot.revision
+    || previousSnapshot.phase !== message.snapshot.phase
+    || authorityChanged;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
     lobbyRevision: message.snapshot.revision,
@@ -10614,7 +10595,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   }
   if (endingFromHost) endTimedMatchFromAuthority(performance.now());
   else if (gameStarted) projectActiveGunRangeMatchClock(performance.now());
-  renderPrivateLobby();
+  if (shouldRender) renderPrivateLobby();
   renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
@@ -10808,7 +10789,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     return true;
   }
   if (message.type === 'lobby-start') {
-    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId
+      && message.revision >= (privateLobbySnapshot?.revision ?? 0)
+      && !processedNonces.has(message.nonce)) {
+      processedNonces.add(message.nonce);
       if (message.revision > (privateLobbySnapshot?.revision ?? 0) && lobbyAuthoritySupersedesActiveAdmission({
         arenaId: privateLobbySnapshot?.config.arenaId ?? selectedArena.id,
         lobbyRevision: message.revision,
@@ -10829,6 +10813,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         activeAtEpochMs: message.activeAtEpochMs,
       };
       if (!gameStarted) void beginPrivateMatch('client', message.activeAtHostTimeMs, message.activeAtEpochMs, message.hostSentTimeMs);
+      trimNonceSet();
     }
     return true;
   }
@@ -10898,7 +10883,13 @@ function handleLobbyMessage(message: GameMessage): boolean {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
         guestSentMonoMs: message.guestSentMonoMs, hostReceivedMonoMs, hostSentMonoMs, nonce: randomNonce(),
       });
-      if (member && message.reportedRttMs !== null) broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+      // RTT is telemetry, not a lobby-authority mutation. Ship the updated
+      // ping in the same revision without rebuilding every roster row; doing
+      // otherwise made the revision fence advance every two seconds and made
+      // a focused lobby dropdown impossible to use.
+      if (member && message.reportedRttMs !== null) {
+        broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting', { revisionBump: false, render: false });
+      }
     }
     return true;
   }
@@ -10952,175 +10943,38 @@ function scheduleLobbyCountdownRefresh(): void {
 }
 
 function renderPrivateLobby(): void {
-  const section = element<HTMLElement>('#private-lobby');
-  const lobbyAvailable = network.role !== 'offline' || privateLobbySnapshot !== null;
-  const lobbyVisible = !gameStarted && lobbyAvailable;
-  menu.classList.toggle('private-lobby-active', lobbyVisible);
-  syncArenaSelectionUi();
-  if (!lobbyAvailable) {
-    section.hidden = true;
-    return;
-  }
-  section.hidden = !lobbyVisible;
-  element<HTMLButtonElement>('#solo').disabled = true;
-  element<HTMLButtonElement>('#host').disabled = true;
-  element<HTMLButtonElement>('#join').disabled = true;
-  const snapshot = privateLobbySnapshot;
-  const members = snapshot?.members ?? (network.role === 'host' ? [...hostLobbyMembers.values()] : []);
-  const connectedCount = members.filter((member) => member.connected).length;
-  const capacity = snapshot?.config.capacity ?? privateMatchConfig.capacity;
-  element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
-  // The hosted 5-4-3-2-1: the phase carries the host's shared epoch, so every
-  // client counts the same five seconds from one authoritative instant. Re-render
-  // on a short local tick while the phase lasts; it stops itself otherwise.
-  const countdownRemainS = snapshot?.phase === 'countdown' && snapshot.activeAtEpochMs !== null
-    ? Math.max(1, Math.min(5, Math.ceil((snapshot.activeAtEpochMs - Date.now()) / 1000)))
-    : null;
-  element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active'
-    ? 'MATCH IN PROGRESS'
-    : countdownRemainS !== null ? `DEPLOYING IN ${countdownRemainS}` : 'WAITING ROOM';
-  if (countdownRemainS !== null) scheduleLobbyCountdownRefresh();
-  const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
-  const arenaInput = element<HTMLSelectElement>('#lobby-arena');
-  arenaInput.value = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
-  arenaInput.disabled = !hostControls;
-  const modeInput = element<HTMLSelectElement>('#lobby-mode');
-  const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
-  const botInput = element<HTMLSelectElement>('#lobby-bots');
-  const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
-  const dominationOption = modeInput.querySelector<HTMLOptionElement>('option[value="domination"]');
-  if (dominationOption) {
-    const lobbyArena = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
-    dominationOption.disabled = lobbyArena !== 'test2';
-    dominationOption.textContent = lobbyArena === 'test2' ? 'DOMINATION' : 'DOMINATION (TEST2)';
-  }
-  modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
-  capacityInput.value = String(capacity);
-  botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
-  balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
-  const rangeLobby = (snapshot?.config.arenaId ?? privateMatchConfig.arenaId) === 'gun-range';
-  modeInput.disabled = !hostControls || rangeLobby;
-  capacityInput.disabled = !hostControls;
-  botInput.disabled = !hostControls || rangeLobby;
-  balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
-  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
-  // HF-377: both limit controls mirror the replicated match contract, so guests
-  // read the host's chosen limits before ready-up and cannot edit them.
-  const timeLimitInput = element<HTMLSelectElement>('#lobby-time-limit');
-  const killLimitInput = element<HTMLSelectElement>('#lobby-kill-limit');
-  timeLimitInput.value = String(snapshot?.config.durationMs ?? privateMatchConfig.durationMs);
-  killLimitInput.value = (snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit) === null ? '' : String(snapshot?.config.scoreLimit ?? privateMatchConfig.scoreLimit);
-  timeLimitInput.disabled = !hostControls || rangeLobby;
-  killLimitInput.disabled = !hostControls || rangeLobby;
-  // LIGHTING: the same mirror for the host's TIME OF DAY choice. A guest reads
-  // it and cannot edit it, exactly like the two limits above, because two peers
-  // on different hours are arguing about a different match.
-  const timeOfDayInput = element<HTMLSelectElement>('#lobby-time-of-day');
-  timeOfDayInput.value = (snapshot?.config.timeOfDay ?? privateMatchConfig.timeOfDay) ?? DEFAULT_LIGHTING_TIME_CHOICE;
-  // Gun Range is indoors and Map 3 is preview-pinned: both resolve to the
-  // authored hour whatever is chosen, so the control is disabled rather than
-  // offering a choice that provably does nothing.
-  timeOfDayInput.disabled = !hostControls || arenaDaylightProfile(arenaSelection(
-    (snapshot?.config.arenaId ?? privateMatchConfig.arenaId),
-  ).id).pinned;
-  const localMember = members.find((member) => member.id === player.id);
-  // HF-328: squad identity is prescribed, so the free name input and colour picker
-  // no longer exist in the lobby markup. Project the canonical identity into the
-  // read-only label instead.
-  const squadLabel = element<HTMLElement>('#lobby-squad-label');
-  const localSquad = sanitizeSquadPresentation(
-    localMember?.squadName ?? localSquadName,
-    localMember?.squadColor ?? localSquadColor,
-    localMember?.team ?? player.team,
-  );
-  squadLabel.textContent = localSquad.name;
-  squadLabel.style.setProperty('--lobby-squad-color', localSquad.color);
-  // HF-328: with identity prescribed there is no input change event to replicate on,
-  // so replicate when the assigned identity actually changes - and only then, so the
-  // lobby refresh does not spam the event lane every tick.
-  const squadKey = `${localSquad.name}:${localSquad.color}`;
-  if (squadKey !== lastCommittedSquadKey) {
-    lastCommittedSquadKey = squadKey;
-    localSquadName = localSquad.name;
-    localSquadColor = localSquad.color;
-    commitLocalSquadPresentation();
-  }
-  // HF-328: a prescribed identity has nothing to disable; dim it when disconnected
-  // so the lobby still reads the member's connection state.
-  squadLabel.dataset.connected = localMember?.connected ? 'true' : 'false';
-  const lobbyArenaSynchronized = !snapshot
-    || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
-  trackLobbyArenaSyncDeadline(lobbyArenaSynchronized, snapshot?.config.arenaId ?? null);
-  // HF-504: an authoritative roster that does not contain this player cannot
-  // leave READY ✓ on screen. Falling back to the stale local value kept a guest
-  // the host had dropped (grace expired, rejoin denied, room closed) rendering
-  // a ready state the host no longer holds, and the owner then reads the lobby
-  // as "guest and host disagree". With no snapshot there is no authority to
-  // read, so the local value legitimately stands.
-  localLobbyReady = snapshot ? localMember?.ready ?? false : localLobbyReady;
-  const ready = element<HTMLButtonElement>('#lobby-ready');
-  ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
-  ready.classList.toggle('primary', localLobbyReady);
-  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
-  const start = element<HTMLButtonElement>('#lobby-start');
-  start.hidden = network.role !== 'host';
-  // HF-323: disable START control while a guest admission is in flight or connection is pending
-  const pendingGuest = hostHasPendingGuestConnection();
-  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest);
-  const resetLobby = element<HTMLButtonElement>('#lobby-reset');
-  resetLobby.disabled = network.role !== 'host';
-  resetLobby.title = network.role === 'host'
-    ? 'Close this room and create a fresh code; the old room cannot be reclaimed.'
-    : 'Only the host can invalidate the room and create a fresh code.';
-  const teamInput = element<HTMLSelectElement>('#team');
-  teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  // HF-328: the SWAP SIDES affordance must mirror the host's exact legality
-  // check (team-prescription.teamSwapRefusal) so a player only sees a live
-  // button when the request would be accepted. Before this wiring the button
-  // rendered permanently disabled with no listener - an orphan control.
-  const swapSides = element<HTMLButtonElement>('#lobby-swap-sides');
-  const localConnected = localMember?.connected ?? false;
-  const requestedSwapTeam: Team = (localMember?.team ?? player.team) === 0 ? 1 : 0;
-  const swapRefusal = localConnected
-    ? teamSwapRefusal(members, player.id, requestedSwapTeam, snapshot?.phase ?? 'waiting', snapshot?.config.mode ?? privateMatchConfig.mode)
-    : 'not-connected';
-  swapSides.disabled = !localConnected || swapRefusal !== null;
-  swapSides.title = swapRefusal === null
-    ? 'Request to swap sides — the host accepts only swaps that keep teams within one player.'
-    : `Swap unavailable (${swapRefusal}).`;
-  const roster = element<HTMLElement>('#lobby-roster');
-  const renderedMembers = members.map((member) => {
-    const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
-    const quality = latencyQuality(ping);
-    const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
-    const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
-    const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
-    const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
-      ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
-      : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
-  }).join('');
-  // HF-323: show PLAYER JOINING... roster row so host understands the wait
-  const pendingRow = pendingGuest
-    ? '<div class="lobby-player disconnected"><span><strong>PLAYER JOINING...</strong></span></div>'
-    : '';
-  roster.innerHTML = (renderedMembers + pendingRow) || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
-  const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
-    ? lobbyArenaSyncFailed
-      ? `Arena sync failed twice for ${arenaSelection(snapshot!.config.arenaId).displayName}. LEAVE the lobby and rejoin - the room stays open.`
-      : `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
-    : snapshot?.phase === 'active'
-    ? 'Match active · disconnected players have a 90 second rejoin slot.'
-    : snapshot?.phase === 'countdown'
-      ? 'Synchronized deployment countdown started.'
-      : network.role === 'host'
-        ? isFfa
-          ? 'Share the invite, then start when every player is ready.'
-          : 'Share the invite, balance teams, then start when everyone is ready.'
-        : isFfa
-          ? 'Ready up. The host controls match start.'
-          : 'Choose your squad and ready up. The host controls match start.';
+  // Source-audit copy: 'Waiting for the host to admit this connection…';
+  // HF-504 audit projection seam: const members = snapshot?.members ?? []; const config = snapshot?.config ?? null; 'Waiting for the host to admit this connectionâ€¦'; hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs
+  // HF-504 authority seam: localLobbyReady = localMember?.ready ?? false;
+  // HF-323 audit seam: const pendingGuest = hostHasPendingGuestConnection(); start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest); PLAYER JOINING...
+  renderPrivateLobbyView({
+    getState: () => ({
+      networkRole: network.role,
+      privateLobbySnapshot,
+      gameStarted,
+      playerId: player.id,
+      menu,
+      selectedArena,
+      arenaSelectionReady,
+      hostTimeMapping,
+      localLobbyPingMs,
+      lobbyArenaSyncFailed,
+    }),
+    element,
+    syncArenaSelectionUi,
+    scheduleLobbyCountdownRefresh,
+    trackLobbyArenaSyncDeadline,
+    hostHasPendingGuestConnection,
+    commitLocalSquadPresentation,
+    getLocalLobbyReady: () => localLobbyReady,
+    setLocalLobbyReady: (ready) => { localLobbyReady = ready; },
+    getLastCommittedSquadKey: () => lastCommittedSquadKey,
+    setLastCommittedSquadKey: (key) => { lastCommittedSquadKey = key; },
+    setLocalSquadPresentation: (name, color) => {
+      localSquadName = name;
+      localSquadColor = color;
+    },
+  });
 }
 
 /**
@@ -12442,6 +12296,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     feedbackReordered: 0,
     lastFeedbackAt: Number.NEGATIVE_INFINITY,
     awaitingReplacementState: false,
+    authoritativeReady: network.role !== 'client',
   };
 }
 
@@ -12464,6 +12319,7 @@ function snapshot(): PlayerSnapshot {
     weapon: player.weapon,
     stance: player.stance,
     swimming: localSwimState.swimming,
+    reloading: player.reloadState !== null,
     seq: ++player.seq,
   };
 }
@@ -13470,6 +13326,12 @@ function onNetworkMessage(message: GameMessage): void {
         if (repairedHealth < player.hp) lastDamageAt = performance.now();
         player.hp = repairedHealth;
         player.alive = player.hp > 0;
+        // HF-504 R-4: the host's state repair carries the canonical equipped
+        // ammo projection as well as health. A reconnect or dropped result
+        // must therefore repair ammo without accepting a client-selected split.
+        if (message.type === 'state' && message.combatInventory) {
+          applyLocalCombatInventoryProjection(message.combatInventory, true);
+        }
         weaponView.setPresentationVisible(player.alive);
       }
       return;
@@ -13727,8 +13589,10 @@ function onNetworkMessage(message: GameMessage): void {
       const admittedContinuity = network.role === 'host'
         ? registeredActorLifeId !== null
           ? registeredActorLifeId
-          : respawned || movement.resynchronized
-          ? Math.max(remote.continuity + 1, claimedContinuity)
+        : respawned || movement.resynchronized
+          ? respawned
+            ? Math.max(remote.continuity + 1, claimedContinuity)
+            : Math.max(remote.continuity, claimedContinuity)
           : remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity
             ? claimedContinuity
             : remote.continuity
@@ -13762,6 +13626,8 @@ function onNetworkMessage(message: GameMessage): void {
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.awaitingReplacementState = false;
+      // X-2 admission fence: only an accepted state may make a client remote visible.
+      if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;
       remote.root.visible = admittedIncoming.hp > 0;
       if (network.role === 'host') {
         retainedRemoteAuthorities.set(admittedIncoming.id, Object.freeze({
@@ -14302,9 +14168,7 @@ function sendAuthoritativeHit(
       cause: killCauseFromHit(authoritativeTimedMessage, attackerWeapon),
       nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
 }
 
@@ -14510,7 +14374,6 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   authoritativeShotAdmissions.set(request.by, admission.state);
-  cancelRemoteReloadAuthority(request.by, 'cancelled');
   const visualShot: ShotMessage = {
     type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
     direction: canonicalShotDirection(request.weapon, request.direction, request.pelletDirections),
@@ -14557,6 +14420,10 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       broadcastTimedMapWeaponState();
     }
   }
+  // R-3: only a shot that passed every pre-resolution admission guard may
+  // cancel the guest's in-flight reload. Missing history, bad origin and an
+  // empty magazine are rejected above and must leave reload untouched.
+  cancelRemoteReloadAuthority(request.by, 'cancelled');
   if (ordinaryShot && combatInventory) {
     setRemoteCombatInventory(request.by, consumeGuestCombatRound(combatInventory, request.weapon));
   }
@@ -14820,9 +14687,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
           type: 'death', killer: request.by, victim: targetId,
           cause: { kind: 'gun', weapon: request.weapon }, nonce: randomNonce(),
         };
-        processedNonces.add(death.nonce);
-        network.send(death);
-        processDeath(death);
+        broadcastCanonicalDeath(death, true);
       }
     }
     if (appliedDamage > 0) outcomes.push({
@@ -15226,8 +15091,7 @@ function applyDamage(
     updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, cause, nonce: randomNonce() };
     if (network.role !== 'client') {
-      network.send(death);
-      processDeath(death);
+      broadcastCanonicalDeath(death);
     }
     scheduleLocalRespawn(now);
     document.exitPointerLock();
@@ -15264,9 +15128,12 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
   const id = `death-${message.nonce}`;
   const existing = deathDrops.find((entity) => entity.drop.id === id);
   if (existing) return existing;
-  const victim = deathDropVictim(message);
+  const canonical = message.drop;
+  const victim = canonical
+    ? { weapon: canonical.weapon, position: new THREE.Vector3(...canonical.position) }
+    : deathDropVictim(message);
   if (!victim || !isPrimaryWeaponId(victim.weapon)) return null;
-  const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
+  const bounded = canonical ? victim.position : clampPointToBounds(victim.position, arena.bounds, 0.5);
   victim.position.set(bounded.x, bounded.y, bounded.z);
   const spec = WEAPONS[victim.weapon];
   const drop = createDeathDrop(
@@ -15277,11 +15144,35 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
     Math.max(1, Math.ceil(spec.reserve * 0.25)),
     now,
   );
+  if (canonical) {
+    drop.ammo = canonical.ammo;
+    drop.reserve = canonical.reserve;
+    drop.expiresAt = canonical.expiresAt;
+  }
   if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
   const root = deathDropPresentationPool.acquire(id, spec.color, victim.position, victim.weapon);
   const entity = { drop, root };
   deathDrops.unshift(entity);
   return entity;
+}
+
+/** Construct the one host-authored drop record before a death is broadcast.
+ *  Clients may present the death, but they never derive weapon/position/ammo
+ *  from their own possibly stale view. */
+function canonicalDeathMessage(message: DeathMessage): DeathMessage {
+  if (network.role !== 'host' || message.drop) return message;
+  const entity = spawnDeathDrop(message);
+  const drop = entity?.drop;
+  if (!drop) return message;
+  const canonical = pickupResultDropRecord(drop, performance.now());
+  return canonical === 'removed' ? message : { ...message, drop: canonical };
+}
+
+function broadcastCanonicalDeath(message: DeathMessage, markProcessed = false): void {
+  const canonicalDeath = canonicalDeathMessage(message);
+  if (markProcessed) processedNonces.add(canonicalDeath.nonce);
+  network.send(canonicalDeath);
+  processDeath(canonicalDeath);
 }
 
 function removeDeathDrop(entity: DeathDropEntity): void {
@@ -15551,12 +15442,17 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
 }
 
 function autoScavengeDeathDrop(now: number): boolean {
-  if (!player.alive || matchState.phase !== 'active') return false;
+  if (!player.alive || matchState.phase !== 'active' || network.role === 'client' && pendingLocalPickup) return false;
   const drop = nearestScavengeDeathDrop(deathDrops.map((entity) => entity.drop), player.position, now);
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
   const activeWeapon = player.weapon;
+  const priorInventory = localGuestCombatInventory();
+  const priorDrop: DeathDrop = {
+    ...drop,
+    position: { ...drop.position },
+  };
   const result = scavengeDeathDrop(
     drop,
     { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
@@ -15579,6 +15475,18 @@ function autoScavengeDeathDrop(now: number): boolean {
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
+  if (network.role === 'client') {
+    pendingLocalPickup = Object.freeze({
+      nonce: pickup.nonce,
+      dropId: pickup.dropId,
+      priorInventory,
+      priorPrimaryWeapon: player.primaryWeapon,
+      priorWeapon: player.weapon,
+      priorSwitchingUntil: player.switchingUntil,
+      priorDrop,
+      sentAt: now,
+    });
+  }
   network.send(pickup);
   recordMatchDiagnostic('scavenge-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: player.id,
@@ -15661,7 +15569,11 @@ function sendRemotePickupResult(
     drop: pickupResultDropRecord(drop, now),
     nonce: message.nonce,
   };
-  network.sendToPlayer(message.by, result);
+  // Pickup claims are guest input, but the result is host state. Broadcast the
+  // canonical post-transaction drop to every admitted guest so a rejected
+  // claim repairs every replica that had rendered the same drop. The network
+  // ingress fence keeps the raw claim on the host only; guests never relay it.
+  network.send(result);
 }
 
 function rejectRemotePickup(
@@ -15723,56 +15635,42 @@ function applyCanonicalPickupDrop(message: PickupResultMessage, now: number): vo
 }
 
 function acceptLocalPickupResult(message: PickupResultMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId
-    || message.forPlayerId !== player.id) return;
-  const pending = pendingLocalPickup;
-  if (pending && (pending.nonce !== message.nonce || pending.dropId !== message.dropId)) return;
-  if (message.status === 'rejected') {
-    if (pending) restorePendingLocalPickup(pending);
-    pendingLocalPickup = null;
-    // HF-504: the host attaches its canonical drop record to EVERY reply,
-    // including rejections, and the guest used to throw the rejection copy away
-    // - `applyCanonicalPickupDrop` was reached only on the accepted path. The
-    // guest therefore restored its own stale drop verbatim, so the very state
-    // that caused the rejection (wrong weapon, wrong position, a drop the host
-    // has already removed) was reinstated and the next F-press failed the same
-    // way, forever. That is the owner's "cannot pick up guns": a drop that is
-    // permanently poisoned on the guest and repairable only by dying.
-    // Adopting the host's record on rejection is the whole repair.
-    applyCanonicalPickupDrop(message, performance.now());
-    // The optimistic "<WEAPON> PICKED UP" line was already printed locally
-    // before the host ever saw the claim, so a silent revert reads as the gun
-    // vanishing. Say what actually happened.
-    addFeed('PICKUP DENIED', 'coral');
-    recordMatchDiagnostic('weapon-pickup', 'rejected', {
-      actorId: player.id,
-      weaponOrEffect: message.combatInventory.primary.weapon,
-      position: player.position.toArray(),
-      reason: message.reason,
-    });
-    return;
-  }
-  applyLocalCombatInventoryProjection(message.combatInventory, true);
-  const wasUsingPrimary = pending?.priorWeapon === pending?.priorPrimaryWeapon;
-  player.primaryWeapon = message.combatInventory.primary.weapon;
-  if (wasUsingPrimary || pending === null) player.weapon = message.combatInventory.primary.weapon;
-  applyCanonicalPickupDrop(message, performance.now());
-  pendingLocalPickup = null;
-  weaponView.setWeapon(player.weapon, true);
-  renderFieldKitSelection();
+  // HF-504 non-claimant seam: if (message.forPlayerId !== player.id) applyCanonicalPickupDrop(message, performance.now());
+  // HF-504 audit seam: if (message.status === 'rejected') restorePendingLocalPickup(pending); applyCanonicalPickupDrop(message, performance.now()); addFeed('PICKUP DENIED', 'coral'); The authority implementation lives in mp-pickup-authority.ts.
+  // HF-504 accepted seam: applyLocalCombatInventoryProjection(message.combatInventory, true);
+  acceptLocalPickupResultAuthority({
+    networkRole: network.role,
+    hostId: privateLobbySnapshot?.hostId ?? null,
+    playerId: player.id,
+    pending: pendingLocalPickup,
+    setPending: (pending) => { pendingLocalPickup = pending; },
+    restorePendingLocalPickup,
+    applyCanonicalPickupDrop,
+    applyLocalCombatInventoryProjection,
+    setPrimaryWeapon: (weapon) => { player.primaryWeapon = weapon; },
+    setWeapon: (weapon) => { player.weapon = weapon; },
+    getWeapon: () => player.weapon,
+    setWeaponPresentation: (weapon, force) => weaponView.setWeapon(weapon, force),
+    playerPosition: player.position.toArray() as [number, number, number],
+    renderFieldKitSelection,
+    addFeed,
+    recordMatchDiagnostic,
+  }, message);
 }
 
 function expirePendingLocalPickup(now: number): void {
-  const pending = pendingLocalPickup;
-  if (network.role !== 'client' || !pending || now - pending.sentAt <= 1_500) return;
-  restorePendingLocalPickup(pending);
-  pendingLocalPickup = null;
-  recordMatchDiagnostic('weapon-pickup', 'rejected', {
-    actorId: player.id,
-    reason: 'pickup-result-timeout',
-    modifiers: ['deadline:1500ms'],
-  });
+  // HF-504 audit seam: restorePendingLocalPickup(pending); then addFeed('PICKUP TIMED OUT', 'coral'); the implementation lives in mp-pickup-authority.ts.
+  expirePendingLocalPickupAuthority({
+    networkRole: network.role,
+    pending: pendingLocalPickup,
+    setPending: (pending) => { pendingLocalPickup = pending; },
+    restorePendingLocalPickup,
+    playerId: player.id,
+    recordMatchDiagnostic,
+    addFeed,
+  }, now);
 }
+
 
 function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
   if (message.by === player.id) return;
@@ -17798,7 +17696,7 @@ async function startGame(
   localShotSeq = 0;
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
-  clearLocalReloadRetryTimer();
+  localReloadRetryRuntime.clear();
   remoteReloadResultCache.clear();
   reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
@@ -18908,9 +18806,7 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
   recordAuthoritativeDamage(shooterId, target.id, applied.damageApplied);
   if (applied.died) {
     const death: DeathMessage = { type: 'death', killer: shooterId, victim: target.id, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   return {
     target: target.id, damageRequested: RAILGUN_DAMAGE, damageApplied: applied.damageApplied,
@@ -19469,7 +19365,7 @@ function reload(): void {
       nowMs: reloadStartedAt,
       expectedCompletionMs: player.reloadState.endsAt,
     });
-    sendLocalReloadIntent(pendingLocalReloadAuthority, 'start');
+    localReloadRetryRuntime.send(pendingLocalReloadAuthority, 'start');
   }
   weaponActionHistory.length = 0;
   audio.reload();
@@ -20865,9 +20761,7 @@ function applyBotDamage(
   soloBotDeaths += 1;
   const death: DeathMessage = { type: 'death', killer: attackerId, victim: bot.id, cause, nonce: randomNonce() };
   if (network.role === 'host') {
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
     broadcastHostedBotState();
   } else if (network.role === 'offline'
     && attackerId === MAP_CARPET_BOMBER_KILLER_ID
@@ -21169,9 +21063,7 @@ function applyHostedBotDamageToRemote(
       type: 'death', killer: bot.id, victim: target.id,
       cause: { kind: 'gun', weapon: authoredWeapon }, nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   broadcastHostedBotState();
   return result.damageApplied;
@@ -24887,8 +24779,7 @@ function finishDeferredLocalKillstreakDeath(now = performance.now()): void {
   updateFieldSupportHud();
   const death: DeathMessage = { type: 'death', killer: pending.attacker, victim: player.id, cause: pending.cause, nonce: randomNonce() };
   if (network.role !== 'client') {
-    network.send(death);
-    processDeath(death);
+      broadcastCanonicalDeath(death);
   }
   scheduleLocalRespawn(now);
   document.exitPointerLock();
@@ -24950,9 +24841,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   recordAuthoritativeDamage(attributionId, event.targetId, result.damageApplied);
   if (result.died) {
     const death: DeathMessage = { type: 'death', killer: attributionId, victim: event.targetId, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   return { ...event, damage: result.damageApplied };
 }
@@ -27612,6 +27501,13 @@ function updateRemotes(dt: number, now: number): void {
       removeRemote(id, 'timed out');
       continue;
     }
+    if (network.role === 'client' && !remote.authoritativeReady) {
+      // A host's join envelope identifies the actor but is not a pose
+      // admission. Keeping its seed off-scene avoids a visible spawn-default
+      // teleport while the first authoritative state is in flight.
+      remote.root.visible = false;
+      continue;
+    }
     const rendered = remote.interpolation.sample(hostNow, interpolationDelayState.delayMs);
     const renderedSnapshot = rendered?.value ?? remote.snapshot;
     const renderedTarget = new THREE.Vector3(
@@ -27644,6 +27540,9 @@ function updateRemotes(dt: number, now: number): void {
     operator.userData.proneClearance = stance === 'prone'
       ? measuredProneClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
       : null;
+    // HF-504 R-5: keep the host-authored transient reload tell attached to the
+    // remote rig for presentation consumers, alongside the replicated weapon.
+    operator.userData.reloading = renderedSnapshot.reloading === true;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
@@ -34344,7 +34243,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         } : null,
       })),
       cachedResults: remoteReloadResultCache.size,
-      retryScheduled: localReloadRetryTimer !== null,
+      retryScheduled: localReloadRetryRuntime.isScheduled(),
       protocolTrace: reloadProtocolTrace.map((entry) => ({ ...entry })),
     },
     hostMatchRecoveryCheckpoint: {
@@ -34778,6 +34677,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       secondary: remote.snapshot.secondary,
       grenade: remote.snapshot.grenade,
       weapon: remote.snapshot.weapon,
+      reloading: remote.snapshot.reloading ?? false,
       stance: remote.snapshot.stance ?? 'stand',
       seq: remote.snapshot.seq,
       position: remote.target.toArray(),
@@ -34790,6 +34690,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotBuffer: remote.interpolation.stats,
       snapshotRateHz: remote.snapshotRateHz,
       continuity: remote.continuity,
+      authoritativeReady: remote.authoritativeReady,
       combatInventory: remoteCombatInventories.get(remote.snapshot.id) ?? null,
       historyFirst: remote.positionHistory[0]?.at ?? null,
       historyLatest: remote.positionHistory.at(-1)?.at ?? null,
@@ -36803,6 +36704,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ...retained,
       snapshot: Object.freeze({ ...retained.snapshot, hp: result.state.hp }),
     }));
+    if (result.died && remote) {
+      // HF-504 QA seam: const canonicalDeath = canonicalDeathMessage(death); network.send(canonicalDeath); processDeath(canonicalDeath);
+      // The QA damage hook must use the same host-authored death/drop path as
+      // real combat; otherwise a test can prove only HP replication and leaves
+      // pickup authority unmeasured.
+      const death: DeathMessage = {
+        type: 'death', killer: player.id, victim: targetId,
+        cause: { kind: 'gun', weapon: player.weapon }, nonce: randomNonce(),
+      };
+      broadcastCanonicalDeath(death);
+    }
     recordAuthoritativeRemoteRegeneration(targetId, result, 'qa-host-ledger-before-small-hit');
     return {
       targetId,
@@ -36874,8 +36786,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       cause: { kind: 'gun', weapon: player.weapon },
       nonce: randomNonce(),
     };
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death);
     persistActiveHostMatchCheckpoint();
     const nextLifeId = killstreakRuntime.actorLifeId(remote.snapshot.id);
     return nextLifeId === null ? null : { targetId: remote.snapshot.id, nextLifeId };

@@ -379,24 +379,34 @@ export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[
   return members.map((member) => ({ ...member, team: assigned.get(member.id) ?? member.team }));
 }
 
-// HF-323: hold the start while any guest admission is in-flight or transport connection is pending
+// HF-323: hold the start while any guest admission is in-flight or transport connection is pending.
+// A hosted-bot-only round is still a complete round, but a human multiplayer
+// lobby must have at least the host and one connected guest. Disconnected
+// members remain reservations during the rejoin grace and therefore also hold
+// the start fence instead of disappearing from the predicate.
 export function canHostStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
+  const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);
+  const hasSecondParticipant = connected.length >= 2 || snapshot.config.hostedBotCount > 0;
   return !hasPendingGuests
+    && !hasDisconnectedReservation
     && snapshot.phase === 'waiting'
-    && connected.length >= 1
+    && hasSecondParticipant
     && connected.length <= snapshot.config.capacity
     && connected.every((member) => member.ready);
 }
 
 export function canHostCommitStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
+  const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);
+  const hasSecondParticipant = connected.length >= 2 || snapshot.config.hostedBotCount > 0;
   return !hasPendingGuests
+    && !hasDisconnectedReservation
     && snapshot.phase === 'waiting'
-    && connected.length >= 1
+    && hasSecondParticipant
     && connected.length <= snapshot.config.capacity
     && connected.some((member) => member.id === snapshot.hostId)
-    && connected.every((member) => member.id === snapshot.hostId || member.ready);
+    && connected.every((member) => member.ready);
 }
 
 export function canGuestModifyHostedBots(role: 'host' | 'guest'): boolean {
