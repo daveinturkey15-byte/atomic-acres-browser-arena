@@ -1290,6 +1290,17 @@ async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
   result.role = rejoinRole;
   const beforeId = (await viewOf(guest.page)).selfId;
   result.identityBefore = beforeId;
+  result.beforeLeaveLifecycle = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const pose = debug?.samplePlayerPose?.() ?? null;
+    const snapshot = debug?.snapshot?.() ?? null;
+    return {
+      gameStarted: pose?.gameStarted ?? null,
+      matchPhase: pose?.matchPhase ?? null,
+      privateMatchPhase: snapshot?.privateMatch?.phase ?? null,
+      activeAtEpochMs: snapshot?.privateMatch?.activeAtEpochMs ?? null,
+    };
+  }).catch(() => null);
 
   await guest.page.evaluate(() => {
     const leave = document.querySelector('#lobby-leave');
@@ -1338,6 +1349,17 @@ async function scenarioRejoin(peers, report, rejoinRole = 'guestA') {
 
   const afterId = (await viewOf(guest.page)).selfId;
   result.identityAfter = afterId;
+  result.afterRejoinLifecycle = await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const pose = debug?.samplePlayerPose?.() ?? null;
+    const snapshot = debug?.snapshot?.() ?? null;
+    return {
+      gameStarted: pose?.gameStarted ?? null,
+      matchPhase: pose?.matchPhase ?? null,
+      privateMatchPhase: snapshot?.privateMatch?.phase ?? null,
+      activeAtEpochMs: snapshot?.privateMatch?.activeAtEpochMs ?? null,
+    };
+  }).catch(() => null);
   // Two-way replication after a rejoin: the rejoined guest must see the others
   // AND the others must see it.
   const views = {};
