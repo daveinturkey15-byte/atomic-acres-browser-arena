@@ -1935,6 +1935,15 @@ describe('Nuke Town Rebuild fidelity', () => {
       'nuketown2 street-vehicle truck box flank 1 pier 0',
       'nuketown2 street-vehicle truck box flank 1 pier 1',
       'nuketown2 street-vehicle truck box roof',
+      // W4-374 - DELIBERATE ADDITION, with the reason. Four transverse ribs
+      // across the cargo-box roof (the box's answer to the forged coach/cab
+      // roof rails). solid:false, shots:false trim on the roof's own solid
+      // body: no cover, collider or ballistic surface moved, the 2x core seat
+      // stays derived from roofY, and the plan-area cap absorbs 0.9 m2.
+      'nuketown2 street-vehicle truck box roof rib 0',
+      'nuketown2 street-vehicle truck box roof rib 1',
+      'nuketown2 street-vehicle truck box roof rib 2',
+      'nuketown2 street-vehicle truck box roof rib 3',
       'nuketown2 street-vehicle truck cab',
       'nuketown2 street-vehicle truck deck',
       'nuketown2 street-vehicle truck roof step 0',

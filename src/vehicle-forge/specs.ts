@@ -62,6 +62,9 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
   // A real coach screen in the raked front face, not only the sunroof-like
   // band the top arc gives: without it the nose is a blank painted panel.
   noseGlass: Object.freeze({ yMin: 1.54, yMax: 2.31 }),
+  // W4-374 roof crown: +30 mm at the centre plane over the flat 3.26 roof
+  // run. Peak 3.29 stays inside the 3.3 dressed box (proportions gate).
+  roofCrownM: 0.03,
   stationSpacing: 0.55,
 });
 
@@ -99,6 +102,9 @@ export const TRUCK_CAB_SPEC: VehicleSpec = Object.freeze({
   screens: Object.freeze([{ z0: 0.94, z1: 1.58 }]),
   shutLines: Object.freeze([1.6, 2.62]),
   noseGlass: Object.freeze({ yMin: 1.14, yMax: 1.62 }),
+  // W4-374 roof crown: +15 mm over the 2.84-2.88 cab roof run. Peak 2.895
+  // stays inside the 2.9 dressed cab (proportions gate).
+  roofCrownM: 0.015,
   stationSpacing: 0.5,
 });
 

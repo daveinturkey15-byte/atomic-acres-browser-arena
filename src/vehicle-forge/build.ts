@@ -23,6 +23,7 @@ import {
   type VehicleSpec,
   chamferedBar,
   loftBody,
+  roofRail,
   surfaceBandAtHeights,
   stripAtHeight,
 } from './geometry';
@@ -253,6 +254,20 @@ export interface MirrorDetail {
   readonly x: number;
 }
 
+export interface RoofRails {
+  /** Plan offsets of the rail pair from the centre plane, metres. */
+  readonly x: readonly number[];
+  /** Roof run the rails follow, in vehicle-frame z. */
+  readonly z0: number;
+  readonly z1: number;
+  /** Bar half-width across x. Defaults to 0.03. */
+  readonly halfWidth?: number;
+  /** Bar height above its bedded base. Defaults to 0.045. */
+  readonly height?: number;
+  /** Which existing bucket the rails merge into - paint or chrome. */
+  readonly bucket: 'paint' | 'chrome';
+}
+
 export interface PanelSeam {
   readonly x: number;
   readonly y: number;
@@ -261,7 +276,6 @@ export interface PanelSeam {
   readonly width?: number;
   readonly depth?: number;
 }
-
 export interface VehicleDressing {
   readonly wheelStyle: WheelStyle;
   /**
@@ -279,6 +293,8 @@ export interface VehicleDressing {
   readonly grille?: GrilleDetail;
   readonly mirrors?: readonly MirrorDetail[];
   readonly panelSeams?: readonly PanelSeam[];
+  /** Longitudinal roof rails riding the crowned roof surface (see roofRail). */
+  readonly roofRails?: RoofRails;
 }
 
 export interface ForgedVehicle {
@@ -500,6 +516,21 @@ export function buildForgedVehicle(
       dressing.stripe.proud,
     );
     if (strip) parts[dressing.stripe.bucket].push(strip);
+  }
+  if (dressing.roofRails) {
+    const rails = dressing.roofRails;
+    for (const x of rails.x) {
+      const rail = roofRail(
+        spec,
+        loft.rings,
+        x,
+        rails.z0,
+        rails.z1,
+        rails.halfWidth ?? 0.03,
+        rails.height ?? 0.045,
+      );
+      if (rail) parts[rails.bucket].push(rail);
+    }
   }
 
   const group = new THREE.Group();

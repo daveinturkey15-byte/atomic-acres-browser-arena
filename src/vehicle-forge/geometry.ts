@@ -119,6 +119,16 @@ export interface VehicleSpec {
    */
   readonly noseGlass?: { readonly yMin: number; readonly yMax: number };
   /** Background station spacing where nothing else asks for one. */
+  /**
+   * Subtle transverse crown of the roof, metres above the loft's flat yTop at
+   * the centre plane, falling to zero at the top-arc edges. The ring stations
+   * loft a flat crown edge to edge, which is the dead-flat read the reference
+   * critic calls out; a few centimetres of fall across the crown width breaks
+   * it without touching the envelope (the peak must stay inside the box the
+   * spec dresses - see the proportions gate). Absent (0) the crown is flat.
+   */
+  readonly roofCrownM?: number;
+  /** Background station spacing where nothing else asks for one. */
   readonly stationSpacing: number;
 }
 
@@ -321,9 +331,30 @@ function ringNormals(points: readonly Vec2[], centreY: number): Vec2[] {
 }
 
 /**
+ * Roof surface height at plan offset x on the station at z, including the
+ * spec's transverse crown. The crown falls as cos() from +crown at the
+ * centre plane to zero at the top-arc edge (hwTop - rTop), so it meets the
+ * arc with a near-horizontal tangent and no kink. stationRing and the roof
+ * rails both read this, so a rail base can never drift off the skin it sits
+ * on. Uses the same clamped hwTop/rTop the ring builder uses.
+ */
+export function crownSurfaceY(spec: VehicleSpec, z: number, x: number): number {
+  const top = topAt(spec, z);
+  const yBelt = Math.min(spec.beltY, top.yTop - 0.03);
+  const hwBelt = flankHalfWidth(spec, yBelt);
+  const hwTop = Math.min(top.halfWidthTop, hwBelt);
+  const rTop = Math.max(0.005, Math.min(top.topRadius, (top.yTop - yBelt) * 0.9, hwTop * 0.5));
+  const crown = spec.roofCrownM ?? 0;
+  if (crown <= 0) return top.yTop;
+  const edge = Math.max(1e-3, hwTop - rTop);
+  const t = Math.min(1, Math.abs(x) / edge);
+  return top.yTop + crown * Math.cos((t * Math.PI) / 2);
+}
+/**
  * One closed 24-point cross-section: bottom centre, right flank rising, top
  * centre, left flank descending as the exact mirror.
  */
+
 export function stationRing(spec: VehicleSpec, z: number): Ring {
   const top = topAt(spec, z);
   const yLowRaw = archLowerEdge(spec, z);
@@ -357,7 +388,7 @@ export function stationRing(spec: VehicleSpec, z: number): Ring {
   points[9] = [hwTop, yArcStart] as const;
   points[10] = [hwTop - rTop * (1 - COS45), yTop - rTop * (1 - COS45)] as const;
   points[11] = [Math.max(0.001, hwTop - rTop), yTop] as const;
-  points[12] = [0, yTop] as const;
+  points[12] = [0, crownSurfaceY(spec, z, 0)] as const;
   for (let k = 1; k <= 11; k += 1) {
     const mirrored = points[12 - k]!;
     points[12 + k] = [-mirrored[0], mirrored[1]] as const;
@@ -927,6 +958,89 @@ export function stripAtHeight(
     }
   }
   return toGeometry(sink, 'strip');
+}
+/**
+ * A longitudinal roof rail: one closed bar riding the crowned roof surface at
+ * the signed plan offset xOffset from z0 to z1 (the caller loops the pair).
+ * The base samples crownSurfaceY station by station (the same surface the
+ * rings loft), sunk 8 mm so the bar beds into the skin instead of floating
+ * on it, and the bar is 45 mm tall - a drip-rail read, not a luggage rack.
+ * Faces are top, both flanks and both end caps; the buried bottom is skipped.
+ * Returns null when fewer than two rings fall in the span.
+ */
+export function roofRail(
+  spec: VehicleSpec,
+  rings: readonly Ring[],
+  xOffset: number,
+  z0: number,
+  z1: number,
+  halfWidth: number,
+  height: number,
+): THREE.BufferGeometry | null {
+  const BED_M = 0.008;
+  const low = Math.min(z0, z1);
+  const high = Math.max(z0, z1);
+  const used = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  if (used.length < 2) return null;
+  const sink = emptySink();
+  const quad = (positions: Vec3[], normal: Vec3, u: number): void => {
+    const normals: Vec3[] = [normal, normal, normal, normal];
+    const uvs: Vec2[] = [[u, 0], [u, 1], [u + 1, 1], [u + 1, 0]];
+    const flip = needsFlip(positions, normal);
+    pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
+    pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
+  };
+  // One bar at the signed plan offset; the caller loops the pair. Both sides
+  // sample |xOffset| for the surface height, so a mirrored pair beds evenly.
+  const x = xOffset;
+  {
+    for (let i = 0; i < used.length - 1; i += 1) {
+      const a = used[i]!;
+      const b = used[i + 1]!;
+      const yA = crownSurfaceY(spec, a.z, xOffset) - BED_M;
+      const yB = crownSurfaceY(spec, b.z, xOffset) - BED_M;
+      const slope = (yB - yA) / Math.max(1e-6, b.z - a.z);
+      const topNormal = normalise([0, 1, -slope]);
+      // Top face.
+      quad([
+        [x - halfWidth, yA + height, a.z],
+        [x + halfWidth, yA + height, a.z],
+        [x + halfWidth, yB + height, b.z],
+        [x - halfWidth, yB + height, b.z],
+      ], topNormal, i);
+      // Flank faces, outward (+x) and inward (-x).
+      quad([
+        [x + halfWidth, yA, a.z],
+        [x + halfWidth, yA + height, a.z],
+        [x + halfWidth, yB + height, b.z],
+        [x + halfWidth, yB, b.z],
+      ], [1, 0, 0], i);
+      quad([
+        [x - halfWidth, yA + height, a.z],
+        [x - halfWidth, yA, a.z],
+        [x - halfWidth, yB, b.z],
+        [x - halfWidth, yB + height, b.z],
+      ], [-1, 0, 0], i);
+      // End caps on the first and last intervals.
+      if (i === 0) {
+        quad([
+          [x - halfWidth, yA, a.z],
+          [x + halfWidth, yA, a.z],
+          [x + halfWidth, yA + height, a.z],
+          [x - halfWidth, yA + height, a.z],
+        ], [0, 0, -1], i);
+      }
+      if (i === used.length - 2) {
+        quad([
+          [x + halfWidth, yB, b.z],
+          [x - halfWidth, yB, b.z],
+          [x - halfWidth, yB + height, b.z],
+          [x + halfWidth, yB + height, b.z],
+        ], [0, 0, 1], i);
+      }
+    }
+  }
+  return toGeometry(sink, 'roof-rail');
 }
 
 /**

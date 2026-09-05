@@ -2292,6 +2292,17 @@ function truck(builder: Builder, m: Nuketown2Materials): void {
       [SIDE_OPENING_HALF * 2, BOX_WALL_TOP - HEADER_Y, T], m.truckBox);
   }
   streetVehicle(builder, 'truck box roof', [t.x, t.roofY - T / 2, t.z], [t.boxLength, T, W], m.truckBox);
+  // W4-374 roof ribs: four transverse ribs across the cargo-box roof, the
+  // box's answer to the coach and cab rails. Same truckBox material (merges;
+  // the forge paint loop re-skins them with the roof), 10 mm bedded so the
+  // base is construction contact, 40 mm proud - clear of the 0.03 coplanar
+  // band. solid:false, shots:false: the roof deck, the 2x core seat derived
+  // from roofY, and the climb treads are untouched. Offset ±0.9/±2.3 keeps
+  // the core seat at the box centre clear.
+  for (const [index, dx] of [-2.3, -0.9, 0.9, 2.3].entries()) {
+    streetVehicle(builder, `truck box roof rib ${index}`, [t.x + dx, t.roofY + 0.015, t.z],
+      [0.09, 0.05, W - 0.1], m.truckBox, { solid: false, shots: false, cast: true });
+  }
   // Front chrome bumper, grille, headlights, and cab windshield:
   streetVehicle(builder, 'truck bumper front', [t.cabX + t.cabLength / 2 + 0.12, 0.35, t.z],
     [0.22, 0.30, W + 0.12], m.chrome, { solid: false, shots: false, cast: true, presentationOnly: true });
@@ -2640,6 +2651,9 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       // maroon upper shell; the clipped band leaves the window run open.
       stripe: { y: 1.75, bucket: 'chrome', z0: 0.55, z1: 8.55, height: 0.045, proud: 0.014 },
       grille: { y: 1.08, width: 1.36, height: 0.34, depth: 0.10, barCount: 5 },
+      // W4-374 roof rails: a chrome pair riding the crowned roof run. Merged
+      // into the existing chrome bucket: no new material, no new draw.
+      roofRails: { x: [0.62, -0.62], z0: 1.7, z1: 7.5, bucket: 'chrome' },
     }, coachMaterials),
     x: c.x + COACH_SPEC.length / 2,
     z: c.z,
@@ -2653,6 +2667,8 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       bumperY: 0.42,
       grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
       mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
+      // W4-374 roof rails: same chrome-merged treatment over the cab roof run.
+      roofRails: { x: [0.6, -0.6], z0: 1.9, z1: 4.3, bucket: 'chrome' },
       panelSeams: [
         { x: -1.31, y: 1.62, z: 5.82, height: 2.38 },
         { x: -1.31, y: 1.62, z: 7.44, height: 2.38 },
