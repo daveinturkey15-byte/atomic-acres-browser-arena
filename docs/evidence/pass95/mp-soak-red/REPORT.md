@@ -4,7 +4,7 @@
 
 [OPEN] The lane is not a release green: the required complete 180-second WebGPU soak and the after `mp-audit` were both blocked by the machine's existing WebGPU queue/deployment fence. Red rows remain findings.
 
-[VERIFIED] Worktree: `C:\Users\david\projects\aa-claude-soakred`; branch: `contrib/dave-gaming-pc/claude/mp-soak-red`; remote head: `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
+[VERIFIED] Prior Round 1 snapshot: worktree `C:\Users\david\projects\aa-claude-soakred`; branch `contrib/dave-gaming-pc/claude/mp-soak-red`; remote head `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
 
 [VERIFIED] Runtime scope: headless Chrome, WebGPU, three peers, ports 4233/4234, simulated 120 ms RTT and 1% loss for soak runs; port 4300 and the owner's worktrees were not used.
 
@@ -101,4 +101,28 @@ The final retry artifacts are quoted separately because they never entered gamep
 - `fa8bb834c2631c6dc21f1089f5e50e0230c8e643` — harden stair and directional probes
 - `33ef9c2121a42fbd544fd935c7e10de743c3dcd0` — fit authority repair under ratchet
 
-[VERIFIED] Final working tree is clean and the remote branch resolves to `33ef9c2121a42fbd544fd935c7e10de743c3dcd0`.
+[VERIFIED] Round 2 report correction checkpoint was pushed at `a47a6429`; the final report-only pin follows that checkpoint.
+
+## Round 2 — deterministic soak-red repair
+
+[VERIFIED] Round 2 was unit-test-first and browser-free. The recorded WebGPU artifacts available in this checkout are the earlier 147-divergence partial run plus failed zero-sample retries; no new browser or soak was started during the first-hour machine restriction.
+
+[VERIFIED] `stale-snapshot-never-applied` root cause: the old guest apply fence was the sequence-only reducer `if (incoming.seq > remote.snapshot.seq)`. A replacement/rejoin sample can carry a newer continuity while its document-local sequence is lower than the retained join seed, so the sample was rejected before interpolation/application. The deterministic fixture feeds continuity 7 / seq 240 followed by continuity 8 / seq 239 and asserts the latter is applied. The new reducer admits continuity before sequence and still rejects an older sample in the same continuity.
+
+[VERIFIED] Before/after apply-path evidence: before, `if (incoming.seq > remote.snapshot.seq) {`; after, `admitRemoteSnapshot(remote.snapshot, remote.continuity, remote.authoritativeHostTimeMs, { ... })`, whose authority reducer applies `incoming.continuity > current.continuity` before the sequence fence. The bound and ordering assertions were not weakened.
+
+[VERIFIED] `guest-self-prediction-over-authority` root cause: the old `incoming.id === player.id` path repaired health/ammo and returned without reconciling the local predicted pose. The new path rejects authority at or before the last acknowledged input sequence, accepts a newer host sample, and snaps when divergence exceeds the documented `0.35 m` correction bound; a scripted prediction at x=12 versus authority at x=1 proves the snap and authority winner.
+
+[VERIFIED] Before/after self-authority evidence: before, the self branch performed health repair and then `return`; after, `reconcileLocalAuthoritativeSnapshot({ predicted: ..., authoritative: incoming, lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq })` gates the sample and the `correction === 'snap'` branch applies the authoritative pose, clears local pose history, and records the correction diagnostic.
+
+[VERIFIED] Rejoin damage drop point: the prior host `message.type === 'join'` branch sent a generic rejoiner `join` broadcast, but did not explicitly send the fresh rejoiner `state` slot to each admitted observer. The usable trace showed the immediate observer remote table as host=1, guestA=1, guestB=0; the damage probe then ran before full-state convergence, leaving the rejoiner at 100 HP. This is the exact observer-side drop, after roster re-registration and before observer authoritative-ready state application.
+
+[VERIFIED] Rejoin fix: the host now sends the retained rejoiner `join` + `state` pair directly to the replacement, builds one fresh slot plan, replays that pair to every currently admitted observer through `sendToPlayer`, and aborts the replay if the rejoiner `connectionEpoch` changes during delivery. Host kill credit uses `sessionBoundCreditKey(playerId, epoch)` from `hostLobbyConnectionEpochs`, and stale per-player credit entries are cleared on remote removal.
+
+[VERIFIED] New deterministic protocol evidence: `src/rejoin-replication.test.ts` validates both full-state messages, both observer deliveries, protocol guards via `isGameMessage`, continuity/host time, and distinct old/current session credit keys.
+
+[VERIFIED] Round 2 gates: `npx tsc --noEmit` exited 0; the requested explicit Windows glob expansion ran 41 files with 365 tests passed and 0 failed; the focused reconciliation/rejoin/network/protocol/size set ran 6 files with 55 tests passed and 0 failed; `git diff --check` passed; the existing 37,396-line size ceiling passed at 37,394 lines.
+
+[VERIFIED] Round 2 commits pushed in order: `0df48d2e` (lock apply-path regressions), `18e79ddb` (authority reconciliation), `194c0542` (rejoin protocol contract), `95fb8394` (fresh observer slot), and `8359502d` (ratchet-preserving extraction).
+
+[OPEN] No new three-peer soak was run: the first 60-minute no-browser restriction was still active during this pass, and the prior complete-after evidence remains blocked by the WebGPU queue/deployment fence. The 180-second production soak, after `mp-audit`, and runtime confirmation of `seenByEveryoneAfter` remain OPEN; no test threshold or fence was relaxed.

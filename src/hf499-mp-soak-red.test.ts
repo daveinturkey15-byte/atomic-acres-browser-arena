@@ -18,14 +18,17 @@ describe('HF-499 active-match rejoin authority', () => {
 
   it('directly repairs the rejoiner and broadcasts its fresh slot to observers', () => {
     expect(main).toContain('function sendAuthoritativeRemoteSnapshotToPlayer(');
+    expect(main).toContain('function broadcastFreshRejoinerSlotToObservers(');
     const joinStart = main.indexOf("if (network.role === 'host' && message.type === 'join') {");
     const joinEnd = main.indexOf('\n    }', main.indexOf('sendGuestResumeRepairSent', joinStart));
     const join = main.slice(joinStart, joinEnd > joinStart ? joinEnd : joinStart + 2_000);
-    expect(join).toContain("network.sendToPlayer(incoming.id, { type: 'join', player: snapshot() });");
-    expect(join).toContain('network.sendToPlayer(incoming.id, createStateMessage());');
+    expect(join).toContain('const connectionEpoch = hostLobbyConnectionEpochs.get(incoming.id);');
+    expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, remote, repairNow);');
+    expect(join).toContain('broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow);');
     expect(join).toContain('for (const candidate of remotes.values())');
     expect(join).toContain('sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow);');
-    expect(join).toContain("network.send({\n        type: 'join',");
+    expect(main).toContain('sessionBoundCreditKey(playerId, epoch)');
+    expect(main).toContain('verifiedRemoteKills.set(creditKey,');
   });
 
   it('re-arms the replacement world handshake for a voluntary active-match rejoin', () => {
@@ -64,5 +67,13 @@ describe('HF-499 replication evidence', () => {
     expect(audit).toContain('authoritativePosition,');
     expect(audit).toContain('snapshotAgeMs: round(remote.snapshotAgeMs)');
     expect(audit).toContain('snapshotBuffer: remote.snapshotBuffer ?? null');
+  });
+
+  it('applies continuity before the remote sequence fence and reconciles guest prediction to host authority', () => {
+    expect(main).toContain('admitRemoteSnapshot(');
+    expect(main).toContain('continuity: message.type === \'state\' ? message.continuity : remote.continuity');
+    expect(main).toContain('reconcileLocalAuthoritativeSnapshot({');
+    expect(main).toContain("reconciliation.correction === 'snap'");
+    expect(main).toContain('lastAcknowledgedLocalInputSeq = incoming.seq;');
   });
 });
