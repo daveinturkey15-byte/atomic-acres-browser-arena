@@ -79,7 +79,7 @@ import {
 } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
-import { arenaNeedsColdSessionPrecompile, coldArenaOperation, withColdArenaRootHidden } from './rendering/cold-session-precompile-reach';
+import { arenaNeedsColdSessionPrecompile, coldArenaOperation } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
@@ -30147,7 +30147,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      await withColdArenaRootHidden(arena.root, !hadPreparedArena, async () => { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); });
+      if (hadPreparedArena) { requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission(); }
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -37375,10 +37375,9 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     )
   ));
 }
-
 function bootstrapMenuPreview(): void {
   document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
-  arenaSelectionReady = true;
+  arenaSelectionReady = false;
   syncArenaSelectionUi();
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
@@ -37386,8 +37385,9 @@ function bootstrapMenuPreview(): void {
   requestAnimationFrame(frame);
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
-    return prepareMenuDeploymentAssets('idle').then(() => {
+    return ensureAuthoredSupportPresentationAssets(killstreakPresentation).then(() => prepareMenuDeploymentAssets('idle')).then(() => {
       if (gameStarted || matchStartPreparing) return;
+      arenaSelectionReady = true; syncArenaSelectionUi();
       setStatus(`${selectedArena.displayName} ready · deployment assets retained.`);
     });
   }).catch(showFatalError);

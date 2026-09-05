@@ -99,13 +99,6 @@ export function arenaNeedsColdSessionPrecompile(arena: { readonly id: string }):
   return (COLD_SESSION_PRECOMPILE_ARENAS as readonly string[]).includes(arena.id);
 }
 
-export async function withColdArenaRootHidden<T>(root: { visible: boolean }, cold: boolean, operation: () => Promise<T>): Promise<T> {
-  if (!cold) return operation();
-  const visible = root.visible;
-  root.visible = false;
-  try { return await operation(); } finally { root.visible = visible; }
-}
-
 export function coldArenaOperation(cold: boolean, operation: () => Promise<unknown>): () => Promise<unknown> {
   return cold ? () => Promise.resolve() : operation;
 }
