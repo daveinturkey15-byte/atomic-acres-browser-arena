@@ -2125,6 +2125,70 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house living shelf', [HOUSE_X1 - WALL_T - 0.3, 1.25, HOUSE_BACK_Z + 3.0], [0.55, 2.10, 1.80], m.trim,
     { solid: false, shots: false, cast: true });
+  // --- HF-478 follow-up: ground-floor mid-century furnishing, FRONT room ----
+  // Candidate 7 interior stations: "the interior feels hollow and unpopulated
+  // without furniture or props ... Add mid-century furniture, wall art".
+  // Every body below goes through pair(), so both houses stay symmetric.
+  // Each solid is an explicit `wood` cover block (the interiors lane's
+  // ballistic classes); everything else is non-blocking dressing
+  // (solid:false, shots:false, no collider). All tops are separated by real Y
+  // (HOUSE-INTERIOR ignores polygonOffset, so no tier is claimed here) and no
+  // two overlapping top faces share a Y within 0.03 m. Only existing material
+  // instances are reused (timber trim/fence, plaster interior, chrome, sign,
+  // glass) - no new material, no new pipeline. Doorways (front/internal runs)
+  // and the internal stair strip x [-6.45, -4.8] are kept clear; the
+  // room-to-room routes keep a standing-wide (>= 0.76 m) corridor.
+  // Front room (street side): kitchen island off the existing counter, dining
+  // set east of the front-door approach, bookshelf on the east wall.
+  pair(builder, 'house kitchen island', [-5.0, 0.45, -14.9], [2.0, 0.90, 0.8], m.interior,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house dining table', [1.9, 0.375, -12.6], [1.6, 0.75, 1.0], m.fence,
+    { ballisticMaterial: 'wood' });
+  pair(builder, 'house front room bookshelf', [3.6, 0.95, -15.6], [0.6, 1.90, 1.0], m.trim,
+    { ballisticMaterial: 'wood' });
+  // Kitchen dressing on the island (all non-blocking, bases on the slab top):
+  pair(builder, 'house kitchen island top', [-5.0, 0.925, -14.9], [2.08, 0.05, 0.88], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen sink', [-5.5, 0.99, -14.9], [0.6, 0.08, 0.5], m.chrome,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen faucet', [-5.5, 1.06, -15.1], [0.06, 0.22, 0.06], m.chrome,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house kitchen stove', [-4.3, 1.01, -14.9], [0.7, 0.12, 0.6], m.trim,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen oven door', [-4.3, 0.45, -14.49], [0.6, 0.5, 0.02], m.chrome,
+    { solid: false, shots: false, cast: true });
+  // Dining chairs: seats plus backrests, non-blocking so the set never walls
+  // off the front-door approach (x [-2.15, -0.35]) or the internal door run.
+  for (const [chairX, chairZ, backZ] of [[1.5, -11.8, -11.55], [2.3, -11.8, -11.55], [1.5, -13.4, -13.65], [2.3, -13.4, -13.65]] as const) {
+    pair(builder, `house dining chair seat ${chairX} ${chairZ}`, [chairX, 0.225, chairZ], [0.45, 0.45, 0.45], m.trim,
+      { solid: false, shots: false, cast: true });
+    pair(builder, `house dining chair back ${chairX} ${chairZ}`, [chairX, 0.675, backZ], [0.45, 0.45, 0.06], m.trim,
+      { solid: false, shots: false, cast: true });
+  }
+  // Books on the bookshelf crown (tops 2.08, clear of every ceiling housing):
+  for (const [bookX, bookH] of [[3.45, 0.18], [3.6, 0.24], [3.75, 0.15]] as const) {
+    pair(builder, `house bookshelf books ${bookX}`, [bookX, 1.90 + bookH / 2, -15.6], [0.12, bookH, 0.7], m.sign,
+      { solid: false, shots: false, cast: true });
+  }
+  // Corner floor lamp (pole chrome, shade trim) and wall art, both dressing:
+  pair(builder, 'house front room lamp pole', [3.3, 0.8, -10.9], [0.1, 1.6, 0.1], m.chrome,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house front room lamp shade', [3.3, 1.66, -10.9], [0.34, 0.22, 0.34], m.trim,
+    { solid: false, shots: false, cast: false });
+  // Wall art: dining frame on the partition's front face, kitchen frame on the
+  // west drywall lining - both proud of the face, never coplanar with it.
+  pair(builder, 'house dining art frame', [0.8, 1.75, -16.32], [1.2, 0.8, 0.03], m.fence,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house dining art canvas', [0.8, 1.75, -16.295], [1.06, 0.66, 0.015], m.sign,
+    { solid: false, shots: false, cast: false });
+  pair(builder, 'house kitchen art frame', [-6.40, 1.70, -13.0], [0.03, 0.7, 1.0], m.fence,
+    { solid: false, shots: false, cast: true });
+  pair(builder, 'house kitchen art canvas', [-6.385, 1.70, -13.0], [0.015, 0.56, 0.86], m.sign,
+    { solid: false, shots: false, cast: false });
+  // Dining rug decal: 0.04 thick slab, top at 0.12 (0.04 over the 0.08 floor
+  // top, outside the 0.03 coplanar window), under the dining set.
+  pair(builder, 'house dining rug', [1.9, 0.10, -12.6], [2.6, 0.04, 2.2], m.interiorFloor,
+    { solid: false, shots: false, cast: false });
 
   // Upper floor stairwell guard rail & balustrade:
   pair(builder, 'house stair rail post 0', [STAIR_X1 + 0.04, UPPER_Y0 + 0.50, -16.5], [0.08, 1.00, 0.08], m.trim,
