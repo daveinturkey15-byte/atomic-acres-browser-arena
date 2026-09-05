@@ -628,34 +628,64 @@ export function traceShL2Radiance(
 }
 
 /**
- * Bakes the whole volume. Synchronous and deterministic; the chunked, budgeted
- * driver that keeps this inside the loading fence lives in
- * `sh-l2-irradiance-runtime.ts`, which calls `bakeShL2Probe` directly.
+ * A bake in progress, advanced probe by probe under a wall-clock budget.
+ *
+ * WHY PER-PROBE AND NOT PER-RAY. One probe at the HIGH tier is 128 rays
+ * against a few dozen analytic shapes, which measures ~0.7 ms on this
+ * machine — well under the 4 ms menu-idle slice — so a probe-granularity
+ * stepper honours the budget where the L1 lane needed per-ray resumption.
+ * The RNG is created once and consumed in probe order, so a bake split
+ * across any number of steps is byte-identical to a one-shot one.
  */
-export function bakeShL2Volume(options: ShL2BakeOptions): ShL2Volume {
-  const now = options.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
-  const started = now();
+export type ShL2BakeSession = Readonly<{
+  /** 0..1, probes finished over probes total. */
+  progress(): number;
+  done(): boolean;
+  /**
+   * Bakes whole probes until `budgetMs` of wall clock has elapsed, then
+   * stops BETWEEN probes. `step(Infinity)` skips the clock entirely rather
+   * than paying a clock read per probe; that is the offline path.
+   *
+   * Returns true when the bake is complete.
+   */
+  step(budgetMs: number): boolean;
+  /**
+   * The volume as it stands. Finished probes hold final deringed data;
+   * unfinished probes are still zero, so a partial volume must never be
+   * uploaded — wait for `done()` (the menu-idle driver does).
+   */
+  volume(): ShL2Volume;
+}>;
+
+export function beginShL2Bake(options: ShL2BakeOptions): ShL2BakeSession {
+  const clock = options.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
+  const started = clock();
+  const digest = shL2Digest(options);
   const [nx, ny, nz] = options.grid.dimensions;
   const probes = nx * ny * nz;
   const coefficients = new Float32Array(probes * SH_L2_FLOATS_PER_PROBE);
   const random = makeRandom(options.seed ?? 0x5f3759df);
-
+  let cursor = 0;
   let deringedProbes = 0;
   let demotedProbes = 0;
-
-  for (let index = 0; index < probes; index += 1) {
+  let finished = probes === 0;
+  let elapsedMs = 0;
+  const finish = (): void => {
+    if (finished) return;
+    elapsedMs = clock() - started;
+    finished = true;
+  };
+  const bakeOne = (index: number): void => {
     const probeBase = index * SH_L2_FLOATS_PER_PROBE;
-    const position = probePosition(options.grid, index);
-    bakeShL2Probe(coefficients, probeBase, position, options, random);
+    bakeShL2Probe(coefficients, probeBase, probePosition(options.grid, index), options, random);
     const dering = deringShL2InPlace(coefficients, probeBase);
     if (Number.isFinite(dering.window)) deringedProbes += 1;
     if (dering.demotedToL1) demotedProbes += 1;
-  }
-
-  return Object.freeze({
+  };
+  const snapshot = (): ShL2Volume => Object.freeze({
     arenaId: options.arenaId,
     conditionId: options.conditionId,
-    digest: shL2Digest(options),
+    digest,
     originM: options.grid.originM,
     spacingM: options.grid.spacingM,
     dimensions: options.grid.dimensions,
@@ -668,9 +698,45 @@ export function bakeShL2Volume(options: ShL2BakeOptions): ShL2Volume {
       filledProbes: 0,
       deringedProbes,
       demotedProbes,
-      elapsedMs: now() - started,
+      elapsedMs: finished ? elapsedMs : clock() - started,
     }),
   });
+  return Object.freeze({
+    progress: (): number => (probes === 0 ? 1 : cursor / probes),
+    done: (): boolean => finished,
+    step(budgetMs: number): boolean {
+      if (finished) return true;
+      if (!Number.isFinite(budgetMs)) {
+        while (cursor < probes) bakeOne(cursor++);
+        finish();
+        return true;
+      }
+      const deadline = clock() + Math.max(0, budgetMs);
+      // At least one probe per step, so step(0) still makes progress and a
+      // zero budget on the transition path can never spin forever.
+      bakeOne(cursor++);
+      if (cursor >= probes) {
+        finish();
+        return true;
+      }
+      while (cursor < probes && clock() < deadline) bakeOne(cursor++);
+      if (cursor >= probes) finish();
+      return finished;
+    },
+    volume: snapshot,
+  });
+}
+
+/**
+ * Bakes the whole volume. Synchronous and deterministic; the menu-idle
+ * driver that keeps this OFF the arena transition steps `beginShL2Bake`
+ * in `sh-l2-irradiance-runtime.ts` under a 4 ms per-slice budget and
+ * uploads only when the session reports done.
+ */
+export function bakeShL2Volume(options: ShL2BakeOptions): ShL2Volume {
+  const session = beginShL2Bake(options);
+  session.step(Number.POSITIVE_INFINITY);
+  return session.volume();
 }
 
 /** World-space centre of probe `index` in a grid. */
