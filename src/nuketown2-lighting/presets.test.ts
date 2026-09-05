@@ -33,8 +33,8 @@ import {
 } from './presets';
 
 describe('Nuke Town Rebuild sky presets', () => {
-  it('authors exactly the three skies the brief names, anchored on the shipped one', () => {
-    expect([...NUKETOWN2_SKY_PRESET_IDS]).toEqual(['late-morning', 'golden-hour', 'overcast']);
+  it('authors exactly the five skies in clock order, anchored on the shipped one', () => {
+    expect([...NUKETOWN2_SKY_PRESET_IDS]).toEqual(['dawn', 'late-morning', 'overcast', 'golden-hour', 'night']);
     expect(NUKETOWN2_ANCHOR_PRESET).toBe('golden-hour');
   });
 

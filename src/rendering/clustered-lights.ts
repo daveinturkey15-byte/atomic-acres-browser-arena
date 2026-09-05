@@ -229,15 +229,41 @@ export const NUKETOWN2_LOCAL_LIGHT_COUNT = NUKETOWN2_LOCAL_LIGHT_CATALOG.length;
 
 export const LOCAL_LIGHT_DUSK_START_HOUR = 15.5;
 export const LOCAL_LIGHT_FULL_HOUR = 18;
+/**
+ * PASS 95: the same lights are STILL ON at dawn and fade out as the sun clears
+ * the fence. Full at or before 06:15, off by 07:30, so the `dawn` sky (06:30)
+ * keeps the porch and street lights burning at 0.9 while `late-morning`
+ * (10:30) has them off, exactly as a real street's photocells do it.
+ */
+export const LOCAL_LIGHT_DAWN_FULL_HOUR = 6.25;
+export const LOCAL_LIGHT_DAWN_OFF_HOUR = 7.5;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function smoothstep01(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
 /** Monotone fade-in from golden hour to night; the selected hour is uniform data. */
 export function duskLocalLightFade(hour: number): number {
-  const t = clamp01((hour - LOCAL_LIGHT_DUSK_START_HOUR) / (LOCAL_LIGHT_FULL_HOUR - LOCAL_LIGHT_DUSK_START_HOUR));
-  return t * t * (3 - 2 * t);
+  return smoothstep01(clamp01((hour - LOCAL_LIGHT_DUSK_START_HOUR) / (LOCAL_LIGHT_FULL_HOUR - LOCAL_LIGHT_DUSK_START_HOUR)));
+}
+
+/** Monotone fade-OUT through dawn: 1 at or before 06:15, 0 by 07:30. */
+export function dawnLocalLightFade(hour: number): number {
+  return smoothstep01(clamp01((LOCAL_LIGHT_DAWN_OFF_HOUR - hour) / (LOCAL_LIGHT_DAWN_OFF_HOUR - LOCAL_LIGHT_DAWN_FULL_HOUR)));
+}
+
+/**
+ * The fade the rig applies for an hour: the dusk fade-in OR the dawn fade-out,
+ * whichever is larger, so the lights are 1 through the night, 0 through the
+ * day, and there is no hour where the value is undefined. Both ramps are
+ * uniform data over the frozen light set.
+ */
+export function localLightFadeForHour(hour: number): number {
+  return Math.max(duskLocalLightFade(hour), dawnLocalLightFade(hour));
 }
 
 export function createNuketown2ClusteredLighting(): ClusteredLighting {
@@ -289,7 +315,7 @@ export function createNuketown2LocalLights(
     bindings.push(Object.freeze({ light, baseIntensity: entry.intensity }));
   }
   const applyLighting = (arenaId: string, hour: number): void => {
-    const fade = arenaId === 'nuketown2' ? duskLocalLightFade(hour) : 0;
+    const fade = arenaId === 'nuketown2' ? localLightFadeForHour(hour) : 0;
     for (const binding of bindings) binding.light.intensity = binding.baseIntensity * fade;
   };
   return Object.freeze({

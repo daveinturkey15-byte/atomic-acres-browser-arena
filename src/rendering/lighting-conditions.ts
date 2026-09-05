@@ -366,7 +366,7 @@ function arcPhase(daylight: ArenaDaylightProfile, hour: number): number {
   return clamp01((hour - dawn) / (dusk - dawn));
 }
 
-function arcElevationDegrees(daylight: ArenaDaylightProfile, hour: number): number {
+export function arcElevationDegrees(daylight: ArenaDaylightProfile, hour: number): number {
   const low = daylight.elevationRange[0];
   const high = daylight.elevationRange[1];
   return low + (high - low) * Math.sin(Math.PI * arcPhase(daylight, hour));

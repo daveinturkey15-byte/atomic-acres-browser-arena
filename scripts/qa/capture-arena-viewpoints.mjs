@@ -70,6 +70,9 @@ for (const arena of ARENAS) {
   }
 }
 const SEED = arg('--seed', 'viewpoint');
+// PASS 95: extra URL query for a capture (e.g. `todhour=20.5&weather=light-rain`), so a
+// time-of-day / weather preset can be captured at the authored stations without a src edit.
+const EXTRA_QUERY = arg('--extra-query', '');
 // HITL 5: optional station subset (`--cameras a,b,c`). Opt-in only; the default
 // is still the whole catalog, and the summary line names the subset size so a
 // partial run can never read as a full one.
@@ -152,7 +155,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error).slice(0, 240)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text().slice(0, 240)); });
 
-  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0`;
+  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0${EXTRA_QUERY ? `&${EXTRA_QUERY}` : ''}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
 

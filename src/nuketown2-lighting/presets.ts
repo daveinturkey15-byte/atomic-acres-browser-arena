@@ -63,18 +63,26 @@ import {
 } from '../rendering/art-direction';
 import { GODRAY_MAXIMUM_ADDITIVE_GAIN } from '../rendering/screen-space-post-profile';
 
-/** The three authored skies. Ordered light-to-warm; the order is the menu's. */
-export type Nuketown2SkyPresetId = 'late-morning' | 'golden-hour' | 'overcast';
+/**
+ * The five authored skies, in CLOCK order; `cycle` walks this list, so a
+ * cycling match reads as one day: dawn, late morning, a cloud deck rolling
+ * over in the afternoon, the shipped golden hour, then night with the street
+ * and porch lights up. PASS 95 (time-of-day + weather lane) added `dawn` and
+ * `night`; the three PASS 94 skies are unchanged to the number.
+ */
+export type Nuketown2SkyPresetId = 'dawn' | 'late-morning' | 'overcast' | 'golden-hour' | 'night';
 
 export const NUKETOWN2_SKY_PRESET_IDS: readonly Nuketown2SkyPresetId[] = Object.freeze([
-  'late-morning', 'golden-hour', 'overcast',
+  'dawn', 'late-morning', 'overcast', 'golden-hour', 'night',
 ]);
 
 /** Player-facing labels, matching the shipped time-of-day row's voice. */
 export const NUKETOWN2_SKY_PRESET_LABELS: Readonly<Record<Nuketown2SkyPresetId, string>> = Object.freeze({
+  dawn: 'DAWN',
   'late-morning': 'LATE MORNING',
   'golden-hour': 'GOLDEN HOUR',
   overcast: 'OVERCAST',
+  night: 'NIGHT',
 });
 
 /** The preset the arena's shipped definition already authors. Identity anchor. */
@@ -200,6 +208,34 @@ const preset = (value: Nuketown2SkyPreset): Nuketown2SkyPreset => Object.freeze(
  * diffuse under 8/8 stratus and no direct beam at all.
  */
 export const NUKETOWN2_SKY_PRESETS: Readonly<Record<Nuketown2SkyPresetId, Nuketown2SkyPreset>> = Object.freeze({
+  // DAWN (PASS 95). A sun two fists above the eastern fence, on the OPPOSITE
+  // bearing to the shipped evening (+40 degrees, inside the +-70 envelope), so
+  // the long shadows fall the other way down the street. Civil-morning
+  // illuminance: ~4 klx of low direct sun through five air masses plus ~3 klx
+  // of a dome that is still mostly blue. The key is amber-pink; the shade is
+  // the coolest of the five skies; the porch and street lights are STILL ON
+  // (`localLightFadeForHour` carries a dawn ramp), which is what makes it read as
+  // morning rather than as a dim evening.
+  dawn: preset({
+    id: 'dawn',
+    brief: 'Low amber sun over the east fence, blue shade, porch lights still burning.',
+    captureHour: 6.5,
+    sunElevationDegrees: 8,
+    sunAzimuthDeltaDegrees: 40,
+    directIlluminanceLux: 4_000,
+    skyIlluminanceLux: 3_000,
+    cloudExtinction: 0,
+    sunTint: [1.16, 0.9, 0.78],
+    skyTint: [0.9, 0.95, 1.14],
+    fogTint: [1.08, 0.97, 0.98],
+    // Morning air holds moisture: the far fence softens earlier than at noon.
+    // 0.428 haze at the longest run, inside the bound.
+    fogNear: 40,
+    fogFar: 160,
+    practicalEmissiveGain: 1.3,
+    bakedIndirect: { preferredTier: 'low', compositeScale: 1.0 },
+    filmic: { bloomThresholdScale: 1, vignetteScale: 1.05, godrayAdditiveGain: 0.16, midtoneContrastDelta: 0 },
+  }),
   // A high, near-white sun. Short hard shadows, blue skylight in the shade, the
   // board siding reading close to its own albedo. This is the sky that makes
   // the interiors matter: the contrast between a lit street and an unlit front
@@ -275,6 +311,38 @@ export const NUKETOWN2_SKY_PRESETS: Readonly<Record<Nuketown2SkyPresetId, Nuketo
     // Under a dome, essentially all of the interior light IS indirect.
     bakedIndirect: { preferredTier: 'high', compositeScale: 1.0 },
     filmic: { bloomThresholdScale: 1, vignetteScale: 1.15, godrayAdditiveGain: 0.05, midtoneContrastDelta: -0.02 },
+  }),
+  // NIGHT (PASS 95). The sun sits at the envelope's 6-degree floor -- the
+  // last of civil twilight, not astronomical dark -- because the readability
+  // rule buys night by HUE, SKY and PRACTICALS, never by removing light from
+  // the shade a defender stands in. ~400 lx of horizon glow plus ~700 lx of a
+  // deep blue dome; the key is 0.55 of the anchor (the shipped floor), so the
+  // shadow lift saturates at its 1.52 ceiling and the composed shade response
+  // lands ABOVE the golden-hour floor by 55%. The street and porch lights are
+  // at full (`localLightFadeForHour` is 1 past 18:00), the practicals are at their
+  // highest gain of the five skies, and the sky backdrop is dimmed by the
+  // sun-following intensity in `sky-weather-presets.ts`. That is the interior-
+  // look value composition: a dark, desaturated band with a few blown fixtures.
+  night: preset({
+    id: 'night',
+    brief: 'Deep blue twilight, street and porch lights up, fixtures blown against a dark band.',
+    captureHour: 20.5,
+    sunElevationDegrees: 6,
+    sunAzimuthDeltaDegrees: -12,
+    directIlluminanceLux: 400,
+    skyIlluminanceLux: 700,
+    cloudExtinction: 0.3,
+    sunTint: [0.92, 0.88, 1.12],
+    skyTint: [0.85, 0.92, 1.2],
+    fogTint: [0.86, 0.9, 1.12],
+    // Night air over a suburb is still clear; the haze at the longest run is
+    // 0.437, one step below the overcast deck, so the far end of the street
+    // is still a target and not a silhouette in fog.
+    fogNear: 46,
+    fogFar: 150,
+    practicalEmissiveGain: 1.6,
+    bakedIndirect: { preferredTier: 'high', compositeScale: 1.0 },
+    filmic: { bloomThresholdScale: 1, vignetteScale: 1.2, godrayAdditiveGain: 0.02, midtoneContrastDelta: 0 },
   }),
 });
 

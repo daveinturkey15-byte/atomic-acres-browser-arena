@@ -10,7 +10,9 @@ import {
   NUKETOWN2_LOCAL_LIGHT_COUNT,
   assertNuketown2ClusteredLightCatalog,
   createNuketown2LocalLights,
+  dawnLocalLightFade,
   duskLocalLightFade,
+  localLightFadeForHour,
 } from './clustered-lights';
 
 describe('Nuke Town clustered light catalog', () => {
@@ -80,5 +82,23 @@ describe('Nuke Town clustered light catalog', () => {
     expect(legacySource).toContain('await exactScenePass.precompileExactScenePass(scene);');
     expect(legacySource.indexOf('createNuketown2LocalLights('))
       .toBeLessThan(legacySource.indexOf('await exactScenePass.precompileExactScenePass(scene);'));
+  });
+  it('PASS 95: the same lights are on through the night and fade out through dawn', () => {
+    expect(localLightFadeForHour(0)).toBe(1);
+    expect(localLightFadeForHour(6)).toBe(1);
+    expect(localLightFadeForHour(6.5)).toBeGreaterThan(0.85);
+    expect(localLightFadeForHour(7.5)).toBe(0);
+    expect(localLightFadeForHour(10.5)).toBe(0);
+    expect(localLightFadeForHour(17.6)).toBeGreaterThan(0.5);
+    expect(localLightFadeForHour(20.5)).toBe(1);
+    let previous = dawnLocalLightFade(0);
+    for (let hour = 0.25; hour <= 24; hour += 0.25) {
+      const next = dawnLocalLightFade(hour);
+      expect(next).toBeLessThanOrEqual(previous);
+      previous = next;
+    }
+    for (let hour = 0; hour <= 24; hour += 0.25) {
+      expect(localLightFadeForHour(hour)).toBe(Math.max(duskLocalLightFade(hour), dawnLocalLightFade(hour)));
+    }
   });
 });

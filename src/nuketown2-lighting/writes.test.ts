@@ -80,10 +80,10 @@ describe('Nuke Town Rebuild lighting: selection through the shipped config', () 
         .toBe(nuketown2PresetForChoice('random', seed, 0));
       expect(NUKETOWN2_SKY_PRESET_IDS).toContain(nuketown2PresetForChoice('random', seed, 0));
     }
-    // Cycle traverses all three inside one 6-minute period and wraps cleanly.
+    // Cycle traverses all five inside one 6-minute period and wraps cleanly.
     const seen = new Set<string>();
     for (let second = 0; second < 360; second += 5) seen.add(nuketown2PresetForChoice('cycle', 0, second));
-    expect([...seen].sort()).toEqual(['golden-hour', 'late-morning', 'overcast']);
+    expect([...seen].sort()).toEqual(['dawn', 'golden-hour', 'late-morning', 'night', 'overcast']);
     expect(nuketown2PresetForChoice('cycle', 0, 361)).toBe(nuketown2PresetForChoice('cycle', 0, 1));
     expect(nuketown2PresetForChoice('cycle', 0, -1)).toBe(nuketown2PresetForChoice('cycle', 0, 359));
   });
@@ -93,7 +93,9 @@ describe('Nuke Town Rebuild lighting: selection through the shipped config', () 
       expect(nuketown2PresetForFixedHour(nuketown2SkyPreset(id).captureHour)).toBe(id);
     }
     expect(nuketown2PresetForFixedHour(10.4)).toBe('late-morning');
-    expect(nuketown2PresetForFixedHour(20)).toBe('golden-hour');
+    expect(nuketown2PresetForFixedHour(18)).toBe('golden-hour');
+    expect(nuketown2PresetForFixedHour(20)).toBe('night');
+    expect(nuketown2PresetForFixedHour(5)).toBe('dawn');
   });
 
   it('tolerates junk without throwing, because a URL is untrusted input', () => {

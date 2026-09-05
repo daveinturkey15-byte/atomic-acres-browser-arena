@@ -118,6 +118,7 @@ import {
   type LightingTimeChoice,
 } from './rendering/lighting-conditions';
 import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
+import { skyBackdropIntensity, tintHexInto, type LightingConditionBaseline } from './rendering/sky-weather-presets';
 import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
 import { ParticleRuntime } from './particles';
 import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
@@ -4119,21 +4120,6 @@ let appliedArenaVisualPolicy: Readonly<{
 // already exist. `src/rendering/lighting-conditions-light-set.test.ts` pins that
 // property against this exact source region, so a future edit that constructs a
 // light here fails a test rather than freezing the game.
-type LightingConditionBaseline = Readonly<{
-  arenaId: ArenaId;
-  sunColor: number;
-  sunIntensity: number;
-  ambientColor: number;
-  ambientIntensity: number;
-  hemisphereSky: number;
-  hemisphereGround: number;
-  hemisphereIntensity: number;
-  fillColor: number;
-  fillIntensity: number;
-  fogColor: number;
-  exposure: number;
-}>;
-
 const LIGHTING_CONDITION_DEG = Math.PI / 180;
 /**
  * Below this the re-aimed sun is invisible and would still cost a full static
@@ -4205,14 +4191,7 @@ let lightingConditionsUniformWrites = 0;
 
 const lightingConditionScratchColor = new THREE.Color();
 
-/** Multiplies an authored colour by a bounded per-channel tint, in place. */
-function lightingConditionTint(hex: number, tint: readonly [number, number, number]): THREE.Color {
-  lightingConditionScratchColor.setHex(hex);
-  lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * tint[0]);
-  lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * tint[1]);
-  lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * tint[2]);
-  return lightingConditionScratchColor;
-}
+const lightingConditionTint = (hex: number, tint: readonly [number, number, number]): THREE.Color => tintHexInto(lightingConditionScratchColor, hex, tint);
 
 /**
  * The fog colour every consumer should start from. The nuke charge, the flash
@@ -4347,6 +4326,7 @@ function applyLightingConditionUniforms(force = false): void {
     scene.fog.color.setHex(conditionedFogBaseColorHex());
     pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
   }
+  scene.backgroundIntensity = skyBackdropIntensity(writes, lightingConditionsSkyDarken); // LIGHTING: PASS 95 sun-following sky, a uniform on the background node.
   // A deterministic review camera owns the exposure while it is set -- that is
   // the capture contract every viewpoint baseline in the repo rests on -- and it
   // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
@@ -4371,7 +4351,7 @@ function lightingConditionsTelemetry(): Record<string, unknown> {
     identity: writes ? lightingConditionsAreIdentity(writes) : true,
     sunReaims: lightingConditionsSunReaims,
     uniformWrites: lightingConditionsUniformWrites,
-    resolves: lightingConditionsResolves, clusteredLights: nuketown2ClusteredLightRig?.telemetry() ?? null,
+    resolves: lightingConditionsResolves, clusteredLights: nuketown2ClusteredLightRig?.telemetry() ?? null, backdropIntensity: Number(scene.backgroundIntensity.toFixed(4)),
   };
 }
 // LIGHTING: ==== end time-of-day conditions ====================================
