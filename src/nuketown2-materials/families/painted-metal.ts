@@ -22,7 +22,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, edgeWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
@@ -72,7 +72,14 @@ function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any;
   ).mul(panelled);
   const section = abs(fract(within.mul(float(2))).sub(float(0.5))).mul(float(2));
   const stampLift = smoothstep(float(0.72), float(0.95), section).mul(panelled);
-  const chip = smoothstep(float(0.58), float(0.74), wear.scuff);
+  // PASS 95 EDGE WEATHERING: paint goes first on the pressed edges of a
+  // panel, the corners of an appliance top and the leaf edges of a door.
+  // Edge chips through to primer, broken by the scuff field; the field
+  // chips stay as they were.
+  const edgeChip = edgeWear(0.022)
+    .mul(smoothstep(float(-0.55), float(0.35), wear.scuff))
+    .mul(uniforms.edgeChip);
+  const chip = max(smoothstep(float(0.58), float(0.74), wear.scuff), edgeChip);
   const primer = linearSwatch(0x9c968c);
   const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
   const weep = smoothstep(float(0.35), float(0.0), p.y).mul(smoothstep(float(0.45), float(0.9), wear.soilMask));

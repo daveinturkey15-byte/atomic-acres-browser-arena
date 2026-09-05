@@ -30,7 +30,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear } from '../wear';
+import { boxUv, buildWear, edgeWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -103,7 +103,16 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const damp = isApron.select(apronDamp, verticalDamp);
   const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
     .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
-  const spall = isApron.select(float(0), blockSpall);
+  // PASS 95 EDGE WEATHERING. A kerb nose and a blockwork arris are where
+  // concrete actually breaks: 12 mm radius chips along the edge, broken up
+  // by the same 40 mm scuff field so it is a run of chips and not a band.
+  // Apron slabs have no free edge to chip, and the term is gated per
+  // material by `edgeChip` inside this ONE shared graph.
+  const arris = edgeWear(0.035)
+    .mul(smoothstep(float(-0.35), float(0.45), wear.scuff))
+    .mul(uniforms.edgeChip)
+    .mul(isApron.select(float(0), float(1)));
+  const spall = max(isApron.select(float(0), blockSpall), arris);
   const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));

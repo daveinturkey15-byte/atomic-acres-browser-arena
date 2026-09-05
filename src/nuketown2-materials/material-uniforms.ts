@@ -34,6 +34,10 @@ export interface Nuketown2Uniforms {
   readonly sidingWainscotColor: any;
   readonly sidingWainscotTop: any;
   readonly asphaltMarking: any;
+  /** PASS 95: 1 where a carriageway surface collects standing water. */
+  readonly asphaltWet: any;
+  /** PASS 95: 1 where a solid's face edges chip, arris and splinter. */
+  readonly edgeChip: any;
   readonly values: Record<string, unknown>;
 }
 
@@ -65,6 +69,8 @@ const DEFAULTS: Record<string, UniformValue> = {
   sidingWainscotColor: new THREE.Color(0xffffff),
   sidingWainscotTop: 2.76,
   asphaltMarking: 0,
+  asphaltWet: 0,
+  edgeChip: 0,
 };
 
 function materialUniform(name: string): any {
@@ -104,6 +110,8 @@ const SHARED_NODES = Object.freeze({
   sidingWainscotColor: materialUniform('sidingWainscotColor'),
   sidingWainscotTop: materialUniform('sidingWainscotTop'),
   asphaltMarking: materialUniform('asphaltMarking'),
+  asphaltWet: materialUniform('asphaltWet'),
+  edgeChip: materialUniform('edgeChip'),
 });
 
 function color(hex: number): THREE.Color {
@@ -144,6 +152,8 @@ export function createNuketown2Uniforms(
     sidingWainscotColor: color(baseSrgb),
     sidingWainscotTop: 2.76,
     asphaltMarking: 0,
+    asphaltWet: 0,
+    edgeChip: 0,
   };
   if (material) material.userData.nuketown2Uniforms = values;
   return { ...SHARED_NODES, values } as Nuketown2Uniforms;

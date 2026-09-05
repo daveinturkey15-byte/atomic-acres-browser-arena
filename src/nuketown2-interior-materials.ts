@@ -20,13 +20,16 @@ import { lutFbm } from './nuketown2-materials/noise-lut';
 /** Cast boundary for TSL DSL runtime helpers */
 const {
   abs,
+  cameraPosition,
   float,
   floor,
   fract,
+  length,
   max,
   mix,
   positionWorld,
   smoothstep,
+  uniform,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -253,8 +256,33 @@ export function createNuketown2GlassMaterial(): MeshStandardNodeMaterial {
   const shimmer = lutFbm(vec2(p.x.mul(1.5), p.y.mul(1.5)), 2).sub(float(0.5)).mul(float(0.035));
   mat.colorNode = baseTint.add(shimmer);
 
+  // PASS 95 LIT WINDOWS. The arena's sky is a fixed golden hour and the
+  // interior-lighting skill's rule is that the read is bought with emissive
+  // fixtures driven above the bloom threshold, not with lights (row 48). Every
+  // house pane already stands in front of a room with a ceiling practical, so
+  // from the street the pane carries that room's warm glow: a per-pane hash
+  // leaves roughly a third of the rooms dark and varies the rest, and the
+  // glow FADES IN with distance (5 m -> 10 m) so a player standing at his own
+  // window looks OUT through clear glass and never into a light box. The
+  // emissive rides the pane's 0.42 alpha, so the peak (2.9 * 0.42 = 1.22
+  // linear) sits just over the composed bloom threshold for a soft halo and
+  // no wash. One emissive node on the existing graph: no new material, no
+  // light object, nothing gameplay-visible changes with profile.
+  const paneCell = vec2(floor(p.x.mul(float(0.45)).add(p.y.mul(float(0.31)))), floor(p.z.mul(float(0.45))));
+  const roomHash = hash2(paneCell);
+  const roomLit = smoothstep(float(0.30), float(0.42), roomHash)
+    .mul(float(0.55).add(roomHash.mul(float(0.45))));
+  const viewDistance = length(p.sub(cameraPosition));
+  const fromOutside = smoothstep(float(5.0), float(10.0), viewDistance);
+  const curtain = float(0.78).add(smoothstep(float(0.2), float(0.9), fract(p.y.div(float(1.1)))).mul(float(0.22)));
+  const glow = uniform(NUKETOWN2_WINDOW_GLOW_INTENSITY);
+  mat.emissiveNode = vec3(1.0, 0.68, 0.36).mul(glow).mul(roomLit).mul(fromOutside).mul(curtain);
+
   return mat;
 }
+
+/** Linear-HDR peak of a lit pane before its alpha; PASS 95, see `createNuketown2GlassMaterial`. */
+export const NUKETOWN2_WINDOW_GLOW_INTENSITY = 2.9;
 
 /**
  * Procedural Beer-Lambert water material for the backyard swimming pool.

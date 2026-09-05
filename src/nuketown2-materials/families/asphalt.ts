@@ -83,9 +83,34 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   );
   const markingRoughness = wear.roughness.add(markingWorn.mul(float(0.08)));
   const isMarking = (uniforms.asphaltMarking as any).greaterThan(float(0.5));
+
+  // PASS 95 WET ASPHALT AND PUDDLES. Water stands where the road is lowest:
+  // the kerb channel first, then the wheel ruts, then whatever the ~5 m
+  // relief field says is a hollow. A puddle has a HARD edge (it is a water
+  // line, not a stain) with a damp halo around it. The puddle itself drops
+  // roughness to a mirror so the existing environment/SSR reflection - not a
+  // new pass - puts the sky and the low sun on the road; the damp halo only
+  // darkens and tightens. Both terms ride the ONE shared asphalt graph behind
+  // the `asphaltWet` uniform, so markings under water get wet too and the
+  // pipeline count does not move. Darkening is capped so the composed floor
+  // stays inside the readability bound the wear engine already enforces.
+  const relief = lutFbm(vec2(p.x.mul(float(0.19)).add(float(3.7)), p.z.mul(float(0.23)).add(float(9.2))), 2);
+  const hollow = relief.sub(float(0.5)).mul(float(1.5))
+    .add(channel.mul(float(0.55)))
+    .add(wheel.mul(float(0.22)));
+  const puddle = smoothstep(float(0.52), float(0.58), hollow).mul(uniforms.asphaltWet);
+  const damp = smoothstep(float(0.18), float(0.50), hollow).mul(uniforms.asphaltWet);
+  const wetFactor = clamp(
+    float(1).sub(damp.mul(float(0.20))).sub(puddle.mul(float(0.16))),
+    float(0.62),
+    float(1),
+  );
+  const dryColor = isMarking.select(markingColor, roadColor);
+  const dryRoughness = isMarking.select(markingRoughness, roadRoughness);
+  const wetRoughness = mix(dryRoughness.sub(damp.mul(float(0.28))), float(0.06), puddle);
   asphaltGraph = {
-    colorNode: isMarking.select(markingColor, roadColor),
-    roughnessNode: isMarking.select(markingRoughness, roadRoughness),
+    colorNode: dryColor.mul(wetFactor),
+    roughnessNode: clamp(wetRoughness, float(0.05), float(1.0)),
   };
   return asphaltGraph;
 }
@@ -104,6 +129,7 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
 
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 0);
+  setNuketown2FamilyUniform(uniforms, 'asphaltWet', 1);
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
@@ -145,6 +171,7 @@ export function createMarkingMaterial(name = 'nuketown2-trim-decal'): MeshStanda
 
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 1);
+  setNuketown2FamilyUniform(uniforms, 'asphaltWet', 1);
   const shared = sharedAsphaltGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;

@@ -30,16 +30,21 @@ import { createNuketown2Uniforms, type Nuketown2Uniforms } from './material-unif
 
 /** One cast boundary for the TSL DSL, the idiom the rest of this repo's node materials use. */
 const {
+  abs,
   cameraPosition,
   clamp,
+  dFdx,
+  dFdy,
   float,
   length,
   max,
+  min,
   mix,
   positionWorld,
   sin,
   smoothstep,
   uniform,
+  uv,
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
@@ -241,6 +246,45 @@ export function buildWear(
     grain: useBackdrop.select(backdrop.grain, grain),
     scuff: useBackdrop.select(backdrop.scuff, scuff),
   };
+}
+
+/**
+ * EDGE WEATHERING (PASS 95 visual-polish lane). A mask that is 1 within
+ * `chipM` metres of any edge of the box FACE the fragment sits on and 0 in the
+ * field, so a family can put its chips, arrises and splinters where wear
+ * actually happens: on the corners, not the middle of a face.
+ *
+ * WHY DERIVATIVES. This arena's solids carry no authored UV channel beyond
+ * `BoxGeometry`'s own 0..1 per face, and the graph never knows how big the
+ * face is (one siding graph dresses a 0.3 m pier and a 12 m wall). The size
+ * is recovered per fragment from screen-space derivatives: with P the world
+ * position and (u, v) the face UV, [dP/du dP/dv] = [dP/dx dP/dy] J^-1 where
+ * J is the 2x2 screen Jacobian of (u, v). |dP/du| is metres per UV unit along
+ * u, so min(u, 1-u) * |dP/du| is the distance to the nearest u edge IN METRES,
+ * which is what a 25 mm chip needs. Six derivatives and a 2x2 solve per
+ * fragment; no texture, no extra vertex data, no new pipeline (the term is
+ * added INSIDE the family's one shared graph, gated by a per-material
+ * uniform, so the WGSL is the same for every member of the family).
+ *
+ * `hash2`-style break-up is the caller's job (chips are not a uniform band).
+ * A face with a degenerate Jacobian (edge-on, or a non-box UV) returns 0,
+ * never NaN: the determinant is clamped away from zero before dividing.
+ */
+export function edgeWear(chipM: number): any {
+  const st = uv();
+  const px = dFdx(positionWorld);
+  const py = dFdy(positionWorld);
+  const ux = dFdx(st.x);
+  const uy = dFdy(st.x);
+  const vx = dFdx(st.y);
+  const vy = dFdy(st.y);
+  const det = max(abs(ux.mul(vy).sub(uy.mul(vx))), float(1e-7));
+  const metresPerU = length(px.mul(vy).sub(py.mul(vx))).div(det);
+  const metresPerV = length(py.mul(ux).sub(px.mul(uy))).div(det);
+  const edgeU = min(st.x, float(1).sub(st.x)).mul(metresPerU);
+  const edgeV = min(st.y, float(1).sub(st.y)).mul(metresPerV);
+  const edgeM = min(edgeU, edgeV);
+  return smoothstep(float(chipM), float(chipM * 0.25), edgeM);
 }
 
 /**

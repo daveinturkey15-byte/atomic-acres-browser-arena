@@ -157,6 +157,24 @@ export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
  * construction time.
  */
 export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
+  const registry = buildRegistry();
+  // PASS 95 EDGE WEATHERING. The roles whose solids have a free edge that
+  // really chips, arrises or splinters. Roof glazing, the coach band, painted
+  // trim and every slab stay clean: a per-material uniform inside the
+  // family's one shared graph, so this adds NO node graph (asserted by
+  // `nuketown2-pipeline-budget.test.ts` and `nuketown2-visual-polish.test.ts`).
+  for (const role of NUKETOWN2_EDGE_CHIP_ROLES) {
+    (registry[role].userData.nuketown2Uniforms as Record<string, unknown>).edgeChip = 1;
+  }
+  return registry;
+}
+
+/** Roles that carry PASS 95 edge weathering. Exported for the gate. */
+export const NUKETOWN2_EDGE_CHIP_ROLES = Object.freeze([
+  'kerb', 'block', 'garageDoor', 'applianceRed', 'applianceBlue', 'sign', 'fence',
+] as const);
+
+function buildRegistry(): Nuketown2MaterialRegistry {
   return Object.freeze({
     // Beyond the fence: dry scrubland keyed between the backdrop skirt's own
     // two authored ground colours, so the plain and the tree line read as the

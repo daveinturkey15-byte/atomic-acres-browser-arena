@@ -18,7 +18,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, edgeWear, linearSwatch } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -78,7 +78,13 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const grained = wood.mul(float(1).sub(latewood.mul(painted.select(float(0.03), float(0.11)))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
-  const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
+  // PASS 95 EDGE WEATHERING: a picket's sawn edges and top silver first and
+  // splinter, so the board reads as a stack of boards rather than a slab.
+  const splinter = edgeWear(0.018)
+    .mul(smoothstep(float(-0.45), float(0.4), wear.scuff))
+    .mul(uniforms.edgeChip);
+  const footed = mix(weathered, weathered.mul(float(1.32)), splinter.mul(float(0.7)))
+    .mul(float(1).sub(dampFoot.mul(float(0.17))));
   timberGraph = {
     colorNode: mix(footed, linearSwatch(0x1a120c), gap),
     roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
