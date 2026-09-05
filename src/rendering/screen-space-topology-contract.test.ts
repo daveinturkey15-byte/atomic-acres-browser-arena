@@ -41,6 +41,9 @@ const NON_SCREEN_SPACE_TOPOLOGY_OWNERS: Readonly<Record<string, string>> = Objec
   antiAliasing: 'renderer-init',
   // GTAO MRT attachments: staged by `ambientOcclusionEnabled`/`...Denoise`.
   ambientOcclusion: 'ambient-occlusion',
+  // Nuke Town's clustered light buffers belong to the arena-lighting rebuild,
+  // not to the screen-space post topology key.
+  clusteredLighting: 'arena-lighting',
 });
 
 /** A value for each control that is the OPPOSITE of presence, and one that is not. */

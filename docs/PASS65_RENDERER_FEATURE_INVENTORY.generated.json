@@ -162,6 +162,19 @@
       ]
     },
     {
+      "key": "graphics.clusteredLighting",
+      "applyMode": "pipeline-rebuild",
+      "authorityAffecting": false,
+      "runtimeConsumer": "arena-lighting",
+      "runtimeEvidence": [
+        {
+          "path": "src/rendering/clustered-lights.ts",
+          "symbol": "NUKETOWN2_CLUSTERED_LIGHTING_SETTINGS",
+          "telemetryPath": "settings.graphics.clusteredLighting + lightingConditions.clusteredLights"
+        }
+      ]
+    },
+    {
       "key": "graphics.bakedIndirect",
       "applyMode": "pipeline-rebuild",
       "authorityAffecting": false,
@@ -621,6 +634,7 @@
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
         "indirectLighting": "low",
+        "clusteredLighting": true,
         "bakedIndirect": "off",
         "ambientOcclusion": "off",
         "screenSpaceReflections": "off",
@@ -839,6 +853,7 @@
         "shadowUpdateMode": "static",
         "shadowFilter": "auto",
         "indirectLighting": "high",
+        "clusteredLighting": true,
         "bakedIndirect": "low",
         "ambientOcclusion": "high",
         "screenSpaceReflections": "low",
@@ -1057,6 +1072,7 @@
         "shadowUpdateMode": "dynamic",
         "shadowFilter": "auto",
         "indirectLighting": "high",
+        "clusteredLighting": true,
         "bakedIndirect": "high",
         "ambientOcclusion": "ultra",
         "screenSpaceReflections": "high",
@@ -1412,11 +1428,12 @@
           "graphics.shadowUpdateMode",
           "graphics.shadowFilter",
           "graphics.indirectLighting",
+          "graphics.clusteredLighting",
           "graphics.preset",
           "graphics.adaptiveResolution"
         ],
-        "effectiveValue": "Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, an auto/PCF/PCSS-soft filter override, and bounded indirect-light scaling",
-        "rationale": "Shadow distance, bias, and local-light volumes remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work. The filter override respects the WebKit basic-depth engine floor."
+        "effectiveValue": "Off/on authored shadows, 1024/2048 maps, static/dynamic refresh, an auto/PCF/PCSS-soft filter override, bounded indirect-light scaling, and the Nuke Town practical-light cluster",
+        "rationale": "Shadow distance, bias, local-light volumes and the clustered-light buffer remain arena-authored because arbitrary values can create leaks, clipping, and unbounded GPU work. The filter override respects the WebKit basic-depth engine floor; clustered lighting is staged with the arena-lighting rebuild."
       },
       "budget": "Per-arena maximum shadow lights, map pixels, distance, and p95 frame budgets.",
       "verifier": "src/rendering/arena-visual-definition.test.ts + src/rendering/light-occlusion.test.ts + src/arena-contrast-lighting.test.ts + tests/e2e/pass65-rustrig-container-lighting.spec.ts",
@@ -2365,5 +2382,5 @@
     "adjustable": 28,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "e77fa8b973e65047851163900333d52a29de71bd6682709f9ae04c24870905b9"
+  "inventorySha256": "85a6de44d54bda18ad5243fe29968220325af4395e64adbd86ec5f137fe25ca7"
 }

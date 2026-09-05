@@ -25,6 +25,7 @@ function graphSignature(value: unknown, seen = new Map<object, string>()): strin
   const object = value as Record<string, any>;
   if (object.isNode !== true) {
     if (object instanceof THREE.Color) return 'color';
+    if (object instanceof THREE.Vector3) return `vector:${object.x},${object.y},${object.z}`;
     return `object:${object.constructor?.name ?? 'unknown'}`;
   }
   const prior = seen.get(object);

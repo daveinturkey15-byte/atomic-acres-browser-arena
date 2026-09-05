@@ -622,6 +622,18 @@ async function runScenarios(peers, report, step) {
     results.fireAtGuest = await scenarioFire(guest, peers[role === 'guestA' ? 'guestB' : 'guestA'], role, 'other-guest');
     results.damageAndDeath = await scenarioDamageDeath(guest, host, peers, role);
     results.respawn = await scenarioRespawn(guest, host, role);
+    // HITL 6 extension: the owner reported that the first death can poison a
+    // guest's reload action sequence, so exercise reload only after that death
+    // and its real respawn. Keep this after the existing death/respawn pair so
+    // the scenario is explicit in the evidence rather than inferred from a
+    // pre-death reload.
+    results.reloadAfterDeath = await scenarioReloadAfterDeath(guest, host, role);
+    // HITL 6 extension: exercise the W-1 cadence boundary with a real slow
+    // shot, a production switch to the fast sidearm, and a shot after the
+    // switch's authored presentation window.
+    results.swapSlowThenFastThenFire = await scenarioSwapSlowThenFastThenFire(
+      guest, host, role,
+    );
     results.scoreboard = await scenarioScoreboard(guest, host, role);
   }
   // Rejoin last: it tears a peer's session down, so everything else has run.
@@ -686,6 +698,7 @@ async function scenarioPickup(guest, host, role) {
   const gotResult = trace.some((entry) => entry.direction === 'in' && /pickup/i.test(entry.type));
   result.sentPickup = sentPickup;
   result.gotPickupResult = gotResult;
+  result.hostRejected = gotResult && result.weaponBefore === result.weaponAfter;
 
   if (result.weaponBefore === result.weaponAfter) {
     record(`PICKUP-NO-EFFECT-${role}`, 'critical', 'guest pressed interact on a ground weapon and its own weapon never changed',
@@ -704,6 +717,67 @@ async function scenarioPickup(guest, host, role) {
       { guestWeapon: result.weaponAfter, hostSeesWeapon: result.hostSeesWeapon });
   }
   result.ok = result.weaponBefore !== result.weaponAfter && result.hostSeesWeapon === result.weaponAfter;
+  return result;
+}
+
+/** HITL 6 extension: reload after the guest has completed a death/respawn. */
+async function scenarioReloadAfterDeath(guest, host, role) {
+  const result = await scenarioReload(guest, host, role);
+  return { ...result, afterDeath: true };
+}
+
+/** HITL 6 extension: slow primary shot -> fast sidearm -> shot. */
+async function scenarioSwapSlowThenFastThenFire(guest, host, role) {
+  const result = { ok: false, sequence: [] };
+  const selfId = (await viewOf(guest.page)).selfId;
+  const targetId = (await viewOf(host.page)).selfId;
+  await guest.page.evaluate((wanted) => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    debug.equipWeapon('m14-ebr');
+    debug.setAmmo('m14-ebr', 1, 90);
+    debug.aimAtRemote('body');
+    debug.fireOnce();
+    return wanted;
+  }, targetId);
+  await sleep(ACK_BUDGET_MS);
+  const beforeFast = await viewOf(guest.page);
+  const fastWeaponBefore = beforeFast.players[selfId]?.weapon ?? null;
+  await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.switchWeapon(1));
+  // switchWeapon owns a 360 ms presentation lock; allow that authored lock
+  // to elapse, without changing the product timing or the audit budget.
+  await sleep(400);
+  const switched = await viewOf(guest.page);
+  const fastWeapon = switched.players[selfId]?.weapon ?? null;
+  await guest.page.evaluate(() => {
+    const debug = window.__ATOMIC_ACRES_DEBUG__;
+    const weapon = debug.snapshot().player.weapon;
+    debug.setAmmo(weapon, 30, 90);
+  });
+  const mark = await markOf(guest);
+  const beforeFire = await viewOf(guest.page);
+  result.fastAmmoBefore = beforeFire.players[selfId]?.ammo ?? null;
+  await guest.page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+  await sleep(ACK_BUDGET_MS);
+  const afterFire = await viewOf(guest.page);
+  result.fastAmmoAfter = afterFire.players[selfId]?.ammo ?? null;
+  result.fastWeaponBefore = fastWeaponBefore;
+  result.fastWeapon = fastWeapon;
+  result.trace = (await traceSince(guest, mark)).map((entry) => `${entry.direction}:${entry.type}`);
+  result.sentShot = result.trace.some((entry) => entry.startsWith('out:') && /shot|hit/i.test(entry));
+  if (!(result.fastAmmoAfter < result.fastAmmoBefore) || !result.sentShot) {
+    record(`SWAP-THEN-FIRE-NO-EFFECT-${role}`, 'high',
+      'a fast weapon did not fire after switching from a slow weapon', {
+        fastWeaponBefore,
+        fastWeapon,
+        ammoBefore: result.fastAmmoBefore,
+        ammoAfter: result.fastAmmoAfter,
+        trace: result.trace.slice(0, 20),
+      });
+  }
+  result.sequence = ['slow-fire', 'switch-to-fast', 'fast-fire'];
+  result.ok = result.fastWeapon !== fastWeaponBefore
+    && result.fastAmmoAfter < result.fastAmmoBefore
+    && result.sentShot;
   return result;
 }
 

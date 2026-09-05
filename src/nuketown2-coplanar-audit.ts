@@ -89,7 +89,7 @@ export type CoplanarVerdict =
   | 'finding';
 
 export type CoplanarRow = {
-  verdict: CoplanarVerdict;
+  classification: CoplanarVerdict;
   /** |topA - topB| in metres. */
   gap: number;
   /** Plan-overlap area in m2. */
@@ -334,16 +334,16 @@ export function classifyPair(
   const sameMaterial = first.materialId === second.materialId;
   const fencedByOffset = first.polygonOffsetFactor < 0 || second.polygonOffsetFactor < 0;
   const base = { gap, overlap };
-  if (overlapInsideCarriageway(first, second)) return { ...base, verdict: 'street-finding' };
-  if (overlapInsideBuilding(first, second)) return { ...base, verdict: 'house-interior-finding' };
-  if (fencedByOffset) return { ...base, verdict: 'fenced' };
+  if (overlapInsideCarriageway(first, second)) return { ...base, classification: 'street-finding' };
+  if (overlapInsideBuilding(first, second)) return { ...base, classification: 'house-interior-finding' };
+  if (fencedByOffset) return { ...base, classification: 'fenced' };
   if (sameMaterial) {
-    if (first.presentationOnly || second.presentationOnly) return { ...base, verdict: 'benign' };
-    if (overlap < MIN_RACE_AREA_M2) return { ...base, verdict: 'contact' };
-    if (!raceRegionVisible(first, second, boxes)) return { ...base, verdict: 'benign' };
-    return { ...base, verdict: 'same-material-visible' };
+    if (first.presentationOnly || second.presentationOnly) return { ...base, classification: 'benign' };
+    if (overlap < MIN_RACE_AREA_M2) return { ...base, classification: 'contact' };
+    if (!raceRegionVisible(first, second, boxes)) return { ...base, classification: 'benign' };
+    return { ...base, classification: 'same-material-visible' };
   }
-  return { ...base, verdict: 'finding' };
+  return { ...base, classification: 'finding' };
 }
 
 export function auditNuketown2Coplanar(): CoplanarAudit {
@@ -371,7 +371,7 @@ export function auditNuketown2Coplanar(): CoplanarAudit {
     benign: 0,
   };
   for (const row of rows) {
-    switch (row.verdict) {
+    switch (row.classification) {
       case 'street-finding': counts.streetFindings += 1; break;
       case 'house-interior-finding': counts.houseInteriorFindings += 1; break;
       case 'same-material-visible': counts.sameMaterialVisibleFindings += 1; break;

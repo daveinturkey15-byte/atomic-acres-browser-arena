@@ -49,7 +49,7 @@ import {
   type CoplanarRow,
 } from '../../src/nuketown2-coplanar-audit';
 
-const VERDICT_LABEL: Readonly<Record<CoplanarRow['verdict'], string>> = Object.freeze({
+const VERDICT_LABEL: Readonly<Record<CoplanarRow['classification'], string>> = Object.freeze({
   'street-finding': 'STREET-FINDING ',
   'house-interior-finding': 'HOUSE-INTERIOR-FINDING ',
   fenced: 'FENCED  ',
@@ -66,7 +66,7 @@ function main(): void {
   const { counts, rows } = audit;
 
   const lines = rows.map((row) => [
-    VERDICT_LABEL[row.verdict],
+    VERDICT_LABEL[row.classification],
     `dy=${row.gap.toFixed(4)}m`,
     `overlap=${row.overlap.toFixed(1)}m2`,
     `[${row.first.name} top=${row.first.top.toFixed(3)} mat=${row.first.materialName} offset=${row.first.polygonOffsetFactor}]`,

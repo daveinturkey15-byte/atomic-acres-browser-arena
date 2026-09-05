@@ -3113,7 +3113,7 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     // own geometry.
     const audit = auditNuketown2Coplanar();
     const visible = audit.rows
-      .filter((row) => row.verdict === 'same-material-visible')
+      .filter((row) => row.classification === 'same-material-visible')
       .map((row) => `${row.first.name} x ${row.second.name}`);
     expect(visible, `SAME-MATERIAL-VISIBLE coplanar pairs:\n${visible.join('\n')}`)
       .toHaveLength(0);

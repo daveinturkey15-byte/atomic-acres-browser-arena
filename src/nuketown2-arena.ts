@@ -994,7 +994,7 @@ function centredPolygon(
   height: number,
   segments: number,
   material: THREE.Material,
-  options: { solid?: boolean; shots?: boolean; cast?: boolean } = {},
+  options: Pick<BoxOptions, 'solid' | 'shots' | 'cast' | 'ballisticMaterial'> = {},
 ): THREE.Mesh {
   const worldX = nuketown2HandedX(position[0]);
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, segments, 1, false), material);
@@ -1025,7 +1025,10 @@ function centredPolygon(
       `${builder.root.name}:${builder.ballisticSurfaceSequence}:${mesh.name}`,
       mesh.name,
       bounds,
-      { impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface> },
+      {
+        impactSurface: mesh.userData.impactSurface as ReturnType<typeof classifyImpactSurface>,
+        material: options.ballisticMaterial,
+      },
     );
     builder.ballisticSurfaceSequence += 1;
     builder.shotSurfaces.push(surface);
@@ -2921,7 +2924,15 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
  * competing movement or shot authority.
  */
 function street(builder: Builder, m: Nuketown2Materials): void {
-  const road = { solid: true, shots: true, cast: false } as const;
+  const road = {
+    solid: true,
+    shots: true,
+    cast: false,
+    // Asphalt and its low kerbs are explicit concrete-class shot authority;
+    // leaving these generated carriageway pieces to name inference makes the
+    // fallback sentinel look like a missing material review.
+    ballisticMaterial: 'concrete',
+  } as const;
   const head = NUKETOWN2_CUL_DE_SAC;
   // ---- HF-477: THE LOLLIPOP -------------------------------------------------
   // Every body below is emitted through `centred()` - ONCE, with no 180-degree
@@ -2953,7 +2964,7 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     const authoredZ = Math.sin(angle) * kerbRadius;
     centred(builder, `carriageway head kerb segment ${index}`,
       [authoredX, 0.06, authoredZ], [chord, 0.24, NUKETOWN2_TURNING_HEAD_KERB_WIDTH], m.kerb,
-      { cast: false, rotation: [0, angle - Math.PI / 2, 0] });
+      { ...road, rotation: [0, angle - Math.PI / 2, 0] });
   }
 
   // The stem's own kerbs, one per side, from the bulb's mouth to the map edge.
@@ -2962,7 +2973,7 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   for (const [index, side] of [-1, 1].entries()) {
     centred(builder, `carriageway stem kerb ${index}`,
       [(head.mouthX + head.offMapX) / 2, 0.06, side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15)],
-      [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, { cast: false, ballisticMaterial: 'concrete' });
+      [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, road);
   }
   // ---- HF-491: THE ROADSIDE BAYS -------------------------------------------
   // Owner, 2026-09-04: the map "needs to be WIDER IN THE MIDDLE, have BITS
@@ -2996,7 +3007,7 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     // tread sits INSIDE the bay, exactly as the stem kerb sits inside the stem.
     const outerZ = Math.abs(bay.z0) > Math.abs(bay.z1) ? bay.z0 : bay.z1;
     centred(builder, `carriageway ${bay.id} kerb`, [midX, 0.06, outerZ - Math.sign(outerZ) * 0.15],
-      [length, 0.24, 0.3], m.kerb, { cast: false });
+      [length, 0.24, 0.3], m.kerb, road);
   }
 
   // Centre line, down the stem only: a cul-de-sac bulb is not marked.

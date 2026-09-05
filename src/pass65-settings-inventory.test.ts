@@ -41,6 +41,7 @@ describe('Pass 65 setting inventory', () => {
     // graph change even though changing its TIER between low and high is not.
     for (const key of [
       'graphics.bakedIndirect',
+      'graphics.clusteredLighting',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
@@ -52,6 +53,7 @@ describe('Pass 65 setting inventory', () => {
     const topologyOwners = new Set([
       'graphics.antiAliasing', 'graphics.geometryDetail', 'graphics.ambientOcclusion',
       'graphics.bakedIndirect',
+      'graphics.clusteredLighting',
       'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
       'graphics.rayTracing',
       'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',

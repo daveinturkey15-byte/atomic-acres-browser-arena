@@ -552,6 +552,16 @@ export function auditWalkableSurfaces(id: string, scene: THREE.Scene, map: Arena
     const slopeDeg = quadSlopeDegrees(quad);
     if (slopeDeg > WALKABLE_MAX_SLOPE_DEG) continue;
     const name = mesh.name || `(unnamed ${mesh.type})`;
+    // Some authored structural dressing deliberately has a visible top face
+    // but is not a player floor. Nuketown2 records that semantic explicitly
+    // on its rooflines and exterior stair carpentry; honoring the marker keeps
+    // this floor audit about movement surfaces rather than treating every
+    // non-solid presentation body as a promised route.
+    if (mesh.userData.nuketown2RoofWalkable === false
+      || mesh.userData.nuketown2ExteriorStairWalkable === false) {
+      exclude('authored non-walkable structural dressing');
+      continue;
+    }
     const rule = WALKABLE_NAME_RULES.find((entry) => entry.pattern.test(name));
     if (rule) {
       exclude(rule.reason);
