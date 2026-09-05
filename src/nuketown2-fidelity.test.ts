@@ -44,7 +44,6 @@ import {
   isNuketown2BayFootprint,
   nuketown2HandedSpan,
   nuketown2HandedX as hx,
-  NUKETOWN2_STREET_CARS,
 } from './nuketown2-layout';
 import {
   NUKETOWN2_ROOF_SYMMETRY_EXCEPTION_NAMES,
@@ -841,6 +840,7 @@ describe('Nuke Town Rebuild fidelity', () => {
       expect(skin.centre.x, `the ${id} skin rides its own box`).toBeCloseTo(hx(seat.x), 6);
     }
   });
+  /**
    * ─────────────────────────────────────────────────────────────────────────
    * PASS 95 ROUND 3 - THE VEHICLES STAND ON THE ROAD, MEASURED IN SQUARE METRES.
    *
