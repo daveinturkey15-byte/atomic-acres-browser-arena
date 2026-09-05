@@ -108,13 +108,15 @@ describe('remote reload stale-revision guard', () => {
 
   it('rejects a stale reload result below the stored revision without touching inventory or presentation', () => {
     const remote = snapshot('guest-a', 'pistol');
+    const beforeRemote = structuredClone(remote);
     const inventories = new Map([['guest-a', createGuestCombatInventory('m4a1', 'pistol', 1)]]);
     const revisions = new Map([['guest-a', 8]]);
     const beforeInventory = inventories.get('guest-a');
     const outcome = applyRemoteReloadResult(remote, beforeInventory!, reloadMessage(7, 'committed'), 'pistol', revisions.get('guest-a') ?? -1);
     expect(outcome).toBeNull();
     expect(inventories.get('guest-a')).toBe(beforeInventory);
-    expect(remote).toMatchObject({ weapon: 'pistol', reloading: undefined });
+    expect(remote).toStrictEqual(beforeRemote);
+    expect(remote.weapon).toBe('pistol');
   });
 
   it('accepts legitimate same-revision started and committed results', () => {
