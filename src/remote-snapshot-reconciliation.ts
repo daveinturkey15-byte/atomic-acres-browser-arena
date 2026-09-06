@@ -132,9 +132,17 @@ export type StaleSelfHealthRepairInput = Readonly<{
  * Admits only a same-life HP decrease: never heals, never resurrects, never
  * moves the player, never advances the input acknowledgement. Stale-life and
  * non-state packets stay rejected; the caller keeps the movement drop counted.
+ *
+ * HF-535 widens the admitted carrier, not the rule. `health-authority` is the
+ * host-authored health fact that travels on its own revision counter instead of
+ * the victim's movement sequence (src/host-health-authority-broadcast.ts); it
+ * is exactly the same class of packet as the stale-sequence self echo — a host
+ * statement about this player's own hp — and it is admitted here under exactly
+ * the same same-life, damage-direction-only conditions. Every other message
+ * type, `join` included, stays rejected as before.
  */
 export function shouldApplyStaleSelfHealthRepair(input: StaleSelfHealthRepairInput): boolean {
-  return input.messageType === 'state'
+  return (input.messageType === 'state' || input.messageType === 'health-authority')
     && Number.isSafeInteger(input.continuity)
     && input.continuity === input.localContinuity
     && Number.isFinite(input.incomingHp)

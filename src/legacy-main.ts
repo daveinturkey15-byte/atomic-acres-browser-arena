@@ -1161,7 +1161,7 @@ import {
   BotStateMessage,
   DeathMessage,
   ExplosiveSource,
-  GameMessage,
+  GameMessage, HealthAuthorityMessage,
   GuestCombatInventory,
   GuestCombatInventoryProjection,
   HitMessage,
@@ -1228,7 +1228,7 @@ import {
   setGuestCombatInventoryGrenades,
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
-import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, clampAdmittedHeldWeapon, createCanonicalRemoteState } from './multiplayer-relay';
+import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, clampAdmittedHeldWeapon, createCanonicalRemoteState } from './multiplayer-relay'; import { admitHealthAuthority, evaluateHealthAuthorityPublication, type PublishedHealthAuthority } from './host-health-authority-broadcast';
 import { isOrdinaryWeapon, remoteReloadResultCacheKey } from './remote-combat-helpers';
 import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
 import { isGuestCombatInventory } from './protocol';
@@ -5787,7 +5787,7 @@ const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
 const remoteReloadResultCache = createRemoteReloadResultCache();
 const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
-const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>(); /* HF-535 host: what observers were last told. HF-535 observer: highest revision applied per subject. Both cleared with the health ledger. */ const publishedHealthAuthorities = new Map<string, PublishedHealthAuthority>(); const appliedHealthAuthorityRevisions = new Map<string, number>();
 const retainedRemoteAuthorities = new Map<string, Readonly<{
   snapshot: PlayerSnapshot;
   continuity: number;
@@ -8793,7 +8793,7 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
     throw new Error('Stored guest authority failed strict restoration');
   }
   retainedRemoteAuthorities.clear();
-  remoteHealthAuthorities.clear();
+  remoteHealthAuthorities.clear(); publishedHealthAuthorities.clear(); appliedHealthAuthorityRevisions.clear();
   remoteCombatInventories.clear();
   remoteCombatInventoryRevisions.clear();
   for (const guest of recoveredGuests) {
@@ -9187,7 +9187,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   return true;
 }
 function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
-function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); }
+function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); } /* HF-535 health authority wiring. The canonical state re-broadcast beside a host damage application re-uses the last sequence the host admitted from the victim, which every observer has already applied, so admitRemoteSnapshot rejects it and health only arrives after the victim's next self-authored packet (three legs, measured 225 ms+). These three functions carry the same fact on its own monotonic revision instead; the whole fail-closed rule set, and why each clause exists, is in src/host-health-authority-broadcast.ts. publishRemoteHealthAuthority is driven from the host tick, which covers every real damage path at one site, and directly from the QA damage hook so its measurement does not wait a frame. The subject applies it through the existing damage-direction-only self repair, so it can never heal, resurrect or move the local player and never advances an input acknowledgement. */ function publishRemoteHealthAuthority(playerId: string): boolean { if (network.role !== 'host') return false; const remote = remotes.get(playerId); const health = remoteHealthAuthorities.get(playerId); if (!remote || !health) return false; const result = evaluateHealthAuthorityPublication({ playerId, hostPlayerId: player.id, hp: health.hp, alive: health.alive, continuity: remote.continuity, matchEpoch: killstreakMatchEpoch, hostTimeMs: currentHostTimeMs(), nonce: randomNonce(), published: publishedHealthAuthorities.get(playerId) }); if (result.published) publishedHealthAuthorities.set(playerId, result.published); if (!result.message) return false; network.send(result.message); return true; } function recordHealthAuthorityDrop(reason: string, message: HealthAuthorityMessage): void { stateAdmissionDropTelemetry.total += 1; stateAdmissionDropTelemetry.byReason[reason] = (stateAdmissionDropTelemetry.byReason[reason] ?? 0) + 1; stateAdmissionDropTelemetry.last = { reason, messageType: message.type, peerId: message.playerId, author: message.by, continuity: message.continuity, revision: message.revision }; } function applyHealthAuthorityMessage(message: HealthAuthorityMessage): void { const isSelf = message.playerId === player.id; const remote = isSelf ? undefined : remotes.get(message.playerId); const admission = admitHealthAuthority({ message, role: network.role, expectedHostId: privateLobbySnapshot?.hostId ?? null, matchEpoch: killstreakMatchEpoch, subjectContinuity: isSelf ? localContinuity : remote?.continuity ?? null, lastRevision: appliedHealthAuthorityRevisions.get(message.playerId) ?? -1 }); if (!admission.accepted) { recordHealthAuthorityDrop(`health-authority-${admission.reason}`, message); return; } appliedHealthAuthorityRevisions.set(message.playerId, admission.revision); if (isSelf) { if (!shouldApplyStaleSelfHealthRepair({ messageType: message.type, continuity: message.continuity, localContinuity, incomingHp: admission.hp, currentHp: player.hp })) { recordHealthAuthorityDrop('health-authority-self-non-damage', message); return; } player.hp = THREE.MathUtils.clamp(admission.hp, 0, 100); player.alive = player.hp > 0; lastDamageAt = performance.now(); weaponView.setPresentationVisible(player.alive); return; } if (!remote) { recordHealthAuthorityDrop('health-authority-unknown-subject', message); return; } remote.snapshot = { ...remote.snapshot, hp: admission.hp }; remote.root.visible = admission.hp > 0; }
 function driveRejoinLatchRecovery(playerId: string, remote: RemotePlayer, nowMs: number, guestEventLaneActive: boolean): void { const latched = remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId); if (!latched) { clearRejoinLatch(playerId); return; } const action = evaluateRejoinLatchRecovery({ nowMs, armedAtMs: rejoinLatchArmedAtMs(playerId), lastResendAtMs: rejoinLatchLastResendAtMs(playerId), guestEventLaneActive, latched }); if (action === 'resend') { noteRejoinLatchResend(playerId, nowMs); sendGuestResumeAuthority(playerId, remote); } else if (action === 'fail-closed') { const pending = pendingGuestAuthorityRepairs.get(playerId); if (pending) { clearRejoinLatch(playerId); sendGuestResumeFailure(pending.message, 'retry-ceiling'); } else { clearRejoinLatch(playerId); armRejoinLatch(playerId, nowMs); } } }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
@@ -9995,7 +9995,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     remoteGrenadeAuthorities.delete(playerId);
     remoteCombatInventories.delete(playerId);
     remoteCombatInventoryRevisions.delete(playerId);
-    remoteHealthAuthorities.delete(playerId);
+    remoteHealthAuthorities.delete(playerId); publishedHealthAuthorities.delete(playerId); appliedHealthAuthorityRevisions.delete(playerId);
     retainedRemoteAuthorities.delete(playerId);
     remoteFlashVictimLifeIds.delete(playerId);
     lastAuthoredFlashResults.delete(playerId);
@@ -10493,7 +10493,7 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
     // the PREVIOUS match's snapshot in awaitingReplacementState and froze for
     // everyone, permanently. The next match must begin with no ghosts.
     retainedRemoteAuthorities.clear();
-    remoteHealthAuthorities.clear();
+    remoteHealthAuthorities.clear(); publishedHealthAuthorities.clear(); appliedHealthAuthorityRevisions.clear();
     for (const member of hostLobbyMembers.values()) {
       hostLobbyMembers.set(member.id, { ...member, ready: false });
       authoritativeScores.set(member.id, emptyPlayerScore(member.id));
@@ -12827,7 +12827,7 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'guest-resume-ack') {
     acceptGuestResumeAck(message);
     return;
-  }
+  } if (message.type === 'health-authority') { applyHealthAuthorityMessage(message); return; }
   if (message.type === 'guest-resume-nack') {
     acceptGuestResumeNack(message);
     return;
@@ -27354,7 +27354,7 @@ function updateRemotes(dt: number, now: number): void {
     jitterMs: measuredJitterMs,
     underruns: newUnderruns,
   }, now);
-  for (const [id, remote] of remotes) { if (network.role === 'host') driveRejoinLatchRecovery(id, remote, now, activeGuestIds?.has(id) ?? false);
+  for (const [id, remote] of remotes) { if (network.role === 'host') { driveRejoinLatchRecovery(id, remote, now, activeGuestIds?.has(id) ?? false); publishRemoteHealthAuthority(id); }
     if (now - remote.lastSeen > 12_000) {
       // Movement freshness and authenticated activity are distinct authorities.
       // A replacement can pause or rebind its lossy state lane while clock
@@ -36564,7 +36564,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ...retained,
       snapshot: Object.freeze({ ...retained.snapshot, hp: result.state.hp }),
     }));
-    if (remote) network.send(createCanonicalRemoteState(remote.snapshot, currentHostTimeMs(), remote.continuity, remote.snapshotRateHz, remoteCombatInventoryProjection(targetId)));
+    if (remote) { network.send(createCanonicalRemoteState(remote.snapshot, currentHostTimeMs(), remote.continuity, remote.snapshotRateHz, remoteCombatInventoryProjection(targetId))); publishRemoteHealthAuthority(targetId); }
     if (result.died && remote) {
       // HF-504 QA seam: const canonicalDeath = canonicalDeathMessage(death); network.send(canonicalDeath); processDeath(canonicalDeath);
       // The QA damage hook must use the same host-authored death/drop path as

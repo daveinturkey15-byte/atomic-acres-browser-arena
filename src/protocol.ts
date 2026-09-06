@@ -361,6 +361,41 @@ export type DeathMessage = {
   /** Host-canonical weapon drop; guests never derive a drop from local state. */
   drop?: PickupResultDropRecord;
 };
+/**
+ * HF-535: a host-authored health/life fact about ONE player, carried on the
+ * reliable event lane so an observer learns it inside one RTT instead of
+ * waiting for the victim's next self-authored movement sequence.
+ *
+ * Why it is a separate message and not a field on `StateMessage`: the canonical
+ * re-broadcast the host emits after applying damage re-uses the LAST sequence
+ * it admitted from the victim, which every observer has already applied, so
+ * `admitRemoteSnapshot` rejects it as an older sequence. Health then arrives
+ * three legs later (host -> victim -> host -> observer). This message carries
+ * its own monotonic `revision` and is ordered independently of movement, so
+ * movement reconciliation is untouched.
+ *
+ * `by` is the AUTHOR and must be the sitting host: `isHostAuthorityMessage`
+ * lists this type, so `network.ts` drops it on a guest connection, and
+ * `admitHealthAuthority` independently re-checks the author against the lobby
+ * host id on the observer. A guest can therefore neither mint one nor have one
+ * relayed on its behalf.
+ */
+export type HealthAuthorityMessage = {
+  type: 'health-authority';
+  /** Sitting host player id; the only legitimate author. */
+  by: string;
+  /** Subject of the health fact. Never equal to `by`. */
+  playerId: string;
+  hp: number;
+  alive: boolean;
+  /** The subject's life/continuity this fact belongs to. */
+  continuity: number;
+  matchEpoch: number;
+  /** Monotonic per subject; an observer applies only a strictly newer one. */
+  revision: number;
+  hostTimeMs: number;
+  nonce: number;
+};
 export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots: HostedBotSnapshot[]; nonce: number };
 export type BotDamageMessage = {
   type: 'bot-damage'; by: string; botId: string; target: string; weapon: WeaponId;
@@ -667,6 +702,7 @@ export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDama
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
   | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage | TaserProtocolMessage
   | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
+  | HealthAuthorityMessage
   | StickyAttachedMessage
   // HF-467: the plain thin-metal panel state. Host-authored exactly like the
   // shed's interactive-world-snapshot, so network.ts drops any copy arriving
@@ -1047,6 +1083,21 @@ export function isGameMessage(value: unknown): value is GameMessage {
               : msg.effectOrigins.length === 0 && msg.targetIds.length === 0)
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
+    case 'health-authority':
+      // HF-535. Fail-closed on the wire: ids well-formed and distinct (a host
+      // never authors a health fact about itself here), hp inside the authored
+      // range, `alive` consistent with hp so a forged "alive at 0 hp" cannot
+      // parse, and every ordering field a safe non-negative integer.
+      return typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.playerId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.playerId)
+        && msg.by !== msg.playerId
+        && typeof msg.hp === 'number' && Number.isFinite(msg.hp) && msg.hp >= 0 && msg.hp <= 100
+        && typeof msg.alive === 'boolean' && msg.alive === (msg.hp > 0)
+        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.revision) && Number(msg.revision) >= 0
+        && typeof msg.hostTimeMs === 'number' && Number.isFinite(msg.hostTimeMs) && msg.hostTimeMs >= 0
+        && Number.isFinite(msg.nonce);
     case 'death':
       return typeof msg.killer === 'string' && typeof msg.victim === 'string'
         && Boolean(msg.cause) && typeof msg.cause === 'object'
@@ -1407,6 +1458,10 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'chat-submit':
     case 'chat-message':
     case 'chat-history':
+    // HF-535: the author, not the subject. Unreachable in practice because
+    // `isHostAuthorityMessage` already drops it on a guest connection; kept so
+    // the exhaustive switch states the ownership rule rather than defaulting.
+    case 'health-authority':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;
@@ -1441,6 +1496,10 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-closed'
     || message.type === 'clock-pong'
     || message.type === 'death'
+    // HF-535: only the sitting host may state a health/life fact about another
+    // player. Listing it here makes network.ts drop it on a guest connection,
+    // so a guest cannot mint one or have one relayed on its behalf.
+    || message.type === 'health-authority'
     || message.type === 'shot-result'
     || message.type === 'grenade-result'
     || message.type === 'match-score'

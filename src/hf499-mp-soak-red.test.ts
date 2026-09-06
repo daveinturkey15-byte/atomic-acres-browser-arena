@@ -51,6 +51,13 @@ describe('HF-499 replication evidence', () => {
   it('records rejoin damage from the post-mutation host baseline and broadcasts the canonical remote state', () => {
     const damageHook = main.slice(main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {'), main.indexOf('\n  earnSupport:', main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {')));
     expect(damageHook).toContain('createCanonicalRemoteState(remote.snapshot');
+    // HF-535, ADDED not replaced: the canonical re-broadcast above re-uses the
+    // last sequence the host admitted from the victim, so a third observer that
+    // already applied that sequence rejects it and learns the new hp only from
+    // the victim's next self-authored packet - the measured firstSeenMs.guestA
+    // === null conjunct. The health authority carries the same fact on its own
+    // monotonic revision, admissible immediately. Both calls must be here.
+    expect(damageHook).toContain('publishRemoteHealthAuthority(targetId);');
     expect(soak).toContain('firstSeen.host = 0;');
     expect(soak).toContain('applied?.storedAfter');
   });
