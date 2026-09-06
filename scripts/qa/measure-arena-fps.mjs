@@ -56,16 +56,33 @@ const DRAW_LOAD = () => {
   return { meshes, triangles: Math.round(triangles), transparent, alwaysDrawn };
 };
 
+// RENDERER AND BROWSER CHANNEL ARE OPTIONS, and this file is the reason.
+//
+// The URL below pinned `renderer=webgl2` and the launch pinned Playwright's
+// BUNDLED chromium, while every other script in this directory - the viewpoint
+// capture included - runs INSTALLED Chrome (`channel: 'chrome'`) on
+// `renderer=webgpu`. On a WebGPU production dist served by `vite preview`
+// that combination never brings `window.__ATOMIC_ACRES_DEBUG__` up at all:
+// measured 2026-09-06 (HF-536 night-materials), both the base and candidate
+// runs died on `page.waitForFunction: Timeout 120000ms exceeded` with an empty
+// log, so the lane could not price its own frame cost. Defaults are unchanged
+// so no existing caller moves; pass `--renderer webgpu --channel chrome` to
+// measure the path the arena actually ships.
+const RENDERER = arg('--renderer', 'webgl2');
+const CHANNEL = arg('--channel', '');
+const BOOT_TIMEOUT_MS = Number(arg('--boot-timeout-ms', '180000'));
+
 const browser = await chromium.launch({
   headless: true,
+  ...(CHANNEL ? { channel: CHANNEL } : {}),
   args: ['--mute-audio', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'],
 });
 const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } });
 
 const rows = [];
 for (const arenaId of ARENAS) {
-  await page.goto(`${BASE}/?release=latest&renderer=webgl2&render=quality&seed=fps&previewTime=0`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 120_000 });
+  await page.goto(`${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=fps&previewTime=0`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, arenaId);
   await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
   await page.waitForFunction(() => {
