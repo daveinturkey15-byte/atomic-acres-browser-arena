@@ -159,3 +159,58 @@ noise so the bar and the surface under it are one material and not two.
 
 **The general rule.** Before adding contrast, check whether the term you are strengthening is even
 alive at the range the frame reads it from. Twice on this map the answer was no.
+
+## R-005 — Count props, not boxes, or a ratchet will forbid detail
+
+**Subject:** a declutter ratchet that blocked every kit-of-parts prefab. **Pass:** `night-kit`.
+**Files:** `src/nuketown2-fidelity.test.ts`, `src/nuketown2-arena.ts` (`BoxOptions.propId`).
+
+**Method.** The HF-491 verge ceiling counted BOXES because, when it was written, every authored
+body was one box AND one prop. The moment a prop is built from parts — a lantern head is a hood, a
+cap and a lit diffuser — a box count forbids the prop from LOOKING like the thing it is, while
+still admitting the same number of separate objects. Move the ceiling onto the PROP at the same
+value, keep the box count as its own measured fence with zero headroom, and give every part of one
+prefab the same `propId`. A body with no `propId` is its own prop, so the re-base moves nothing
+that already existed. Keep the label out of colliders, shot surfaces and the ballistic ledger, so
+it can never launder cover in; write it at ONE call site so a reviewer reads it next to the
+geometry.
+
+**Cost:** zero. **Measured:** props 34 of 36; boxes 70 (was 30 before the two prefabs landed).
+
+---
+
+## R-006 — A dressing strip is invisible unless its normal differs
+
+**Subject:** a 26 m kerb that read as one grey stripe. **Pass:** `night-kit`.
+**Files:** `src/forge-kit/kerb-course.ts`, `src/nuketown2-arena.ts` (`carriageway stem kerb`).
+
+**Method.** The instinct is to lay a thin bright strip along the top arris. It does nothing: an
+axis-aligned box on an axis-aligned box shares its normals, returns the same value under the same
+light, and is invisible except at the silhouette. ROTATE the strip 45 degrees about the run axis
+and half of it buries in the parent while the lit half faces up and out — now it has its own
+normal and draws a continuous highlight the length of the run. Then INTERRUPT that highlight at
+the real stone pitch (915 mm, BS 7263) with a mortar haunch standing 8 mm proud: an interrupted
+highlight is how an eye counts stones.
+
+**Scale departure, recorded not hidden:** the real chamfer is 13 mm and subtends under one pixel
+at the review distance, so it is authored at 45 mm — the smallest section that survives 1080p at
+14-24 m. Everything else in the prefab is real millimetres.
+
+**Cost:** +1 draw call (the `kerb` role gains its first presentation batch), +1,032 triangles,
+zero materials. The solid kerb box is untouched, so colliders and ballistics are byte-identical.
+
+---
+
+## R-007 — Presentation-only boxes are free draws; spend them on the eaves
+
+**Subject:** 6 m of unbroken siding on every house elevation. **Pass:** `night-kit`.
+**Files:** `src/forge-kit/gutter-run.ts`, `src/nuketown2-arena.ts`.
+
+**Method.** `batchPresentationOnlyBoxes` merges every `solid:false, shots:false` BoxGeometry that
+shares a material into ONE mesh, so a prefab that borrows an existing role costs triangles and no
+draw call at all. That makes the eaves the cheapest large improvement on a house: a trough, a bead
+standing 20 mm proud of it (the bead is the part the low sun catches — one box with one normal
+cannot produce that line), hoppers, downpipes at the inner faces of the end walls, and shoes
+160 mm off the lawn. Put the pipes where a builder would: at the corners, clear of every opening.
+
+**Cost:** 96 triangles per run, four runs, +0 draws, +0 materials.
