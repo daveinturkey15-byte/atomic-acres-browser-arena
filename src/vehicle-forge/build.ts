@@ -38,6 +38,7 @@ import {
   createForgeLiningMaterial,
   createForgePaintMaterial,
   createForgeTyreMaterial,
+  quantizeVehicleAnchor,
 } from './materials';
 
 export interface ForgedVehicleMaterials {
@@ -127,6 +128,25 @@ export interface MergedForgedPlacements {
 }
 
 /**
+ * Stamp the non-geometric placement anchor used by the shared weathering
+ * graph. Positions, indices and triangle counts are untouched; the attribute
+ * simply survives the per-material static merge so one vehicle cannot inherit
+ * its neighbour's enamel hash.
+ */
+function stampVehicleAnchor(geometry: THREE.BufferGeometry, x = 0, z = 0): THREE.BufferGeometry {
+  const position = geometry.getAttribute('position');
+  if (!position) return geometry;
+  const [qx, qz] = quantizeVehicleAnchor(x, z);
+  const anchor = new Float32Array(position.count * 2);
+  for (let index = 0; index < position.count; index += 1) {
+    anchor[index * 2] = qx;
+    anchor[index * 2 + 1] = qz;
+  }
+  geometry.setAttribute('forgeVehicleAnchor', new THREE.Float32BufferAttribute(anchor, 2));
+  return geometry;
+}
+
+/**
  * PERF (HITL 5, HF-491). Fold every placed vehicle into ONE mesh per material.
  *
  * The street vehicles are static scenery. Built one group per vehicle they
@@ -167,6 +187,7 @@ export function mergeForgedPlacements(
       transform.multiplyMatrices(groupMatrix, child.matrix);
       const geometry = child.geometry.clone();
       geometry.applyMatrix4(transform);
+      stampVehicleAnchor(geometry, x, z);
       geometry.computeBoundingBox();
       if (geometry.boundingBox) bounds.union(geometry.boundingBox);
       const material = child.material as THREE.Material;
@@ -780,7 +801,7 @@ export function buildForgedWheelSet(
   let triangles = 0;
   for (const bucket of ['tyre', 'chrome', 'lining'] as const) {
     if (parts[bucket].length === 0) continue;
-    const merged = mergeGeometries(parts[bucket], false);
+    const merged = mergeGeometries(parts[bucket].map((geometry) => stampVehicleAnchor(geometry)), false);
     if (!merged) continue;
     const mesh = new THREE.Mesh(merged, materials[bucket]);
     mesh.name = `vehicle-forge ${id} ${bucket}`;
@@ -1172,7 +1193,8 @@ export function buildForgedVehicle(
   for (const bucket of BUCKET_ORDER) {
     const geometries = parts[bucket];
     if (geometries.length === 0) continue;
-    const merged = geometries.length === 1 ? geometries[0]! : mergeGeometries(geometries, false);
+    const anchored = geometries.map((geometry) => stampVehicleAnchor(geometry));
+    const merged = anchored.length === 1 ? anchored[0]! : mergeGeometries(anchored, false);
     if (!merged) continue;
     const mesh = new THREE.Mesh(merged, materials[bucket]);
     mesh.name = `vehicle-forge ${spec.id} ${bucket}`;

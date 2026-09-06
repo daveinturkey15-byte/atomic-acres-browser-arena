@@ -31,10 +31,16 @@
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { fbm2, valueNoise2 } from '../map3/noise';
+import { fbm2, hash2, valueNoise2 } from '../map3/noise';
 
 const {
+  attribute,
+  cameraPosition,
+  dot,
+  floor,
   float,
+  length,
+  max,
   mix,
   normalWorld,
   positionViewDirection,
@@ -45,6 +51,109 @@ const {
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
+
+/**
+ * HF-536 weathering contract. These are deliberately scalar graph constants:
+ * the paint and chrome buckets stay shared, while the surface terms are
+ * authored in metres and disappear before they can alias at distance.
+ */
+export const VEHICLE_ANCHOR_QUANTUM_M = 0.001;
+export const VEHICLE_PAINT_SATURATION_LOSS_MIN = 0.08;
+export const VEHICLE_PAINT_SATURATION_LOSS_MAX = 0.15;
+export const VEHICLE_PAINT_VALUE_LIFT_MIN = 0.03;
+export const VEHICLE_PAINT_VALUE_LIFT_MAX = 0.08;
+export const VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MIN = 0.25;
+export const VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MAX = 0.35;
+export const VEHICLE_CLEARCOAT_FLANK_ROUGHNESS_MIN = 0.5;
+export const VEHICLE_CLEARCOAT_FLANK_ROUGHNESS_MAX = 0.6;
+export const VEHICLE_DUST_BAND_HEIGHT_M = 0.35;
+export const VEHICLE_DUST_BAND_MIX = 0.35;
+export const VEHICLE_DUST_BAND_ROUGHNESS = 0.85;
+export const VEHICLE_DUST_SPATTER_FEATURE_MIN_M = 0.02;
+export const VEHICLE_DUST_SPATTER_FEATURE_MAX_M = 0.06;
+export const VEHICLE_CHROME_PIT_FEATURE_MIN_M = 0.003;
+export const VEHICLE_CHROME_PIT_FEATURE_MAX_M = 0.008;
+export const VEHICLE_CHROME_PIT_ROUGHNESS_MIN = 0.08;
+export const VEHICLE_CHROME_PIT_ROUGHNESS_MAX = 0.35;
+export const VEHICLE_CHROME_PIT_COVERAGE = 0.15;
+export const VEHICLE_TRIM_GRIME_OFFSET_MIN_M = 0.015;
+export const VEHICLE_TRIM_GRIME_OFFSET_MAX_M = 0.025;
+export const VEHICLE_WEATHERING_DETAIL_NEAR_M = 1.2;
+export const VEHICLE_WEATHERING_DETAIL_FAR_M = 3;
+
+/** Known proud trim elevations, used only when a merged graph cannot inspect parts. */
+export const TRIM_GRIME_HEIGHTS_M = Object.freeze([
+  0.34, 0.4, 0.42, 0.46, 0.5, 0.7, 0.78, 0.84,
+  0.9, 0.95, 1.2, 1.3, 1.75, 1.78, 1.99, 2.03, 2.42,
+]);
+
+function fractNumber(value: number): number {
+  return value - Math.floor(value);
+}
+
+/** Quantise the placement anchor to the R-003 1 mm grid. */
+export function quantizeVehicleAnchor(x: number, z: number): readonly [number, number] {
+  return [
+    Math.round(x / VEHICLE_ANCHOR_QUANTUM_M) * VEHICLE_ANCHOR_QUANTUM_M,
+    Math.round(z / VEHICLE_ANCHOR_QUANTUM_M) * VEHICLE_ANCHOR_QUANTUM_M,
+  ];
+}
+
+/** CPU mirror of the textureless shader hash used for per-vehicle variation. */
+export function vehicleAnchorHash(x: number, z: number): number {
+  const [qx, qz] = quantizeVehicleAnchor(x, z);
+  return fractNumber(Math.sin(qx * 127.1 + qz * 311.7) * 43758.5453);
+}
+
+export interface VehicleWeatheringProfile {
+  readonly anchor: readonly [number, number];
+  readonly hash: number;
+  readonly saturationLoss: number;
+  readonly valueLift: number;
+}
+
+export function vehicleWeatheringProfile(x: number, z: number): VehicleWeatheringProfile {
+  const anchor = quantizeVehicleAnchor(x, z);
+  const hash = vehicleAnchorHash(anchor[0], anchor[1]);
+  return {
+    anchor,
+    hash,
+    saturationLoss: VEHICLE_PAINT_SATURATION_LOSS_MIN
+      + hash * (VEHICLE_PAINT_SATURATION_LOSS_MAX - VEHICLE_PAINT_SATURATION_LOSS_MIN),
+    valueLift: VEHICLE_PAINT_VALUE_LIFT_MIN
+      + hash * (VEHICLE_PAINT_VALUE_LIFT_MAX - VEHICLE_PAINT_VALUE_LIFT_MIN),
+  };
+}
+
+/** Ground-contact dust mix: full at y=0, gone at the 350 mm band edge. */
+export function dustBandWeight(heightM: number): number {
+  if (!Number.isFinite(heightM) || heightM >= VEHICLE_DUST_BAND_HEIGHT_M) return 0;
+  const t = Math.max(0, heightM / VEHICLE_DUST_BAND_HEIGHT_M);
+  const smooth = t * t * (3 - 2 * t);
+  return VEHICLE_DUST_BAND_MIX * (1 - smooth);
+}
+
+/** Fade for 3-8 mm pits, 20-60 mm spatters and 15-25 mm grime lines. */
+export function weatheringDetailFalloff(distanceM: number): number {
+  if (!Number.isFinite(distanceM) || distanceM >= VEHICLE_WEATHERING_DETAIL_FAR_M) return 0;
+  if (distanceM <= VEHICLE_WEATHERING_DETAIL_NEAR_M) return 1;
+  const t = (distanceM - VEHICLE_WEATHERING_DETAIL_NEAR_M)
+    / (VEHICLE_WEATHERING_DETAIL_FAR_M - VEHICLE_WEATHERING_DETAIL_NEAR_M);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/** Deterministic census helper for the 10-20% chrome pit coverage contract. */
+export function measureChromePitCoverage(sampleCount = 4096): number {
+  const count = Math.max(1, Math.floor(sampleCount));
+  let pits = 0;
+  for (let i = 0; i < count; i += 1) {
+    const cellX = i % 64;
+    const cellZ = Math.floor(i / 64);
+    const field = fractNumber(Math.sin(cellX * 127.1 + cellZ * 311.7) * 43758.5453);
+    if (field >= 1 - VEHICLE_CHROME_PIT_COVERAGE) pits += 1;
+  }
+  return pits / count;
+}
 
 /**
  * WebGL2 compatibility coverage needs `shaderIDs[material.type]` to resolve;
@@ -69,6 +178,33 @@ function dustFilm(): unknown {
   const upness = saturate(normalWorld.y.mul(float(0.5)).add(float(0.5)));
   const blotch = fbm2(vec2(positionWorld.x.mul(0.8), positionWorld.z.mul(0.8)));
   return saturate(smoothstep(float(0.55), float(0.98), upness).mul(blotch.mul(0.6).add(0.55)));
+}
+
+function weatheringDetailFadeNode(): any {
+  return smoothstep(
+    float(VEHICLE_WEATHERING_DETAIL_FAR_M),
+    float(VEHICLE_WEATHERING_DETAIL_NEAR_M),
+    length(positionWorld.sub(cameraPosition)),
+  );
+}
+
+function trimGrimeMaskNode(): any {
+  let mask = float(0);
+  for (const height of TRIM_GRIME_HEIGHTS_M) {
+    const line = smoothstep(
+      float(height - VEHICLE_TRIM_GRIME_OFFSET_MAX_M),
+      float(height - VEHICLE_TRIM_GRIME_OFFSET_MIN_M),
+      positionWorld.y,
+    ).mul(
+      float(1).sub(smoothstep(
+        float(height - VEHICLE_TRIM_GRIME_OFFSET_MIN_M),
+        float(height),
+        positionWorld.y,
+      )),
+    );
+    mask = max(mask, line);
+  }
+  return mask;
 }
 
 export interface PaintOptions {
@@ -127,34 +263,76 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
   const dust = dustFilm();
-  // Wear that lives ONLY in roughness is invisible: it is carried here as an
-  // albedo step first (the film greys the pigment) and roughness second.
-  const film = vec3(0.58, 0.56, 0.52);
-  // A uniform is intentional: all forge paints share one graph shape and the
-  // dark-blue saloon remains dark blue. In particular, never normalise the
-  // channels to a minimum floor here; that was the source of the purple trim
-  // seen in candidate 4b.
-  material.colorNode = mix(TSL.uniform(new THREE.Vector3(base.r, base.g, base.b)), film, (dust as any).mul(float(0.30)));
-  material.roughnessNode = float(baseRoughness).add((dust as any).mul(float(0.20)));
-  // HF-536 detail pass (Muse): sill road-film over the lowest 0.25 m, broken
-  // up by world-space noise so no two panels soil identically, no sampler.
-  // World y is ground truth - every forged placement stands at y = 0 - so one
-  // mask serves every spec and livery with no new branch: the graph shape is
-  // unchanged across liveries and the pipeline keys stay shared.
-  // (TSL nodes are untyped at this boundary, so the slot record names the only
-  // two node combinators this factory uses instead of scattering casts.)
+  const detailFade = weatheringDetailFadeNode();
+  const vehicleAnchor = attribute('forgeVehicleAnchor', 'vec2');
+  const anchorHash = hash2(vehicleAnchor);
+  const baseUniform = TSL.uniform(new THREE.Vector3(base.r, base.g, base.b));
+
+  // Faded enamel is a per-vehicle, 1 mm-quantised tone shift. A local up
+  // normal keys the sun-bleached roof/bonnet, while flanks retain the livery.
+  const saturationLoss = float(VEHICLE_PAINT_SATURATION_LOSS_MIN).add(
+    anchorHash.mul(float(VEHICLE_PAINT_SATURATION_LOSS_MAX - VEHICLE_PAINT_SATURATION_LOSS_MIN)),
+  );
+  const valueLift = float(VEHICLE_PAINT_VALUE_LIFT_MIN).add(
+    anchorHash.mul(float(VEHICLE_PAINT_VALUE_LIFT_MAX - VEHICLE_PAINT_VALUE_LIFT_MIN)),
+  );
+  const pigmentLuma = dot(baseUniform, vec3(0.2126, 0.7152, 0.0722));
+  const bleachedPigment = mix(baseUniform, vec3(pigmentLuma, pigmentLuma, pigmentLuma), saturationLoss)
+    .mul(float(1).add(valueLift));
+  const upperPanel = smoothstep(float(0.58), float(0.88), normalWorld.y);
+  const fadedEnamel = mix(baseUniform, bleachedPigment, upperPanel);
+
+  // The 350 mm road-dust band is broad and stable; only its 20-60 mm spatter
+  // fades at the detail distance. Roughness reaches the authored 0.85 at the
+  // contact edge, with the wheel-arch/sill height bands reading strongest.
+  const dustBand = float(1).sub(smoothstep(float(0), float(VEHICLE_DUST_BAND_HEIGHT_M), positionWorld.y));
+  const spatterNoise = valueNoise2(vec2(
+    positionWorld.x.mul(float(1 / 0.04)),
+    positionWorld.z.mul(float(1 / 0.04)),
+  ));
+  const spatter = mix(float(1), mix(float(0.82), float(1.18), spatterNoise), detailFade);
+  const dustMix = dustBand.mul(float(VEHICLE_DUST_BAND_MIX)).mul(spatter);
+  const warmDust = vec3(0.44, 0.36, 0.27);
+  const dustyEnamel = mix(fadedEnamel, warmDust, dustMix);
+
+  // Merged parts do not expose semantic trim IDs to the graph. These known
+  // elevations provide the required 15-25 mm occlusion-like line underneath
+  // every proud batten, rub rail, bumper and handle without new samplers.
+  const trimGrime = trimGrimeMaskNode().mul(detailFade);
+  const grimeColour = vec3(0.12, 0.095, 0.07);
+  const grimeEnamel = mix(dustyEnamel, grimeColour, trimGrime.mul(float(0.42)));
+
+  // A uniform is intentional: every forge paint shares one graph shape and
+  // the dark-blue saloon remains dark blue. Wear is visible in albedo first,
+  // then in the physical roughness response.
+  material.colorNode = mix(grimeEnamel, vec3(0.58, 0.56, 0.52), (dust as any).mul(float(0.30)));
+  material.roughnessNode = mix(
+    float(baseRoughness).add((dust as any).mul(float(0.20))),
+    float(VEHICLE_DUST_BAND_ROUGHNESS),
+    dustBand,
+  );
+
+  // Clearcoat is smoother on upper lit panels and deliberately rougher on
+  // flanks: a small world-space variation keeps the coat from reading flat.
+  const coatNoise = valueNoise2(vec2(
+    positionWorld.x.mul(2.7).add(positionWorld.y.mul(1.7)),
+    positionWorld.z.mul(2.7),
+  ));
+  const upperCoat = mix(
+    float(VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MIN),
+    float(VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MAX),
+    coatNoise,
+  );
+  const flankCoat = mix(
+    float(VEHICLE_CLEARCOAT_FLANK_ROUGHNESS_MIN),
+    float(VEHICLE_CLEARCOAT_FLANK_ROUGHNESS_MAX),
+    coatNoise,
+  );
+  // TSL slots are untyped at this boundary; these are the three graph nodes
+  // assigned by this factory, not additional material instances.
   type TslNode = { mul(v: unknown): TslNode; add(v: unknown): TslNode };
   const paintNodes = material as unknown as { colorNode: TslNode; roughnessNode: TslNode; clearcoatRoughnessNode: TslNode };
-  const sillMask = float(1).sub(smoothstep(float(0.02), float(0.27), positionWorld.y));
-  const sillNoise = fbm2(vec2(positionWorld.x.mul(3.1), positionWorld.z.mul(3.1)));
-  const sill = saturate(sillMask.mul(sillNoise.mul(float(0.45)).add(float(0.55))));
-  const sillFilm = vec3(0.3, 0.285, 0.26);
-  paintNodes.colorNode = mix(paintNodes.colorNode, sillFilm, sill.mul(float(0.45)));
-  paintNodes.roughnessNode = paintNodes.roughnessNode.add(sill.mul(float(0.25)));
-  // HF-536 detail pass (Muse): clear-coat micro-variation 0.25-0.45, so the
-  // paint catches the low sun in patches instead of one flat sheet.
-  const coatNoise = valueNoise2(vec2(positionWorld.x.mul(2.7).add(positionWorld.y.mul(1.7)), positionWorld.z.mul(2.7)));
-  paintNodes.clearcoatRoughnessNode = float(0.25).add(coatNoise.mul(float(0.20)));
+  paintNodes.clearcoatRoughnessNode = mix(flankCoat, upperCoat, upperPanel);
   return material;
 }
 
@@ -231,6 +409,29 @@ export function createForgeChromeMaterial(worn = false): MeshStandardNodeMateria
   material.name = worn ? 'vehicle-forge-chrome-worn' : 'vehicle-forge-chrome';
   material.userData.forgeRole = 'chrome';
   tagCompatibility(material, 'MeshStandardMaterial');
+
+  // Chrome pitting is a binary 3-8 mm hashed field, not a texture. The line
+  // under each proud trim elevation is the same distance-faded grime contract
+  // used by paint, so the two materials agree at every runtime profile.
+  const pitCell = vec2(
+    floor(positionWorld.x.add(positionWorld.y.mul(0.37)).div(float(0.005))),
+    floor(positionWorld.z.add(positionWorld.y.mul(0.61)).div(float(0.005))),
+  );
+  const pitField = hash2(pitCell);
+  const pitMask = pitField.greaterThan(float(1 - VEHICLE_CHROME_PIT_COVERAGE))
+    .select(float(1), float(0))
+    .mul(weatheringDetailFadeNode());
+  const trimGrime = trimGrimeMaskNode().mul(weatheringDetailFadeNode());
+  material.colorNode = mix(
+    vec3(0.62, 0.65, 0.68),
+    vec3(0.18, 0.14, 0.1),
+    trimGrime.mul(float(0.45)),
+  );
+  material.roughnessNode = mix(
+    float(worn ? 0.22 : VEHICLE_CHROME_PIT_ROUGHNESS_MIN),
+    float(VEHICLE_CHROME_PIT_ROUGHNESS_MAX),
+    pitMask,
+  );
   return material;
 }
 
