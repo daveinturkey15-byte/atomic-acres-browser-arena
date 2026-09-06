@@ -212,6 +212,12 @@ import {
   type YardRole,
   yardPropPlacements,
 } from './forge-kit';
+// HF-536 night-gemini5: street signage and furniture kit
+import {
+  type StreetSignPart,
+  type StreetSignRole,
+  streetSignPropPlacements,
+} from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -3880,6 +3886,56 @@ function yardPairKit(
 }
 
 /**
+ * HF-536 night-gemini5: Resolve one street-sign ROLE onto THIS arena's existing material registry.
+ * Borrows existing arena materials only; adds zero materials, uniforms, or shader graphs.
+ */
+function streetSignRoleMaterial(m: Nuketown2Materials, role: StreetSignRole): THREE.Material {
+  switch (role) {
+    case 'chrome': return m.chrome;
+    case 'painted-red': return m.applianceRed;
+    case 'painted-green': return m.carClassic;
+    case 'rubber': return m.rubber;
+    case 'timber': return m.fence;
+    case 'painted-metal': return m.garageDoor;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * Emit one street-sign prefab at an authored anchor, through `pair()`.
+ * Every part is presentation-only (solid:false, shots:false).
+ * Every part carries the prefab's propId so declutter gates count props, not boxes.
+ */
+function streetSignPairKit(
+  builder: Builder,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly StreetSignPart[],
+  m: Nuketown2Materials,
+): void {
+  for (const part of parts) {
+    const id = `${propId} ${part.suffix}`;
+    pair(builder, id, [
+      anchor[0] + part.offset[0],
+      anchor[1] + part.offset[1],
+      anchor[2] + part.offset[2],
+    ], [part.size[0], part.size[1], part.size[2]], streetSignRoleMaterial(m, part.role),
+    {
+      solid: false,
+      shots: false,
+      cast: part.cast,
+      presentationOnly: true,
+      propId,
+      ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+    });
+    for (const side of ['north', 'south'] as const) {
+      const mesh = builder.root.getObjectByName(`nuketown2 ${side} ${id}`);
+      if (mesh) mesh.userData.presentationOnly = true;
+    }
+  }
+}
+
+/**
  * HF-536 night-facade-port. Resolve one facade ROLE onto THIS arena's registry.
  *
  * `src/forge-kit/facade.ts` also ships a `createFacadeMaterials()` that mints
@@ -4129,6 +4185,10 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // crosses it.
   pair(builder, 'verge sign board', [-16.6, 4.3, VERGE_FURNITURE_Z], [3.6, 1.8, 0.3], m.sign,
     { ballisticMaterial: 'thin-metal' });
+  // HF-536 night-gemini5: street signage and furniture kit
+  for (const placement of streetSignPropPlacements()) {
+    streetSignPairKit(builder, placement.propId, placement.anchor, placement.parts, m);
+  }
 }
 
 /**

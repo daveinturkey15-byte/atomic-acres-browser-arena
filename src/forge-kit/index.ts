@@ -139,3 +139,26 @@ export {
   type YardRole,
   yardPropPlacements,
 } from './yard';
+// HF-536 night-gemini5: street signage and furniture kit
+export {
+  BENCH_AND_BIN_TRIANGLES,
+  BOLLARD_TRIANGLES,
+  CHEVRON_BOARD_TRIANGLES,
+  FIRE_HYDRANT_TRIANGLES,
+  SPEED_ROUNDEL_TRIANGLES,
+  STOP_SIGN_TRIANGLES,
+  STREET_NAME_BLADE_TRIANGLES,
+  STREET_SIGN_BOX_TRIANGLES,
+  STREET_SIGN_ROLES,
+  benchAndBin,
+  bollard,
+  chevronBoard,
+  fireHydrant,
+  speedRoundel,
+  stopSign,
+  streetNameBlade,
+  streetSignPropPlacements,
+  type StreetSignPart,
+  type StreetSignPropPlacement,
+  type StreetSignRole,
+} from './street-signs';
