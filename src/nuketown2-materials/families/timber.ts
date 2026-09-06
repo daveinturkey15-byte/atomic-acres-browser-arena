@@ -19,6 +19,7 @@
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, linearSwatch } from '../wear';
+import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -30,6 +31,13 @@ const { abs, clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } 
 export const PICKET_PITCH_M = 0.146;
 /** Deck board pitch, metres (140 mm board + 5 mm gap). */
 export const DECK_PITCH_M = 0.145;
+
+/** A picket or deck board stands this proud of the rail behind it, metres. */
+const BOARD_PROUD_M = 0.019;
+/** Latewood bands stand proud of the softer earlywood after weathering, metres. */
+const GRAIN_RELIEF_M = 0.0006;
+/** A knot is harder than the board and weathers PROUD, metres. */
+const KNOT_RELIEF_M = 0.0011;
 
 export type TimberVariant = 'fence' | 'deck' | 'painted-trim';
 
@@ -48,9 +56,9 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
   });
 }
 
-let timberGraph: { colorNode: any; roughnessNode: any } | null = null;
+let timberGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (timberGraph) return timberGraph;
   const spec = timberSpec('nuketown2-timber-shared', 0x673b24, 'fence');
   const p = positionWorld;
@@ -79,9 +87,18 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
   const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
+  // RELIEF. The board face is proud of the gap behind it, the latewood bands
+  // stand out of the weathered face, and a knot weathers proud because it is
+  // denser than the board it sits in. Painted trim gets grain relief only: a
+  // paint film fills the gap and buries the grain.
+  const height = gap.mul(float(-BOARD_PROUD_M))
+    .add(latewood.sub(float(0.5)).mul(painted.select(float(GRAIN_RELIEF_M * 0.25), float(GRAIN_RELIEF_M * 2))))
+    .add(knot.mul(painted.select(float(KNOT_RELIEF_M * 0.3), float(KNOT_RELIEF_M))))
+    .add(boardTone.mul(float(0.004)));
   timberGraph = {
     colorNode: mix(footed, linearSwatch(0x1a120c), gap),
     roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
+    normalNode: reliefNormal(height),
   };
   return timberGraph;
 }
@@ -102,6 +119,7 @@ export function createTimberMaterial(
   const shared = sharedTimberGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 

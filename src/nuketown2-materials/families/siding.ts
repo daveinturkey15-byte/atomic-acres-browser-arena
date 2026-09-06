@@ -25,17 +25,41 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, wallUv } from '../wear';
+import { buildWear, linearSwatch, wallUv } from '../wear';
+import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
+import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
-const { abs, float, floor, fract, max, mix, positionWorld, smoothstep, vec3 } =
+const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2, vec3 } =
   TSL as unknown as Record<string, any>;
 
 /** Board exposure, metres. */
 export const SIDING_COURSE_M = 0.184;
 /** Butt-joint spacing along the run, metres. */
 const SIDING_BOARD_RUN_M = 3.6;
+
+/**
+ * How far a board's butt stands proud of the course beneath it, metres.
+ *
+ * A 7 1/4 in lap board is milled 11 mm at the butt and 5 mm at the top edge,
+ * so the exposed face is a shallow wedge and the butt overhangs the course
+ * below by the full 11 mm. THAT overhang is the whole reading of lap siding:
+ * a ladder of hard shadow lines under lit lips. The shipped material painted
+ * the shadow into the albedo and left the lip flat, which is why every wall in
+ * the arena read as a printed board rather than a built one.
+ */
+export const SIDING_LAP_PROUD_M = 0.010;
+/** A caulked butt joint between two boards recesses this far, metres. */
+const SIDING_JOINT_RELIEF_M = -0.0018;
+/** A nail head dimples the paint film this deep, metres. */
+const SIDING_NAIL_RELIEF_M = -0.0012;
+/**
+ * Paint fails at the BUTT first - the bottom edge takes the drip line, so the
+ * film lifts there and the primer shows. This is the fraction of a course, up
+ * from the butt, over which that failure is authored.
+ */
+const SIDING_BUTT_FAILURE = 0.16;
 
 export interface SidingOptions {
   /** Optional pale ground-floor paint. */
@@ -58,9 +82,9 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
   });
 }
 
-let sidingGraph: { colorNode: any; roughnessNode: any } | null = null;
+let sidingGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (sidingGraph) return sidingGraph;
   const spec = sidingSpec('nuketown2-siding-shared', 0x46809f);
   const p = positionWorld;
@@ -77,7 +101,17 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const nailHeight = abs(withinCourse.sub(float(0.136))).mul(float(SIDING_COURSE_M));
   const nail = smoothstep(float(0.004), float(0.0015), max(nailRun, nailHeight));
   const jointRun = uv.x.add(courseIdx.mul(float(1.15))).div(float(SIDING_BOARD_RUN_M));
-  const joint = smoothstep(float(0.0012), float(0.0), abs(fract(jointRun).sub(float(0.5))).mul(float(SIDING_BOARD_RUN_M)));
+  const joint = smoothstep(float(0.0035), float(0.0), abs(fract(jointRun).sub(float(0.5))).mul(float(SIDING_BOARD_RUN_M)));
+  // Per-BOARD paint variation. Two boards off the same tin never dry the same
+  // shade, and a wall of identical boards is one of the cheapest CG tells
+  // there is - the shipped graph had none, so every course was the exact same
+  // value from eaves to plinth.
+  const boardTone = hash2(vec2(floor(jointRun), courseIdx)).sub(float(0.5)).mul(float(0.075));
+  // Paint failure at the butt: the film lifts off the drip edge and the primer
+  // under it shows. A 22 % albedo step, which is the visible-wear rule
+  // (spec.ts MIN_ALBEDO_WEAR_STEP) applied where the failure actually starts.
+  const buttFailure = smoothstep(float(SIDING_BUTT_FAILURE), float(0.0), withinCourse)
+    .mul(smoothstep(float(0.30), float(0.78), wear.scuff));
   const isUpper = smoothstep(
     uniforms.sidingWainscotTop.sub(float(0.004)),
     uniforms.sidingWainscotTop.add(float(0.004)),
@@ -87,12 +121,34 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const base = (uniforms.sidingWainscot as any).greaterThan(float(0.5)).select(wainscotBase, uniforms.baseColor);
   const sunFade = smoothstep(float(1.2), float(5.2), p.y).mul(float(0.09));
   const splash = smoothstep(float(0.55), float(0.02), p.y).mul(float(0.16));
-  const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash));
-  const shadowed = mix(painted, painted.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
+  const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash)).mul(float(1).add(boardTone));
+  // Primer grey, not a darkening: paint failure on a saturated wall LIGHTENS
+  // and on a pale wall darkens slightly, which is what makes it read as bare
+  // undercoat rather than as dirt.
+  const failed = mix(painted, linearSwatch(0x9b9384).mul(wear.albedoMul), buttFailure.mul(float(0.55)));
+  const shadowed = mix(failed, failed.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
   const lit = mix(shadowed, shadowed.mul(float(1.12)), topCatch.mul(float(0.6)));
+  // RELIEF. The lap is a sawtooth in height: full proud at the butt
+  // (withinCourse -> 0), milled away to nothing at the top edge
+  // (withinCourse -> 1), then the next board's butt starts again. The constant
+  // slope over the face tilts each board ~3 deg out of the wall, which is what
+  // it really is; the discontinuity at the course line is the shadow.
+  const height = float(1).sub(withinCourse).mul(float(SIDING_LAP_PROUD_M))
+    .add(joint.mul(float(SIDING_JOINT_RELIEF_M)))
+    .add(nail.mul(float(SIDING_NAIL_RELIEF_M)))
+    .add(buttFailure.mul(float(-0.0006)));
   sidingGraph = {
     colorNode: mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5))),
-    roughnessNode: wear.roughness.add(dripShadow.mul(float(0.06))).add(splash.mul(float(0.10))).sub(sunFade.mul(float(0.30))),
+    roughnessNode: clamp(
+      wear.roughness
+        .add(dripShadow.mul(float(0.06)))
+        .add(splash.mul(float(0.10)))
+        .add(buttFailure.mul(float(0.22)))
+        .sub(sunFade.mul(float(0.30))),
+      float(0.20),
+      float(1.0),
+    ),
+    normalNode: reliefNormal(height),
   };
   return sidingGraph;
 }
@@ -125,6 +181,7 @@ export function createSidingMaterial(
   const shared = sharedSidingGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 

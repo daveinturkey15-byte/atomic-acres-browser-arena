@@ -1,0 +1,127 @@
+{
+  "task": "HF-536 NIGHT lane materials \u2014 reference stage (ART-FORGE ruleset Amendment A1/A2)",
+  "generatedUtc": "2026-09-06T18:04:00Z",
+  "route": "codex-cli 0.144.1 `codex exec --model gpt-5.6-luna` built-in image generation (owner ruling 2026-09-06 18:05: never OpenRouter credit; OpenAI via Luna authorised)",
+  "licence": "owner-authorised AI reference 2026-09-06",
+  "allowedUse": "reference",
+  "shipped": false,
+  "note": "Every tile below is an INPUT to the FIT stage only. Nothing here is loaded, decoded, atlased or sampled by the game; the shipped surfaces remain pure TSL node graphs with zero new samplers (device sampler budget untouched \u2014 see gotcha-silent-arena-rollback-device-limit). Measurements taken with scripts/forge/measure-reference-tile.mjs at an assumed 2.0 m tile span; the derived family constants live in the family sources and are pinned in src/nuketown2-materials/relief.test.ts.",
+  "tiles": [
+    {
+      "path": "docs/forge/references/asphalt.png",
+      "family": "asphalt",
+      "prompt": "1024x1024 seamless tileable texture reference of weathered dense-graded asphalt road surface, 10mm exposed aggregate stone visible in a dark bitumen matrix, one dark tar seam, faint tyre polish, photographic, neutral overcast lighting, top-down",
+      "measured": {
+        "lumaP50": 66.4,
+        "lumaP10": 50.4,
+        "lumaP90": 96.1,
+        "lumaStddev": 19.55,
+        "relativeSwing": 0.278,
+        "dominantFeatureM": 0.0313,
+        "coursedness": 1.34
+      },
+      "fittedTo": "AGGREGATE_M 0.022 (mid-scale stone, carried to 30 m), AGGREGATE_ALBEDO 0.085 signed (17 % peak-to-peak) against the tile's 27.8 % relative swing, AGGREGATE_RELIEF_M 0.0012, isotropic (coursedness 1.34) so no directional term"
+    },
+    {
+      "path": "docs/forge/references/marking.png",
+      "family": "asphalt (marking variant)",
+      "prompt": "1024x1024 seamless tileable texture reference of worn white thermoplastic road lane marking on asphalt, 30 percent paint loss, chipped abraded edges with aggregate showing through, tyre scuffing, photographic, neutral overcast lighting, top-down",
+      "measured": {
+        "lumaP50": 91.4,
+        "lumaP10": 73.7,
+        "lumaP90": 185.5,
+        "lumaStddev": 41.8,
+        "relativeSwing": 0.379
+      },
+      "fittedTo": "bimodal p10 73.7 (road showing through) vs p90 185.5 (intact film) is the paint-loss model: PAINT_LOSS_LO 0.53 / PAINT_LOSS_HI 0.66 over the shared LUT (scanned to a measured 0.30 loss fraction, inside brief 3a's 20-40 % band), MARKING_FILM_M 0.0028, chip edge modulated by the road's own aggregate field"
+    },
+    {
+      "path": "docs/forge/references/siding.png",
+      "family": "siding",
+      "prompt": "1024x1024 seamless tileable texture reference of painted cream-white horizontal lap weatherboard siding, 185mm board exposure, hard drip shadow line under every course, chalked and slightly peeling paint at the board butts, visible brush tooth, photographic, neutral overcast lighting, flat-on",
+      "measured": {
+        "lumaP50": 214.0,
+        "lumaP10": 130.7,
+        "lumaP90": 218.6,
+        "lumaStddev": 37.65,
+        "relativeSwing": 0.19,
+        "coursePeriodM": 0.2734,
+        "coursedness": 115.43
+      },
+      "fittedTo": "coursedness 115 confirms the course line is the dominant signal and must be RELIEF, not albedo: SIDING_LAP_PROUD_M 0.010. p10 130.7 against p50 214 is the drip-shadow band, already carried. boardTone 0.075 added for the per-board paint variation the shipped graph had none of. SIDING_COURSE_M stays 0.184 (R17 real dimension) rather than the tile's apparent 0.273 \u2014 the tile's true span is unknown."
+    },
+    {
+      "path": "docs/forge/references/block-wall.png",
+      "family": "concrete (block variant)",
+      "prompt": "1024x1024 seamless tileable texture reference of grey concrete masonry block wall, 390x190mm units in half bond, recessed 10mm mortar joints, per-block tone variation, dark damp weathering band along the bottom two courses, photographic, neutral overcast lighting, flat-on",
+      "measured": {
+        "lumaP50": 137.6,
+        "lumaP10": 100.7,
+        "lumaP90": 146.4,
+        "lumaStddev": 18.08,
+        "relativeSwing": 0.138,
+        "coursePeriodM": 0.0234,
+        "coursedness": 65.44
+      },
+      "fittedTo": "MORTAR_RECESS_M -0.005 (the tile's coursedness 65 is the joint, and a joint that is only albedo cannot produce it under a moving sun); WEATHER_BAND_M 0.55 from the tile's dark lower band; per-block tone already 0.11 and left alone (tile swing 0.138)"
+    },
+    {
+      "path": "docs/forge/references/roof.png",
+      "family": "roof",
+      "prompt": "1024x1024 seamless tileable texture reference of grey asphalt three-tab shingle roof, horizontal courses at 143mm exposure with soft shadow under each butt, 3mm keyway slots staggered per course, mineral granule texture, faint algae streaking, photographic, neutral overcast lighting, flat-on",
+      "measured": {
+        "lumaP50": 98.4,
+        "lumaP10": 69.6,
+        "lumaP90": 110.3,
+        "lumaStddev": 20.16,
+        "relativeSwing": 0.216,
+        "coursePeriodM": 0.2422,
+        "coursedness": 112.8
+      },
+      "fittedTo": "SHINGLE_BUTT_PROUD_M 0.004 and KEYWAY_RECESS_M -0.0035; GRANULE_RELIEF_M 0.0007 for the granule bed that stops the plane reading as plastic"
+    },
+    {
+      "path": "docs/forge/references/concrete.png",
+      "family": "concrete (apron/kerb variant)",
+      "prompt": "1024x1024 seamless tileable texture reference of poured concrete driveway apron, broom finish with fine parallel ridges, sawn control joint, oil staining, chipped edge, damp band, photographic, neutral overcast lighting, top-down",
+      "measured": {
+        "lumaP50": 146.3,
+        "lumaP10": 123.5,
+        "lumaP90": 159.6,
+        "lumaStddev": 14.84,
+        "relativeSwing": 0.103,
+        "coursedness": 18.81
+      },
+      "fittedTo": "SLAB_JOINT_RECESS_M -0.006 and BROOM_RELIEF_M 0.0008; the tile's low 10.3 % swing is why concrete's albedo terms were NOT raised \u2014 the family already exceeds it and the missing signal was relief, not contrast"
+    },
+    {
+      "path": "docs/forge/references/timber.png",
+      "family": "timber",
+      "prompt": "1024x1024 seamless tileable texture reference of weathered softwood fence pickets, silvered UV-bleached grain with darker latewood bands, knots, 3mm gaps between boards, dark damp foot, photographic, neutral overcast lighting, flat-on",
+      "measured": {
+        "lumaP50": 144.1,
+        "lumaP10": 65.0,
+        "lumaP90": 171.1,
+        "lumaStddev": 39.73,
+        "relativeSwing": 0.301,
+        "coursedness": 2.51
+      },
+      "fittedTo": "BOARD_PROUD_M 0.019 (the p10 65 against p50 144 is the gap between pickets, a depth not a stain), GRAIN_RELIEF_M 0.0006, KNOT_RELIEF_M 0.0011"
+    }
+  ],
+  "notGenerated": [
+    {
+      "family": "painted-metal",
+      "reason": "authored from the existing family's real dimensions (0.51 m sectional panel, 6 mm joint) \u2014 the tile budget was spent on the five families the critic named"
+    },
+    {
+      "family": "glass",
+      "reason": "out of budget this pass; glass relief is flat by definition and the family's only defect (metalness) was already fixed"
+    },
+    {
+      "family": "lawn",
+      "reason": "vegetation lane owns it"
+    }
+  ],
+  "storedResolution": "512x512 (committed). The 1024x1024 originals as generated are kept out of the repo at C:/Users/david/Desktop/stuff/aa-day-2026-09-06/lanes/night-materials/references-1024/ so a 1.7 GB docs tree does not grow by another 17 MB; every measurement in this file was taken at a 256x256 resample, so nothing here depends on the discarded resolution."
+}

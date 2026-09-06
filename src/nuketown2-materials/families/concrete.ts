@@ -30,7 +30,8 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear } from '../wear';
+import { boxUv, buildWear, linearSwatch } from '../wear';
+import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
@@ -44,6 +45,26 @@ export const SLAB_JOINT_M = 2.7;
 export const BLOCK_COURSE_M = 0.20;
 /** Blockwork stretcher length (390 mm unit + 10 mm perp joint), metres. */
 export const BLOCK_STRETCHER_M = 0.40;
+
+/**
+ * How deep a struck mortar joint sits below the block face, metres.
+ *
+ * A bucket-handle or weather-struck joint is raked back 4-6 mm. That recess is
+ * the ONLY reason a block wall reads as coursed masonry from 15 m: the joint's
+ * top lip shades and its bottom lip catches, so the wall carries a horizontal
+ * ladder of light. Painted flat into the albedo - which is what shipped - it is
+ * a grey line on a grey card, and the perimeter wall was the station the critic
+ * scored lowest on materials for exactly that reason.
+ */
+export const MORTAR_RECESS_M = -0.005;
+/** A sawn control joint in a slab is cut a quarter of the depth: 25 mm on a 100 mm pour. */
+const SLAB_JOINT_RECESS_M = -0.006;
+/** Broom-finish ridge height, metres. 1 mm is the real tooth of a concrete broom. */
+const BROOM_RELIEF_M = 0.0008;
+/** A spalled block face loses this much, metres. */
+const SPALL_RELIEF_M = -0.004;
+/** Height of the rain-wash weathering band above the foot, metres. */
+const WEATHER_BAND_M = 0.55;
 
 export type ConcreteVariant = 'apron' | 'kerb' | 'block';
 
@@ -69,9 +90,9 @@ export interface ConcreteOptions {
   readonly dampFootY?: number;
 }
 
-let concreteGraph: { colorNode: any; roughnessNode: any } | null = null;
+let concreteGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (concreteGraph) return concreteGraph;
   const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
   const p = positionWorld;
@@ -108,13 +129,34 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);
+  const spalled = mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7)));
+  // WEATHERING BAND. Rain runs off a wall and loads its lower half with grime
+  // and algae; the top stays washed. It is a 0.55 m gradient off the foot, one
+  // sided (dirt only ever subtracts) and tinted toward the soil colour rather
+  // than simply darkened, because grey concrete going grey-green is what the
+  // eye reads as weather and grey concrete going black is what it reads as a
+  // shadow bug.
+  const weatherBand = smoothstep(footY.add(float(WEATHER_BAND_M)), footY.add(float(0.05)), p.y)
+    .mul(isApron.select(float(0), float(1)))
+    .mul(wear.soilMask.mul(float(0.55)).add(float(0.45)));
+  const weathered = mix(spalled, spalled.mul(float(0.80)).mul(linearSwatch(0xb8b6a4).mul(float(1.35))), weatherBand.mul(float(0.34)));
+  // RELIEF. Mortar recess, sawn joint, broom tooth and spall, in metres.
+  const height = joint.mul(isBlock.select(float(MORTAR_RECESS_M), float(SLAB_JOINT_RECESS_M)))
+    .add(relief.mul(float(BROOM_RELIEF_M)))
+    .add(spall.mul(float(SPALL_RELIEF_M)))
+    .add(unit.mul(float(0.004)));
   concreteGraph = {
-    colorNode: mix(jointed, jointed.mul(float(1.22)), spall.mul(float(0.7))),
+    colorNode: weathered,
     roughnessNode: clamp(
-      wear.roughness.add(joint.mul(float(0.05))).sub(damp.mul(float(0.14))).add(relief.mul(float(0.05))),
+      wear.roughness
+        .add(joint.mul(float(0.05)))
+        .add(weatherBand.mul(float(0.08)))
+        .sub(damp.mul(float(0.14)))
+        .add(relief.mul(float(0.05))),
       float(0.25),
       float(1.0),
     ),
+    normalNode: reliefNormal(height),
   };
   return concreteGraph;
 }
@@ -142,6 +184,7 @@ export function createConcreteMaterial(
   const shared = sharedConcreteGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
 

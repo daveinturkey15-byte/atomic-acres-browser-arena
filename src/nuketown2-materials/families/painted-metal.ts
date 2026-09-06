@@ -23,6 +23,7 @@
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { boxUv, buildWear, linearSwatch } from '../wear';
+import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
@@ -31,6 +32,15 @@ const { abs, clamp, float, fract, max, mix, positionWorld, smoothstep } =
 
 /** Sectional door panel height, metres. */
 export const DOOR_PANEL_M = 0.51;
+
+/** The shadow line between two sectional door panels is a real 6 mm gap, metres. */
+const PANEL_JOINT_RECESS_M = -0.006;
+/** A stamped section is pressed this far out of the panel face, metres. */
+const STAMP_RELIEF_M = 0.004;
+/** A paint chip is a 0.1 mm ledge - too small to shade, but it breaks the specular edge. */
+const CHIP_RELIEF_M = -0.00012;
+/** Orange peel: the 0.9 mm cell structure of a sprayed film, metres. It is the reason a real door is not a mirror. */
+const ORANGE_PEEL_M = 0.00006;
 
 export function paintedMetalSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
   return assertSpec({
@@ -56,9 +66,9 @@ export interface PaintedMetalOptions {
   readonly metalness?: number;
 }
 
-let paintedMetalGraph: { colorNode: any; roughnessNode: any } | null = null;
+let paintedMetalGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
-function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
+function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (paintedMetalGraph) return paintedMetalGraph;
   const spec = paintedMetalSpec('nuketown2-painted-metal-shared', 0xaebdc1);
   const p = positionWorld;
@@ -81,9 +91,18 @@ function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any;
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
   const stamped = mix(rusted, rusted.mul(float(0.62)), panelShade);
+  // RELIEF. Panel joint, stamped section, chip ledge and the orange peel of
+  // the spray film itself. The peel is 60 microns and will never shade, but it
+  // is what perturbs the specular so a door highlight moves like paint rather
+  // than sliding like a mirror.
+  const height = panelShade.mul(float(PANEL_JOINT_RECESS_M))
+    .add(stampLift.mul(float(STAMP_RELIEF_M)))
+    .add(chip.mul(float(CHIP_RELIEF_M)))
+    .add(wear.grain.mul(float(ORANGE_PEEL_M)));
   paintedMetalGraph = {
     colorNode: mix(stamped, stamped.mul(float(1.08)), stampLift.mul(float(0.4))),
     roughnessNode: clamp(wear.roughness.add(chalk.mul(float(0.28))).add(chip.mul(float(0.30))).add(weep.mul(float(0.24))), float(0.15), float(1.0)),
+    normalNode: reliefNormal(height),
   };
   return paintedMetalGraph;
 }
@@ -111,5 +130,6 @@ export function createPaintedMetalMaterial(
   const shared = sharedPaintedMetalGraph(uniforms);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
   return mat;
 }
