@@ -2922,6 +2922,16 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       // W4-374 roof rails: a chrome pair riding the crowned roof run. Merged
       // into the existing chrome bucket: no new material, no new draw.
       roofRails: { x: [0.62, -0.62], z0: 1.7, z1: 7.5, bucket: 'chrome' },
+      // HF-536 (night-kit). A wing mirror on each side of the screen. It is a
+      // small part with a large job: a 9.1 m lofted slab has NOTHING outboard
+      // of its own skin, so at `coach-elevation` its silhouette is one clean
+      // curve top to bottom. Two arms and two heads break that outline where
+      // the eye reads a vehicle's face. Mounted at z 1.28 (just aft of the
+      // screen run, which ends at 1.12) and y 2.42, a real driver's eye line;
+      // the arm reaches x 1.16-1.44 against a body half-width of 1.20 at that
+      // height, so the head stands 0.30 m proud of the flank. Chrome bucket:
+      // no new material, no new draw call.
+      mirrors: [{ x: 1.30, y: 2.42, z: 1.28 }],
       // HF-536 (R14). The coach floated: sun reached under the whole 9.1 m
       // sill and the far kerb showed through the gap. One dark block between
       // the arches (0.24 -> sill 0.4) and one contact pool inside its own
@@ -3029,11 +3039,21 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     underbody: { y0: 0.18, y1: 0.23, insetM: 0.25 },
     contactShadow: true,
   };
+  // HF-536 (night-kit). Door mirrors on both saloons and the coupe. The loft
+  // already carries the shut lines (SEDAN_SPEC.shutLines 1.42 / 2.6 / 3.58),
+  // the bumpers and the bezelled lamps, so the one thing missing from a car
+  // read at 4 m - `vehicle-near` is the station that judges it - was anything
+  // standing OFF the skin. Mounted at the A-pillar foot: z 1.70 (the side
+  // glass starts at 1.64), y 1.34 on the door skin, arm x 0.72-1.00 and head
+  // out to x 1.04 against a body half-width of ~0.90 there, so it clears the
+  // flank by 0.14 m and reads against the sky from the pavement.
+  const doorMirrors = [{ x: 0.86, y: 1.34, z: 1.70 }] as const;
   const sedanDressing = {
     wheelStyle: 'whitewall' as const,
     headLamps: { x: 0.66, y: 0.84, radius: 0.115 },
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
+    mirrors: doorMirrors,
     ...groundedDressing,
   };
   // The driveway coupe: same SEDAN_SPEC envelope (the collider boxes own it),
@@ -3047,6 +3067,10 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     bumperY: 0.40,
     stripe: { y: 0.90, bucket: 'chrome' as const, z0: 0.35, z1: 4.05, height: 0.06, proud: 0.014 },
     grille: { y: 0.70, width: 1.10, height: 0.26, depth: 0.10, barCount: 4 },
+    // The coupe's mirror sits 60 mm lower and 80 mm further forward than the
+    // saloon's, on the same arm: a period coupe hangs it off the wing, not the
+    // door, and the difference is visible at `vehicle-near`.
+    mirrors: [{ x: 0.86, y: 1.28, z: 1.62 }],
     ...groundedDressing,
   };
   // HF-477's two street cars are dressed by the shared forge paint graph. Both
