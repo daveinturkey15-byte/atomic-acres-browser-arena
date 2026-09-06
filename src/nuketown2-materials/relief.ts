@@ -43,6 +43,16 @@
  * m/m. That is what lets a family author "the mortar joint is 5 mm deep" and
  * get a 5 mm joint at every range, and what lets a unit test pin the number.
  *
+ * NYQUIST IS A HARD RULE FOR A HEIGHT FIELD, not the soft one it is for an
+ * albedo field. A sub-pixel albedo pattern averages to a flat tint and nothing
+ * moves; a sub-pixel HEIGHT pattern differentiates into a random number per
+ * pixel, and on any surface this arena's authored sky floors near luma 6 that
+ * random tilt goes exact-black as speckle. Every term a family adds to its
+ * height must therefore carry a distance falloff that kills it before its
+ * feature crosses the 2 px floor `spec.ts` defines - and note that the review
+ * capture is 1280x720 while `spec.ts` computes that floor at 1080 lines, so a
+ * feature at the floor is 1.33 px in the frames the gates actually score.
+ *
  * SLOPE CLAMP. A lap-siding course or a shingle butt is a genuine STEP in the
  * height field, and a step differentiated across one pixel is an unbounded
  * slope: at 2 m a 10 mm step spans a 1.2 mm pixel, i.e. a slope of 8. Left

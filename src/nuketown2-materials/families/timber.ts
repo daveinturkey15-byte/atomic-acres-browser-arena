@@ -18,7 +18,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, detailFalloff, linearSwatch } from '../wear';
 import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
@@ -34,8 +34,17 @@ export const DECK_PITCH_M = 0.145;
 
 /** A picket or deck board stands this proud of the rail behind it, metres. */
 const BOARD_PROUD_M = 0.019;
-/** Latewood bands stand proud of the softer earlywood after weathering, metres. */
+/**
+ * Latewood bands stand proud of the softer earlywood after weathering, metres.
+ *
+ * Faded over the same band as the concrete broom and for the same reason: the
+ * latewood phase is a 2.2 mm sawtooth, and a height sampled below Nyquist
+ * differentiates into per-pixel noise rather than into shading. Full strength
+ * inside 1.2 m, gone by 3 m.
+ */
 const GRAIN_RELIEF_M = 0.0006;
+const GRAIN_RELIEF_NEAR_M = 1.2;
+const GRAIN_RELIEF_FAR_M = 3.0;
 /** A knot is harder than the board and weathers PROUD, metres. */
 const KNOT_RELIEF_M = 0.0011;
 
@@ -92,7 +101,9 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   // denser than the board it sits in. Painted trim gets grain relief only: a
   // paint film fills the gap and buries the grain.
   const height = gap.mul(float(-BOARD_PROUD_M))
-    .add(latewood.sub(float(0.5)).mul(painted.select(float(GRAIN_RELIEF_M * 0.25), float(GRAIN_RELIEF_M * 2))))
+    .add(latewood.sub(float(0.5))
+      .mul(painted.select(float(GRAIN_RELIEF_M * 0.25), float(GRAIN_RELIEF_M * 2)))
+      .mul(detailFalloff(GRAIN_RELIEF_NEAR_M, GRAIN_RELIEF_FAR_M)))
     .add(knot.mul(painted.select(float(KNOT_RELIEF_M * 0.3), float(KNOT_RELIEF_M))))
     .add(boardTone.mul(float(0.004)));
   timberGraph = {

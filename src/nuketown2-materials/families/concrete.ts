@@ -30,7 +30,7 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear, detailFalloff, linearSwatch } from '../wear';
 import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
@@ -59,8 +59,28 @@ export const BLOCK_STRETCHER_M = 0.40;
 export const MORTAR_RECESS_M = -0.005;
 /** A sawn control joint in a slab is cut a quarter of the depth: 25 mm on a 100 mm pour. */
 const SLAB_JOINT_RECESS_M = -0.006;
-/** Broom-finish ridge height, metres. 1 mm is the real tooth of a concrete broom. */
+/**
+ * Broom-finish ridge height, metres. 0.8 mm is the real tooth of a concrete broom.
+ *
+ * FADED, AND THIS IS THE RULE NOT THE EXCEPTION. The broom pattern is a 2.5 mm
+ * sawtooth. As an ALBEDO term that is harmless when it goes sub-pixel: it
+ * averages to a uniform 4.5 % darkening and nothing moves. As a HEIGHT term it
+ * is not harmless, because the normal is the DERIVATIVE of the height, and the
+ * derivative of a signal sampled below Nyquist is a random number per pixel.
+ * Measured on capture night-materials-2 at
+ * nuketown2-truck-cab-near (284,709)-(326,719): 106 of 462 pixels exact-black
+ * against 0 in forge-final, as speckle, on the closest apron in the frame -
+ * random normals tilting off the sky on ground the authored sky already floors
+ * near luma 6.
+ *
+ * 2.5 mm subtends 2 px at 1.35 m on the 1280x720 review capture, so the term
+ * is authored to be at full strength inside 1.2 m and gone by 3 m - the same
+ * treatment `wear.ts` already gives its 1 mm grain, for the same reason.
+ */
 const BROOM_RELIEF_M = 0.0008;
+/** Distance band over which the broom relief is real, metres. See above. */
+const BROOM_RELIEF_NEAR_M = 1.2;
+const BROOM_RELIEF_FAR_M = 3.0;
 /** A spalled block face loses this much, metres. */
 const SPALL_RELIEF_M = -0.004;
 /** Height of the rain-wash weathering band above the foot, metres. */
@@ -142,7 +162,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const weathered = mix(spalled, spalled.mul(float(0.80)).mul(linearSwatch(0xb8b6a4).mul(float(1.35))), weatherBand.mul(float(0.34)));
   // RELIEF. Mortar recess, sawn joint, broom tooth and spall, in metres.
   const height = joint.mul(isBlock.select(float(MORTAR_RECESS_M), float(SLAB_JOINT_RECESS_M)))
-    .add(relief.mul(float(BROOM_RELIEF_M)))
+    .add(relief.mul(float(BROOM_RELIEF_M)).mul(detailFalloff(BROOM_RELIEF_NEAR_M, BROOM_RELIEF_FAR_M)))
     .add(spall.mul(float(SPALL_RELIEF_M)))
     .add(unit.mul(float(0.004)));
   concreteGraph = {
