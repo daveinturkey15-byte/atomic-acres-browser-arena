@@ -116,7 +116,6 @@ import {
 } from './nuketown-forest-surround';
 import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField } from './nuketown-lawn-field';
 import { buildNuketown2Vegetation } from './nuketown2-vegetation';
-import { buildNuketown2Effects } from './nuketown2-effects';
 import {
   createNuketown2GrimeMaterials,
   nuketown2GrimeDecals,
@@ -1142,8 +1141,6 @@ type Nuketown2Materials = Readonly<{
   /** The up-and-over garage door leaf parked in its head. */
   garageDoor: THREE.Material;
   trim: THREE.Material;
-  /** DAY-VISUAL-C: lit street-lamp diffuser (glass family, scalar emissive). */
-  lampHead: THREE.Material;
   /** HF-434: the road DASHES - polygonOffset tier -2, over the -1 road. */
   trimDecal: THREE.Material;
   roof: THREE.Material;
@@ -1332,7 +1329,6 @@ function nuketown2Materials(): Nuketown2Materials {
     garageDoor: forged.garageDoor,
     // `white`, the shipped map's trim: sills, heads, lintels, road dashes.
     trim: forged.trim,                               // SOLID users: sills, heads, lintels
-    lampHead: forged.lampHead,                       // SOLID user: the two verge lamp heads
     trimDecal: forged.trimDecal,
     roof: forged.roof,
     // plaster-warm: interior walls, floors, stairs and the ground-room bodies.
@@ -3323,7 +3319,7 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
     pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
       { solid: false, shots: false, cast: false, presentationOnly: true });
-    pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.lampHead,
+    pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.trim,
       { solid: false, shots: false, cast: false, presentationOnly: true });
   }
   // ---- HF-477: THE FURNITURE LINE, AND WHY IT IS A LINE ---------------------
@@ -3861,16 +3857,6 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   const vegetation = buildNuketown2Vegetation(builder.root);
   builder.root.userData.nuketown2VegetationStats = vegetation.stats;
 
-  // ---- DAY-VISUAL-C: bounded golden-hour effects ---------------------------
-  // Sun-shaft/dust quads leaning toward the low sun (src/nuketown2-effects.ts,
-  // the farcrysis-atmosphere pattern: additive, fog:false, zero per-frame
-  // allocation). Built AFTER the presentation batcher like the lawn and the
-  // vegetation — plain meshes are not batch candidates — with no colliders and
-  // no lights, and advanced through the ONE existing hook below: no new
-  // per-frame call site, no new traversal.
-  const effects = buildNuketown2Effects(builder.root);
-  builder.root.userData.nuketown2EffectsStats = effects.stats;
-
   // legacy-main drives this through `updateArenaArt`, the same one uniform
   // write per frame the shipped map's lawn takes. The sway itself is GPU-side.
   // Both wind consumers ride the ONE existing hook - no new per-frame call
@@ -3878,7 +3864,6 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   builder.root.userData.nuketownLawnWind = (seconds: number) => {
     lawn.advanceWind(seconds);
     vegetation.advanceWind(seconds);
-    effects.advance(seconds);
   };
   // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
   builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
