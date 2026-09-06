@@ -50,6 +50,14 @@ const RENDERER = arg('--renderer', 'webgpu');
 let BASE = arg('--url', 'http://127.0.0.1:41911');
 const LABEL = arg('--label', null);
 const SETTLE_MS = Number(arg('--settle-ms', '5000'));
+// --review-hold-ms: extra hold AFTER the presentation receipt commits and
+// BEFORE sample 0. The receipt says the camera pose is presented; it does not
+// say the renderer has converged (static shadow refresh, lighting writes).
+// Measured 2026-09-06 (shadow-floor lane): the same bundle at the same station
+// is bistable at the shipped ~900 ms window and stable to 0.01 points when the
+// frame is held 6000 ms. Default 0 keeps the historical contract; the root
+// gate runs pass 6000.
+const REVIEW_HOLD_MS = Number(arg('--review-hold-ms', '0'));
 const PER_ARENA_MS = Number(arg('--per-arena-ms', '150000'));
 const VIEWPORT = (() => {
   const [w, h] = arg('--viewport', '1280x720').split('x').map(Number);
@@ -307,6 +315,7 @@ try {
           const samplePaths = [];
           let sampleTelemetry = null;
           let failure = null;
+          if (REVIEW_HOLD_MS > 0) await page.waitForTimeout(REVIEW_HOLD_MS);
           for (let sample = 0; sample < SAMPLES; sample += 1) {
             if (sample > 0) await page.waitForTimeout(400 + 350 * sample);
             // Pixel-time proof, not just commit-time: re-read the
@@ -398,6 +407,7 @@ try {
     viewport: VIEWPORT,
     seed: SEED,
     settleMs: SETTLE_MS,
+    reviewHoldMs: REVIEW_HOLD_MS,
     samples: SAMPLES,
     capturedAt: new Date().toISOString(),
     environmentInvalid,
