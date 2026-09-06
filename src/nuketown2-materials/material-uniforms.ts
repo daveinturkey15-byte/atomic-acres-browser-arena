@@ -86,14 +86,46 @@ const DEFAULTS: Record<string, UniformValue> = {
  * but NodeBuilder.getNodeUniform() maps it to ColorNodeUniform, whose update
  * path reads `.r/.g/.b`. Pinning 'vec3' would allocate a Vector3NodeUniform,
  * which reads `.x/.y/.z` off a Color and writes undefined -> NaN again.
+ *
+ * The declared type is only half of it. The VALUE arriving here must also be a
+ * THREE.Color, and `Material.clone()` breaks that: three r185
+ * `Material.copy()` (materials/Material.js:1172) does
+ * `this.userData = JSON.parse( JSON.stringify( source.userData ) )`, and
+ * `Color.toJSON()` returns `getHex()` - a raw NUMBER. So every arena material
+ * built by cloning a Nuke Town family material for its own polygon-offset
+ * decal tier (`nuketown2-balcony-rail-cap`, `nuketown2-yard-butt-pad`,
+ * `nuketown2-perimeter-wall-end`, `nuketown2-exterior-stair-riser`) carries
+ * `userData.nuketown2Uniforms.baseColor` as a hex number. Feeding that to the
+ * shared node makes `UniformsGroup.updateColor()` read `v.r` off a Number,
+ * write `undefined` into the Float32Array (NaN), and - because the
+ * `a[offset] !== v.r` guard compares NaN with undefined - re-write NaN on
+ * every frame forever. Measured 2026-09-06: the timber/trim object uniform
+ * buffer held NaN in slots 0-2 (nodeUniform0 = baseColor) while every other
+ * nuketown2 program's buffer was finite. Hence the type check below.
  */
 function materialUniform(name: string): any {
   const value = DEFAULTS[name];
-  const node = (value instanceof THREE.Color ? uniform(value, 'color') : uniform(value, 'float')) as any;
+  const wantsColor = value instanceof THREE.Color;
+  const node = (wantsColor ? uniform(value, 'color') : uniform(value, 'float')) as any;
   node.onObjectUpdate((frame: { material?: THREE.Material | null }) => {
     const values = (frame.material as (THREE.Material & { userData?: Record<string, any> }) | null | undefined)
       ?.userData?.nuketown2Uniforms;
-    if (values?.[name] !== undefined) node.value = values[name];
+    const raw = values?.[name];
+    if (raw === undefined) return;
+    if (!wantsColor) {
+      if (typeof raw === 'number' && Number.isFinite(raw)) node.value = raw;
+      return;
+    }
+    if (raw instanceof THREE.Color) { node.value = raw; return; }
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      // Repair a JSON-degraded clone in place (see the block comment above), so
+      // the cost is paid once per cloned material rather than once per draw.
+      const repaired = new THREE.Color().setHex(raw, THREE.SRGBColorSpace);
+      values[name] = repaired;
+      node.value = repaired;
+    }
+    // Anything else (null, string, plain object) is dropped: a colour slot must
+    // never be handed a value whose .r/.g/.b are undefined.
   });
   return node;
 }
