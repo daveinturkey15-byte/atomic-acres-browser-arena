@@ -47,8 +47,8 @@
  * height field, and a step differentiated across one pixel is an unbounded
  * slope: at 2 m a 10 mm step spans a 1.2 mm pixel, i.e. a slope of 8. Left
  * unclamped that flips the normal past grazing and sparkles. `MAX_RELIEF_SLOPE`
- * caps it at 2.5 (68 deg), which keeps the step reading as a hard lit/shadow
- * pair without ever inverting the facing.
+ * caps it, which keeps the step reading as a hard lit/shadow pair without ever
+ * inverting the facing; see that constant for the measurement that set it.
  */
 import * as TSL from 'three/tsl';
 
@@ -58,12 +58,17 @@ const { clamp, faceDirection, float, length, max, normalView, positionView } =
 /**
  * Steepest surface gradient any relief term may produce, in m/m.
  *
- * 2.5 is tan(68 deg). Chosen as the largest slope that still leaves the
- * perturbed normal on the same side of the geometric one at the grazing angles
- * this arena's key light throws (sun bearing (-0.853, +0.522), elevation ~14
- * deg at `tod=authored`), so a step can never render as a hole.
+ * 1.4 is tan(54 deg). It began at 2.5 (tan 68 deg) - the largest slope that
+ * still leaves the perturbed normal on the same side of the geometric one, so
+ * a step can never render as a hole. Capture night-materials-1 measured the
+ * second-order cost of a tilt that large: on surfaces this arena's authored
+ * sky already floors near luma 6, tilting the normal off the sky loses enough
+ * ambient to cross the exact-black clamp, and the newly-black mask was a
+ * scatter of single pixels on shadowed asphalt. 1.4 keeps every authored step
+ * (the steepest is the siding lap at 11 mm over its transition) reading as a
+ * hard lit/shadow pair while halving the worst-case ambient loss.
  */
-export const MAX_RELIEF_SLOPE = 2.5;
+export const MAX_RELIEF_SLOPE = 1.4;
 
 /**
  * Below this world-space pixel size the derivative is trusted; below it the

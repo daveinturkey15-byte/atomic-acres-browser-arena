@@ -55,10 +55,36 @@ const CARRIAGEWAY_HALF_M = 5.3;
 const AGGREGATE_M = 0.022;
 const AGGREGATE_NEAR_M = 14;
 const AGGREGATE_FAR_M = 30;
-/** Peak signed albedo swing of the aggregate term, as a fraction of base: 17 % peak-to-peak. */
-const AGGREGATE_ALBEDO = 0.085;
-/** Height of a proud stone face above the bitumen matrix, metres. */
-const AGGREGATE_RELIEF_M = 0.0012;
+/**
+ * Peak albedo LIFT of the aggregate term, as a fraction of base: 17 % of the
+ * road's value, applied ONE-SIDED.
+ *
+ * MEASURED CORRECTION (capture night-materials-1). The first version applied
+ * this symmetrically, +-8.5 %. On lit asphalt that is right and reads well; in
+ * the shadow footprint under the coach - which this arena's authored sky
+ * already floors at luma 6-9, a known art defect the shadow-floor lane owns -
+ * the DOWNWARD half of the swing pushed a scatter of pixels under the
+ * exact-black clamp. Measured: coach-elevation exact-black 1.81 % -> 3.73 %,
+ * appliance-bank-south 0.66 % -> 2.18 %, and a newly-black mask showed 100 %
+ * of it as aggregate speckle on shadowed carriageway and nothing else.
+ *
+ * One-sided is also the more honest physics: an exposed stone face is
+ * POLISHED and LIGHTER than the bitumen matrix around it, which is why a real
+ * road reads as pale grit on black rather than as black grit on grey. The
+ * matrix is the base value and the stone lifts off it, so the darkest the
+ * surface gets is unchanged and the shadow floor is left exactly where the
+ * shadow lane found it.
+ */
+const AGGREGATE_ALBEDO = 0.17;
+/**
+ * Height of a proud stone face above the bitumen matrix, metres.
+ *
+ * 1.2 -> 0.9 mm in the same correction: the relief tilt is the second half of
+ * the shadow-floor speckle (a normal tilted off the sky loses ambient), and
+ * 0.9 mm is still 1.6 px of shading at the 3 m the road is read from at
+ * `driveway-apron-close`.
+ */
+const AGGREGATE_RELIEF_M = 0.0009;
 /** A bitumen overband on a sealed joint stands this proud, metres (real: 2-4 mm). */
 const SEAM_RELIEF_M = 0.003;
 /** A cold patch is sawn out and re-laid slightly high; its saw-cut edge is the hardest step on the road. */
@@ -132,11 +158,14 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   const edgeAbrasion = smoothstep(float(CARRIAGEWAY_HALF_M - EDGE_ABRASION_M), float(CARRIAGEWAY_HALF_M), abs(p.z));
 
   const road = uniforms.baseColor.mul(wear.albedoMul);
-  const stoned = road.mul(float(1).add(aggregate.mul(float(AGGREGATE_ALBEDO))));
+  // ONE-SIDED: stone lifts off the matrix, the matrix is the floor. See
+  // AGGREGATE_ALBEDO for the measurement that forced this.
+  const stone = max(aggregate, float(0));
+  const stoned = road.mul(float(1).add(stone.mul(float(AGGREGATE_ALBEDO))));
   const patched = mix(stoned, linearSwatch(0x2b2c2d).mul(wear.albedoMul), patch);
   const polished = patched.mul(float(1).add(wheel.mul(float(0.17))));
   const stained = polished.mul(float(1).sub(channel.mul(float(0.13))));
-  const ravelled = stained.mul(float(1).add(edgeAbrasion.mul(aggregate).mul(float(0.10))));
+  const ravelled = stained.mul(float(1).add(edgeAbrasion.mul(stone).mul(float(0.16))));
   const roadColor = mix(ravelled, linearSwatch(0x1f2021), max(seam, crack.mul(float(0.8))));
 
   // MARKINGS. The loss field is deliberately NOT `wear.scuff`: scuff is faded
@@ -155,13 +184,13 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   const markingBase = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).sub(scrub.mul(float(0.30))));
   const markingColor = mix(
     markingBase,
-    linearSwatch(0x3b3d3e).mul(float(1).add(aggregate.mul(float(AGGREGATE_ALBEDO)))),
+    linearSwatch(0x3b3d3e).mul(float(1).add(stone.mul(float(AGGREGATE_ALBEDO)))),
     paintLoss,
   );
 
   const roadRoughness = clamp(
     wear.roughness
-      .add(aggregate.mul(float(0.12)))
+      .add(stone.mul(float(0.16)))
       .add(edgeAbrasion.mul(float(0.10)))
       .sub(wheel.mul(float(0.16)))
       .sub(seam.mul(float(0.40)))
@@ -188,6 +217,9 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
     .add(crack.mul(float(CRACK_RELIEF_M)))
     .add(wheel.mul(float(WHEEL_RUT_M)))
     .add(edgeAbrasion.mul(aggregate).mul(float(AGGREGATE_RELIEF_M)));
+  // NOTE the relief keeps the SIGNED field: a height map is symmetric even
+  // when the albedo is not, because the matrix between two stones really is
+  // below them. Only the albedo needed to become one-sided.
   // A marking is a FILM laid on that road: it keeps the road's own relief
   // where the paint has gone and replaces it with a flat 2.8 mm plateau where
   // it has not, so the bar has a real edge to catch the sun on.
