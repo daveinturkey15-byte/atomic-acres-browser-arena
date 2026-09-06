@@ -176,7 +176,9 @@ describe('Nuke Town forest surround', () => {
       minValue = Math.min(minValue, colorAttribute.getX(vertex));
     }
     // Undersides darken; nothing is lightened (tint-cannot-lighten gotcha).
-    expect(minValue).toBeLessThanOrEqual(0.63);
+    // 0.80 pins the HF-536 forge-3 measurement: at 0.62 the shadow-flank tiers
+    // fell into the exact-black band under the authored golden-hour sky.
+    expect(minValue).toBeLessThanOrEqual(0.81);
     expect(minValue).toBeGreaterThan(0);
 
     forest.dispose();
