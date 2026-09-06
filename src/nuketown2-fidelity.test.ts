@@ -3039,13 +3039,15 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
    * anybody noticing. Raising either is a decision, made here, with the new
    * measured number and the reason in the commit.
    *
-   * FURNITURE boxes, MEASURED 70 on this tree: 30 authored bodies before this
-   * pass, minus the 4 single-box lamp heads it replaces, plus the lantern head
-   * (7 boxes x 2 posts x 2 halves = 28) and the planter coping (4 boxes x 2
-   * planters x 2 halves = 16). PROPS over the same set: 34 of a ceiling of 36.
-   */
-  const NUKETOWN2_VERGE_FURNITURE_BOX_FENCE = 70;
-  /** Verge FURNITURE boxes plus the 15 ground-dressing lawn tiles that share the prefix. MEASURED 85. */
+  * FURNITURE boxes, MEASURED 78 on this tree: 30 authored bodies before this
+  * pass, minus the 4 single-box lamp heads it replaces, plus the lantern head
+  * (7 boxes x 2 posts x 2 halves = 28) and the planter coping (4 boxes x 2
+  * planters x 2 halves = 16), plus the night-muse-lamps pool pass (one light
+  * pool + one cone highlight x 2 posts x 2 halves = 8, sharing the head's
+  * prop id so PROPS stay 34 of a ceiling of 36).
+  */
+  const NUKETOWN2_VERGE_FURNITURE_BOX_FENCE = 78;
+  /** Verge FURNITURE boxes plus the 15 ground-dressing lawn tiles that share the prefix. MEASURED 93. */
   const NUKETOWN2_VERGE_BODY_BOX_FENCE = NUKETOWN2_VERGE_FURNITURE_BOX_FENCE + 15;
 
   it('keeps the front verge open - no street-furniture class the reference does not have', () => {

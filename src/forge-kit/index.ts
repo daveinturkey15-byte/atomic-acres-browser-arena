@@ -16,6 +16,17 @@ export {
   lanternHeadParts,
 } from './lantern-head';
 export {
+  LAMP_POOL_COLOR_HEX,
+  LAMP_POOL_OPACITY,
+  LAMP_POOL_RADIUS,
+  LAMP_POOL_SLAB_H,
+  LAMP_POOL_TRIANGLES,
+  LAMP_POOL_Y,
+  LAMP_POST_HIGHLIGHT,
+  getLampPoolMaterial,
+  lampPoolParts,
+} from './lamp-pool';
+export {
   GUTTER_DOWNPIPE,
   GUTTER_RUN_TRIANGLES,
   GUTTER_TROUGH,

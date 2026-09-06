@@ -196,7 +196,7 @@ import {
 } from './forge-kit/interior/prefabs';
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
-import { type ForgeKitBox, gutterRunParts, kerbCourseParts, lanternHeadParts } from './forge-kit';
+import { type ForgeKitBox, getLampPoolMaterial, gutterRunParts, kerbCourseParts, lampPoolParts, lanternHeadParts } from './forge-kit';
 // HF-536 night-facade-port: the facade module's recipe, as PARTS.
 import {
   type FacadePart,
@@ -1078,6 +1078,13 @@ function pair(
     northMesh.userData.nuketown2Prop = `north ${options.propId}`;
     southMesh.userData.nuketown2Prop = `south ${options.propId}`;
   }
+  // The flag `box()` cannot carry: it declares presentation-only authority
+  // the same way `streetVehicle` already does. Without it every kit part
+  // silently joins `solidMeshes` in the fidelity gate.
+  if (options.presentationOnly) {
+    northMesh.userData.presentationOnly = true;
+    southMesh.userData.presentationOnly = true;
+  }
 }
 /**
  * HF-536 NIGHT-MUSE-INTERIORS — emit one forge-kit interior prefab through
@@ -1182,6 +1189,7 @@ function centred(
   const mesh = box(builder, `nuketown2 ${name}`,
     [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
   if (options.propId) mesh.userData.nuketown2Prop = options.propId;
+  if (options.presentationOnly) mesh.userData.presentationOnly = true;
   return mesh;
 }
 
@@ -3753,6 +3761,10 @@ function forgeKitMaterial(m: Nuketown2Materials, role: ForgeKitBox['role']): THR
     case 'warmLight': return m.warmLight;
     case 'block': return m.block;
     case 'kerb': return m.kerb;
+    // HF-536 (night-muse-lamps, Amendment B): the additive light pool. No
+    // existing role is additive, so the prefab owns one shared instance -
+    // one material, one graph, one static batch for the whole arena.
+    case 'lampPool': return getLampPoolMaterial();
     case 'trim': default: return m.trim;
   }
 }
@@ -3930,6 +3942,13 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
     // (R2/R5), and the lighting lane's bloom is what makes it glow.
     forgeKitPair(builder, m, `verge ${lamp.id} lamp head`,
       [lamp.x, lamp.fixtureY, lamp.z], lanternHeadParts());
+    // HF-536 (night-muse-lamps). The pool and the cone highlight share the
+    // head's prop id, so the declutter ratchet keeps counting one prop per
+    // lamp, and the lane's one additive material, so the batcher folds all
+    // four pools into a single draw. Anchored at the ground under the post;
+    // no light is added (R5), the sun stays the key.
+    forgeKitPair(builder, m, `verge ${lamp.id} lamp head`,
+      [lamp.x, 0, lamp.z], lampPoolParts());
   }
   // ---- HF-477: THE FURNITURE LINE, AND WHY IT IS A LINE ---------------------
   // Every prop here is emitted through `pair()`, so a prop at authored

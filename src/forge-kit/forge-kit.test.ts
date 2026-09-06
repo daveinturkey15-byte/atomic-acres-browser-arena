@@ -21,7 +21,7 @@ import {
 import type { ForgeKitBox } from './index';
 
 const TRIS_PER_BOX = 12;
-const ROLES = new Set(['trim', 'chrome', 'warmLight', 'block', 'kerb']);
+const ROLES = new Set(['trim', 'chrome', 'warmLight', 'block', 'kerb', 'lampPool']);
 
 const triangles = (parts: readonly ForgeKitBox[]): number => parts.length * TRIS_PER_BOX;
 

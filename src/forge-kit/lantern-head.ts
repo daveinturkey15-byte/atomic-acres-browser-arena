@@ -35,7 +35,7 @@ export interface ForgeKitBox {
   readonly offset: readonly [number, number, number];
   readonly size: readonly [number, number, number];
   /** The material ROLE the part wants; the caller resolves it. */
-  readonly role: 'trim' | 'chrome' | 'warmLight' | 'block' | 'kerb';
+  readonly role: 'trim' | 'chrome' | 'warmLight' | 'block' | 'kerb' | 'lampPool';
   /**
    * Optional Euler rotation, radians. Only a prefab whose READ depends on a
    * face catching the sun at a different angle from the body it dresses uses
