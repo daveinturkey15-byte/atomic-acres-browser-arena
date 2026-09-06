@@ -162,6 +162,46 @@ export const NUKETOWN_MOUNTAIN_SHADE_COOL = 0x8f96c8;
  */
 export const NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR = 1.45;
 /**
+ * HF-536 Night Lane Gemini 3: Mountain strata bands and shadow fissures.
+ * 1. STRATA: horizontal band function of world height, period 4-7m, width 25-35%, darkening 18-28%.
+ * 2. FISSURES: 1-in-4 columns, darkening 35-45% on fissure, 12-18% on neighbours, down to 45-65% peak height.
+ * 3. CONTRAST: crest p90/p10 >= 1.9, minimum vertex luma >= 10/255.
+ */
+export const NUKETOWN_MOUNTAIN_STRATA_PERIOD = 6.6;
+export const NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION = 0.30;
+export const NUKETOWN_MOUNTAIN_STRATA_DARKENING = 0.22;
+export const NUKETOWN_MOUNTAIN_FISSURE_FRACTION = 0.25;
+export const NUKETOWN_MOUNTAIN_FISSURE_DARKENING = 0.40;
+export const NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING = 0.15;
+export const NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF = 0.55;
+export const NUKETOWN_MOUNTAIN_MIN_LUMA = 10.05 / 255.0;
+
+/** Horizontal strata band darkening at world height y for a column with phase offset. */
+export function nuketownMountainStrataDarkening(y: number, phase: number): number {
+  const period = NUKETOWN_MOUNTAIN_STRATA_PERIOD;
+  const width = period * NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION;
+  const val = ((y - phase) % period + period) % period;
+  return val < width ? NUKETOWN_MOUNTAIN_STRATA_DARKENING : 0;
+}
+
+/** Count of horizontal strata dark bands along a vertical column from ground up to peakHeight. */
+export function countStrataBandsInColumn(peakHeight: number, phase: number): number {
+  let count = 0;
+  let inBand = false;
+  const step = 0.05;
+  for (let y = 0; y <= peakHeight; y += step) {
+    const darkening = nuketownMountainStrataDarkening(y, phase);
+    const active = darkening > 0;
+    if (active && !inBand) {
+      count += 1;
+      inBand = true;
+    } else if (!active && inBand) {
+      inBand = false;
+    }
+  }
+  return count;
+}
+/**
  * Apply the two-tone rock light to a base colour.
  *
  * Pure (no THREE renderer needed) so the contract test can pin the contrast
@@ -258,6 +298,10 @@ type RidgeRingSpec = Readonly<{
   shadeStrength: number;
   /** Jitter column normals by +-0.25 rad for facet alternation. */
   facetJitter?: boolean;
+  /** Horizontal strata bands (world height banding). */
+  strata?: boolean;
+  /** Vertical shadow fissures on crest columns. */
+  fissures?: boolean;
 }>;
 
 /**
@@ -302,6 +346,10 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   for (let segment = 0; segment <= spec.segments; segment += 1) {
     const wrapped = segment % spec.segments;
     const angle = (wrapped / spec.segments) * Math.PI * 2;
+    const isFissureCol = spec.fissures && (wrapped % 4 === 1);
+    const isNeighbourCol = spec.fissures && (
+      ((wrapped + 1) % 4 === 1) || ((wrapped - 1 + spec.segments) % 4 === 1)
+    );
     // v5: smooth variation, continuous in angle (see smoothVar). The old
     // hash jitter stepped every segment, faceting both the silhouette and
     // the tone into one flat plate per segment.
@@ -377,8 +425,9 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       const baseDot = Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * slopeFacing;
 
       let lambert: number;
+      let normalJitter = 0;
       if (spec.facetJitter) {
-        const normalJitter = (segment % 2 === 0 ? 0.25 : -0.25);
+        normalJitter = (segment % 2 === 0 ? 0.25 : -0.25);
         // Jitter drives adjacent facets between lit (warm R > B >= 15) and shade (cool B > R >= 10)
         lambert = THREE.MathUtils.clamp(0.5 + normalJitter * 3.5 + baseDot * 0.08, 0, 1);
       } else {
@@ -386,8 +435,73 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       }
       const litT = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
       mountainTwoTone(vertexColor.r, vertexColor.g, vertexColor.b, litT, toneRgb);
+
+      let r = toneRgb[0];
+      let g = toneRgb[1];
+      let b = toneRgb[2];
+
+      // HF-536 Night Lane Gemini 3:
+      // 1. Facet contrast boost on jittered ridge facets (raise lit/shade p90/p10 ratio >= 1.9)
+      if (spec.facetJitter) {
+        if (normalJitter > 0) {
+          // Warm sunlit facet boost
+          r *= 1.25;
+          g *= 1.20;
+          b *= 1.15;
+        } else {
+          // Cool shade facet: deepen shade while enhancing cool blue-violet tint
+          r *= 0.82;
+          g *= 0.88;
+          b *= 1.05;
+        }
+      }
+
+      // 2. Horizontal strata bands: darken vertex color by 22% (18-28%) inside band
+      if (spec.strata) {
+        const colPhase = 3.8 + smoothVar(angle, 4, spec.phase + 2.5) * 0.4;
+        const strataDarkening = nuketownMountainStrataDarkening(y, colPhase);
+        if (strataDarkening > 0) {
+          const factor = 1 - strataDarkening;
+          r *= factor;
+          g *= factor;
+          b *= factor;
+        }
+      }
+
+      // 3. Vertical shadow fissures: from crest down to 55% (45-65%) of peak height
+      if (spec.fissures) {
+        const cutoffY = height * NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF;
+        if (y >= cutoffY) {
+          const fissureT = (y - cutoffY) / Math.max(1e-3, height - cutoffY);
+          if (isFissureCol) {
+            const d = NUKETOWN_MOUNTAIN_FISSURE_DARKENING * fissureT;
+            r *= (1 - d);
+            g *= (1 - d);
+            b *= (1 - d * 0.95);
+          } else if (isNeighbourCol) {
+            const d = NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING * fissureT;
+            r *= (1 - d);
+            g *= (1 - d);
+            b *= (1 - d);
+          }
+        }
+      }
+
       const tone = 0.94 + varA * 0.12;
-      colors.push(toneRgb[0] * tone, toneRgb[1] * tone, toneRgb[2] * tone);
+      r *= tone;
+      g *= tone;
+      b *= tone;
+
+      // 4. Shadow floor: keep every vertex luma >= 10/255 in linear units (no exact-black rock)
+      const vertexLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (vertexLuma < NUKETOWN_MOUNTAIN_MIN_LUMA) {
+        const lift = NUKETOWN_MOUNTAIN_MIN_LUMA / Math.max(1e-4, vertexLuma);
+        r *= lift;
+        g *= lift;
+        b *= lift;
+      }
+
+      colors.push(r, g, b);
     }
   }
 
@@ -551,6 +665,8 @@ export function buildNuketownMountainBackdrop(
       haze: NUKETOWN_MOUNTAIN_HAZE_MID,
       shadeStrength: 0.95,
       facetJitter: true,
+      strata: true,
+      fissures: true,
     }),
     ridgeMaterial,
   );
