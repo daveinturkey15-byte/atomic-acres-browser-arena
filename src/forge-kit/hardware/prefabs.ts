@@ -155,10 +155,16 @@ export const DOOR_HARDWARE_TRIANGLES = 6 * HARDWARE_BOX_TRIANGLES;
  * 4. garageDoorHardware — anchor at ground on the garage-front plane under
  * the parked sectional leaf (panel board fronts measured at -15.95, leaf
  * y in [2.6, 3.4], run x in [5.0, 8.5]).
+ *
+ * The leaf is four 0.2 m boards over [2.6, 3.4], so the battens sit ON the
+ * three panel joints (2.80, 3.00, 3.20) plus the leaf's bottom rail (2.62):
+ * a batten mid-panel reads as a stripe, on a joint it reads as the shadow
+ * line a sectional door has. Backs stay 20 mm proud of the board faces, so
+ * the relief contract and the oriented-audit occlusion pattern are unchanged.
  * 8 boxes = 96 triangles.
  */
 export function garageDoorHardware(): readonly HardwarePart[] {
-  const battens: HardwarePart[] = ([2.70, 2.90, 3.10, 3.30] as const).map((y, index) =>
+  const battens: HardwarePart[] = ([2.62, 2.80, 3.00, 3.20] as const).map((y, index) =>
     part(`batten ${index}`, [0, y, 0.080], [3.46, 0.03, 0.02], 'trim', false),
   );
   return Object.freeze([
@@ -167,9 +173,11 @@ export function garageDoorHardware(): readonly HardwarePart[] {
     // owned planes never coincide where footprints overlap).
     part('rail left', [-1.65, 3.00, 0.101], [0.05, 0.76, 0.05], 'trim', false),
     part('rail right', [1.65, 3.00, 0.101], [0.05, 0.76, 0.05], 'trim', false),
-    // Centre pull: plate 38 mm proud of the boards, grip 12 mm off the plate.
-    part('handle plate', [0, 3.00, 0.094], [0.10, 0.14, 0.012], 'painted-metal', false),
-    part('handle grip', [0, 3.00, 0.162], [0.03, 0.03, 0.10], 'chrome', false),
+    // Centre pull on the second panel from the bottom (2.83-2.97, clear of
+    // the 2.80 and 3.00 joint battens): plate 38 mm proud of the boards,
+    // grip 12 mm off the plate.
+    part('handle plate', [0, 2.90, 0.094], [0.10, 0.14, 0.012], 'painted-metal', false),
+    part('handle grip', [0, 2.90, 0.162], [0.03, 0.03, 0.10], 'chrome', false),
   ]);
 }
 export const GARAGE_DOOR_HARDWARE_TRIANGLES = 8 * HARDWARE_BOX_TRIANGLES;

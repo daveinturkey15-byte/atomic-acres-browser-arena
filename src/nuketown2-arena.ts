@@ -2720,6 +2720,31 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
     lapSidingParts({
       run: DOOR[1] - DOOR[0], height: 0.8, facing: 'z+', role: 'panel', courseHeight: 0.2,
     }));
+  // HF-536 night-muse-garage: ONE row of four small panes in the second panel
+  // from the top (course [3.0, 3.2], centre 3.1), each 0.45 x 0.25 m in the
+  // house window-glass role for 0.45 m2 of door glazing per house (<= 0.6).
+  // The leaf carried no glazing before this (boards + reveals only), so there
+  // is no oversized pane to remove here; the in-frame cyan mass is the aqua
+  // garage car seen through the open bay, a SOLID vehicle collider that stays
+  // exactly as authored (re-skinning it would cost the ray-traced preset its
+  // only roughness <= 0.22 surface over 6 m2 - see the carA comment). Every
+  // part is presentation-only through pair(): no collider, no shot surface,
+  // no ballistic row, both houses identical by construction. Trim frames
+  // stand 0.01 m proud of the pane faces; nothing is coplanar with the leaf.
+  for (const [index, dx] of ([-1.3125, -0.4375, 0.4375, 1.3125] as const).entries()) {
+    const px = (DOOR[0]! + DOOR[1]!) / 2 + dx;
+    const dressing = { solid: false, shots: false, cast: false, presentationOnly: true, propId: 'garage door window' } as const;
+    pair(builder, `garage door window pane ${index}`, [px, 3.1, GARAGE_FRONT_Z + 0.074],
+      [0.45, 0.25, 0.028], m.windowGlass, dressing);
+    for (const side of ([-0.26, 0.26] as const)) {
+      pair(builder, `garage door window frame side ${index} ${side < 0 ? 'left' : 'right'}`,
+        [px + side, 3.1, GARAGE_FRONT_Z + 0.08], [0.06, 0.37, 0.04], m.trim, dressing);
+    }
+    for (const side of ([-0.16, 0.16] as const)) {
+      pair(builder, `garage door window frame ${index} ${side < 0 ? 'bottom' : 'top'}`,
+        [px, 3.1 + side, GARAGE_FRONT_Z + 0.08], [0.58, 0.06, 0.04], m.trim, dressing);
+    }
+  }
 
   // Rear door into the back yard.
   const REAR = doorRun('garage rear door');
@@ -2758,12 +2783,17 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage tube light tube 1', [cx + 0.08, H - 0.20, zMid], [0.06, 0.06, 2.2], m.coldLight,
     { solid: false, shots: false, cast: false });
 
-  // Roll-up garage door tracks and coiled drum:
+  // Roll-up garage door tracks and coiled drum. HF-536 night-muse-garage: the
+  // drum hung 0.25 m OUTSIDE the leaf (zFront + 0.22), a trim band floating
+  // across the sectional panels that hid the battens and any leaf dressing
+  // from the street. It now coils INSIDE above the opening head, where a
+  // roller lives; presentation-only, so no collider, shot surface or rating
+  // moves with it.
   pair(builder, 'garage door track left', [DOOR[0] + 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.chrome,
     { solid: false, shots: false, cast: true });
   pair(builder, 'garage door track right', [DOOR[1] - 0.04, 1.5, zFront + 0.08], [0.08, 3.0, 0.08], m.chrome,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'garage door drum', [cx, H - 0.35, zFront + 0.22], [DOOR[1] - DOOR[0] + 0.2, 0.35, 0.35], m.trim,
+  pair(builder, 'garage door drum', [cx, H - 0.35, zFront - 0.42], [DOOR[1] - DOOR[0] + 0.2, 0.35, 0.35], m.trim,
     { solid: false, shots: false, cast: true });
 
   // Exposed ceiling rafters (span inside wall envelope, top below 3.4 m wall):
