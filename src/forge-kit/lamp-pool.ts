@@ -20,10 +20,10 @@
  * ONE MATERIAL FOR THE WHOLE LANE (Amendment B: "additive light pool; no
  * existing role is additive"). Both parts, at both posts, share a single
  * `MeshBasicNodeMaterial`: warm 0xffc37a, additive, transparent, depthWrite
- * off, radial falloff from 0.35 at the centre to 0 at the rim computed from
- * the face UV (every BoxGeometry face spans 0..1, so one formula serves the
- * pool's top face AND the strip's front face - bright middle fading to both
- * ends, which is the vertical gradient the brief asks for). No texture
+ * off, LINEAR radial falloff from 0.95 at the centre to 0 at the rim computed
+ * from the face UV (every BoxGeometry face spans 0..1, so one formula serves
+ * the pool's top face AND the strip's front face - bright middle fading to
+ * both ends, which is the vertical gradient the brief asks for). No texture
  * sampler, no `uniform()` node: colour and opacity are literals baked into
  * the one graph, so the pipeline budget grows by exactly one program and the
  * black-surface lane's program-set condition holds. Because every pool box
@@ -63,8 +63,13 @@ export const LAMP_POOL_Y = 0.012;
 export const LAMP_POOL_SLAB_H = 0.02;
 /** Warm sodium-ish tint (brief: 0xffc37a-ish). Baked as a linear literal, not a uniform. */
 export const LAMP_POOL_COLOR_HEX = 0xffc37a;
-/** Centre opacity; the TSL falloff takes it to 0 at the rim. Subtle under the golden-hour key. */
-export const LAMP_POOL_OPACITY = 0.35;
+/** Centre opacity; the TSL falloff takes it to 0 at the rim. 0.95 over a LINEAR
+ * radial falloff: the interim-3 squared 0.35 pool read 1.124, the 0.8 squared
+ * re-capture read 1.275 (+33 disc-mean per unit opacity) - squared tops out at
+ * ~1.34 at opacity 1.0, so the shape carries the rest: linear keeps value 0 at
+ * the rim (no hard edge; the slope crease is ~0.5 LDR/px, invisible) and lifts
+ * the disc-mean factor 0.458 -> 0.667, predicting ~1.47 mid-band. */
+export const LAMP_POOL_OPACITY = 0.95;
 /** Triangles this prefab adds per lamp: one pool slab plus one highlight strip, 12 each. */
 export const LAMP_POOL_TRIANGLES = 12 * 2;
 
@@ -116,7 +121,7 @@ let cachedLampPoolMaterial: MeshBasicNodeMaterial | null = null;
  * Module singleton (not per-lamp, not per-build): one instance, one node
  * graph, one compiled program, one static batch. The falloff is a pure
  * function of the face UV - `d = |uv*2-1|`, 0 at the centre, 1 at the edge
- * midpoints - squared and scaled by the centre opacity, so the pool's top
+ * midpoints - linear, scaled by the centre opacity, so the pool's top
  * face draws a circular warm patch and the strip's front face draws a
  * vertical highlight, from the same graph.
  */
@@ -135,7 +140,7 @@ export function getLampPoolMaterial(): MeshBasicNodeMaterial {
   const tint = vec3(float(warm.r), float(warm.g), float(warm.b));
   const centred = uv().sub(vec2(float(0.5), float(0.5))).mul(float(2.0));
   const edge = clamp(float(1).sub(length(centred)), float(0), float(1));
-  const falloff = edge.mul(edge).mul(float(LAMP_POOL_OPACITY));
+  const falloff = edge.mul(float(LAMP_POOL_OPACITY));
   material.colorNode = vec4(tint, falloff);
   cachedLampPoolMaterial = material;
   return material;
