@@ -3075,6 +3075,13 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
     mirrors: doorMirrors,
+    // HF-536 detail pass (Muse): door pulls, hub-nut hint, plates, indicators, roof gutters, boot shut (mirror placement kept from night-kit).
+    doorHandles: { y: 0.95, z: [1.9, 3.0] },
+    wheelNuts: true,
+    plates: { y: 0.55 },
+    indicators: { y: 0.84, x: 0.66 },
+    gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
+    bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
     ...groundedDressing,
   };
   // The driveway coupe: same SEDAN_SPEC envelope (the collider boxes own it),
@@ -3092,6 +3099,13 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     // saloon's, on the same arm: a period coupe hangs it off the wing, not the
     // door, and the difference is visible at `vehicle-near`.
     mirrors: [{ x: 0.86, y: 1.28, z: 1.62 }],
+    // HF-536 detail pass (Muse): door pulls, hub-nut hint, plates, indicators, roof gutters, boot shut (mirror placement kept from night-kit).
+    doorHandles: { y: 0.95, z: [1.9, 3.0] },
+    wheelNuts: true,
+    plates: { y: 0.55 },
+    indicators: { y: 0.78, x: 0.62 },
+    gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
+    bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
     ...groundedDressing,
   };
   // HF-477's two street cars are dressed by the shared forge paint graph. Both
