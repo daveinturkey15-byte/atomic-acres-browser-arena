@@ -54,7 +54,7 @@
 //     --candidate artifacts/viewpoint-regression/candidate \
 //     [--out artifacts/viewpoint-regression/diff-<base>-<candidate>]
 import sharp from 'sharp';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { VIEWPOINT_CATALOG } from './viewpoint-catalog.mjs';
@@ -71,6 +71,16 @@ export const THRESHOLDS = Object.freeze({
   deltaSoft: 8,
   newlyBlackFloor: 6,      // max-channel <= 6 is the driver's NaN/zero clamp
   newlyBlackFraction: 0.005, // >=0.5% of frame newly clamped black FAILS
+  // UNSTABLE_BASE, added HF-535. The base side may now carry several capture
+  // SESSIONS (repeat --base, or --base-dir over a directory of them). If a
+  // station's exact-black fraction disagrees by more than this between base
+  // sessions, the baseline is a dice roll and every verdict computed from it is
+  // meaningless - so the run FAILS on the baseline rather than reporting a
+  // candidate verdict it cannot support. Measured cause 2026-09-06: the review
+  // path did not pin the time of day, so nuketown2-coach-elevation captured the
+  // SAME bundle at 4.58% and at 26.87% exact-black. A gate that averaged that
+  // away would have hidden the defect it exists to catch.
+  baseBlackSpread: 0.01,   // >1 percentage point between base sessions is UNSTABLE_BASE
 });
 
 // Per-pixel max(r,g,b) at analysis resolution. Grayscale luminance weights the
@@ -89,6 +99,39 @@ const maxChannel = async (path) => {
   }
   return out;
 };
+
+/** Fraction of pixels at or under the clamp floor, on one analysis frame. */
+export function exactBlackFraction(frame, floor = THRESHOLDS.newlyBlackFloor) {
+  let black = 0;
+  for (let i = 0; i < frame.length; i += 1) if (frame[i] <= floor) black += 1;
+  return black / frame.length;
+}
+
+/**
+ * THE UNSTABLE-BASE DETECTOR. One number per base SESSION (mean exact-black
+ * fraction over that session's own samples), then the spread between sessions.
+ *
+ * Deliberately NOT the persistence-min: persistence answers "did this pixel
+ * ever agree", which is the right question for a candidate diff and the wrong
+ * one here. The question here is whether two sessions of the same bundle
+ * produced the same PICTURE, and a mean per session is the statistic that
+ * cannot be quietly satisfied by one lucky sample.
+ */
+export function baseStabilityFor(perSessionFrames, spreadLimit = THRESHOLDS.baseBlackSpread) {
+  const perSession = perSessionFrames
+    .filter((frames) => frames.length > 0)
+    .map((frames) => frames.reduce((sum, f) => sum + exactBlackFraction(f), 0) / frames.length);
+  if (perSession.length < 2) {
+    return { sessions: perSession.length, perSession, spread: 0, unstable: false };
+  }
+  const spread = Math.max(...perSession) - Math.min(...perSession);
+  return {
+    sessions: perSession.length,
+    perSession: perSession.map((v) => Number(v.toFixed(5))),
+    spread: Number(spread.toFixed(5)),
+    unstable: spread > spreadLimit,
+  };
+}
 
 const grayscale = async (path) => new Promise((resolvePromise, rejectPromise) => {
   sharp(path)
@@ -250,22 +293,36 @@ async function writeComposite(basePng, candPng, outPath, persistenceMin) {
     .toFile(outPath);
 }
 
+/**
+ * `baseManifest` may be ONE manifest or an array of them, one per base capture
+ * session. Every existing check is applied to every base session: a run that
+ * accepts several baselines must not accept a weaker one among them.
+ */
 export function validateManifests(baseManifest, candManifest) {
   const problems = [];
-  if (baseManifest.backend !== candManifest.backend) {
-    problems.push(`backend mismatch: ${baseManifest.backend} vs ${candManifest.backend} - comparing WebGPU against WebGL2 proves nothing`);
+  const baseManifests = Array.isArray(baseManifest) ? baseManifest : [baseManifest];
+  if (baseManifests.length === 0) problems.push('no base capture manifest supplied');
+  for (const base of baseManifests) {
+    // The single-base wording is unchanged, so every existing refusal message
+    // and the tests that pin it still read exactly as before; a multi-session
+    // run names WHICH session failed, because "one of five" is not actionable.
+    const where = base.dir ?? base.label ?? base.url ?? 'base';
+    const tag = baseManifests.length > 1 ? ` (session ${where})` : '';
+    if (base.backend !== candManifest.backend) {
+      problems.push(`backend mismatch: ${base.backend} vs ${candManifest.backend} - comparing WebGPU against WebGL2 proves nothing${tag}`);
+    }
+    if (base.verdict !== 'PASS') {
+      problems.push(`base capture did not pass (verdict='${base.verdict}')${tag}`);
+    }
+    if (base.bundleAtStart === candManifest.bundleAtStart) {
+      problems.push(`both runs served the same bundle '${base.bundleAtStart}' - harness mistake, not a code regression${tag}`);
+    }
   }
-  for (const m of [baseManifest, candManifest]) {
+  for (const m of [...baseManifests, candManifest]) {
     if (m.environmentInvalid) problems.push(`${m.label ?? m.url}: captured under invalid environment (${m.environmentInvalid})`);
-  }
-  if (baseManifest.verdict !== 'PASS') {
-    problems.push(`base capture did not pass (verdict='${baseManifest.verdict}')`);
   }
   if (candManifest.verdict !== 'PASS') {
     problems.push(`candidate capture did not pass (verdict='${candManifest.verdict}')`);
-  }
-  if (baseManifest.bundleAtStart === candManifest.bundleAtStart) {
-    problems.push(`both runs served the same bundle '${baseManifest.bundleAtStart}' - harness mistake, not a code regression`);
   }
   return problems;
 }
@@ -276,10 +333,25 @@ async function main() {
     const index = argv.indexOf(name);
     return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
   };
-  const BASE_DIR = resolve(arg('--base', ''));
+  const argAll = (name) => argv.reduce((out, token, index) => {
+    if (token === name && argv[index + 1]) out.push(argv[index + 1]);
+    return out;
+  }, []);
+  // HF-535: several base SESSIONS. `--base` may be repeated, and `--base-dir`
+  // names a directory whose immediate children are capture directories.
+  const BASE_DIRS = argAll('--base').map((d) => resolve(d));
+  for (const parent of argAll('--base-dir').map((d) => resolve(d))) {
+    if (!existsSync(parent)) continue;
+    for (const child of readdirSync(parent, { withFileTypes: true })) {
+      if (!child.isDirectory()) continue;
+      const dir = resolve(parent, child.name);
+      if (existsSync(resolve(dir, 'capture-manifest.json'))) BASE_DIRS.push(dir);
+    }
+  }
+  const BASE_DIR = BASE_DIRS[0];
   const CAND_DIR = resolve(arg('--candidate', ''));
-  if (!BASE_DIR || !CAND_DIR || !existsSync(BASE_DIR) || !existsSync(CAND_DIR)) {
-    console.error('[viewpoint-diff] both --base and --candidate must be existing capture directories');
+  if (!BASE_DIR || !CAND_DIR || BASE_DIRS.some((d) => !existsSync(d)) || !existsSync(CAND_DIR)) {
+    console.error('[viewpoint-diff] both --base (repeatable) / --base-dir and --candidate must be existing capture directories');
     process.exit(2);
   }
   const OUT_DIR = resolve(arg('--out',
@@ -290,15 +362,19 @@ async function main() {
     if (!existsSync(path)) return null;
     try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
   };
-  const baseManifest = loadManifest(BASE_DIR);
+  const baseManifests = BASE_DIRS.map((dir) => {
+    const m = loadManifest(dir);
+    return m ? { ...m, dir } : null;
+  });
+  const baseManifest = baseManifests[0];
   const candManifest = loadManifest(CAND_DIR);
-  if (!baseManifest || !candManifest) {
+  if (baseManifests.some((m) => !m) || !candManifest) {
     console.error('[viewpoint-diff] capture-manifest.json missing on a side; run capture-arena-viewpoints.mjs first');
     process.exit(2);
   }
   // Comparing WebGPU against WebGL2 proves nothing about either route; a
   // capture taken under an invalidated environment proves even less.
-  const envProblems = validateManifests(baseManifest, candManifest);
+  const envProblems = validateManifests(baseManifests, candManifest);
   if (envProblems.length > 0) {
     console.error('[viewpoint-diff] INVALID comparison:');
     for (const problem of envProblems) console.error(`  - ${problem}`);
@@ -307,7 +383,6 @@ async function main() {
 
   mkdirSync(OUT_DIR, { recursive: true });
   const candSampleCount = Math.max(1, Number(candManifest.samples ?? 1));
-  const baseSampleCount = Math.max(1, Number(baseManifest.samples ?? 1));
   const samplePaths = (dir, arena, cameraId, count) => {
     const paths = [];
     for (let s = 0; s < count; s += 1) {
@@ -318,7 +393,12 @@ async function main() {
     return paths;
   };
   const candidatePaths = (arena, cameraId) => samplePaths(CAND_DIR, arena, cameraId, candSampleCount);
-  const basePaths = (arena, cameraId) => samplePaths(BASE_DIR, arena, cameraId, baseSampleCount);
+  // One list per base SESSION. The flattened union feeds the persistence rule
+  // (a pixel is base-lit only if lit in EVERY sample of EVERY base session);
+  // the per-session lists feed the unstable-base detector.
+  const baseSessionPaths = (arena, cameraId) => baseManifests.map((m) => samplePaths(
+    m.dir, arena, cameraId, Math.max(1, Number(m.samples ?? 1)),
+  ));
   const comparisons = [];
   for (const arena of Object.keys(VIEWPOINT_CATALOG)) {
     for (const cameraId of VIEWPOINT_CATALOG[arena]) {
@@ -337,11 +417,18 @@ async function main() {
         comparisons.push(entry);
         continue;
       }
-      const bPaths = basePaths(arena, cameraId);
+      const bSessions = baseSessionPaths(arena, cameraId);
+      const bPaths = bSessions.flat();
       const { metrics, persistenceMin } = await comparePair(bPaths, cPaths);
       entry.metrics = metrics;
-      entry.samplesUsed = { base: bPaths.length, candidate: cPaths.length };
-      entry.verdict = verdictFor(metrics);
+      entry.samplesUsed = { base: bPaths.length, baseSessions: bSessions.length, candidate: cPaths.length };
+      // THE BASELINE IS EVIDENCE TOO. Computed before the candidate verdict is
+      // reported, because an unstable baseline invalidates that verdict rather
+      // than qualifying it.
+      entry.baseStability = baseStabilityFor(
+        await Promise.all(bSessions.map((paths) => Promise.all(paths.map(maxChannel)))),
+      );
+      entry.verdict = entry.baseStability.unstable ? 'UNSTABLE_BASE' : verdictFor(metrics);
       if (entry.verdict === 'REGION_CHANGED' || entry.verdict === 'GLOBAL_CHANGED' || entry.verdict === 'NEWLY_BLACK') {
         entry.composite = resolve(OUT_DIR, `${arena}__${cameraId}.png`);
         await writeComposite(bPaths[0], cPaths[0], entry.composite, persistenceMin);
@@ -352,10 +439,13 @@ async function main() {
 
   const counts = {};
   for (const entry of comparisons) counts[entry.verdict] = (counts[entry.verdict] ?? 0) + 1;
-  const blocking = ['NEWLY_BLACK', 'REGION_CHANGED', 'GLOBAL_CHANGED', 'MISSING'];
+  const blocking = ['NEWLY_BLACK', 'UNSTABLE_BASE', 'REGION_CHANGED', 'GLOBAL_CHANGED', 'MISSING'];
   // FAIL outranks DIFFS: a station the candidate clamps to black is a defect,
   // and it must not be reported with the same word as a legitimate change.
-  const verdict = comparisons.some((c) => c.verdict === 'NEWLY_BLACK')
+  // UNSTABLE_BASE joins NEWLY_BLACK at FAIL: a baseline that disagrees with
+  // itself is a defect in the thing the whole instrument measures against, and
+  // reporting a candidate verdict over it is the exact failure this catches.
+  const verdict = comparisons.some((c) => c.verdict === 'NEWLY_BLACK' || c.verdict === 'UNSTABLE_BASE')
     ? 'FAIL'
     : (comparisons.some((c) => blocking.includes(c.verdict)) ? 'DIFFS' : 'CLEAN');
   const report = {
@@ -364,7 +454,13 @@ async function main() {
     thresholds: THRESHOLDS,
     analysis: { width: ANALYSIS_W, height: ANALYSIS_H },
     base: { dir: BASE_DIR, sha: baseManifest.sha, bundleAtStart: baseManifest.bundleAtStart, capturedAt: baseManifest.capturedAt },
-    persistence: { rule: 'pixel-wise min |base-candidate| across ALL base x candidate sample pairs', baseSamples: baseManifest.samples ?? 1, candidateSamples: candManifest.samples ?? 1 },
+    baseSessions: baseManifests.map((m) => ({ dir: m.dir, sha: m.sha, bundleAtStart: m.bundleAtStart, capturedAt: m.capturedAt, samples: m.samples ?? 1 })),
+    persistence: {
+      rule: 'pixel-wise min |base-candidate| across ALL base x candidate sample pairs; a pixel is base-lit only if lit in EVERY sample of EVERY base session',
+      baseSamples: baseManifests.reduce((sum, m) => sum + Math.max(1, Number(m.samples ?? 1)), 0),
+      baseSessionCount: baseManifests.length,
+      candidateSamples: candManifest.samples ?? 1,
+    },
     candidate: { dir: CAND_DIR, sha: candManifest.sha, bundleAtStart: candManifest.bundleAtStart, capturedAt: candManifest.capturedAt },
     counts,
     comparisons,
@@ -378,6 +474,7 @@ async function main() {
     console.error(`[viewpoint-diff] ${entry.verdict.padEnd(14)} ${entry.arena}/${entry.cameraId}`
       + (m ? ` mean=${m.meanAbsDelta} r32=${m.ratioOver32} region=${m.largestRegionFraction}`
         + ` newlyBlack=${m.newlyBlackFraction} (${m.newlyBlackPixels}px) healed=${m.healedFraction}`
+        + (entry.baseStability ? ` baseBlack=[${entry.baseStability.perSession.join(', ')}] spread=${entry.baseStability.spread}` : '')
         : ` (${entry.missingSide} missing)`));
   }
   process.exit(verdict === 'CLEAN' ? 0 : 1);

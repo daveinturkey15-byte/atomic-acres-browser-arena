@@ -202,6 +202,11 @@ test('diff thresholds stay at calibrated strictness', async () => {
     // above any measured same-build self-diff.
     newlyBlackFloor: 6,
     newlyBlackFraction: 0.005,
+    // HF-535, ADDED not loosened: the unstable-base spread. Measured
+    // 2026-09-06: the same bundle captured nuketown2-coach-elevation at 4.58%
+    // and 26.87% exact-black because the review path did not pin the arena's
+    // random time of day. Every value above is untouched.
+    baseBlackSpread: 0.01,
   });
 });
 
@@ -236,6 +241,11 @@ test('diff gates verdicts on cross-sample persistence at unchanged strictness', 
     // above any measured same-build self-diff.
     newlyBlackFloor: 6,
     newlyBlackFraction: 0.005,
+    // HF-535, ADDED not loosened: the unstable-base spread. Measured
+    // 2026-09-06: the same bundle captured nuketown2-coach-elevation at 4.58%
+    // and 26.87% exact-black because the review path did not pin the arena's
+    // random time of day. Every value above is untouched.
+    baseBlackSpread: 0.01,
   });
 });
 
@@ -499,3 +509,102 @@ test('diff CLI refuses when both captures served the same bundle', () => {
   }
 });
 
+
+// ---------------------------------------------------------------------------
+// HF-535: UNSTABLE BASE. A baseline is evidence and has to be tested like one.
+//
+// Measured 2026-09-06 (aa-day-roof, artifacts/blackroad/race/): the byte-
+// identical base bundle captured nuketown2-coach-elevation at 4.58% / 7.34%
+// exact-black in some sessions and 25.74% / 26.87% in others, because the
+// deterministic review path did not pin the arena's random time of day. Every
+// NEWLY_BLACK verdict taken against a single stored baseline that day was
+// reading that dice roll. These tests pin the repair: several base sessions,
+// a persistence baseline across them, and a FAIL - never a quiet average -
+// when the baseline disagrees with itself.
+// ---------------------------------------------------------------------------
+
+test('base sessions are combined by persistence, not averaged', async () => {
+  const source = readFileSync(resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'), 'utf8');
+  // --base is repeatable and --base-dir accepts a directory of sessions.
+  assert.match(source, /argAll\('--base'\)/);
+  assert.match(source, /argAll\('--base-dir'\)/);
+  // The union of every session's samples feeds the existing persistence rule,
+  // so a pixel counts as base-lit only if it is lit in EVERY base session.
+  assert.match(source, /baseSessionPaths/);
+  assert.match(source, /const bPaths = bSessions\.flat\(\);/);
+  assert.match(source, /a pixel is base-lit only if lit in EVERY sample of EVERY base session/);
+});
+
+test('unstable base is a FAIL tier, and outranks the candidate verdict', async () => {
+  const source = readFileSync(resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'), 'utf8');
+  assert.match(source, /entry\.verdict = entry\.baseStability\.unstable \? 'UNSTABLE_BASE' : verdictFor\(metrics\);/);
+  assert.match(source, /c\.verdict === 'NEWLY_BLACK' \|\| c\.verdict === 'UNSTABLE_BASE'/);
+  assert.match(source, /const blocking = \['NEWLY_BLACK', 'UNSTABLE_BASE'/);
+});
+
+test('baseStabilityFor measures per-session black fraction and its spread', async () => {
+  const { baseStabilityFor, exactBlackFraction, THRESHOLDS } = await import('./diff-arena-viewpoints.mjs');
+  const frame = (blackCount, size = 100) => {
+    const out = new Uint8Array(size).fill(200);
+    for (let i = 0; i < blackCount; i += 1) out[i] = THRESHOLDS.newlyBlackFloor;
+    return out;
+  };
+  assert.equal(exactBlackFraction(frame(25)), 0.25);
+  // A pixel exactly at the floor counts as clamped; one above it does not.
+  const edge = new Uint8Array([THRESHOLDS.newlyBlackFloor, THRESHOLDS.newlyBlackFloor + 1]);
+  assert.equal(exactBlackFraction(edge), 0.5);
+
+  // One session: nothing to compare, and it must not claim stability it has
+  // not measured.
+  const single = baseStabilityFor([[frame(25)]]);
+  assert.equal(single.sessions, 1);
+  assert.equal(single.unstable, false);
+  assert.equal(single.spread, 0);
+
+  // Two agreeing sessions stay stable at the pinned limit.
+  const agreeing = baseStabilityFor([[frame(5)], [frame(5)]]);
+  assert.equal(agreeing.sessions, 2);
+  assert.equal(agreeing.spread, 0);
+  assert.equal(agreeing.unstable, false);
+
+  // Exactly at the limit is still stable; one pixel past it is not. 100-pixel
+  // frames make one pixel exactly one percentage point.
+  const atLimit = baseStabilityFor([[frame(5)], [frame(6)]]);
+  assert.equal(atLimit.spread, THRESHOLDS.baseBlackSpread);
+  assert.equal(atLimit.unstable, false);
+  const overLimit = baseStabilityFor([[frame(5)], [frame(7)]]);
+  assert.ok(overLimit.spread > THRESHOLDS.baseBlackSpread);
+  assert.equal(overLimit.unstable, true);
+
+  // THE MEASURED CASE: 4.58% against 26.87% of the same bundle.
+  const measured = baseStabilityFor([[frame(5)], [frame(27)]]);
+  assert.equal(measured.unstable, true);
+  assert.deepEqual(measured.perSession, [0.05, 0.27]);
+
+  // A session's own samples are averaged before the spread, so one lucky
+  // sample inside a session cannot make an unstable baseline look stable.
+  const luckySample = baseStabilityFor([[frame(5), frame(5)], [frame(5), frame(27)]]);
+  assert.equal(luckySample.unstable, true);
+});
+
+test('validateManifests applies every existing check to every base session', async () => {
+  const { validateManifests } = await import('./diff-arena-viewpoints.mjs');
+  const base = (over) => ({
+    verdict: 'PASS', backend: 'webgpu', bundleAtStart: '/base.js', dir: 'base', ...over,
+  });
+  const cand = { verdict: 'PASS', backend: 'webgpu', bundleAtStart: '/cand.js' };
+  assert.deepEqual(validateManifests([base(), base({ dir: 'base2' })], cand), []);
+  // Backward compatible with a single manifest.
+  assert.deepEqual(validateManifests(base(), cand), []);
+  // A weaker session among several must not be absorbed by the good ones.
+  const mixed = validateManifests([base(), base({ dir: 'base2', verdict: 'FAIL' })], cand);
+  assert.equal(mixed.length, 1);
+  assert.match(mixed[0], /base capture did not pass \(verdict='FAIL'\) \(session base2\)/);
+  const sameBundle = validateManifests([base(), base({ dir: 'base2', bundleAtStart: '/cand.js' })], cand);
+  assert.equal(sameBundle.length, 1);
+  assert.match(sameBundle[0], /both runs served the same bundle/);
+  const wrongBackend = validateManifests([base(), base({ dir: 'base2', backend: 'webgl2' })], cand);
+  assert.equal(wrongBackend.length, 1);
+  assert.match(wrongBackend[0], /backend mismatch: webgl2 vs webgpu.*\(session base2\)/);
+  assert.deepEqual(validateManifests([], cand), ['no base capture manifest supplied']);
+});
