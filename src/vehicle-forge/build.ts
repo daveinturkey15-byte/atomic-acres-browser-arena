@@ -295,6 +295,105 @@ export interface VehicleDressing {
   readonly panelSeams?: readonly PanelSeam[];
   /** Longitudinal roof rails riding the crowned roof surface (see roofRail). */
   readonly roofRails?: RoofRails;
+  /**
+   * HF-536 (R14). The dark mass BETWEEN the wheels. Without it a lofted body
+   * on four wheels reads as a shell hovering over the road: the sun reaches
+   * straight under the sill, the far kerb shows through the gap, and the
+   * silhouette has a bright stripe where a chassis should be.
+   */
+  readonly underbody?: UnderbodyBlock;
+  /**
+   * HF-536 (R14). Contact darkening under the vehicle - the ambient-occlusion
+   * pool every grounded object owes the ground. Kept INSIDE the vehicle's own
+   * plan footprint so it never reads as a painted shadow from above.
+   */
+  readonly contactShadow?: boolean;
+}
+
+/**
+ * The dark block slung between the axles: `y0` to `y1` in the vehicle frame,
+ * `insetM` in from the sill half-width on each side so it can never escape the
+ * body it hides under (and so it stays inside the collider envelope the arena
+ * owns - `specs.ts:7-21`).
+ */
+export interface UnderbodyBlock {
+  readonly y0: number;
+  readonly y1: number;
+  readonly insetM: number;
+}
+
+/** Plan fraction of (track, wheelbase) the contact pool covers. */
+export const CONTACT_SHADOW_PLAN_FRACTION = 0.55;
+/**
+ * 12 mm proud of the carriageway. The road decals this sits over are tiered
+ * below 0.02, so the pool sorts above them without a `renderOrder` of its own;
+ * raise it to 0.02 only if a station shows z-fighting (recorded in the report).
+ */
+export const CONTACT_SHADOW_Y = 0.012;
+/** Sides of the contact pool's 12-gon: 12 triangles, once per vehicle. */
+const CONTACT_SHADOW_SEGMENTS = 12;
+
+/** Options for the axle-only wheel sets (the truck's bogie under its cargo box). */
+export interface WheelSetDressing {
+  readonly underbody?: UnderbodyBlock;
+  readonly contactShadow?: boolean;
+  /**
+   * Explicit vehicle-frame z range for the contact pool. The truck is ONE
+   * vehicle built as two placements (a lofted cab plus this bogie), and two
+   * coplanar pools at the same height would hatch where they overlap - so the
+   * bogie draws the truck's whole pool and the cab draws none.
+   */
+  readonly contactSpan?: Readonly<{ z0: number; z1: number }>;
+}
+
+/**
+ * The z run a grounded dressing spans: between the wheel arches, or - when a
+ * vehicle has a single axle (the cab-over truck) - from that arch to the tail.
+ */
+function groundedSpan(
+  axles: readonly number[],
+  wheelRadius: number,
+  archGap: number,
+  length: number,
+): { z0: number; z1: number } {
+  const archHalfSpan = wheelRadius + archGap;
+  const z0 = Math.min(...axles) + archHalfSpan;
+  const z1 = Math.max(...axles) - archHalfSpan;
+  if (z1 - z0 >= 0.4) return { z0, z1 };
+  return { z0, z1: length - wheelRadius };
+}
+
+/**
+ * EVERY GEOMETRY IN A BUCKET MUST AGREE ABOUT ITS INDEX BUFFER.
+ * `mergeGeometries` refuses a mix and returns null - which does not throw, does
+ * not fail a build, and simply DELETES the bucket: the first cut of this pass
+ * dropped every tyre on the street and only the R24 wheel gate noticed. The
+ * lofted wheels are non-indexed, so these primitives are converted to match.
+ */
+function nonIndexed(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  return geometry.index ? geometry.toNonIndexed() : geometry;
+}
+
+/** One box, 12 triangles, in the tyre bucket: matte and dark, no new material. */
+function underbodyBox(
+  halfWidth: number,
+  block: UnderbodyBlock,
+  span: { z0: number; z1: number },
+): THREE.BufferGeometry {
+  return translated(
+    nonIndexed(new THREE.BoxGeometry(halfWidth * 2, Math.max(0.02, block.y1 - block.y0), span.z1 - span.z0)),
+    0,
+    (block.y0 + block.y1) / 2,
+    (span.z0 + span.z1) / 2,
+  );
+}
+
+/** One 12-gon, 12 triangles, in the tyre bucket. */
+function contactPool(semiX: number, semiZ: number, centreZ: number): THREE.BufferGeometry {
+  const disc = nonIndexed(new THREE.CircleGeometry(1, CONTACT_SHADOW_SEGMENTS));
+  disc.applyMatrix4(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+  disc.applyMatrix4(new THREE.Matrix4().makeScale(semiX, 1, semiZ));
+  return translated(disc, 0, CONTACT_SHADOW_Y, centreZ);
 }
 
 export interface ForgedVehicle {
@@ -346,6 +445,7 @@ export function buildForgedWheelSet(
   axleZ: readonly number[],
   style: WheelStyle,
   materials: ForgedVehicleMaterials,
+  dressing: WheelSetDressing = {},
 ): ForgedVehicle {
   const parts = { tyre: [] as THREE.BufferGeometry[], chrome: [] as THREE.BufferGeometry[] };
   for (const z of axleZ) {
@@ -359,6 +459,24 @@ export function buildForgedWheelSet(
       if (wheel.whitewall) parts.chrome.push(place(wheel.whitewall));
       parts.tyre.push(place(wheel.dark));
     }
+  }
+  // HF-536 (R14): the same grounded dressing a lofted body gets. The bogie
+  // carries the truck's, because the truck is one vehicle in two placements.
+  const wheelSetSpan = { z0: Math.min(...axleZ), z1: Math.max(...axleZ) };
+  if (dressing.underbody) {
+    parts.tyre.push(underbodyBox(
+      Math.max(0.05, trackHalfWidth - dressing.underbody.insetM),
+      dressing.underbody,
+      { z0: wheelSetSpan.z0 + radius, z1: wheelSetSpan.z1 - radius },
+    ));
+  }
+  if (dressing.contactShadow) {
+    const span = dressing.contactSpan ?? wheelSetSpan;
+    parts.tyre.push(contactPool(
+      CONTACT_SHADOW_PLAN_FRACTION * trackHalfWidth * 2,
+      Math.max(0.2, (span.z1 - span.z0) / 2),
+      (span.z0 + span.z1) / 2,
+    ));
   }
   const group = new THREE.Group();
   group.name = `vehicle-forge ${id}`;
@@ -438,6 +556,27 @@ export function buildForgedVehicle(
       parts.chrome.push(tail(lamp.bezel));
       parts.tailLamp.push(tail(lamp.lens));
     }
+  }
+
+  // HF-536 (R14). GROUNDED DRESSING, before any trim, so it merges into the
+  // tyre bucket with the wheels and costs no extra draw.
+  if (dressing.underbody) {
+    parts.tyre.push(underbodyBox(
+      Math.max(0.05, spec.sillHalfWidth - dressing.underbody.insetM),
+      dressing.underbody,
+      groundedSpan(axles, spec.wheelRadius, spec.archGap, spec.length),
+    ));
+  }
+  if (dressing.contactShadow) {
+    const wheelbase = Math.max(...axles) - Math.min(...axles);
+    const poolZ = wheelbase >= 0.5
+      ? { length: wheelbase, centre: (Math.min(...axles) + Math.max(...axles)) / 2 }
+      : { length: spec.length - spec.wheelRadius * 2, centre: spec.length / 2 };
+    parts.tyre.push(contactPool(
+      CONTACT_SHADOW_PLAN_FRACTION * spec.trackHalfWidth * 2,
+      CONTACT_SHADOW_PLAN_FRACTION * poolZ.length,
+      poolZ.centre,
+    ));
   }
 
   if (dressing.bumperY !== undefined) {

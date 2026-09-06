@@ -177,6 +177,9 @@ import {
 } from './nuketown2-interior-materials';
 // PASS 94 lane TECHNIQUES: the pool surface moved to its own module.
 import { createNuketown2PoolWaterMaterial } from './nuketown2-pool-water';
+// HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
+// HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
+// import { lanternHeadParts } from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -2876,6 +2879,12 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       // W4-374 roof rails: a chrome pair riding the crowned roof run. Merged
       // into the existing chrome bucket: no new material, no new draw.
       roofRails: { x: [0.62, -0.62], z0: 1.7, z1: 7.5, bucket: 'chrome' },
+      // HF-536 (R14). The coach floated: sun reached under the whole 9.1 m
+      // sill and the far kerb showed through the gap. One dark block between
+      // the arches (0.24 -> sill 0.4) and one contact pool inside its own
+      // footprint, both merged into the tyre bucket - 24 triangles, no draw.
+      underbody: { y0: 0.24, y1: COACH_SPEC.sillY - 0.01, insetM: 0.25 },
+      contactShadow: true,
     }, coachMaterials),
     x: c.x + COACH_SPEC.length / 2,
     z: c.z,
@@ -2906,6 +2915,11 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
         { x: 1.31, y: 1.62, z: 9.06, height: 2.38 },
         { x: 1.31, y: 1.62, z: 10.68, height: 2.38 },
       ],
+      // HF-536 (R14). The cab-over sits on a 0.6 m sill, the highest on the
+      // street, so it floated hardest. Underbody only: the truck is ONE
+      // vehicle in two placements and its bogie draws the whole contact pool,
+      // because two coplanar pools at 12 mm would hatch where they overlap.
+      underbody: { y0: 0.24, y1: TRUCK_CAB_SPEC.sillY - 0.01, insetM: 0.25 },
     }, truckMaterials),
     x: truckNoseX,
     z: t.z,
@@ -2950,17 +2964,34 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       [truckNoseX - (t.x + truckBoxHalf + 1.0), truckNoseX - (t.x - truckBoxHalf + 1.1)],
       'steel',
       truckMaterials,
+      {
+        // HF-536 (R14): a second dark block under the cargo box, and the ONE
+        // contact pool for the whole truck - cab nose to cargo tail, inset
+        // 0.35 m at each end, expressed in the cab's frame like the axles are.
+        underbody: { y0: 0.24, y1: TRUCK_CAB_SPEC.sillY - 0.01, insetM: 0.25 },
+        contactShadow: true,
+        contactSpan: { z0: 0.35, z1: t.cabLength + t.boxLength - 0.35 },
+      },
     ),
     x: truckNoseX,
     z: t.z,
     yaw: -Math.PI / 2,
   });
 
+  // HF-536 (R14): every grounded vehicle owes the ground a contact pool and a
+  // dark mass under the sill. The saloon's sill is 0.24 m, so its block is a
+  // thin 0.18-0.23 slab - enough to close the light gap without reaching the
+  // road the pool already darkens.
+  const groundedDressing = {
+    underbody: { y0: 0.18, y1: 0.23, insetM: 0.25 },
+    contactShadow: true,
+  };
   const sedanDressing = {
     wheelStyle: 'whitewall' as const,
     headLamps: { x: 0.66, y: 0.84, radius: 0.115 },
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
+    ...groundedDressing,
   };
   // The driveway coupe: same SEDAN_SPEC envelope (the collider boxes own it),
   // dressed down into a classic coupe - lamps tucked lower and smaller, bumper
@@ -2973,6 +3004,7 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     bumperY: 0.40,
     stripe: { y: 0.90, bucket: 'chrome' as const, z0: 0.35, z1: 4.05, height: 0.06, proud: 0.014 },
     grille: { y: 0.70, width: 1.10, height: 0.26, depth: 0.10, barCount: 4 },
+    ...groundedDressing,
   };
   // HF-477's two street cars are dressed by the shared forge paint graph. Both
   // nose to +x, so the vehicle frame's +z maps to world -x, as the retired head
@@ -3336,6 +3368,31 @@ function street(builder: Builder, m: Nuketown2Materials): void {
 }
 
 /**
+ * HF-536 PASS 2. A brick coping ring on a planter box: four low bars around
+ * its rim, 0.06 m proud of the top and 0.03 m proud of each side, so the
+ * planter reads as a built kerb planter rather than an extruded rectangle.
+ * Presentation only - the planter box keeps the collider and the shot surface.
+ */
+export function planterCoping(
+  builder: Builder,
+  m: Nuketown2Materials,
+  id: string,
+  [x, z]: readonly [number, number],
+  [width, depth]: readonly [number, number],
+): void {
+  const H = 0.10;
+  const T = 0.09;
+  const y = LOW_COVER + 0.06 - H / 2;
+  const w = width + 0.06;
+  const d = depth + 0.06;
+  const decoration = { solid: false, shots: false, cast: false, presentationOnly: true } as const;
+  pair(builder, `${id} coping front`, [x, y, z + d / 2 - T / 2], [w, H, T], m.block, decoration);
+  pair(builder, `${id} coping back`, [x, y, z - d / 2 + T / 2], [w, H, T], m.block, decoration);
+  pair(builder, `${id} coping left`, [x - w / 2 + T / 2, y, z], [T, H, d - T * 2], m.block, decoration);
+  pair(builder, `${id} coping right`, [x + w / 2 - T / 2, y, z], [T, H, d - T * 2], m.block, decoration);
+}
+
+/**
  * The front verge: what stands between the kerb and each house's front wall.
  * The reference's letterboxes sit out here (they carry the two characters'
  * names), and the driveway is edged rather than open, so crossing the last 4 m
@@ -3347,6 +3404,17 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
     pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
       { solid: false, shots: false, cast: false, presentationOnly: true });
+    // HF-536 (PASS 2) HELD, NOT SHIPPED. The forge-kit lantern prefab
+    // (`src/forge-kit/lantern-head.ts`) replaces this dash of trim with a
+    // tapered hood, a cap course and an emissive diffuser plate aimed at the
+    // road - and it cannot land here yet. Seven presentation boxes per head
+    // through `pair()` is +24 verge BODIES, and the HF-491 declutter ratchet
+    // (`nuketown2-fidelity.test.ts:3042`, "verge FURNITURE <= 36 with zero
+    // headroom") counts boxes, not props: measured 70 against a cap of 36.
+    // That ratchet is an owner instruction ("it's busy, cluttered; thin out
+    // the clutter"), so it is not weakened to admit a look (R32) - the prefab
+    // waits for the coordinator to decide whether a prefab's parts count as
+    // one prop. See lanes/forge-street/REPORT.md, blocker B1.
     pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.trim,
       { solid: false, shots: false, cast: false, presentationOnly: true });
   }
@@ -3411,6 +3479,10 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 0.6], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, VERGE_FURNITURE_Z], [3.6, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
+  // HF-536 (PASS 2) HELD: the brick coping ring on both kerb planters is
+  // +16 verge bodies against the same HF-491 ratchet (blocker B1). The helper
+  // `planterCoping` below is kept, unwired, so the coordinator's decision is a
+  // one-line change rather than a re-author.
   // HF-437 - THE WIDENED STRIP'S COVER, brought onto the line with everything
   // else. Both are solid and shot-rated by default - movement AND shot
   // authority - which is what made them cover in the first place.
