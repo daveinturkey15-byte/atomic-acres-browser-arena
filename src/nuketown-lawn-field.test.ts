@@ -31,9 +31,17 @@ import {
   NUKETOWN_VERGE_BLOOM_TINT,
   NUKETOWN_VERGE_BLOOM_SEED,
   NUKETOWN_VERGE_BLOOM_REGIONS,
+  NUKETOWN2_CLOVER_BASE_COLOR,
+  NUKETOWN2_CLOVER_BUDGET,
+  NUKETOWN2_CLOVER_HEIGHT_M,
+  NUKETOWN2_CLOVER_TINT,
+  NUKETOWN2_LAWN_BASE_COLOR,
+  NUKETOWN2_LAWN_TINT,
   nuketownLawnPlacementAllowed,
 } from './nuketown-lawn-field';
-import { grassClumpTintPeak } from './rendering/instanced-grass-field';
+import { buildNuketown2 } from './nuketown2-arena';
+import { GRASS_MAX_HEIGHT } from './grass-placement';
+import { grassClumpTintPeak, grassDryness } from './rendering/instanced-grass-field';
 
 type Origin = { x: number; z: number; scaleY: number };
 
@@ -303,5 +311,158 @@ describe('Nuke Town verge bloom field (HF-536)', () => {
 
   it('keeps bloom tint spec under material.color ceiling', () => {
     expect(grassClumpTintPeak(NUKETOWN_VERGE_BLOOM_TINT)).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HF-536 look-2b: dry-grass variety and the clover/flower layer (nuketown2)
+// ---------------------------------------------------------------------------
+
+describe('HF-536 look-2b nuketown2 lawn variety', () => {
+  /**
+   * THE NEUTRALITY PROOF, and the reason it is the first test here.
+   *
+   * This pass moved the rebuild lawn's BASE colour from the green 0x5e9e41 to
+   * the straw 0xc5aa5b, because `material.color` multiplies and is capped at
+   * white, so a straw patch is simply unreachable from a green base (this
+   * machine's "three.js tint cannot lighten" gotcha). That is a big lever on a
+   * surface that covers most of the map, and the ONLY thing that makes it safe
+   * is that the green half of the tint was re-derived to compose to exactly
+   * the old value. This asserts that composition against the OLD constants,
+   * over the whole warm range - not against a comment.
+   */
+  it('composes the GREEN lawn to exactly its pre-pass colour', () => {
+    const oldBase = new THREE.Color(0x5e9e41);
+    const newBase = new THREE.Color(NUKETOWN2_LAWN_BASE_COLOR);
+    for (const warm of [0, 0.25, 0.5, 0.75, 1]) {
+      const before = [
+        oldBase.r * (NUKETOWN_LAWN_TINT.rBase + NUKETOWN_LAWN_TINT.rWarm * warm),
+        oldBase.g * (NUKETOWN_LAWN_TINT.gBase + NUKETOWN_LAWN_TINT.gWarm * warm),
+        oldBase.b * (NUKETOWN_LAWN_TINT.bBase + NUKETOWN_LAWN_TINT.bWarm * warm),
+      ];
+      const after = [
+        newBase.r * (NUKETOWN2_LAWN_TINT.rBase + NUKETOWN2_LAWN_TINT.rWarm * warm),
+        newBase.g * (NUKETOWN2_LAWN_TINT.gBase + NUKETOWN2_LAWN_TINT.gWarm * warm),
+        newBase.b * (NUKETOWN2_LAWN_TINT.bBase + NUKETOWN2_LAWN_TINT.bWarm * warm),
+      ];
+      for (let channel = 0; channel < 3; channel += 1) {
+        expect(after[channel]!, `warm=${warm} channel=${channel}`)
+          .toBeCloseTo(before[channel]!, 4);
+      }
+    }
+    // ...and the value terms, which multiply both, did not move either.
+    expect(NUKETOWN2_LAWN_TINT.valueBase).toBe(NUKETOWN_LAWN_TINT.valueBase);
+    expect(NUKETOWN2_LAWN_TINT.valuePatch).toBe(NUKETOWN_LAWN_TINT.valuePatch);
+    expect(NUKETOWN2_LAWN_TINT.valueJitter).toBe(NUKETOWN_LAWN_TINT.valueJitter);
+  });
+
+  it('keeps both new tint specs under the material.color white cap', () => {
+    expect(grassClumpTintPeak(NUKETOWN2_LAWN_TINT)).toBeLessThanOrEqual(1);
+    expect(grassClumpTintPeak(NUKETOWN2_CLOVER_TINT)).toBeLessThanOrEqual(1);
+  });
+
+  it('makes the dry patch a REAL straw: warmer AND brighter than the turf', () => {
+    // The whole point of moving the base. A dry spot that is merely darker is
+    // a shadow, not dry grass, and that is all a tint over a green base can do.
+    const base = new THREE.Color(NUKETOWN2_LAWN_BASE_COLOR);
+    const dry = NUKETOWN2_LAWN_TINT.dry!;
+    const green = [
+      base.r * (NUKETOWN2_LAWN_TINT.rBase + NUKETOWN2_LAWN_TINT.rWarm * 0.5),
+      base.g * (NUKETOWN2_LAWN_TINT.gBase + NUKETOWN2_LAWN_TINT.gWarm * 0.5),
+      base.b * (NUKETOWN2_LAWN_TINT.bBase + NUKETOWN2_LAWN_TINT.bWarm * 0.5),
+    ];
+    const patch = [
+      green[0]! + (base.r * dry.rDry - green[0]!) * dry.weight,
+      green[1]! + (base.g * dry.gDry - green[1]!) * dry.weight,
+      green[2]! + (base.b * dry.bDry - green[2]!) * dry.weight,
+    ];
+    const luma = (c: number[]): number => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    expect(luma(patch)).toBeGreaterThan(luma(green) * 1.15);
+    expect(patch[0]! / patch[1]!).toBeGreaterThan((green[0]! / green[1]!) * 1.8);
+    // ...and it stays a PATCH, not a repaint: never more than the brief's mix.
+    expect(dry.weight).toBeLessThanOrEqual(0.35);
+    // Patch size inside the brief's 3-6 m band.
+    expect(dry.patchM).toBeGreaterThanOrEqual(3);
+    expect(dry.patchM).toBeLessThanOrEqual(6);
+  });
+
+  it('spreads the dryness over a real yard instead of tinting all of it', () => {
+    // Measured over the rebuild's north yard lawn rectangle, not asserted from
+    // the `coverage` constant: the field is a warped sin/cos product, so the
+    // constant is a knob, not the answer.
+    const dry = NUKETOWN2_LAWN_TINT.dry!;
+    let samples = 0;
+    let touched = 0;
+    let full = 0;
+    for (let x = -16; x < 16; x += 0.25) {
+      for (let z = 23; z < 36; z += 0.25) {
+        const d = grassDryness(dry, x, z);
+        samples += 1;
+        if (d > 0.05) touched += 1;
+        if (d > 0.6) full += 1;
+      }
+    }
+    expect(samples).toBeGreaterThan(5000);
+    expect(touched / samples).toBeGreaterThan(0.12);
+    expect(touched / samples).toBeLessThan(0.45);
+    expect(full / samples).toBeGreaterThan(0.05);
+    for (const [x, z] of [[0, 0], [7.3, -19.1], [-15.9, 35.4], [3.14, 2.72]] as const) {
+      const d = grassDryness(dry, x, z);
+      expect(d).toBeGreaterThanOrEqual(0);
+      expect(d).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('plants the clover layer inside its 400-tuft cap, presentation only', () => {
+    const scene = new THREE.Scene();
+    const map = buildNuketown2(scene);
+    const stats = map.root.userData.nuketown2CloverStats as {
+      blades: number; drawCalls: number; triangles: number;
+    };
+    expect(stats).toBeDefined();
+    expect(stats.blades).toBeGreaterThan(60);
+    expect(stats.blades).toBeLessThanOrEqual(NUKETOWN2_CLOVER_BUDGET);
+    // The clover never becomes tall grass: under half the art-only ceiling.
+    expect(NUKETOWN2_CLOVER_HEIGHT_M).toBeLessThan(GRASS_MAX_HEIGHT * 0.6);
+    let cloverNodes = 0;
+    map.root.traverse((node) => {
+      if (!node.name.startsWith('nuketown2-clover')) return;
+      cloverNodes += 1;
+      expect(node.userData.presentationOnly, node.name).toBe(true);
+      expect(node.userData.blocksShots, node.name).toBe(false);
+    });
+    expect(cloverNodes).toBeGreaterThan(1);
+    for (const mesh of map.raycastMeshes) {
+      expect(mesh.name.startsWith('nuketown2-clover')).toBe(false);
+    }
+  });
+
+  it('carries TWO plant tints in the clover layer from one material', () => {
+    // The brief asked for two more tints. They come from the SAME field: the
+    // base is the pale bloom and the tint pulls most tufts to clover green,
+    // with the dry-patch field acting as the flower-head clusters. One field,
+    // one graph, no second pipeline and no sampler.
+    const base = new THREE.Color(NUKETOWN2_CLOVER_BASE_COLOR);
+    const leaf = [
+      base.r * NUKETOWN2_CLOVER_TINT.rBase,
+      base.g * NUKETOWN2_CLOVER_TINT.gBase,
+      base.b * NUKETOWN2_CLOVER_TINT.bBase,
+    ];
+    const bloom = [
+      base.r * NUKETOWN2_CLOVER_TINT.dry!.rDry,
+      base.g * NUKETOWN2_CLOVER_TINT.dry!.gDry,
+      base.b * NUKETOWN2_CLOVER_TINT.dry!.bDry,
+    ];
+    const luma = (c: number[]): number => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+    expect(luma(bloom)).toBeGreaterThan(luma(leaf) * 3);
+    // ...and the leaf is a GREEN, not a wash: the green channel dominates.
+    expect(leaf[1]!).toBeGreaterThan(leaf[0]! * 1.4);
+    expect(leaf[1]!).toBeGreaterThan(leaf[2]! * 1.4);
+  });
+
+  it('builds the clover deterministically', () => {
+    const first = buildNuketown2(new THREE.Scene()).root.userData.nuketown2CloverStats;
+    const second = buildNuketown2(new THREE.Scene()).root.userData.nuketown2CloverStats;
+    expect(second).toEqual(first);
   });
 });

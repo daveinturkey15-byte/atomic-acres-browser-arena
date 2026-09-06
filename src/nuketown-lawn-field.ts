@@ -299,6 +299,95 @@ export type NuketownLawnKeepOutCircle = Readonly<{
   radius: number;
 }>;
 
+// ---------------------------------------------------------------------------
+// HF-536 look-2b: dry-grass variety and a clover/flower layer (nuketown2 only)
+// ---------------------------------------------------------------------------
+
+/**
+ * THE DRY-GRASS BASE COLOUR, and why the base had to move at all.
+ *
+ * The critic's gap #4 on the interim-2 build is that the verges and lawns "are
+ * uniform green strips". The instance tint is the right place to break that
+ * up - it costs no draw, no triangle and no pipeline - EXCEPT that
+ * `material.color` MULTIPLIES and is capped at white (this machine's memory
+ * "three.js tint cannot lighten"). A straw patch is BRIGHTER and REDDER than
+ * kept turf, so from the old 0x5e9e41 green base the only "dry" a tint can
+ * reach is a darker olive, which reads as shadow, not as dry grass. That is
+ * exactly the impossible tint-only system the memory records.
+ *
+ * So the base moves to the DRY tone and the green tint pulls it back down.
+ * The remap is EXACT, not approximate: every green coefficient below is the
+ * old coefficient multiplied by linear(0x5e9e41)/linear(0xc5aa5b) per channel,
+ * so `linear(base) * tint` for a green blade is bit-for-bit what it was
+ * before this pass. `nuketown-lawn-field.test.ts` asserts that composition
+ * against the OLD constants rather than trusting this comment.
+ *
+ * Measured composed results (linear -> sRGB 0-255), at value 0.855:
+ *   green blade        (75, 142, 39)   - unchanged from the pre-pass lawn
+ *   full dry (weight 1) (184, 158, 84)  - reachable, but not used
+ *   shipped patch (0.35) (127, 148, 59) - what a dry spot actually renders as
+ */
+export const NUKETOWN2_LAWN_BASE_COLOR = 0xc5aa5b;
+
+/**
+ * Late-summer kept turf with metre-scale dry spots. Green half is the exact
+ * pre-pass lawn (see above); the `dry` block is the whole visible change.
+ *
+ * `patchM` 4.5 m sits in the middle of the brief's 3-6 m band and is well
+ * inside a single yard (the rebuild's yard lawn is 13 m deep), so a yard shows
+ * two or three dry spots rather than one wash. `coverage` 0.34 was chosen so
+ * about a third of the turf carries some dryness - measured over the real
+ * regions by the lane test, not asserted from this number.
+ */
+export const NUKETOWN2_LAWN_TINT: GrassClumpTint = Object.freeze({
+  rBase: 0.126298, rWarm: 0.044104,
+  gBase: 0.748511, gWarm: 0.085058,
+  bBase: 0.252640, bWarm: -0.055581,
+  valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
+  dry: Object.freeze({
+    rDry: 0.999, gDry: 0.997, bDry: 0.995,
+    weight: 0.35,
+    patchM: 4.5,
+    coverage: 0.34,
+  }),
+});
+
+/** Clover/flower tuft cap - the brief's ceiling, enforced by construction. */
+export const NUKETOWN2_CLOVER_BUDGET = 400;
+/** Clover placement cell, sized so the rebuild's lawn area lands under the cap. */
+export const NUKETOWN2_CLOVER_CELL_M = 1.95;
+/** Clover seed - its own stream, decorrelated from the lawn and the bloom. */
+export const NUKETOWN2_CLOVER_SEED = NUKETOWN_LAWN_SEED ^ 0x0c10_7e12;
+/** Clover leaf height - a third of a blade, so it never reads as tall grass. */
+export const NUKETOWN2_CLOVER_HEIGHT_M = 0.105;
+/**
+ * Pale bloom base. Same trick as the lawn: the BASE is the brightest tone the
+ * layer must reach (the cream flower head) and the tint pulls the majority of
+ * tufts down to clover green, so ONE field carries TWO plant tints without a
+ * second material, a second pipeline or a second sampler.
+ */
+export const NUKETOWN2_CLOVER_BASE_COLOR = 0xf6f2b3;
+
+/**
+ * Clover-and-flower tint. Composed results at value 0.86:
+ *   clover leaf  (69, 112, 54)  - cooler and darker than the lawn's green
+ *   flower head  (230, 226, 167) - the pale cream bloom
+ * The bloom is the `dry` pole at weight 1: patches ARE the flower clusters,
+ * which is how clover actually grows (heads in clumps, leaf everywhere else).
+ */
+export const NUKETOWN2_CLOVER_TINT: GrassClumpTint = Object.freeze({
+  rBase: 0.074762, rWarm: 0,
+  gBase: 0.212997, gWarm: 0,
+  bBase: 0.093652, bWarm: 0,
+  valueBase: 0.86, valuePatch: 0.03, valueJitter: 0.04,
+  dry: Object.freeze({
+    rDry: 0.999, gDry: 0.999, bDry: 0.999,
+    weight: 1,
+    patchM: 2.6,
+    coverage: 0.22,
+  }),
+});
+
 /**
  * The rebuild's lawn REGIONS: every `material: 'lawn'` rectangle in the plan,
  * plus the 180-degree partner the arena's own `pair()` emits for each of them.
@@ -386,7 +475,9 @@ export function buildNuketownRebuildLawnField(
       (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
     )),
     material: {
-      color: 0x5e9e41,
+      // HF-536 look-2b: the base is now the DRY tone; the tint carries the
+      // green (see NUKETOWN2_LAWN_BASE_COLOR). Green composition is unchanged.
+      color: NUKETOWN2_LAWN_BASE_COLOR,
       roughness: 0.89,
       metalness: 0.02,
       swayAmount: 0.045,
@@ -395,7 +486,71 @@ export function buildNuketownRebuildLawnField(
       sssStrength: 0.29,
       rootShade: [0.56, 0.65, 0.5],
     },
-    tint: NUKETOWN_LAWN_TINT,
+    tint: NUKETOWN2_LAWN_TINT,
+  });
+  parent.add(field.group);
+  return field;
+}
+
+/**
+ * The clover / flower-tuft layer (HF-536 look-2b, critic gap #4 "clover
+ * patches, flowering weeds").
+ *
+ * Same regions and the same keep-out truth as the lawn - it is planted where
+ * the lawn is planted, just far sparser (one candidate per 1.95 m cell against
+ * the lawn's 0.3 m) and with a rosette geometry instead of a blade fan. It
+ * follows the verge-bloom field's shape exactly, so nothing new is invented:
+ * one instanced field, one node graph, no texture and no sampler.
+ *
+ * Presentation only: 0.105 m tall (less than half the 0.25 m art-only ceiling),
+ * no collider, no shot surface, seeded-deterministic.
+ */
+export function buildNuketown2CloverField(
+  parent: THREE.Object3D,
+  options: Readonly<{
+    dressing: readonly NuketownGroundDressingPiece[];
+    keepOuts: readonly Box2[];
+    keepOutCircles?: readonly NuketownLawnKeepOutCircle[];
+    reduced?: boolean;
+  }>,
+): InstancedGrassField {
+  const reduced = options.reduced === true;
+  const keepOuts = options.keepOuts;
+  const keepOutCircles = options.keepOutCircles ?? [];
+  const field = buildInstancedGrassField({
+    name: 'nuketown2-clover',
+    seed: NUKETOWN2_CLOVER_SEED,
+    regions: nuketownRebuildLawnRegions(options.dressing),
+    // Reduced widens the cell, which lowers the count - it can never raise it.
+    cellSizeM: reduced ? NUKETOWN2_CLOVER_CELL_M * 1.5 : NUKETOWN2_CLOVER_CELL_M,
+    bladeHeightM: NUKETOWN2_CLOVER_HEIGHT_M,
+    // Wide and barely bent: a clover leaflet is a disc on a short stem, not a
+    // blade. Four of them per tuft is the trefoil rosette plus one head.
+    bladeWidthM: 0.108,
+    bladeBendM: 0.022,
+    bladesPerTuft: reduced ? 3 : 4,
+    scaleRange: [0.62, 1.0],
+    placementAllowed: (x, z) => !keepOuts.some((box) => (
+      x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+    )) && !keepOutCircles.some((circle) => (
+      (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
+    )),
+    material: {
+      color: NUKETOWN2_CLOVER_BASE_COLOR,
+      roughness: 0.82,
+      metalness: 0.02,
+      // Clover leaves are broad and catch more wind than a grass blade, but
+      // they sit lower, so the tip travel stays small in absolute terms.
+      swayAmount: 0.03,
+      windSpeed: 0.95,
+      sssColor: 0xc9e08a,
+      sssStrength: 0.22,
+      rootShade: [0.72, 0.78, 0.66],
+    },
+    tint: NUKETOWN2_CLOVER_TINT,
   });
   parent.add(field.group);
   return field;

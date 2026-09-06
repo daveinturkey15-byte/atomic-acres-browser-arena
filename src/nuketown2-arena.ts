@@ -114,7 +114,7 @@ import {
   NUKETOWN2_FOREST_ENVELOPE,
   buildNuketownForestSurround,
 } from './nuketown-forest-surround';
-import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField } from './nuketown-lawn-field';
+import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField, buildNuketown2CloverField } from './nuketown-lawn-field';
 import { buildNuketown2Vegetation } from './nuketown2-vegetation';
 import {
   createNuketown2GrimeMaterials,
@@ -4554,6 +4554,23 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   });
   builder.root.userData.nuketown2LawnStats = lawn.stats;
 
+  // HF-536 look-2b: the clover / flower-tuft layer, on the same regions and the
+  // same collider-derived keep-outs. Built here rather than inside the lawn
+  // builder so its stats stay separately countable against the arena budget.
+  const clover = buildNuketown2CloverField(builder.root, {
+    dressing: NUKETOWN2_GROUND_DRESSING.map((piece) => {
+      const [x0, x1] = nuketown2HandedSpan(piece.x0, piece.x1);
+      return { ...piece, x0, x1 };
+    }),
+    keepOuts: builder.colliders.slice(groundColliderCount),
+    keepOutCircles: [{
+      centreX: nuketown2HandedX(NUKETOWN2_CUL_DE_SAC.centreX),
+      centreZ: 0,
+      radius: NUKETOWN2_CUL_DE_SAC.radius,
+    }],
+  });
+  builder.root.userData.nuketown2CloverStats = clover.stats;
+
   // ---- PASS 94 lane TECHNIQUES: hedges + the avenue ----------------------
   // Presentation only, and admissible for two separate reasons the module's
   // own test pins: every hedge run dresses the footprint of a body already
@@ -4570,10 +4587,13 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   // site, no new traversal, and no allocation in the closure.
   builder.root.userData.nuketownLawnWind = (seconds: number) => {
     lawn.advanceWind(seconds);
+    clover.advanceWind(seconds);
     vegetation.advanceWind(seconds);
   };
   // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
-  builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => lawn.crushAt(x, z, radiusM);
+  builder.root.userData.nuketownLawnCrush = (x: number, z: number, radiusM: number) => (
+    lawn.crushAt(x, z, radiusM) + clover.crushAt(x, z, radiusM)
+  );
 
   // ---- ...and the FOREST RING and MOUNTAIN RING behind it -----------------
   // The same two modules the shipped map uses, re-fitted to this footprint
