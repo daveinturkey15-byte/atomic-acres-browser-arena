@@ -116,6 +116,7 @@ import {
 } from './nuketown-forest-surround';
 import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField, buildNuketown2CloverField } from './nuketown-lawn-field';
 import { buildNuketown2Vegetation } from './nuketown2-vegetation';
+import { buildNuketown2VergeEdge } from './nuketown2-verge-edge';
 import {
   createNuketown2GrimeMaterials,
   nuketown2GrimeDecals,
@@ -4900,6 +4901,17 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     }],
   });
   builder.root.userData.nuketown2CloverStats = clover.stats;
+  // ---- HF-536 night-muse-verge: turf-to-kerb transitions (critic gap #4) ---
+  // Soil strip + clover/dandelion clusters + unmown edge grass. Three
+  // InstancedMeshes, zero new samplers, no collider/raycast/shot surface, and
+  // names that never match the ' verge ' furniture filter, so the
+  // PROPS/verge-body ratchets below cannot see them. Same keep-out truth as
+  // the lawn; built here for the same batcher reason.
+  const vergeEdge = buildNuketown2VergeEdge(builder.root, {
+    planter: m.planter,
+    keepOuts: builder.colliders.slice(groundColliderCount),
+  });
+  builder.root.userData.nuketown2VergeEdgeStats = vergeEdge.stats;
 
   // ---- PASS 94 lane TECHNIQUES: hedges + the avenue ----------------------
   // Presentation only, and admissible for two separate reasons the module's
@@ -4918,6 +4930,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   builder.root.userData.nuketownLawnWind = (seconds: number) => {
     lawn.advanceWind(seconds);
     clover.advanceWind(seconds);
+    vergeEdge.advanceWind(seconds);
     vegetation.advanceWind(seconds);
   };
   // Owner 2026-08-30 breakable grass: gunfire and blasts flatten blades.
