@@ -795,7 +795,41 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
       // Being closest to atomic-acres is the correct outcome to check hardest:
       // these two are the SAME PLACE rebuilt, so they had to be pushed apart on
       // purpose - the shipped map is warm sunset, this one is bleached noon.
-      gain: [1.18, 1.16, 1.12],
+      //
+      // HF-536 look-2a, 2026-09-06 — THE ONE VALUE THE BLEACHED-NOON SEARCH
+      // LEFT BEHIND. Measured (docs/forge/tonal-gap.json, 29 stations,
+      // interim-2 vs the target boards, same camera): the sunlit set — every
+      // non-sky box's pixels at or above that box's own p75 — comes back a
+      // mean 13.8 COOLER in R-B than the board's, and 20-60 cooler on the
+      // stations the owner looks at first (street-centre 19.8 vs 51.7,
+      // perimeter-wall-end 21.2 vs 82.3, south-upper-window 31.7 vs 82.9).
+      // A key that measures cool under a 0xfff1ce sun is this row's blue
+      // channel: gain B 1.12 against R 1.18 is a ratio of only 1.054, which is
+      // what "bleached" means numerically — all three channels near the
+      // ceiling, so the key has brightness but no colour.
+      //
+      // SEARCHED, NOT FELT, and the search is the point. The first attempt
+      // (1.16/1.12/1.06) FAILED the distinctiveness gate at 0.01965 against
+      // atomic-acres, floor 0.02157 - warming this row on the CDL axis walks
+      // it straight into the warm suburban sunset it was pushed apart from.
+      // So the whole legal box was enumerated against the gate's own
+      // instrument (89 triples, R/G/B monotone, quality profile,
+      // `gradeThroughArena`): 25 are legal, and this is the warmest of them
+      // that also keeps nuketown2 OFF the bottom of the catalog. Weakest pair
+      // 0.02347 vs atomic-acres - above the 0.02157 floor AND above the
+      // shipped catalog's own weakest pair (rustworks-1v1 vs gun-range,
+      // 0.02262), so this arena is still not the closest pair in the game.
+      // Sunlit-probe R-B 44.2 -> 47.9 of 255 and the midtone probe 90.6 ->
+      // 84.7, i.e. warmer AND less pale, with the shade probe held at 24.0
+      // (was 24.5). The measured ceiling on this axis is +5.3 of R-B
+      // (1.18/1.08/1.04, margin 0.02212); the frame needs 13.8. The rest is
+      // NOT in the grade - see the lane report on the 0x8fb0bf ambient.
+      //
+      // LIFT AND GAMMA ARE DELIBERATELY UNTOUCHED: lift is what holds the
+      // shadow floor this pass must not lose (the worst ground-box p10 across
+      // 29 stations is 11 of 255, one point of headroom over the R26 floor of
+      // 10), and gamma is the other half of the searched distinctiveness pair.
+      gain: [1.18, 1.08, 1.06],
       lift: [0.006, 0.006, 0.006],
       gamma: [0.92, 0.98, 1.04],
     },
@@ -818,10 +852,23 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     // road, the mountains and the car body all came back with a hue angle of
     // 237-278 deg - violet - against a sun at 0xfff1ce. Warm key with violet
     // shade is a magenta cast, not golden hour; warm key with COOL shade is.
+    //
+    // HF-536 look-2a, 2026-09-06 — the hue pair above was RIGHT and too QUIET
+    // to reach the frame. night-lighting shipped it at strengthScale 1.0 and
+    // then measured the shade still at hue 270 deg (it moved 2 degrees), which
+    // is the honest signature of a correct tint applied at a third of the
+    // authority the picture needed. Split toning is exactly luminance
+    // preserving — the chain renormalises back to the incoming Rec.709 luma —
+    // so this is the ONE axis on which warm/cool separation can be bought with
+    // ZERO readability cost, and it is therefore where a lane told "the frame
+    // reads pale, cool and flat" should spend first. 1.45 of a 1.6 bound.
+    // highlightTint deepens 0xffd9a8 -> 0xffd096: R-B 87 -> 105, which is the
+    // measured 13.8-point sunlit R-B deficit paid back on the highlight side
+    // where the sun actually is, rather than smeared across the whole frame.
     splitTone: {
       shadowTint: 0x2b4258,      // cool slate-blue shade under a warm low sun
-      highlightTint: 0xffd9a8,   // amber board siding in the last hour of light
-      strengthScale: 1.0,
+      highlightTint: 0xffd096,   // deeper amber: the last hour, not mid-afternoon
+      strengthScale: 1.45,
       shadowBalance: 0.52,
       highlightBalance: 0.42,
     },
@@ -842,7 +889,20 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     // 0.62 puts the quality shoulder at 0.558 linear, i.e. the sky (which
     // measured p50 208-219 against a 150-215 plan) is conditioned before ACES
     // instead of arriving already clipped.
-    tone: { toeStrengthScale: 11.25, shoulderStartScale: 0.62 },
+    //
+    // HF-536 look-2a, 2026-09-06 — 0.62 -> 0.52 is night-lighting's own named
+    // next value, left unspent for want of a measurement, now spent because
+    // the measurement exists. docs/forge/tonal-gap.json over 29 stations puts
+    // our global p95 within 0.5 of the boards' (222 vs 222) while our global
+    // p50 sits 47.8 ABOVE theirs: the highlights are correctly placed and
+    // everything else has been dragged up to join them. That is a shoulder
+    // that starts too late, not an exposure error — an exposure move would
+    // take the already-correct p95 down with it, and it is bounded from below
+    // anyway by NUKETOWN2_SHADE_READABILITY_FLOOR. 0.52 puts the quality
+    // shoulder at 0.468 linear (was 0.558), still clear of the
+    // MINIMUM_COMPOSED_HIGHLIGHT_SHOULDER_START floor of 0.45, and the toe is
+    // untouched so nothing below the shoulder can move down.
+    tone: { toeStrengthScale: 11.25, shoulderStartScale: 0.52 },
     atmosphere: {
       mistNear: 0xd6d2c4, mistFar: 0xf4f0e4,
       smokeNear: 0x3c3a34, smokeFar: 0x9c988c,

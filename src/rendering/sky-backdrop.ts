@@ -35,7 +35,7 @@ type GradientStop = readonly [offset: number, css: string];
  * washed out by the gameplay fog band - both of which previously left arenas
  * with no visible sky at all.
  */
-const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly GradientStop[]>> = Object.freeze({
+export const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly GradientStop[]>> = Object.freeze({
   // Deep sunset: indigo zenith through violet and a broad burnt-orange band
   // into a glowing gold horizon. Owner wanted a much richer Atomic Acres sky.
   'sunset-farmland': Object.freeze([
@@ -269,14 +269,40 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
   // Nuke Town fork of estate-golden-hour: same zenith and same below-horizon
   // valley, but the horizon band is warm without blowing out (mid stops pulled
   // toward amber/rust instead of the estate's hot highlight).
+  //
+  // HF-536 look-2a, 2026-09-06 — TONAL MATCH TO THE BOARDS. Measured, not felt
+  // (docs/forge/tonal-gap.json, 29 stations, interim-2 vs
+  // root-captures/refs-boards/nuketown2, same camera): inside the 19 sky boxes
+  // our frame came back at p50 200-218 with HSV saturation 5-16%, i.e. a warm
+  // near-white — (211.9,203.8,201.3) on nuke-street, (199.3,200.6,205.2) on
+  // vehicle-mid — while the boards hold p50 158-200 at 18-31% saturated BLUE:
+  // (142.1,167.1,183.9) and (150.5,176.4,195.3) on the same two stations. Only
+  // 6 of 19 sky boxes were inside 20% of the board's saturation.
+  //
+  // Two authored causes, both here, both fixed as values with the sun disc,
+  // the aureole and every below-horizon valley stop untouched:
+  //   1. the WARM RAMP STARTED TOO HIGH. 0.462 was #b08a80 — a warm rust at
+  //      roughly 5 degrees above the horizon, which is the band the sky boxes
+  //      actually see on a level camera, so most stations read the horizon
+  //      flare as their whole sky. It is now a neutral dusk transition and the
+  //      amber is held to 0.482+, tight to the horizon where the boards put it.
+  //   2. the BLUE WAS TOO PALE TO SURVIVE THE HAZE. The aerial-perspective
+  //      inscatter is additive and takes the fog colour (legacy-main.ts:4369
+  //      passes `scene.fog.color`, 0xb1c0be), so a 45%-saturation upper sky
+  //      arrives desaturated and lifted. Every stop from the zenith to 0.40 is
+  //      deepened ~20% in luma and pushed 8-13 points of saturation so what
+  //      survives the haze is still blue.
+  // Reference luma/saturation before -> after: zenith 66/79% -> 50/85%,
+  // 0.30 100/60% -> 81/71%, 0.40 118/45% -> 104/58%, 0.462 145/27% (warm)
+  // -> 133/10% (neutral). Pinned in src/nuketown2-look-tonal-match.test.ts.
   'nuketown2-golden-hour': Object.freeze([
-    [0, '#1d4a8c'],
-    [0.16, '#2f5c9b'],
-    [0.30, '#3f6a9e'],
-    [0.40, '#5b7aa6'],
-    [0.462, '#b08a80'],
-    [0.482, '#dd9458'],
-    [0.4985, '#f0b874'],
+    [0, '#123a75'],
+    [0.16, '#1d4886'],
+    [0.30, '#2b5a93'],
+    [0.40, '#4470a0'],
+    [0.462, '#8f8290'],
+    [0.482, '#d28d55'],
+    [0.4985, '#edb069'],
     [0.506, '#eab89e'],
     [0.522, '#9d8fbe'],
     [0.552, '#8177ac'],
@@ -404,10 +430,20 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
   }),
   // Nuke Town fork of estate-golden-hour: same deck geometry and count, paler
   // lit tops and a touch less alpha so the low sun reads warm, not blown.
+  //
+  // HF-536 look-2a — THE MILK. 32 near-white decks at alpha 0.50 span
+  // 0.20-0.505, which is the ENTIRE band a level camera sees, so the sky the
+  // player gets is roughly half cloud by coverage before the additive haze is
+  // applied on top. That is the arithmetic behind the measured 5-16% sky
+  // saturation against the boards' 18-31% (docs/forge/tonal-gap.json): a
+  // saturated blue gradient averaged with a 255,238,214 deck at half weight
+  // cannot come out saturated. Deck geometry, count, band and scale are all
+  // UNCHANGED — only the coverage weight and the lit-top white move, so the
+  // sky keeps its cloud structure and stops erasing its own colour.
   'nuketown2-golden-hour': Object.freeze({
     count: 32, bandTop: 0.20, bandBottom: 0.505,
-    rgb: [255, 238, 214] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
-    alpha: 0.50, scale: 0.5,
+    rgb: [250, 232, 206] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
+    alpha: 0.36, scale: 0.5,
   }),
 });
 

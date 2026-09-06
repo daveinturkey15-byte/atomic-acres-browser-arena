@@ -77,7 +77,22 @@ describe('HF-536 nuketown2 display toe — the ACES toe no longer crushes the sh
 describe('HF-536 nuketown2 highlight shoulder — the into-sun sky is conditioned, not clipped', () => {
   it('authors a compress-only shoulder scale', () => {
     const direction = artDirectionForArena('nuketown2');
-    expect(direction.tone?.shoulderStartScale).toBe(0.62);
+    // HF-536 look-2a, 2026-09-06 — RE-STATED, AND STRICTLY STRONGER. This row
+    // pinned the literal 0.62 by equality, which asserted the VALUE rather
+    // than the property it was defending (compress-only, and never walked
+    // back). night-lighting itself named 0.52 as the next value and left it
+    // unspent; look-2a spent it with a measurement (global p95 within 0.5 of
+    // the target boards while global p50 sits 47.8 above them, over 29
+    // stations - docs/forge/tonal-gap.json). The pin now asserts the RATCHET:
+    // the shoulder may go on compressing and may never be relaxed back toward
+    // the ACES clip night-lighting found the sky sitting on. That admits
+    // strictly fewer values than `<= maximum` alone did, and it would still
+    // have caught the regression the literal was written to catch.
+    const SHOULDER_START_SCALE_RATCHET = 0.62;
+    expect(direction.tone?.shoulderStartScale).toBeLessThanOrEqual(SHOULDER_START_SCALE_RATCHET);
+    expect(direction.tone?.shoulderStartScale).toBeGreaterThanOrEqual(
+      ART_DIRECTION_SAFETY_BOUNDS.shoulderStartScale.minimum,
+    );
     expect(direction.tone?.shoulderStartScale).toBeLessThanOrEqual(
       ART_DIRECTION_SAFETY_BOUNDS.shoulderStartScale.maximum,
     );
