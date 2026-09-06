@@ -57,7 +57,7 @@ describe('HF-499 replication evidence', () => {
     // the victim's next self-authored packet - the measured firstSeenMs.guestA
     // === null conjunct. The health authority carries the same fact on its own
     // monotonic revision, admissible immediately. Both calls must be here.
-    expect(damageHook).toContain('publishRemoteHealthAuthority(targetId);');
+    expect(damageHook).toContain('publishRemoteHealthAuthority(targetId, true);');
     expect(soak).toContain('firstSeen.host = 0;');
     expect(soak).toContain('applied?.storedAfter');
   });

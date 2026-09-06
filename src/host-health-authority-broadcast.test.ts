@@ -126,7 +126,7 @@ describe('HF-535 observer admission is fail-closed', () => {
 describe('HF-535 host publication ordering', () => {
   const base = {
     playerId: VICTIM_ID, hostPlayerId: HOST_ID, matchEpoch: 7,
-    hostTimeMs: 1_000, nonce: 42, continuity: 3,
+    hostTimeMs: 1_000, nonce: 42, continuity: 3, nowMs: 0,
   };
 
   it('publishes the first fact about a player and then only on a drop or life change', () => {
@@ -149,22 +149,29 @@ describe('HF-535 host publication ordering', () => {
     // watermark, a player who fell to 80 and regenerated to 100 would never
     // publish the NEXT fall to 80 - the drop would look like no change.
     let published: PublishedHealthAuthority | undefined;
+    let nowMs = 0;
     for (const hp of [100, 80, 90, 100]) {
-      published = evaluateHealthAuthorityPublication({ ...base, hp, alive: true, published }).published;
+      // Step past the three-copy emission window each time, so the watermark is
+      // tracking live hp rather than holding a fact that is still in flight.
+      for (let step = 0; step < 4; step += 1) {
+        nowMs += 40;
+        published = evaluateHealthAuthorityPublication({ ...base, nowMs, hp, alive: true, published }).published;
+      }
     }
     expect(published?.hp).toBe(100);
-    const again = evaluateHealthAuthorityPublication({ ...base, hp: 80, alive: true, published });
+    nowMs += 40;
+    const again = evaluateHealthAuthorityPublication({ ...base, nowMs, hp: 80, alive: true, published });
     expect(again.reason).toBe('published');
     expect(again.message?.hp).toBe(80);
   });
 
   it('publishes a death and a new life, and never mints a live corpse', () => {
     const alive = evaluateHealthAuthorityPublication({ ...base, hp: 100, alive: true, published: undefined });
-    const dead = evaluateHealthAuthorityPublication({ ...base, hp: 0, alive: true, published: alive.published });
+    const dead = evaluateHealthAuthorityPublication({ ...base, nowMs: 10, hp: 0, alive: true, published: alive.published });
     expect(dead.reason).toBe('published');
     expect(dead.message?.alive).toBe(false);
     const respawn = evaluateHealthAuthorityPublication({
-      ...base, continuity: 4, hp: 100, alive: true, published: dead.published,
+      ...base, nowMs: 20, continuity: 4, hp: 100, alive: true, published: dead.published,
     });
     expect(respawn.reason).toBe('published');
     expect(respawn.message?.continuity).toBe(4);
@@ -177,6 +184,44 @@ describe('HF-535 host publication ordering', () => {
     expect(evaluateHealthAuthorityPublication({ ...base, hp: Number.NaN, alive: true, published: undefined }).reason)
       .toBe('malformed');
     expect(evaluateHealthAuthorityPublication({ ...base, continuity: -1, hp: 80, alive: true, published: undefined }).reason)
+      .toBe('malformed');
+  });
+
+  it('emits three idempotent copies of one fact, then stops', () => {
+    // The gate impairs the reliable lane with 1% seeded loss, so a single-shot
+    // fact can simply vanish for one observer. The copies carry the SAME
+    // revision, which the observer rejects as stale, and they carry the same
+    // payload even if hp moved between them.
+    const first = evaluateHealthAuthorityPublication({ ...base, hp: 80, alive: true, published: undefined });
+    expect(first.reason).toBe('published');
+    const tooSoon = evaluateHealthAuthorityPublication({ ...base, nowMs: 10, hp: 80, alive: true, published: first.published });
+    expect(tooSoon.reason).toBe('unchanged');
+    const second = evaluateHealthAuthorityPublication({ ...base, nowMs: 40, hp: 90, alive: true, published: tooSoon.published });
+    expect(second.reason).toBe('resent');
+    expect(second.message?.hp, 'a copy must not disagree with the fact it repeats').toBe(80);
+    expect(second.message?.revision).toBe(first.message?.revision);
+    const third = evaluateHealthAuthorityPublication({ ...base, nowMs: 80, hp: 90, alive: true, published: second.published });
+    expect(third.reason).toBe('resent');
+    expect(third.message?.hp).toBe(80);
+    const fourth = evaluateHealthAuthorityPublication({ ...base, nowMs: 200, hp: 90, alive: true, published: third.published });
+    expect(fourth.reason).toBe('unchanged');
+    expect(fourth.published?.hp, 'the watermark resumes tracking live hp once the fact is fully emitted').toBe(90);
+  });
+
+  it('forces a publish on a path that knows the stored authority moved', () => {
+    // The damage paths pass force, so no ledger disagreement can swallow the
+    // one fact an observer is owed.
+    const first = evaluateHealthAuthorityPublication({ ...base, hp: 80, alive: true, published: undefined });
+    let published = first.published;
+    for (const nowMs of [40, 80, 200]) {
+      published = evaluateHealthAuthorityPublication({ ...base, nowMs, hp: 80, alive: true, published }).published;
+    }
+    const unchanged = evaluateHealthAuthorityPublication({ ...base, nowMs: 240, hp: 80, alive: true, published });
+    expect(unchanged.reason).toBe('unchanged');
+    const forced = evaluateHealthAuthorityPublication({ ...base, nowMs: 240, hp: 80, alive: true, force: true, published: unchanged.published });
+    expect(forced.reason).toBe('published');
+    expect(forced.message?.revision).toBe((first.message?.revision ?? 0) + 1);
+    expect(evaluateHealthAuthorityPublication({ ...base, hp: Number.NaN, alive: true, force: true, published: undefined }).reason)
       .toBe('malformed');
   });
 
@@ -227,7 +272,11 @@ describe('HF-535 legacy-main wiring', () => {
     const start = main.indexOf('damageRemoteAuthoritatively: (amount: number, playerId) => {');
     const hook = main.slice(start, main.indexOf('\n  earnSupport:', start));
     expect(hook).toContain('createCanonicalRemoteState(remote.snapshot');
-    expect(hook).toContain('publishRemoteHealthAuthority(targetId);');
+    expect(hook).toContain('publishRemoteHealthAuthority(targetId, true);');
+    expect(
+      hook.indexOf('publishRemoteHealthAuthority(targetId, true);'),
+      'the health fact leads: the canonical state behind it is the one an observer rejects',
+    ).toBeLessThan(hook.indexOf('createCanonicalRemoteState(remote.snapshot'));
   });
 
   it('applies it on the observer and clears both ledgers with the health authority', () => {
@@ -238,5 +287,7 @@ describe('HF-535 legacy-main wiring', () => {
     expect(main).toContain('shouldApplyStaleSelfHealthRepair({ messageType: message.type');
     expect(main).toContain('publishedHealthAuthorities.clear(); appliedHealthAuthorityRevisions.clear();');
     expect(main).toContain('publishedHealthAuthorities.delete(playerId); appliedHealthAuthorityRevisions.delete(playerId);');
+    // A forced publish that still declines is a lost fact, so it is counted.
+    expect(main).toContain('function recordHealthAuthorityPublishDecline(');
   });
 });

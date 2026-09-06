@@ -31,6 +31,21 @@ import type { HealthAuthorityMessage } from './protocol';
 
 export const HEALTH_AUTHORITY_MAX_HP = 100;
 
+/**
+ * How many copies of ONE fact the host emits, and how far apart.
+ *
+ * MEASURED (day-mp-damage soak attempt 1, artifacts/qa/mp-soak-gate/day-mp-damage-bundle.json):
+ * the gate impairs every send with a deterministic 60 ms one-way delay AND 1%
+ * seeded loss, and that loss is applied BEFORE `connection.send`, so it hits the
+ * reliable event lane too - a single-shot health fact has a 1-in-100 chance of
+ * simply never existing for one observer, with no retransmit to save it. Three
+ * copies 35 ms apart all land inside the 120 ms bound (60/95/130 ms one-way for
+ * the first two) and are idempotent: the revision is unchanged, so an observer
+ * that already applied the fact rejects the copies as `stale-revision`.
+ */
+export const HEALTH_AUTHORITY_EMIT_COPIES = 3;
+export const HEALTH_AUTHORITY_RESEND_INTERVAL_MS = 35;
+
 const PLAYER_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/u;
 
 const clampHp = (hp: number): number => Math.min(HEALTH_AUTHORITY_MAX_HP, Math.max(0, hp));
@@ -41,6 +56,9 @@ export type PublishedHealthAuthority = Readonly<{
   alive: boolean;
   continuity: number;
   revision: number;
+  /** Copies of THIS revision already emitted, and when the last one went out. */
+  emits: number;
+  lastEmittedAtMs: number;
 }>;
 
 export type HealthAuthorityPublishInput = Readonly<{
@@ -53,10 +71,18 @@ export type HealthAuthorityPublishInput = Readonly<{
   matchEpoch: number;
   hostTimeMs: number;
   nonce: number;
+  /** Monotonic local clock, for the resend cadence only. */
+  nowMs: number;
+  /**
+   * Publish even if the change detector would call this unchanged. Set on the
+   * paths that KNOW they just moved the stored authority (host damage), so a
+   * ledger disagreement can never swallow the one fact an observer is owed.
+   */
+  force?: boolean;
   published: PublishedHealthAuthority | undefined;
 }>;
 
-export type HealthAuthorityPublishReason = 'published' | 'unchanged' | 'malformed';
+export type HealthAuthorityPublishReason = 'published' | 'resent' | 'unchanged' | 'malformed';
 
 export type HealthAuthorityPublishResult = Readonly<{
   message: HealthAuthorityMessage | null;
@@ -92,6 +118,7 @@ export function evaluateHealthAuthorityPublication(
     || !Number.isSafeInteger(input.continuity) || input.continuity < 0
     || !Number.isSafeInteger(input.matchEpoch) || input.matchEpoch < 0
     || !Number.isFinite(input.hostTimeMs) || input.hostTimeMs < 0
+    || !Number.isFinite(input.nowMs)
     || !Number.isFinite(input.nonce)) {
     return { message: null, reason: 'malformed', published: input.published };
   }
@@ -102,28 +129,55 @@ export function evaluateHealthAuthorityPublication(
   // `alive === (hp > 0)` check satisfiable by every message this mints.
   const alive = input.alive && hp > 0;
   const prior = input.published;
-  const changed = !prior
+  const changed = input.force === true
+    || !prior
     || prior.continuity !== input.continuity
     || alive !== prior.alive
     || Math.floor(hp) < Math.floor(prior.hp);
-  const revision = changed ? (prior?.revision ?? -1) + 1 : (prior?.revision ?? 0);
-  const published: PublishedHealthAuthority = Object.freeze({ hp, alive, continuity: input.continuity, revision });
-  if (!changed) return { message: null, reason: 'unchanged', published };
+  const mint = (
+    factHp: number, factAlive: boolean, factContinuity: number, revision: number,
+  ): HealthAuthorityMessage => ({
+    type: 'health-authority',
+    by: input.hostPlayerId,
+    playerId: input.playerId,
+    hp: factHp,
+    alive: factAlive,
+    continuity: factContinuity,
+    matchEpoch: input.matchEpoch,
+    revision,
+    hostTimeMs: input.hostTimeMs,
+    nonce: input.nonce,
+  });
+  if (changed) {
+    const revision = (prior?.revision ?? -1) + 1;
+    return {
+      message: mint(hp, alive, input.continuity, revision),
+      reason: 'published',
+      published: Object.freeze({
+        hp, alive, continuity: input.continuity, revision, emits: 1, lastEmittedAtMs: input.nowMs,
+      }),
+    };
+  }
+  // While a fact is still being emitted its stored hp IS the fact, so the
+  // copies cannot disagree with each other; the watermark only resumes
+  // tracking live hp once the last copy has gone out. Without that hold, a
+  // regeneration between copies would put two different payloads on the wire
+  // under one revision and the value an observer kept would depend on arrival
+  // order.
+  const emitting = prior.emits < HEALTH_AUTHORITY_EMIT_COPIES;
+  if (emitting && input.nowMs - prior.lastEmittedAtMs >= HEALTH_AUTHORITY_RESEND_INTERVAL_MS) {
+    // Same revision, same fact: a duplicate an observer rejects as stale, and
+    // the only defence against the gate's 1% loss on a single-shot event.
+    return {
+      message: mint(prior.hp, prior.alive, prior.continuity, prior.revision),
+      reason: 'resent',
+      published: Object.freeze({ ...prior, emits: prior.emits + 1, lastEmittedAtMs: input.nowMs }),
+    };
+  }
   return {
-    message: {
-      type: 'health-authority',
-      by: input.hostPlayerId,
-      playerId: input.playerId,
-      hp,
-      alive,
-      continuity: input.continuity,
-      matchEpoch: input.matchEpoch,
-      revision,
-      hostTimeMs: input.hostTimeMs,
-      nonce: input.nonce,
-    },
-    reason: 'published',
-    published,
+    message: null,
+    reason: 'unchanged',
+    published: emitting ? prior : Object.freeze({ ...prior, hp, alive }),
   };
 }
 
