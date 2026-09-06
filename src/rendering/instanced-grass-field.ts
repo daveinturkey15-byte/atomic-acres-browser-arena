@@ -75,15 +75,72 @@ export type GrassClumpTint = Readonly<{
   gBase: number; gWarm: number;
   bBase: number; bWarm: number;
   valueBase: number; valuePatch: number; valueJitter: number;
+  /** Optional dry/straw patch field. Omit for the original green-only tint. */
+  dry?: GrassDryPatchSpec;
+}>;
+
+/**
+ * HF-536 look-2b. A SECOND, higher-frequency field that mixes each channel
+ * toward a dry-straw set inside metre-scale patches, so a lawn reads as kept
+ * turf with dry spots rather than one uniform green strip.
+ *
+ * WHY IT IS A SECOND FIELD AND NOT A WIDER `warm` RANGE. `warm` is a ~57 m
+ * wavelength gradient - one slow sweep across a 36 x 84 m map - so widening it
+ * tilts the whole lawn instead of patching it. Dry spots on a real verge are
+ * 3-6 m across, which is a different octave, and the two have to be able to
+ * disagree (a dry spot inside the cool half of the map).
+ *
+ * WHY THE DRY CHANNELS ARE MULTIPLIERS AND NOT A COLOUR. `material.color`
+ * MULTIPLIES and is capped at white (memory: "three.js tint cannot lighten"),
+ * so a tint can only ever REMOVE light from the base. A straw patch is
+ * BRIGHTER and REDDER than kept turf, so it is unreachable from a green base -
+ * which is why the consumer that switches this on must also raise its base
+ * colour to the DRY tone and pull the green back down with `rBase`/`gBase`.
+ * `nuketown-lawn-field.ts` does exactly that and pins the composed green
+ * against the pre-change value so the green half provably does not move.
+ */
+export type GrassDryPatchSpec = Readonly<{
+  /** Channel factors at FULL dryness, before the value term. Must stay <= 1. */
+  rDry: number; gDry: number; bDry: number;
+  /** Peak mix weight toward the dry channels inside a patch, 0..1. */
+  weight: number;
+  /** Patch period in metres - the wavelength of the dry field. */
+  patchM: number;
+  /** Roughly what fraction of the field reads dry at all, 0..1. */
+  coverage: number;
 }>;
 
 /** Worst-case channel factor a tint spec can produce (must stay <= 1). */
 export function grassClumpTintPeak(tint: GrassClumpTint): number {
-  return Math.max(
+  const green = Math.max(
     tint.rBase + Math.max(0, tint.rWarm),
     tint.gBase + Math.max(0, tint.gWarm),
     tint.bBase + Math.max(0, tint.bWarm),
   );
+  if (!tint.dry) return green;
+  // A mix never leaves the interval spanned by its two ends, so the peak of
+  // the mixed tint is the peak of either end - no `weight` term is needed.
+  return Math.max(green, tint.dry.rDry, tint.dry.gDry, tint.dry.bDry);
+}
+
+/**
+ * Dryness at a world point, 0 (kept green) .. 1 (full straw patch).
+ * Exported so the lane test can measure real coverage over a real region
+ * instead of trusting the constant.
+ */
+export function grassDryness(spec: GrassDryPatchSpec, x: number, z: number): number {
+  const k = (Math.PI * 2) / spec.patchM;
+  // Domain warp on z breaks the axis-aligned lattice a bare sin(x)*cos(z)
+  // product leaves behind - without it the "patches" read as a checkerboard.
+  const warp = Math.cos(z * k * 0.83 + 1.7) * 0.9;
+  const field = Math.sin(x * k + warp) * Math.cos(z * k * 0.71 - 0.9);
+  const n = 0.5 + 0.5 * field;
+  const lo = 1 - Math.min(1, Math.max(0, spec.coverage));
+  const hi = lo + (1 - lo) * 0.55;
+  if (n <= lo) return 0;
+  if (n >= hi || hi <= lo) return 1;
+  const t = (n - lo) / (hi - lo);
+  return t * t * (3 - 2 * t);
 }
 
 export type GrassFieldMaterialOptions = Readonly<{
@@ -425,11 +482,21 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     const patch = Math.sin(x * 0.31 - 2.2) * Math.cos(z * 0.27 + 1.1);
     const warm = 0.5 + 0.5 * clump;
     const value = spec.valueBase + spec.valuePatch * patch + spec.valueJitter * jitter;
-    bladeColor.setRGB(
-      (spec.rBase + spec.rWarm * warm) * value,
-      (spec.gBase + spec.gWarm * warm) * value,
-      (spec.bBase + spec.bWarm * warm) * value,
-    );
+    let r = spec.rBase + spec.rWarm * warm;
+    let g = spec.gBase + spec.gWarm * warm;
+    let b = spec.bBase + spec.bWarm * warm;
+    if (spec.dry) {
+      // Metre-scale dry patches. `d = 0` reproduces the green tint EXACTLY,
+      // so a field that omits `dry` and one whose dryness happens to be 0 are
+      // byte-identical - which is what keeps this additive.
+      const d = grassDryness(spec.dry, x, z) * spec.dry.weight;
+      if (d > 0) {
+        r += (spec.dry.rDry - r) * d;
+        g += (spec.dry.gDry - g) * d;
+        b += (spec.dry.bDry - b) * d;
+      }
+    }
+    bladeColor.setRGB(r * value, g * value, b * value);
     return bladeColor;
   };
 
