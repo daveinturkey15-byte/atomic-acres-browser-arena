@@ -1,0 +1,109 @@
+{
+ "contract": "nuketown2-sampler-census-v1",
+ "why": "gotcha-silent-arena-rollback-device-limit: a 17-sampler arena's requestDevice was rejected with no visible error and the arena silently rolled back. This lane's scope hangs on whether one more texture sampler is affordable, so the answer is measured, not assumed.",
+ "instrument": "scripts/qa/probe-sampler-census.mjs - wraps GPUAdapter.requestDevice before three touches it, records adapter/requested/granted limits, every bind-group layout's entries classified sampler/texture, and every render pipeline resolved through its pipeline layout.",
+ "measuredOn": {
+  "dist": "dist-look2b-base",
+  "sha": "eca5cc98 base d2d15da6 (pre-correction candidate source, arena material set identical)",
+  "generatedAt": "2026-09-06T19:24:15.505Z",
+  "arena": "nuketown2"
+ },
+ "note": "THE LIMIT IS PER PIPELINE PER SHADER STAGE. The arena TOTAL is not what maxSamplersPerShaderStage bounds and is deliberately not reported as the headline.",
+ "profiles": {
+  "quality": {
+   "backend": "webgpu",
+   "bundle": "http://127.0.0.1:4322/assets/legacy-main-Djbddx_D.js",
+   "renderPipelines": 275,
+   "shaderModules": 379,
+   "bindGroupLayouts": 41,
+   "limits": {
+    "adapterMaxSamplersPerShaderStage": 16,
+    "adapterMaxSampledTexturesPerShaderStage": 48,
+    "requested": {
+     "maxSampledTexturesPerShaderStage": 48,
+     "maxSamplersPerShaderStage": 16
+    },
+    "grantedMaxSamplersPerShaderStage": 16,
+    "grantedMaxSampledTexturesPerShaderStage": 48
+   },
+   "worstPipeline": {
+    "samplersPerPipelineLayout": 10,
+    "samplersPerFragmentWgsl": 0,
+    "sampledTexturesPerPipelineLayout": 12,
+    "sampledTexturesPerFragmentWgsl": 0
+   },
+   "headroom": {
+    "samplers": 6,
+    "sampledTextures": 36
+   },
+   "sceneMaterials": {
+    "materials": 1658,
+    "materialsWithMaps": 321,
+    "mapKeys": {
+     "map": 241,
+     "normalMap": 281,
+     "roughnessMap": 249,
+     "metalnessMap": 249,
+     "aoMap": 30,
+     "emissiveMap": 16,
+     "bumpMap": 2,
+     "alphaMap": 24
+    }
+   },
+   "worstPipelineLabels": [
+    "renderPipeline_RenderPipeline_25",
+    "renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_1884",
+    "renderPipeline_MAT_Pass65_carbine_Polymer_PBR_939"
+   ],
+   "uncapturedErrors": []
+  },
+  "performance": {
+   "backend": "webgpu",
+   "bundle": "http://127.0.0.1:4322/assets/legacy-main-Djbddx_D.js",
+   "renderPipelines": 217,
+   "shaderModules": 289,
+   "bindGroupLayouts": 31,
+   "limits": {
+    "adapterMaxSamplersPerShaderStage": 16,
+    "adapterMaxSampledTexturesPerShaderStage": 48,
+    "requested": {
+     "maxSampledTexturesPerShaderStage": 48,
+     "maxSamplersPerShaderStage": 16
+    },
+    "grantedMaxSamplersPerShaderStage": 16,
+    "grantedMaxSampledTexturesPerShaderStage": 48
+   },
+   "worstPipeline": {
+    "samplersPerPipelineLayout": 9,
+    "samplersPerFragmentWgsl": 0,
+    "sampledTexturesPerPipelineLayout": 11,
+    "sampledTexturesPerFragmentWgsl": 0
+   },
+   "headroom": {
+    "samplers": 7,
+    "sampledTextures": 37
+   },
+   "sceneMaterials": {
+    "materials": 1655,
+    "materialsWithMaps": 319,
+    "mapKeys": {
+     "map": 239,
+     "normalMap": 279,
+     "roughnessMap": 247,
+     "metalnessMap": 247,
+     "aoMap": 30,
+     "emissiveMap": 16,
+     "bumpMap": 2,
+     "alphaMap": 24
+    }
+   },
+   "worstPipelineLabels": [
+    "renderPipeline_RenderPipeline_25",
+    "renderPipeline_MAT_Pass65_Crossbow_Armor_PBR_1892",
+    "renderPipeline_Semtex red PBR_981"
+   ],
+   "uncapturedErrors": []
+  }
+ },
+ "verdict": "AFFORDABLE. Granted maxSamplersPerShaderStage = 16 in BOTH owner-facing profiles (adapter also 16; three requests 16 explicitly). The worst single pipeline binds 10 samplers on Quality and 9 on Performance, leaving 6 and 7 spare, and 36/37 of the 48 sampled-texture slots free. The worst pipelines are VIEWMODEL/weapon PBR materials (Pass65 Crossbow Armor, carbine Polymer) and an unlabelled composite pipeline - NOT arena surfaces - so an alpha leaf atlas, which compiles its own pipeline carrying exactly one material texture, cannot approach the limit. Zero uncaptured WebGPU errors on either profile. HF-536 look-2b therefore took the leaf-atlas branch, not the geometry-only fallback."
+}
