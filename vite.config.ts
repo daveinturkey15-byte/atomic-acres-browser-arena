@@ -42,7 +42,7 @@ export default defineConfig({
        * against 937 kB is not a trade worth a second build system, and whoever
        * opens /map3.html after playing now reuses the vendor chunk they have.
        */
-      input: { index: 'index.html', map3: 'map3.html' },
+      input: { index: 'index.html', map3: 'map3.html', forgeFacade: 'forge-facade.html' },
       output: {
         manualChunks(id) {
           const normalized = id.replaceAll('\\', '/');

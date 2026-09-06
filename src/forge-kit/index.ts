@@ -66,3 +66,15 @@ export {
   wallArtParts,
   workbenchDressingParts,
 } from './interior/prefabs';
+export {
+  buildNorthHouseFacade,
+  createFacadeMaterials,
+  doorUnit,
+  downpipe,
+  facadeTriangleCount,
+  gutterRun,
+  lapSiding,
+  shingleRoofSlab,
+  windowUnit,
+} from './facade';
+export type { FacadeMaterials, FacadeRole, HouseFacadeOptions } from './facade';
