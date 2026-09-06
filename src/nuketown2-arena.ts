@@ -2981,6 +2981,14 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
         { x: 1.31, y: 1.62, z: 9.06, height: 2.38 },
         { x: 1.31, y: 1.62, z: 10.68, height: 2.38 },
       ],
+      // HF-536 detail pass (Muse): door pull, hubcap domes on the dished steel
+      // faces, cab roof vent, centred exhaust stack, plates and indicators.
+      doorHandles: { y: 1.3, z: [2.1] },
+      hubcaps: true,
+      vents: { x: 0.45, z: [3.0] },
+      stack: { z: 5.0, y0: 1.0, y1: 2.82 },
+      plates: { y: 0.62 },
+      indicators: { y: 0.95, x: 0.92 },
       // HF-536 (R14). The cab-over sits on a 0.6 m sill, the highest on the
       // street, so it floated hardest. Underbody only: the truck is ONE
       // vehicle in two placements and its bogie draws the whole contact pool,
