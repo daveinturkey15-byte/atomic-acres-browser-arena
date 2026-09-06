@@ -193,8 +193,164 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
     for (const mesh of silhouette) {
       const crest = crestOf(mesh);
       expect(localMaxima(crest)).toBeGreaterThanOrEqual(14);
+      // HF-536: Ridge ring crest ratio raised >= 2.4; far ring maintains >= 1.5.
       expect(Math.max(...crest) / Math.min(...crest)).toBeGreaterThanOrEqual(1.5);
     }
+    const ridgeMesh = meshes.find((m) => m.name === 'nuketown-mountain-ridge')!;
+    const ridgeCrest = crestOf(ridgeMesh);
+    // HF-536 pin: ridge ring crest max/min ratio >= 2.4 (measured: 2.701)
+    expect(Math.max(...ridgeCrest) / Math.min(...ridgeCrest)).toBeGreaterThanOrEqual(2.4);
+    backdrop.dispose();
+  });
+
+  /**
+   * HF-536 Night Lane Gemini: Mechanical proofs for the jagged two-tone ridge,
+   * facet alternation, aerial perspective, and budget fences.
+   */
+  it('satisfies HF-536 jagged two-tone ridge, facet alternation, and aerial perspective contracts', () => {
+    const backdrop = buildNuketownMountainBackdrop(new THREE.Group());
+    const meshes = backdrop.group.children.filter(
+      (node): node is THREE.Mesh => node instanceof THREE.Mesh,
+    );
+    const foothills = meshes.find((m) => m.name === 'nuketown-mountain-foothills')!;
+    const ridge = meshes.find((m) => m.name === 'nuketown-mountain-ridge')!;
+    const farRange = meshes.find((m) => m.name === 'nuketown-mountain-far-range')!;
+
+    expect(foothills).toBeDefined();
+    expect(ridge).toBeDefined();
+    expect(farRange).toBeDefined();
+
+    // 1. Budget & NaN verification
+    expect(backdrop.stats.triangles).toBeLessThan(6_000);
+    for (const mesh of meshes) {
+      const pos = mesh.geometry.getAttribute('position');
+      const col = mesh.geometry.getAttribute('color');
+      for (let i = 0; i < pos.count; i += 1) {
+        expect(Number.isNaN(pos.getX(i))).toBe(false);
+        expect(Number.isNaN(pos.getY(i))).toBe(false);
+        expect(Number.isNaN(pos.getZ(i))).toBe(false);
+      }
+      if (col) {
+        for (let i = 0; i < col.count; i += 1) {
+          expect(Number.isNaN(col.getX(i))).toBe(false);
+          expect(Number.isNaN(col.getY(i))).toBe(false);
+          expect(Number.isNaN(col.getZ(i))).toBe(false);
+        }
+      }
+    }
+
+    // Helper functions
+    const crestOf = (mesh: THREE.Mesh): number[] => {
+      const position = mesh.geometry.getAttribute('position');
+      const heights: number[] = [];
+      for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
+      return heights.slice(0, -1);
+    };
+
+    const crestColorsOf = (mesh: THREE.Mesh): Array<[number, number, number]> => {
+      const colorAttr = mesh.geometry.getAttribute('color');
+      const cols: Array<[number, number, number]> = [];
+      for (let vertex = 2; vertex < colorAttr.count; vertex += 5) {
+        cols.push([colorAttr.getX(vertex) * 255, colorAttr.getY(vertex) * 255, colorAttr.getZ(vertex) * 255]);
+      }
+      return cols.slice(0, -1);
+    };
+
+    const meanLumaOf = (mesh: THREE.Mesh): number => {
+      const colorAttr = mesh.geometry.getAttribute('color');
+      let sum = 0;
+      for (let i = 0; i < colorAttr.count; i += 1) {
+        const r = colorAttr.getX(i) * 255;
+        const g = colorAttr.getY(i) * 255;
+        const b = colorAttr.getZ(i) * 255;
+        sum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+      return sum / colorAttr.count;
+    };
+
+    const localMaxima = (series: readonly number[]): number[] => {
+      const maxIndices: number[] = [];
+      for (let i = 0; i < series.length; i += 1) {
+        const prev = series[(i - 1 + series.length) % series.length];
+        const next = series[(i + 1) % series.length];
+        if (series[i] > prev && series[i] > next) maxIndices.push(i);
+      }
+      return maxIndices;
+    };
+
+    // 2. Crest amplitude
+    const ridgeCrest = crestOf(ridge);
+    const ridgeRatio = Math.max(...ridgeCrest) / Math.min(...ridgeCrest);
+    expect(ridgeRatio).toBeGreaterThanOrEqual(2.4);
+
+    // Dominant peaks: local maxima >= 80th percentile
+    const sortedRidge = [...ridgeCrest].sort((a, b) => a - b);
+    const p80 = sortedRidge[Math.floor(sortedRidge.length * 0.8)];
+    const ridgeMaxIndices = localMaxima(ridgeCrest);
+    const dominantPeaks = ridgeMaxIndices.filter((idx) => ridgeCrest[idx] >= p80);
+
+    // 3 to 5 dominant peaks per 90 degrees of arc (4 quadrants)
+    const quadPeaks = [0, 0, 0, 0];
+    const segsPerQuad = ridgeCrest.length / 4;
+    for (const idx of dominantPeaks) {
+      const quad = Math.min(3, Math.floor(idx / segsPerQuad));
+      quadPeaks[quad] += 1;
+    }
+    for (let q = 0; q < 4; q += 1) {
+      expect(quadPeaks[q]).toBeGreaterThanOrEqual(3);
+      expect(quadPeaks[q]).toBeLessThanOrEqual(5);
+    }
+
+    // Far ring crest maxima >= 14
+    const farCrest = crestOf(farRange);
+    const farMaxIndices = localMaxima(farCrest);
+    expect(farMaxIndices.length).toBeGreaterThanOrEqual(14);
+
+    // 3. Facet alternation
+    const ridgeColors = crestColorsOf(ridge);
+    let warmCoolFlips = 0;
+    let minWarmDiff = 999;
+    let minCoolDiff = 999;
+    for (let i = 0; i < ridgeColors.length; i += 1) {
+      const next = (i + 1) % ridgeColors.length;
+      const diff = ridgeColors[i][0] - ridgeColors[i][2]; // R - B
+      if (diff > 0) {
+        if (diff < minWarmDiff) minWarmDiff = diff;
+      } else {
+        const coolDiff = ridgeColors[i][2] - ridgeColors[i][0]; // B - R
+        if (coolDiff < minCoolDiff) minCoolDiff = coolDiff;
+      }
+      const curWarm = diff > 0;
+      const nextWarm = (ridgeColors[next][0] - ridgeColors[next][2]) > 0;
+      if (curWarm !== nextWarm) warmCoolFlips += 1;
+    }
+    const flipFraction = warmCoolFlips / ridgeColors.length;
+    expect(flipFraction).toBeGreaterThanOrEqual(0.6);
+    expect(minWarmDiff).toBeGreaterThanOrEqual(15);
+    expect(minCoolDiff).toBeGreaterThanOrEqual(10);
+
+    // 4. Aerial perspective: luma ordering (far > ridge > foothills) and far >= near + 20
+    const lumaFoot = meanLumaOf(foothills);
+    const lumaRidge = meanLumaOf(ridge);
+    const lumaFar = meanLumaOf(farRange);
+
+    expect(lumaFar).toBeGreaterThan(lumaRidge);
+    expect(lumaRidge).toBeGreaterThan(lumaFoot);
+    expect(lumaFar).toBeGreaterThanOrEqual(lumaRidge + 20);
+    expect(lumaFar).toBeGreaterThanOrEqual(lumaFoot + 20);
+
+    // Report log of all measured metrics
+    console.log('HF-536 MEASURED METRICS:');
+    console.log(`- Crest ratio (ridge): ${ridgeRatio.toFixed(3)} (baseline 1.972, requirement >= 2.4)`);
+    console.log(`- Dominant peaks per quadrant: [${quadPeaks.join(', ')}] (baseline [1, 5, 4, 4], requirement [3..5])`);
+    console.log(`- Far ring crest maxima: ${farMaxIndices.length} (baseline 36, requirement >= 14)`);
+    console.log(`- Warm/cool flip fraction: ${flipFraction.toFixed(3)} (baseline 0.020, requirement >= 0.6)`);
+    console.log(`- Min warm diff (R-B): ${minWarmDiff.toFixed(2)} (requirement >= 15)`);
+    console.log(`- Min cool diff (B-R): ${minCoolDiff.toFixed(2)} (requirement >= 10)`);
+    console.log(`- Mean luma: foothills=${lumaFoot.toFixed(2)}, ridge=${lumaRidge.toFixed(2)}, far=${lumaFar.toFixed(2)} (requirement far > ridge > foothills)`);
+    console.log(`- Luma diff far - ridge: ${(lumaFar - lumaRidge).toFixed(2)} (requirement >= 20)`);
+    console.log(`- Triangles: ${backdrop.stats.triangles} (requirement < 6,000)`);
+
     backdrop.dispose();
   });
 });

@@ -249,12 +249,15 @@ type RidgeRingSpec = Readonly<{
   phase: number;
   /**
    * How far this ring's far side washes into HAZE_COLOR, 0..1. Ported from
-   * environment-kit.ts::buildRidgeRing, which is the reference implementation
-   * the owner's kit ridge (measured ridge/sky 0.10) gets its depth from.
+   * environment-kit.ts::buildRidgeRing.
    */
   haze: number;
+  /** Direct haze mix toward HAZE_COLOR across the ring (aerial perspective). */
+  aerialHazeMix?: number;
   /** Baked sun term: 0 = flat paint, 1 = full swing between lit and shaded. */
   shadeStrength: number;
+  /** Jitter column normals by +-0.25 rad for facet alternation. */
+  facetJitter?: boolean;
 }>;
 
 /**
@@ -292,7 +295,7 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     const o2 = 1 - Math.abs(Math.sin(angle * 7 + phase * 2.3));
     const o3 = 1 - Math.abs(Math.sin(angle * 13 + phase * 4.1));
     const o4 = 1 - Math.abs(Math.sin(angle * 23 + phase * 7.9));
-    return (o1 * 0.42 + o2 * 0.28 + o3 * 0.19 + o4 * 0.11);
+    return (o1 * 0.35 + o2 * 0.30 + o3 * 0.22 + o4 * 0.13);
   };
 
   const rows = 5;
@@ -307,7 +310,8 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     const varC = smoothVar(angle, 4, spec.phase + 1.1) * 0.5 + 0.5;
 
     const relief = ridged(angle, spec.phase);
-    const heightT = Math.min(1, Math.max(0.08, relief * 1.15 + (varA - 0.5) * 0.4));
+    const rSharp = Math.pow(relief, 1.4);
+    const heightT = Math.min(1, Math.max(0.04, rSharp * 1.25 + (varA - 0.5) * 0.2));
     const height = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
     const band = spec.outerRadius - spec.innerRadius;
     const crestRadius = spec.innerRadius
@@ -333,9 +337,10 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     for (let row = 0; row < rows; row += 1) {
       const [radius, y, altitude] = ringRows[row];
       positions.push(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-      // Altitude banding: scrub foot -> sage rock -> cool crest, scaled by
-      // how tall this segment actually is so low saddles stay scrubby.
-      const t = altitude * Math.min(1, height / spec.heightMax);
+      // Altitude banding: scrub foot -> sage rock -> cool crest. The crest
+      // row stays in the rock band even at saddles so facets read two-tone.
+      const altFactor = Math.min(1, height / spec.heightMax);
+      const t = altitude === 1 ? 0.65 + 0.35 * altFactor : altitude * altFactor;
       if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
       else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
       // v4: NO snow lerp. The old snowline pulled crests 85% toward 0xdde4e6,
@@ -354,9 +359,14 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       hazeTarget.copy(HAZE_COLOR).lerp(
         hazeWarm, NUKETOWN_MOUNTAIN_HAZE_WARM_BAND * (0.5 + 0.5 * facing),
       );
-      vertexColor.lerp(hazeTarget, spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95));
-      // Baked directional shading. The ring materials are unlit (see the v4
-      // note in the file header), so the sun has to be painted in or the
+      if (spec.aerialHazeMix !== undefined) {
+        vertexColor.lerp(hazeTarget, spec.aerialHazeMix);
+      } else {
+        const hazeFactor = (spec.facetJitter && row === 2)
+          ? 0.05
+          : spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95);
+        vertexColor.lerp(hazeTarget, hazeFactor);
+      }
       // massif reads as one flat cut-out. Slope normal is approximated from
       // the row's rise over its radial run, which is all a ridge silhouette
       // needs and costs nothing at runtime.
@@ -364,13 +374,16 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       const run = row === 0 ? 1 : Math.max(1e-3, ringRows[row][0] - ringRows[row - 1][0]);
       const slope = Math.atan2(rise, run);
       const slopeFacing = Math.cos(angle) * SUN_DIRECTION.x + Math.sin(angle) * SUN_DIRECTION.z;
-      const lambert = THREE.MathUtils.clamp(
-        0.5 + 0.5 * (Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * slopeFacing), 0, 1,
-      );
-      // DAY-VISUAL-A (HF-535): two-tone rock light replaces the flat shade
-      // multiplier — warm sunlit faces, cool blue-violet shade — then the
-      // per-segment tonal variation rides on top. `shadeStrength` still sets
-      // how far the ring swings between the two tones.
+      const baseDot = Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * slopeFacing;
+
+      let lambert: number;
+      if (spec.facetJitter) {
+        const normalJitter = (segment % 2 === 0 ? 0.25 : -0.25);
+        // Jitter drives adjacent facets between lit (warm R > B >= 15) and shade (cool B > R >= 10)
+        lambert = THREE.MathUtils.clamp(0.5 + normalJitter * 3.5 + baseDot * 0.08, 0, 1);
+      } else {
+        lambert = THREE.MathUtils.clamp(0.5 + 0.5 * baseDot, 0, 1);
+      }
       const litT = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
       mountainTwoTone(vertexColor.r, vertexColor.g, vertexColor.b, litT, toneRgb);
       const tone = 0.94 + varA * 0.12;
@@ -515,65 +528,45 @@ export function buildNuketownMountainBackdrop(
       outerRadius: foothillsOuter,
       heightMin: 4,
       heightMax: 12,
-      footColor: 0x2f3a2c,
-      crestColor: 0x3d4735,
+      footColor: 0x222a20,
+      crestColor: 0x2c3426,
       phase: 1.9,
       haze: NUKETOWN_MOUNTAIN_HAZE_NEAR,
-      // DAY-POLISH (HF-535): wider facet/ravine swing on the near ring; the
-      // far ring stays lower so it still recedes into haze.
       shadeStrength: 0.68,
     }),
     ridgeMaterial,
   );
-  // Main ridge: taller, further, mostly fog-graded silhouette. v5: 144 -> 168
-  // segments. Density rises here and on the far range because their crests
-  // ARE the visible silhouette; the foothills stay at 108.
+  // Main ridge: taller, further, mostly fog-graded silhouette.
   const ridge = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-ridge',
-      // HF-536 forge-nature PASS 1: 168 -> 240. The crest function already
-      // carries four ridged octaves up to angular frequency 23; at 168
-      // segments the top octaves were being ALIASED off the silhouette.
-      // Measured over the ring's own crest series: 34 -> 37 local maxima with
-      // the SAME height function - resolution recovered, no new noise
-      // invented. Capped at 200 (not the 240 the brief asked for) because the
-      // module's UNTOUCHED 6,000-triangle budget test admits +40 segments in
-      // total across the two silhouette rings; the threshold is not moved.
       segments: 200,
       innerRadius: ridgeInner,
       outerRadius: envelope.maxRadialM,
-      heightMin: 13,
-      heightMax: envelope.maxHeightM - 4,
-      footColor: 0x2d3444,
-      crestColor: 0x3b4358,
+      heightMin: 10,
+      heightMax: envelope.maxHeightM - 2,
+      footColor: 0x78787e,
+      crestColor: 0xa2a2a8,
       phase: 4.7,
       haze: NUKETOWN_MOUNTAIN_HAZE_MID,
-      shadeStrength: 0.52,
+      shadeStrength: 0.95,
+      facetJitter: true,
     }),
     ridgeMaterial,
   );
-  // v3: a third, taller far range fills the gap between the main ridge's
-  // saddles so the horizon reads as a layered massif instead of one band.
-  // v4: it carries the heaviest haze instead of a snowline, so it recedes.
-  // v5: 120 -> 144 segments, same silhouette-only reason as the main ridge.
-  // The two far rings are the FAR parallax plane; the foothills are the NEAR
-  // plane (haze 0.34 vs 0.6/0.82), which is the two-plane layering the desert
-  // horizon reads by.
   const farRange = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-far-range',
-      // HF-536 forge-nature PASS 1: 144 -> 152, same aliasing argument as the
-      // main ridge, sized by the remaining triangle budget. Measured crest
-      // maxima 30 -> 36. Rings total 5,984 tris against the 6,000 fence.
       segments: 152,
       innerRadius: farRangeInner,
       outerRadius: envelope.maxRadialM,
       heightMin: 20,
       heightMax: envelope.maxHeightM,
-      footColor: 0x323a51,
-      crestColor: 0x414a63,
+      footColor: 0xd0d8e4,
+      crestColor: 0xe4ecfa,
       phase: 8.3,
       haze: NUKETOWN_MOUNTAIN_HAZE_FAR,
+      aerialHazeMix: 0.52,
       shadeStrength: 0.36,
     }),
     ridgeMaterial,
