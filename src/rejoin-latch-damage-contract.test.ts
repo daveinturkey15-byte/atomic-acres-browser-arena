@@ -52,10 +52,24 @@ describe('rejoin latch recovery without bypassing authority', () => {
     const gate = 'remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id)';
     const at = source.indexOf(gate);
     const window = source.slice(at, at + 800);
-    expect(window).toContain('rejoinLatchResendAtMs');
-    expect(window).toContain('sendGuestResumeAuthority(incoming.id, remote)');
+    // HF-535: ef32a3e7 resent from THIS drop site. That made the recovery
+    // edge-triggered by an inbound guest state — the exact signal a latched
+    // guest never sends (its 20 Hz pump is gated on !awaitingCanonicalGuestAuthority
+    // and on player.alive), so in the day-mp soak the repair fired twice, both
+    // within 4 ms of the join, and the host's copy of guestB then froze for 73 s.
+    // The drop site now ARMS the latch and the host tick drives it, which
+    // strictly widens the cases the resend covers. The drop itself is unchanged.
+    expect(window).toContain('armRejoinLatch(incoming.id, performance.now())');
+    expect(window).not.toContain('rejoinLatchResendAtMs');
     // The latch still drops the unauthenticated sample; resend only retries the nonce.
     expect(window).toContain('return; }');
+    // ...and the resend is still reachable, still throttled, and now also
+    // reachable when no guest state ever arrives.
+    const tick = source.slice(source.indexOf('function updateRemotes('));
+    expect(tick.slice(0, tick.indexOf('\n}\n'))).toContain('driveRejoinLatchRecovery(');
+    const drive = source.slice(source.indexOf('function driveRejoinLatchRecovery'));
+    expect(drive.slice(0, drive.indexOf('\nfunction ', 1)))
+      .toContain('sendGuestResumeAuthority(playerId, remote)');
   });
 
   it('re-acknowledges an already-applied resume authority without re-teleporting', () => {

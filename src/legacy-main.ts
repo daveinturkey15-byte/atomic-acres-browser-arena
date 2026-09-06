@@ -394,7 +394,7 @@ import {
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
 import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack'; import { canSpendReconnectRepairAttempt, shouldDeclareResumeTimeout, shouldReadmitResumeAuthority } from './guest-rejoin-repair-pacing';
-import { renderPrivateLobbyView } from './mp-lobby-authority-views';
+import { renderPrivateLobbyView } from './mp-lobby-authority-views'; import { armRejoinLatch, clearAllRejoinLatches, clearRejoinLatch, evaluateRejoinLatchRecovery, noteRejoinLatchResend, rejoinLatchArmedAtMs, rejoinLatchLastResendAtMs } from './rejoin-latch-recovery';
 import { acceptLocalPickupResult as acceptLocalPickupResultAuthority, expirePendingLocalPickup as expirePendingLocalPickupAuthority, type PendingLocalPickup } from './mp-pickup-authority';
 import { createLocalReloadRetryRuntime } from './mp-reload-retry';
 import {
@@ -6225,7 +6225,6 @@ const pendingGuestAuthorityRepairs = new Map<string, Readonly<{
   authorityNonce: number;
   message: GuestResumeAuthorityMessage;
 }>>();
-const rejoinLatchResendAtMs = new Map<string, number>();
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -7890,7 +7889,7 @@ function resetPrivateLobbyState(): void {
   hostDisconnectedAt.clear();
   pendingHostRecoveryJoins.clear();
   hostLobbyAdmissionInFlight.clear();
-  pendingGuestAuthorityRepairs.clear(); rejoinLatchResendAtMs.clear();
+  pendingGuestAuthorityRepairs.clear(); clearAllRejoinLatches();
   hostMatchRecoveryPreparing = false;
   retainedRemoteAuthorities.clear();
   remoteCombatInventories.clear();
@@ -9081,13 +9080,13 @@ function rejectLobbyPlayer(
 function resetAuthenticatedGuestReplacement(playerId: string): void {
   const now = performance.now();
   hostKillstreakLoadoutAcks.clearActor(playerId);
-  pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
   clearRemoteReloadAuthority(playerId);
   const remote = remotes.get(playerId);
   if (remote) {
     remote.interpolation.clear();
     remote.positionHistory.length = 0;
-    remote.awaitingReplacementState = true;
+    remote.awaitingReplacementState = true; armRejoinLatch(playerId, now);
     remote.lastSeen = now;
     remote.feedbackSequenceGaps = 0;
     remote.feedbackReordered = 0;
@@ -9189,6 +9188,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
 }
 function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
 function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); }
+function driveRejoinLatchRecovery(playerId: string, remote: RemotePlayer, nowMs: number, guestEventLaneActive: boolean): void { const latched = remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId); if (!latched) { clearRejoinLatch(playerId); return; } const action = evaluateRejoinLatchRecovery({ nowMs, armedAtMs: rejoinLatchArmedAtMs(playerId), lastResendAtMs: rejoinLatchLastResendAtMs(playerId), guestEventLaneActive, latched }); if (action === 'resend') { noteRejoinLatchResend(playerId, nowMs); sendGuestResumeAuthority(playerId, remote); } else if (action === 'fail-closed') { const pending = pendingGuestAuthorityRepairs.get(playerId); clearRejoinLatch(playerId); if (pending) sendGuestResumeFailure(pending.message, 'retry-ceiling'); } }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -9200,14 +9200,14 @@ function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
     expectedAuthorityNonce: pending.authorityNonce,
   }) || hostLobbyConnectionEpochs.get(message.by) !== message.connectionEpoch) return true;
   const remote = remotes.get(message.by);
-  if (!remote || !remote.awaitingReplacementState) return true;
+  if (!remote || !remote.awaitingReplacementState) { pendingGuestAuthorityRepairs.delete(message.by); clearRejoinLatch(message.by); return true; }
   processedNonces.add(message.nonce);
   // The replacement document may have emitted a state-lane sample before its
   // reliable world-ready join. Only this exact epoch + authority-nonce ACK
   // releases mutable pose authority; earlier samples must not replace the
   // retained host pose used by the resume transaction.
   remote.awaitingReplacementState = false;
-  pendingGuestAuthorityRepairs.delete(message.by); rejoinLatchResendAtMs.delete(message.by);
+  pendingGuestAuthorityRepairs.delete(message.by); clearRejoinLatch(message.by);
   const member = hostLobbyMembers.get(message.by);
   if (member && !member.connected) {
     // This ACK can only arrive on the current admitted event connection and is
@@ -9233,7 +9233,7 @@ function sendGuestResumeFailure(
     worldRevision: pending.worldRevision, authorityNonce: pending.nonce,
     attempt: pending.attempt, reason, nonce: randomNonce(),
   };
-  pendingGuestAuthorityRepairs.delete(pending.forPlayerId); rejoinLatchResendAtMs.delete(pending.forPlayerId);
+  pendingGuestAuthorityRepairs.delete(pending.forPlayerId); clearRejoinLatch(pending.forPlayerId);
   network.sendToPlayer(pending.forPlayerId, failure);
 }
 
@@ -9974,7 +9974,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyTokenDigests.delete(playerId);
     pendingHostRecoveryJoins.delete(playerId);
     hostLobbyAdmissionInFlight.delete(playerId);
-    pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
+    pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
     hostKillstreakLoadoutAcks.clearActor(playerId);
     const retained = retainedRemoteAuthorities.get(playerId);
     if (retained) {
@@ -10016,7 +10016,7 @@ function markLobbyDisconnected(playerId: string): void {
   if (!member || playerId === player.id) return;
   if (!member.connected && hostDisconnectedAt.has(playerId)) return;
   hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
-  pendingGuestAuthorityRepairs.delete(playerId); rejoinLatchResendAtMs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
   hostDisconnectedAt.set(playerId, performance.now());
   broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   scheduleDisconnectedLobbyExpiry(playerId);
@@ -13389,7 +13389,7 @@ function onNetworkMessage(message: GameMessage): void {
           at: currentHostTimeMs(), x: initialIncoming.x, y: initialIncoming.y, z: initialIncoming.z,
           yaw: initialIncoming.yaw, stance: initialIncoming.stance ?? 'stand', continuity: retainedAuthority.continuity,
         }];
-        remote.awaitingReplacementState = true;
+        remote.awaitingReplacementState = true; armRejoinLatch(incoming.id, performance.now());
       } else if (network.role === 'host' && message.type === 'state'
         && message.continuity >= remote.continuity) {
         // createRemote seeds continuity 1 and the creating sample cannot enter
@@ -13466,7 +13466,7 @@ function onNetworkMessage(message: GameMessage): void {
       }
     }
     if (network.role === 'host' && message.type === 'state'
-      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) { recordStateAdmissionDrop(remote.awaitingReplacementState ? 'rejoin-latch-awaiting-replacement' : 'rejoin-latch-pending-repair'); const latchNowMs = performance.now(); if (latchNowMs - (rejoinLatchResendAtMs.get(incoming.id) ?? Number.NEGATIVE_INFINITY) > 1000) { rejoinLatchResendAtMs.set(incoming.id, latchNowMs); sendGuestResumeAuthority(incoming.id, remote); } return; }
+      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) { recordStateAdmissionDrop(remote.awaitingReplacementState ? 'rejoin-latch-awaiting-replacement' : 'rejoin-latch-pending-repair'); armRejoinLatch(incoming.id, performance.now()); return; }
     const snapshotAdmission = admitRemoteSnapshot(remote.snapshot, remote.continuity, remote.authoritativeHostTimeMs, { kind: message.type, snapshot: incoming, continuity: message.type === 'state' ? message.continuity : remote.continuity, hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs() }); if (snapshotAdmission.accepted) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
@@ -27354,7 +27354,7 @@ function updateRemotes(dt: number, now: number): void {
     jitterMs: measuredJitterMs,
     underruns: newUnderruns,
   }, now);
-  for (const [id, remote] of remotes) {
+  for (const [id, remote] of remotes) { if (network.role === 'host') driveRejoinLatchRecovery(id, remote, now, activeGuestIds?.has(id) ?? false);
     if (now - remote.lastSeen > 12_000) {
       // Movement freshness and authenticated activity are distinct authorities.
       // A replacement can pause or rebind its lossy state lane while clock
