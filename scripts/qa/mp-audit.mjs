@@ -314,6 +314,9 @@ const viewOf = (page) => page.evaluate(() => {
     players,
     fireBlock: snapshot.fireBlock ? { total: snapshot.fireBlock.total, byReason: { ...snapshot.fireBlock.byReason }, last: snapshot.fireBlock.last } : null,
     stateAdmissionDrops: snapshot.stateAdmissionDrops ?? null,
+    matchAdmissionPark: snapshot.matchAdmissionPark ?? null,
+    clientWorldRepair: snapshot.clientWorldRepair ?? null,
+    clientWorldRepairFailures: snapshot.clientWorldRepairFailures ?? null,
     ui: {
       menuHidden: document.querySelector('#menu')?.classList.contains('hidden') ?? null,
       readyDisabled: document.querySelector('#lobby-ready')?.disabled ?? null,

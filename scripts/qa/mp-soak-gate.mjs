@@ -93,6 +93,7 @@ const bundle = {
     role: 'guestB', leaveObserved: false, rejoinObserved: false, seenByEveryoneAfter: false,
     damage: { triggered: false, credited: false, maxLatencyMs: null, byPeer: {} },
   },
+  admissionDropTimeline: [],
   scenarios: { guests: { guestA: {}, guestB: {} } },
   consoleErrors: { host: [], guestA: [], guestB: [] },
   scoreboard: { agreement: false },
@@ -160,7 +161,7 @@ async function peerViews() {
 
 function evidenceView(view) {
   if (!view) return null;
-  return { selfId: view.selfId, role: view.role, matchPhase: view.matchPhase, gameStarted: view.gameStarted, remotes: view.remotes, players: view.players };
+  return { selfId: view.selfId, role: view.role, matchPhase: view.matchPhase, gameStarted: view.gameStarted, remotes: view.remotes, players: view.players, stateAdmissionDrops: view.stateAdmissionDrops ?? null, matchAdmissionPark: view.matchAdmissionPark ?? null, clientWorldRepair: view.clientWorldRepair ?? null, clientWorldRepairFailures: view.clientWorldRepairFailures ?? null };
 }
 
 function addReplicationDivergences(views, second) {
@@ -262,6 +263,20 @@ function addReplicationDivergences(views, second) {
   }
 }
 
+const prevAdmissionByReason = {};
+
+function admissionDeltaFor(role, drops) {
+  const byReason = drops?.byReason ?? {};
+  const prev = prevAdmissionByReason[role] ?? {};
+  const delta = {};
+  for (const [reason, count] of Object.entries(byReason)) {
+    const before = Number(prev[reason] ?? 0);
+    if (Number(count) > before) delta[reason] = Number(count) - before;
+  }
+  prevAdmissionByReason[role] = { ...byReason };
+  return delta;
+}
+
 async function sampleReplication(playStart) {
   let second = 0;
   while (Date.now() - playStart < PLAY_DURATION_MS) {
@@ -271,6 +286,13 @@ async function sampleReplication(playStart) {
     if (Date.now() - playStart >= PLAY_DURATION_MS) break;
     const views = await peerViews();
     bundle.replication.samples.push({ second, atEpochMs: Date.now(), peers: Object.fromEntries(PEERS.map((role) => [role, evidenceView(views[role])])) });
+    const deltas = {};
+    const last = {};
+    for (const role of PEERS) {
+      deltas[role] = admissionDeltaFor(role, views[role]?.stateAdmissionDrops);
+      if (Object.keys(deltas[role]).length > 0) last[role] = views[role]?.stateAdmissionDrops?.last ?? null;
+    }
+    bundle.admissionDropTimeline.push({ second, atEpochMs: Date.now(), deltas, last });
     addReplicationDivergences(views, second);
     second += 1;
   }
@@ -486,14 +508,31 @@ async function closeOwnedBrowsers(force = false) {
   }
 }
 
+function formatAdmissionSection() {
+  const lines = ['## admission drops (informational — not a gate row)', ''];
+  let events = 0;
+  for (const entry of bundle.admissionDropTimeline) {
+    for (const role of Object.keys(entry.deltas ?? {})) {
+      const delta = entry.deltas[role];
+      if (!delta || Object.keys(delta).length === 0) continue;
+      events += 1;
+      const last = entry.last?.[role];
+      lines.push(`- s${entry.second} ${role} ${JSON.stringify(delta)}${last ? ` last=${JSON.stringify(last)}` : ''}`);
+    }
+  }
+  if (events === 0) lines.push('- no state admission drops sampled on any peer');
+  return lines.join('\n');
+}
+
 async function writeEvidence() {
   bundle.timing.endedAtEpochMs ??= Date.now();
   bundle.timing.playDurationMs = bundle.timing.playDurationMs || Math.max(0, bundle.timing.endedAtEpochMs - bundle.timing.startedAtEpochMs);
   bundle.gate = evaluateMpSoakBundle(bundle);
   mkdirSync(outDir, { recursive: true });
   await writeFile(join(outDir, `${label}-bundle.json`), `${JSON.stringify(bundle, null, 2)}\n`, 'utf8');
-  await writeFile(join(outDir, `${label}-table.md`), `${formatMpSoakTable(bundle.gate.rows)}\n`, 'utf8');
+  await writeFile(join(outDir, `${label}-table.md`), `${formatMpSoakTable(bundle.gate.rows)}\n\n${formatAdmissionSection()}\n`, 'utf8');
   console.log(`\n=== mp-soak-gate table ===\n${formatMpSoakTable(bundle.gate.rows)}`);
+  console.log(`\n=== admission drops (informational) ===\n${formatAdmissionSection()}`);
   console.log(`artifact: ${join(outDir, `${label}-bundle.json`)}`);
   return bundle.gate;
 }
