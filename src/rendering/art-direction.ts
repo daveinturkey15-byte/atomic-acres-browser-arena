@@ -88,6 +88,40 @@ export type ArenaArtDirection = Readonly<{
   vignette: Readonly<{ base: number; settingScale: number }>;
   /** Bloom identity. thresholdScale >= 1 — thresholds may only move UP. */
   bloom: Readonly<{ intensityScale: number; thresholdScale: number }>;
+  /**
+   * HF-536 night-lighting — the two tone-curve shapers an arena may author.
+   *
+   * Optional: an arena that omits it composes exactly as it does today, so
+   * this field cannot move any shipped arena's picture by existing.
+   *
+   * BOTH DIRECTIONS ARE ONE-WAY, and that is the whole combat-safety argument:
+   *
+   * - `toeStrengthScale >= 1`. Stage 8 is a pure ADD of
+   *   `toeFloor * toeStrength * shadowMask` (`applyDisplayToe`), so scaling it
+   *   up can only RAISE a shadow pixel. Nothing that renders today can get
+   *   darker, and `NEWLY_BLACK` can only fall. The composed lift is clamped to
+   *   `MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT`, which is the 5%-display ceiling the
+   *   grade-profile combat envelope already states in prose.
+   * - `shoulderStartScale <= 1`. Stage 6 pre-conditions the highlights before
+   *   the ACES transform; lowering where the shoulder starts hands ACES a
+   *   compressed range instead of a clipped one, which RECOVERS separation
+   *   between a blown sky and the sunlit wall in front of it. Raising it is
+   *   refused because that would push more of the frame into the clip.
+   *
+   * Measured reason nuketown2 needs them (root-captures/forge-final, 29
+   * stations, tod=authored, 6000 ms hold): the composed display toe on the
+   * quality profile is `0.035 * 0.14 = 0.0049`, i.e. **1.25 of 255** — a toe
+   * stage that lifts by less than one 8-bit step, against a value plan that
+   * asks for a shadow floor of >= 10. And the sky is at p50 208-219 with the
+   * sunlit siding at p50 203, i.e. sky and wall are the same value because
+   * both sit on the ACES shoulder.
+   */
+  tone?: Readonly<{
+    /** Multiplies the profile's display toe strength. >= 1 (lift only). */
+    toeStrengthScale: number;
+    /** Multiplies the profile's highlight shoulder start. <= 1 (compress only). */
+    shoulderStartScale: number;
+  }>;
   /** Atmosphere particle mood: mist/smoke/dust tint pairs + density scale. */
   atmosphere: Readonly<{
     mistNear: number; mistFar: number;
@@ -108,6 +142,24 @@ export const MINIMUM_COMPOSED_BLOOM_THRESHOLD = 1.02;
 /** Chain-proven monotonicity bound for the display midtone contrast. */
 export const MAXIMUM_COMPOSED_MIDTONE_CONTRAST = 0.3;
 
+/**
+ * HF-536 — ceiling on the composed display toe lift, in display-referred
+ * units (1.0 = 255). The grade-profile combat envelope already states the rule
+ * in prose ("Shadow toe never lifts blacks above ~5% display luminance"); this
+ * is that sentence made executable now that an arena can scale the toe.
+ * 0.05 display = 12.75 of 255, comfortably above the R26 shadow floor of 10
+ * and far below anything that could fog a sightline.
+ */
+export const MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT = 0.05;
+
+/**
+ * HF-536 — floor on the composed highlight shoulder start, in linear HDR.
+ * Below this the shoulder would begin inside the diffuse midtones, which is
+ * where surface modelling lives; the stage is a highlight conditioner, not a
+ * global contrast reducer.
+ */
+export const MINIMUM_COMPOSED_HIGHLIGHT_SHOULDER_START = 0.45;
+
 /** Bounds for the linear scene grade after composition. */
 export const SCENE_SATURATION_BOUNDS = Object.freeze({ minimum: 0.6, maximum: 1.45 });
 export const SCENE_CONTRAST_BOUNDS = Object.freeze({ minimum: 0.9, maximum: 1.18 });
@@ -127,6 +179,9 @@ export const ART_DIRECTION_SAFETY_BOUNDS = Object.freeze({
   bloomIntensityScale: Object.freeze({ minimum: 0.75, maximum: 1.35 }),
   bloomThresholdScale: Object.freeze({ minimum: 1, maximum: 1.3 }),
   atmosphereDensity: Object.freeze({ minimum: 0.6, maximum: 1.35 }),
+  // HF-536. Lift-only and compress-only by construction; see the `tone` field.
+  toeStrengthScale: Object.freeze({ minimum: 1, maximum: 14 }),
+  shoulderStartScale: Object.freeze({ minimum: 0.5, maximum: 1 }),
 });
 
 function assertWithin(
@@ -176,6 +231,20 @@ export function assertArtDirectionSafety(direction: ArenaArtDirection): void {
   assertWithin(direction.id, 'bloom.intensityScale', direction.bloom.intensityScale, ART_DIRECTION_SAFETY_BOUNDS.bloomIntensityScale);
   assertWithin(direction.id, 'bloom.thresholdScale', direction.bloom.thresholdScale, ART_DIRECTION_SAFETY_BOUNDS.bloomThresholdScale);
   assertWithin(direction.id, 'atmosphere.density', direction.atmosphere.density, ART_DIRECTION_SAFETY_BOUNDS.atmosphereDensity);
+  if (direction.tone) {
+    assertWithin(
+      direction.id,
+      'tone.toeStrengthScale',
+      direction.tone.toeStrengthScale,
+      ART_DIRECTION_SAFETY_BOUNDS.toeStrengthScale,
+    );
+    assertWithin(
+      direction.id,
+      'tone.shoulderStartScale',
+      direction.tone.shoulderStartScale,
+      ART_DIRECTION_SAFETY_BOUNDS.shoulderStartScale,
+    );
+  }
 }
 
 function frozen(direction: ArenaArtDirection): ArenaArtDirection {
@@ -190,6 +259,7 @@ function frozen(direction: ArenaArtDirection): ArenaArtDirection {
     vignette: Object.freeze({ ...direction.vignette }),
     bloom: Object.freeze({ ...direction.bloom }),
     atmosphere: Object.freeze({ ...direction.atmosphere }),
+    ...(direction.tone ? { tone: Object.freeze({ ...direction.tone }) } : {}),
   });
 }
 
@@ -735,16 +805,44 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     saturationScale: 1.06,
     contrastScale: 1.06,
     crosstalkDelta: -0.13,
+    // HF-536 night-lighting, 2026-09-06. Re-hued for the golden hour this arena
+    // was RE-LIT to in HF-426 Job 3, which the row above deliberately did not
+    // follow. Split toning is exactly luminance preserving (the chain
+    // renormalises back to the incoming Rec.709 luma), so this pair moves hue
+    // and cannot move visibility - it is the one grade axis with no readability
+    // cost at all, which is why the golden-hour correction is taken here rather
+    // than in gain/gamma (untouched above: the distinctiveness search that set
+    // them is not re-run by this lane).
+    //
+    // MEASURED reason (root-captures/forge-final, score-stations): the shaded
+    // road, the mountains and the car body all came back with a hue angle of
+    // 237-278 deg - violet - against a sun at 0xfff1ce. Warm key with violet
+    // shade is a magenta cast, not golden hour; warm key with COOL shade is.
     splitTone: {
-      shadowTint: 0x3c2f4e,      // violet shade under a colourless noon sky
-      highlightTint: 0xf6f0e2,   // bleached board siding, almost no hue left
+      shadowTint: 0x2b4258,      // cool slate-blue shade under a warm low sun
+      highlightTint: 0xffd9a8,   // amber board siding in the last hour of light
       strengthScale: 1.0,
       shadowBalance: 0.52,
       highlightBalance: 0.42,
     },
     midtoneContrastDelta: 0.08,
     vignette: { base: 0.07, settingScale: 1 },
-    bloom: { intensityScale: 1.0, thresholdScale: 1.06 },
+    // HF-536: the street lamp heads, the sun disc and the glazing are the only
+    // things in this arena above the composed threshold, and they were flat
+    // white boxes. Threshold up (1.10 x 1.10 = 1.21 linear on quality - further
+    // above white than before, so no wall can join in) and intensity up, which
+    // is a glow on the emitters rather than a wash on the sightlines.
+    bloom: { intensityScale: 1.28, thresholdScale: 1.1 },
+    // HF-536 - see `tone` on ArenaArtDirection for the full argument and the
+    // measured numbers. 11.25 is derived, not felt: the PERFORMANCE profile
+    // has the smallest toe (strength 0.10), and 0.035 x 0.10 x 11.25 = 0.0394
+    // display = 10.0 of 255, which is exactly the R26 shadow-floor row. Quality
+    // and Max compose past the 0.05 ceiling and clamp there (12.75 of 255), so
+    // every profile clears the floor and none of them exceeds the envelope.
+    // 0.62 puts the quality shoulder at 0.558 linear, i.e. the sky (which
+    // measured p50 208-219 against a 150-215 plan) is conditioned before ACES
+    // instead of arriving already clipped.
+    tone: { toeStrengthScale: 11.25, shoulderStartScale: 0.62 },
     atmosphere: {
       mistNear: 0xd6d2c4, mistFar: 0xf4f0e4,
       smokeNear: 0x3c3a34, smokeFar: 0x9c988c,
@@ -796,7 +894,20 @@ export function composeArtDirectedProfile(
       ART_DIRECTION_SAFETY_BOUNDS.composedCrosstalk.minimum,
       ART_DIRECTION_SAFETY_BOUNDS.composedCrosstalk.maximum,
     ),
-    transfer: profile.transfer,
+    // HF-536. Compress-only: the composed shoulder start may fall (handing ACES
+    // a pre-conditioned highlight range instead of a clipped one) but never
+    // rise, and never below the midtone floor.
+    transfer: direction.tone
+      ? Object.freeze({
+        shoulderStart: Math.max(
+          MINIMUM_COMPOSED_HIGHLIGHT_SHOULDER_START,
+          profile.transfer.shoulderStart * Math.min(1, direction.tone.shoulderStartScale),
+        ),
+        shoulderEnd: profile.transfer.shoulderEnd,
+        shoulderPower: profile.transfer.shoulderPower,
+        shoulderDesaturation: profile.transfer.shoulderDesaturation,
+      })
+      : profile.transfer,
     bloom: Object.freeze({
       threshold: Math.max(
         profile.bloom.threshold * direction.bloom.thresholdScale,
@@ -808,7 +919,16 @@ export function composeArtDirectedProfile(
     display: Object.freeze({
       toeCeiling: profile.display.toeCeiling,
       toeFloor: profile.display.toeFloor,
-      toeStrength: profile.display.toeStrength,
+      // HF-536. Lift-only, and the composed LIFT (`toeFloor * toeStrength`, the
+      // quantity `applyDisplayToe` actually adds) is what the ceiling bounds —
+      // scaling the strength alone would let a profile with a larger toeFloor
+      // walk past the envelope.
+      toeStrength: direction.tone
+        ? Math.min(
+          profile.display.toeStrength * Math.max(1, direction.tone.toeStrengthScale),
+          MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT / Math.max(profile.display.toeFloor, 1e-6),
+        )
+        : profile.display.toeStrength,
       midtonePivot: profile.display.midtonePivot,
       midtoneWidth: profile.display.midtoneWidth,
       midtoneContrast: clampScalar(

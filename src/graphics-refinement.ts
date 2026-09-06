@@ -89,7 +89,20 @@ const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freez
   // NUKETOWN2 (PREVIEW, HF-407): matte board siding, asphalt and painted
   // vehicle panels - the same surface mix the shipped Nuke Town was fitted at,
   // so it carries the same 0.24 rather than a value nobody measured.
-  'nuketown2': 0.24,
+  //
+  // HF-536 night-lighting, 2026-09-06: 0.24 -> 0.32. The 0.24 was inherited
+  // from the shipped map's surface mix, but this rebuild added a DAMP asphalt
+  // read (roughness 0.95 -> 0.62 damp in the asphalt family) and three painted
+  // vehicles, and scene.environment is the ONLY reflection term any of them
+  // gets: the shadow-floor lane measured (2026-09-06, lane FINAL.json step 1)
+  // that `material.envMapIntensity` is a literal no-op on this route because
+  // the road binds no material envMap and `scene.environmentIntensity` is the
+  // single scalar. So a per-family reflection weight is not reachable without
+  // an envNode graph edit; this scalar is the whole lever.
+  // Sized against the exposure budget, not by feel: the same measurement puts
+  // 0.24 -> 1.0 at +7.6% sunlit luma, i.e. ~+1.6% at 0.32, inside the +-5%
+  // this pass is allowed to move the sunlit siding.
+  'nuketown2': 0.32,
   // RAID2 (PREVIEW, HF-408): same volume and same map size as test2, so the
   // texel footprint is the same and the bias that works there works here.
   'raid2': 0.22,

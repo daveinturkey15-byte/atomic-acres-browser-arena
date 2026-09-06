@@ -189,6 +189,36 @@ function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+/**
+ * HF-536 night-lighting — GTAO gather radius per tier, IN METRES.
+ *
+ * `GTAONode` multiplies its sample direction by `radius` in VIEW space
+ * (`node_modules/three/examples/jsm/tsl/display/GTAONode.js`, the
+ * `sampleViewOffset` line), so this number is a real world length, not a
+ * screen fraction. The shipped tiers were 0.18 / 0.22 / 0.25 m — an interior
+ * prop radius. In a 36 x 84 m exterior arena the contacts a player reads are
+ * a kerb against asphalt, a house base against a lawn, a porch soffit, a
+ * hedge against a wall and a vehicle against the road; those separations are
+ * 0.4-0.9 m, so a 0.22 m gather darkened a band roughly 3 px wide at 1280x720
+ * from ten metres and every box in the frame read as floating (owner,
+ * 2026-09-06: "looks like Roblox").
+ *
+ * Cost is unchanged by construction: GTAO's per-pixel cost is
+ * `samples x resolutionScale`, and neither moves here. A wider radius changes
+ * only where the same twelve taps land (measured fps delta reported in the
+ * lane report).
+ *
+ * The strengths are deliberately NOT raised alongside: strength is the mix
+ * weight of the occlusion term, and moving both at once would make the pass
+ * unattributable. Widening the gather is the correction; darkening it further
+ * would be a second, separate claim.
+ */
+export const GTAO_RADIUS_METRES = Object.freeze({
+  low: 0.42,
+  high: 0.6,
+  ultra: 0.8,
+});
+
 function presetGraphics(preset: Exclude<GraphicsPreset, 'custom'>): GraphicsSettings {
   return Object.freeze({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset] });
 }
@@ -414,10 +444,10 @@ export function resolveGraphicsRuntime(
   const ambientOcclusion = settings.ambientOcclusion === 'off'
     ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false })
     : settings.ambientOcclusion === 'low'
-      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42, denoise: false })
+      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: GTAO_RADIUS_METRES.low, strength: 0.42, denoise: false })
       : settings.ambientOcclusion === 'high'
-        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true })
-        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62, denoise: true });
+        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52, denoise: true })
+        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: GTAO_RADIUS_METRES.ultra, strength: 0.62, denoise: true });
   if (forceCompatibility) {
     return Object.freeze({
       requestedPreset: requestedGraphics.preset,

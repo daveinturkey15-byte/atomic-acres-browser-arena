@@ -11,6 +11,7 @@ import {
   resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   writePass65Settings,
+  GTAO_RADIUS_METRES,
 } from './pass65-settings';
 import { GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import { activeWeatherPresentation, resetWeatherPresentation } from './weather/weather-settings';
@@ -32,7 +33,7 @@ describe('Pass 65 settings contract', () => {
       renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
       shadowMapSize: 2048, maximumAnisotropy: 8,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52,
       },
     });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
@@ -216,13 +217,13 @@ describe('Pass 65 settings contract', () => {
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'off' } }).graphics).ambientOcclusion)
       .toEqual({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false });
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'low' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'low', enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42, denoise: false });
+      .toEqual({ quality: 'low', enabled: true, resolutionScale: 0.35, samples: 8, radius: GTAO_RADIUS_METRES.low, strength: 0.42, denoise: false });
     // Pass 76: High and Ultra add the depth/normal-aware denoise pass; Low
     // stays the raw cheap tier.
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'high' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true });
+      .toEqual({ quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52, denoise: true });
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'ultra' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62, denoise: true });
+      .toEqual({ quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16, radius: GTAO_RADIUS_METRES.ultra, strength: 0.62, denoise: true });
   });
 
   it('canonicalizes custom supersampling to the renderer-supported 125% ceiling', () => {

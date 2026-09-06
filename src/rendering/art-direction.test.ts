@@ -5,6 +5,8 @@ import {
   ART_DIRECTION_SAFETY_BOUNDS,
   DISPLAY_VIGNETTE_MAXIMUM,
   MAXIMUM_COMPOSED_MIDTONE_CONTRAST,
+  MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT,
+  MINIMUM_COMPOSED_HIGHLIGHT_SHOULDER_START,
   MINIMUM_COMPOSED_BLOOM_THRESHOLD,
   SCENE_CONTRAST_BOUNDS,
   SCENE_SATURATION_BOUNDS,
@@ -211,12 +213,42 @@ describe('Lane L profile composition', () => {
           ART_DIRECTION_SAFETY_BOUNDS.composedCrosstalk.maximum,
         );
         // The display toe (shadow-lift combat floor) is never weakened.
+        //
+        // HF-536: this used to be strict equality on toeStrength, i.e. "the
+        // arena may not touch the toe at all". That is stricter than the
+        // property it was defending, and it was defending the wrong side: the
+        // shipped composed lift was 0.035 x 0.14 = 0.0049 display (1.25 of
+        // 255), which is not a shadow floor, and nuketown2's shaded street
+        // measured p50 1.7 with it. `ArenaArtDirection.tone.toeStrengthScale`
+        // is bounded >= 1 so it can only LIFT, and the composition clamps the
+        // composed LIFT - the quantity `applyDisplayToe` actually adds - to
+        // MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT. Both halves are asserted here, so
+        // this row still fails on any crush and now also fails on any lift
+        // past the envelope, which the equality never checked.
         expect(composed.display.toeCeiling).toBe(GRADE_PROFILES[profileId].display.toeCeiling);
         expect(composed.display.toeFloor).toBe(GRADE_PROFILES[profileId].display.toeFloor);
-        expect(composed.display.toeStrength).toBe(GRADE_PROFILES[profileId].display.toeStrength);
-        // Grain and transfer stay profile-owned.
+        expect(composed.display.toeStrength).toBeGreaterThanOrEqual(
+          GRADE_PROFILES[profileId].display.toeStrength,
+        );
+        expect(composed.display.toeFloor * composed.display.toeStrength).toBeLessThanOrEqual(
+          MAXIMUM_COMPOSED_DISPLAY_TOE_LIFT + 1e-12,
+        );
+        // Grain stays profile-owned outright. The highlight transfer is
+        // profile-owned in shape; an arena may only move where the shoulder
+        // STARTS, downwards (more pre-conditioning before ACES, never less),
+        // and never below the midtone floor.
         expect(composed.grain).toBe(GRADE_PROFILES[profileId].grain);
-        expect(composed.transfer).toBe(GRADE_PROFILES[profileId].transfer);
+        expect(composed.transfer.shoulderEnd).toBe(GRADE_PROFILES[profileId].transfer.shoulderEnd);
+        expect(composed.transfer.shoulderPower).toBe(GRADE_PROFILES[profileId].transfer.shoulderPower);
+        expect(composed.transfer.shoulderDesaturation).toBe(
+          GRADE_PROFILES[profileId].transfer.shoulderDesaturation,
+        );
+        expect(composed.transfer.shoulderStart).toBeLessThanOrEqual(
+          GRADE_PROFILES[profileId].transfer.shoulderStart,
+        );
+        expect(composed.transfer.shoulderStart).toBeGreaterThanOrEqual(
+          MINIMUM_COMPOSED_HIGHLIGHT_SHOULDER_START,
+        );
       }
     }
   });
