@@ -53,6 +53,7 @@ const lines = [
   `# reachable = open air ${PLATE_CLEARANCE_M} m out from the broad face`,
   `# meshes=${audit.meshes} · plates=${audit.plates} · non-box skipped=${audit.skippedNonBox}`,
   `# FINDINGS (FrontSide, reachable from BOTH sides): ${audit.findings.length}`,
+  `# plates CLOSED by geometry (an outward face on both broad sides - FrontSide cannot show through them): ${audit.closedBodies}`,
   `# single-sided plates reachable from ONE side (correct): ${audit.oneSided}`,
   `# plates already DoubleSide/BackSide: ${audit.alreadyDoubleSided}`,
   '',

@@ -49,8 +49,73 @@ export type PlateAudit = {
   skippedNonBox: number;
   oneSided: number;
   alreadyDoubleSided: number;
+  /**
+   * Plates whose GEOMETRY already supplies an outward face in both broad
+   * directions. `side: FrontSide` cannot make those see-through, so they are
+   * censused and excluded rather than reported. See `closedFaces`.
+   */
+  closedBodies: number;
   findings: PlateFinding[];
 };
+
+/**
+ * Directions (in the body's own world-rotated basis) in which the geometry
+ * actually presents an OUTWARD-facing triangle.
+ *
+ * THIS IS THE PREMISE THE FIRST CUT OF THIS AUDIT SKIPPED (HF-536
+ * night-defects-3a). `side: THREE.FrontSide` only produces a hole where the
+ * face you are looking at is ABSENT. On a closed box every one of the six
+ * faces exists and every one points outward, so a viewer on any side sees a
+ * front face and the material's side mode is irrelevant. Reporting a closed
+ * box as see-through is a false positive, and "fixing" it with DoubleSide buys
+ * nothing but backface shading and shadow cost.
+ *
+ * Measured at 2320affd: all 38 findings of the first cut were closed
+ * BoxGeometry, 12 triangles, 6/6 outward faces
+ * (`scripts/qa/audit-nuketown2-plate-closure.ts`).
+ */
+export function closedFaces(mesh: THREE.Mesh): Set<number> {
+  const covered = new Set<number>();
+  const geometry = mesh.geometry;
+  const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (!position) return covered;
+  mesh.updateWorldMatrix(true, false);
+  const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+  // The body's own axes, carried into world space: a stair stringer rotated
+  // about z still has six faces, and classifying it against WORLD axes would
+  // call a perfectly closed box open. Closure is a property of the geometry,
+  // not of its orientation.
+  const basis = ([0, 1, 2] as const).flatMap((axis) => ([-1, 1] as const).map((sign) => {
+    const vector = new THREE.Vector3();
+    vector.setComponent(axis, sign);
+    return { key: axis * 2 + (sign > 0 ? 1 : 0), vector: vector.applyMatrix3(normalMatrix).normalize() };
+  }));
+  const index = geometry.getIndex();
+  const count = index ? index.count : position.count;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  for (let i = 0; i + 2 < count; i += 3) {
+    const i0 = index ? index.getX(i) : i;
+    const i1 = index ? index.getX(i + 1) : i + 1;
+    const i2 = index ? index.getX(i + 2) : i + 2;
+    a.fromBufferAttribute(position, i0);
+    b.fromBufferAttribute(position, i1);
+    c.fromBufferAttribute(position, i2);
+    normal.crossVectors(b.sub(a), c.sub(a));
+    if (normal.lengthSq() === 0) continue;
+    normal.applyMatrix3(normalMatrix).normalize();
+    for (const entry of basis) if (normal.dot(entry.vector) > 0.99) covered.add(entry.key);
+  }
+  return covered;
+}
+
+/** True when the body presents an outward face on BOTH broad sides of `axis`. */
+export function broadFacesClosed(mesh: THREE.Mesh, axis: 0 | 1 | 2): boolean {
+  const covered = closedFaces(mesh);
+  return covered.has(axis * 2) && covered.has(axis * 2 + 1);
+}
 
 function insideAny(solids: readonly Solid[], skip: Solid, x: number, y: number, z: number): boolean {
   for (const solid of solids) {
@@ -80,9 +145,12 @@ export function auditNuketown2SingleSidedPlates(root?: THREE.Object3D): PlateAud
     if (mesh.userData.collisionOnly === true) return;
     meshes += 1;
     if ((mesh as THREE.InstancedMesh).isInstancedMesh === true) { skippedNonBox += 1; return; }
-    const parameters = (mesh.geometry as THREE.BoxGeometry).parameters as
-      { width?: number; height?: number; depth?: number } | undefined;
-    if (parameters?.width === undefined || parameters.height === undefined || parameters.depth === undefined) {
+    // HF-536 night-defects-3a: the first cut admitted BoxGeometry ONLY, which
+    // meant the audit could not see the very class it was invented for - a
+    // single-sided PLANE standing in as a wall or a floor. Every geometry with
+    // a position attribute is now censused; closure is decided from the
+    // triangles (see `closedFaces`), not from a constructor's parameters.
+    if ((mesh.geometry.getAttribute('position') as THREE.BufferAttribute | undefined) === undefined) {
       skippedNonBox += 1;
       return;
     }
@@ -104,6 +172,7 @@ export function auditNuketown2SingleSidedPlates(root?: THREE.Object3D): PlateAud
   let plates = 0;
   let oneSided = 0;
   let alreadyDoubleSided = 0;
+  let closedBodies = 0;
   for (const candidate of candidates) {
     const { solid, mesh, material } = candidate;
     if (material.transparent === true) continue;
@@ -120,6 +189,11 @@ export function auditNuketown2SingleSidedPlates(root?: THREE.Object3D): PlateAud
     if (area < PLATE_MIN_AREA_M2) continue;
     plates += 1;
     if (material.side !== THREE.FrontSide) { alreadyDoubleSided += 1; continue; }
+    // THE PREMISE, TESTED (HF-536 night-defects-3a). A FrontSide body is only
+    // see-through where the face is missing. If the geometry already presents
+    // an outward face on both broad sides, no viewer can ever see through it
+    // and there is nothing to fix.
+    if (broadFacesClosed(mesh, axis)) { closedBodies += 1; continue; }
     const centre: [number, number, number] = [
       (solid.minX + solid.maxX) / 2,
       (solid.minY + solid.maxY) / 2,
@@ -162,5 +236,5 @@ export function auditNuketown2SingleSidedPlates(root?: THREE.Object3D): PlateAud
     void mesh;
   }
   findings.sort((left, right) => right.area - left.area);
-  return { meshes, plates, skippedNonBox, oneSided, alreadyDoubleSided, findings };
+  return { meshes, plates, skippedNonBox, oneSided, alreadyDoubleSided, closedBodies, findings };
 }
