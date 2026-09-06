@@ -206,6 +206,12 @@ import {
   shingleRoofParts,
   windowRevealParts,
 } from './forge-kit';
+// HF-536 night-gemini4: yard props kit
+import {
+  type YardPart,
+  type YardRole,
+  yardPropPlacements,
+} from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -3817,6 +3823,61 @@ function forgeKitCentred(
       });
   }
 }
+/**
+ * HF-536 night-gemini4: Resolve one yard ROLE onto THIS arena's existing material registry.
+ * Borrows existing arena materials only; adds zero materials, uniforms, or shader graphs.
+ */
+function yardRoleMaterial(m: Nuketown2Materials, role: YardRole): THREE.Material {
+  switch (role) {
+    case 'timber': return m.fence;
+    case 'foliage':
+    case 'lawn':
+    case 'planter': return m.planter;
+    case 'rubber': return m.rubber;
+    case 'chrome': return m.chrome;
+    case 'interior': return m.interior;
+    case 'painted-metal': return m.garageDoor;
+    case 'painted-red': return m.applianceRed;
+    case 'painted-blue': return m.applianceBlue;
+    case 'painted-green': return m.carClassic;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * Emit one yard prefab at an authored anchor, through `pair()`.
+ * Every part is presentation-only (solid:false, shots:false).
+ * Bins and table cast shadows (cast:true); small clutter does not (cast:false).
+ * Every part carries the prefab's propId so declutter gates count props, not boxes.
+ */
+function yardPairKit(
+  builder: Builder,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly YardPart[],
+  m: Nuketown2Materials,
+): void {
+  for (const part of parts) {
+    const id = `${propId} ${part.suffix}`;
+    pair(builder, id, [
+      anchor[0] + part.offset[0],
+      anchor[1] + part.offset[1],
+      anchor[2] + part.offset[2],
+    ], [part.size[0], part.size[1], part.size[2]], yardRoleMaterial(m, part.role),
+    {
+      solid: false,
+      shots: false,
+      cast: part.cast,
+      presentationOnly: true,
+      propId,
+      ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+    });
+    for (const side of ['north', 'south'] as const) {
+      const mesh = builder.root.getObjectByName(`nuketown2 ${side} ${id}`);
+      if (mesh) mesh.userData.presentationOnly = true;
+    }
+  }
+}
 
 /**
  * HF-536 night-facade-port. Resolve one facade ROLE onto THIS arena's registry.
@@ -4243,6 +4304,10 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
   pair(builder, 'yard patio table slab', [-14.5, 0.04, -31.5], [2.60, 0.08, 2.60], m.drive,
     { solid: false, shots: false, cast: false });
+  // HF-536 night-gemini4: yard props kit (bins, mailbox, garden set, hose reel, washing line, sand-pit toys, planters)
+  for (const placement of yardPropPlacements()) {
+    yardPairKit(builder, placement.propId, placement.anchor, placement.parts, m);
+  }
 }
 
 /**
