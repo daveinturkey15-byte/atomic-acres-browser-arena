@@ -1524,8 +1524,8 @@ function nuketown2Materials(): Nuketown2Materials {
     // between the shipped backdrop skirt's two authored ground colours - damp
     // forest floor 0x4c5340 and dry scrub 0x5d6047 - which is the ground this
     // slab is standing in for, so the plain and the tree line now read as the
-    // same land. PASS 94: the same 0x515642 key, now carrying dry-scrub straw
-    // patches and metre-scale bare ground instead of one flat value.
+    // same land. PASS 94: the same scrub key (0x515642, HF-536 muse-lawn 0x5e5f3c),
+    // now carrying dry-scrub straw patches and metre-scale bare ground instead of
     ground: forged.ground,
     // grass-turf, the shipped lawn plate. The instanced lawn field grows out of
     // this, and that field's blade green (0x5e9e41) was keyed against it.

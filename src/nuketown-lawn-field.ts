@@ -330,19 +330,19 @@ export type NuketownLawnKeepOutCircle = Readonly<{
 export const NUKETOWN2_LAWN_BASE_COLOR = 0xc5aa5b;
 
 /**
- * Late-summer kept turf with metre-scale dry spots. Green half is the exact
- * pre-pass lawn (see above); the `dry` block is the whole visible change.
- *
- * `patchM` 4.5 m sits in the middle of the brief's 3-6 m band and is well
- * inside a single yard (the rebuild's yard lawn is 13 m deep), so a yard shows
- * two or three dry spots rather than one wash. `coverage` 0.34 was chosen so
- * about a third of the turf carries some dryness - measured over the real
- * regions by the lane test, not asserted from this number.
+ * Late-summer kept turf with metre-scale dry spots. HF-536 muse-lawn: the green
+ * half moves from lime (composed hue 99.0 sat 72.5% at value 0.855) to the boards
+ * olive (composed sRGB ~(103, 101, 57), hue ~57 sat ~45% across warm 0..1:
+ * (98, 95, 59) / (103, 101, 57) / (108, 106, 55) - measured against interim-4
+ * boards bedGround hue 61.3 sat 63.5%, surroundGround hue 68.5 sat 69.4%).
+ * Base stays the dry tone 0xc5aa5b so the straw pole remains reachable; only the
+ * green pull-down coefficients move. `patchM`/`coverage`/weight keep look-2b's
+ * field period and phase, so plate and blades still go dry in the same places.
  */
 export const NUKETOWN2_LAWN_TINT: GrassClumpTint = Object.freeze({
-  rBase: 0.126298, rWarm: 0.044104,
-  gBase: 0.748511, gWarm: 0.085058,
-  bBase: 0.252640, bWarm: -0.055581,
+  rBase: 0.254, rWarm: 0.060,
+  gBase: 0.336, gWarm: 0.085,
+  bBase: 0.485, bWarm: -0.055,
   valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
   dry: Object.freeze({
     rDry: 0.999, gDry: 0.997, bDry: 0.995,
@@ -476,13 +476,15 @@ export function buildNuketownRebuildLawnField(
     )),
     material: {
       // HF-536 look-2b: the base is now the DRY tone; the tint carries the
-      // green (see NUKETOWN2_LAWN_BASE_COLOR). Green composition is unchanged.
+      // green (see NUKETOWN2_LAWN_BASE_COLOR). HF-536 muse-lawn: the tip/backlit
+      // translucency follows the lawn to the boards olive (0xa4cb55 hue 79.8 sat
+      // 58.1% -> 0x9aa04e hue 64.4 sat 51.2%, measured with the lawn boxes).
       color: NUKETOWN2_LAWN_BASE_COLOR,
       roughness: 0.89,
       metalness: 0.02,
       swayAmount: 0.045,
       windSpeed: 0.8,
-      sssColor: 0xa4cb55,
+      sssColor: 0x9aa04e,
       sssStrength: 0.29,
       rootShade: [0.56, 0.65, 0.5],
     },

@@ -257,18 +257,23 @@ function createCourtMaterial(): MeshStandardNodeMaterial {
  *
  * The old base vec3(0.70, 0.69, 0.65) x mean tone 0.99 reads linear luma
  * 0.682 against the lawn plate 0x496438 (linear luma 0.108): a 6.3x ratio,
- * far above the 2.5 paving-on-grass ceiling. The base below reads
+ * far above the 2.5 paving-on-grass ceiling. Sweep2's base below read
  * 0.2296 mean (2.12x the plate; ~1.87x the patchy effective mean ~0.123),
  * inside the [1.8, 2.2]x band, as a warm grey (sRGB ~133,132,129).
+ * HF-536 muse-lawn [MEASURED] follow-up: the plate moved olive 0x496438 ->
+ * 0x6a6b3a (linear luma 0.108 -> 0.139), so the stone follows it to keep its
+ * band: the base below reads 0.2801 mean at tone mean 0.99 (2.02x the plate;
+ * ~1.84x the patchy effective mean ~0.152), inside the [1.8, 2.2]x band,
+ * as a warm grey (sRGB ~146,145,141).
  * Dedicated role: `m.stones` dresses only `yard stepping stones`, so no fork.
  */
-export const NUKETOWN2_STEP_STONE_BASE_LINEAR = Object.freeze([0.236, 0.232, 0.219] as const);
+export const NUKETOWN2_STEP_STONE_BASE_LINEAR = Object.freeze([0.288, 0.283, 0.267] as const);
 export const NUKETOWN2_STEP_STONE_TONE_LO = 0.92;
 export const NUKETOWN2_STEP_STONE_TONE_SPAN = 0.14;
 /** Full grain swing; the per-pixel term is +/- half of this. */
 export const NUKETOWN2_STEP_STONE_GRAIN = 0.04;
 /** The lawn plate the ratio is measured against (registry `lawn` base). */
-export const NUKETOWN2_STEP_STONE_LAWN_BASE_SRGB = 0x496438;
+export const NUKETOWN2_STEP_STONE_LAWN_BASE_SRGB = 0x6a6b3a;
 
 /**
  * FLAGSTONE PATH. One organic meandering run per yard: ten irregular polygonal

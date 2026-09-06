@@ -215,7 +215,7 @@ describe('Nuke Town Rebuild vegetation', () => {
     vegetation.dispose();
   });
 
-  it('keys the hedge top face lighter than its root (DAY-VISUAL-B clipped look)', () => {
+  it('keys the hedge top face lighter than its root (DAY-VISUAL-B clipped look, HF-536 muse-lawn measured ratchet: hedge 0x33592b -> 0x55602e with the lawn)', () => {
     // The TSL value ramp multiplies the base colour by HEDGE_TOP_TINT at the
     // crown: a warm-lit clipped top face against dark sides, not a flat slab.
     expect(HEDGE_TOP_TINT.r).toBeGreaterThan(1.2);
@@ -223,8 +223,9 @@ describe('Nuke Town Rebuild vegetation', () => {
     expect(HEDGE_TOP_TINT.b).toBeLessThan(1);
     expect(HEDGE_TOP_TINT.r).toBeGreaterThan(HEDGE_TOP_TINT.g);
     expect(HEDGE_TOP_TINT.g).toBeGreaterThan(HEDGE_TOP_TINT.b);
-    // And the base is a deep clipped green, near-black in shadow.
-    expect(HEDGE_SPECIES.color).toBe(0x33592b);
+    // And the base is a deep clipped OLIVE, near-black in shadow, measured with the
+    // lawn boxes (boards bedGround hue 61.3 sat 63.5%; old lime 0x33592b hue 109.6).
+    expect(HEDGE_SPECIES.color).toBe(0x55602e);
   });
 
   // -------------------------------------------------------------------------

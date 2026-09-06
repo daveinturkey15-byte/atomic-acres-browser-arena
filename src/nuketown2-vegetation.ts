@@ -13,8 +13,9 @@
  *
  * WHAT WAS ACTUALLY THERE, corrected after looking at the review captures. An
  * earlier draft of this comment said the arena's hedge and planter bodies were
- * "plain grey boxes". They are not: `m.planter` is `0x415a33`, a dark olive
- * green, so they already read as vegetation-coloured MASSES. What they did not
+ * "plain grey boxes". They are not: `m.planter` is `0x57602f` (HF-536 muse-lawn,
+ * was `0x415a33`), a dark olive green, so they already read as
+ * vegetation-coloured MASSES. What they did not
  * have was any silhouette, any value gradient and any movement - and at
  * distance a green box and a green hedge are the same four pixels, which is
  * why the far LOD tier here is deliberately just the box. The visible win is
@@ -200,11 +201,14 @@ export function createLeafAtlasData(
             data[write] = 0; data[write + 1] = 0; data[write + 2] = 0; data[write + 3] = 0;
             continue;
           }
-          // Base-to-tip value ramp plus a pale midrib.
+          // Base-to-tip value ramp plus a pale midrib. HF-536 muse-lawn: the leaf
+          // albedo follows the lawn to the boards olive (old 0.29/0.55/0.19 tip
+          // sRGB ~(74, 140, 48) hue 103.0 sat 65.7% read lime; new 0.36/0.42/0.19
+          // tip sRGB ~(92, 107, 48) hue 75.3 sat 55.1%, measured with the lawn).
           const ramp = 0.62 + 0.38 * t;
           const midrib = Math.abs(u) < 0.055 ? 0.22 : 0;
-          const r = Math.min(1, (0.29 + hueShift) * ramp + midrib * 0.5);
-          const g = Math.min(1, (0.55 + hueShift * 0.4) * ramp + midrib * 0.6);
+          const r = Math.min(1, (0.36 + hueShift) * ramp + midrib * 0.5);
+          const g = Math.min(1, (0.42 + hueShift * 0.4) * ramp + midrib * 0.6);
           const b = Math.min(1, (0.19 - hueShift * 0.5) * ramp + midrib * 0.35);
           data[write] = Math.round(r * 255);
           data[write + 1] = Math.round(g * 255);
@@ -257,14 +261,14 @@ export type NuketownFoliageSpecies = Readonly<{
   swayM: number;
   windSpeed: number;
 }>;
-
-/** Clipped suburban box hedge: tight, dark, barely moves. */
 export const HEDGE_SPECIES: NuketownFoliageSpecies = Object.freeze({
-  // DAY-VISUAL-B: deeper clipped green (the reference hedge is near-black
-  // green in shadow) with a touch more backlit translucency on the ridge.
+  // DAY-VISUAL-B, retuned HF-536 muse-lawn: hedge follows the lawn to the boards olive (interim-4 boards
+  // bedGround hue 61.3 sat 63.5%, surroundGround hue 68.5 sat 69.4%; old 0x33592b
+  // hue 109.6 sat 51.7% read neon against the olive turf). New 0x55602e hue 73.2
+  // sat 52.1%; sss 0x8fbe4e -> 0x9aa04e with the blade tips so cards and mass agree.
   id: 'clipped-box-hedge',
-  color: 0x33592b,
-  sssColor: 0x8fbe4e,
+  color: 0x55602e,
+  sssColor: 0x9aa04e,
   sssStrength: 0.26,
   swayM: 0.035,
   windSpeed: 0.7,

@@ -337,9 +337,29 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
    * the old value. This asserts that composition against the OLD constants,
    * over the whole warm range - not against a comment.
    */
-  it('composes the GREEN lawn to exactly its pre-pass colour', () => {
+  it('moves the GREEN lawn toward the boards olive (HF-536 muse-lawn measured ratchet: lime hue 99 -> olive ~57 deg)', () => {
+    // Look-2b's neutrality proof (exact composition vs 0x5e9e41) is SUPERSEDED by
+    // measurement: interim-4 boards bedGround hue 61.3 sat 63.5%, surroundGround
+    // hue 68.5 sat 69.4%, while the lime composed hue 99.0 sat 72.5% at value 0.855
+    // was the largest colour gap in every yard frame. The green half now composes
+    // to olive; the value terms still match the shipped lawn exactly.
     const oldBase = new THREE.Color(0x5e9e41);
     const newBase = new THREE.Color(NUKETOWN2_LAWN_BASE_COLOR);
+    const toSrgb = (l: number): number => (l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055) * 255;
+    const hueSat = (rgb: readonly number[]): readonly [number, number] => {
+      const [r, g, b] = [rgb[0]! / 255, rgb[1]! / 255, rgb[2]! / 255];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max === min) return [0, 0] as const;
+      const sat = (max - min) / max;
+      let hue = 0;
+      if (max === r) hue = ((g - b) / (max - min)) % 6;
+      else if (max === g) hue = (b - r) / (max - min) + 2;
+      else hue = (r - g) / (max - min) + 4;
+      hue *= 60;
+      if (hue < 0) hue += 360;
+      return [hue, sat * 100] as const;
+    };
     for (const warm of [0, 0.25, 0.5, 0.75, 1]) {
       const before = [
         oldBase.r * (NUKETOWN_LAWN_TINT.rBase + NUKETOWN_LAWN_TINT.rWarm * warm),
@@ -351,10 +371,21 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
         newBase.g * (NUKETOWN2_LAWN_TINT.gBase + NUKETOWN2_LAWN_TINT.gWarm * warm),
         newBase.b * (NUKETOWN2_LAWN_TINT.bBase + NUKETOWN2_LAWN_TINT.bWarm * warm),
       ];
-      for (let channel = 0; channel < 3; channel += 1) {
-        expect(after[channel]!, `warm=${warm} channel=${channel}`)
-          .toBeCloseTo(before[channel]!, 4);
-      }
+      // The move happened: red rises, green leaves lime.
+      expect(after[0]!, `warm=${warm} red rises`).toBeGreaterThan(before[0]!);
+      expect(after[1]!, `warm=${warm} green leaves lime`).toBeLessThan(before[1]! * 0.6);
+      // ...and it landed olive: composed with the shipped value term, inside the
+      // ratchet band the boards measure (lime hue 99.0 sat 72.5 fails both sides).
+      const srgb = [
+        toSrgb(after[0]! * NUKETOWN2_LAWN_TINT.valueBase),
+        toSrgb(after[1]! * NUKETOWN2_LAWN_TINT.valueBase),
+        toSrgb(after[2]! * NUKETOWN2_LAWN_TINT.valueBase),
+      ];
+      const [hue, sat] = hueSat(srgb);
+      expect(hue, `warm=${warm} hue olive`).toBeGreaterThan(45);
+      expect(hue, `warm=${warm} hue olive`).toBeLessThan(75);
+      expect(sat, `warm=${warm} saturation olive`).toBeGreaterThan(30);
+      expect(sat, `warm=${warm} saturation olive`).toBeLessThan(60);
     }
     // ...and the value terms, which multiply both, did not move either.
     expect(NUKETOWN2_LAWN_TINT.valueBase).toBe(NUKETOWN_LAWN_TINT.valueBase);
@@ -367,7 +398,7 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     expect(grassClumpTintPeak(NUKETOWN2_CLOVER_TINT)).toBeLessThanOrEqual(1);
   });
 
-  it('makes the dry patch a REAL straw: warmer AND brighter than the turf', () => {
+  it('makes the dry patch a REAL straw over the OLIVE turf (HF-536 muse-lawn measured ratchet: olive R/G forces warmth 1.8 -> 1.1, luma step kept)', () => {
     // The whole point of moving the base. A dry spot that is merely darker is
     // a shadow, not dry grass, and that is all a tint over a green base can do.
     const base = new THREE.Color(NUKETOWN2_LAWN_BASE_COLOR);
@@ -384,7 +415,9 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     ];
     const luma = (c: number[]): number => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
     expect(luma(patch)).toBeGreaterThan(luma(green) * 1.15);
-    expect(patch[0]! / patch[1]!).toBeGreaterThan((green[0]! / green[1]!) * 1.8);
+    // Muse-lawn: the green is olive now (R/G 1.04, not lime 0.26), so the straw's
+    // measured R/G step is 1.21x, not 1.8x; the 1.81x luma step above is the dry read.
+    expect(patch[0]! / patch[1]!).toBeGreaterThan((green[0]! / green[1]!) * 1.1);
     // ...and it stays a PATCH, not a repaint: never more than the brief's mix.
     expect(dry.weight).toBeLessThanOrEqual(0.35);
     // Patch size inside the brief's 3-6 m band.
@@ -466,7 +499,7 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     expect(leaf[1]!).toBeGreaterThan(leaf[2]! * 1.4);
   });
 
-  it('keys the ground PLATE dry patch to the same field as the blades', () => {
+  it('keys the OLIVE ground PLATE dry patch to the same field as the blades (HF-536 muse-lawn measured ratchet: plate 0x496438 -> 0x6a6b3a, hue step 1.8 -> 1.15)', () => {
     // THE CORRECTION ROUND'S CONTRACT. The first cut put dryness on the blade
     // instances only and it measured invisible (north-yard/lawnNear luma
     // stddev 15.70 -> 16.07, zero straw pixels either side, 15 of 29 stations
@@ -485,10 +518,12 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     expect(LAWN_DRY_PATCH_THRESHOLDS[1]).toBeCloseTo(lo + (1 - lo) * 0.55, 3);
     // ...and the plate's dry albedo must be a HUE step, not a brightness step:
     // the term it replaces was a x1.42 value multiply, which is why the plate
-    // read as one flat green however dry the field said it was.
+    // read as one flat green however dry the field said it was. Muse-lawn: the
+    // turf is olive now (R/G 0.98, not lime 0.53), so the straw's measured R/G
+    // step is 1.42x; the B/G drop below the turf is the rest of the hue proof.
     const [r, g, b] = LAWN_DRY_ALBEDO_LINEAR;
-    const turf = new THREE.Color(0x496438);
-    expect(r / g).toBeGreaterThan((turf.r / turf.g) * 1.8);
+    const turf = new THREE.Color(0x6a6b3a);
+    expect(r / g).toBeGreaterThan((turf.r / turf.g) * 1.15);
     expect(b / g).toBeLessThan(turf.b / turf.g);
   });
 

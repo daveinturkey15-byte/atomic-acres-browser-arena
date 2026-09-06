@@ -222,11 +222,15 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // every horizon frame - was a measured 12-second first-submission stall
     // that failed the arena boot smoke. Only the metre-scale field it exists
     // to carry survives, which is the one it was authored for.
-    ground: createLawnMaterial('nuketown2-ground-scrub', 0x515642, {
+    // HF-536 muse-lawn: olive turf toward the measured boards (interim-4 boards
+    // grassNear hue 70.3 sat 62.2%, lawnSouth hue 55.5 sat 56.5% at p50 23-33;
+    // ours was lime hue 96.8 sat 44% at p50 71-74). 0x6a6b3a = hue 61.2 sat 45.8%.
+    // Scrub follows the same step so the verge stays one palette as the lawn.
+    ground: createLawnMaterial('nuketown2-ground-scrub', 0x5e5f3c, {
       variant: 'scrub',
       readDistanceM: 55,
     }),
-    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x496438, { variant: 'turf', polygonOffset: -2 }),
+    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x6a6b3a, { variant: 'turf', polygonOffset: -2 }),
 
     // Damp asphalt with a sun streak: baseRoughness 0.95 -> 0.66 and
     // trafficRoughness 0.10 -> 0.16, soil 0.080 -> 0.110 for the kerb-channel
@@ -315,7 +319,9 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
       roughness: 0.42,
       metalness: 0.18,
     }),
-    planter: createLawnMaterial('nuketown2-planter', 0x415a33, { variant: 'hedge' }),
+    // HF-536 muse-lawn: planter follows the lawn to the boards olive (old 0x415a33
+    // hue 98.5 sat 43.3%; new 0x57602f hue 71.0 sat 51.0% measured with the lawn).
+    planter: createLawnMaterial('nuketown2-planter', 0x57602f, { variant: 'hedge' }),
 
     // Chrome-trim exception: the coach waistline is the one intentionally
     // reflective painted-metal accent, so its 0.25 metalness is pinned here

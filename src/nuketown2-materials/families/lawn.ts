@@ -67,11 +67,14 @@ export const LAWN_DRY_PATCH_WEIGHT = 0.35;
 /** Field threshold pair - the same numbers `grassDryness` derives from coverage 0.34. */
 export const LAWN_DRY_PATCH_THRESHOLDS = Object.freeze([0.66, 0.847] as const);
 /**
- * Straw albedo, LINEAR. sRGB ~ (0.58, 0.52, 0.27): late-summer dead grass over
- * thatch. It is a hue and a value step away from the 0x496438 turf, which is
- * the whole point - the term it replaces could only brighten.
+ * Straw albedo, LINEAR. sRGB (158, 136, 70) hue 45.0 deg sat 55.7%: the boards'
+ * warm dry tips over thatch (HF-536 muse-lawn: root-captures interim-4 boards
+ * overhead/lawnBox hue 34.3 sat 40.4%, stepGround hue 28.0 sat 39.9%; old
+ * (0.300, 0.235, 0.062) hue 47.8 read cooler, and the turf moves olive, so the
+ * straw warms to keep its hue step over it).
+ * Hue and value step away from the 0x6a6b3a turf, as before.
  */
-export const LAWN_DRY_ALBEDO_LINEAR = Object.freeze([0.300, 0.235, 0.062] as const);
+export const LAWN_DRY_ALBEDO_LINEAR = Object.freeze([0.342, 0.246, 0.061] as const);
 
 export type LawnVariant = 'turf' | 'scrub' | 'hedge';
 
@@ -111,7 +114,9 @@ let lawnGraph: { colorNode: any; roughnessNode: any } | null = null;
 
 function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   if (lawnGraph) return lawnGraph;
-  const spec = lawnSpec('nuketown2-lawn-shared', 0x496438, 'turf');
+  // Shared graph input only (wear sizes/variant; colour comes from each material's
+  // own uniforms): kept on the registry plate 0x6a6b3a (HF-536 muse-lawn).
+  const spec = lawnSpec('nuketown2-lawn-shared', 0x6a6b3a, 'turf');
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
   const variant = uniforms.lawnVariant as any;
