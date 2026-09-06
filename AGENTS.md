@@ -9,6 +9,39 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - The `gh-pages` branch is production output only. Never develop on it or publish to it from a feature worktree.
 - `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md` is the canonical contribution and release procedure.
 
+### Ancestry rules (HF-536, 2026-09-06)
+
+These four are executable, not advisory. `scripts/release/pipeline-guard.mjs` refuses a
+violating tree in every non-`doctor` mode, and
+`scripts/release/acceptance-gate.mjs --phase reconciliation` refuses a violating merge.
+
+- **`main` is the only base.** Every contribution branch is cut from exact `origin/main`
+  (`git worktree add -b contrib/<machine>/<harness>/<slug> <absolute-path> origin/main`) and
+  must still contain `origin/main` at handoff. There is no long-lived alternative base.
+- **Never create a new root commit.** Full-tree snapshot imports — `git checkout --orphan`,
+  `git init` plus a copy, importing a directory as a fresh history — are banned. Every
+  parentless commit that may appear in this repository is listed in
+  `.github/ancestry-roots.json`; a root that is not listed fails the guard. Adding an entry
+  to that file is an explicit reviewed decision and is never the fix for a red guard.
+- **Never publish from a line that does not contain `origin/main`.** The publisher must
+  refuse a source SHA for which `git merge-base --is-ancestor origin/main <sha>` fails, and
+  must record `containsOriginMain` and `originMainSha` in the receipt. An owner override is
+  an explicit flag with a written reason stamped into the receipt, never a silent default.
+- **Integration and gauntlet lines are short-lived.** An `integration/*` or gauntlet line is
+  itself cut from `origin/main` and merges back to `main` by pull request within one pass
+  (one publish cycle). A line that has published a pass and has not merged to `main` is a
+  release-blocking condition for the NEXT pass, not background hygiene.
+- **`release/<passN>` branches carry evidence only.** They are cut from the exact `main` SHA
+  that CI proved green and may contain nothing but `docs/evidence/**` and acceptance
+  receipts. A runtime commit on a `release/*` branch is how a fix ships without ever
+  touching `main`.
+
+Why these exist: seven parentless full-tree snapshot imports on 2026-09-03..05 severed the
+shipping line from `origin/main`. Nothing executable refused them, so the break survived 21
+passes and turned a lossless fast-forward into 385 phantom merge conflicts against a tree
+that was already a strict superset of `main`. Full record with every command:
+`docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md`.
+
 ## Pass 65 routing
 
 - Before any Pass 65 work, read `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`, `docs/PASS65_REQUIREMENTS_MATRIX.md`, `docs/PASS65_DECISION_RECEIPTS.json`, `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`, and the relevant sections of `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`; every correction-wave owner must also read `docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`, while release/HITL owners must read `docs/PASS65_OWNER_HITL_CHECKLIST.md`.
@@ -61,6 +94,7 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - Every Pass 62+ `runtime` or `release-shell` PR must change exactly one `acceptance/pass-<number>.json`, map every requested outcome to evidence, and record Dave's approval of the immutable PR preview's exact source SHA. Runtime/release-shell changes after that preview invalidate approval.
 - Pass 66 is the narrow exception to a new owner-preview interaction: after the immutable preview exists and every blocking gate is green, a process-only manifest update may bind Dave's already-recorded standing conditional publication instruction to that exact SHA. The receipt must truthfully say that Dave did not inspect that immutable preview in a new HITL round, use the actual later binding timestamp, and invalidate on any runtime or release-shell drift.
 - A separate integrator reviews the actual diff and checks. The PR must contain current `origin/main` before merge.
+- A **release-line reconciliation** PR is the single narrow exception to "exactly one enforced acceptance manifest per PR". It must be a two-parent merge whose tree is byte-identical to its first parent and whose second parent is the PR base, it must carry the `reconciliation` label so `verify.yml` selects `--phase reconciliation`, and it grants no acceptance: the receipt records `grantsAcceptance: false` and owner approval of the bytes remains owed on the contribution line. Every other shape still throws. It runs the FULL browser matrix — do not shortcut it.
 - `requirements-acceptance` is a required check alongside both static/unit and both bounded-browser checks. Green tests without complete requirement coverage are not release evidence.
 - Production promotion is serialized by `.github/workflows/release-production.yml`. Supply the exact green `main` SHA and release pass; never deploy from a feature branch or local dirty tree.
 - Do not describe a change as live until the workflow receipt names the source SHA and Pages SHA and the canonical HTTPS site is checked.

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+
+const ANCESTRY_ROOTS_RELATIVE_PATH = '.github/ancestry-roots.json';
+const SHA40 = /^[0-9a-f]{40}$/;
 
 const REQUIRED_CHECKS = Object.freeze([
   'requirements-acceptance',
@@ -82,6 +85,36 @@ function checkRuns(repoName, sourceSha) {
   return REQUIRED_CHECKS.map((name) => ({ name, conclusion: latest.get(name) ?? 'missing' }));
 }
 
+// HF-536 (2026-09-06). Seven parentless full-tree snapshot imports on
+// 2026-09-03..05 severed the shipping line from origin/main. Nothing executable
+// refused them, so the break went unnoticed for 21 passes and produced 385
+// phantom merge conflicts against a tree that was already a strict superset of
+// main. These two assertions are that refusal. See
+// docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md.
+function ancestryRoots(repo) {
+  const path = join(repo, '.github', 'ancestry-roots.json');
+  let document;
+  try {
+    document = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`Cannot read ${ANCESTRY_ROOTS_RELATIVE_PATH}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (document?.schemaVersion !== 1) throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} schemaVersion must be 1`);
+  const collect = (key) => {
+    if (!Array.isArray(document[key])) throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} ${key} must be an array`);
+    return document[key].map((entry, index) => {
+      if (!SHA40.test(entry?.sha ?? '')) {
+        throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} ${key}[${index}].sha must be a full 40-character SHA`);
+      }
+      return entry.sha;
+    });
+  };
+  const legitimate = collect('legitimate');
+  const quarantined = collect('quarantined');
+  if (legitimate.length === 0) throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} must list at least one legitimate root`);
+  return { legitimate, quarantined, allowed: new Set([...legitimate, ...quarantined]) };
+}
+
 function writeReceipt(repo, kind, receipt) {
   const compactTime = receipt.timestamp.replace(/[-:.]/g, '');
   const path = join(repo, 'artifacts', 'pipeline', `${compactTime}-${kind}.json`);
@@ -127,6 +160,9 @@ const receipt = {
   },
 };
 
+const headRoots = git(repo, 'rev-list', '--max-parents=0', 'HEAD').split(/\r?\n/).filter(Boolean);
+receipt.rootCommitCount = headRoots.length;
+
 if (mode !== 'doctor') {
   run('git', ['-C', repo, 'fetch', 'origin', 'main', '--prune']);
   receipt.originMainSha = git(repo, 'rev-parse', 'origin/main');
@@ -136,6 +172,28 @@ if (mode !== 'doctor') {
     { allowFailure: true },
   ).status === 0;
   if (!receipt.clean) throw new Error(`Refusing ${mode}: worktree has ${dirty.length} changed path(s)`);
+
+  // Was recorded but never enforced, and enforced only in `contribute`. A line
+  // that does not contain origin/main must not reach ANY non-doctor mode:
+  // publishing from one is how 21 passes shipped without main ever moving.
+  if (!receipt.containsOriginMain) {
+    throw new Error(`Refusing ${mode}: HEAD ${headSha} does not contain current origin/main ${receipt.originMainSha}; reconcile through a pull request into main and rerun checks`);
+  }
+
+  const roots = ancestryRoots(repo);
+  const unlisted = headRoots.filter((root) => !roots.allowed.has(root)).sort();
+  receipt.ancestryRoots = {
+    allowlist: ANCESTRY_ROOTS_RELATIVE_PATH,
+    legitimate: roots.legitimate.length,
+    quarantined: headRoots.filter((root) => roots.quarantined.includes(root)).sort(),
+    unlisted,
+  };
+  if (unlisted.length > 0) {
+    throw new Error(`Refusing ${mode}: HEAD reaches ${unlisted.length} root commit(s) absent from ${ANCESTRY_ROOTS_RELATIVE_PATH} (${unlisted.join(', ')}). A parentless full-tree snapshot import (git checkout --orphan, or git init plus a copy) severs ancestry and is banned; do not add the root to the allowlist to clear this failure without an explicit reviewed decision`);
+  }
+  if (receipt.ancestryRoots.quarantined.length > 0) {
+    console.error(`WARNING: HEAD reaches ${receipt.ancestryRoots.quarantined.length} quarantined snapshot-import root(s) recorded in ${ANCESTRY_ROOTS_RELATIVE_PATH}. This is known incident debt from 2026-09-03..05, not a new break.`);
+  }
 }
 
 if (mode === 'contribute') {
@@ -145,9 +203,7 @@ if (mode === 'contribute') {
   if (!branch.startsWith(prefix) || branch.length === prefix.length) {
     throw new Error(`Contribution branch must match ${prefix}<short-outcome>; current branch is ${branch}`);
   }
-  if (!receipt.containsOriginMain) {
-    throw new Error('Contribution does not contain current origin/main; reconcile and rerun checks');
-  }
+  // containsOriginMain is now enforced above for every non-doctor mode.
   receipt.machine = machine;
   receipt.harness = harness;
 }

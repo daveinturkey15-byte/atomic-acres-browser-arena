@@ -1,9 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   assertCiImpactMatchesPaths,
+  assertReconciliationMergeShape,
   classifyPreviewDelta,
   committedManifestBytes,
+  readAncestryRootAllowlist,
   selectCiAcceptanceManifest,
+  selectReconciliationManifest,
   validateAcceptanceManifest,
 } from '../scripts/release/acceptance-gate.mjs';
 
@@ -317,5 +322,184 @@ describe('release acceptance manifest', () => {
     const result = validateAcceptanceManifest(manifest, { policy });
     expect(result.ok).toBe(false);
     expect(result.errors).toEqual(['humanAcceptance must be approved by Dave with timestamped evidence']);
+  });
+});
+
+// HF-536 (2026-09-06). The reconciliation phase is the only path in this
+// repository that may accept a pull request whose head touches every enforced
+// acceptance manifest at once. It is therefore the only path where a bug is
+// silently catastrophic, so every assertion it makes has a red self-test here:
+// each case below is a PR-shaped merge that MUST be refused.
+// See docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md.
+describe('reconciliation merge shape', () => {
+  const HEAD = 'a'.repeat(40);
+  const FIRST_PARENT = 'b'.repeat(40);
+  const BASE = 'c'.repeat(40);
+  const TREE = 'd'.repeat(40);
+  const ROOT = 'e'.repeat(40);
+  const SNAPSHOT_ROOT = '93dacd33934823fa2a6bc931bffb7c1b7fd94d05';
+
+  function validFacts(): any {
+    return {
+      head: HEAD,
+      base: BASE,
+      parents: [FIRST_PARENT, BASE],
+      headTree: TREE,
+      firstParentTree: TREE,
+      firstParentIsRoot: false,
+      firstParentRoots: [ROOT],
+      allowedRoots: [ROOT],
+      quarantinedRoots: [],
+    };
+  }
+
+  it('accepts the exact tree-identical two-parent shape and grants nothing beyond it', () => {
+    const result = assertReconciliationMergeShape(validFacts());
+    expect(result.reconciliation).toBe(true);
+    expect(result.treeIdenticalTo).toBe(FIRST_PARENT);
+    expect(result.base).toBe(BASE);
+    expect(result.tree).toBe(TREE);
+    expect(result.quarantinedRoots).toEqual([]);
+  });
+
+  it('REFUSES a merge whose tree differs from its first parent', () => {
+    // The ordering trap: if the guard PR merged to main but was not replayed
+    // onto the contribution line, a tree-identical merge would silently revert
+    // it. Checking only the parent count would not detect that; checking the
+    // tree relationship does.
+    const facts = { ...validFacts(), headTree: 'f'.repeat(40) };
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/reconciliation merge tree .* differs from first parent .* must carry the contribution tree unchanged/);
+  });
+
+  it('REFUSES a three-parent merge', () => {
+    const facts = validFacts();
+    facts.parents = [FIRST_PARENT, BASE, '9'.repeat(40)];
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/must be a two-parent merge; found 3 parent/);
+  });
+
+  it('REFUSES a single-parent head', () => {
+    const facts = validFacts();
+    facts.parents = [FIRST_PARENT];
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/must be a two-parent merge; found 1 parent/);
+  });
+
+  it('REFUSES a merge whose second parent is not the pull-request base', () => {
+    const facts = validFacts();
+    facts.parents = [FIRST_PARENT, '7'.repeat(40)];
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/reconciliation second parent 7{40} must equal the pull-request base c{40}/);
+  });
+
+  it('REFUSES a first parent that introduces a root absent from the allowlist', () => {
+    const facts = validFacts();
+    facts.firstParentRoots = [ROOT, SNAPSHOT_ROOT];
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/introduces 1 root commit/);
+    expect(() => assertReconciliationMergeShape(facts)).toThrow(SNAPSHOT_ROOT);
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/snapshot import severs ancestry and is banned/);
+  });
+
+  it('REFUSES a first parent that is itself a root commit', () => {
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), firstParentIsRoot: true }))
+      .toThrow(/first parent b{40} is itself a root commit/);
+  });
+
+  it('REFUSES a head that names one commit as both parents', () => {
+    const facts = validFacts();
+    facts.parents = [BASE, BASE];
+    expect(() => assertReconciliationMergeShape(facts))
+      .toThrow(/names c{40} as both parents/);
+  });
+
+  it('REFUSES an empty or malformed ancestry allowlist rather than passing vacuously', () => {
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), allowedRoots: [] }))
+      .toThrow(/needs a non-empty .github\/ancestry-roots\.json allowlist/);
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), firstParentRoots: [] }))
+      .toThrow(/needs the exact root-commit set of the first parent/);
+  });
+
+  it('REFUSES abbreviated or missing SHAs on every input', () => {
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), head: 'abc1234' }))
+      .toThrow(/needs one exact --head SHA/);
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), base: undefined }))
+      .toThrow(/needs one exact --base SHA/);
+    expect(() => assertReconciliationMergeShape({ ...validFacts(), firstParentTree: null }))
+      .toThrow(/needs exact head and first-parent tree SHAs/);
+  });
+
+  it('reports quarantined snapshot roots without failing on them', () => {
+    const facts = validFacts();
+    facts.firstParentRoots = [ROOT, SNAPSHOT_ROOT];
+    facts.allowedRoots = [ROOT, SNAPSHOT_ROOT];
+    facts.quarantinedRoots = [SNAPSHOT_ROOT];
+    expect(assertReconciliationMergeShape(facts).quarantinedRoots).toEqual([SNAPSHOT_ROOT]);
+  });
+});
+
+describe('ancestry root allowlist', () => {
+  const sha = (char: string) => char.repeat(40);
+  const document = (): any => ({
+    schemaVersion: 1,
+    legitimate: [{ sha: sha('1') }],
+    quarantined: [{ sha: sha('2') }],
+  });
+
+  it('reads the legitimate and quarantined sets and their union', () => {
+    const roots = readAncestryRootAllowlist(document());
+    expect(roots.legitimate).toEqual([sha('1')]);
+    expect(roots.quarantined).toEqual([sha('2')]);
+    expect(roots.allowed).toEqual([sha('1'), sha('2')]);
+  });
+
+  it('REFUSES a wrong schema, an abbreviated SHA, an empty legitimate set, or a duplicate', () => {
+    expect(() => readAncestryRootAllowlist({ ...document(), schemaVersion: 2 }))
+      .toThrow(/schemaVersion must be 1/);
+    expect(() => readAncestryRootAllowlist({ ...document(), legitimate: [{ sha: 'abc1234' }] }))
+      .toThrow(/legitimate\[0\]\.sha must be a full 40-character SHA/);
+    expect(() => readAncestryRootAllowlist({ ...document(), legitimate: [] }))
+      .toThrow(/must list at least one legitimate root/);
+    expect(() => readAncestryRootAllowlist({ ...document(), quarantined: [{ sha: sha('1') }] }))
+      .toThrow(/lists a root twice/);
+  });
+
+  it('matches the checked-in allowlist: 8 legitimate roots and the 7 quarantined snapshot imports', () => {
+    const roots = readAncestryRootAllowlist(
+      readFileSync(fileURLToPath(new URL('../.github/ancestry-roots.json', import.meta.url)), 'utf8'),
+    );
+    expect(roots.legitimate).toHaveLength(8);
+    expect(roots.quarantined).toHaveLength(7);
+    expect(roots.quarantined).toContain('93dacd33934823fa2a6bc931bffb7c1b7fd94d05');
+  });
+});
+
+describe('reconciliation manifest selection', () => {
+  const reconciliationPolicy = { manifestDirectory: 'acceptance', enforceFromPass: 62 };
+
+  it('binds to the newest enforced manifest on the contribution line', () => {
+    expect(selectReconciliationManifest([
+      'acceptance/README.md',
+      'acceptance/pass-62.json',
+      'acceptance/pass-95.json',
+      'acceptance/pass-94.json',
+      'acceptance/policy.json',
+    ], reconciliationPolicy)).toBe('acceptance/pass-95.json');
+  });
+
+  it('orders numerically rather than lexicographically', () => {
+    expect(selectReconciliationManifest(
+      ['acceptance/pass-9.json', 'acceptance/pass-80.json'],
+      reconciliationPolicy,
+    )).toBe('acceptance/pass-80.json');
+  });
+
+  it('REFUSES a line carrying no enforced manifest', () => {
+    expect(() => selectReconciliationManifest(
+      ['acceptance/pass-61.json', 'acceptance/policy.json'],
+      reconciliationPolicy,
+    )).toThrow(/carries no enforced acceptance manifest \(PASS 62\+\)/);
   });
 });
