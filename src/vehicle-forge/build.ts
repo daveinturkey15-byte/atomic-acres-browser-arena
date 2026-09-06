@@ -374,7 +374,9 @@ function nonIndexed(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   return geometry.index ? geometry.toNonIndexed() : geometry;
 }
 
-/** One box, 12 triangles, in the tyre bucket: matte and dark, no new material. */
+/** One box, 12 triangles, in the LINING bucket (matte dark grey, no new material): the tyre albedo
+ * renders exact black on the camera-facing underbody face in the vehicle's own shadow (HF-536 forge-2
+ * measurement), and an exact-black block reads as a hole, not as an underbody. */
 function underbodyBox(
   halfWidth: number,
   block: UnderbodyBlock,
@@ -447,7 +449,7 @@ export function buildForgedWheelSet(
   materials: ForgedVehicleMaterials,
   dressing: WheelSetDressing = {},
 ): ForgedVehicle {
-  const parts = { tyre: [] as THREE.BufferGeometry[], chrome: [] as THREE.BufferGeometry[] };
+  const parts = { tyre: [] as THREE.BufferGeometry[], chrome: [] as THREE.BufferGeometry[], lining: [] as THREE.BufferGeometry[] };
   for (const z of axleZ) {
     for (const side of [1, -1] as const) {
       const wheel = wheelParts(radius, tyreHalfWidth, style);
@@ -464,7 +466,7 @@ export function buildForgedWheelSet(
   // carries the truck's, because the truck is one vehicle in two placements.
   const wheelSetSpan = { z0: Math.min(...axleZ), z1: Math.max(...axleZ) };
   if (dressing.underbody) {
-    parts.tyre.push(underbodyBox(
+    parts.lining.push(underbodyBox(
       Math.max(0.05, trackHalfWidth - dressing.underbody.insetM),
       dressing.underbody,
       { z0: wheelSetSpan.z0 + radius, z1: wheelSetSpan.z1 - radius },
@@ -483,7 +485,8 @@ export function buildForgedWheelSet(
   group.userData.presentationOnly = true;
   let drawCalls = 0;
   let triangles = 0;
-  for (const bucket of ['tyre', 'chrome'] as const) {
+  for (const bucket of ['tyre', 'chrome', 'lining'] as const) {
+    if (parts[bucket].length === 0) continue;
     const merged = mergeGeometries(parts[bucket], false);
     if (!merged) continue;
     const mesh = new THREE.Mesh(merged, materials[bucket]);
@@ -561,7 +564,7 @@ export function buildForgedVehicle(
   // HF-536 (R14). GROUNDED DRESSING, before any trim, so it merges into the
   // tyre bucket with the wheels and costs no extra draw.
   if (dressing.underbody) {
-    parts.tyre.push(underbodyBox(
+    parts.lining.push(underbodyBox(
       Math.max(0.05, spec.sillHalfWidth - dressing.underbody.insetM),
       dressing.underbody,
       groundedSpan(axles, spec.wheelRadius, spec.archGap, spec.length),

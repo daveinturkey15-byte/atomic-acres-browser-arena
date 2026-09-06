@@ -179,7 +179,7 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
  */
 export function createForgeLiningMaterial(): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial({
-    color: linearOf(0x363636),
+    color: linearOf(0x4a4a4c), // HF-536: lifted from 0x363636 so an underbody in its own shadow clears the exact-black band
     roughness: 0.94,
     metalness: 0,
   });
