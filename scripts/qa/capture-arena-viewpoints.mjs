@@ -98,6 +98,10 @@ const killServeChild = () => {
 };
 
 const serveDist = arg('--serve-dist', null);
+// --query appends extra URL parameters to every capture page load, e.g.
+// --query tod=authored to pin the sky (the solo default is a RANDOM sky per
+// session, which made same-bundle captures differ between sessions).
+const extraQuery = (arg('--query', '') || '').replace(/^[?&]+/, '');
 if (serveDist) {
   // Short-lived server, spawned here and reaped via killServeChild() in
   // `finally`. Port chosen away from 41900/41901 (owner builds) and
@@ -173,7 +177,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error).slice(0, 240)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text().slice(0, 240)); });
 
-  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0`;
+  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0${extraQuery ? `&${extraQuery}` : ''}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
 
@@ -390,6 +394,7 @@ try {
     backend,
     adapter: adapterInfo,
     bundleAtStart: BUNDLE_AT_START,
+    query: extraQuery || null,
     viewport: VIEWPORT,
     seed: SEED,
     settleMs: SETTLE_MS,
