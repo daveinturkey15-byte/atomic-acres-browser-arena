@@ -18,6 +18,10 @@ import { nuketown2HandedSpan, nuketown2HandedX } from './nuketown2-layout';
 import {
   GROUND_PLATE_TOP_Y,
   NUKETOWN2_GRIME_OFFSET_FACTOR,
+  NUKETOWN2_STEP_STONE_BASE_LINEAR,
+  NUKETOWN2_STEP_STONE_LAWN_BASE_SRGB,
+  NUKETOWN2_STEP_STONE_TONE_LO,
+  NUKETOWN2_STEP_STONE_TONE_SPAN,
   createNuketown2GrimeMaterials,
   nuketown2GrimeDecals,
 } from './nuketown2-grime-decals';
@@ -213,6 +217,33 @@ describe('Nuke Town Rebuild grime decals', () => {
       // And it is a film, not a body: 24 mm proud of a wall face.
       expect(Math.min(decal.size[0], decal.size[2])).toBeLessThan(0.05);
     }
+    materials.dispose();
+  });
+
+  it('pins the stepping-stone albedo to paving-on-grass luma (HF-536 sweep2 row 13)', () => {
+    const { materials, table } = decals();
+    // Dedicated role: only `yard stepping stones` may carry the stones
+    // material, so retuning it cannot pale anything else.
+    const stoneUsers = table.filter((decal) => decal.material === materials.stones);
+    expect(stoneUsers.length).toBeGreaterThan(0);
+    for (const decal of stoneUsers) {
+      expect(decal.name).toBe('yard stepping stones');
+    }
+    // Mean authored albedo (tone mean, grain mean 0) against the lawn plate.
+    const toLinear = (channel: number): number => {
+      const s = channel / 255;
+      return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    const hex = NUKETOWN2_STEP_STONE_LAWN_BASE_SRGB;
+    const lawn = [hex >>> 16, (hex >>> 8) & 0xff, hex & 0xff].map(toLinear);
+    const lawnLuma = 0.2126 * lawn[0]! + 0.7152 * lawn[1]! + 0.0722 * lawn[2]!;
+    const meanTone = NUKETOWN2_STEP_STONE_TONE_LO + NUKETOWN2_STEP_STONE_TONE_SPAN / 2;
+    const stone = NUKETOWN2_STEP_STONE_BASE_LINEAR.map((v) => v * meanTone);
+    const stoneLuma = 0.2126 * stone[0]! + 0.7152 * stone[1]! + 0.0722 * stone[2]!;
+    const ratio = stoneLuma / lawnLuma;
+    // A paving slab on grass reads 1.6-2.2x the lawn luma, never 4x+.
+    expect(ratio).toBeGreaterThan(1.8);
+    expect(ratio).toBeLessThan(2.2);
     materials.dispose();
   });
 });

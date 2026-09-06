@@ -252,6 +252,23 @@ function createCourtMaterial(): MeshStandardNodeMaterial {
   mat.opacityNode = max(border, wedge).mul(wear).mul(0.86);
   return mat;
 }
+/**
+ * HF-536 night-muse-sweep2 row 13 [MEASURED]: the stepping-stone albedo pin.
+ *
+ * The old base vec3(0.70, 0.69, 0.65) x mean tone 0.99 reads linear luma
+ * 0.682 against the lawn plate 0x496438 (linear luma 0.108): a 6.3x ratio,
+ * far above the 2.5 paving-on-grass ceiling. The base below reads
+ * 0.2296 mean (2.12x the plate; ~1.87x the patchy effective mean ~0.123),
+ * inside the [1.8, 2.2]x band, as a warm grey (sRGB ~133,132,129).
+ * Dedicated role: `m.stones` dresses only `yard stepping stones`, so no fork.
+ */
+export const NUKETOWN2_STEP_STONE_BASE_LINEAR = Object.freeze([0.236, 0.232, 0.219] as const);
+export const NUKETOWN2_STEP_STONE_TONE_LO = 0.92;
+export const NUKETOWN2_STEP_STONE_TONE_SPAN = 0.14;
+/** Full grain swing; the per-pixel term is +/- half of this. */
+export const NUKETOWN2_STEP_STONE_GRAIN = 0.04;
+/** The lawn plate the ratio is measured against (registry `lawn` base). */
+export const NUKETOWN2_STEP_STONE_LAWN_BASE_SRGB = 0x496438;
 
 /**
  * FLAGSTONE PATH. One organic meandering run per yard: ten irregular polygonal
@@ -291,9 +308,9 @@ function createStoneMaterial(): MeshStandardNodeMaterial {
   const inPath = smoothstep(float(-0.05), float(0.05), u)
     .mul(float(1).sub(smoothstep(float(9.95), float(10.05), u)));
   const stone = float(1).sub(smoothstep(edge.sub(0.06), edge.add(0.02), q)).mul(inPath);
-  const grain = fract(p.x.mul(61.3).add(p.z.mul(43.9)).sin().mul(1237.7)).sub(0.5).mul(0.12);
-  const tone = float(0.92).add((h3 as any).mul(0.14));
-  mat.colorNode = vec3(0.70, 0.69, 0.65).mul(tone).add(vec3(1, 1, 1).mul(grain));
+  const grain = fract(p.x.mul(61.3).add(p.z.mul(43.9)).sin().mul(1237.7)).sub(0.5).mul(NUKETOWN2_STEP_STONE_GRAIN);
+  const tone = float(NUKETOWN2_STEP_STONE_TONE_LO).add((h3 as any).mul(NUKETOWN2_STEP_STONE_TONE_SPAN));
+  mat.colorNode = vec3(NUKETOWN2_STEP_STONE_BASE_LINEAR[0], NUKETOWN2_STEP_STONE_BASE_LINEAR[1], NUKETOWN2_STEP_STONE_BASE_LINEAR[2]).mul(tone).add(vec3(1, 1, 1).mul(grain));
   mat.opacityNode = stone.mul(0.95);
   return mat;
 }
