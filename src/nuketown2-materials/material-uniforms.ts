@@ -67,8 +67,29 @@ const DEFAULTS: Record<string, UniformValue> = {
   asphaltMarking: 0,
 };
 
+/**
+ * The node type implied by a default value.
+ *
+ * This MUST be pinned explicitly. `uniform(value)` with no type argument leaves
+ * `nodeType === null`, so every program re-derives the declared type at
+ * graph-build time from whatever `node.value` happens to hold at that moment.
+ * Because these nodes are shared across all Nuke Town families, the derivation
+ * is order-dependent: the nuketown2-roof-shingles program declared the shared
+ * `baseColor` slot as `nodeUniform0 : f32` while nuketown2-asphalt-road and
+ * nuketown2-siding-cream declared the same node as `vec3<f32>`. A scalar slot
+ * fed a THREE.Color goes through UniformsGroup.updateNumber(), which does
+ * `Float32Array[offset] = <Color object>` -> NaN every frame (the
+ * `a[offset] !== v` guard never settles), which is the black-roof defect.
+ *
+ * 'color' — not 'vec3' — is the correct pin for a THREE.Color value: it still
+ * declares `vec3<f32>` in WGSL (NodeBuilder.getVectorType('color') === 'vec3'),
+ * but NodeBuilder.getNodeUniform() maps it to ColorNodeUniform, whose update
+ * path reads `.r/.g/.b`. Pinning 'vec3' would allocate a Vector3NodeUniform,
+ * which reads `.x/.y/.z` off a Color and writes undefined -> NaN again.
+ */
 function materialUniform(name: string): any {
-  const node = uniform(DEFAULTS[name] as any) as any;
+  const value = DEFAULTS[name];
+  const node = (value instanceof THREE.Color ? uniform(value, 'color') : uniform(value, 'float')) as any;
   node.onObjectUpdate((frame: { material?: THREE.Material | null }) => {
     const values = (frame.material as (THREE.Material & { userData?: Record<string, any> }) | null | undefined)
       ?.userData?.nuketown2Uniforms;
