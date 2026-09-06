@@ -4169,10 +4169,12 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // symmetric to shoot at, which this arena's whole fairness contract needs.
   pair(builder, 'yard cover crate', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.4, LOW_COVER, 2.0], m.planter,
     { ballisticMaterial: 'wood' });
-  // Tactical crate lid frame & horizontal strapping bands:
-  pair(builder, 'yard cover crate lid', [-8.5, LOW_COVER + 0.03, HOUSE_BACK_Z - 4.5], [2.48, 0.06, 2.08], m.trim,
+  // Tactical crate lid frame & top-edge strapping band. HF-536 night-muse-sweep:
+  // the mid-body chrome strap + 4 cm lid overhang read as a gift box; the lid
+  // overhangs 2 cm as cap flashing and the strap rides as a rim batten under it.
+  pair(builder, 'yard cover crate lid', [-8.5, LOW_COVER + 0.03, HOUSE_BACK_Z - 4.5], [2.44, 0.06, 2.04], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard cover crate strap', [-8.5, LOW_COVER / 2, HOUSE_BACK_Z - 4.5], [2.44, 0.10, 2.04], m.chrome,
+  pair(builder, 'yard cover crate strap', [-8.5, LOW_COVER - 0.09, HOUSE_BACK_Z - 4.5], [2.44, 0.08, 2.04], m.chrome,
     { solid: false, shots: false, cast: true });
   pair(builder, 'yard cover wall', [5.5, HARD_COVER / 2, HOUSE_BACK_Z - 5.5], [7.0, HARD_COVER, 0.35], m.block);
   // Patio dining set with timber table & outdoor umbrella:
@@ -4230,9 +4232,11 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // resolve to two different materials because of their labels.
   pair(builder, 'yard far crate', [11.5, LOW_COVER / 2, -28.0], [2.6, LOW_COVER, 2.2], m.planter,
     { ballisticMaterial: 'wood' });
-  pair(builder, 'yard far crate lid', [11.5, LOW_COVER + 0.03, -28.0], [2.68, 0.06, 2.28], m.trim,
+  // HF-536 night-muse-sweep: same gift-box read as the cover crate; lid 2 cm
+  // overhang, strap as a rim batten under the cap. Solid body untouched.
+  pair(builder, 'yard far crate lid', [11.5, LOW_COVER + 0.03, -28.0], [2.64, 0.06, 2.24], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard far crate strap', [11.5, LOW_COVER / 2, -28.0], [2.64, 0.10, 2.24], m.chrome,
+  pair(builder, 'yard far crate strap', [11.5, LOW_COVER - 0.09, -28.0], [2.64, 0.08, 2.24], m.chrome,
     { solid: false, shots: false, cast: true });
   // THE BORDER PATH. The reference's fence holes lead to a path that curves
   // round to the opposite yard, and this arena's border path is the straight
