@@ -184,3 +184,31 @@ export {
   type StreetPropPlacement,
   type StreetRole,
 } from './street';
+// HF-536 night-muse-windows: window dressing kit (frames, mullions, sills, curtains, blinds)
+export type { WindowDressingOptions, WindowPart, WindowRole } from './window';
+export {
+  WINDOW_BLIND_GAP,
+  WINDOW_BLIND_SLATS,
+  WINDOW_BLIND_T,
+  WINDOW_BOX_TRIANGLES,
+  WINDOW_CURTAIN_T,
+  WINDOW_CURTAIN_W,
+  WINDOW_DRIP_D,
+  WINDOW_DRIP_H,
+  WINDOW_FRAME_D,
+  WINDOW_FRAME_W,
+  WINDOW_GROUND_BOXES,
+  WINDOW_GROUND_TRIANGLES,
+  WINDOW_HOUSE_BOXES,
+  WINDOW_HOUSE_TRIANGLES,
+  WINDOW_MULL_D,
+  WINDOW_MULL_W,
+  WINDOW_OUTER_BOXES,
+  WINDOW_OUTER_TRIANGLES,
+  WINDOW_SILL_D,
+  WINDOW_SILL_H,
+  WINDOW_UPPER_BOXES,
+  WINDOW_UPPER_TRIANGLES,
+  windowDressing,
+  windowOuterParts,
+} from './window';

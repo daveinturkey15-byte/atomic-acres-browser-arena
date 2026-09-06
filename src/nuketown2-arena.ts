@@ -197,6 +197,8 @@ import {
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
 import { type ForgeKitBox, getLampPoolMaterial, gutterRunParts, kerbCourseParts, lampPoolParts, lanternHeadParts } from './forge-kit';
+// HF-536 night-muse-windows: window dressing kit (frames, mullions, sills, curtains, blinds).
+import { type WindowPart, type WindowRole, windowDressing } from './forge-kit/window';
 // HF-536 night-facade-port: the facade module's recipe, as PARTS.
 import {
   type FacadePart,
@@ -1154,6 +1156,54 @@ function interiorRoleMaterial(m: Nuketown2Materials, role: InteriorRole): THREE.
     case 'applianceBlue': return m.applianceBlue;
     case 'planter': return m.planter;
     case 'sign': return m.sign;
+  }
+}
+/** Resolve a window-dressing role onto this arena's existing materials. Zero new graphs. */
+function windowRoleMaterial(m: Nuketown2Materials, role: WindowRole): THREE.Material {
+  switch (role) {
+    case 'interior': return m.interior;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * HF-536 NIGHT-MUSE-WINDOWS — dress EVERY window opening on both houses.
+ * Anchors are AUTHORED frame at the opening centre on the wall centre plane;
+ * `pair()` mirrors them into the south house exactly (facing signs ride along
+ * because the offsets are authored, then negated with the anchor).
+ * Ground windows get curtains, upper windows get blinds. Every part is
+ * presentation-only (solid:false, shots:false, cast:false) sharing one propId
+ * per window, so the declutter ratchet counts one prop per window.
+ */
+function houseWindowDressing(builder: Builder, m: Nuketown2Materials): void {
+  const placements: ReadonlyArray<{
+    readonly id: string;
+    readonly anchor: readonly [number, number, number];
+    readonly width: number;
+    readonly height: number;
+    readonly facing: 1 | -1;
+    readonly dressing: 'curtain' | 'blind';
+  }> = [
+    { id: 'house window dressing ground front west', anchor: [-4.6, 1.55, -10.15], width: 2.0, height: 1.1, facing: 1, dressing: 'curtain' },
+    { id: 'house window dressing ground front east', anchor: [2.4, 1.55, -10.15], width: 2.0, height: 1.1, facing: 1, dressing: 'curtain' },
+    { id: 'house window dressing upper front', anchor: [-1.25, 5.2, -10.15], width: 3.2, height: 2.0, facing: 1, dressing: 'blind' },
+    { id: 'house window dressing upper back', anchor: [2.0, 5.2, -22.85], width: 2.5, height: 2.0, facing: -1, dressing: 'blind' },
+  ];
+  for (const placement of placements) {
+    const parts: readonly WindowPart[] = windowDressing({
+      width: placement.width,
+      height: placement.height,
+      depth: WALL_T,
+      facing: placement.facing,
+      dressing: placement.dressing,
+    });
+    for (const part of parts) {
+      pair(builder, `${placement.id} ${part.suffix}`,
+        [placement.anchor[0]! + part.offset[0]!, placement.anchor[1]! + part.offset[1]!, placement.anchor[2]! + part.offset[2]!],
+        [part.size[0]!, part.size[1]!, part.size[2]!],
+        windowRoleMaterial(m, part.role),
+        { solid: false, shots: false, cast: false, presentationOnly: true, propId: placement.id });
+    }
   }
 }
 
@@ -2576,6 +2626,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   // ---- HF-536 NIGHT-MUSE-INTERIORS: ground-floor + dining dressing ---------
   houseInteriorDressing(builder, m);
+  // ---- HF-536 NIGHT-MUSE-WINDOWS: frames, mullions, sills, curtains, blinds -
+  houseWindowDressing(builder, m);
 }
 
 /**
