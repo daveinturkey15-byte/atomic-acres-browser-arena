@@ -186,12 +186,21 @@ import {
   coffeeTableParts,
   diningTableParts,
   floorLampParts,
+  fridgeParts,
+  kettlePairParts,
   kitchenRunParts,
   oilStainParts,
+  pendantParts,
+  pictureParts,
   rackingBoxesParts,
   rugParts,
   shelfUnitParts,
+  skirtingParts,
   sofaParts,
+  switchParts,
+  tvUnitParts,
+  upperBackBedroomParts,
+  upperFrontBedroomParts,
   wallArtParts,
   workbenchDressingParts,
 } from './forge-kit/interior/prefabs';
@@ -1237,6 +1246,18 @@ function houseInteriorDressing(builder: Builder, m: Nuketown2Materials): void {
   pairKit(builder, 'house interior dining chair north 1', [2.1, 0.075, -16.6], chairParts(true), resolve);
   pairKit(builder, 'house interior dining chair south 0', [1.4, 0.125, -18.1], chairParts(false), resolve);
   pairKit(builder, 'house interior dining chair south 1', [2.1, 0.125, -18.1], chairParts(false), resolve);
+  // ---- HF-536 NIGHT-MUSE-INTERIORS-2: upper bedrooms, wall dressing, ground gaps.
+  // Absolute-authored placements (anchor origin); pair() mirrors both houses.
+  const origin = [0, 0, 0] as const;
+  pairKit(builder, 'house interior upper bedroom back', origin, upperBackBedroomParts(), resolve);
+  pairKit(builder, 'house interior upper bedroom front', origin, upperFrontBedroomParts(), resolve);
+  pairKit(builder, 'house interior skirting', origin, skirtingParts(), resolve);
+  pairKit(builder, 'house interior pictures', origin, pictureParts(), resolve);
+  pairKit(builder, 'house interior pendants', origin, pendantParts(), resolve);
+  pairKit(builder, 'house interior switches', origin, switchParts(), resolve);
+  pairKit(builder, 'house interior tv unit', origin, tvUnitParts(), resolve);
+  pairKit(builder, 'house interior fridge', origin, fridgeParts(), resolve);
+  pairKit(builder, 'house interior kettle pair', origin, kettlePairParts(), resolve);
 }
 
 /**

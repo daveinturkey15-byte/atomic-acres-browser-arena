@@ -14,7 +14,7 @@
  * - atomic-acres-procedural-art-authoring: deterministic (no Math.random
  *   anywhere; every tint/height is a literal), presentation-only (the arena
  *   emits every part solid:false shots:false), additive (no existing file
- *   behaviour changes), budgeted (116 boxes/house, 10/garage — see counts).
+ *   behaviour changes), budgeted (281 boxes/house, 10/garage — see counts).
  * - webgpu-tsl-arena-forging: ZERO new material graphs — every role below
  *   resolves to a material `nuketown2Materials()` already builds, so the
  *   54-graph pipeline fence (`NUKETOWN2_MAX_DISTINCT_MATERIAL_GRAPHS`) is
@@ -320,6 +320,18 @@ export function workbenchDressingParts(): readonly InteriorPart[] {
 }
 
 /**
+ * oilStain — one dark plate on the garage slab in the house-side lane.
+ * Local frame: origin 20 mm under the slab top so the plate reads as a stain,
+ * not a step (top lands 45 mm over the slab — outside the 0.03 m coplanar
+ * window — while the sunk base kills the bottom-face coincidence).
+ */
+export function oilStainParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('stain', [0, 0.0325, 0], [1.0, 0.065, 0.9], 'rubber', false),
+  ]);
+}
+
+/**
  * rackingBoxes — cardboard boxes and tins on the existing racking boards
  * (local y values are ABSOLUTE heights: boards top out at 0.40/0.88/1.36/1.72
  * and the rack at 1.90, so every box top lands >= 0.06 clear of any
@@ -335,14 +347,305 @@ export function rackingBoxesParts(): readonly InteriorPart[] {
 }
 
 /**
- * oilStain — one dark plate on the garage slab in the house-side lane.
- * Local frame: origin 20 mm under the slab top so the plate reads as a stain,
- * not a step (top lands 45 mm over the slab — outside the 0.03 m coplanar
- * window — while the sunk base kills the bottom-face coincidence).
+ * HF-536 NIGHT-MUSE-INTERIORS-2 — upper bedrooms, wall dressing, ground gaps.
+ *
+ * CONVENTION (10 mm float). Every freestanding part bottoms 0.01 m above its
+ * supporting top and every wall-mounted part backs 0.012 m off its wall face.
+ * The 10 mm reads as a shadow gap and keeps every same-direction face pair out
+ * of the oriented instrument's 0.03 m band; resting contact (opposite normals,
+ * FrontSide) is used only for dressing stacked on solids (mattress on the bed
+ * solid, kettle on the worktop). This differs from the pass-1 5 mm sink, which
+ * cannot satisfy the brief's >= 0.01 m room-clearance gate.
+ *
+ * HONEST DEVIATIONS (all forced by the 0.03 m coplanar band or the mirror):
+ * - rug: 6 striped pile strips (tops 0.05-0.06 proud, kit pattern), not a
+ *   single 0.02 m plate — a 0.02 plate's top would sit inside the 0.03 m band
+ *   over the floor slab.
+ * - picture inner plate: front 0.04+ proud of the wall (0.02 proud of the frame
+ *   strips it never overlaps in plan), not 0.005 — 0.005 is inside the band.
+ * - wardrobe door strips share the carcass role (`interior`): 0.005 proud in a
+ *   second role would be a same-direction finding over 0.9 m2.
+ * - desk chair faces along z (chairParts backNorth/backSouth): an x-facing
+ *   chair would face the desk in one house and away from it in the other,
+ *   because pair() negates x.
+ * - placements are ABSOLUTE AUTHORED (anchor [0,0,0] at the call site): every
+ *   upper/wall instance is unique, so a local frame buys nothing.
  */
-export function oilStainParts(): readonly InteriorPart[] {
+
+/** Shift chairParts to an absolute authored centre, prefixing suffixes. */
+function chairAt(
+  prefix: string,
+  centre: readonly [number, number, number],
+  backNorth: boolean,
+): readonly InteriorPart[] {
+  return Object.freeze(chairParts(backNorth).map((p) => part(
+    `${prefix} ${p.suffix}`,
+    [centre[0]! + p.offset[0]!, centre[1]! + p.offset[1]!, centre[2]! + p.offset[2]!],
+    p.size,
+    p.role,
+    p.cast,
+  )));
+}
+
+/** One row of books on a shelf board top. Specs are [width, height] literals. */
+function booksRow(
+  prefix: string,
+  x0: number,
+  baseY: number,
+  zc: number,
+  row: number,
+  specs: ReadonlyArray<readonly [number, number]>,
+): readonly InteriorPart[] {
+  const roles: readonly InteriorRole[] = ['trim', 'sign', 'rubber', 'fence'];
+  const out: InteriorPart[] = [];
+  let x = x0;
+  for (const [index, spec] of specs.entries()) {
+    const [w, h] = [spec[0]!, spec[1]!];
+    out.push(part(
+      `${prefix} book r${row} ${index}`, [x + w / 2, baseY + h / 2, zc], [w, h, 0.18],
+      roles[(row + index) % roles.length]!, false,
+    ));
+    x += w + 0.015;
+  }
+  return Object.freeze(out);
+}
+
+/** Upper BACK bedroom: dressing for the bed solid + bedside + wardrobe + desk + chair + rug + bookshelf. 52 boxes. */
+export function upperBackBedroomParts(): readonly InteriorPart[] {
   return Object.freeze([
-    part('stain', [0, 0.0325, 0], [1.0, 0.065, 0.9], 'rubber', false),
+    // Dressing on the existing bed solid (top 3.85): resting contact.
+    part('bed mattress', [-0.5, 3.94, -21.4], [1.7, 0.18, 1.7], 'interior', false),
+    part('bed pillow west', [-0.9, 4.09, -21.975], [0.6, 0.12, 0.35], 'trim', false),
+    part('bed pillow east', [-0.1, 4.09, -21.975], [0.6, 0.12, 0.35], 'trim', false),
+    part('bed throw', [-0.5, 4.06, -20.75], [1.7, 0.06, 0.4], 'applianceRed', false),
+    // Bedside table + lamp, west of the bed foot.
+    part('bedside carcass', [-1.675, 3.56, -20.075], [0.45, 0.5, 0.45], 'interior', false),
+    part('bedside top', [-1.675, 3.83, -20.075], [0.5, 0.04, 0.5], 'interiorFloor', false),
+    part('bedside lamp base', [-1.675, 3.885, -20.075], [0.16, 0.05, 0.16], 'trim', false),
+    part('bedside lamp stem', [-1.675, 4.05, -20.075], [0.05, 0.28, 0.05], 'chrome', false),
+    part('bedside lamp shade', [-1.675, 4.29, -20.075], [0.24, 0.2, 0.24], 'trim', false),
+    // Wardrobe against the east wall: carcass + same-role door strips + chrome handles.
+    part('wardrobe carcass', [3.58, 4.31, -17.9], [0.6, 2.0, 1.2], 'interior', true),
+    part('wardrobe door north', [3.285, 4.31, -18.2], [0.02, 1.8, 0.5], 'interior', false),
+    part('wardrobe door south', [3.285, 4.31, -17.6], [0.02, 1.8, 0.5], 'interior', false),
+    part('wardrobe handle north', [3.255, 4.3, -17.92], [0.04, 0.12, 0.04], 'chrome', false),
+    part('wardrobe handle south', [3.255, 4.3, -17.88], [0.04, 0.12, 0.04], 'chrome', false),
+    // Desk against the east wall + z-facing chair north of it.
+    part('desk top', [3.53, 4.025, -19.7], [0.64, 0.05, 1.2], 'interiorFloor', false),
+    part('desk leg south', [3.53, 3.655, -20.2], [0.6, 0.69, 0.05], 'trim', false),
+    ...chairAt('desk chair', [3.53, 3.315, -18.75], false),
+    part('desk leg north', [3.53, 3.655, -19.2], [0.6, 0.69, 0.05], 'trim', false),
+    // Rug: 6 pile strips, tops 0.06 proud of the upper slab.
+    ...[0, 1, 2, 3, 4, 5].map((index) => part(
+      `rug strip ${index}`, [0.5 + index * 0.312 + 0.15, 3.335, -18.1], [0.3, 0.05, 1.5],
+      index % 2 === 0 ? 'interior' : 'fence', false,
+    )),
+    // Bookshelf against the partition south face: sides/top/bottom/back + 4 shelves + 14 books.
+    part('shelf side west', [-0.53, 4.26, -16.85], [0.04, 1.9, 0.3], 'interiorFloor', true),
+    part('shelf side east', [0.93, 4.26, -16.85], [0.04, 1.9, 0.3], 'interiorFloor', true),
+    part('shelf bottom', [0.2, 3.33, -16.85], [1.5, 0.04, 0.3], 'interiorFloor', false),
+    part('shelf top', [0.2, 5.19, -16.85], [1.5, 0.04, 0.3], 'interiorFloor', true),
+    part('shelf back', [0.2, 4.26, -16.99], [1.5, 1.9, 0.02], 'interiorFloor', false),
+    part('shelf board 0', [0.2, 3.735, -16.85], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 1', [0.2, 4.135, -16.85], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 2', [0.2, 4.535, -16.85], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 3', [0.2, 4.875, -16.85], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    ...booksRow('shelf', -0.51, 3.35, -16.85, 0, [[0.10, 0.30], [0.12, 0.24], [0.09, 0.28], [0.13, 0.22]]),
+    ...booksRow('shelf', -0.51, 3.75, -16.85, 1, [[0.11, 0.26], [0.09, 0.30], [0.12, 0.20], [0.10, 0.24]]),
+    ...booksRow('shelf', -0.51, 4.15, -16.85, 2, [[0.12, 0.28], [0.10, 0.22], [0.13, 0.26]]),
+    ...booksRow('shelf', -0.51, 4.55, -16.85, 3, [[0.10, 0.24], [0.12, 0.30], [0.09, 0.20]]),
+  ]);
+}
+
+/** Upper FRONT bedroom: freestanding bed + bedside + wardrobe + desk + chair + rug + bookshelf. 53 boxes. */
+export function upperFrontBedroomParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('bed base', [0.4, 3.46, -14.4], [1.8, 0.3, 2.0], 'interior', true),
+    part('bed mattress', [0.4, 3.71, -14.4], [1.7, 0.2, 1.9], 'trim', false),
+    part('bed pillow west', [0.0, 3.87, -15.125], [0.6, 0.12, 0.35], 'trim', false),
+    part('bed pillow east', [0.8, 3.87, -15.125], [0.6, 0.12, 0.35], 'trim', false),
+    part('bed throw', [0.4, 3.84, -13.6], [1.7, 0.06, 0.4], 'applianceBlue', false),
+    part('bedside carcass', [1.725, 3.56, -15.175], [0.45, 0.5, 0.45], 'interior', false),
+    part('bedside top', [1.725, 3.83, -15.175], [0.5, 0.04, 0.5], 'interiorFloor', false),
+    part('bedside lamp base', [1.725, 3.885, -15.175], [0.16, 0.05, 0.16], 'trim', false),
+    part('bedside lamp stem', [1.725, 4.05, -15.175], [0.05, 0.28, 0.05], 'chrome', false),
+    part('bedside lamp shade', [1.725, 4.29, -15.175], [0.24, 0.2, 0.24], 'trim', false),
+    part('wardrobe carcass', [3.58, 4.31, -14.2], [0.6, 2.0, 1.2], 'interior', true),
+    part('wardrobe door north', [3.285, 4.31, -14.5], [0.02, 1.8, 0.5], 'interior', false),
+    part('wardrobe door south', [3.285, 4.31, -13.9], [0.02, 1.8, 0.5], 'interior', false),
+    part('wardrobe handle north', [3.255, 4.3, -14.22], [0.04, 0.12, 0.04], 'chrome', false),
+    part('wardrobe handle south', [3.255, 4.3, -14.18], [0.04, 0.12, 0.04], 'chrome', false),
+    part('desk top', [-6.03, 4.025, -12.9], [0.7, 0.05, 1.2], 'interiorFloor', false),
+    part('desk leg south', [-6.03, 3.655, -13.4], [0.6, 0.69, 0.05], 'trim', false),
+    part('desk leg north', [-6.03, 3.655, -12.4], [0.6, 0.69, 0.05], 'trim', false),
+    ...chairAt('desk chair', [-6.03, 3.315, -11.9], false),
+    ...[0, 1, 2, 3, 4, 5].map((index) => part(
+      `rug strip ${index}`, [-3.43 + index * 0.312 + 0.15, 3.335, -13.5], [0.3, 0.05, 1.5],
+      index % 2 === 0 ? 'interior' : 'fence', false,
+    )),
+    part('shelf side west', [1.32, 4.26, -16.15], [0.04, 1.9, 0.3], 'interiorFloor', true),
+    part('shelf side east', [2.78, 4.26, -16.15], [0.04, 1.9, 0.3], 'interiorFloor', true),
+    part('shelf bottom', [2.05, 3.33, -16.15], [1.5, 0.04, 0.3], 'interiorFloor', false),
+    part('shelf top', [2.05, 5.19, -16.15], [1.5, 0.04, 0.3], 'interiorFloor', true),
+    part('shelf back', [2.05, 4.26, -16.29], [1.5, 1.9, 0.02], 'interiorFloor', false),
+    part('shelf board 0', [2.05, 3.735, -16.15], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 1', [2.05, 4.135, -16.15], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 2', [2.05, 4.535, -16.15], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    part('shelf board 3', [2.05, 4.875, -16.15], [1.42, 0.03, 0.26], 'interiorFloor', false),
+    ...booksRow('shelf', 1.34, 3.35, -16.15, 0, [[0.10, 0.30], [0.12, 0.24], [0.09, 0.28], [0.13, 0.22]]),
+    ...booksRow('shelf', 1.34, 3.75, -16.15, 1, [[0.11, 0.26], [0.09, 0.30], [0.12, 0.20], [0.10, 0.24]]),
+    ...booksRow('shelf', 1.34, 4.15, -16.15, 2, [[0.12, 0.28], [0.10, 0.22], [0.13, 0.26]]),
+    ...booksRow('shelf', 1.34, 4.55, -16.15, 3, [[0.10, 0.24], [0.12, 0.30], [0.09, 0.20]]),
+  ]);
+}
+
+/**
+ * skirtingParts — 0.10 m strips, 0.012 m proud of every interior wall base the
+ * ground kit left bare (ground east/front/back; all upper walls). Ground
+ * partition faces and the ground west wall already carry baseboards; doubling
+ * them would race the existing strips, so they are deliberately not repeated.
+ * Wall runs stop 0.02 short of the side linings (butt joints, no corner overlap).
+ * 20 boxes.
+ */
+export function skirtingParts(): readonly InteriorPart[] {
+  const g = 0.14;
+  const u = 3.36;
+  return Object.freeze([
+    part('ground east back south', [3.908, g, -21.134], [0.02, 0.10, 3.028], 'trim', false),
+    part('ground east back north', [3.908, g, -17.225], [0.02, 0.10, 1.11], 'trim', false),
+    part('ground east front', [3.908, g, -13.335], [0.02, 0.10, 5.99], 'trim', false),
+    part('ground front west', [-4.29, g, -10.342], [4.24, 0.10, 0.02], 'trim', false),
+    part('ground front east', [1.784, g, -10.342], [4.228, 0.10, 0.02], 'trim', false),
+    part('ground back west', [-4.29, g, -22.658], [4.24, 0.10, 0.02], 'trim', false),
+    part('ground back east', [1.79, g, -22.658], [4.24, 0.10, 0.02], 'trim', false),
+    part('upper west front', [-6.408, u, -13.335], [0.02, 0.10, 5.99], 'trim', false),
+    part('upper west back', [-6.408, u, -22.045], [0.02, 0.10, 1.23], 'trim', false),
+    part('upper east front', [3.908, u, -13.335], [0.02, 0.10, 5.99], 'trim', false),
+    part('upper east back', [3.908, u, -19.665], [0.02, 0.10, 5.99], 'trim', false),
+    part('upper partition north west', [-4.2, u, -16.328], [1.16, 0.10, 0.02], 'trim', false),
+    part('upper partition north east', [1.065, u, -16.328], [5.69, 0.10, 0.02], 'trim', false),
+    part('upper partition south west', [-4.2, u, -16.672], [1.16, 0.10, 0.02], 'trim', false),
+    part('upper partition south east', [1.065, u, -16.672], [5.69, 0.10, 0.02], 'trim', false),
+    part('upper front west', [-4.634, u, -10.322], [3.528, 0.10, 0.02], 'trim', false),
+    part('upper front east', [2.134, u, -10.322], [3.528, 0.10, 0.02], 'trim', false),
+    part('upper back west', [-5.159, u, -22.678], [2.478, 0.10, 0.02], 'trim', false),
+    part('upper back mid', [-0.675, u, -22.678], [2.81, 0.10, 0.02], 'trim', false),
+    part('upper back east', [3.59, u, -22.678], [0.64, 0.10, 0.02], 'trim', false),
+  ]);
+}
+
+/** One 0.5 x 0.4 m picture: 4 frame strips + a canvas plate. Frame never overlaps the canvas in plan. */
+function pictureAt(
+  prefix: string,
+  wall: 'n' | 's' | 'e' | 'w',
+  au: number,
+  av: number,
+  face: number,
+): InteriorPart[] {
+  // Frame centre stands 0.042 off the face (0.012 gap + 0.03 half-depth);
+  // the canvas centre 0.032 off it (0.012 gap + 0.02 half-depth), so the
+  // canvas front lands 0.052 proud of the plaster and 0.02 behind the frame.
+  const roomSign = wall === 'n' || wall === 'w' ? 1 : -1;
+  const frameC = face + roomSign * 0.042;
+  const canvasC = face + roomSign * 0.032;
+  const frame = (suffix: string, c0: number, c1: number, s0: number, s1: number): InteriorPart => {
+    const offset: readonly [number, number, number] = wall === 'n' || wall === 's'
+      ? [c0, c1, frameC] : [frameC, c1, c0];
+    const size: readonly [number, number, number] = wall === 'n' || wall === 's'
+      ? [s0, s1, 0.06] : [0.06, s1, s0];
+    return part(`${prefix} ${suffix}`, offset, size, 'trim', false);
+  };
+  const canvasOffset: readonly [number, number, number] = wall === 'n' || wall === 's'
+    ? [au, av, canvasC] : [canvasC, av, au];
+  const canvasSize: readonly [number, number, number] = wall === 'n' || wall === 's'
+    ? [0.38, 0.28, 0.04] : [0.04, 0.28, 0.38];
+  const sign: InteriorRole = 'sign';
+  return [
+    frame('frame top', au, av + 0.17, 0.5, 0.06),
+    frame('frame bottom', au, av - 0.17, 0.5, 0.06),
+    frame('frame left', au - 0.22, av, 0.06, 0.28),
+    frame('frame right', au + 0.22, av, 0.06, 0.28),
+    part(`${prefix} canvas`, canvasOffset, canvasSize, sign, false),
+  ];
+}
+
+/**
+ * pendantParts — ceiling rose + rod + shade + warm bulb at each room centre.
+ * Back-room centres are occupied by the existing ceiling housings, so those
+ * two hang offset (documented, not centred). 16 boxes.
+ */
+export function pendantParts(): readonly InteriorPart[] {
+  const drop = (
+    prefix: string, x: number, z: number, ceil: number,
+  ): readonly InteriorPart[] => Object.freeze([
+    part(`${prefix} rose`, [x, ceil - 0.04, z], [0.3, 0.06, 0.3], 'trim', false),
+    part(`${prefix} rod`, [x, ceil - 0.325, z], [0.04, 0.53, 0.04], 'chrome', false),
+    part(`${prefix} shade`, [x, ceil - 0.715, z], [0.36, 0.25, 0.36], 'trim', false),
+    part(`${prefix} bulb`, [x, ceil - 0.89, z], [0.12, 0.1, 0.12], 'warmLight', false),
+  ]);
+  return Object.freeze([
+    ...drop('kitchen pendant', -1.25, -13.34, 3.0),
+    ...drop('living pendant', -2.9, -19.0, 3.0),
+    ...drop('upper front pendant', 0.3, -14.3, 6.2),
+    ...drop('upper back pendant', 0.5, -18.3, 6.2),
+  ]);
+}
+
+/**
+ * pictureParts — one picture per room (ground kitchen, ground living, upper
+ * front, upper back). Frame backs stand 0.012 off the plaster; the canvas
+ * front stands 0.052 proud of it, 0.02 behind the frame strips it butts
+ * against without overlapping. 20 boxes.
+ */
+export function pictureParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    // Partition north face (-16.35), back lining north face (-22.68),
+    // upper front wall south face (-10.30), upper east lining west face (3.93).
+    ...pictureAt('kitchen picture', 'n', 2.8, 1.7, -16.35),
+    ...pictureAt('living picture', 'n', -2.65, 1.7, -22.68),
+    ...pictureAt('upper front picture', 's', 1.75, 4.9, -10.30),
+    ...pictureAt('upper back picture', 'e', -20.55, 5.2, 3.93),
+  ]);
+}
+
+/**
+ * switchParts — one plate beside each house doorway (front, back, internal
+ * ground, internal upper, garage link, balcony). The ground living switch the
+ * arena already carries is not repeated. 6 boxes.
+ */
+export function switchParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('switch front door', [0.0, 1.25, -10.3445], [0.09, 0.14, 0.025], 'trim', false),
+    part('switch back door', [0.0, 1.25, -22.6555], [0.09, 0.14, 0.025], 'trim', false),
+    part('switch internal ground', [-1.5, 1.25, -16.3255], [0.09, 0.14, 0.025], 'trim', false),
+    part('switch internal upper', [-1.5, 4.55, -16.6745], [0.09, 0.14, 0.025], 'trim', false),
+    part('switch garage link', [3.9055, 1.25, -17.5], [0.025, 0.14, 0.09], 'trim', false),
+    part('switch balcony', [-1.8, 4.55, -22.6755], [0.09, 0.14, 0.025], 'trim', false),
+  ]);
+}
+
+/** tvUnitParts — low unit + dark screen against the living-room east wall. 2 boxes. */
+export function tvUnitParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('tv unit', [3.655, 0.315, -21.27], [0.45, 0.45, 0.7], 'interior', false),
+    part('tv screen', [3.63, 0.84, -21.27], [0.06, 0.6, 0.7], 'rubber', false),
+  ]);
+}
+
+/** fridgeParts — tall carcass + same-role door strip + chrome handle. 3 boxes. */
+export function fridgeParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('fridge carcass', [3.53, 1.04, -14.15], [0.7, 1.9, 0.7], 'interior', true),
+    part('fridge door', [3.185, 1.04, -14.15], [0.02, 1.7, 0.6], 'interior', false),
+    part('fridge handle', [3.15, 1.1, -13.95], [0.05, 0.3, 0.05], 'chrome', false),
+  ]);
+}
+
+/** kettlePairParts — kettle + toaster on the kitchen worktop (top 1.045). 2 boxes. */
+export function kettlePairParts(): readonly InteriorPart[] {
+  return Object.freeze([
+    part('kettle', [-4.7, 1.155, -12.81], [0.18, 0.22, 0.18], 'chrome', false),
+    part('toaster', [-4.35, 1.135, -12.81], [0.26, 0.18, 0.16], 'trim', false),
   ]);
 }
 
@@ -366,9 +669,23 @@ export const CHAIR_TRIANGLES = 6 * INTERIOR_BOX_TRIANGLES;
 export const WORKBENCH_DRESSING_TRIANGLES = 5 * INTERIOR_BOX_TRIANGLES;
 export const RACKING_BOXES_TRIANGLES = 4 * INTERIOR_BOX_TRIANGLES;
 export const OIL_STAIN_TRIANGLES = 1 * INTERIOR_BOX_TRIANGLES;
+export const UPPER_BACK_BEDROOM_TRIANGLES = 52 * INTERIOR_BOX_TRIANGLES;
+export const UPPER_FRONT_BEDROOM_TRIANGLES = 53 * INTERIOR_BOX_TRIANGLES;
+export const SKIRTING_TRIANGLES = 20 * INTERIOR_BOX_TRIANGLES;
+export const PICTURES_TRIANGLES = 20 * INTERIOR_BOX_TRIANGLES;
+export const PENDANTS_TRIANGLES = 16 * INTERIOR_BOX_TRIANGLES;
+export const SWITCHES_TRIANGLES = 6 * INTERIOR_BOX_TRIANGLES;
+export const TV_UNIT_TRIANGLES = 2 * INTERIOR_BOX_TRIANGLES;
+export const FRIDGE_TRIANGLES = 3 * INTERIOR_BOX_TRIANGLES;
+export const KETTLE_PAIR_TRIANGLES = 2 * INTERIOR_BOX_TRIANGLES;
 
-/** Everything one house carries: 107 boxes = 1,284 tris (budget 14,000). */
-export const HOUSE_INTERIOR_BOXES = 107;
+/** Interiors-2 adds 174 boxes = 2,088 tris per house (brief budget 3,200). */
+export const HOUSE_INTERIORS2_BOXES = 174;
+export const HOUSE_INTERIORS2_TRIANGLES = HOUSE_INTERIORS2_BOXES * INTERIOR_BOX_TRIANGLES;
+export const HOUSE_INTERIORS2_BUDGET = 3200;
+
+/** Everything one house carries: 281 boxes = 3,372 tris (107 pass-1 + 174 pass-2, budget 14,000). */
+export const HOUSE_INTERIOR_BOXES = 281;
 export const HOUSE_INTERIOR_TRIANGLES = HOUSE_INTERIOR_BOXES * INTERIOR_BOX_TRIANGLES;
 /** Everything one garage carries: 10 boxes = 120 tris (budget 4,000). */
 export const GARAGE_INTERIOR_BOXES = 10;
