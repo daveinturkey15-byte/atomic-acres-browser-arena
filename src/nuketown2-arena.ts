@@ -221,6 +221,12 @@ import {
   type StreetSignRole,
   streetSignPropPlacements,
 } from './forge-kit';
+// HF-536 night-muse-hardware: facade and fence hardware kit
+import {
+  type HardwarePart,
+  type HardwareRole,
+  hardwarePlacements,
+} from './forge-kit/hardware';
 // HF-536 night-muse-street: street wear kit
 import {
   type StreetPart,
@@ -4150,6 +4156,54 @@ function streetSignPairKit(
   }
 }
 /**
+ * HF-536 night-muse-hardware: Resolve one hardware ROLE onto THIS arena's
+ * existing material registry. Borrows existing arena materials only; adds
+ * zero materials, uniforms, or shader graphs.
+ */
+function hardwareRoleMaterial(m: Nuketown2Materials, role: HardwareRole): THREE.Material {
+  switch (role) {
+    case 'painted-metal': return m.garageDoor;
+    case 'timber': return m.fence;
+    case 'chrome': return m.chrome;
+    case 'rubber': return m.rubber;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * Emit one hardware prefab at an authored anchor, through `pair()`.
+ * Every part is presentation-only (solid:false, shots:false, cast:false).
+ * Every part carries the prefab's propId so declutter gates count props, not boxes.
+ */
+function hardwarePairKit(
+  builder: Builder,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly HardwarePart[],
+  m: Nuketown2Materials,
+): void {
+  for (const part of parts) {
+    const id = `${propId} ${part.suffix}`;
+    pair(builder, id, [
+      anchor[0] + part.offset[0],
+      anchor[1] + part.offset[1],
+      anchor[2] + part.offset[2],
+    ], [part.size[0], part.size[1], part.size[2]], hardwareRoleMaterial(m, part.role),
+    {
+      solid: false,
+      shots: false,
+      cast: part.cast,
+      presentationOnly: true,
+      propId,
+      ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+    });
+    for (const side of ['north', 'south'] as const) {
+      const mesh = builder.root.getObjectByName(`nuketown2 ${side} ${id}`);
+      if (mesh) mesh.userData.presentationOnly = true;
+    }
+  }
+}
+/**
  * HF-536 night-muse-street: Resolve one street-wear ROLE onto THIS arena's
  * existing material registry. Borrows existing arena materials only; adds
  * zero materials, uniforms, or shader graphs.
@@ -4641,6 +4695,12 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
   // HF-536 night-gemini4: yard props kit (bins, mailbox, garden set, hose reel, washing line, sand-pit toys, planters)
   for (const placement of yardPropPlacements()) {
     yardPairKit(builder, placement.propId, placement.anchor, placement.parts, m);
+  }
+  // HF-536 night-muse-hardware: facade and fence hardware kit (plaque,
+  // doorbell/lantern, door and garage furniture, fence caps/rails/gates,
+  // vent and meter box) on both houses and both yards.
+  for (const placement of hardwarePlacements()) {
+    hardwarePairKit(builder, placement.propId, placement.anchor, placement.parts, m);
   }
 }
 
