@@ -1674,8 +1674,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // The 300 mm band between the ground storey's head and the upper piers is the
   // upper FLOOR SLAB's edge - `m.interior` drywall, outdoors, on the map's most
   // photographed elevation. Siding it is a defect fix as much as a facade one.
+  // HF-536 night: the band's top course ended EXACTLY at UPPER_Y0, which is
+  // also `window ledge sill`'s top face (NUKETOWN2_WINDOW_LEDGE.top). Two
+  // up-facing faces of different materials shared the y = 3.30 plane over
+  // 0.19 m2 where the sill's projection crosses the board's 60 mm reveal - the
+  // oriented coplanar audit's only consequential row. The band now stops 10 mm
+  // short so the sill overhangs the last course the way a real sill does; the
+  // sill's own body still laps into the course below it, so nothing is open.
   facadePair(builder, m, 'house front storey band', [cx, GROUND_H, HOUSE_FRONT_Z],
-    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H, facing: 'z+', role: 'sidingUpper', courseOffset: 90 }));
+    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H - 0.01, facing: 'z+', role: 'sidingUpper', courseOffset: 90 }));
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
   // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
