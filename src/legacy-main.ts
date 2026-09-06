@@ -674,6 +674,8 @@ import {
   registerCarpetCorridorPoint,
   type CarpetCorridorTargeting,
 } from './carpet-corridor-targeting';
+// HF-369: and the two-stage overlay that says WHICH of those two clicks you are on.
+import { carpetCorridorOverlayPlan, carpetCorridorPrompt, drawCarpetCorridorOverlay } from './ui/carpet-corridor-map-overlay';
 import { controllableAlternativeForSlotId,
   controllableKillstreakId,
   selectControllableSupportEntity,
@@ -26002,41 +26004,25 @@ function drawStrikeMap(now = performance.now()): void {
     context.fillStyle = '#10232a'; context.font = '900 18px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
     context.fillText(String(index + 1), x, y + 1);
   });
-  // HF-317: the Carpet Bomber run reads as a CORRIDOR — a banded start→end line
-  // with a heading arrow — so it is never mistaken for Tri-Pass's three
-  // numbered dots or for the Care Package's single drop marker.
+  // HF-369 (salvage, docs/salvage/WIRING-PLAN-ccfeec86.md section 2). HF-317 made the run read as a
+  // CORRIDOR rather than Tri-Pass dots, but it drew nothing until BOTH clicks had landed, labelled
+  // the pins START/END, and drew the raw pick. Owner: "should be clearer that the 2nd click of the
+  // carpet bomb is for its direction, animated on the map". The overlay module names the stage, so
+  // after click one the map shows a labelled DROP pin with a sweeping compass dial; and it draws
+  // the run the HOST WILL FLY - clamped to [MIN, MAX] and re-centred by the shared solver - not the
+  // drag, which could be drawn at roughly twice the bombed length. Motion is a pure function of
+  // `now`, so reducedMotion freezes it at phase zero. The solver itself is untouched.
   const corridorPoints = carpetCorridorTargeting?.points ?? [];
-  if (corridorPoints.length > 0) {
+  if (carpetCorridorTargeting) {
     const [originX] = worldToTacticalMap(0, 0, arena.bounds, width, height);
     const [halfWidthProbeX] = worldToTacticalMap(CARPET_CORRIDOR_BAND_HALF_WIDTH_M, 0, arena.bounds, width, height);
-    const bandHalfWidth = Math.max(6, Math.abs(halfWidthProbeX - originX));
-    const canvasPoints = corridorPoints.map((point) => worldToTacticalMap(point.x, point.z, arena.bounds, width, height));
-    const [start] = canvasPoints;
-    const end = canvasPoints[1] ?? null;
-    if (end) {
-      context.strokeStyle = 'rgba(255, 179, 71, 0.28)';
-      context.lineWidth = bandHalfWidth * 2;
-      context.lineCap = 'round';
-      context.beginPath(); context.moveTo(start[0], start[1]); context.lineTo(end[0], end[1]); context.stroke();
-      context.lineCap = 'butt';
-      context.strokeStyle = '#ffb347';
-      context.lineWidth = 5;
-      context.beginPath(); context.moveTo(start[0], start[1]); context.lineTo(end[0], end[1]); context.stroke();
-      const heading = Math.atan2(end[1] - start[1], end[0] - start[0]);
-      context.fillStyle = '#ffb347';
-      context.beginPath();
-      context.moveTo(end[0] + Math.cos(heading) * 20, end[1] + Math.sin(heading) * 20);
-      context.lineTo(end[0] + Math.cos(heading + 2.5) * 16, end[1] + Math.sin(heading + 2.5) * 16);
-      context.lineTo(end[0] + Math.cos(heading - 2.5) * 16, end[1] + Math.sin(heading - 2.5) * 16);
-      context.closePath(); context.fill();
-    }
-    canvasPoints.forEach(([x, y], index) => {
-      context.fillStyle = '#ffb347';
-      context.beginPath(); context.arc(x, y, 15, 0, Math.PI * 2); context.fill();
-      context.strokeStyle = '#fff4d9'; context.lineWidth = 3; context.stroke();
-      context.fillStyle = '#10232a'; context.font = '900 15px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
-      context.fillText(index === 0 ? 'START' : 'END', x, y + 1);
-    });
+    drawCarpetCorridorOverlay(context, carpetCorridorOverlayPlan({
+      state: carpetCorridorTargeting,
+      project: (worldX, worldZ) => worldToTacticalMap(worldX, worldZ, arena.bounds, width, height),
+      bandHalfWidthPx: Math.max(6, Math.abs(halfWidthProbeX - originX)),
+      nowMs: now,
+      reducedMotion: accessibilityRuntime.reducedMotion,
+    }));
   }
   context.textBaseline = 'alphabetic';
   context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
@@ -26049,13 +26035,15 @@ function drawStrikeMap(now = performance.now()): void {
     : pointSupportTargeting
       ? 'CARE PACKAGE'
       : 'TRI-PASS';
-  element<HTMLElement>('#strike-target-instruction').textContent = carpetCorridorActive
-    ? 'SELECT RUN START AND END'
+  // HF-369: derived from carpetCorridorStage, so the caption cannot name the wrong click.
+  const corridorPrompt = carpetCorridorTargeting ? carpetCorridorPrompt(carpetCorridorTargeting) : null;
+  element<HTMLElement>('#strike-target-instruction').textContent = corridorPrompt
+    ? corridorPrompt.instruction
     : pointSupportTargeting
       ? 'SELECT DELIVERY AREA'
       : 'SELECT THREE TARGETS';
-  element<HTMLElement>('#strike-target-help').innerHTML = carpetCorridorActive
-    ? 'CLICK RUN START THEN RUN END · <kbd>ESC</kbd> CANCELS AND REFUNDS'
+  element<HTMLElement>('#strike-target-help').innerHTML = corridorPrompt
+    ? corridorPrompt.help
     : pointSupportTargeting
       ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
       : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';

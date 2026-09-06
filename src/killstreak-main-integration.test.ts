@@ -353,16 +353,29 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(cancelBlock).toContain("?? (carpetCorridorTargeting !== null && !carpetCorridorTargeting.complete ? 'carpet-bomber' : null)");
     expect(cancelBlock).toContain('carpetCorridorTargeting = null;');
 
-    // Overlay copy names the run and counts to two.
+    // Overlay copy names the run and counts to two. RE-PINNED 2026-09-06 (HF-369,
+    // HF-536 S1 salvage): the two captions this used to pin were static literals
+    // that said 'SELECT RUN START AND END' and 'CLICK RUN START THEN RUN END' for
+    // BOTH clicks - the owner complaint itself. They are now derived from
+    // carpetCorridorStage by src/ui/carpet-corridor-map-overlay.ts, so the caption
+    // cannot name the wrong click. Nothing is relaxed: the positive assertions are
+    // replaced one-for-one and the retired literals are asserted GONE.
     expect(source).toContain("? 'CARPET BOMBER'");
-    expect(source).toContain("? 'SELECT RUN START AND END'");
-    expect(source).toContain("? 'CLICK RUN START THEN RUN END · <kbd>ESC</kbd> CANCELS AND REFUNDS'");
+    expect(source).toContain('const corridorPrompt = carpetCorridorTargeting ? carpetCorridorPrompt(carpetCorridorTargeting) : null;');
+    expect(source).toContain('? corridorPrompt.instruction');
+    expect(source).toContain('? corridorPrompt.help');
+    expect(source).not.toContain("'SELECT RUN START AND END'");
+    expect(source).not.toContain('CLICK RUN START THEN RUN END');
     expect(source).toContain('const targetCount = carpetCorridorActive ? CARPET_CORRIDOR_POINT_COUNT : pointSupportTargeting ? 1 : 3;');
     expect(source).toContain('`${selectedCount} / ${targetCount}`');
 
-    // The corridor draws as a line between two labelled ends, not Tri-Pass dots.
+    // The corridor draws as a banded run with a heading arrow, not Tri-Pass dots.
+    // RE-PINNED 2026-09-06 (HF-369): the draw moved into the overlay module, which
+    // also labels the pins DROP / DIRECTION and clamps the drawn run to the one the
+    // host will fly. Full coverage in src/carpet-corridor-main-integration.test.ts.
     expect(source).toContain('const corridorPoints = carpetCorridorTargeting?.points ?? [];');
-    expect(source).toContain("context.fillText(index === 0 ? 'START' : 'END', x, y + 1);");
+    expect(source).toContain('drawCarpetCorridorOverlay(context, carpetCorridorOverlayPlan({');
+    expect(source).not.toContain("index === 0 ? 'START' : 'END'");
   });
 
   // Re-pinned 2026-08-31: the airspace (portal/no-fly navigation, centre-spawn
