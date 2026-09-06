@@ -45,6 +45,13 @@ const BOARD_PROUD_M = 0.019;
 const GRAIN_RELIEF_M = 0.0006;
 const GRAIN_RELIEF_NEAR_M = 1.2;
 const GRAIN_RELIEF_FAR_M = 3.0;
+/**
+ * Latewood band period, metres. The albedo sawtooth below runs at this pitch;
+ * 2.2 mm is sub-pixel past ~2 m on the review capture, where point sampling
+ * turns it into dotted scallops along the boards (row 6). Exported for the
+ * pattern-period gate.
+ */
+export const LATEWOOD_PERIOD_M = 0.0022;
 /** A knot is harder than the board and weathers PROUD, metres. */
 const KNOT_RELIEF_M = 0.0011;
 
@@ -84,15 +91,22 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const gap = painted.select(float(0), rawGap);
   const boardTone = hash2(vec2(boardIdx, vertical.select(float(41.3), float(7.9)))).sub(float(0.5)).mul(float(0.16));
   const along = vertical.select(p.y, p.x);
-  const bandPhase = along.mul(float(1 / 0.0022)).add(hash2(vec2(boardIdx, float(3.1))).mul(float(30)));
+  const bandPhase = along.mul(float(1 / LATEWOOD_PERIOD_M)).add(hash2(vec2(boardIdx, float(3.1))).mul(float(30)));
   const latewood = abs(fract(bandPhase).sub(float(0.5))).mul(float(2));
+  // DOTTED-SCALLOP FIX (row 6). The albedo latewood sawtooth ran unfaded at a
+  // 2.2 mm pitch, so past ~2 m every sample aliased into per-board dots and
+  // scallop arcs on the fence. The relief already fades over 1.2-3 m; the
+  // albedo now fades over the same band. Boards keep boardTone, knots, scuff
+  // and silvering at range - the scales the frame actually resolves.
+  const grainFade = detailFalloff(GRAIN_RELIEF_NEAR_M, GRAIN_RELIEF_FAR_M);
+  const latewoodAlbedo = latewood.mul(grainFade);
   const knotCell = floor(along.div(float(0.55)));
   const knotCentre = hash2(vec2(boardIdx, knotCell)).mul(float(0.55)).add(knotCell.mul(float(0.55)));
   const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
   const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
   const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
   const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
-  const grained = wood.mul(float(1).sub(latewood.mul(painted.select(float(0.03), float(0.11)))));
+  const grained = wood.mul(float(1).sub(latewoodAlbedo.mul(painted.select(float(0.03), float(0.11)))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
   const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
