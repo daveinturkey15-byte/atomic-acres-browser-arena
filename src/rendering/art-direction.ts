@@ -298,7 +298,16 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     splitTone: {
       shadowTint: 0x0a6a5e,      // deep lagoon cyan-green under the canopy
       highlightTint: 0xfff0b0,   // hot noon sun on sand
-      strengthScale: 1.45,
+      // CORRECTION ROUND, MEASURED: 1.45 gave the frame back its warm/cool
+      // separation and also took global HSV saturation from 11.5% over the
+      // boards to 18.3% over — the wrong direction on the one axis finding 3
+      // says is already the problem (plastic vegetation). 1.25 keeps most of
+      // the separation and hands back roughly a third of that regression; the
+      // sunlit R-B gain is safe to trade here because the CPU chain model
+      // measured split-tone strength as NEARLY INERT on warmth (sweeping 1.0
+      // to 1.6 moves the sunlit probe's R-B by 0.4 of 255) — the warmth came
+      // from the searched gain, not from here.
+      strengthScale: 1.25,
       shadowBalance: 0.5,
       highlightBalance: 0.44,
     },
