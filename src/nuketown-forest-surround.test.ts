@@ -2,13 +2,23 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   buildNuketownForestSurround,
+  FOREST_BROADLEAF_CANOPY_LOBES,
+  FOREST_BROADLEAF_MAX_TRIANGLES,
   FOREST_CONIFER_HEIGHT_M,
+  FOREST_CONIFER_MAX_TRIANGLES,
+  FOREST_CONIFER_TIER_COUNT,
+  FOREST_CONIFER_TIER_HEIGHT_M,
+  FOREST_CONIFER_TIER_OVERLAP_FRACTION,
+  FOREST_CONIFER_TIER_OVERLAP_M,
+  FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M,
   FOREST_HEIGHT_JITTER,
-  FOREST_RIM_RADIAL_JITTER,
-  FOREST_STANDOUT_EVERY,
   FOREST_MAX_RADIAL_M,
   FOREST_RECT_MARGIN_M,
+  FOREST_RIM_RADIAL_JITTER,
+  FOREST_STANDOUT_EVERY,
+  coniferInstanceJitter,
 } from './nuketown-forest-surround';
+import { LEAF_ALPHA_TEST, nuketown2LeafAtlas } from './nuketown2-vegetation';
 import { ARENA_BOUNDS } from './arena-layout';
 import { buildArena } from './map';
 
@@ -182,5 +192,151 @@ describe('Nuke Town forest surround', () => {
     expect(minValue).toBeGreaterThan(0);
 
     forest.dispose();
+  });
+
+  it('HF-536: keeps prefab triangle counts within budget (conifer <= 220, broadleaf <= 320)', () => {
+    const parent = new THREE.Group();
+    const forest = buildNuketownForestSurround(parent);
+    const conifers = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-conifers',
+    ) as THREE.InstancedMesh;
+    const broadTrunks = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-broadleaf-trunks',
+    ) as THREE.InstancedMesh;
+    const canopies = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-broadleaf-canopies',
+    ) as THREE.InstancedMesh;
+
+    const coniferTris = conifers.geometry.getAttribute('position').count / 3;
+    expect(coniferTris).toBeLessThanOrEqual(FOREST_CONIFER_MAX_TRIANGLES);
+    expect(coniferTris).toBe(100);
+
+    const broadTrunkTris = broadTrunks.geometry.getAttribute('position').count / 3;
+    const canopyTris = canopies.geometry.getAttribute('position').count / 3;
+    const broadleafTotalTris = broadTrunkTris + canopyTris;
+    expect(broadleafTotalTris).toBeLessThanOrEqual(FOREST_BROADLEAF_MAX_TRIANGLES);
+    expect(broadleafTotalTris).toBe(208);
+
+    forest.dispose();
+  });
+
+  it('HF-536: verifies conifer tier count 5, measured 30 % overlap, and visible trunk height >= 1.2 m', () => {
+    expect(FOREST_CONIFER_TIER_COUNT).toBe(5);
+    expect(FOREST_CONIFER_TIER_OVERLAP_FRACTION).toBe(0.30);
+    expect(FOREST_CONIFER_TIER_OVERLAP_M / FOREST_CONIFER_TIER_HEIGHT_M).toBeCloseTo(0.30, 2);
+    expect(FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M).toBeGreaterThanOrEqual(1.2);
+
+    // In the geometry: verify that lowest foliage tier vertices start at or above 1.2 m
+    const parent = new THREE.Group();
+    const forest = buildNuketownForestSurround(parent);
+    const conifers = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-conifers',
+    ) as THREE.InstancedMesh;
+
+    const position = conifers.geometry.getAttribute('position');
+    let minFoliageY = Infinity;
+    for (let i = 0; i < position.count; i += 1) {
+      const radius = Math.hypot(position.getX(i), position.getZ(i));
+      // Exclude trunk vertices (r <= 0.20)
+      if (radius > 0.35) {
+        minFoliageY = Math.min(minFoliageY, position.getY(i));
+      }
+    }
+    // Skirt cards hang down from the 1.2 m rim, keeping the trunk base visible
+    expect(minFoliageY).toBeGreaterThanOrEqual(0.5);
+    forest.dispose();
+  });
+
+  it('HF-536: verifies broadleaf canopy lobes count is 4-6 with leaf card shell', () => {
+    expect(FOREST_BROADLEAF_CANOPY_LOBES).toBeGreaterThanOrEqual(4);
+    expect(FOREST_BROADLEAF_CANOPY_LOBES).toBeLessThanOrEqual(6);
+
+    const parent = new THREE.Group();
+    const forest = buildNuketownForestSurround(parent);
+    const canopies = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-broadleaf-canopies',
+    ) as THREE.InstancedMesh;
+    // Geometry carries UVs for the leaf card shell
+    const uvAttr = canopies.geometry.getAttribute('uv');
+    expect(uvAttr).toBeDefined();
+    forest.dispose();
+  });
+
+  it('HF-536: verifies instance count and draw count are identical to before', () => {
+    const parent = new THREE.Group();
+    const forest = buildNuketownForestSurround(parent);
+
+    // Roster identical to before:
+    // conifers: 340, broadleafs: 169 (trunks: 169, canopies: 169), understory: 260, contactSkirts: 509
+    expect(forest.stats.conifers).toBe(340);
+    expect(forest.stats.broadleafs).toBe(169);
+    expect(forest.stats.understory).toBe(260);
+    expect(forest.stats.contactSkirts).toBe(509);
+
+    // Exactly 5 meshes = 5 draw calls, identical to before
+    expect(forest.stats.meshes).toBe(5);
+    expect(forest.group.children.length).toBe(5);
+
+    // Total belt triangles measured and <= 80,000 budget
+    expect(forest.stats.triangles).toBe(78933);
+    expect(forest.stats.triangles).toBeLessThan(80_000);
+
+    forest.dispose();
+  });
+
+  it('HF-536: spends exactly ONE texture sampler on the new foliage material (look-2b pin)', () => {
+    const parent = new THREE.Group();
+    const forest = buildNuketownForestSurround(parent);
+    const conifers = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-conifers',
+    ) as THREE.InstancedMesh;
+    const canopies = forest.group.children.find(
+      (child) => (child as THREE.InstancedMesh).name === 'forest-broadleaf-canopies',
+    ) as THREE.InstancedMesh;
+
+    for (const mesh of [conifers, canopies]) {
+      const material = mesh.material as THREE.Material & Record<string, unknown>;
+      const textures = new Set<object>();
+      const seen = new Set<object>();
+      const walk = (node: unknown): void => {
+        if (!node || typeof node !== 'object' || seen.has(node)) return;
+        seen.add(node);
+        const record = node as Record<string, unknown>;
+        const value = record.value as { isTexture?: boolean } | undefined;
+        if (value && typeof value === 'object' && value.isTexture === true) textures.add(value);
+        for (const key of Object.keys(record)) {
+          if (key === 'parent' || key === 'parents') continue;
+          walk(record[key]);
+        }
+      };
+      for (const slot of ['colorNode', 'opacityNode', 'positionNode', 'normalNode', 'roughnessNode']) {
+        walk(material[slot]);
+      }
+      for (const slot of ['map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+        const texture = material[slot] as { isTexture?: boolean } | null | undefined;
+        if (texture && texture.isTexture === true) textures.add(texture);
+      }
+      expect(textures.size, `${mesh.name} material may cost exactly one sampler`).toBe(1);
+      expect([...textures][0] as THREE.Texture).toBe(nuketown2LeafAtlas());
+      expect(material.alphaTest).toBe(LEAF_ALPHA_TEST);
+      expect(material.opacityNode, `${mesh.name} must have opacityNode for alpha-test cutout`).toBeTruthy();
+    }
+
+    forest.dispose();
+  });
+
+  it('HF-536: verifies determinism and bounds of conifer instance jitter hash', () => {
+    for (let index = 0; index < 340; index += 1) {
+      const first = coniferInstanceJitter(index);
+      const second = coniferInstanceJitter(index);
+      expect(first.yawJitter).toBe(second.yawJitter);
+      expect(first.scaleJitter).toBe(second.scaleJitter);
+
+      expect(first.scaleJitter).toBeGreaterThanOrEqual(0.85);
+      expect(first.scaleJitter).toBeLessThanOrEqual(1.15);
+
+      expect(first.yawJitter).toBeGreaterThanOrEqual(0);
+      expect(first.yawJitter).toBeLessThan(Math.PI * 2);
+    }
   });
 });

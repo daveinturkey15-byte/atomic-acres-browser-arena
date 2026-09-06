@@ -18,9 +18,16 @@
  * surfaces, fog stays on. Deterministic: fixed-seed mulberry32 streams.
  */
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import * as TSL from 'three/tsl';
 import { ARENA_BOUNDS } from './arena-layout';
 import { nuketownLawnPlacementAllowed } from './nuketown-lawn-field';
 import { nuketownBackdropGroundNormal, nuketownBackdropGroundY } from './nuketown-mountain-backdrop';
+import {
+  LEAF_ALPHA_TEST,
+  LEAF_ATLAS_CELLS,
+  nuketown2LeafAtlas,
+} from './nuketown2-vegetation';
 
 /** Trees never spawn closer to the arena than this rectangle inflation. */
 export const FOREST_RECT_MARGIN_M = 3.2;
@@ -86,6 +93,39 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
 });
 /** World-space height of the conifer prototype, trunk base to leader tip. */
 export const FOREST_CONIFER_HEIGHT_M = 10.3;
+
+/** HF-536: Conifer prefab constants */
+export const FOREST_CONIFER_TIER_COUNT = 5;
+export const FOREST_CONIFER_TIER_HEIGHT_FRACTION = 0.22;
+export const FOREST_CONIFER_TIER_OVERLAP_FRACTION = 0.30;
+export const FOREST_CONIFER_TIER_HEIGHT_M = Number((FOREST_CONIFER_HEIGHT_M * FOREST_CONIFER_TIER_HEIGHT_FRACTION).toFixed(4));
+export const FOREST_CONIFER_TIER_OVERLAP_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * FOREST_CONIFER_TIER_OVERLAP_FRACTION).toFixed(4));
+export const FOREST_CONIFER_TIER_PITCH_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * (1 - FOREST_CONIFER_TIER_OVERLAP_FRACTION)).toFixed(4));
+export const FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M = 1.2;
+export const FOREST_CONIFER_TRUNK_DIAMETER_BASE_M = 0.35;
+export const FOREST_CONIFER_MAX_TRIANGLES = 220;
+
+/** HF-536: Broadleaf prefab constants */
+export const FOREST_BROADLEAF_CANOPY_LOBES = 5;
+export const FOREST_BROADLEAF_MAX_TRIANGLES = 320;
+
+/**
+ * HF-536: Deterministic per-instance yaw and scale jitter from a hash of the
+ * instance index. Scale jitter is strictly within [0.85, 1.15].
+ */
+export function coniferInstanceJitter(index: number): { yawJitter: number; scaleJitter: number } {
+  let h = (index ^ 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  const yawJitter = (h / 0xffff_ffff) * Math.PI * 2;
+
+  let h2 = (h ^ 0x5a5a5a5a) >>> 0;
+  h2 = Math.imul(h2 ^ (h2 >>> 15), 0x45d9f3b) >>> 0;
+  h2 = (h2 ^ (h2 >>> 16)) >>> 0;
+  const scaleJitter = 0.85 + (h2 / 0xffff_ffff) * 0.30;
+  return { yawJitter, scaleJitter };
+}
 /** Every Nth conifer is a standout grown above the treeline. Deterministic. */
 export const FOREST_STANDOUT_EVERY = 13;
 /** Height multiplier for standouts. */
@@ -318,19 +358,22 @@ type MergePart = {
   geometry: THREE.BufferGeometry;
   matrix: THREE.Matrix4;
   shade?: { underside: number; top: number };
+  color?: readonly [number, number, number];
 };
 
 function mergeParts(parts: MergePart[], name: string): THREE.BufferGeometry {
   const positions: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   let shaded = false;
+  let hasUvs = false;
   for (const part of parts) {
     const clone = part.geometry.clone();
     clone.applyMatrix4(part.matrix);
     const nonIndexed = clone.index ? clone.toNonIndexed() : clone;
     const attribute = nonIndexed.getAttribute('position');
-    // Local extent AFTER the part matrix, so the ramp keys off the part's own
-    // cone from base ring to apex rather than the whole merged tree.
+    const uvAttr = nonIndexed.getAttribute('uv');
+    if (uvAttr) hasUvs = true;
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < attribute.count; i += 1) {
@@ -341,7 +384,15 @@ function mergeParts(parts: MergePart[], name: string): THREE.BufferGeometry {
     const span = Math.max(1e-4, maxY - minY);
     for (let i = 0; i < attribute.count; i += 1) {
       positions.push(attribute.getX(i), attribute.getY(i), attribute.getZ(i));
-      if (part.shade) {
+      if (uvAttr) {
+        uvs.push(uvAttr.getX(i), uvAttr.getY(i));
+      } else {
+        uvs.push(-1, -1);
+      }
+      if (part.color) {
+        shaded = true;
+        colors.push(part.color[0], part.color[1], part.color[2]);
+      } else if (part.shade) {
         shaded = true;
         const t = (attribute.getY(i) - minY) / span;
         const value = part.shade.underside + (part.shade.top - part.shade.underside) * t;
@@ -356,9 +407,208 @@ function mergeParts(parts: MergePart[], name: string): THREE.BufferGeometry {
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   if (shaded) merged.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  if (hasUvs) merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   merged.computeVertexNormals();
   merged.name = name;
   return merged;
+}
+
+function buildSkirtCardRing(radius: number, y: number, count = 4, tierIndex = 0): THREE.BufferGeometry {
+  const quads: Array<{ geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  const cardWidth = (2 * Math.PI * radius / Math.max(1, count)) * 0.92;
+  const cardHeight = Math.min(0.65, 0.35 + radius * 0.12);
+  for (let i = 0; i < count; i += 1) {
+    const quad = new THREE.PlaneGeometry(cardWidth, cardHeight, 1, 1);
+    quad.translate(0, -cardHeight / 2, 0);
+    const col = (i + tierIndex * 3) % LEAF_ATLAS_CELLS;
+    const row = (tierIndex + (i % 2)) % LEAF_ATLAS_CELLS;
+    const uvAttr = quad.getAttribute('uv') as THREE.BufferAttribute;
+    for (let k = 0; k < uvAttr.count; k += 1) {
+      uvAttr.setXY(
+        k,
+        (col + uvAttr.getX(k)) / LEAF_ATLAS_CELLS,
+        (row + uvAttr.getY(k)) / LEAF_ATLAS_CELLS,
+      );
+    }
+    uvAttr.needsUpdate = true;
+    const angle = (i / count) * Math.PI * 2 + tierIndex * 0.45;
+    const tilt = 0.35;
+    const x = Math.cos(angle) * (radius * 0.96);
+    const z = Math.sin(angle) * (radius * 0.96);
+    const m = new THREE.Matrix4()
+      .makeTranslation(x, y, z)
+      .multiply(new THREE.Matrix4().makeRotationY(-angle - Math.PI / 2))
+      .multiply(new THREE.Matrix4().makeRotationX(tilt));
+    quads.push({ geometry: quad, matrix: m });
+  }
+  const merged = mergeParts(quads, 'conifer-skirt-ring');
+  for (const q of quads) q.geometry.dispose();
+  return merged;
+}
+
+export function buildConiferPrototype(seed: number = SEED ^ 0x0000_7e11): THREE.BufferGeometry {
+  const parts: MergePart[] = [];
+  // 1. Dark 8-gon trunk (0.35 m dia at base, visible 1.2 m below tier 0)
+  const trunkGeometry = new THREE.CylinderGeometry(0.13, FOREST_CONIFER_TRUNK_DIAMETER_BASE_M / 2, 1.4, 8, 1, true);
+  parts.push({
+    geometry: trunkGeometry,
+    matrix: new THREE.Matrix4().makeTranslation(0, 0.7, 0),
+    shade: { underside: 0.22, top: 0.28 },
+  });
+
+  const R0 = 2.5;
+  const tierHeight = FOREST_CONIFER_TIER_HEIGHT_M;
+  const pitch = FOREST_CONIFER_TIER_PITCH_M;
+  const y0 = FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M;
+
+  // Segment counts per tier: tier 0 uses 8 segments (rim radius >= 2.0 for jitterRim);
+  // tiers 1..3 use 6 segments, tier 4 (apex) uses 6 segments cone.
+  // Cards per tier: tier 0: 4, tier 1: 4, tier 2: 3, tier 3: 2, tier 4: 0.
+  const tierSegments = [8, 6, 6, 6, 6];
+  const tierCardCounts = [4, 4, 3, 2, 0];
+
+  const createdGeometries: THREE.BufferGeometry[] = [trunkGeometry];
+  for (let i = 0; i < FOREST_CONIFER_TIER_COUNT; i += 1) {
+    const rFrac = 1.0 - (i / (FOREST_CONIFER_TIER_COUNT - 1)) * (1.0 - 0.25);
+    const rBottom = R0 * rFrac;
+    const tierBottomY = y0 + i * pitch;
+    const segments = tierSegments[i];
+    if (i < FOREST_CONIFER_TIER_COUNT - 1) {
+      const rTop = rBottom * 0.38;
+      const frustum = new THREE.CylinderGeometry(rTop, rBottom, tierHeight, segments, 1, true);
+      createdGeometries.push(frustum);
+      parts.push({
+        geometry: frustum,
+        matrix: new THREE.Matrix4().makeTranslation(0, tierBottomY + tierHeight / 2, 0),
+        shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 1 },
+      });
+    } else {
+      const apexHeight = FOREST_CONIFER_HEIGHT_M - tierBottomY;
+      const cone = new THREE.ConeGeometry(rBottom, apexHeight, segments, 1, true);
+      createdGeometries.push(cone);
+      parts.push({
+        geometry: cone,
+        matrix: new THREE.Matrix4().makeTranslation(0, tierBottomY + apexHeight / 2, 0),
+        shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 1 },
+      });
+    }
+
+    if (tierCardCounts[i] > 0) {
+      const skirtRing = buildSkirtCardRing(rBottom, tierBottomY, tierCardCounts[i], i);
+      createdGeometries.push(skirtRing);
+      parts.push({
+        geometry: skirtRing,
+        matrix: new THREE.Matrix4(),
+        shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 0.95 },
+      });
+    }
+  }
+
+  const merged = mergeParts(parts, 'forest-conifer');
+  jitterRim(merged, (seed ^ 0x0000_7e11) >>> 0, 2.0);
+  for (const g of createdGeometries) g.dispose();
+  return merged;
+}
+
+export function buildBroadleafTrunkPrototype(): THREE.BufferGeometry {
+  const parts: MergePart[] = [];
+  const trunk = new THREE.CylinderGeometry(0.24, 0.38, 3.4, 8, 1, true);
+  parts.push({
+    geometry: trunk,
+    matrix: new THREE.Matrix4().makeTranslation(0, 1.7, 0),
+  });
+  for (let i = 0; i < 3; i += 1) {
+    const angle = i * (Math.PI * 2 / 3) + 0.3;
+    const limb = new THREE.CylinderGeometry(0.08, 0.16, 1.8, 8, 1, true);
+    const m = new THREE.Matrix4()
+      .makeRotationY(angle)
+      .multiply(new THREE.Matrix4().makeTranslation(0.45, 2.9, 0))
+      .multiply(new THREE.Matrix4().makeRotationZ(Math.PI / 4.5));
+    parts.push({ geometry: limb, matrix: m });
+  }
+  const merged = mergeParts(parts, 'forest-broadleaf-trunk');
+  for (const p of parts) p.geometry.dispose();
+  return merged;
+}
+
+export function buildBroadleafCanopyPrototype(): THREE.BufferGeometry {
+  const parts: MergePart[] = [];
+  // 4 overlapping ellipsoid lobes (low-poly icosphere detail 0: 20 tris each = 80 tris)
+  const lobeDefs = [
+    { radius: 1.8, detail: 0, sx: 1.15, sy: 0.85, sz: 1.15, x: 0, y: 0.2, z: 0 },
+    { radius: 1.45, detail: 0, sx: 1.05, sy: 0.8, sz: 1.0, x: 1.1, y: -0.2, z: 0.4 },
+    { radius: 1.4, detail: 0, sx: 0.95, sy: 0.8, sz: 1.1, x: -1.0, y: -0.1, z: 0.5 },
+    { radius: 1.35, detail: 0, sx: 1.0, sy: 0.85, sz: 0.95, x: -0.2, y: 0.7, z: -0.3 },
+  ];
+  for (let l = 0; l < lobeDefs.length; l += 1) {
+    const d = lobeDefs[l];
+    const lobeGeom = new THREE.IcosahedronGeometry(d.radius, d.detail);
+    lobeGeom.scale(d.sx, d.sy, d.sz);
+    parts.push({
+      geometry: lobeGeom,
+      matrix: new THREE.Matrix4().makeTranslation(d.x, d.y, d.z),
+      shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 1.0 },
+    });
+
+    // 8 leaf-edge cards per lobe using the SAME atlas sampler (8 * 4 * 2 = 64 tris)
+    const cardsPerLobe = 8;
+    const rx = d.radius * d.sx;
+    const ry = d.radius * d.sy;
+    const rz = d.radius * d.sz;
+    const cardWidth = 0.55;
+    const cardHeight = 0.55;
+    for (let k = 0; k < cardsPerLobe; k += 1) {
+      const quad = new THREE.PlaneGeometry(cardWidth, cardHeight, 1, 1);
+      const col = (k + l * 2) % LEAF_ATLAS_CELLS;
+      const row = (l + (k % 3)) % LEAF_ATLAS_CELLS;
+      const uvAttr = quad.getAttribute('uv') as THREE.BufferAttribute;
+      for (let v = 0; v < uvAttr.count; v += 1) {
+        uvAttr.setXY(
+          v,
+          (col + uvAttr.getX(v)) / LEAF_ATLAS_CELLS,
+          (row + uvAttr.getY(v)) / LEAF_ATLAS_CELLS,
+        );
+      }
+      uvAttr.needsUpdate = true;
+      const theta = (k / cardsPerLobe) * Math.PI * 2 + l * 0.75;
+      const cardX = d.x + Math.cos(theta) * (rx * 1.03);
+      const cardY = d.y + Math.sin(k * 1.3) * (ry * 0.28);
+      const cardZ = d.z + Math.sin(theta) * (rz * 1.03);
+      const m = new THREE.Matrix4()
+        .makeTranslation(cardX, cardY, cardZ)
+        .multiply(new THREE.Matrix4().makeRotationY(-theta - Math.PI / 2))
+        .multiply(new THREE.Matrix4().makeRotationX(0.2));
+      parts.push({
+        geometry: quad,
+        matrix: m,
+        shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 1.0 },
+      });
+    }
+  }
+
+  const merged = mergeParts(parts, 'forest-broadleaf-canopy');
+  for (const p of parts) p.geometry.dispose();
+  return merged;
+}
+
+export function createForestFoliageMaterial(name: string, roughness = 0.94): THREE.Material {
+  const atlas = nuketown2LeafAtlas();
+  const mat = new MeshStandardNodeMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness,
+    metalness: 0,
+    flatShading: true,
+    side: THREE.DoubleSide,
+  });
+  mat.name = name;
+  mat.alphaTest = LEAF_ALPHA_TEST;
+
+  const uvNode = TSL.uv();
+  const isCard = uvNode.y.greaterThanEqual(TSL.float(0.0));
+  const cardSample = TSL.texture(atlas, uvNode.clamp(TSL.vec2(0, 0), TSL.vec2(1, 1)));
+  mat.opacityNode = TSL.select(isCard, cardSample.a, TSL.float(1.0));
+  return mat;
 }
 
 /**
@@ -464,37 +714,21 @@ export function buildNuketownForestSurround(
     stats.triangles += triCount(mesh.geometry) * mesh.count;
   };
 
-  // ---- conifers: merged trunk + three tiers, one instanced draw --------------
-  // DAY-VISUAL-B: a slim leader spire above tierB, so the ring reads as tall
-  // dark spires with layered branch tiers instead of two stacked cones. The
-  // leader base (r=1.05 at y=6.9) tucks inside tierB's own surface there
-  // (r~1.08), never floating, and the tip reaches FOREST_CONIFER_HEIGHT_M.
-  // HF-536 forge-nature PASS 1: 8 -> 12 radial segments per tier (the rim is
-  // the silhouette the treeline is read by), ragged rims (jitterRim) and a
-  // baked underside/top value ramp per tier so the tiers separate from each
-  // other instead of reading as one flat green cone. Measured cost below.
-  const coniferParts: MergePart[] = [];
-  const trunkGeometry = new THREE.CylinderGeometry(0.22, 0.34, 2.2, 7);
-  const tierA = new THREE.ConeGeometry(2.6, 5.6, 12);
-  const tierB = new THREE.ConeGeometry(1.9, 4.4, 12);
-  const tierLeader = new THREE.ConeGeometry(1.05, 3.4, 12);
-  coniferParts.push({ geometry: trunkGeometry, matrix: new THREE.Matrix4().makeTranslation(0, 1.1, 0) });
-  coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0), shade: { underside: 0.80, top: 1 } });
-  coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0), shade: { underside: 0.80, top: 1 } });
-  coniferParts.push({ geometry: tierLeader, matrix: new THREE.Matrix4().makeTranslation(0, 8.6, 0), shade: { underside: 0.80, top: 1 } });
-  const coniferGeometry = mergeParts(coniferParts, 'forest-conifer');
-  jitterRim(coniferGeometry, (envelope.seed ^ 0x0000_7e11) >>> 0, 0.5);
-  for (const part of [trunkGeometry, tierA, tierB, tierLeader]) part.dispose();
-  // vertexColors rides on the SAME material instance - no new material, no new
-  // uniform, no sampler (R2, program-set delta 0).
-  const coniferMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.94, metalness: 0, flatShading: true });
+  // ---- conifers: merged 8-gon trunk + 5 cone frustum tiers + skirt cards ---
+  // HF-536: 5 stacked cone frustums, radii 1.0 -> 0.25, 22 % tier height, 30 %
+  // overlap, each tier broken by alpha-tested ragged skirt cards, dark 8-gon trunk
+  // visible >= 1.2 m below tier 0. Exactly one atlas sampler on the material.
+  const coniferGeometry = buildConiferPrototype(envelope.seed);
+  const coniferMaterial = createForestFoliageMaterial('forest-conifers-material', 0.94);
   disposables.push(coniferGeometry, coniferMaterial);
 
   const coniferSlots = ringSlots(envelope, 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
   const conifers = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, coniferSlots.length);
   conifers.name = 'forest-conifers';
   coniferSlots.forEach((slot, index) => {
-    euler.set(0, slot.yaw, 0);
+    // HF-536: deterministic yaw and 0.85-1.15 scale jitter from index hash
+    const { yawJitter, scaleJitter } = coniferInstanceJitter(index);
+    euler.set(0, slot.yaw + yawJitter, 0);
     quaternion.setFromEuler(euler);
     position.set(slot.x, groundY(slot.x, slot.z) - TRUNK_SINK_M, slot.z);
     // DAY-VISUAL-B: every FOREST_STANDOUT_EVERY-th tree grows above the line,
@@ -506,7 +740,11 @@ export function buildNuketownForestSurround(
     // own placement stream, already decorrelated from `slot.tone`.
     const heightHash = (Math.sin(slot.yaw * 91.7 + index * 0.618) * 0.5 + 0.5);
     const heightJitter = 0.89 + FOREST_HEIGHT_JITTER * heightHash;
-    scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45) * standout * heightJitter, slot.scale);
+    scaleVec.set(
+      slot.scale * scaleJitter,
+      slot.scale * scaleJitter * (0.9 + slot.tone * 0.45) * standout * heightJitter,
+      slot.scale * scaleJitter,
+    );
     matrix.compose(position, quaternion, scaleVec);
     conifers.setMatrixAt(index, matrix);
     // DAY-VISUAL-B warm/cool flank bias, then the HF-536 measured lightness
@@ -520,17 +758,13 @@ export function buildNuketownForestSurround(
   register(conifers);
   stats.conifers = coniferSlots.length;
 
-  // ---- broadleafs: trunk instances + double-blob canopy instances ---------
-  const broadTrunkGeometry = new THREE.CylinderGeometry(0.28, 0.42, 3.4, 7);
-  // HF-536: the same underside ramp as the conifer tiers (x0.7 at the blob's
-  // own bottom), so a canopy reads as a lit crown over a shaded belly rather
-  // than one evenly-lit ball.
-  const canopyGeometry = mergeParts([
-    { geometry: new THREE.IcosahedronGeometry(2.3, 1), matrix: new THREE.Matrix4().makeTranslation(0, 0, 0), shade: { underside: 0.7, top: 1 } },
-    { geometry: new THREE.IcosahedronGeometry(1.6, 1), matrix: new THREE.Matrix4().makeTranslation(1.2, 0.9, 0.5), shade: { underside: 0.7, top: 1 } },
-  ], 'forest-broadleaf-canopy');
+  // ---- broadleafs: trunk + 3 primary limbs, 5-lobe canopy + card shell -----
+  // HF-536: 8-gon tapered trunk + 3 primary limbs (64 tris) and 5 overlapping
+  // ellipsoid lobes with an alpha-tested leaf card shell (240 tris), budget <= 320.
+  const broadTrunkGeometry = buildBroadleafTrunkPrototype();
+  const canopyGeometry = buildBroadleafCanopyPrototype();
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.96, metalness: 0 });
-  const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, metalness: 0, flatShading: true });
+  const canopyMaterial = createForestFoliageMaterial('forest-broadleaf-canopies-material', 0.92);
   disposables.push(broadTrunkGeometry, canopyGeometry, trunkMaterial, canopyMaterial);
 
   const broadleafSlots = ringSlots(envelope, 180, broadleafBand[0], broadleafBand[1], envelope.seed ^ 0x00ff_1234, 4.2);
