@@ -177,6 +177,23 @@ import {
 } from './nuketown2-interior-materials';
 // PASS 94 lane TECHNIQUES: the pool surface moved to its own module.
 import { createNuketown2PoolWaterMaterial } from './nuketown2-pool-water';
+import {
+  type InteriorPart,
+  type InteriorRole,
+  armchairParts,
+  chairParts,
+  coffeeTableParts,
+  diningTableParts,
+  floorLampParts,
+  kitchenRunParts,
+  oilStainParts,
+  rackingBoxesParts,
+  rugParts,
+  shelfUnitParts,
+  sofaParts,
+  wallArtParts,
+  workbenchDressingParts,
+} from './forge-kit/interior/prefabs';
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
 import { type ForgeKitBox, gutterRunParts, kerbCourseParts, lanternHeadParts } from './forge-kit';
@@ -1050,6 +1067,96 @@ function pair(
     northMesh.userData.nuketown2Prop = `north ${options.propId}`;
     southMesh.userData.nuketown2Prop = `south ${options.propId}`;
   }
+}
+/**
+ * HF-536 NIGHT-MUSE-INTERIORS — emit one forge-kit interior prefab through
+ * `pair()` and stamp both halves presentation-only.
+ *
+ * WHY THE POST-EMISSION STAMP. `box()` (additional-maps.ts) does not declare
+ * `presentationOnly` in its options type and never reads it, so the flag
+ * `pair()` forwards is silently dropped — every `presentationOnly: true` the
+ * arena passes today is a no-op except through `streetVehicle()`. Changing
+ * `pair()`/`box()` to propagate it would newly exclude ~80 existing
+ * presentation meshes from `solidMeshes` and both parity audits in one edit,
+ * which is out of this lane's scope; the kit sets the flag on exactly the
+ * meshes it owns, looked up by the names `pair()` just emitted.
+ */
+function pairKit(
+  builder: Builder,
+  name: string,
+  anchor: readonly [number, number, number],
+  parts: readonly InteriorPart[],
+  roleMaterial: (role: InteriorRole) => THREE.Material,
+): void {
+  for (const part of parts) {
+    const id = `${name} ${part.suffix}`;
+    pair(builder, id, [
+      anchor[0]! + part.offset[0]!,
+      anchor[1]! + part.offset[1]!,
+      anchor[2]! + part.offset[2]!,
+    ], [part.size[0]!, part.size[1]!, part.size[2]!], roleMaterial(part.role),
+    { solid: false, shots: false, cast: part.cast });
+    for (const side of ['north', 'south'] as const) {
+      const mesh = builder.root.getObjectByName(`nuketown2 ${side} ${id}`);
+      if (mesh) mesh.userData.presentationOnly = true;
+    }
+  }
+}
+
+/** Resolve a kit role to the material instance the arena already builds. */
+function interiorRoleMaterial(m: Nuketown2Materials, role: InteriorRole): THREE.Material {
+  switch (role) {
+    case 'interior': return m.interior;
+    case 'interiorFloor': return m.interiorFloor;
+    case 'trim': return m.trim;
+    case 'warmLight': return m.warmLight;
+    case 'chrome': return m.chrome;
+    case 'windowGlass': return m.windowGlass;
+    case 'fence': return m.fence;
+    case 'rubber': return m.rubber;
+    case 'applianceRed': return m.applianceRed;
+    case 'applianceBlue': return m.applianceBlue;
+    case 'planter': return m.planter;
+    case 'sign': return m.sign;
+  }
+}
+
+/**
+ * HF-536 NIGHT-MUSE-INTERIORS — dress both houses' ground floors.
+ * Anchors are AUTHORED frame; `pair()` mirrors them into both houses.
+ * Kitchen run sits on the front-room counter slab (top 0.995); the sofa
+ * dresses the living-couch solid (top 0.62); the shelf hutch stands on the
+ * living bench-top slab (top 0.995); everything else stands on the floor slab
+ * (top 0.08) or on the rug the kit lays (top 0.125).
+ */
+function houseInteriorDressing(builder: Builder, m: Nuketown2Materials): void {
+  const resolve = (role: InteriorRole): THREE.Material => interiorRoleMaterial(m, role);
+  pairKit(builder, 'house interior kitchen run', [-4.8, 0.995, -13.34], kitchenRunParts(), resolve);
+  pairKit(builder, 'house interior sofa', [-2.0, 0.62, -18.75], sofaParts(), resolve);
+  pairKit(builder, 'house interior armchair', [0.9, 0.125, -18.7], armchairParts(), resolve);
+  pairKit(builder, 'house interior coffee table', [-0.2, 0.125, -18.75], coffeeTableParts(), resolve);
+  pairKit(builder, 'house interior rug', [-0.6, 0.075, -18.75], rugParts(), resolve);
+  pairKit(builder, 'house interior floor lamp', [1.7, 0.075, -19.3], floorLampParts(), resolve);
+  pairKit(builder, 'house interior shelf hutch', [1.5, 0.99, -20.6], shelfUnitParts(), resolve);
+  pairKit(builder, 'house interior wall art', [1.6, 1.5, -16.35], wallArtParts(), resolve);
+  pairKit(builder, 'house interior dining table', [1.75, 0.075, -17.35], diningTableParts(), resolve);
+  pairKit(builder, 'house interior dining chair north 0', [1.4, 0.075, -16.6], chairParts(true), resolve);
+  pairKit(builder, 'house interior dining chair north 1', [2.1, 0.075, -16.6], chairParts(true), resolve);
+  pairKit(builder, 'house interior dining chair south 0', [1.4, 0.125, -18.1], chairParts(false), resolve);
+  pairKit(builder, 'house interior dining chair south 1', [2.1, 0.125, -18.1], chairParts(false), resolve);
+}
+
+/**
+ * HF-536 NIGHT-MUSE-INTERIORS — dress both garages. Tools/tin sit on the
+ * bench-top slab (top 0.995, clear of the vice at the west end); boxes sit on
+ * the racking boards; the stain lies in the house-side lane, clear of the car
+ * (x from 5.9) and the link-door wall.
+ */
+function garageInteriorDressing(builder: Builder, m: Nuketown2Materials): void {
+  const resolve = (role: InteriorRole): THREE.Material => interiorRoleMaterial(m, role);
+  pairKit(builder, 'garage interior bench dressing', [8.1, 0.995, -21.4], workbenchDressingParts(), resolve);
+  pairKit(builder, 'garage interior racking', [8.6, 0, -18.6], rackingBoxesParts(), resolve);
+  pairKit(builder, 'garage interior oil stain', [5.2, 0.06, -19.45], oilStainParts(), resolve);
 }
 
 /** A body already centred on the origin axis it would be rotated about. */
@@ -2344,6 +2451,8 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house stair rail mid bar', [STAIR_X1 + 0.04, UPPER_Y0 + 0.48, (-16.5 + STAIRWELL_Z0) / 2], [0.04, 0.04, -16.5 - STAIRWELL_Z0], m.trim,
     { solid: false, shots: false, cast: true });
+  // ---- HF-536 NIGHT-MUSE-INTERIORS: ground-floor + dining dressing ---------
+  houseInteriorDressing(builder, m);
 }
 
 /**
@@ -2524,6 +2633,8 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
       [0.16, 0.64, 0.64], m.rubber,
       { solid: false, shots: false, cast: true });
   }
+  // ---- HF-536 NIGHT-MUSE-INTERIORS: bench/racking/oil dressing --------------
+  garageInteriorDressing(builder, m);
 }
 
 /**
