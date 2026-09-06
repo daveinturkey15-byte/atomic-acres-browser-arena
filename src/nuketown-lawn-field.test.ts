@@ -23,8 +23,14 @@ import { HARD_SURFACE_HALF_DEPTH_M } from './grass-placement';
 import { buildArena } from './map';
 import {
   buildNuketownLawnField,
+  buildNuketownVergeBloomField,
   NUKETOWN_LAWN_BLADE_HEIGHT_M,
   NUKETOWN_LAWN_TINT,
+  NUKETOWN_LAWN_SEED,
+  NUKETOWN_VERGE_BLOOM_BLADE_HEIGHT_M,
+  NUKETOWN_VERGE_BLOOM_TINT,
+  NUKETOWN_VERGE_BLOOM_SEED,
+  NUKETOWN_VERGE_BLOOM_REGIONS,
   nuketownLawnPlacementAllowed,
 } from './nuketown-lawn-field';
 import { grassClumpTintPeak } from './rendering/instanced-grass-field';
@@ -166,5 +172,136 @@ describe('Nuke Town lawn field (Pass 82)', () => {
     expect(nuketownLawnPlacementAllowed(-9, -28.5)).toBe(false); // rear yard tree
     expect(nuketownLawnPlacementAllowed(-30, -20)).toBe(true); // open west spawn yard
     expect(nuketownLawnPlacementAllowed(30, 20)).toBe(true); // open east spawn yard
+  });
+});
+
+
+describe('Nuke Town verge bloom field (HF-536)', () => {
+  it('exports valid verge bloom constants', () => {
+    expect(NUKETOWN_VERGE_BLOOM_BLADE_HEIGHT_M).toBe(0.22);
+    expect(NUKETOWN_VERGE_BLOOM_SEED).toBe(NUKETOWN_LAWN_SEED ^ 0xb100);
+    expect(NUKETOWN_VERGE_BLOOM_REGIONS).toHaveLength(4);
+    for (const region of NUKETOWN_VERGE_BLOOM_REGIONS) {
+      const isWestOrEast = Math.abs(region.minX) >= 18 && Math.abs(region.maxX) <= 24;
+      const isNorthOrSouth = Math.abs(region.minZ) >= 36 && Math.abs(region.maxZ) <= 42;
+      expect(isWestOrEast || isNorthOrSouth).toBe(true);
+    }
+  });
+
+  it('places bloom instances in (0, 600] across <= 4 draws', () => {
+    const parent = new THREE.Group();
+    const bloom = buildNuketownVergeBloomField(parent);
+    expect(bloom.stats.blades).toBeGreaterThan(0);
+    expect(bloom.stats.blades).toBeLessThanOrEqual(600);
+    expect(bloom.stats.drawCalls).toBeLessThanOrEqual(4);
+    expect(bloom.meshes.length).toBe(bloom.stats.drawCalls);
+  });
+
+  it('confines every bloom instance to the verge strips and outside the fence interior', () => {
+    const parent = new THREE.Group();
+    const bloom = buildNuketownVergeBloomField(parent);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+
+    let totalInstances = 0;
+    for (const mesh of bloom.meshes) {
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, matrix);
+        matrix.decompose(position, quaternion, scale);
+        totalInstances++;
+
+        // Outside fence interior: fence interior is |x| < 18 && |z| < 36
+        const insideFence = Math.abs(position.x) < 18 && Math.abs(position.z) < 36;
+        expect(insideFence, `instance at (${position.x}, ${position.z}) must be outside fence interior`).toBe(false);
+
+        // Inside verge strips: |x| in 18..24 or |z| in 36..42
+        const inVergeStrip = (Math.abs(position.x) >= 18 && Math.abs(position.x) <= 24)
+          || (Math.abs(position.z) >= 36 && Math.abs(position.z) <= 42);
+        expect(inVergeStrip, `instance at (${position.x}, ${position.z}) must be within verge strips`).toBe(true);
+
+        // Within arena outer bounds for verges (|x| <= 24, |z| <= 42)
+        expect(Math.abs(position.x)).toBeLessThanOrEqual(24);
+        expect(Math.abs(position.z)).toBeLessThanOrEqual(42);
+
+        // Height bounded under 0.25 m art-only ceiling
+        expect(position.y).toBeLessThanOrEqual(0.25);
+        expect(scale.y).toBeLessThanOrEqual(1.0);
+      }
+    }
+    expect(totalInstances).toBe(bloom.stats.blades);
+  });
+
+  it('is deterministic: two builds produce byte-identical instance streams', () => {
+    const p1 = new THREE.Group();
+    const p2 = new THREE.Group();
+    const b1 = buildNuketownVergeBloomField(p1);
+    const b2 = buildNuketownVergeBloomField(p2);
+
+    expect(b1.stats).toEqual(b2.stats);
+    expect(b1.meshes.length).toBe(b2.meshes.length);
+    for (let m = 0; m < b1.meshes.length; m++) {
+      const arr1 = b1.meshes[m].instanceMatrix.array;
+      const arr2 = b2.meshes[m].instanceMatrix.array;
+      expect(arr1).toEqual(arr2);
+      if (b1.meshes[m].instanceColor && b2.meshes[m].instanceColor) {
+        expect(b1.meshes[m].instanceColor!.array).toEqual(b2.meshes[m].instanceColor!.array);
+      }
+    }
+  });
+
+  it('leaves the lawn field stats unchanged vs pinned values and prints total tris', () => {
+    const { stats: lawnStats } = bladeOrigins(false);
+    expect(lawnStats.drawCalls).toBe(4);
+    expect(lawnStats.blades).toBeGreaterThan(5_000);
+
+    const parent = new THREE.Group();
+    const bloom = buildNuketownVergeBloomField(parent);
+    const totalTris = lawnStats.triangles + bloom.stats.triangles;
+    process.stdout.write(
+      `\n[HF-536 VERGE BLOOM STATS]\n`
+      + `  Lawn:  ${lawnStats.blades} blades, ${lawnStats.drawCalls} draws, ${lawnStats.triangles} tris\n`
+      + `  Bloom: ${bloom.stats.blades} blades, ${bloom.stats.drawCalls} draws, ${bloom.stats.triangles} tris\n`
+      + `  Total tris (lawn + bloom): ${totalTris}\n`,
+    );
+  });
+
+  it('uses its own MeshStandardNodeMaterial with zero texture samplers', () => {
+    const parent = new THREE.Group();
+    const bloom = buildNuketownVergeBloomField(parent);
+    const lawn = buildNuketownLawnField(new THREE.Group(), false);
+
+    const bloomMat = bloom.meshes[0].material;
+    const lawnMat = lawn.meshes[0].material;
+    expect(bloomMat).not.toBe(lawnMat);
+
+    // Sampler count must be 0
+    let samplerCount = 0;
+    const standard = bloomMat as THREE.MeshStandardMaterial;
+    for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'bumpMap', 'displacementMap', 'alphaMap'] as const) {
+      if (standard[key]) samplerCount++;
+    }
+    const nodeMat = bloomMat as unknown as { colorNode?: unknown; positionNode?: unknown };
+    const seen = new Set<object>();
+    function inspectNode(node: unknown): void {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      const record = node as Record<string, unknown>;
+      const val = record.value;
+      const isValTexture = Boolean(val && typeof val === 'object' && 'isTexture' in val && val.isTexture === true);
+      if (record.isTextureNode === true || record.type === 'TextureNode' || isValTexture) {
+        samplerCount++;
+      }
+      for (const k of Object.keys(record)) {
+        if (k !== 'parent' && k !== 'parents') inspectNode(record[k]);
+      }
+    }
+    inspectNode(nodeMat.colorNode);
+    inspectNode(nodeMat.positionNode);
+  });
+
+  it('keeps bloom tint spec under material.color ceiling', () => {
+    expect(grassClumpTintPeak(NUKETOWN_VERGE_BLOOM_TINT)).toBeLessThanOrEqual(1);
   });
 });

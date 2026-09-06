@@ -43,6 +43,7 @@ import {
   type GrassClumpTint,
   type GrassRegionRect,
   type InstancedGrassField,
+  type InstancedGrassFieldStats,
 } from './rendering/instanced-grass-field';
 
 /** Suburban blade cap — kept lawn, under the 0.25 m art-only ceiling. */
@@ -140,6 +141,79 @@ export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
   valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
 });
 
+export type NuketownVergeBloomStats = InstancedGrassFieldStats;
+
+/**
+ * Late-summer verge bloom tint: dry August tufts and pale yellow/white blooms
+ * scattered along the beyond-fence verges (HF-536).
+ */
+export const NUKETOWN_VERGE_BLOOM_TINT: GrassClumpTint = Object.freeze({
+  rBase: 0.86, rWarm: 0.10,
+  gBase: 0.72, gWarm: 0.06,
+  bBase: 0.22, bWarm: -0.05,
+  valueBase: 0.9, valuePatch: 0.04, valueJitter: 0.05,
+});
+
+/** Verge bloom blade height — matching kept height under the 0.25 m art-only ceiling. */
+export const NUKETOWN_VERGE_BLOOM_BLADE_HEIGHT_M = 0.22;
+/** Verge bloom placement seed — decorrelated from the lawn stream. */
+export const NUKETOWN_VERGE_BLOOM_SEED = NUKETOWN_LAWN_SEED ^ 0xb100;
+
+/**
+ * Beyond-fence verge strip regions: |x| in 18..24 or |z| in 36..42.
+ * Four boundary rectangles covering the perimeter strips outside the fence.
+ */
+export const NUKETOWN_VERGE_BLOOM_REGIONS: readonly GrassRegionRect[] = Object.freeze([
+  // West verge strip: |x| in 18..24
+  Object.freeze({ minX: -24, maxX: -18, minZ: -42, maxZ: 42 }),
+  // East verge strip: |x| in 18..24
+  Object.freeze({ minX: 18, maxX: 24, minZ: -42, maxZ: 42 }),
+  // North verge strip: |z| in 36..42
+  Object.freeze({ minX: -18, maxX: 18, minZ: -42, maxZ: -36 }),
+  // South verge strip: |z| in 36..42
+  Object.freeze({ minX: -18, maxX: 18, minZ: 36, maxZ: 42 }),
+]);
+
+/**
+ * Build the Nuke Town verge bloom field under `parent`. Deterministic,
+ * presentation only; <= 600 instances, <= 4 draws. Places sparse yellow/white
+ * blooms and dry tufts on the beyond-fence verge strips only (|x| in 18..24 or
+ * |z| in 36..42, clipped by `nuketownLawnPlacementAllowed`).
+ *
+ * It gets its own material (MeshStandardNodeMaterial, allowed under Amendment B;
+ * adds no texture sampler).
+ */
+export function buildNuketownVergeBloomField(
+  parent: THREE.Object3D,
+  _reduced = false,
+): InstancedGrassField {
+  const field = buildInstancedGrassField({
+    name: 'nuketown-verge-bloom',
+    seed: NUKETOWN_VERGE_BLOOM_SEED,
+    regions: NUKETOWN_VERGE_BLOOM_REGIONS,
+    cellSizeM: 2.4,
+    bladeHeightM: NUKETOWN_VERGE_BLOOM_BLADE_HEIGHT_M,
+    bladeWidthM: 0.062,
+    bladeBendM: 0.055,
+    bladesPerTuft: 3,
+    scaleRange: [0.68, 1.0],
+    placementAllowed: nuketownLawnPlacementAllowed,
+    material: {
+      color: 0x5e9e41,
+      roughness: 0.89,
+      metalness: 0.02,
+      swayAmount: 0.045,
+      windSpeed: 0.8,
+      sssColor: 0xa4cb55,
+      sssStrength: 0.29,
+      rootShade: [0.56, 0.65, 0.5],
+    },
+    tint: NUKETOWN_VERGE_BLOOM_TINT,
+  });
+  parent.add(field.group);
+  return field;
+}
+
 /**
  * Build the Nuke Town lawn field under `parent`. Deterministic, presentation
  * only; two lawn bands = two instanced draws. `reduced` widens the placement
@@ -185,6 +259,7 @@ export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean)
     tint: NUKETOWN_LAWN_TINT,
   });
   parent.add(field.group);
+  buildNuketownVergeBloomField(parent, reduced);
   return field;
 }
 
