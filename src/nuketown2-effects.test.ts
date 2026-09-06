@@ -57,8 +57,14 @@ describe("DAY-VISUAL-C nuketown2 golden-hour effects", () => {
       expect(shaft.material.fog).toBe(false);
       expect(shaft.mesh.frustumCulled).toBe(false);
       expect(shaft.mesh.renderOrder).toBe(997);
-      expect(shaft.baseOpacity).toBeGreaterThanOrEqual(0.04);
-      expect(shaft.baseOpacity).toBeLessThanOrEqual(0.07);
+      // DAY-POLISH (HF-535): barely-there beams; the pinned constant is the
+      // thing the lane intentionally changed (was 0.04..0.07 over the road).
+      expect(shaft.baseOpacity).toBeGreaterThanOrEqual(0.016);
+      expect(shaft.baseOpacity).toBeLessThanOrEqual(0.03);
+      // Feet stay above ~3 m and clear of the carriageway: centre height and
+      // verge-side anchors are the regression pins for REG-03/REG-05.
+      expect(shaft.mesh.position.y).toBeGreaterThanOrEqual(5.0);
+      expect(Math.abs(shaft.mesh.position.z)).toBeGreaterThan(7.5);
     }
     expect(effects.dustMaterial.blending).toBe(THREE.AdditiveBlending);
     expect(effects.dustMaterial.depthWrite).toBe(false);
