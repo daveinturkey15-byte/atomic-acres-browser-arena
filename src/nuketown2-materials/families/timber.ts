@@ -54,6 +54,15 @@ const GRAIN_RELIEF_FAR_M = 3.0;
 export const LATEWOOD_PERIOD_M = 0.0022;
 /** A knot is harder than the board and weathers PROUD, metres. */
 const KNOT_RELIEF_M = 0.0011;
+/**
+ * Silvering lift on unpainted timber, as a fraction of albedo. The lift is
+ * modulated by the 1.8 m traffic fBm soil field, so at full 0.55 it laid
+ * metre-scale soft blotches over the sunlit (orange) fence runs that read as
+ * a swirl rather than as weathering (row 6, perimeter-wall-end-close).
+ * Bounded to 0.36: still well above a visible wear step, no longer blobby
+ * under the low key. Painted trim keeps its own 0.25 in the graph.
+ */
+export const TIMBER_SILVER_LIFT = 0.36;
 
 export type TimberVariant = 'fence' | 'deck' | 'painted-trim';
 
@@ -108,7 +117,7 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
   const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
   const grained = wood.mul(float(1).sub(latewoodAlbedo.mul(painted.select(float(0.03), float(0.11)))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
-  const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(0.55))));
+  const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(TIMBER_SILVER_LIFT))));
   const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
   // RELIEF. The board face is proud of the gap behind it, the latewood bands
   // stand out of the weathered face, and a knot weathers proud because it is
