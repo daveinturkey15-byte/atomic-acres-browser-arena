@@ -35,7 +35,15 @@ export interface ForgeKitBox {
   readonly offset: readonly [number, number, number];
   readonly size: readonly [number, number, number];
   /** The material ROLE the part wants; the caller resolves it. */
-  readonly role: 'trim' | 'chrome' | 'warmLight' | 'block';
+  readonly role: 'trim' | 'chrome' | 'warmLight' | 'block' | 'kerb';
+  /**
+   * Optional Euler rotation, radians. Only a prefab whose READ depends on a
+   * face catching the sun at a different angle from the body it dresses uses
+   * this - a kerb chamfer is the whole reason it exists. An axis-aligned box
+   * laid on top of another axis-aligned box shares its normals and is
+   * therefore invisible except at the silhouette; a 45-degree arris is not.
+   */
+  readonly rotation?: readonly [number, number, number];
 }
 
 /** Mouth width / depth of the hood, metres - a 560 x 300 mm lantern. */

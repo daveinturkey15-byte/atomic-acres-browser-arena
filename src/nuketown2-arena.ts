@@ -179,7 +179,7 @@ import {
 import { createNuketown2PoolWaterMaterial } from './nuketown2-pool-water';
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
-// import { lanternHeadParts } from './forge-kit';
+import { type ForgeKitBox, gutterRunParts, kerbCourseParts, lanternHeadParts } from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -967,7 +967,25 @@ function makeBuilder(scene: THREE.Scene, name: string): Builder {
   };
 }
 
-type BoxOptions = Parameters<typeof box>[5] & { presentationOnly?: boolean };
+type BoxOptions = Parameters<typeof box>[5] & {
+  presentationOnly?: boolean;
+  /**
+   * HF-536 (night-kit). The PROP this body belongs to.
+   *
+   * A kit-of-parts prefab (`src/forge-kit/*`) emits several boxes for ONE
+   * piece of street furniture: a lantern head is a hood, a cap and a lit
+   * diffuser, not three lamps. The declutter ratchet in
+   * `nuketown2-fidelity.test.ts` counts what a player sees standing in the
+   * road - PROPS - so every part of one prefab declares the same id here and
+   * the ratchet collapses them. A body with no id is its own prop, which is
+   * how every authored body counted before prefabs existed, so re-basing the
+   * ratchet onto this field changes no pre-existing count.
+   *
+   * It is a presentation label only: it never reaches a collider, a shot
+   * surface or the ballistic ledger.
+   */
+  propId?: string;
+};
 
 /**
  * Emit a body AND its exact 180-degree partner, `(x, z) -> (-x, -z)`.
@@ -1010,8 +1028,15 @@ function pair(
   // the whole mirror: a half-mirror is impossible because there is no second
   // path from an authored number to a solid.
   const worldX = nuketown2HandedX(position[0]);
-  box(builder, `nuketown2 north ${name}`, [worldX, position[1], position[2]], size, north, northOptions);
-  box(builder, `nuketown2 south ${name}`, [-worldX, position[1], -position[2]], size, south, southOptions);
+  const northMesh = box(builder, `nuketown2 north ${name}`, [worldX, position[1], position[2]], size, north, northOptions);
+  const southMesh = box(builder, `nuketown2 south ${name}`, [-worldX, position[1], -position[2]], size, south, southOptions);
+  // Both halves get their OWN prop key: the two lamp posts on the two verges
+  // are two props, not one, so the ratchet still counts what stands on each
+  // side of the street.
+  if (options.propId) {
+    northMesh.userData.nuketown2Prop = `north ${options.propId}`;
+    southMesh.userData.nuketown2Prop = `south ${options.propId}`;
+  }
 }
 
 /** A body already centred on the origin axis it would be rotated about. */
@@ -1023,8 +1048,10 @@ function centred(
   material: THREE.Material,
   options: BoxOptions = {},
 ): THREE.Mesh {
-  return box(builder, `nuketown2 ${name}`,
+  const mesh = box(builder, `nuketown2 ${name}`,
     [nuketown2HandedX(position[0]), position[1], position[2]], size, material, options);
+  if (options.propId) mesh.userData.nuketown2Prop = options.propId;
+  return mesh;
 }
 
 /** Emit one authored low solid without creating the forbidden 180-degree pair. */
@@ -1522,6 +1549,22 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house front roof fascia', [cx, ROOF_Y0 + 0.06, -9.95], [HOUSE_WIDTH + 0.16, 0.12, 0.10], m.trim,
     { solid: false, shots: false, cast: true });
+  // HF-536 (night-kit): THE GUTTER. Below the fascia the wall ran clean from
+  // eaves to lawn on every elevation - 6 m of unbroken siding, which is most
+  // of what makes a house read as a Roblox block rather than a building. A
+  // trough, a lit bead, two hoppers, two downpipes and two shoes give the
+  // elevation a horizontal line at the eaves and two verticals at the corners,
+  // which is the three-scale silhouette break R20 asks for.
+  //
+  // The downpipes stand at cx +/- 5.20, which is HOUSE_X0 + WALL_T and
+  // HOUSE_X1 - WALL_T - the inner faces of the two end walls, where a builder
+  // puts them and where they clear FRONT_WINDOW_A (-5.6..-3.6),
+  // FRONT_WINDOW_B (1.4..3.4) and the porch canopy (6.6 m wide) entirely.
+  // The drop 5.86 m lands the shoe at y 0.16..0.30, 160 mm off the lawn.
+  forgeKitPair(builder, m, 'house front gutter', [cx, ROOF_Y0 + 0.06, -9.90],
+    gutterRunParts({ run: HOUSE_WIDTH + 0.06, drop: 5.86, facing: 1 }));
+  forgeKitPair(builder, m, 'house back gutter', [cx, ROOF_Y0 + 0.06, HOUSE_BACK_Z - 0.05],
+    gutterRunParts({ run: HOUSE_WIDTH + 0.06, drop: 5.86, facing: -1 }));
   // --- front wall, upper floor: the power window ---------------------------
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0 + WALL_T, UPPER_WINDOW[0]],
@@ -3302,9 +3345,21 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   // Same 0.24 m lip and the same 0.3 m tread as before; only the run changed,
   // because there is one road leaving the head now instead of two.
   for (const [index, side] of [-1, 1].entries()) {
+    const kerbRun = head.offMapX - head.mouthX;
+    const kerbZ = side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15);
     centred(builder, `carriageway stem kerb ${index}`,
-      [(head.mouthX + head.offMapX) / 2, 0.06, side * (NUKETOWN2_STREET_HALF_WIDTH - 0.15)],
-      [head.offMapX - head.mouthX, 0.24, 0.3], m.kerb, road);
+      [(head.mouthX + head.offMapX) / 2, 0.06, kerbZ],
+      [kerbRun, 0.24, 0.3], m.kerb, road);
+    // HF-536 (night-kit): the stone course. The SOLID box above is untouched -
+    // same extents, same ballistic surface, same collider - and everything
+    // below it is presentation only, so movement and shots are byte-identical.
+    // What it adds is a 45-degree chamfer arris the length of the run and a
+    // mortar joint every 915 mm, which is what turns a 26 m grey stripe into a
+    // laid kerb at the two stations that see most of it (street-centre,
+    // into-sun-street). Full derivation in `forge-kit/kerb-course.ts`.
+    forgeKitCentred(builder, m, `carriageway stem kerb ${index} course`,
+      [(head.mouthX + head.offMapX) / 2, 0.06, kerbZ],
+      kerbCourseParts({ run: kerbRun, height: 0.24, tread: 0.3, roadSide: side === 1 ? -1 : 1 }));
   }
   // ---- HF-491: THE ROADSIDE BAYS -------------------------------------------
   // Owner, 2026-09-04: the map "needs to be WIDER IN THE MIDDLE, have BITS
@@ -3368,6 +3423,74 @@ function street(builder: Builder, m: Nuketown2Materials): void {
 }
 
 /**
+ * HF-536 (night-kit). Resolve a forge-kit prefab's material ROLE to the
+ * arena's own material INSTANCE.
+ *
+ * A prefab never mints a material: it names a role that already exists here,
+ * and this is the only place that mapping is written. Adding a role to the
+ * union in `forge-kit/lantern-head.ts` therefore fails to compile until a
+ * reviewer decides which existing instance it borrows - which is the point.
+ */
+function forgeKitMaterial(m: Nuketown2Materials, role: ForgeKitBox['role']): THREE.Material {
+  switch (role) {
+    case 'chrome': return m.chrome;
+    case 'warmLight': return m.warmLight;
+    case 'block': return m.block;
+    case 'kerb': return m.kerb;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * Emit one forge-kit prefab at an authored anchor, through `pair()`, so both
+ * residential halves stay identical and the 180-degree symmetry gate keeps
+ * measuring real geometry. Every part is presentation only and every part
+ * carries the SAME prop id, so the declutter ratchet counts one prop.
+ */
+function forgeKitPair(
+  builder: Builder,
+  m: Nuketown2Materials,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly ForgeKitBox[],
+): void {
+  for (const part of parts) {
+    pair(builder, `${propId} ${part.suffix}`,
+      [anchor[0] + part.offset[0], anchor[1] + part.offset[1], anchor[2] + part.offset[2]],
+      [part.size[0], part.size[1], part.size[2]],
+      forgeKitMaterial(m, part.role),
+      {
+        solid: false, shots: false, cast: false, presentationOnly: true, propId,
+        ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+      });
+  }
+}
+
+/**
+ * The same, for a prefab that dresses a body authored ONCE per side rather
+ * than as a 180-degree pair - the carriageway kerbs, which cannot be `pair()`
+ * bodies because the road is not symmetric in z.
+ */
+function forgeKitCentred(
+  builder: Builder,
+  m: Nuketown2Materials,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly ForgeKitBox[],
+): void {
+  for (const part of parts) {
+    centred(builder, `${propId} ${part.suffix}`,
+      [anchor[0] + part.offset[0], anchor[1] + part.offset[1], anchor[2] + part.offset[2]],
+      [part.size[0], part.size[1], part.size[2]],
+      forgeKitMaterial(m, part.role),
+      {
+        solid: false, shots: false, cast: false, presentationOnly: true, propId,
+        ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+      });
+  }
+}
+
+/**
  * HF-536 PASS 2. A brick coping ring on a planter box: four low bars around
  * its rim, 0.06 m proud of the top and 0.03 m proud of each side, so the
  * planter reads as a built kerb planter rather than an extruded rectangle.
@@ -3385,7 +3508,11 @@ export function planterCoping(
   const y = LOW_COVER + 0.06 - H / 2;
   const w = width + 0.06;
   const d = depth + 0.06;
-  const decoration = { solid: false, shots: false, cast: false, presentationOnly: true } as const;
+  const decoration = {
+    solid: false, shots: false, cast: false, presentationOnly: true,
+    // HF-536 (night-kit): four bars are ONE coping ring, not four props.
+    propId: `${id} coping`,
+  } as const;
   pair(builder, `${id} coping front`, [x, y, z + d / 2 - T / 2], [w, H, T], m.block, decoration);
   pair(builder, `${id} coping back`, [x, y, z - d / 2 + T / 2], [w, H, T], m.block, decoration);
   pair(builder, `${id} coping left`, [x - w / 2 + T / 2, y, z], [T, H, d - T * 2], m.block, decoration);
@@ -3404,19 +3531,24 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
     pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
       { solid: false, shots: false, cast: false, presentationOnly: true });
-    // HF-536 (PASS 2) HELD, NOT SHIPPED. The forge-kit lantern prefab
-    // (`src/forge-kit/lantern-head.ts`) replaces this dash of trim with a
-    // tapered hood, a cap course and an emissive diffuser plate aimed at the
-    // road - and it cannot land here yet. Seven presentation boxes per head
-    // through `pair()` is +24 verge BODIES, and the HF-491 declutter ratchet
-    // (`nuketown2-fidelity.test.ts:3042`, "verge FURNITURE <= 36 with zero
-    // headroom") counts boxes, not props: measured 70 against a cap of 36.
-    // That ratchet is an owner instruction ("it's busy, cluttered; thin out
-    // the clutter"), so it is not weakened to admit a look (R32) - the prefab
-    // waits for the coordinator to decide whether a prefab's parts count as
-    // one prop. See lanes/forge-street/REPORT.md, blocker B1.
-    pair(builder, `verge ${lamp.id} lamp head`, [lamp.x, lamp.fixtureY, lamp.z], [0.52, 0.12, 0.26], m.trim,
-      { solid: false, shots: false, cast: false, presentationOnly: true });
+    // HF-536 (night-kit) SHIPPED. What stood here was ONE 0.52 x 0.12 x 0.26 m
+    // box of `trim` at 4.35 m: from 20 m down the street that is a dark
+    // horizontal dash with no lit face, the single loudest prop tell in the
+    // street-centre frame. The forge-kit prefab replaces it with a tapered
+    // four-wall hood, a cap course 30 mm proud, an emissive diffuser plate
+    // aimed at the road and a bright rim around it (7 boxes, 84 tris).
+    //
+    // It was blocked by the HF-491 declutter ratchet, which counted BOXES.
+    // The coordinator re-based that ratchet onto PROPS at the same ceiling of
+    // 36 (see `nuketown2-fidelity.test.ts`), which is what the owner's
+    // instruction actually said, so the head now lands as ONE prop.
+    //
+    // No light is added: the diffuser borrows the EXISTING `warmLight`
+    // emissive instance the ceiling lenses use, so the program set, the
+    // sampler count and the 30-entry clustered-light catalogue are untouched
+    // (R2/R5), and the lighting lane's bloom is what makes it glow.
+    forgeKitPair(builder, m, `verge ${lamp.id} lamp head`,
+      [lamp.x, lamp.fixtureY, lamp.z], lanternHeadParts());
   }
   // ---- HF-477: THE FURNITURE LINE, AND WHY IT IS A LINE ---------------------
   // Every prop here is emitted through `pair()`, so a prop at authored
@@ -3479,10 +3611,12 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'verge front hedge', [-4.7, LOW_COVER / 2, HOUSE_FRONT_Z + 0.6], [3.9, LOW_COVER, 0.9], m.planter);
   // Planter on the outer verge, out past the garage.
   pair(builder, 'verge planter', [13.5, LOW_COVER / 2, VERGE_FURNITURE_Z], [3.6, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
-  // HF-536 (PASS 2) HELD: the brick coping ring on both kerb planters is
-  // +16 verge bodies against the same HF-491 ratchet (blocker B1). The helper
-  // `planterCoping` below is kept, unwired, so the coordinator's decision is a
-  // one-line change rather than a re-author.
+  // HF-536 (night-kit) SHIPPED with the lantern head, for the same reason: the
+  // ratchet now counts props, and a coping ring is one prop. Both planters get
+  // a brick rim 60 mm proud of the top and 30 mm proud of each side, so a
+  // planter reads as built kerbwork instead of an extruded rectangle. The
+  // planter box keeps the collider and the shot surface; the ring is
+  // presentation only, so cover is byte-identical (R29).
   // HF-437 - THE WIDENED STRIP'S COVER, brought onto the line with everything
   // else. Both are solid and shot-rated by default - movement AND shot
   // authority - which is what made them cover in the first place.
@@ -3493,6 +3627,8 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // drop-out probe caught it on the first build (the drop landed ON it, 0.95 m
   // up). At -3.6 it clears the walk line by 1.15 m and still butts the hedge.
   pair(builder, 'verge kerb planter', [-3.6, LOW_COVER / 2, VERGE_FURNITURE_Z], [2.4, LOW_COVER, VERGE_FURNITURE_DEPTH], m.planter);
+  planterCoping(builder, m, 'verge planter', [13.5, VERGE_FURNITURE_Z], [3.6, VERGE_FURNITURE_DEPTH]);
+  planterCoping(builder, m, 'verge kerb planter', [-3.6, VERGE_FURNITURE_Z], [2.4, VERGE_FURNITURE_DEPTH]);
 
   // HF-477's front-lawn appliance bank is NOT authored here. Both lanes read
   // the same feature out of FINDINGS Q4 - a three-unit cooker bank on each

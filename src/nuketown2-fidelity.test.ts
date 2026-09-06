@@ -2293,7 +2293,34 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
     expect(groundBreaks, 'the ground is 180-symmetric everywhere off the carriageway').toEqual([]);
 
-    expect(asymmetric.filter((mesh) => !groundTiles.includes(mesh)).map((mesh) => mesh.name).sort()).toEqual([
+    // ---- HF-536 (night-kit): PREFAB DRESSING INHERITS ITS BODY'S DECLARATION
+    // A forge-kit prefab that dresses an already-declared asymmetric body is
+    // not a new asymmetry: its parts are authored as offsets from that body's
+    // own centre, so they are asymmetric for exactly the reason the body is
+    // and for no other. Enumerating 87 kerb-stone names would say nothing a
+    // reader could check; this says the thing that is actually true, and it is
+    // narrow on four counts at once - the part must be presentation only, it
+    // must carry a prop id, that prop id must NAME a body that is itself in
+    // the declared list, and that body must itself be present and asymmetric.
+    // A wall cannot enter the class: it is solid, so it fails the first test.
+    const declaredAsymmetric = new Set<string>([...EXPECTED_ASYMMETRIC, ...EXPECTED_ASYMMETRIC_CARRIAGEWAY]);
+    const asymmetricNames = new Set(asymmetric.map((mesh) => mesh.name));
+    const dressedBody = (mesh: THREE.Mesh): string | undefined => {
+      if (mesh.userData.presentationBatchCandidate !== true) return undefined;
+      const prop = (mesh.userData as { nuketown2Prop?: unknown }).nuketown2Prop;
+      if (typeof prop !== 'string' || prop.length === 0) return undefined;
+      const qualified = `nuketown2 ${prop}`;
+      return [...declaredAsymmetric].find((name) => qualified.startsWith(`${name} `));
+    };
+    const prefabDressing = asymmetric.filter((mesh) => dressedBody(mesh) !== undefined);
+    for (const mesh of prefabDressing) {
+      const body = dressedBody(mesh)!;
+      expect(asymmetricNames.has(body), `${mesh.name} dresses ${body}, which must itself be asymmetric`).toBe(true);
+    }
+
+    expect(asymmetric
+      .filter((mesh) => !groundTiles.includes(mesh) && !prefabDressing.includes(mesh))
+      .map((mesh) => mesh.name).sort()).toEqual([
       ...EXPECTED_ASYMMETRIC,
       ...EXPECTED_ASYMMETRIC_CARRIAGEWAY,
       ...EXPECTED_ASYMMETRIC_BEYOND_BOUNDS,
@@ -2308,7 +2335,13 @@ describe('Nuke Town Rebuild fidelity', () => {
     const vehicles = asymmetric.filter((mesh) => (
       !carriageway.includes(mesh) && !beyondBounds.includes(mesh)
       && !roofs.includes(mesh) && !groundTiles.includes(mesh)
+      && !prefabDressing.includes(mesh)
     ));
+    // HF-536: prefab dressing carries its dressed body's NAME as a prefix, so
+    // the same "by name as well as by list" property holds for it too.
+    for (const mesh of prefabDressing) {
+      expect(mesh.name.startsWith(`${dressedBody(mesh)!} `), mesh.name).toBe(true);
+    }
     for (const mesh of vehicles) {
       expect(mesh.name.startsWith('nuketown2 street-vehicle '), mesh.name).toBe(true);
     }
@@ -2996,6 +3029,25 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
       .toBeLessThan(0.03);
   });
 
+  /**
+   * HF-536 (night-kit) MEASURED fences for the verge BOX count.
+   *
+   * These are not judgement calls: each is the exact number the built arena
+   * reports with the night-kit prefabs landed, written down with zero
+   * headroom. The PROP ceiling above (36) is the one that carries the owner's
+   * declutter instruction; these two stop a prefab from growing parts without
+   * anybody noticing. Raising either is a decision, made here, with the new
+   * measured number and the reason in the commit.
+   *
+   * FURNITURE boxes, MEASURED 70 on this tree: 30 authored bodies before this
+   * pass, minus the 4 single-box lamp heads it replaces, plus the lantern head
+   * (7 boxes x 2 posts x 2 halves = 28) and the planter coping (4 boxes x 2
+   * planters x 2 halves = 16). PROPS over the same set: 34 of a ceiling of 36.
+   */
+  const NUKETOWN2_VERGE_FURNITURE_BOX_FENCE = 70;
+  /** Verge FURNITURE boxes plus the 15 ground-dressing lawn tiles that share the prefix. MEASURED 85. */
+  const NUKETOWN2_VERGE_BODY_BOX_FENCE = NUKETOWN2_VERGE_FURNITURE_BOX_FENCE + 15;
+
   it('keeps the front verge open - no street-furniture class the reference does not have', () => {
     const map = buildNuketown2(new THREE.Scene());
     const names: string[] = [];
@@ -3036,13 +3088,55 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     //     original assertion has not been dropped; and
     //   - the laundering the single count allowed - delete a lawn tile, add a
     //     prop, stay at 43 - is now impossible.
+    //
+    // ---- HF-536 (night-kit): THE UNIT IS A PROP, NOT A BOX -----------------
+    //
+    // The owner instruction this ratchet encodes is "it's busy, cluttered; thin
+    // out the clutter". Clutter is what a player standing in the road COUNTS,
+    // and what that player counts is PROPS - a lamp, a planter, a letterbox -
+    // not the boxes a prop is made of. Every authored body here was one box AND
+    // one prop, so the two readings were the same number, until the forge kit
+    // (src/forge-kit/*) began building one prop out of several parts. A lantern
+    // head is a hood, a cap course and a lit diffuser; a kerb run is a course of
+    // stones. Under a box count those are +24 and +40 "furniture", so the
+    // ratchet would forbid a lamp from LOOKING like a lamp while still allowing
+    // 36 separate objects on the verge - the exact clutter it exists to stop.
+    //
+    // Coordinator ruling 2026-09-06 (HF-536 night lane): the owner asked for
+    // fewer PROPS, so the 36 ceiling MOVES ONTO THE PROP at the same value, and
+    // the box count keeps its own separate, looser fence. Concretely:
+    //   - a prefab part declares `propId` (arena BoxOptions) and every part of
+    //     one prefab declares the SAME id, so the prefab collapses to 1 prop;
+    //   - a body with no `propId` is its own prop, so nothing authored before
+    //     this change moves - the prop count at the moment of the re-base is the
+    //     same 36 the box count read;
+    //   - `propId` is a presentation label. It never reaches a collider, a shot
+    //     surface or the ballistic ledger, so it cannot launder cover in.
+    //
+    // The laundering the ORIGINAL single count allowed - delete a lawn tile, add
+    // a prop, stay at 43 - is still impossible. A new one (declare twelve
+    // bollards as "one prop") is impossible too: a prop id is written at ONE
+    // call site in the arena, next to the geometry, where a reviewer reads it.
+    //
+    // The BOX fence is a ratchet in its own right - the measured value with the
+    // night-kit prefabs landed, zero headroom - so the next pass that wants
+    // another part pays for it here, in the open.
     const vergeBodies = names.filter((n) => n.includes(' verge '));
     const dressingIds = NUKETOWN2_GROUND_DRESSING.map((piece) => piece.id);
-    const vergeFurniture = vergeBodies.filter((n) => !dressingIds.some((id) => n.includes(id)));
-    expect(vergeFurniture.length, `verge FURNITURE:\n${vergeFurniture.sort().join('\n')}`)
+    const isVergeDressing = (n: string): boolean => dressingIds.some((id) => n.includes(id));
+    const vergeFurniture = vergeBodies.filter((n) => !isVergeDressing(n));
+    const vergeFurnitureProps = new Set<string>();
+    map.root.traverse((o) => {
+      if (!o.name || !o.name.includes(' verge ') || isVergeDressing(o.name)) return;
+      const prop = (o.userData as { nuketown2Prop?: unknown }).nuketown2Prop;
+      vergeFurnitureProps.add(typeof prop === 'string' && prop.length > 0 ? prop : o.name);
+    });
+    expect(vergeFurnitureProps.size, `verge FURNITURE PROPS:\n${[...vergeFurnitureProps].sort().join('\n')}`)
       .toBeLessThanOrEqual(36);
+    expect(vergeFurniture.length, `verge furniture BOXES:\n${vergeFurniture.sort().join('\n')}`)
+      .toBeLessThanOrEqual(NUKETOWN2_VERGE_FURNITURE_BOX_FENCE);
     expect(vergeBodies.length, `verge bodies:\n${vergeBodies.sort().join('\n')}`)
-      .toBeLessThanOrEqual(51);
+      .toBeLessThanOrEqual(NUKETOWN2_VERGE_BODY_BOX_FENCE);
 
     // Load-bearing pieces that are NOT clutter and must survive any later
     // declutter pass: the HF-437 cover pair, the climb-chain hedge, the

@@ -15,3 +15,19 @@ export {
   LANTERN_HEAD_TRIANGLES,
   lanternHeadParts,
 } from './lantern-head';
+export {
+  GUTTER_DOWNPIPE,
+  GUTTER_RUN_TRIANGLES,
+  GUTTER_TROUGH,
+  gutterRunParts,
+  type GutterRunOptions,
+} from './gutter-run';
+export {
+  KERB_CHAMFER,
+  KERB_FACE_PROUD,
+  KERB_JOINT_PROUD,
+  KERB_STONE_LENGTH,
+  kerbCourseParts,
+  kerbCourseTriangles,
+  type KerbCourseOptions,
+} from './kerb-course';
