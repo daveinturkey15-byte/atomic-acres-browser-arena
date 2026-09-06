@@ -117,6 +117,7 @@ import {
 import { type NuketownGroundDressingPiece, buildNuketownRebuildLawnField, buildNuketown2CloverField } from './nuketown-lawn-field';
 import { buildNuketown2Vegetation } from './nuketown2-vegetation';
 import { buildNuketown2VergeEdge } from './nuketown2-verge-edge';
+import { buildNuketown2RoadEdge } from './nuketown2-road-edge';
 import {
   createNuketown2GrimeMaterials,
   nuketown2GrimeDecals,
@@ -4993,6 +4994,14 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     keepOuts: builder.colliders.slice(groundColliderCount),
   });
   builder.root.userData.nuketown2VergeEdgeStats = vergeEdge.stats;
+  // ---- HF-536 night-gemini13: road edges that read as used (critic gap #5) ---
+  // Gravel scatter + broken asphalt chunks + edge ravelling relief.
+  // Three InstancedMeshes, zero new materials/samplers, no colliders.
+  const roadEdge = buildNuketown2RoadEdge(builder.root, {
+    kerb: m.kerb,
+    asphalt: m.asphalt,
+  });
+  builder.root.userData.nuketown2RoadEdgeStats = roadEdge.stats;
 
   // ---- PASS 94 lane TECHNIQUES: hedges + the avenue ----------------------
   // Presentation only, and admissible for two separate reasons the module's
