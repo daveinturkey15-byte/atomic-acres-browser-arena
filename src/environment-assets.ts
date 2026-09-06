@@ -1006,6 +1006,24 @@ export function updateArenaArt(root: THREE.Group, now: number): void {
 }
 
 /** Builds original Atomic Acres hero vehicles and environmental props. */
+/**
+ * The Quality art coach, built AND placed. HF-536: this used to be three
+ * inline lines inside `loadArenaArt`, which meant the only way to get the
+ * coach into a test was to run the whole async GLB-loading art path — so the
+ * Quality composition parity gate simply never saw it, and the four brass
+ * stanchion poles inside the bus (`coach-stanchion`, art-kit.ts) could not
+ * explain the four `central bus stanchion` colliders they physically stand
+ * in. The gate reported invisible geometry that has been visible all along.
+ * One function, two callers, no drift.
+ */
+export function placeArenaCoach(): THREE.Group {
+  const coach = buildRetroCoach();
+  coach.position.set(CENTRAL_BUS.x, 0, CENTRAL_BUS.z);
+  coach.rotation.y = Math.PI / 2 + 0.02;
+  coach.traverse((node) => { node.userData.blocksShots = true; });
+  return coach;
+}
+
 export async function loadArenaArt(
   scene: THREE.Scene,
   onProgress?: (loaded: number, total: number) => void,
@@ -1022,11 +1040,7 @@ export async function loadArenaArt(
   scene.add(root);
 
   addNarrativeDressing(root, reduced);
-  const coach = buildRetroCoach();
-  coach.position.set(CENTRAL_BUS.x, 0, CENTRAL_BUS.z);
-  coach.rotation.y = Math.PI / 2 + 0.02;
-  coach.traverse((node) => { node.userData.blocksShots = true; });
-  root.add(coach);
+  root.add(placeArenaCoach());
   onProgress?.(1, 12);
   onProgress?.(2, 12);
 

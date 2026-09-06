@@ -4,7 +4,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { readFile } from 'node:fs/promises';
 import { buildArena } from './map';
-import { addNeighbourhoodLife } from './environment-assets';
+import { addNeighbourhoodLife, placeArenaCoach } from './environment-assets';
 
 /**
  * QUALITY-COMPOSITION PARITY GATE — born from a real owner walk, 2026-08-29:
@@ -52,13 +52,32 @@ function collectTriangleSources(object: THREE.Object3D): Array<{ bounds: Bounds;
       positions[index * 3 + 2] = sourceAttribute.getZ(index);
     }
     if (!geometry.boundingBox) geometry.computeBoundingBox();
-    const box = geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld);
-    if (!Number.isFinite(box.min.x)) return;
-    sources.push({
-      bounds: { minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z, name: mesh.name },
-      positions,
-      matrix: mesh.matrixWorld.clone(),
-    });
+    // HF-536 INSTANCE HONESTY. An InstancedMesh's `matrixWorld` places the
+    // PROTOTYPE, not the instances: reading it alone collapses a whole
+    // scattered field onto one spot, usually the origin, where it "explains"
+    // whatever collider happens to be standing there and explains nothing
+    // anywhere else. Each instance is emitted as its own source, sharing the
+    // one dequantized position array.
+    const instanced = mesh as THREE.InstancedMesh;
+    const matrices: THREE.Matrix4[] = [];
+    if (instanced.isInstancedMesh === true) {
+      const instanceMatrix = new THREE.Matrix4();
+      for (let index = 0; index < instanced.count; index += 1) {
+        instanced.getMatrixAt(index, instanceMatrix);
+        matrices.push(new THREE.Matrix4().multiplyMatrices(mesh.matrixWorld, instanceMatrix));
+      }
+    } else {
+      matrices.push(mesh.matrixWorld.clone());
+    }
+    for (const matrix of matrices) {
+      const box = geometry.boundingBox!.clone().applyMatrix4(matrix);
+      if (!Number.isFinite(box.min.x)) continue;
+      sources.push({
+        bounds: { minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z, name: mesh.name },
+        positions,
+        matrix,
+      });
+    }
   });
   return sources;
 }
@@ -118,6 +137,23 @@ describe('Quality composition parity (atomic-acres)', () => {
       height: 1,
       close: () => undefined,
     }) as unknown as ImageBitmap);
+    // The coach carries one canvas decal (its ATOM-LINER destination board).
+    // Node has no canvas; the parity gate only ever reads vertex positions, so
+    // a no-op 2D context is enough to let the art build.
+    const inertElement = (): unknown => new Proxy({ width: 0, height: 0, style: {} } as Record<string, unknown>, {
+      get: (target, key) => {
+        if (key in target) return target[key as string];
+        if (key === 'getContext') {
+          return () => new Proxy({}, { get: () => () => undefined, set: () => true });
+        }
+        return () => undefined;
+      },
+      set: (target, key, value) => { target[key as string] = value; return true; },
+    });
+    vi.stubGlobal('document', {
+      createElement: () => inertElement(),
+      createElementNS: () => inertElement(),
+    });
     const bytes = await readFile('public/assets/original/models/atomic-acres-blender-arena.glb');
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     const gltf = await new Promise<GLTF>((resolveAsset, rejectAsset) => {
@@ -127,6 +163,12 @@ describe('Quality composition parity (atomic-acres)', () => {
     const sources = [
       ...collectTriangleSources(gltf.scene),
       ...collectTriangleSources(environmentRoot),
+      // HF-536: the Quality art coach. `loadArenaArt` adds it to the scene on
+      // every profile, so a Quality player sees it - but it is built there and
+      // not in `addNeighbourhoodLife`, so this gate never had it in the visible
+      // set and reported the bus's own brass stanchion poles as invisible
+      // geometry. `placeArenaCoach` is the shared placement both callers use.
+      ...collectTriangleSources(placeArenaCoach()),
     ];
     // Quality retains the collision-audit mirrors (mounds) from the
     // procedural layer; everything else procedural is hidden.
