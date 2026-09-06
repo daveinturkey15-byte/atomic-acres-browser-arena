@@ -93,6 +93,16 @@ const WEATHER_BAND_M = 0.55;
 
 export type ConcreteVariant = 'apron' | 'kerb' | 'block';
 
+/**
+ * HF-536: Kerb and driveway concrete moved to the boards by measurement.
+ * Measured on street-centre, coach-elevation, nuke-street boards:
+ * warmer sandy concrete tone (hue 25-36 deg) replacing pale cool grey (0x9a978a, hue 49 deg).
+ */
+export const KERB_CONCRETE_SRGB = 0x9e917d;
+
+/** Driveway apron concrete: warmer weathered apron tone (replaces 0x8b8879). */
+export const DRIVEWAY_APRON_SRGB = 0x8d806d;
+
 export function concreteSpec(name: string, baseSrgb: number, polygonOffset?: number): Nuketown2MaterialSpec {
   return assertSpec({
     name,
@@ -119,7 +129,7 @@ let concreteGraph: { colorNode: any; roughnessNode: any; normalNode: any } | nul
 
 function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
   if (concreteGraph) return concreteGraph;
-  const spec = concreteSpec('nuketown2-concrete-shared', 0x9a978a);
+  const spec = concreteSpec('nuketown2-concrete-shared', KERB_CONCRETE_SRGB);
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
   const variant = uniforms.concreteVariant as any;
@@ -223,8 +233,8 @@ export function createConcreteMaterial(
 }
 
 export function createNuketown2KerbMaterial(): MeshStandardNodeMaterial {
-  return createConcreteMaterial('nuketown2-kerb', 0x9a978a, { variant: 'kerb', dampFootY: 0 });
+  return createConcreteMaterial('nuketown2-kerb', KERB_CONCRETE_SRGB, { variant: 'kerb', dampFootY: 0 });
 }
 export function createNuketown2DriveMaterial(): MeshStandardNodeMaterial {
-  return createConcreteMaterial('nuketown2-drive-decal', 0x8b8879, { variant: 'apron', polygonOffset: -1 });
+  return createConcreteMaterial('nuketown2-drive-decal', DRIVEWAY_APRON_SRGB, { variant: 'apron', polygonOffset: -1 });
 }

@@ -23,13 +23,13 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { buildWear, detailFalloff, groundUv, linearSwatch, signedNoise } from '../wear';
+import { buildWear, detailFalloff, groundUv, linearRgb, linearSwatch, signedNoise } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { lutFbm, lutRidgedFbm } from '../noise-lut';
 import { reliefNormal } from '../relief';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
-const { abs, clamp, float, fract, max, min, mix, positionWorld, smoothstep, vec2 } =
+const { abs, clamp, float, fract, max, min, mix, positionWorld, smoothstep, vec2, vec3 } =
   TSL as unknown as Record<string, any>;
 
 /** Half-width of the carriageway, metres — the kerb line the channel stain hugs. */
@@ -75,7 +75,7 @@ const AGGREGATE_FAR_M = 30;
  * surface gets is unchanged and the shadow floor is left exactly where the
  * shadow lane found it.
  */
-const AGGREGATE_ALBEDO = 0.17;
+export const AGGREGATE_ALBEDO = 0.17;
 /**
  * Height of a proud stone face above the bitumen matrix, metres.
  *
@@ -126,11 +126,104 @@ const PAINT_LOSS_FAR_M = 44;
 export const PAINT_LOSS_LO = 0.53;
 export const PAINT_LOSS_HI = 0.66;
 
+/**
+ * HF-536: Asphalt palette moved to the boards by measurement.
+ * Target from root-captures/refs-boards/nuketown2 (street-centre, into-sun-street,
+ * coach-elevation, vehicle stations): warm dark charcoal (hue 20-30 deg, sat 25-35%,
+ * luma p50 ~50-55) replacing the previous flat cool blue-grey (0x3b3d3e, hue 200 deg,
+ * luma p50 ~93-140).
+ * Measurement reference: street-centre/roadCentre board p50=50, RGB [68.6, 54.7, 44.2], hue 25.8 deg.
+ */
+export const ASPHALT_BASE_SRGB = 0x392f26;
+
+/** Bitumen tar-seam overband: warm near-black/charcoal seal (replaces cool 0x1f2021). */
+export const ASPHALT_TAR_SEAM_SRGB = 0x1d1611;
+
+/** Sawn cold-patch repair: dense warm asphalt patch (replaces cool 0x2b2c2d). */
+export const ASPHALT_COLD_PATCH_SRGB = 0x2b221a;
+
+/** Exposed mineral aggregate chip: warm crushed stone chip albedo. */
+export const ASPHALT_AGGREGATE_SRGB = 0x584a3b;
+
+/** Normalized linear lift tint for aggregate stone chip in the asphalt matrix. */
+export const ASPHALT_AGGREGATE_TINT = Object.freeze([1.29, 1.00, 0.65] as const);
+
+/** Wheel-path polish tint: warm tyre sheen and road dust lift (replaces scalar 0.17). */
+export const ASPHALT_POLISH_TINT = Object.freeze([0.25, 0.20, 0.12] as const);
+/**
+ * Worn thermoplastic lane marking paint tone: warm off-white (replaces cool/neutral 0xd9d3c2).
+ * Measured on street-centre and nuke-street boards: RGB [244, 215, 181] / [253, 238, 211],
+ * hue ~33-38 deg, luma ~218-239.
+ */
+export const MARKING_PAINT_SRGB = 0xe8d5ba;
+
+/**
+ * Board target constants for road carriageway measurement.
+ * Sourced from scripts/forge/boxes.json measurements on refs-boards/nuketown2
+ * (street-centre/roadCentre, into-sun-street/road, coach-elevation/roadLower).
+ */
+export const BOARD_TARGET_ROAD = Object.freeze({
+  srgbHex: 0x45372c,
+  hueDeg: 25.8,
+  satPercent: 35.6,
+  lumaP50: 50,
+} as const);
+
+/**
+ * Computes the authored asphalt/aggregate/seam/polish mix in linear space.
+ * Used by nuketown2-road-tone.test.ts to verify the linear mix lands within
+ * 12 deg hue and 10 points saturation of the board target.
+ */
+export function computeAuthoredRoadLinearMix(options?: {
+  stoneWeight?: number;
+  patchWeight?: number;
+  wheelWeight?: number;
+  seamWeight?: number;
+}): [number, number, number] {
+  const stoneWeight = options?.stoneWeight ?? 0.35;
+  const patchWeight = options?.patchWeight ?? 0.07;
+  const wheelWeight = options?.wheelWeight ?? 0.25;
+  const seamWeight = options?.seamWeight ?? 0.04;
+  const baseLin = linearRgb(ASPHALT_BASE_SRGB);
+  const patchLin = linearRgb(ASPHALT_COLD_PATCH_SRGB);
+  const seamLin = linearRgb(ASPHALT_TAR_SEAM_SRGB);
+
+
+  const aggregateLift = [
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[0],
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[1],
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[2],
+  ];
+  const stonedLin: [number, number, number] = [
+    baseLin[0] * (1 + stoneWeight * aggregateLift[0]),
+    baseLin[1] * (1 + stoneWeight * aggregateLift[1]),
+    baseLin[2] * (1 + stoneWeight * aggregateLift[2]),
+  ];
+
+  const patchedLin: [number, number, number] = [
+    stonedLin[0] * (1 - patchWeight) + patchLin[0] * patchWeight,
+    stonedLin[1] * (1 - patchWeight) + patchLin[1] * patchWeight,
+    stonedLin[2] * (1 - patchWeight) + patchLin[2] * patchWeight,
+  ];
+
+  const polishedLin: [number, number, number] = [
+    patchedLin[0] * (1 + wheelWeight * ASPHALT_POLISH_TINT[0]),
+    patchedLin[1] * (1 + wheelWeight * ASPHALT_POLISH_TINT[1]),
+    patchedLin[2] * (1 + wheelWeight * ASPHALT_POLISH_TINT[2]),
+  ];
+
+  return [
+    polishedLin[0] * (1 - seamWeight) + seamLin[0] * seamWeight,
+    polishedLin[1] * (1 - seamWeight) + seamLin[1] * seamWeight,
+    polishedLin[2] * (1 - seamWeight) + seamLin[2] * seamWeight,
+  ];
+}
+
 export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialSpec {
   return assertSpec({
     name,
     family: 'asphalt',
-    baseSrgb: 0x3b3d3e,
+    baseSrgb: ASPHALT_BASE_SRGB,
     roughness: 0.95,
     metalness: 0.02,
     grain: { sizeM: 0.0010, albedo: 0.035, roughness: 0.05 },
@@ -140,6 +233,7 @@ export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialS
     polygonOffset: -1,
   });
 }
+
 
 let asphaltGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
 
@@ -174,12 +268,17 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   // ONE-SIDED: stone lifts off the matrix, the matrix is the floor. See
   // AGGREGATE_ALBEDO for the measurement that forced this.
   const stone = max(aggregate, float(0));
-  const stoned = road.mul(float(1).add(stone.mul(float(AGGREGATE_ALBEDO))));
-  const patched = mix(stoned, linearSwatch(0x2b2c2d).mul(wear.albedoMul), patch);
-  const polished = patched.mul(float(1).add(wheel.mul(float(0.17))));
+  const aggLift = vec3(
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[0],
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[1],
+    AGGREGATE_ALBEDO * ASPHALT_AGGREGATE_TINT[2],
+  );
+  const stoned = road.mul(float(1).add(stone.mul(aggLift)));
+  const patched = mix(stoned, linearSwatch(ASPHALT_COLD_PATCH_SRGB).mul(wear.albedoMul), patch);
+  const polished = patched.mul(float(1).add(wheel.mul(vec3(ASPHALT_POLISH_TINT[0], ASPHALT_POLISH_TINT[1], ASPHALT_POLISH_TINT[2]))));
   const stained = polished.mul(float(1).sub(channel.mul(float(0.13))));
   const ravelled = stained.mul(float(1).add(edgeAbrasion.mul(stone).mul(float(0.16))));
-  const roadColor = mix(ravelled, linearSwatch(0x1f2021), max(seam, crack.mul(float(0.8))));
+  const roadColor = mix(ravelled, linearSwatch(ASPHALT_TAR_SEAM_SRGB), max(seam, crack.mul(float(0.8))));
 
   // MARKINGS. The loss field is deliberately NOT `wear.scuff`: scuff is faded
   // out by 18 m and every station that judges a lane marking looks at it from
@@ -197,7 +296,7 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   const markingBase = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).sub(scrub.mul(float(0.30))));
   const markingColor = mix(
     markingBase,
-    linearSwatch(0x3b3d3e).mul(float(1).add(stone.mul(float(AGGREGATE_ALBEDO)))),
+    linearSwatch(ASPHALT_BASE_SRGB).mul(float(1).add(stone.mul(aggLift))),
     paintLoss,
   );
 
@@ -280,7 +379,7 @@ export function markingSpec(name = 'nuketown2-trim-decal'): Nuketown2MaterialSpe
   return assertSpec({
     name,
     family: 'asphalt',
-    baseSrgb: 0xd9d3c2,
+    baseSrgb: MARKING_PAINT_SRGB,
     roughness: 0.86,
     metalness: 0.02,
     grain: { sizeM: 0.0010, albedo: 0.035, roughness: 0.05 },

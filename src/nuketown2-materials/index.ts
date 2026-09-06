@@ -37,8 +37,8 @@ import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { createSidingMaterial } from './families/siding';
 import { createRoofMaterial } from './families/roof';
-import { createAsphaltMaterial, createMarkingMaterial } from './families/asphalt';
-import { createConcreteMaterial } from './families/concrete';
+import { createAsphaltMaterial, createMarkingMaterial, MARKING_PAINT_SRGB } from './families/asphalt';
+import { createConcreteMaterial, KERB_CONCRETE_SRGB, DRIVEWAY_APRON_SRGB } from './families/concrete';
 import { createTimberMaterial } from './families/timber';
 import { createGlassMaterial } from './families/glass';
 import { createPaintedMetalMaterial } from './families/painted-metal';
@@ -57,8 +57,27 @@ export {
 export { buildWear, linearRgb, linearSwatch, uniformSwatch } from './wear';
 export { createSidingMaterial, sidingSpec } from './families/siding';
 export { createRoofMaterial, roofSpec } from './families/roof';
-export { asphaltSpec, createAsphaltMaterial, createMarkingMaterial, markingSpec } from './families/asphalt';
-export { concreteSpec, createConcreteMaterial } from './families/concrete';
+export {
+  ASPHALT_BASE_SRGB,
+  ASPHALT_TAR_SEAM_SRGB,
+  ASPHALT_COLD_PATCH_SRGB,
+  ASPHALT_AGGREGATE_SRGB,
+  ASPHALT_AGGREGATE_TINT,
+  ASPHALT_POLISH_TINT,
+  MARKING_PAINT_SRGB,
+  BOARD_TARGET_ROAD,
+  computeAuthoredRoadLinearMix,
+  asphaltSpec,
+  createAsphaltMaterial,
+  createMarkingMaterial,
+  markingSpec,
+} from './families/asphalt';
+export {
+  KERB_CONCRETE_SRGB,
+  DRIVEWAY_APRON_SRGB,
+  concreteSpec,
+  createConcreteMaterial,
+} from './families/concrete';
 export { createTimberMaterial, timberSpec } from './families/timber';
 export { createGlassMaterial, glassSpec } from './families/glass';
 export { createPaintedMetalMaterial, paintedMetalSpec } from './families/painted-metal';
@@ -220,15 +239,15 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // "Poured and kept" (R15): the kerb run keeps its wear scales and loses
     // 40 % of its scuff albedo swing, which is the tidy read visual-a reached
     // by editing the concrete graph - the same result at value level.
-    kerb: tuneRoleValues(createConcreteMaterial('nuketown2-kerb', 0x9a978a, { variant: 'kerb', dampFootY: 0 }), {
+    kerb: tuneRoleValues(createConcreteMaterial('nuketown2-kerb', KERB_CONCRETE_SRGB, { variant: 'kerb', dampFootY: 0 }), {
       scuffAlbedo: 0.030,
     }),
-    drive: createConcreteMaterial('nuketown2-drive', 0x8b8879, { variant: 'apron' }),
-    driveDecal: createConcreteMaterial('nuketown2-drive-decal', 0x8b8879, { variant: 'apron', polygonOffset: -1 }),
+    drive: createConcreteMaterial('nuketown2-drive', DRIVEWAY_APRON_SRGB, { variant: 'apron' }),
+    driveDecal: createConcreteMaterial('nuketown2-drive-decal', DRIVEWAY_APRON_SRGB, { variant: 'apron', polygonOffset: -1 }),
     // Worn, slightly dirty paint. Crisp white dashes read as a racing game;
     // a real dash is a dirty warm off-white the tyres have scrubbed through.
     trimDecal: tuneRoleValues(createMarkingMaterial(), {
-      baseColor: roleColor(0xcfc6b0),
+      baseColor: roleColor(MARKING_PAINT_SRGB),
       scuffAlbedo: 0.10,
     }),
     block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block' }),

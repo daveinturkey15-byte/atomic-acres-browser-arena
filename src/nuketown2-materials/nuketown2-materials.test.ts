@@ -42,7 +42,7 @@ import { noiseLutTexture } from './noise-lut';
 import { sidingSpec } from './families/siding';
 import { roofSpec } from './families/roof';
 import { asphaltSpec, markingSpec } from './families/asphalt';
-import { concreteSpec } from './families/concrete';
+import { concreteSpec, KERB_CONCRETE_SRGB } from './families/concrete';
 import { timberSpec } from './families/timber';
 import { glassSpec } from './families/glass';
 import { paintedMetalSpec } from './families/painted-metal';
@@ -66,7 +66,7 @@ const FAMILIES: ReadonlyArray<{
   { family: 'roof', spec: roofSpec('gate-roof'), roughness: [0.80, 1.00], metalness: [0, 0.05] },
   { family: 'asphalt', spec: asphaltSpec('gate-asphalt'), roughness: [0.85, 1.00], metalness: [0, 0.05] },
   { family: 'asphalt-marking', spec: markingSpec('gate-marking'), roughness: [0.75, 1.00], metalness: [0, 0.05] },
-  { family: 'concrete', spec: concreteSpec('gate-concrete', 0x9a978a), roughness: [0.85, 1.00], metalness: [0, 0.05] },
+  { family: 'concrete', spec: concreteSpec('gate-concrete', KERB_CONCRETE_SRGB), roughness: [0.85, 1.00], metalness: [0, 0.05] },
   { family: 'timber', spec: timberSpec('gate-timber', 0x8a6244, 'fence'), roughness: [0.80, 1.00], metalness: [0, 0.05] },
   { family: 'timber-painted', spec: timberSpec('gate-trim', 0xf0e4c9, 'painted-trim'), roughness: [0.50, 0.80], metalness: [0, 0.05] },
   // Float glass is a DIELECTRIC. metalness must be exactly 0: anything above
