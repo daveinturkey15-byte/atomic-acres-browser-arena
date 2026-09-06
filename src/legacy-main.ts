@@ -322,6 +322,8 @@ import {
   deploymentLoadingProgress,
   type DeploymentLoadingStage,
 } from './deployment-loading-progress';
+import { applyDeploymentBriefing } from './ui/deployment-briefing-surface'; // HF-372
+import { applyDeploymentLoadingProgress, applyDeploymentTransitionPoster, applyDeploymentTransitionPresentation } from './ui/deployment-console-surface';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
 import { CRIMSON_FLAMETHROWER_KILLSTREAK_ID } from './killstreak-catalog'; // HF-334
@@ -1557,6 +1559,7 @@ const matchPauseBackdrop = element<HTMLElement>('#match-pause-backdrop');
 const deploymentTransition = element<HTMLElement>('#deployment-transition');
 const deploymentTransitionPoster = element<HTMLImageElement>('#deployment-transition-poster');
 const deploymentTransitionVideo = element<HTMLVideoElement>('#deployment-transition-video');
+const deploymentTransitionKicker = element<HTMLElement>('#deployment-transition-kicker');
 const deploymentTransitionTitle = element<HTMLElement>('#deployment-transition-title');
 const deploymentTransitionStatus = element<HTMLElement>('#deployment-transition-status');
 const deploymentTransitionProgress = element<HTMLProgressElement>('#deployment-transition-progress');
@@ -2507,19 +2510,13 @@ function updateDeploymentLoadingProgress(stage = bootstrapStage): void {
     deploymentLoadingPercent,
   );
   deploymentLoadingPercent = progress.percent;
-  deploymentTransitionProgress.value = progress.percent;
-  deploymentTransitionProgress.textContent = `${progress.percent}%`;
-  deploymentTransitionPercent.value = `${progress.percent}%`;
-  deploymentTransitionEta.value = progress.completed
-    ? '100% · IN GAME'
-    : progress.etaSeconds === null
-      ? 'ETA ESTIMATING…'
-      : `ETA ${progress.etaSeconds}s`;
-  deploymentTransitionStage.textContent = `${progress.label.toUpperCase()} · 100% = IN GAME`;
-  deploymentTransition.dataset.loadingStage = stage;
-  deploymentTransition.dataset.loadingPercent = String(progress.percent);
-  deploymentTransition.dataset.loadingEtaSeconds = progress.etaSeconds === null ? 'estimating' : String(progress.etaSeconds);
-  deploymentTransition.dataset.loadingComplete = String(progress.completed);
+  applyDeploymentLoadingProgress({
+    bar: deploymentTransitionProgress,
+    percent: deploymentTransitionPercent,
+    eta: deploymentTransitionEta,
+    stage: deploymentTransitionStage,
+    root: deploymentTransition,
+  }, stage, progress);
 }
 
 function setBootstrapStage(stage: BootstrapStage): void {
@@ -16911,14 +16908,11 @@ function syncMenuLifecyclePresentation(): void {
 function prepareDeploymentTransition(): void {
   resetDeploymentLoadingProgress();
   const preview = menuPreviewVideoDefinition(selectedArena.id);
+  // NOT extracted: src/admission-debug-contract.test.ts pins these three deletes as literal source here.
   delete deploymentTransition.dataset.readyAt;
   delete deploymentTransition.dataset.readyGeneration;
   delete deploymentTransition.dataset.readyPresentedGameplayFrame;
-  deploymentTransitionPoster.src = preview.poster;
-  deploymentTransitionPoster.width = preview.width;
-  deploymentTransitionPoster.height = preview.height;
-  deploymentTransitionPoster.hidden = false;
-  deploymentTransitionVideo.hidden = true;
+  applyDeploymentTransitionPoster(deploymentTransitionPoster, deploymentTransitionVideo, preview);
   const reducedMotion = accessibilityRuntime.reducedMotion;
   if (!reducedMotion) {
     // Reuse the already-buffered menu element. Starting a second VP9/H264
@@ -16929,13 +16923,18 @@ function prepareDeploymentTransition(): void {
     deploymentTransitionPoster.hidden = menuPreviewVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
     void menuPreviewVideo.play().catch(() => { deploymentTransitionPoster.hidden = false; });
   }
-  deploymentTransitionTitle.textContent = selectedArena.displayName.toUpperCase();
-  deploymentTransitionStatus.textContent = `Preparing ${selectedArena.displayName} authoritative arena state…`;
-  deploymentTransition.dataset.arena = selectedArena.id;
-  deploymentTransition.dataset.presentation = preview.presentationId;
-  deploymentTransition.dataset.media = reducedMotion ? 'reduced-motion-poster' : 'shared-prerecorded-video';
-  deploymentTransition.dataset.liveRender = 'false';
-  deploymentTransition.dataset.statusKind = 'ok';
+  // HF-372 (salvage, docs/salvage/WIRING-PLAN-ccfeec86.md §1): every arena used to load behind the
+  // same sentence, "Preparing <name> authoritative arena state…". ORDERING THIS RELIES ON —
+  // `prepareDeploymentTransition()` has exactly one caller, in the match-admission path, and it runs
+  // IMMEDIATELY BEFORE `applyMenuLifecycle({ type: 'match-start' })`, so the lifecycle surface is not
+  // yet 'deploying' here and `setStatus()`'s deploying branch, the other writer of this status element,
+  // cannot be racing it. From match-start the loader owns the status line; the briefing is written
+  // once, never per frame; its identity persists in the kicker. Pinned by src/deployment-briefing-main-integration.test.ts.
+  applyDeploymentBriefing(
+    { kicker: deploymentTransitionKicker, title: deploymentTransitionTitle, status: deploymentTransitionStatus },
+    selectedArena.id, selectedArena.displayName, `${PASS66_RELEASE_IDENTITY.pass} // DEPLOYMENT STREAM`,
+  );
+  applyDeploymentTransitionPresentation(deploymentTransition, { arenaId: selectedArena.id, presentationId: preview.presentationId, reducedMotion });
 }
 
 function applyMenuLifecycle(event: MenuLifecycleEvent): void {
