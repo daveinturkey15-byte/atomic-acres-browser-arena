@@ -37,6 +37,7 @@ import {
   createLeafAtlasData,
   leafSprigGeometry,
   nuketown2AvenueTreePositions,
+  nuketown2LeafAtlas,
 } from './nuketown2-vegetation';
 
 describe('Nuke Town Rebuild vegetation', () => {
@@ -306,6 +307,50 @@ describe('Nuke Town Rebuild vegetation', () => {
     // sprig at the origin. The runs span both halves of an 84 m map.
     expect(mesh.boundingSphere).not.toBeNull();
     expect(mesh.boundingSphere!.radius).toBeGreaterThan(8);
+    vegetation.dispose();
+  });
+
+  it('spends exactly ONE texture sampler on the whole leaf layer', () => {
+    // The gotcha this defends against by name:
+    // gotcha-silent-arena-rollback-device-limit. A 17-sampler arena's
+    // requestDevice was rejected with no visible error and the arena silently
+    // rolled back, so every sampler this map spends has to be deliberate and
+    // countable. The browser census in docs/forge/sampler-census.json is the
+    // authority on the arena TOTAL; this is the cheap static guard that stops
+    // a future edit adding a normal map, a roughness map and an alpha map to
+    // the leaf material without anyone noticing.
+    const parent = new THREE.Group();
+    const vegetation = buildNuketown2Vegetation(parent);
+    const mesh = vegetation.group.children.find(
+      (node) => node.name === 'nuketown2-hedges-leaf-cards',
+    ) as THREE.InstancedMesh;
+    const material = mesh.material as THREE.Material & Record<string, unknown>;
+    const textures = new Set<object>();
+    const seen = new Set<object>();
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      const record = node as Record<string, unknown>;
+      const value = record.value as { isTexture?: boolean } | undefined;
+      if (value && typeof value === 'object' && value.isTexture === true) textures.add(value);
+      for (const key of Object.keys(record)) {
+        if (key === 'parent' || key === 'parents') continue;
+        walk(record[key]);
+      }
+    };
+    for (const slot of ['colorNode', 'opacityNode', 'positionNode', 'normalNode', 'roughnessNode']) {
+      walk(material[slot]);
+    }
+    // Plus the classic non-node map slots, which a NodeMaterial still honours.
+    for (const slot of ['map', 'alphaMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) {
+      const texture = material[slot] as { isTexture?: boolean } | null | undefined;
+      if (texture && texture.isTexture === true) textures.add(texture);
+    }
+    expect(textures.size, 'the leaf layer may cost exactly one sampler').toBe(1);
+    expect([...textures][0] as THREE.Texture).toBe(nuketown2LeafAtlas());
+    // ...and the atlas is a module singleton, so a second hedge build cannot
+    // quietly spend a second sampler.
+    expect(nuketown2LeafAtlas()).toBe(nuketown2LeafAtlas());
     vegetation.dispose();
   });
 
