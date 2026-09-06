@@ -208,6 +208,8 @@ import {
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
 import { type ForgeKitBox, getLampPoolMaterial, gutterRunParts, kerbCourseParts, lampPoolParts, lanternHeadParts } from './forge-kit';
+// HF-536 night-gemini14: lamp atmospheric light cones and dust motes (critic gap #5)
+import { buildNuketown2LampFx } from './nuketown2-lamp-fx';
 // HF-536 night-muse-windows: window dressing kit (frames, mullions, sills, curtains, blinds).
 import { type WindowPart, type WindowRole, windowDressing } from './forge-kit/window';
 // HF-536 night-facade-port: the facade module's recipe, as PARTS.
@@ -5042,6 +5044,9 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   const backdrop = buildNuketownMountainBackdrop(builder.root, NUKETOWN2_BACKDROP_ENVELOPE);
   builder.root.userData.nuketown2ForestStats = forest.stats;
   builder.root.userData.nuketown2BackdropStats = backdrop.stats;
+  // HF-536 night-gemini14: lamp atmospheric light cones and dust motes (critic gap #5)
+  const lampFx = buildNuketown2LampFx(builder.root);
+  builder.root.userData.nuketown2LampFxStats = lampFx.stats;
 
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const c = NUKETOWN2_STREET_COACH;
