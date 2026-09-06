@@ -43,7 +43,15 @@
 //   node scripts/qa/probe-nuketown2-microshift-flicker.mjs \
 //     --serve-dist dist-defects-b --out artifacts/qa/microshift-flicker \
 //     [--stations a,b,c] [--hold-ms 6000] [--shift-m 0.002] [--threshold 40]
-//     [--grid 40] [--target-pct 0.05]
+//     [--grid 40] [--target-pct 0.05] [--render quality|performance]
+//     [--shifts 0,0.0005,0.002,0.008,0.032]
+//
+// ALWAYS pair the output with scripts/qa/classify-microshift-flicker.mjs. The
+// raw flicker count is an UPPER BOUND, not a finding: a 2 mm lateral move
+// shifts a surface 5 m away by 0.37 px, and that sub-pixel move legitimately
+// changes an antialiased SILHOUETTE pixel by more than 40 levels. The
+// classifier splits edge pixels (explained, not evidence) from interior
+// pixels in a locally flat neighbourhood (the honest depth-race candidates).
 //
 // Exit 0 when every station is under --target-pct and no station is NOISY;
 // 1 when a station is over; 2 when the environment is not a real WebGPU route.
@@ -78,6 +86,16 @@ const STATIONS = (arg('--stations', DEFAULT_STATIONS.join(','))
 const HOLD_MS = Number(arg('--hold-ms', '6000'));
 const SETTLE_MS = Number(arg('--settle-ms', '5000'));
 const SHIFT_M = Number(arg('--shift-m', '0.002'));
+// --shifts turns the probe into a SHIFT SWEEP: one B frame per magnitude, all
+// against the same A. That is the causal test for what the flicker is. A
+// sub-pixel resampling artefact scales with the shift and vanishes as it goes
+// to zero, because the projected offset is (shift / distance) * focalPixels; a
+// depth race does not care how far the camera moved, only that it moved, so it
+// stays roughly flat and does not collapse at 0.05 mm.
+const SHIFTS = (arg('--shifts', String(SHIFT_M)).split(',').map(Number).filter((v) => Number.isFinite(v)));
+// The render profile the frame is captured in. The owner's defect report is
+// not qualified by profile, and the contract requires both to hold.
+const RENDER_PROFILE = arg('--render', 'quality');
 const THRESHOLD = Number(arg('--threshold', '40'));
 const GRID = Number(arg('--grid', '40'));
 const TARGET_PCT = Number(arg('--target-pct', '0.05'));
@@ -258,7 +276,7 @@ try {
   const page = await browser.newPage({ viewport: VIEWPORT });
   const session = await page.context().newCDPSession(page);
   await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
-  const url = `${BASE}/?release=latest&renderer=webgpu&render=quality&seed=viewpoint&previewTime=0&tod=authored`;
+  const url = `${BASE}/?release=latest&renderer=webgpu&render=${RENDER_PROFILE}&seed=viewpoint&previewTime=0&tod=authored`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
 
@@ -347,30 +365,47 @@ try {
           x: cam.position[0], y: cam.position[1], z: cam.position[2],
           yaw, pitch, fov: cam.fov, fixedTimeMs: review.fixedTimeMs, seed: review.seed,
         };
-        const shifted = {
-          ...base,
-          x: base.x + right[0] * SHIFT_M,
-          y: base.y + right[1] * SHIFT_M,
-          z: base.z + right[2] * SHIFT_M,
-        };
-        record.pose = { position: cam.position, quaternion: cam.quaternion, yaw, pitch, fov: cam.fov, right, shiftM: SHIFT_M, fixedTimeMs: review.fixedTimeMs, seed: review.seed };
+        record.pose = { position: cam.position, quaternion: cam.quaternion, yaw, pitch, fov: cam.fov, right, shiftM: SHIFT_M, shifts: SHIFTS, fixedTimeMs: review.fixedTimeMs, seed: review.seed };
 
-        const frameA = await shoot(base, `${stationId}#A`);
-        const frameA2 = await shoot(base, `${stationId}#A2`);
-        const frameB = await shoot(shifted, `${stationId}#B`);
-
-        const [ma, ma2, mb] = await Promise.all([
-          toMaxChannel(frameA), toMaxChannel(frameA2), toMaxChannel(frameB),
-        ]);
-        if (ma.width !== mb.width || ma.height !== mb.height) throw new Error('frame size drifted mid-station');
-        const result = analyse(ma.max, ma2.max, mb.max, ma.width, ma.height);
         const stationDir = resolve(OUT_DIR, stationId);
         mkdirSync(stationDir, { recursive: true });
+        const frameA = await shoot(base, `${stationId}#A`);
+        const frameA2 = await shoot(base, `${stationId}#A2`);
+        const ma = await toMaxChannel(frameA);
+        const ma2 = await toMaxChannel(frameA2);
         if (KEEP_FRAMES) {
           writeFileSync(resolve(stationDir, 'a.png'), frameA);
           writeFileSync(resolve(stationDir, 'a2-control.png'), frameA2);
-          writeFileSync(resolve(stationDir, 'b-shifted.png'), frameB);
         }
+
+        // One B frame per requested magnitude; the headline numbers below stay
+        // the primary shift so a sweep run is a superset of a normal run.
+        const sweep = [];
+        let frameB = null;
+        let mb = null;
+        for (const shiftM of SHIFTS) {
+          const shifted = {
+            ...base,
+            x: base.x + right[0] * shiftM,
+            y: base.y + right[1] * shiftM,
+            z: base.z + right[2] * shiftM,
+          };
+          const frame = await shoot(shifted, `${stationId}#B@${shiftM}`);
+          const m = await toMaxChannel(frame);
+          if (ma.width !== m.width || ma.height !== m.height) throw new Error('frame size drifted mid-station');
+          const r = analyse(ma.max, ma2.max, m.max, ma.width, ma.height);
+          sweep.push({
+            shiftM,
+            projectedPxAt5m: Number(((shiftM / 5) * (ma.width / 2) / Math.tan((cam.fov * Math.PI / 180) / 2)).toFixed(4)),
+            flickerPct: Number(r.flickerPct.toFixed(4)),
+            flickerPixels: r.flickerCount,
+          });
+          if (KEEP_FRAMES) writeFileSync(resolve(stationDir, SHIFTS.length > 1 ? `b-shift-${shiftM}.png` : 'b-shifted.png'), frame);
+          if (shiftM === SHIFT_M || frameB === null) { frameB = frame; mb = m; }
+        }
+        if (!KEEP_FRAMES || SHIFTS.length > 1) writeFileSync(resolve(stationDir, 'b-shifted.png'), frameB);
+        const result = analyse(ma.max, ma2.max, mb.max, ma.width, ma.height);
+        record.shiftSweep = sweep;
         await writeMask(result.flicker, ma.width, ma.height, resolve(stationDir, 'flicker-mask.png'));
         await writeHeatmap(result.cells, resolve(stationDir, 'flicker-heatmap.png'));
 
@@ -420,6 +455,8 @@ try {
       adapter: adapterInfo,
       viewport: VIEWPORT,
       shiftM: SHIFT_M,
+      shifts: SHIFTS,
+      renderProfile: RENDER_PROFILE,
       maxChannelThreshold: THRESHOLD,
       holdMs: HOLD_MS,
       settleMs: SETTLE_MS,
