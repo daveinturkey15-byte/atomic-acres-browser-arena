@@ -32,7 +32,7 @@
 //        [--samples 3]
 import { chromium } from '@playwright/test';
 import { execFile, spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS } from './viewpoint-catalog.mjs';
@@ -113,6 +113,20 @@ if (serveDist) {
   if (!up) {
     killServeChild();
     console.error('[viewpoint-capture] served dist never came up');
+    process.exit(2);
+  }
+  // HF-535 (2026-09-06): `--strictPort` makes the spawned preview die silently
+  // on EADDRINUSE (stdio is ignored), and the readiness probe above accepts
+  // ANY server on :41931. A stale `vite preview` for another worktree squatted
+  // the port and fourteen consecutive captures measured a Pass-93 bundle while
+  // reporting the b5b06e0f sha. Refuse to measure a server that does not serve
+  // THIS dist byte-for-byte at index.html, and say so when the child is dead.
+  const diskIndex = readFileSync(resolve(serveDist, 'index.html'), 'utf8');
+  const servedIndex = await (await fetch(`http://127.0.0.1:${PORT}/index.html`)).text();
+  if (servedIndex !== diskIndex || server.exitCode !== null) {
+    killServeChild();
+    const why = server.exitCode !== null ? `spawned preview exited ${server.exitCode} (port squatter?)` : 'served index.html differs from the dist on disk';
+    console.error(`[viewpoint-capture] REFUSED :${PORT}: ${why}; nothing captured. Find the squatter with Get-NetTCPConnection -LocalPort ${PORT}.`);
     process.exit(2);
   }
   BASE = `http://127.0.0.1:${PORT}`;
