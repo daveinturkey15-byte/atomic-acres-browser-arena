@@ -348,6 +348,15 @@ describe('Nuke Town Rebuild vegetation', () => {
     }
     expect(textures.size, 'the leaf layer may cost exactly one sampler').toBe(1);
     expect([...textures][0] as THREE.Texture).toBe(nuketown2LeafAtlas());
+    // THE CUT-OUT ITSELF. Read out of the installed r185 source rather than
+    // assumed: NodeMaterial.setupDiffuseColor takes `vec4(this.colorNode)`,
+    // and NodeBuilder.format (NodeBuilder.js:3407-3409) pads a vec3 to
+    // `vec4( <vec3>, 1.0 )` - so alpha is 1 until an opacityNode multiplies
+    // it, and `materialOpacity` is NOT applied when opacityNode is set. Drop
+    // the opacityNode and every leaf card becomes a solid opaque square while
+    // still passing every other assertion in this file. So pin both halves.
+    expect(material.alphaTest).toBe(LEAF_ALPHA_TEST);
+    expect(material.opacityNode, 'without an opacityNode the cut-out is a solid square').toBeTruthy();
     // ...and the atlas is a module singleton, so a second hedge build cannot
     // quietly spend a second sampler.
     expect(nuketown2LeafAtlas()).toBe(nuketown2LeafAtlas());
