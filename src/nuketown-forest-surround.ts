@@ -399,9 +399,9 @@ export function buildNuketownForestSurround(
   const tierB = new THREE.ConeGeometry(1.9, 4.4, 12);
   const tierLeader = new THREE.ConeGeometry(1.05, 3.4, 12);
   coniferParts.push({ geometry: trunkGeometry, matrix: new THREE.Matrix4().makeTranslation(0, 1.1, 0) });
-  coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0), shade: { underside: 0.62, top: 1 } });
-  coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0), shade: { underside: 0.62, top: 1 } });
-  coniferParts.push({ geometry: tierLeader, matrix: new THREE.Matrix4().makeTranslation(0, 8.6, 0), shade: { underside: 0.62, top: 1 } });
+  coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0), shade: { underside: 0.80, top: 1 } });
+  coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0), shade: { underside: 0.80, top: 1 } });
+  coniferParts.push({ geometry: tierLeader, matrix: new THREE.Matrix4().makeTranslation(0, 8.6, 0), shade: { underside: 0.80, top: 1 } });
   const coniferGeometry = mergeParts(coniferParts, 'forest-conifer');
   jitterRim(coniferGeometry, (envelope.seed ^ 0x0000_7e11) >>> 0, 0.5);
   for (const part of [trunkGeometry, tierA, tierB, tierLeader]) part.dispose();
