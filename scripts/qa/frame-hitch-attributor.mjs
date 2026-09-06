@@ -47,6 +47,11 @@
 //     --port 4254 --arena nuketown2 --seconds 90 \
 //     --out-dir docs/evidence/pass95/frame-hitches
 //
+// HOST MODE (private lobby with N hosted bots, needs local PeerJS on --peer-port):
+//   node scripts/qa/frame-hitch-attributor.mjs --dist dist --label host4 \
+//     --port 4292 --arena skyline-terminal --seconds 120 --mode host --host-bots 4 \
+//     --out-dir docs/evidence/pass95/day-freeze
+//
 // CONTRACT NOTES
 //   - Headless installed Chrome (channel: 'chrome') under PASS73_NATIVE_WEBGPU=1,
 //     stock flags per tests/e2e/pass93-stock-flags-boot.spec.ts (mute-audio,
@@ -63,6 +68,7 @@ import { chromium } from '@playwright/test';
 import { createServer } from 'node:http';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -86,6 +92,11 @@ const NO_TRACE = flag('--no-trace');
 const BOOT_TIMEOUT_MS = 240_000;
 // Hard kill: no browser session in this repository may run past four minutes.
 const HARD_KILL_MS = Number(arg('--hard-kill-ms', '235000'));
+const MODE = arg('--mode', 'solo');
+const HOST_BOTS = Number(arg('--host-bots', '2'));
+const PEER_PORT = Number(arg('--peer-port', String(PORT + 100)));
+if (MODE !== 'solo' && MODE !== 'host') throw new Error(`--mode must be solo or host (got ${MODE})`);
+if (MODE === 'host' && ![0, 2, 4].includes(HOST_BOTS)) throw new Error(`--host-bots must be 0, 2 or 4 (got ${HOST_BOTS})`);
 
 mkdirSync(OUT_DIR, { recursive: true });
 // The run report claims PASS73_NATIVE_WEBGPU=1; enforce it so a bundled-Chromium
@@ -120,6 +131,22 @@ if (!URL_BASE) {
   await new Promise((ready) => server.listen(PORT, '127.0.0.1', ready));
   base = `http://127.0.0.1:${PORT}/`;
 }
+// Host mode drives the real private-lobby path, so it needs the same local
+// PeerJS signalling the e2e MP specs use (network.host() has no offline path).
+let peerProcess = null;
+if (MODE === 'host') {
+  peerProcess = spawn(process.execPath, [resolve('node_modules/peer/dist/bin/peerjs.js'),
+    '--host', '127.0.0.1', '--port', String(PEER_PORT), '--path', '/peerjs', '--no-allow_discovery'],
+  { stdio: 'ignore', windowsHide: true });
+  let peerReady = false;
+  for (let attempt = 0; attempt < 100 && !peerReady; attempt += 1) {
+    if (peerProcess.exitCode !== null) throw new Error(`Local PeerJS server exited with ${peerProcess.exitCode}`);
+    try { await fetch(`http://127.0.0.1:${PEER_PORT}/peerjs`); peerReady = true; }
+    catch { await new Promise((wait) => setTimeout(wait, 100)); }
+  }
+  if (!peerReady) throw new Error('Local PeerJS server did not become ready');
+  console.error(`[hitch] ${LABEL}: peer signalling ready on 127.0.0.1:${PEER_PORT}`);
+}
 
 const percentile = (sorted, p) => (sorted.length === 0 ? null : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]);
 const round = (value, digits = 2) => Number(Number(value).toFixed(digits));
@@ -135,6 +162,9 @@ const report = {
   sampleSeconds: SECONDS,
   hitchThresholdMs: HITCH_MS,
 };
+report.mode = MODE;
+report.hostBots = MODE === 'host' ? HOST_BOTS : null;
+report.peerPort = MODE === 'host' ? PEER_PORT : null;
 
 // --------------------------------------------------------------------------
 // The in-page instrument. Everything here runs before page script.
@@ -396,6 +426,11 @@ try {
   const url = new URL(base);
   url.searchParams.set('release', 'latest');
   url.searchParams.set('renderer', 'webgpu');
+  if (MODE === 'host') {
+    url.searchParams.set('multiplayerQa', '1');
+    url.searchParams.set('peerQaPort', String(PEER_PORT));
+    url.searchParams.set('seed', `day-freeze-${LABEL}`);
+  }
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(globalThis.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: BOOT_TIMEOUT_MS });
   await page.waitForFunction(() => { const s = document.querySelector('#solo'); return s !== null && !s.disabled; }, undefined, { timeout: BOOT_TIMEOUT_MS });
@@ -420,11 +455,39 @@ try {
 
   const deployStart = Date.now();
   await page.evaluate(async (arena) => { await globalThis.__ATOMIC_ACRES_DEBUG__.selectArena(arena); }, ARENA);
-  await page.evaluate(() => { globalThis.__ATOMIC_ACRES_DEBUG__.startSolo(); });
-  await page.waitForFunction(() => {
-    const s = globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot();
-    return Boolean(s && s.matchPhase === 'active' && s.gameStarted === true);
-  }, undefined, { timeout: BOOT_TIMEOUT_MS });
+  if (MODE === 'host') {
+    // Real host lobby path: private lobby, #lobby-bots select, start match.
+    // Host + hosted bots satisfies canHostCommitStart with no guest (bots count
+    // as the second participant), so no guest page is needed.
+    await page.waitForFunction(() => {
+      const ready = globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot().weaponReady === true;
+      const host = document.querySelector('#host');
+      return ready && host !== null && !host.disabled;
+    }, undefined, { timeout: BOOT_TIMEOUT_MS });
+    await page.fill('#player-name', 'DAY FREEZE HOST');
+    await page.click('#host');
+    await page.waitForFunction(() => Boolean(document.querySelector('#room-code')?.textContent?.trim()), undefined, { timeout: BOOT_TIMEOUT_MS });
+    await page.selectOption('#lobby-bots', String(HOST_BOTS));
+    await page.waitForFunction((expected) => (
+      globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot().privateMatch?.hostedBotCount === expected
+    ), HOST_BOTS, { timeout: BOOT_TIMEOUT_MS });
+    await page.click('#lobby-ready');
+    await page.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: BOOT_TIMEOUT_MS });
+    await page.click('#lobby-start');
+    await page.waitForFunction(() => {
+      const s = globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return Boolean(s && s.matchPhase === 'active' && s.gameStarted === true);
+    }, undefined, { timeout: BOOT_TIMEOUT_MS });
+    const hostedCount = await page.evaluate(() => globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot().bots.length);
+    if (hostedCount !== HOST_BOTS) throw new Error(`host lobby fielded ${hostedCount} bots, expected ${HOST_BOTS}`);
+    console.error(`[hitch] ${LABEL}: hosted match active with ${hostedCount} bots`);
+  } else {
+    await page.evaluate(() => { globalThis.__ATOMIC_ACRES_DEBUG__.startSolo(); });
+    await page.waitForFunction(() => {
+      const s = globalThis.__ATOMIC_ACRES_DEBUG__?.snapshot();
+      return Boolean(s && s.matchPhase === 'active' && s.gameStarted === true);
+    }, undefined, { timeout: BOOT_TIMEOUT_MS });
+  }
   report.deployMs = Date.now() - deployStart;
   console.error(`[hitch] ${LABEL}: match active after ${report.deployMs} ms; sampling ${SECONDS}s`);
 
@@ -504,6 +567,7 @@ try {
   clearTimeout(hardKill);
   await browser.close().catch(() => {});
   if (server) server.close();
+  if (peerProcess?.exitCode === null) peerProcess.kill();
 }
 
 if (!sampled) throw new Error('sampler produced no data');
