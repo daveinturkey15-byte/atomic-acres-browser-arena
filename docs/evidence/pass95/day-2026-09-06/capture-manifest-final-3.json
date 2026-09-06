@@ -1,0 +1,442 @@
+{
+  "contract": "arena-viewpoint-regression-capture-v1",
+  "verdict": "PASS",
+  "label": "final-3",
+  "sha": "bc649bb5",
+  "url": "http://127.0.0.1:41931",
+  "renderer": "webgpu",
+  "backend": "webgpu",
+  "adapter": {
+    "gpu": true,
+    "adapter": true,
+    "device": true,
+    "vendor": "nvidia",
+    "architecture": "blackwell"
+  },
+  "bundleAtStart": "/legacy-main-B_HlzZdZ.js",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "viewpoint",
+  "settleMs": 5000,
+  "samples": 2,
+  "capturedAt": "2026-09-06T09:57:37.432Z",
+  "environmentInvalid": null,
+  "arenas": [
+    {
+      "arena": "nuketown2",
+      "ok": true,
+      "shots": [
+        {
+          "cameraId": "nuketown2-overhead",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-overhead.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-overhead.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-overhead.s1.png"
+          ],
+          "committedFrame": 515,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 546
+        },
+        {
+          "cameraId": "nuketown2-north-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-yard.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-yard.s1.png"
+          ],
+          "committedFrame": 664,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 688
+        },
+        {
+          "cameraId": "nuketown2-south-yard",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-yard.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-yard.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-yard.s1.png"
+          ],
+          "committedFrame": 813,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 840
+        },
+        {
+          "cameraId": "nuketown2-street-centre",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-street-centre.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-street-centre.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-street-centre.s1.png"
+          ],
+          "committedFrame": 975,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1000
+        },
+        {
+          "cameraId": "nuketown2-north-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-upper-window.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-upper-window.s1.png"
+          ],
+          "committedFrame": 1125,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1149
+        },
+        {
+          "cameraId": "nuketown2-south-upper-window",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-upper-window.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-upper-window.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-upper-window.s1.png"
+          ],
+          "committedFrame": 1281,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1314
+        },
+        {
+          "cameraId": "nuketown2-into-sun-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-into-sun-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-into-sun-street.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-into-sun-street.s1.png"
+          ],
+          "committedFrame": 1433,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1459
+        },
+        {
+          "cameraId": "nuketown2-north-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-interior.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-interior.s1.png"
+          ],
+          "committedFrame": 1584,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1606
+        },
+        {
+          "cameraId": "nuketown2-south-interior",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-interior.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-interior.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-south-interior.s1.png"
+          ],
+          "committedFrame": 1724,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1750
+        },
+        {
+          "cameraId": "nuketown2-garage",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garage.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garage.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garage.s1.png"
+          ],
+          "committedFrame": 1895,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 1921
+        },
+        {
+          "cameraId": "nuketown2-north-balcony",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-balcony.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-balcony.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-north-balcony.s1.png"
+          ],
+          "committedFrame": 2070,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2098
+        },
+        {
+          "cameraId": "nuketown2-front-porch",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-front-porch.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-front-porch.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-front-porch.s1.png"
+          ],
+          "committedFrame": 2234,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2265
+        },
+        {
+          "cameraId": "nuketown2-vehicle-near",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-near.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-near.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-near.s1.png"
+          ],
+          "committedFrame": 2405,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2431
+        },
+        {
+          "cameraId": "nuketown2-vehicle-mid",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-mid.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-mid.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-mid.s1.png"
+          ],
+          "committedFrame": 2547,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2576
+        },
+        {
+          "cameraId": "nuketown2-vehicle-far",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-far.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-far.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-vehicle-far.s1.png"
+          ],
+          "committedFrame": 2731,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2760
+        },
+        {
+          "cameraId": "nuketown2-coach-elevation",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-coach-elevation.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-coach-elevation.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-coach-elevation.s1.png"
+          ],
+          "committedFrame": 2903,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 2930
+        },
+        {
+          "cameraId": "nuketown2-truck-cab-near",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-truck-cab-near.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-truck-cab-near.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-truck-cab-near.s1.png"
+          ],
+          "committedFrame": 3077,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3105
+        },
+        {
+          "cameraId": "nuketown2-appliance-bank-north-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-north-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-north-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-north-close.s1.png"
+          ],
+          "committedFrame": 3229,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3256
+        },
+        {
+          "cameraId": "nuketown2-appliance-bank-south-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-south-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-south-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-appliance-bank-south-close.s1.png"
+          ],
+          "committedFrame": 3378,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3407
+        },
+        {
+          "cameraId": "nuketown2-glasshouse-north-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-glasshouse-north-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-glasshouse-north-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-glasshouse-north-close.s1.png"
+          ],
+          "committedFrame": 3561,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3599
+        },
+        {
+          "cameraId": "nuketown2-garden-pod-north-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garden-pod-north-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garden-pod-north-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-garden-pod-north-close.s1.png"
+          ],
+          "committedFrame": 3766,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 3804
+        },
+        {
+          "cameraId": "nuketown2-sand-pit-north-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-sand-pit-north-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-sand-pit-north-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-sand-pit-north-close.s1.png"
+          ],
+          "committedFrame": 3975,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4009
+        },
+        {
+          "cameraId": "nuketown2-driveway-apron-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-driveway-apron-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-driveway-apron-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-driveway-apron-close.s1.png"
+          ],
+          "committedFrame": 4174,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4209
+        },
+        {
+          "cameraId": "nuketown2-border-path-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-border-path-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-border-path-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-border-path-close.s1.png"
+          ],
+          "committedFrame": 4346,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4386
+        },
+        {
+          "cameraId": "nuketown2-perimeter-wall-long-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-long-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-long-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-long-close.s1.png"
+          ],
+          "committedFrame": 4559,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4596
+        },
+        {
+          "cameraId": "nuketown2-perimeter-wall-end-close",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-end-close.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-end-close.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-perimeter-wall-end-close.s1.png"
+          ],
+          "committedFrame": 4768,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4785
+        },
+        {
+          "cameraId": "nuketown2-nuke-street",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-street.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-street.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-street.s1.png"
+          ],
+          "committedFrame": 4935,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 4967
+        },
+        {
+          "cameraId": "nuketown2-nuke-north-balcony",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-north-balcony.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-north-balcony.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-north-balcony.s1.png"
+          ],
+          "committedFrame": 5114,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 5141
+        },
+        {
+          "cameraId": "nuketown2-nuke-south-balcony",
+          "ok": true,
+          "path": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-south-balcony.png",
+          "samplePaths": [
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-south-balcony.png",
+            "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3\\nuketown2\\nuketown2-nuke-south-balcony.s1.png"
+          ],
+          "committedFrame": 5265,
+          "fixedTimeMs": 63000,
+          "seed": 6401,
+          "exposure": 1.08,
+          "frame": 5295
+        }
+      ],
+      "ms": 99932,
+      "errors": []
+    }
+  ]
+}
