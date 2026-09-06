@@ -47,6 +47,15 @@ const CONTACT_BULGE = 0.07;
 const RADIAL_SEGMENTS = 20;
 
 /**
+ * HF-536 detail pass (Muse): 10 segments for the parts nobody inspects - the
+ * inboard dark disc (arch shadow, matte) and the 1 mm whitewall rib (edge-on).
+ * The tyre silhouette and the outboard chrome face stay at 20.
+ */
+const TRIM_SEGMENTS = 10;
+
+/** The inboard disc faces away from every camera under the arch: 8 is plenty. */
+const DARK_SEGMENTS = 8;
+/**
  * Turn a lathe built about +Y into a wheel whose axle runs along +X, with the
  * outboard face at +x. `rotateZ(-90 deg)` maps `(x, y, z) -> (y, -x, z)`, so the
  * profile's axis coordinate becomes the world x it was authored as.
@@ -127,7 +136,7 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
     [rim * 0.55, -face - 0.012],
     [0, -face - 0.016],
   ];
-  const dark = toAxleFrame(latheGeometry(darkProfile, RADIAL_SEGMENTS, 40));
+  const dark = toAxleFrame(latheGeometry(darkProfile, DARK_SEGMENTS, 40));
   dark.name = 'vehicle-forge-wheel-dark';
 
   const whitewall = style === 'whitewall'
@@ -136,7 +145,7 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
       [radius * 0.91, face + 0.012],
       [radius * 0.91, face + 0.020],
       [rim * 1.02, face + 0.020],
-    ], RADIAL_SEGMENTS, 40))
+    ], TRIM_SEGMENTS, 40))
     : null;
   if (whitewall) whitewall.name = 'vehicle-forge-whitewall';
 
@@ -177,4 +186,22 @@ export function lampParts(radius: number, depth: number): LampParts {
   lens.name = 'vehicle-forge-lamp-lens';
 
   return { bezel, lens };
+}
+
+/**
+ * HF-536 detail pass (Muse): a 12-gon hubcap dome for a dished steel face,
+ * in the axle frame (+x outboard) like every other wheel part, so the caller's
+ * existing place/mirror logic puts it on the outboard face on both sides.
+ * Full-cover and whitewall faces already carry a domed centre in their lathe
+ * profile, so they do not take one; a dome on a dome is triangle moss.
+ */
+export function hubcapDome(rimRadius: number, faceX: number): THREE.BufferGeometry {
+  const dome = toAxleFrame(latheGeometry([
+    [0.001, faceX],
+    [rimRadius * 0.45, faceX + 0.003],
+    [rimRadius * 0.3, faceX + 0.02],
+    [0.001, faceX + 0.028],
+  ], 12, 40));
+  dome.name = 'vehicle-forge-hubcap';
+  return dome;
 }

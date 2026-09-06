@@ -136,6 +136,25 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   // seen in candidate 4b.
   material.colorNode = mix(TSL.uniform(new THREE.Vector3(base.r, base.g, base.b)), film, (dust as any).mul(float(0.30)));
   material.roughnessNode = float(baseRoughness).add((dust as any).mul(float(0.20)));
+  // HF-536 detail pass (Muse): sill road-film over the lowest 0.25 m, broken
+  // up by world-space noise so no two panels soil identically, no sampler.
+  // World y is ground truth - every forged placement stands at y = 0 - so one
+  // mask serves every spec and livery with no new branch: the graph shape is
+  // unchanged across liveries and the pipeline keys stay shared.
+  // (TSL nodes are untyped at this boundary, so the slot record names the only
+  // two node combinators this factory uses instead of scattering casts.)
+  type TslNode = { mul(v: unknown): TslNode; add(v: unknown): TslNode };
+  const paintNodes = material as unknown as { colorNode: TslNode; roughnessNode: TslNode; clearcoatRoughnessNode: TslNode };
+  const sillMask = float(1).sub(smoothstep(float(0.02), float(0.27), positionWorld.y));
+  const sillNoise = fbm2(vec2(positionWorld.x.mul(3.1), positionWorld.z.mul(3.1)));
+  const sill = saturate(sillMask.mul(sillNoise.mul(float(0.45)).add(float(0.55))));
+  const sillFilm = vec3(0.3, 0.285, 0.26);
+  paintNodes.colorNode = mix(paintNodes.colorNode, sillFilm, sill.mul(float(0.45)));
+  paintNodes.roughnessNode = paintNodes.roughnessNode.add(sill.mul(float(0.25)));
+  // HF-536 detail pass (Muse): clear-coat micro-variation 0.25-0.45, so the
+  // paint catches the low sun in patches instead of one flat sheet.
+  const coatNoise = valueNoise2(vec2(positionWorld.x.mul(2.7).add(positionWorld.y.mul(1.7)), positionWorld.z.mul(2.7)));
+  paintNodes.clearcoatRoughnessNode = float(0.25).add(coatNoise.mul(float(0.20)));
   return material;
 }
 

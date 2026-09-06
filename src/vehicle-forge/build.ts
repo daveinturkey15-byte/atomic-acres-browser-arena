@@ -22,12 +22,14 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   type VehicleSpec,
   chamferedBar,
+  crownSurfaceY,
+  flankHalfWidth,
   loftBody,
   roofRail,
   surfaceBandAtHeights,
   stripAtHeight,
 } from './geometry';
-import { type WheelStyle, lampParts, wheelParts } from './wheels';
+import { type WheelStyle, hubcapDome, lampParts, wheelParts } from './wheels';
 import {
   createForgeChromeMaterial,
   createForgeGlassMaterial,
@@ -276,6 +278,60 @@ export interface PanelSeam {
   readonly width?: number;
   readonly depth?: number;
 }
+
+/** One door-handle row: small chrome pulls at the given height and door z list. */
+export interface DoorHandleRow {
+  readonly y: number;
+  readonly z: readonly number[];
+}
+
+/** Window-run pillars dividing a continuous side-glass band (groove bucket). */
+export interface PillarDressing {
+  readonly z: readonly number[];
+  readonly y0: number;
+  readonly y1: number;
+}
+
+/** Roof vents riding the crowned roof at plan offset ±x (chrome bucket). */
+export interface VentDressing {
+  readonly x: number;
+  readonly z: readonly number[];
+}
+
+/** A single centred exhaust stack behind the cab (chrome bucket). */
+export interface StackDressing {
+  readonly z: number;
+  readonly y0: number;
+  readonly y1: number;
+}
+
+/** Roof-gutter bars along both roof side edges (chrome bucket). */
+export interface GutterDressing {
+  readonly x: number;
+  readonly y: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/** A horizontal boot-lid shut line across the deck (groove bucket). */
+export interface BootSeam {
+  readonly y: number;
+  readonly z: number;
+  readonly halfWidth: number;
+}
+
+/** Front indicator pair (headLamp bucket) plus tail-cluster pair (tailLamp). */
+export interface IndicatorDressing {
+  readonly y: number;
+  readonly x: number;
+}
+
+/** Number plates: 2-triangle quads, nose and tail, centred (accent bucket). */
+export interface PlateDressing {
+  readonly y: number;
+  readonly width?: number;
+  readonly height?: number;
+}
 export interface VehicleDressing {
   readonly wheelStyle: WheelStyle;
   /**
@@ -295,6 +351,26 @@ export interface VehicleDressing {
   readonly panelSeams?: readonly PanelSeam[];
   /** Longitudinal roof rails riding the crowned roof surface (see roofRail). */
   readonly roofRails?: RoofRails;
+  /** Chrome door pulls on both flanks (HF-536 detail pass, Muse). */
+  readonly doorHandles?: DoorHandleRow;
+  /** 12-gon hubcap domes on dished steel faces; covers already have one. */
+  readonly hubcaps?: boolean;
+  /** Saloon hub-nut hint: small hex centres on full-cover faces. */
+  readonly wheelNuts?: boolean;
+  /** Nose and tail number-plate quads (accent bucket). */
+  readonly plates?: PlateDressing;
+  /** Front indicators (headLamp) and tail-cluster extras (tailLamp). */
+  readonly indicators?: IndicatorDressing;
+  /** Window-run pillars across the side-glass band (groove bucket). */
+  readonly pillars?: PillarDressing;
+  /** Roof vents riding the crown (chrome bucket). */
+  readonly vents?: VentDressing;
+  /** Centred exhaust stack (chrome bucket). */
+  readonly stack?: StackDressing;
+  /** Roof-gutter bars on both roof edges (chrome bucket). */
+  readonly gutters?: GutterDressing;
+  /** Horizontal boot-lid shut line (groove bucket). */
+  readonly bootSeam?: BootSeam;
   /**
    * HF-536 (R14). The dark mass BETWEEN the wheels. Without it a lofted body
    * on four wheels reads as a shell hovering over the road: the sun reaches
@@ -398,12 +474,22 @@ function contactPool(semiX: number, semiZ: number, centreZ: number): THREE.Buffe
   return translated(disc, 0, CONTACT_SHADOW_Y, centreZ);
 }
 
+export interface ForgedPartBound {
+  readonly bucket: string;
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+}
+
 export interface ForgedVehicle {
   readonly group: THREE.Group;
   /** One per merged material bucket - this vehicle's draw-call cost. */
   readonly drawCalls: number;
   readonly triangles: number;
   readonly stations: number;
+  /** Pre-merge part counts per bucket - the detail-pass audit trail. */
+  readonly partCounts: Readonly<Record<string, number>>;
+  /** Pre-merge AABB of every part, vehicle frame - the envelope audit trail. */
+  readonly partBounds: readonly ForgedPartBound[];
 }
 
 type Bucket = 'paint' | 'accent' | 'glass' | 'lining' | 'groove' | 'chrome' | 'tyre' | 'headLamp' | 'tailLamp';
@@ -425,6 +511,34 @@ function translated(geometry: THREE.BufferGeometry, x: number, y: number, z: num
 function mirroredToLeft(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   geometry.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
   return geometry;
+}
+
+/**
+ * HF-536 detail pass (Muse): the pre-merge audit trail. Counts and AABBs are
+ * read off the placed, vehicle-frame geometries before they merge, so the
+ * gates can assert per-bucket part counts and per-part envelope containment
+ * without unmerging anything. Build-time only; no per-frame cost.
+ */
+function summarizeParts(parts: Readonly<Record<string, THREE.BufferGeometry[]>>): {
+  partCounts: Record<string, number>;
+  partBounds: ForgedPartBound[];
+} {
+  const partCounts: Record<string, number> = {};
+  const partBounds: ForgedPartBound[] = [];
+  for (const [bucket, geometries] of Object.entries(parts)) {
+    partCounts[bucket] = geometries.length;
+    for (const geometry of geometries) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (!box) continue;
+      partBounds.push({
+        bucket,
+        min: [box.min.x, box.min.y, box.min.z],
+        max: [box.max.x, box.max.y, box.max.z],
+      });
+    }
+  }
+  return { partCounts, partBounds };
 }
 
 /**
@@ -499,7 +613,7 @@ export function buildForgedWheelSet(
     drawCalls += 1;
     triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
   }
-  return { group, drawCalls, triangles, stations: 0 };
+  return { group, drawCalls, triangles, stations: 0, ...summarizeParts(parts) };
 }
 
 export function buildForgedVehicle(
@@ -639,6 +753,109 @@ export function buildForgedVehicle(
     }
   }
 
+  if (dressing.doorHandles) {
+    const { y, z } = dressing.doorHandles;
+    const flankX = flankHalfWidth(spec, y);
+    for (const handleZ of z) {
+      for (const side of [1, -1] as const) {
+        // The pull lies ALONG the door (z), standing 20 mm proud of the flank:
+        // extruded along x it would be a 14 cm spike out of the panel.
+        const pull = chamferedBar(0.07, 0.012, 0.012, 0.004);
+        pull.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+        parts.chrome.push(translated(pull, side * (flankX + 0.008), y, handleZ));
+      }
+    }
+  }
+  // Full-cover and whitewall faces already carry a domed centre in their lathe
+  // profile; a dome on a dome is triangle moss, so hubcaps dress steel only.
+  if (dressing.hubcaps && dressing.wheelStyle === 'steel') {
+    const rim = spec.wheelRadius * 0.62;
+    const faceX = spec.tyreHalfWidth * 0.72 - 0.018;
+    for (const z of axles) {
+      for (const side of [1, -1] as const) {
+        const dome = hubcapDome(rim, faceX);
+        parts.chrome.push(translated(
+          side === 1 ? dome : mirroredToLeft(dome),
+          side * spec.trackHalfWidth,
+          spec.wheelRadius,
+          z,
+        ));
+      }
+    }
+  }
+  // The hub-nut hint for covered faces: a small hex centre on the dome they
+  // already carry. Steel faces read their hub from the cap and dome instead.
+  if (dressing.wheelNuts && dressing.wheelStyle !== 'steel') {
+    const faceX = spec.tyreHalfWidth * 0.72 + 0.012;
+    for (const z of axles) {
+      for (const side of [1, -1] as const) {
+        const nut = nonIndexed(new THREE.CylinderGeometry(0.02, 0.02, 0.014, 6));
+        nut.applyMatrix4(new THREE.Matrix4().makeRotationZ(-Math.PI / 2));
+        parts.chrome.push(translated(
+          side === 1 ? nut : mirroredToLeft(nut),
+          side * (spec.trackHalfWidth + faceX + 0.004),
+          spec.wheelRadius,
+          z,
+        ));
+      }
+    }
+  }
+  if (dressing.indicators) {
+    const { y, x } = dressing.indicators;
+    for (const side of [1, -1] as const) {
+      parts.headLamp.push(translated(chamferedBar(0.035, 0.03, 0.02, 0.006), side * x, y, 0.005));
+      parts.tailLamp.push(translated(chamferedBar(0.035, 0.03, 0.02, 0.006), side * x, y, spec.length - 0.005));
+    }
+  }
+  if (dressing.plates) {
+    const plateW = dressing.plates.width ?? 0.32;
+    const plateH = dressing.plates.height ?? 0.09;
+    const rear = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
+    parts.accent.push(translated(rear, 0, dressing.plates.y, spec.length + 0.004));
+    const front = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
+    front.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
+    parts.accent.push(translated(front, 0, dressing.plates.y, -0.004));
+  }
+  if (dressing.pillars) {
+    const { z, y0, y1 } = dressing.pillars;
+    const midY = (y0 + y1) / 2;
+    const glassX = flankHalfWidth(spec, midY) - 0.005;
+    for (const pillarZ of z) {
+      for (const side of [1, -1] as const) {
+        parts.groove.push(translated(chamferedBar(0.012, (y1 - y0) / 2, 0.014, 0.004), side * glassX, midY, pillarZ));
+      }
+    }
+  }
+  if (dressing.vents) {
+    for (const z of dressing.vents.z) {
+      for (const side of [1, -1] as const) {
+        const ventY = crownSurfaceY(spec, z, dressing.vents.x) + 0.005;
+        parts.chrome.push(translated(chamferedBar(0.09, 0.025, 0.06, 0.008), side * dressing.vents.x, ventY, z));
+      }
+    }
+  }
+  if (dressing.stack) {
+    const { z, y0, y1 } = dressing.stack;
+    parts.chrome.push(translated(chamferedBar(0.035, (y1 - y0) / 2, 0.035, 0.008), 0, (y0 + y1) / 2, z));
+    parts.chrome.push(translated(chamferedBar(0.045, 0.03, 0.045, 0.008), 0, y1 + 0.02, z));
+  }
+  if (dressing.gutters) {
+    const { x, y, z0, z1 } = dressing.gutters;
+    const midZ = (z0 + z1) / 2;
+    const half = (z1 - z0) / 4;
+    for (const side of [1, -1] as const) {
+      for (const gutterZ of [midZ - half, midZ + half]) {
+        const bar = chamferedBar(half - 0.01, 0.012, 0.012, 0.004);
+        bar.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+        parts.chrome.push(translated(bar, side * x, y, gutterZ));
+      }
+    }
+  }
+  if (dressing.bootSeam) {
+    const { y, z, halfWidth } = dressing.bootSeam;
+    parts.groove.push(translated(chamferedBar(halfWidth, 0.009, 0.009, 0.003), 0, y, z));
+  }
+
   if (dressing.surfaceBands) {
     for (const band of dressing.surfaceBands) {
       const surface = surfaceBandAtHeights(
@@ -701,5 +918,5 @@ export function buildForgedVehicle(
     triangles += (merged.getAttribute('position')?.count ?? 0) / 3;
   }
 
-  return { group, drawCalls, triangles, stations: loft.rings.length };
+  return { group, drawCalls, triangles, stations: loft.rings.length, ...summarizeParts(parts) };
 }

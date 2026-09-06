@@ -2932,6 +2932,19 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       // height, so the head stands 0.30 m proud of the flank. Chrome bucket:
       // no new material, no new draw call.
       mirrors: [{ x: 1.30, y: 2.42, z: 1.28 }],
+      // HF-536 detail pass (Muse): door pulls, window-run pillars, luggage-door seams, roof vents,
+      // number plates and indicator lenses - all existing buckets, no new draw. (Mirror placement kept from night-kit.)
+      doorHandles: { y: 1.2, z: [2.0, 6.4] },
+      pillars: { z: [3.2, 4.95, 6.7], y0: 1.78, y1: 2.6 },
+      panelSeams: [
+        { x: -1.24, y: 1.15, z: 5.6, height: 0.9 },
+        { x: 1.24, y: 1.15, z: 5.6, height: 0.9 },
+        { x: -1.24, y: 1.15, z: 7.2, height: 0.9 },
+        { x: 1.24, y: 1.15, z: 7.2, height: 0.9 },
+      ],
+      vents: { x: 0.45, z: [4.2, 5.6] },
+      plates: { y: 0.62 },
+      indicators: { y: 0.96, x: 0.94 },
       // HF-536 (R14). The coach floated: sun reached under the whole 9.1 m
       // sill and the far kerb showed through the gap. One dark block between
       // the arches (0.24 -> sill 0.4) and one contact pool inside its own

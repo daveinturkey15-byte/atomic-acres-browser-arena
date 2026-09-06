@@ -457,3 +457,142 @@ describe('vehicle-forge paint batch contract', () => {
     expect(new Set(reads).size).toBe(PASS95_LIVERIES.length);
   });
 });
+
+describe('vehicle-forge HF-536 detail pass', () => {
+  // The fenced dressings: the module's canonical dressings with the full
+  // detail set (mirrors, handles, pillars, plates, indicators, hubcaps, stack,
+  // vents, gutters, boot and luggage seams). The fences hold for THESE; the
+  // arena dressings carry extra lamps, rails and bogie axles and are measured
+  // against the same fences in REPORT.md, not here.
+  const coachDressing: VehicleDressing = {
+    wheelStyle: 'cover',
+    bumperY: 0.34,
+    surfaceBands: [{ y0: 1.78, y1: 2.46, bucket: 'accent', z0: 0.75, z1: 8.35, proud: 0.01 }],
+    stripe: { y: 1.75, bucket: 'chrome', z0: 0.55, z1: 8.55, height: 0.045, proud: 0.014 },
+    grille: { y: 1.08, width: 1.36, height: 0.34, depth: 0.1, barCount: 5 },
+    mirrors: [{ x: 1.13, y: 2.1, z: 1.2 }],
+    doorHandles: { y: 1.2, z: [2.0, 6.4] },
+    pillars: { z: [3.2, 4.95, 6.7], y0: 1.78, y1: 2.6 },
+    panelSeams: [
+      { x: -1.24, y: 1.15, z: 6.4, height: 0.9 },
+      { x: 1.24, y: 1.15, z: 6.4, height: 0.9 },
+    ],
+    plates: { y: 0.62 },
+    indicators: { y: 0.96, x: 0.94 },
+  };
+  const truckDressing: VehicleDressing = {
+    wheelStyle: 'steel',
+    bumperY: 0.42,
+    surfaceBands: [{ y0: 2.02, y1: 2.88, bucket: 'accent', z0: 0.5, z1: 4.7, proud: 0.01 }],
+    stripe: { y: 1.99, bucket: 'chrome', z0: 0.4, z1: 4.8, height: 0.05, proud: 0.014 },
+    grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
+    mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
+    panelSeams: [...[-1, 1].flatMap((x) => [5.82, 7.44, 9.06, 10.68].map((z) => ({ x: x * 1.31, y: 1.62, z, height: 2.38 })))],
+    doorHandles: { y: 1.3, z: [2.1] },
+    hubcaps: true,
+    vents: { x: 0.45, z: [3.0] },
+    stack: { z: 5.0, y0: 1.0, y1: 2.82 },
+    plates: { y: 0.62 },
+    indicators: { y: 0.95, x: 0.92 },
+  };
+  const saloonDressing: VehicleDressing = {
+    wheelStyle: 'whitewall',
+    bumperY: 0.46,
+    mirrors: [{ x: 0.8, y: 1.25, z: 1.35 }],
+    doorHandles: { y: 0.95, z: [1.9, 3.0] },
+    wheelNuts: true,
+    plates: { y: 0.55 },
+    indicators: { y: 0.84, x: 0.66 },
+    gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
+    bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
+  };
+  const FENCED: ReadonlyArray<readonly [VehicleSpec, VehicleDressing, number]> = [
+    [COACH_SPEC, coachDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.coach],
+    [TRUCK_CAB_SPEC, truckDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.truck],
+    [SEDAN_SPEC, saloonDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.saloon],
+  ];
+
+  it('keeps every fenced vehicle under its triangle fence', () => {
+    for (const [spec, dressing, budget] of FENCED) {
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `fence-${spec.id}`));
+      // The test prints the counts: this line is the headroom ledger.
+      console.log(`${spec.id}: ${Math.round(built.triangles)} / ${budget} tris in ${built.drawCalls} draws`);
+      expect(built.triangles, `${spec.id} triangles`).toBeLessThanOrEqual(budget);
+    }
+  });
+
+  it('merges detail into the existing buckets: part counts per bucket, draws flat', () => {
+    const expected: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+      'nuketown2-coach': { paint: 1, accent: 3, glass: 1, lining: 1, groove: 9, chrome: 21, tyre: 8, headLamp: 2, tailLamp: 2 },
+      'nuketown2-truck-cab': { paint: 1, accent: 3, glass: 1, lining: 1, groove: 9, chrome: 24, tyre: 4, headLamp: 2, tailLamp: 2 },
+      'nuketown2-sedan': { paint: 1, accent: 2, glass: 1, lining: 1, groove: 2, chrome: 26, tyre: 8, headLamp: 2, tailLamp: 2 },
+    };
+    for (const [spec, dressing] of FENCED) {
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x9e1c1c, `buckets-${spec.id}`));
+      expect(built.partCounts, `${spec.id} part counts`).toEqual(expected[spec.id]);
+      expect(built.drawCalls, `${spec.id} draws`).toBeLessThanOrEqual(9);
+      expect(built.group.children.length, `${spec.id} meshes`).toBe(built.drawCalls);
+    }
+  });
+
+  it('emits no NaN in any position, normal or uv', () => {
+    for (const [spec, dressing] of FENCED) {
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0xe7dec6, `nan-${spec.id}`));
+      built.group.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) return;
+        for (const attribute of ['position', 'normal', 'uv'] as const) {
+          const array = (node.geometry.getAttribute(attribute) as THREE.BufferAttribute | undefined)?.array as Float32Array | undefined;
+          expect(array, `${spec.id} ${node.name} ${attribute}`).toBeDefined();
+          for (let index = 0; index < array!.length; index += 1) {
+            expect(Number.isFinite(array![index]), `${spec.id} ${node.name} ${attribute}[${index}]`).toBe(true);
+          }
+        }
+      });
+    }
+  });
+
+  it('keeps every part AABB inside the collider envelope (+0.05 proud trim)', () => {
+    // The truck's cargo-box ribs live over the authored box behind the cab, so
+    // its z span is the whole 11.7 m vehicle the older fence test uses - the
+    // cab loft itself never leaves z 0..5.2.
+    const spans: Readonly<Record<string, number>> = { 'nuketown2-truck-cab': 11.7 };
+    for (const [spec, dressing] of FENCED) {
+      const height = Math.max(...spec.top.map((vertex) => vertex.yTop)) + (spec.roofCrownM ?? 0);
+      const length = spans[spec.id] ?? spec.length;
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0xf2ede2, `envelope-${spec.id}`));
+      let worst = 0;
+      for (const part of built.partBounds) {
+        const overX = Math.max(Math.abs(part.min[0]), Math.abs(part.max[0])) - spec.halfWidth;
+        const overY = Math.max(-part.min[1], part.max[1] - height);
+        const overZ = Math.max(-part.min[2], part.max[2] - length);
+        worst = Math.max(worst, overX, overY, overZ);
+        expect(overX, `${spec.id} ${part.bucket} x`).toBeLessThanOrEqual(0.05);
+        expect(overY, `${spec.id} ${part.bucket} y`).toBeLessThanOrEqual(0.05);
+        expect(overZ, `${spec.id} ${part.bucket} z`).toBeLessThanOrEqual(0.05);
+      }
+      console.log(`${spec.id}: worst part overhang ${worst.toFixed(4)} m`);
+    }
+  });
+
+  it('mirrors every bucket exactly about the centre plane', () => {
+    // Unique-vertex multisets, so triangulation diagonals (a plate's two tris
+    // share one diagonal or the other after mirroring) cannot fail it - only
+    // real mirrored-pair drift can.
+    for (const [spec, dressing] of FENCED) {
+      const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x2b3138, `mirror-${spec.id}`));
+      for (const child of built.group.children) {
+        if (!(child instanceof THREE.Mesh)) continue;
+        const array = (child.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+        const forward = new Set<string>();
+        const mirrored = new Set<string>();
+        for (let index = 0; index < array.length; index += 3) {
+          forward.add(`${Math.round(array[index]! * 1e4)},${Math.round(array[index + 1]! * 1e4)},${Math.round(array[index + 2]! * 1e4)}`);
+          mirrored.add(`${Math.round(-array[index]! * 1e4)},${Math.round(array[index + 1]! * 1e4)},${Math.round(array[index + 2]! * 1e4)}`);
+        }
+        expect(forward.size, `${spec.id} ${child.name} unique verts`).toBeGreaterThan(0);
+        expect([...forward].filter((key) => !mirrored.has(key)), `${spec.id} ${child.name} unmatched`).toEqual([]);
+        expect([...mirrored].filter((key) => !forward.has(key)), `${spec.id} ${child.name} unmatched mirror`).toEqual([]);
+      }
+    }
+  });
+});

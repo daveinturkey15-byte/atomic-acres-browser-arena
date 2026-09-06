@@ -27,7 +27,7 @@ export {
 } from './geometry';
 export type { LoftResult, QuadKind, Ring, SpanZ, TopVertex, Vec2, VehicleSpec } from './geometry';
 
-export { lampParts, wheelParts } from './wheels';
+export { hubcapDome, lampParts, wheelParts } from './wheels';
 export type { LampParts, WheelParts, WheelStyle } from './wheels';
 
 export {
@@ -44,14 +44,23 @@ export type { LampKind, PaintOptions } from './materials';
 
 export { buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet, createForgeSharedMaterials, mergeForgedPlacements } from './build';
 export type {
+  BootSeam,
+  DoorHandleRow,
+  ForgedPartBound,
   ForgedVehicle,
   ForgedVehicleMaterials,
+  GutterDressing,
+  IndicatorDressing,
   LampPlacement,
   GrilleDetail,
   MirrorDetail,
   PanelSeam,
+  PillarDressing,
+  PlateDressing,
+  StackDressing,
   SurfaceBand,
   VehicleDressing,
+  VentDressing,
   WaistStripe,
   ForgeSharedBucket,
   ForgeSharedMaterials,
