@@ -2563,7 +2563,17 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'garage floor', [cx, GROUND_FLOOR_TOP - GROUND_FLOOR_T / 2, zMid],
     [GARAGE_WIDTH, GROUND_FLOOR_T, GARAGE_DEPTH], m.garageFloor, { cast: false });
   pair(builder, 'garage roof', [cx, H + 0.15, zMid], [GARAGE_WIDTH, 0.3, GARAGE_DEPTH], m.roof);
+  // HF-536 night-facade-port: shingle courses and an eave, as on the houses.
+  // The slab is shifted 100 mm east and narrowed 200 mm so the 200 mm eave
+  // lands exactly on the shared wall at GARAGE_X0 instead of poking a fascia
+  // board through it into the house's upper room.
+  facadePair(builder, m, 'garage roof shingles', [cx + 0.1, H + 0.15, zMid],
+    shingleRoofParts({
+      width: GARAGE_WIDTH - 0.2, depth: GARAGE_DEPTH, slabTop: 0.15, overhang: 0.2, role: 'roof',
+    }));
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
+  facadePair(builder, m, 'garage outboard siding', [GARAGE_X1, 0, zMid],
+    lapSidingParts({ run: GARAGE_DEPTH, height: H, facing: 'x+', role: 'garageSiding' }));
 
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box. Matches the hole cut in
@@ -2579,16 +2589,30 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   [[GARAGE_X0 + WALL_T, DOOR[0]], [DOOR[1], GARAGE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
+    facadePair(builder, m, `garage front siding ${index}`,
+      [(run[0]! + run[1]!) / 2, 0, GARAGE_FRONT_Z],
+      lapSidingParts({ run: run[1]! - run[0]!, height: H, facing: 'z+', role: 'garageSiding' }));
   });
   // The door LEAF, parked in its head: the shipped map's chrome, and the piece
   // that makes a 3.5 m hole read as a garage rather than as a missing wall.
   pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.garageDoor);
+  // HF-536 night-facade-port: the parked leaf is a SECTIONAL door, so it gets
+  // the panel joints a sectional door has. Same lap recipe as the walls at a
+  // 200 mm pitch - the reveal is what tells a player it is a door rather than
+  // a painted band over the opening.
+  facadePair(builder, m, 'garage door panels', [(DOOR[0] + DOOR[1]) / 2, H - 0.8, GARAGE_FRONT_Z],
+    lapSidingParts({
+      run: DOOR[1] - DOOR[0], height: 0.8, facing: 'z+', role: 'panel', courseHeight: 0.2,
+    }));
 
   // Rear door into the back yard.
   const REAR = doorRun('garage rear door');
   [[GARAGE_X0 + WALL_T, REAR[0]], [REAR[1], GARAGE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `garage back pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
+    facadePair(builder, m, `garage back siding ${index}`,
+      [(run[0]! + run[1]!) / 2, 0, GARAGE_BACK_Z],
+      lapSidingParts({ run: run[1]! - run[0]!, height: H, facing: 'z-', role: 'garageSiding' }));
   });
   pair(builder, 'garage back head', [(REAR[0] + REAR[1]) / 2, H - 0.4, zBack], [REAR[1] - REAR[0], 0.8, WALL_T], m.trim);
 
