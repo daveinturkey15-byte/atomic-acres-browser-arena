@@ -123,21 +123,13 @@ export type NuketownFoliageSpecies = Readonly<{
 
 /** Clipped suburban box hedge: tight, dark, barely moves. */
 export const HEDGE_SPECIES: NuketownFoliageSpecies = Object.freeze({
-  // DAY-VISUAL-B: deeper clipped green (the reference hedge is near-black
-  // green in shadow) with a touch more backlit translucency on the ridge.
   id: 'clipped-box-hedge',
-  color: 0x33592b,
+  color: 0x3f6b32,
   sssColor: 0x8fbe4e,
-  sssStrength: 0.26,
+  sssStrength: 0.22,
   swayM: 0.035,
   windSpeed: 0.7,
 });
-/**
- * DAY-VISUAL-B: the hedge top-face key. The TSL value ramp multiplies the
- * base colour by this at the crown, so the clipped top reads as a lighter
- * lit face against dark sides. Pinned by the vegetation test.
- */
-export const HEDGE_TOP_TINT = Object.freeze({ r: 1.32, g: 1.22, b: 0.88 });
 
 /** Deciduous avenue tree: open crown, warmer, moves a lot more. */
 export const TREE_SPECIES: NuketownFoliageSpecies = Object.freeze({
@@ -286,9 +278,9 @@ function createFoliageMaterial(species: NuketownFoliageSpecies, massHeightM: num
     ((species.color >> 8) & 255) / 255,
     (species.color & 255) / 255,
   );
-  const root = base.mul(vec3(0.44, 0.52, 0.44));
+  const root = base.mul(vec3(0.52, 0.6, 0.5));
   let col = mix(root, base, smoothstep(0, 0.5, hN));
-  col = mix(col, base.mul(vec3(HEDGE_TOP_TINT.r, HEDGE_TOP_TINT.g, HEDGE_TOP_TINT.b)), hN.mul(0.62));
+  col = mix(col, base.mul(vec3(1.2, 1.14, 0.86)), hN.mul(0.62));
 
   // Backlit translucency: leaves lit from behind glow. One dot product, no
   // extra pass, and it is what separates a leaf mass from a painted box.
@@ -370,20 +362,16 @@ function hedgeSegmentGeometry(level: 0 | 1 | 2, height: number, depth: number): 
   // mass. X is now a fraction of the unit segment, so adjacent lobes overlap by
   // about half and the ridge keeps its scallops at every run thickness.
   const lobeSpanX = (1 / lobeCount) * 1.55;
-  // DAY-VISUAL-B: lower, flatter lobes (ridge tops out at 0.99 of the run
-  // height) so the run reads as a clipped flat top with crisp box corners
-  // and a scalloped foliage ridge, not a row of puffs. Triangle counts are
-  // untouched - only transforms move, so every LOD ordering pin still holds.
   for (let i = 0; i < lobeCount; i += 1) {
     const t = (i + 0.5) / lobeCount;
     const off = (i % 2 === 0 ? 1 : -1) * depth * 0.14;
     parts.push({
       geom: lobe,
       matrix: place(
-        (t - 0.5) * 0.98, height * 0.87, off,
+        (t - 0.5) * 0.98, height * 0.86, off,
         i * 1.13,
         lobeSpanX * (0.94 + (i % 3) * 0.08),
-        height * 0.24,
+        height * 0.30,
         depth * (0.80 + (i % 2) * 0.12),
       ),
     });
@@ -432,10 +420,7 @@ function avenueTreeGeometry(level: 0 | 1 | 2): THREE.BufferGeometry {
   const lobe = new THREE.IcosahedronGeometry(1.0, level === 0 ? 1 : 0);
   for (let i = 0; i < lobes; i += 1) {
     const yaw = (i / lobes) * Math.PI * 2;
-    // DAY-VISUAL-B: lobe 2 sits proud of the ring, opening a notch between
-    // its neighbours so light reads through the crown instead of one closed
-    // mass. Same triangle count - only the offset moves.
-    const r = lobes === 1 ? 0 : i === 2 && level === 0 ? 1.08 : 0.72;
+    const r = lobes === 1 ? 0 : 0.72;
     parts.push({
       geom: lobe,
       matrix: place(
@@ -445,20 +430,9 @@ function avenueTreeGeometry(level: 0 | 1 | 2): THREE.BufferGeometry {
       ),
     });
   }
-  // DAY-VISUAL-B: a small crown leader above the ring - the sub-cluster that
-  // breaks the crown silhouette. Detail 0 (20 tris): +~1 k worst case.
-  let leader: THREE.BufferGeometry | null = null;
-  if (level === 0) {
-    leader = new THREE.IcosahedronGeometry(1.0, 0);
-    parts.push({
-      geom: leader,
-      matrix: place(0.34, trunkH + 2.72, -0.28, 0.7, 0.82, 0.72, 0.82),
-    });
-  }
   const merged = mergeTransformed(parts);
   trunk.dispose();
   lobe.dispose();
-  if (leader) leader.dispose();
   for (const bough of boughs) bough.dispose();
   return merged;
 }
@@ -521,10 +495,7 @@ function hedgeRunGeometry(
     const s = 0.94 + rng() * 0.12;
     const px = alongX ? t * length + jx : jz;
     const pz = alongX ? jz : t * length + jx;
-    // DAY-VISUAL-B: slight yaw per segment so the clipped faces catch the sun
-    // unevenly instead of tiling. Derived from jx (no new rng draw), so every
-    // existing segment keeps its jitter and scale.
-    parts.push({ geom, matrix: place(px, 0, pz, (alongX ? 0 : Math.PI / 2) + jx * 2.1, pitch * 1.02, s, 1) });
+    parts.push({ geom, matrix: place(px, 0, pz, alongX ? 0 : Math.PI / 2, pitch * 1.02, s, 1) });
   }
   const merged = mergeTransformed(parts);
   geom.dispose();
@@ -728,15 +699,11 @@ export function buildNuketown2Vegetation(
       mesh.receiveShadow = false;
       for (let i = 0; i < sector.length; i += 1) {
         const entry = sector[i]!;
-        // DAY-VISUAL-B: wider seed-stable scale band plus a slight per-tree
-        // lean. The pivot is at the trunk base, so the base never leaves its
-        // 4.6 m-separated station; measured max tilt 0.044 rad keeps the crown
-        // shift under 0.35 m.
-        const s = 0.78 + (i % 9) * 0.05;
+        const s = 0.82 + (i % 7) * 0.055;
         // Instances are LOCAL to the sector LOD, so the LOD's own position is
         // subtracted here and nowhere else.
         scratchPos.set(entry[0] - cx, 0, entry[1] - cz);
-        scratchEuler.set(((i * 2) % 5 - 2) * 0.011, entry[2], ((i * 3) % 5 - 2) * 0.011);
+        scratchEuler.set(0, entry[2], 0);
         scratchQuat.setFromEuler(scratchEuler);
         scratchScale.set(s, s * (0.9 + (i % 5) * 0.05), s);
         matrix.compose(scratchPos, scratchQuat, scratchScale);

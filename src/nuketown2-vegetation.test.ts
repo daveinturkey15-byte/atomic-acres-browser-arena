@@ -23,7 +23,6 @@ import {
   AVENUE_MAX_RADIAL_M,
   HEDGE_CLAD_M,
   HEDGE_CLAD_TOP_M,
-  HEDGE_TOP_TINT,
   AVENUE_RECT_MARGIN_M,
   AVENUE_TREE_BUDGET,
   HEDGE_SPECIES,
@@ -196,49 +195,6 @@ describe('Nuke Town Rebuild vegetation', () => {
     // headroom, and it is 7 % of the arena's 650 k triangle budget. If a future
     // edit blows it, the thing to change is the geometry, not this number.
     expect(vegetation.stats.worstCaseTriangles).toBeLessThan(45_000);
-    vegetation.dispose();
-  });
-
-  it('keys the hedge top face lighter than its root (DAY-VISUAL-B clipped look)', () => {
-    // The TSL value ramp multiplies the base colour by HEDGE_TOP_TINT at the
-    // crown: a warm-lit clipped top face against dark sides, not a flat slab.
-    expect(HEDGE_TOP_TINT.r).toBeGreaterThan(1.2);
-    expect(HEDGE_TOP_TINT.g).toBeGreaterThan(1.1);
-    expect(HEDGE_TOP_TINT.b).toBeLessThan(1);
-    expect(HEDGE_TOP_TINT.r).toBeGreaterThan(HEDGE_TOP_TINT.g);
-    expect(HEDGE_TOP_TINT.g).toBeGreaterThan(HEDGE_TOP_TINT.b);
-    // And the base is a deep clipped green, near-black in shadow.
-    expect(HEDGE_SPECIES.color).toBe(0x33592b);
-  });
-
-  it('leans avenue trunks seed-stably without moving their stations', () => {
-    const parent = new THREE.Group();
-    const vegetation = buildNuketown2Vegetation(parent);
-    const matrix = new THREE.Matrix4();
-    const yAxis = new THREE.Vector3();
-    let maxTilt = 0;
-    let leaning = 0;
-    let total = 0;
-    for (const node of vegetation.group.children) {
-      const lod = node as THREE.LOD;
-      if (lod.isLOD !== true || !lod.name.includes('avenue')) continue;
-      const mesh = lod.levels[0]!.object as THREE.InstancedMesh;
-      for (let i = 0; i < mesh.count; i += 1) {
-        mesh.getMatrixAt(i, matrix);
-        // Yaw-proof: read the tilt off the instance Y basis, not an Euler
-        // triple (XYZ decomposition flips x/z near yaw PI).
-        yAxis.set(matrix.elements[4]!, matrix.elements[5]!, matrix.elements[6]!).normalize();
-        const tilt = Math.acos(Math.min(1, yAxis.y));
-        maxTilt = Math.max(maxTilt, tilt);
-        if (tilt > 0.005) leaning += 1;
-        total += 1;
-      }
-    }
-    // Every lean pivots at the trunk base: measured 0.044 rad max keeps the
-    // crown shift under 0.35 m while the 4.6 m-separated station never moves.
-    expect(total).toBeGreaterThan(30);
-    expect(leaning).toBeGreaterThan(total * 0.8);
-    expect(maxTilt).toBeLessThanOrEqual(0.05);
     vegetation.dispose();
   });
 });

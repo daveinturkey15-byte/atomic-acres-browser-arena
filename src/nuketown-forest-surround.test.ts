@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   buildNuketownForestSurround,
-  FOREST_CONIFER_HEIGHT_M,
   FOREST_MAX_RADIAL_M,
   FOREST_RECT_MARGIN_M,
 } from './nuketown-forest-surround';
@@ -74,35 +73,4 @@ describe('Nuke Town forest surround', () => {
     first.dispose();
     second.dispose();
   });
-
-  it('varies the treeline silhouette with standouts above the line (DAY-VISUAL-B)', () => {
-    const parent = new THREE.Group();
-    const forest = buildNuketownForestSurround(parent);
-    const conifers = forest.group.children.find(
-      (child) => (child as THREE.InstancedMesh).name === 'forest-conifers',
-    ) as THREE.InstancedMesh;
-    // Leader spire tip: the prototype grows from 9.4 m to FOREST_CONIFER_HEIGHT_M.
-    conifers.geometry.computeBoundingBox();
-    expect(conifers.geometry.boundingBox!.max.y).toBeGreaterThan(FOREST_CONIFER_HEIGHT_M - 0.01);
-    expect(conifers.geometry.boundingBox!.max.y).toBeLessThan(FOREST_CONIFER_HEIGHT_M + 0.01);
-    const matrix = new THREE.Matrix4();
-    const positionVec = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const scaleVec = new THREE.Vector3();
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (let index = 0; index < conifers.count; index += 1) {
-      conifers.getMatrixAt(index, matrix);
-      matrix.decompose(positionVec, quaternion, scaleVec);
-      minY = Math.min(minY, scaleVec.y);
-      maxY = Math.max(maxY, scaleVec.y);
-    }
-    // Varied heights with a few standouts: world-height spread at least 10 m,
-    // and at least one tree growing near twice the prototype.
-    expect((maxY - minY) * FOREST_CONIFER_HEIGHT_M).toBeGreaterThanOrEqual(10);
-    expect(maxY).toBeGreaterThanOrEqual(1.9);
-    // The ring stays a small share of the arena budget (measured 66,713).
-    expect(forest.stats.triangles).toBeLessThan(80_000);
-    forest.dispose();
 });
-  });

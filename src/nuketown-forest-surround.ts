@@ -84,18 +84,6 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
   groundY: () => NUKETOWN2_FOREST_GROUND_Y,
   groundNormal: (_x: number, _z: number, target: THREE.Vector3) => target.set(0, 1, 0),
 });
-/** World-space height of the conifer prototype, trunk base to leader tip. */
-export const FOREST_CONIFER_HEIGHT_M = 10.3;
-/** Every Nth conifer is a standout grown above the treeline. Deterministic. */
-export const FOREST_STANDOUT_EVERY = 13;
-/** Height multiplier for standouts. */
-export const FOREST_STANDOUT_BOOST = 1.28;
-/**
- * Fixed aesthetic sun side for the warm/cool tone bias: the reference holds
- * warm sun on one flank of the treeline and cool shadow on the other.
- * Presentation-only tint bias, not a light rig claim.
- */
-export const FOREST_SUN_AZIMUTH = Object.freeze({ x: -0.79, z: -0.61 });
 
 export interface NuketownForestStats {
   conifers: number;
@@ -293,22 +281,16 @@ export function buildNuketownForestSurround(
     stats.triangles += triCount(mesh.geometry) * mesh.count;
   };
 
-  // ---- conifers: merged trunk + three tiers, one instanced draw --------------
-  // DAY-VISUAL-B: a slim leader spire above tierB, so the ring reads as tall
-  // dark spires with layered branch tiers instead of two stacked cones. The
-  // leader base (r=1.05 at y=6.9) tucks inside tierB's own surface there
-  // (r~1.08), never floating, and the tip reaches FOREST_CONIFER_HEIGHT_M.
+  // ---- conifers: merged trunk + two cone tiers, one instanced draw --------
   const coniferParts: Array<{ geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
   const trunkGeometry = new THREE.CylinderGeometry(0.22, 0.34, 2.2, 7);
   const tierA = new THREE.ConeGeometry(2.6, 5.6, 8);
   const tierB = new THREE.ConeGeometry(1.9, 4.4, 8);
-  const tierLeader = new THREE.ConeGeometry(1.05, 3.4, 7);
   coniferParts.push({ geometry: trunkGeometry, matrix: new THREE.Matrix4().makeTranslation(0, 1.1, 0) });
   coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0) });
   coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0) });
-  coniferParts.push({ geometry: tierLeader, matrix: new THREE.Matrix4().makeTranslation(0, 8.6, 0) });
   const coniferGeometry = mergeParts(coniferParts, 'forest-conifer');
-  for (const part of [trunkGeometry, tierA, tierB, tierLeader]) part.dispose();
+  for (const part of [trunkGeometry, tierA, tierB]) part.dispose();
   const coniferMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94, metalness: 0, flatShading: true });
   disposables.push(coniferGeometry, coniferMaterial);
 
@@ -320,19 +302,10 @@ export function buildNuketownForestSurround(
     euler.set(0, slot.yaw, 0);
     quaternion.setFromEuler(euler);
     position.set(slot.x, groundY(slot.x, slot.z) - TRUNK_SINK_M, slot.z);
-    // DAY-VISUAL-B: every FOREST_STANDOUT_EVERY-th tree grows above the line,
-    // so the treeline has varied heights with a few standouts, deterministically.
-    const standout = index % FOREST_STANDOUT_EVERY === 0 ? FOREST_STANDOUT_BOOST : 1;
-    scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45) * standout, slot.scale);
+    scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45), slot.scale);
     matrix.compose(position, quaternion, scaleVec);
     conifers.setMatrixAt(index, matrix);
-    // DAY-VISUAL-B: warm sun on the lit flank, cool shadow on the far flank.
-    const radius = Math.hypot(slot.x, slot.z) || 1;
-    const sunSide = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / radius);
-    color.setHex(coniferTones[Math.floor(slot.tone * coniferTones.length) % coniferTones.length]);
-    if (sunSide > 0) color.offsetHSL(0.012 * sunSide, 0.06 * sunSide, 0.028 * sunSide);
-    else color.offsetHSL(0.008 * sunSide, 0, 0.03 * sunSide);
-    conifers.setColorAt(index, color);
+    conifers.setColorAt(index, color.setHex(coniferTones[Math.floor(slot.tone * coniferTones.length) % coniferTones.length]));
   });
   register(conifers);
   stats.conifers = coniferSlots.length;
@@ -364,13 +337,7 @@ export function buildNuketownForestSurround(
     position.set(slot.x, floor + 4.3 * slot.scale, slot.z);
     matrix.compose(position, quaternion, scaleVec);
     canopies.setMatrixAt(index, matrix);
-    // DAY-VISUAL-B: same warm/cool flank bias as the conifers.
-    const canopyRadius = Math.hypot(slot.x, slot.z) || 1;
-    const canopySun = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / canopyRadius);
-    color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]);
-    if (canopySun > 0) color.offsetHSL(0.012 * canopySun, 0.06 * canopySun, 0.028 * canopySun);
-    else color.offsetHSL(0.008 * canopySun, 0, 0.03 * canopySun);
-    canopies.setColorAt(index, color);
+    canopies.setColorAt(index, color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]));
   });
   register(broadTrunks);
   register(canopies);
