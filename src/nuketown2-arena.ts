@@ -3462,6 +3462,7 @@ const BAY_MOUTH = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'mouth')!;
 const BAY_OUTER = NUKETOWN2_BAY_RUNS.find((run) => run.id === 'outer')!;
 /** North-side outer edge of a bay: the kerb line pushed 2.2 m into the verge. */
 const BAY_BACK_Z = KERB_Z - NUKETOWN2_BAY_DEPTH;
+
 export const NUKETOWN2_GROUND_DRESSING: readonly NuketownGroundDressingPiece[] = Object.freeze([
   // Driveway apron: garage door out to the kerb. HF-477 ran it the last 2.7 m
   // to KERB_Z instead of stopping at the old centred head's |z| = 8 edge -
@@ -3658,6 +3659,61 @@ function street(builder: Builder, m: Nuketown2Materials): void {
   // same circle, so the outdoor slab and lawn cannot survive in its corners.
   centredPolygon(builder, 'carriageway turning head', [head.centreX, -0.06, 0],
     head.radius, 0.12, NUKETOWN2_TURNING_HEAD_SEGMENTS, m.asphalt, road);
+
+
+  // ---- HF-536 night-defects-3a: THE BULB'S FOUR CORNER POCKETS ------------
+  // The turning head is a CIRCLE of radius `head.radius` inside a 16 x 16 m
+  // bounding square, and the square is what the ground dressing cuts out of
+  // the verge lawn. The road only ever filled the circle, so the four corners
+  // between circle and square carried NO SURFACE AT ALL - not lawn, not
+  // asphalt. Standing in the street or at a front window and looking down at
+  // the kerb, you saw straight through the floor.
+  //
+  // MEASURED at fc6ceb96, before this body existed
+  // (scripts/qa/audit-nuketown2-ground-coverage.ts): 4 uncovered regions,
+  // 17.94 m2, at world x[0.75,3.5] and x[13.5,16.5] on both z sides - exactly
+  // the band |z| in [5.3, 8] outside the circle. The rendered sweep
+  // (scripts/qa/sweep-nuketown2-seethrough.mjs, background repainted so
+  // "nothing was drawn" is unambiguous) saw the same holes as background
+  // pixels below the horizon from ordinary standing positions.
+  //
+  // ONE body, not a staircase of tiles: the pocket is a square with a circular
+  // hole, so it is authored as exactly that - an extruded ring. A rectangular
+  // staircase cannot both avoid lapping the road (which would be a coplanar
+  // race across the busiest ground in the map) and close the gap; only the
+  // real shape does both. It sits on the lawn tier, 0.02 m proud of the road
+  // like every other verge surface, and it is a closed extrusion rather than a
+  // plane so the single-sided-plate audit stays at zero.
+  {
+    const pocketX0 = Math.min(nuketown2HandedX(head.closedX), nuketown2HandedX(head.mouthX));
+    const pocketX1 = Math.max(nuketown2HandedX(head.closedX), nuketown2HandedX(head.mouthX));
+    const pocketCentreX = nuketown2HandedX(head.centreX);
+    const shape = new THREE.Shape();
+    shape.moveTo(pocketX0, -NUKETOWN2_TURNING_HEAD_HALF);
+    shape.lineTo(pocketX1, -NUKETOWN2_TURNING_HEAD_HALF);
+    shape.lineTo(pocketX1, NUKETOWN2_TURNING_HEAD_HALF);
+    shape.lineTo(pocketX0, NUKETOWN2_TURNING_HEAD_HALF);
+    shape.closePath();
+    const bulb = new THREE.Path();
+    // The hole is the road's own circle, at its own radius: one number, read
+    // from the same constant the road polygon uses, so the two can never drift.
+    bulb.absarc(pocketCentreX, 0, head.radius, 0, Math.PI * 2, true);
+    shape.holes.push(bulb);
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.14, bevelEnabled: false, curveSegments: 96 });
+    // Shape space (x, y) is world (x, z); the extrusion axis becomes world y.
+    // Both the square and the circle are symmetric in z, so the sign flip this
+    // rotation applies to the shape's y is immaterial.
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, -0.12, 0);
+    const pocket = new THREE.Mesh(geometry, m.lawn);
+    pocket.name = 'nuketown2 carriageway turning head pocket';
+    pocket.castShadow = false;
+    pocket.receiveShadow = true;
+    pocket.userData.rustworksDetail = 'core';
+    pocket.userData.presentationBatchCandidate = false;
+    pocket.userData.blocksShots = false;
+    builder.root.add(pocket);
+  }
   centred(builder, 'carriageway stem', [(head.mouthX + head.offMapX) / 2, -0.06, 0],
     [head.offMapX - head.mouthX, 0.12, NUKETOWN2_STREET_HALF_WIDTH * 2], m.asphalt,
     { ...road, ballisticMaterial: 'concrete' });
