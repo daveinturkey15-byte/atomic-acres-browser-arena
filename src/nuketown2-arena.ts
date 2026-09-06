@@ -2913,13 +2913,41 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   });
   // The cargo box's own axles: dressed, but with no arch to cut them into,
   // because the box above them is authored gameplay geometry that stays boxy.
+  //
+  // HF-536 (owner, 2026-09-06): "the wheels on our car are not even on our car,
+  // they are not physically attached, a buggy implementation."
+  //
+  // THE BUG. `buildForgedWheelSet` takes axle positions in the VEHICLE frame,
+  // and this placement stands at `x: truckNoseX, yaw: -PI/2`, so a vehicle-frame
+  // z reaches the world as `worldX = truckNoseX - z` - i.e. the argument is
+  // `z = truckNoseX - worldAxleX`. What was written instead was
+  // `truckNoseX - (+/-boxLength/2 + 1.0/1.1)`: world-x arithmetic with the
+  // truck's OWN ORIGIN `t.x` dropped. That was correct exactly once, before
+  // HF-477, when the cargo box centre WAS the world origin and `t.x` did not
+  // exist (see the note at ~2470). After the truck moved into the bulb the two
+  // axles resolved to z -7.90 and -1.50 - both NEGATIVE, i.e. AHEAD of the nose:
+  // one pair 1.5 m in front of the cab and one 7.9 m down the stem under the
+  // saloon, with the cargo box left wheel-less. Nothing caught it because a
+  // forged skin is presentation, and no collider, parity or spawn gate looks at
+  // presentation. `nuketown2-fidelity.test.ts`'s wheel gate (R24) does now.
+  //
+  // THE FIX. Both axles are re-expressed as `truckNoseX - worldAxleX` from the
+  // SAME two world positions the retired box wheels used at ~2533
+  // (`t.x - boxHalf + 1.1` and `t.x + boxHalf + 1.0`), so the dressed wheels
+  // land exactly where the authored ones stood and cannot drift from the box
+  // again without the layout constant moving with them. With
+  // `truckNoseX = t.x + boxHalf + t.cabLength` these evaluate to
+  // `cabLength - 1.0 = 4.20` and `cabLength + boxLength - 1.1 = 10.60` in the
+  // cab's frame, i.e. world x -7.85 and -14.25 pre-mirror: under the cab's rear
+  // and under the cargo box, which is where a bogie goes.
+  const truckBoxHalf = t.boxLength / 2;
   placements.push({
     built: buildForgedWheelSet(
       'nuketown2-truck-bogie',
       TRUCK_CAB_SPEC.wheelRadius,
       TRUCK_CAB_SPEC.tyreHalfWidth,
       TRUCK_CAB_SPEC.trackHalfWidth,
-      [truckNoseX - (t.boxLength / 2 + 1.0), truckNoseX - (-t.boxLength / 2 + 1.1)],
+      [truckNoseX - (t.x + truckBoxHalf + 1.0), truckNoseX - (t.x - truckBoxHalf + 1.1)],
       'steel',
       truckMaterials,
     ),

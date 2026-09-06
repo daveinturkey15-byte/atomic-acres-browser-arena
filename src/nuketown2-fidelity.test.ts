@@ -775,6 +775,129 @@ describe('Nuke Town Rebuild fidelity', () => {
     }
   });
 
+  /**
+   * HF-536 (PASS 2, R24). WHEELS ARE ATTACHED BY CONSTRUCTION.
+   *
+   * Owner, 2026-09-06: "the wheels on our car are not even on our car, they are
+   * not physically attached, a buggy implementation."
+   *
+   * The forge's wheels are presentation, so no collider, parity or spawn gate
+   * has ever looked at where they landed. This does: it reads the baked
+   * world-space tyre geometry the player actually sees, clusters it into
+   * wheels, and requires every wheel to sit on the authored body it dresses.
+   */
+  it('lands every forged tyre on the authored vehicle body it dresses', () => {
+    const map = buildNuketown2(new THREE.Scene());
+    map.root.updateMatrixWorld(true);
+
+    // 1. The baked, world-space tyre bucket.
+    const tyreMeshes: THREE.Mesh[] = [];
+    map.root.traverse((object) => {
+      if (object instanceof THREE.Mesh && /^vehicle-forge (merged )?[\w-]* ?tyre$/u.test(object.name)) {
+        tyreMeshes.push(object);
+      }
+    });
+    expect(tyreMeshes.length, 'forged tyre-bucket meshes in the scene').toBeGreaterThan(0);
+
+    // 2. Cluster tyre vertices into WHEELS: greedy buckets by plan position
+    //    within 0.5 m (a wheel is 0.84 m across at most, and the nearest two
+    //    wheels on any vehicle here are 1.58 m apart in plan).
+    type Cluster = { x: number; z: number; yMin: number; yMax: number; n: number };
+    const clusters: Cluster[] = [];
+    for (const mesh of tyreMeshes) {
+      const position = mesh.geometry.getAttribute('position');
+      const vertex = new THREE.Vector3();
+      for (let i = 0; i < position.count; i += 1) {
+        vertex.fromBufferAttribute(position as THREE.BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
+        let found = clusters.find((c) => Math.hypot(c.x / c.n - vertex.x, c.z / c.n - vertex.z) < 0.5);
+        if (!found) {
+          found = { x: 0, z: 0, yMin: Infinity, yMax: -Infinity, n: 0 };
+          clusters.push(found);
+        }
+        found.x += vertex.x;
+        found.z += vertex.z;
+        found.yMin = Math.min(found.yMin, vertex.y);
+        found.yMax = Math.max(found.yMax, vertex.y);
+        found.n += 1;
+      }
+    }
+    // A WHEEL IS THE TALL THING IN THE TYRE BUCKET. HF-536 also puts the
+    // grounded dressing there - the underbody block and the contact pool, both
+    // matte dark, both merged into the same draw - so the bucket is separated
+    // by vertical extent rather than by name: a wheel spans its full diameter
+    // (0.68 m at the smallest), a dressing plate is flat.
+    const all = clusters.map((c) => ({
+      x: c.x / c.n, z: c.z / c.n, y: (c.yMin + c.yMax) / 2, height: c.yMax - c.yMin,
+    }));
+    const wheels = all.filter((c) => c.height >= 0.5);
+    const dressing = all.filter((c) => c.height < 0.5);
+    expect(wheels.length, 'forged wheel clusters').toBeGreaterThanOrEqual(14);
+    // Nothing else may hide in this bucket: every non-wheel cluster has to be
+    // grounded dressing, which lives under the sill.
+    for (const plate of dressing) {
+      expect(
+        plate.y + plate.height / 2,
+        `a non-wheel cluster in the tyre bucket reaches y ${(plate.y + plate.height / 2).toFixed(3)} at `
+          + `(${plate.x.toFixed(2)}, ${plate.z.toFixed(2)}); only grounded dressing belongs here`,
+      ).toBeLessThanOrEqual(0.45);
+    }
+
+    // 3. The authored bodies these wheels dress, read from the world the
+    //    colliders own - not from the forge's own numbers, which is the whole
+    //    point: a wheel placed by broken arithmetic still agrees with itself.
+    const bodies = map.raycastMeshes
+      .filter((mesh) => /(car body|saloon body|classic body|coach body|truck cab|truck deck)$/u.test(mesh.name))
+      .map((mesh) => {
+        const box = new THREE.Box3().setFromObject(mesh);
+        return { name: mesh.name, box };
+      });
+    expect(bodies.length, 'authored vehicle bodies').toBeGreaterThanOrEqual(6);
+
+    // 4a. Every wheel sits under an authored body (plan footprint + 0.6 m).
+    const orphans = all.filter((wheel) => !bodies.some(({ box }) => (
+      wheel.x >= box.min.x - 0.6 && wheel.x <= box.max.x + 0.6
+      && wheel.z >= box.min.z - 0.6 && wheel.z <= box.max.z + 0.6
+    )));
+    expect(
+      orphans.map((w) => `(${w.x.toFixed(2)}, ${w.z.toFixed(2)})`).join(' '),
+      `${orphans.length} forged wheel cluster(s) sit on no authored vehicle body. `
+        + 'A wheel is attached by construction or it is not a wheel (HF-536, R24).',
+    ).toBe('');
+
+    // 4b. Every wheel is at a real wheel height.
+    for (const wheel of wheels) {
+      const nearest = [0.34, 0.42].reduce((best, r) => (
+        Math.abs(r - wheel.y) < Math.abs(best - wheel.y) ? r : best), 0.42);
+      expect(
+        Math.abs(wheel.y - nearest),
+        `wheel at (${wheel.x.toFixed(2)}, ${wheel.z.toFixed(2)}) centres at y ${wheel.y.toFixed(3)}, `
+          + `which is not a forge wheel radius (0.34 / 0.42)`,
+      ).toBeLessThanOrEqual(0.05);
+    }
+
+    // 4c. R24 in its strict form for the TRUCK, the vehicle the defect is on:
+    //     each of its three axles must be within 0.6 m (plan, along the street)
+    //     of the authored axle position the retired box wheels used.
+    const t = NUKETOWN2_CENTRAL_TRUCK;
+    const authoredAxleX = [
+      t.x - t.boxLength / 2 + 1.1,
+      t.x + t.boxLength / 2 + 1.0,
+      t.cabX + 1.8,
+    ].map((x) => hx(x));
+    const truckWheels = wheels.filter((wheel) => Math.abs(wheel.z - t.z) <= t.width / 2 + 0.6);
+    expect(truckWheels.length, 'tyre clusters on the truck line').toBeGreaterThanOrEqual(6);
+    for (const axleX of authoredAxleX) {
+      const onAxle = truckWheels.filter((wheel) => Math.abs(wheel.x - axleX) <= 0.6);
+      expect(
+        onAxle.length,
+        `no forged tyre within 0.6 m of the authored truck axle at world x ${axleX.toFixed(2)}. `
+          + `Truck-line tyre clusters are at x [${truckWheels.map((w) => w.x.toFixed(2)).join(', ')}]. `
+          + 'buildForgedWheelSet axle z must be written as truckNoseX - worldAxleX from the SAME '
+          + 'constants that place the box wheels (src/nuketown2-arena.ts ~2917-2925).',
+      ).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it('lands every forged vehicle skin on the collider body it dresses, mirrored with it', () => {
     const map = buildNuketown2(new THREE.Scene());
     map.root.updateMatrixWorld(true);
