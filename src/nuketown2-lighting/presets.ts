@@ -94,7 +94,7 @@ export const NUKETOWN2_AUTHORED = Object.freeze({
   fogNear: 58,
   fogFar: 148,
   exposure: 1.08,
-  skyPreset: 'estate-golden-hour',
+  skyPreset: 'nuketown2-golden-hour',
 });
 
 /**
