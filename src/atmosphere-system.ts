@@ -157,6 +157,18 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
     ] as SmokeCard[]),
   }),
 });
+/**
+ * DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze palette. Warm amber
+ * light side keyed to the 0xfff1ce rig (numbers untouched), cool
+ * violet-grey shade side. The lane test pins warm-above-cool luminance and
+ * the amber hue so a future palette pass cannot silently re-grey it.
+ */
+export const NUKETOWN2_HAZE_PALETTE = Object.freeze({
+  shadow: 0x6f6a88,
+  light: 0xe6b47e,
+  smoke: 0x7d8489,
+  warm: 0xd9a06a,
+});
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 const MAX_SMOKE_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.smoke.length));
@@ -547,6 +559,13 @@ export class AtmosphereSystem {
             ? { shadow: 0x6e6a5c, light: 0xf0dfb4, smoke: 0x8a8172, warm: 0xd8bd8c }
           : arenaId === 'test2'
             ? { shadow: 0x5c6a72, light: 0xffe0a8, smoke: 0x87837a, warm: 0xe3b57e }
+          // DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze. Warm low-sun
+          // light side (amber, keyed to the 0xfff1ce rig without touching its
+          // numbers), cool violet-grey shade side per the reference's violet
+          // shade. Back yards and cul-de-sacs only — the road stays clear by
+          // layout, not by palette.
+          : arenaId === 'nuketown2'
+            ? NUKETOWN2_HAZE_PALETTE
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);

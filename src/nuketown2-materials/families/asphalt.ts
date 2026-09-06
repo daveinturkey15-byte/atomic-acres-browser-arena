@@ -33,6 +33,16 @@ const { abs, clamp, float, fract, max, min, mix, positionWorld, smoothstep, vec2
 
 /** Half-width of the carriageway, metres — the kerb line the channel stain hugs. */
 const CARRIAGEWAY_HALF_M = 5.3;
+/**
+ * DAY-VISUAL-A (HF-535): dark, slightly wet carriageway. How far roughness
+ * drops in the damp wheel paths / patch field (soft sheen, same graph).
+ */
+export const ASPHALT_WET_SHEEN_ROUGHNESS_DROP = 0.18;
+/**
+ * DAY-VISUAL-A (HF-535): warm low-sun glint on the polished wheel paths.
+ * Mix factor toward the warm swatch at full polish; the lane test pins it.
+ */
+export const ASPHALT_SUN_GLINT_WARM_MIX = 0.22;
 
 export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialSpec {
   return assertSpec({
@@ -71,13 +81,23 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   const channel = smoothstep(float(CARRIAGEWAY_HALF_M - 0.7), float(CARRIAGEWAY_HALF_M), abs(p.z));
   const road = uniforms.baseColor.mul(wear.albedoMul);
   const patched = mix(road, linearSwatch(0x2b2c2d).mul(wear.albedoMul), patch);
-  const polished = patched.mul(float(1).add(wheel.mul(float(0.17))));
+  // DAY-VISUAL-A (HF-535): dark, slightly wet carriageway. The polished wheel
+  // paths carry a warm low-sun glint instead of a neutral lift, and the wheel
+  // paths plus the patch field read damp through a roughness drop (soft
+  // sheen). Same shared graph, no new pipeline.
+  const dampSheen = max(patch.mul(float(0.6)), wheel.mul(float(0.8)));
+  const sunGlint = linearSwatch(0xffc98f);
+  const polished = mix(
+    patched.mul(float(1).add(wheel.mul(float(0.17)))),
+    sunGlint.mul(wear.albedoMul).mul(float(1.12)),
+    wheel.mul(float(ASPHALT_SUN_GLINT_WARM_MIX)),
+  );
   const stained = polished.mul(float(1).sub(channel.mul(float(0.13))));
   const roadColor = mix(stained, linearSwatch(0x1f2021), max(seam, crack.mul(float(0.8))));
   const markingWorn = smoothstep(float(0.15), float(0.62), wear.scuff);
   const markingColor = mix(uniforms.baseColor.mul(wear.albedoMul), linearSwatch(0x3b3d3e), markingWorn.mul(float(0.65)));
   const roadRoughness = clamp(
-    wear.roughness.sub(wheel.mul(float(0.16))).sub(seam.mul(float(0.40))).add(channel.mul(float(0.04))).add(patch.mul(float(-0.06))),
+    wear.roughness.sub(wheel.mul(float(0.16))).sub(seam.mul(float(0.40))).add(channel.mul(float(0.04))).add(patch.mul(float(-0.06))).sub(dampSheen.mul(float(ASPHALT_WET_SHEEN_ROUGHNESS_DROP))),
     float(0.20),
     float(1.0),
   );

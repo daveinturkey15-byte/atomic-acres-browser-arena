@@ -121,9 +121,11 @@ export function nuketownLawnPlacementAllowed(x: number, z: number): boolean {
  * same draws, same triangles - only the instance tint constants moved.
  */
 export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
-  rBase: 0.63, rWarm: 0.18,
-  gBase: 0.88, gWarm: 0.09,
-  bBase: 0.5, bWarm: -0.09,
+  // DAY-VISUAL-A (HF-535): dry late-summer verge — warm yellow-green shift
+  // (+red/+green warm, -blue). Peak 0.98, still under material.color's cap.
+  rBase: 0.63, rWarm: 0.22,
+  gBase: 0.88, gWarm: 0.10,
+  bBase: 0.5, bWarm: -0.11,
   valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
 });
 
