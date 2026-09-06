@@ -21,8 +21,10 @@ import type { HealthAuthorityMessage } from './protocol';
  *     be told about immediately, and mints the message with the next revision.
  *   - `admitHealthAuthority` runs on an observer and is fail-closed: it admits
  *     only a message authored by the sitting host, for the current match epoch,
- *     for a life that is not older than the one it is presenting, with a
- *     strictly newer revision.
+ *     for the life it is presenting, with a strictly newer revision in that
+ *     epoch. A fact about a NEWER life is held, not presented: the observer's
+ *     continuity has not advanced yet, so applying it would make a corpse
+ *     visible at its death position; the state lane delivers the new life.
  *
  * It deliberately holds no movement authority: nothing here reads or writes a
  * position, a sequence, or an input acknowledgement, so guest prediction and
@@ -196,6 +198,26 @@ export type HealthAuthorityAdmissionInput = Readonly<{
   subjectContinuity: number | null;
   /** Highest revision already applied for the subject; -1 when none. */
   lastRevision: number;
+  /**
+   * Match epoch the stored `lastRevision` belongs to. When defined and
+   * different from `matchEpoch` the stored revision is treated as absent: a
+   * rematch restarts revisions at 0 while an observer that never reset would
+   * otherwise reject the first facts as stale. `null`/undefined keeps the
+   * legacy same-epoch comparison.
+   */
+  lastRevisionEpoch?: number | null;
+}>;
+
+/**
+ * What an observer holds per subject once a health fact is applied: the
+ * epoch-scoped revision (fix 1) plus the applied hp and life the state lane
+ * is clamped against (fix 4). Recorded only on a path that actually applied.
+ */
+export type AppliedHealthAuthority = Readonly<{
+  matchEpoch: number;
+  revision: number;
+  hp: number;
+  continuity: number;
 }>;
 
 export type HealthAuthorityAdmissionReason =
@@ -205,6 +227,7 @@ export type HealthAuthorityAdmissionReason =
   | 'stale-epoch'
   | 'unknown-subject'
   | 'stale-life'
+  | 'newer-life-held'
   | 'stale-revision';
 
 export type HealthAuthorityAdmissionResult = Readonly<{
@@ -228,11 +251,18 @@ export type HealthAuthorityAdmissionResult = Readonly<{
  *                  keeps the privilege host-only INSIDE the app, independently
  *                  of `isHostAuthorityMessage` dropping it at the transport.
  *   stale-epoch    a fact from a previous match.
- *   stale-life     a fact about a life older than the one being presented. A
- *                  fact for a NEWER life is admitted: continuity only ever
- *                  advances, so it cannot be a replay, and `alive` is derived
- *                  from hp, so it can never resurrect anybody.
- *   stale-revision a duplicate or reordered fact inside the same life.
+ *   stale-life     a fact about a life older than the one being presented.
+ *   newer-life-held
+ *                  a fact about a life NEWER than the one being presented. It
+ *                  is not a replay (continuity only advances) but applying it
+ *                  ahead of the local life would present a corpse as alive at
+ *                  its death position, so it is held: it burns no revision and
+ *                  applies once the local continuity reaches its life. `alive`
+ *                  derived from hp only bars same-life resurrection.
+ *   stale-revision a duplicate or reordered fact inside the same life and
+ *                  match epoch. The applied revision is scoped to the epoch:
+ *                  a revision stored under a different match epoch is treated
+ *                  as absent, so the first facts of a rematch are admissible.
  */
 export function admitHealthAuthority(input: HealthAuthorityAdmissionInput): HealthAuthorityAdmissionResult {
   const { message } = input;
@@ -249,6 +279,119 @@ export function admitHealthAuthority(input: HealthAuthorityAdmissionInput): Heal
   if (!Number.isSafeInteger(input.matchEpoch) || message.matchEpoch !== input.matchEpoch) return reject('stale-epoch');
   if (input.subjectContinuity === null || !Number.isSafeInteger(input.subjectContinuity)) return reject('unknown-subject');
   if (message.continuity < input.subjectContinuity) return reject('stale-life');
-  if (!Number.isSafeInteger(input.lastRevision) || message.revision <= input.lastRevision) return reject('stale-revision');
+  if (message.continuity > input.subjectContinuity) return reject('newer-life-held');
+  // The observer ledger is cleared only on host-side paths while the host
+  // restarts revisions at 0 every match, so a stored revision from another
+  // epoch must not fence the new match out.
+  const effectiveLastRevision = input.lastRevisionEpoch === undefined || input.lastRevisionEpoch === null
+    || input.lastRevisionEpoch === input.matchEpoch
+    ? input.lastRevision
+    : -1;
+  if (!Number.isSafeInteger(input.lastRevision) || message.revision <= effectiveLastRevision) return reject('stale-revision');
   return { accepted: true, reason: 'accepted', hp, alive, revision: message.revision };
+}
+
+/**
+ * DAY-MP-DAMAGE-FIXES fix 3 — respawn classification needs a continuity
+ * advance, not just a 0 -> positive hp edge.
+ *
+ * The observer applies a lethal health fact directly onto `remote.snapshot`
+ * while the matching pre-death canonical state is still in flight on the
+ * lossy state lane (no cross-lane ordering). That ordinary state then reads
+ * as `snapshot.hp <= 0 && incoming.hp > 0` and was classified as a respawn,
+ * admitting an unbounded teleport through `admitRemoteSnapshotMovement`,
+ * pushing `claimEligibleAt` and bypassing the loadout-change gates. A genuine
+ * respawn always advances the life, so the hp edge alone is never enough.
+ */
+export type RemoteRespawnClassificationInput = Readonly<{
+  snapshotHp: number;
+  incomingHp: number;
+  remoteContinuity: number;
+  incomingContinuity: number;
+  redeployed: boolean;
+}>;
+
+export function classifyRemoteRespawn(input: RemoteRespawnClassificationInput): boolean {
+  if (input.redeployed) return true;
+  if (!Number.isFinite(input.snapshotHp) || !Number.isFinite(input.incomingHp)) return false;
+  return input.snapshotHp <= 0
+    && input.incomingHp > 0
+    && input.incomingContinuity > input.remoteContinuity;
+}
+
+/**
+ * DAY-MP-DAMAGE-FIXES fix 4 — an admitted state cannot revert a held health
+ * authority inside the same life.
+ *
+ * `remote.snapshot = admittedIncoming` overwrote an applied authority hp with
+ * any newer-sequence state, including one the host relayed before it applied
+ * the damage. While a fact is held for the subject's current continuity, an
+ * admitted state is clamped DOWN to the authority value (never up: this path
+ * must not heal) unless the state carries a newer life.
+ */
+export type HealthAuthorityHpClampInput = Readonly<{
+  admittedHp: number;
+  heldHp: number | undefined;
+  heldContinuity: number | undefined;
+  subjectContinuity: number;
+  incomingContinuity: number;
+}>;
+
+export function clampAdmittedHpToHealthAuthority(input: HealthAuthorityHpClampInput): number {
+  if (input.heldHp === undefined || input.heldContinuity === undefined) return input.admittedHp;
+  if (!Number.isFinite(input.admittedHp) || !Number.isFinite(input.heldHp)) return input.admittedHp;
+  if (input.heldContinuity !== input.subjectContinuity) return input.admittedHp;
+  if (input.incomingContinuity > input.subjectContinuity) return input.admittedHp;
+  return Math.min(input.admittedHp, input.heldHp);
+}
+
+/**
+ * DAY-MP-DAMAGE-FIXES fix 2 — re-mint the host's current published fact for
+ * a (re)joining observer.
+ *
+ * A fact published while an observer was inside its rejoin blind window was
+ * rejected as unknown-subject and never retried (the publisher only re-mints
+ * on change and the copy window is 70 ms). The seed carries the SAME
+ * revision, so it is idempotent: an observer that already applied the fact
+ * rejects it as stale-revision, one that missed it applies it. Null when the
+ * host never published for the subject — the join/state repair already seeds
+ * that hp. Host-side only; the caller sends it directly to the joiner.
+ */
+export type HealthAuthoritySeedInput = Readonly<{
+  playerId: string;
+  hostPlayerId: string;
+  matchEpoch: number;
+  hostTimeMs: number;
+  nonce: number;
+  published: PublishedHealthAuthority | undefined;
+}>;
+
+export function mintHealthAuthoritySeed(input: HealthAuthoritySeedInput): HealthAuthorityMessage | null {
+  const prior = input.published;
+  if (!prior) return null;
+  if (!PLAYER_ID_PATTERN.test(input.playerId)
+    || !PLAYER_ID_PATTERN.test(input.hostPlayerId)
+    || input.playerId === input.hostPlayerId
+    || !Number.isSafeInteger(input.matchEpoch) || input.matchEpoch < 0
+    || !Number.isFinite(prior.hp)
+    || !Number.isSafeInteger(prior.continuity) || prior.continuity < 0
+    || !Number.isSafeInteger(prior.revision) || prior.revision < 0
+    || !Number.isFinite(input.hostTimeMs) || input.hostTimeMs < 0
+    || !Number.isFinite(input.nonce)) {
+    return null;
+  }
+  const hp = clampHp(prior.hp);
+  const alive = prior.alive && hp > 0;
+  return {
+    type: 'health-authority',
+    by: input.hostPlayerId,
+    playerId: input.playerId,
+    hp,
+    alive,
+    continuity: prior.continuity,
+    matchEpoch: input.matchEpoch,
+    revision: prior.revision,
+    hostTimeMs: input.hostTimeMs,
+    nonce: input.nonce,
+  };
 }

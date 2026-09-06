@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   admitHealthAuthority,
+  clampAdmittedHpToHealthAuthority,
+  classifyRemoteRespawn,
   evaluateHealthAuthorityPublication,
+  mintHealthAuthoritySeed,
   type PublishedHealthAuthority,
 } from './host-health-authority-broadcast';
 import { isGameMessage, isHostAuthorityMessage, isStateTrafficMessage, type HealthAuthorityMessage, type PlayerSnapshot } from './protocol';
@@ -93,8 +96,19 @@ describe('HF-535 observer admission is fail-closed', () => {
 
   it('rejects a fact about a life older than the one being presented', () => {
     expect(admitHealthAuthority({ message: message({ continuity: 2 }), ...observing }).reason).toBe('stale-life');
-    // A NEWER life is admitted: continuity only advances, so it is not a replay.
-    expect(admitHealthAuthority({ message: message({ continuity: 4 }), ...observing }).accepted).toBe(true);
+  });
+
+  it('holds a fact about a newer life instead of presenting a corpse as alive', () => {
+    // DAY-MP-DAMAGE-FIXES fix 5: admitting a life N+1 fact on an observer
+    // still presenting life N turned the corpse visible at its death position.
+    // The fact is held (and burns no revision) until the local continuity
+    // advances; the state lane delivers the new life's hp in the meantime.
+    const held = admitHealthAuthority({
+      message: message({ continuity: 4, hp: 100, alive: true, revision: 2 }), ...observing,
+    });
+    expect(held.accepted).toBe(false);
+    expect(held.reason).toBe('newer-life-held');
+    expect(held.revision).toBe(-1);
   });
 
   it('rejects an unknown subject rather than inventing a presentation for it', () => {
@@ -289,5 +303,154 @@ describe('HF-535 legacy-main wiring', () => {
     expect(main).toContain('publishedHealthAuthorities.delete(playerId); appliedHealthAuthorityRevisions.delete(playerId);');
     // A forced publish that still declines is a lost fact, so it is counted.
     expect(main).toContain('function recordHealthAuthorityPublishDecline(');
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fix 1: the applied revision is scoped to the match epoch', () => {
+  it('accepts revision 1 of epoch B after revision 6 was applied in epoch A', () => {
+    const appliedInA = admitHealthAuthority({
+      message: message({ revision: 6, matchEpoch: 7 }),
+      ...observing, matchEpoch: 7, lastRevision: -1, lastRevisionEpoch: null,
+    });
+    expect(appliedInA.accepted).toBe(true);
+    const firstOfB = admitHealthAuthority({
+      message: message({ revision: 1, matchEpoch: 8 }),
+      ...observing, matchEpoch: 8, lastRevision: appliedInA.revision, lastRevisionEpoch: 7,
+    });
+    expect(firstOfB.accepted).toBe(true);
+    expect(firstOfB.reason).toBe('accepted');
+  });
+
+  it('still rejects a duplicate revision inside the same epoch', () => {
+    expect(admitHealthAuthority({
+      message: message({ revision: 6 }), ...observing, lastRevision: 6, lastRevisionEpoch: 7,
+    }).reason).toBe('stale-revision');
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fix 5: a newer-life fact is held, never presented', () => {
+  it('applies the fact once the local continuity has advanced to its life', () => {
+    const admission = admitHealthAuthority({
+      message: message({ continuity: 4, hp: 100, alive: true, revision: 2 }),
+      ...observing, subjectContinuity: 4, lastRevision: -1,
+    });
+    expect(admission.accepted).toBe(true);
+  });
+
+  it('no longer claims a newer-life fact cannot resurrect anybody', () => {
+    const moduleSrc = readFileSync(new URL('./host-health-authority-broadcast.ts', import.meta.url), 'utf8');
+    expect(moduleSrc).not.toContain('so it can never resurrect anybody');
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fix 2: a (re)joining observer is seeded with the current authority', () => {
+  it('re-mints the current published fact for the joiner, idempotent by revision', () => {
+    const first = evaluateHealthAuthorityPublication({
+      playerId: VICTIM_ID, hostPlayerId: HOST_ID, matchEpoch: 7,
+      hostTimeMs: 1_000, nonce: 42, continuity: 3, nowMs: 0, hp: 80, alive: true, published: undefined,
+    });
+    const seed = mintHealthAuthoritySeed({
+      playerId: VICTIM_ID, hostPlayerId: HOST_ID, matchEpoch: 7,
+      hostTimeMs: 2_000, nonce: 77, published: first.published,
+    });
+    expect(seed).not.toBeNull();
+    expect(seed?.revision).toBe(first.message?.revision);
+    expect(seed?.hp).toBe(80);
+    expect(seed?.continuity).toBe(3);
+    expect(seed?.by).toBe(HOST_ID);
+    expect(isGameMessage(seed!)).toBe(true);
+    // Idempotent: the joiner that already applied it rejects the seed as stale.
+    const replay = admitHealthAuthority({
+      message: seed!, role: 'client', expectedHostId: HOST_ID, matchEpoch: 7,
+      subjectContinuity: 3, lastRevision: seed!.revision, lastRevisionEpoch: 7,
+    });
+    expect(replay.reason).toBe('stale-revision');
+  });
+
+  it('mints nothing when the host never published for the subject', () => {
+    expect(mintHealthAuthoritySeed({
+      playerId: VICTIM_ID, hostPlayerId: HOST_ID, matchEpoch: 7,
+      hostTimeMs: 2_000, nonce: 77, published: undefined,
+    })).toBeNull();
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fix 3: respawn classification needs a continuity advance', () => {
+  it('does not classify a lethal fact plus a same-life pre-death state as a respawn', () => {
+    // The ordering hazard: a lethal health fact applied on the observer ahead
+    // of an in-flight pre-death canonical state. The state carries hp 100
+    // while the snapshot shows 0, but its continuity did not advance.
+    expect(classifyRemoteRespawn({
+      snapshotHp: 0, incomingHp: 100, remoteContinuity: 4, incomingContinuity: 4, redeployed: false,
+    })).toBe(false);
+  });
+
+  it('still classifies a genuine new-life respawn', () => {
+    expect(classifyRemoteRespawn({
+      snapshotHp: 0, incomingHp: 100, remoteContinuity: 4, incomingContinuity: 5, redeployed: false,
+    })).toBe(true);
+  });
+
+  it('keeps the redeployed clause', () => {
+    expect(classifyRemoteRespawn({
+      snapshotHp: 100, incomingHp: 100, remoteContinuity: 4, incomingContinuity: 4, redeployed: true,
+    })).toBe(true);
+  });
+
+  it('never classifies a continuous live move as a respawn', () => {
+    expect(classifyRemoteRespawn({
+      snapshotHp: 80, incomingHp: 90, remoteContinuity: 4, incomingContinuity: 4, redeployed: false,
+    })).toBe(false);
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fix 4: an admitted state cannot revert a held authority', () => {
+  const held = { heldHp: 0, heldContinuity: 4, subjectContinuity: 4, incomingContinuity: 4 };
+
+  it('clamps a stale-high state to the held authority inside the same life', () => {
+    expect(clampAdmittedHpToHealthAuthority({ ...held, admittedHp: 100 })).toBe(0);
+  });
+
+  it('leaves further damage and consistent states alone', () => {
+    expect(clampAdmittedHpToHealthAuthority({ ...held, heldHp: 80, admittedHp: 70 })).toBe(70);
+    expect(clampAdmittedHpToHealthAuthority({ ...held, heldHp: 80, admittedHp: 80 })).toBe(80);
+  });
+
+  it('releases the clamp when the state carries a newer life', () => {
+    expect(clampAdmittedHpToHealthAuthority({ ...held, admittedHp: 100, incomingContinuity: 5 })).toBe(100);
+  });
+
+  it('does nothing with no held authority', () => {
+    expect(clampAdmittedHpToHealthAuthority({
+      admittedHp: 100, heldHp: undefined, heldContinuity: undefined,
+      subjectContinuity: 4, incomingContinuity: 4,
+    })).toBe(100);
+  });
+});
+
+describe('DAY-MP-DAMAGE-FIXES fixes 2/3/4/6: legacy-main wiring', () => {
+  const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+
+  it('fix 2: seeds a (re)joining observer beside the repair snapshots', () => {
+    expect(main).toContain('mintHealthAuthoritySeed({ playerId: candidate.snapshot.id');
+    expect(main).toContain('mintHealthAuthoritySeed({ playerId: incoming.id');
+    expect(main).toContain('network.sendToPlayer(incoming.id, healthSeed);');
+  });
+
+  it('fix 3: gates the respawn classification on a continuity advance', () => {
+    expect(main).toContain('classifyRemoteRespawn({ snapshotHp: remote.snapshot.hp');
+  });
+
+  it('fix 4: clamps an admitted state to the held authority inside the same life', () => {
+    expect(main).toContain('clampAdmittedHpToHealthAuthority({ admittedHp: admittedIncoming.hp');
+  });
+
+  it('fix 6: records the applied revision only on a path that actually applied', () => {
+    const start = main.indexOf('function applyHealthAuthorityMessage(');
+    const applyFn = main.slice(start, start + 8000);
+    expect(applyFn).toContain('health-authority-self-non-damage');
+    expect(applyFn.indexOf('health-authority-self-non-damage')).toBeLessThan(
+      applyFn.indexOf('appliedHealthAuthorityRevisions.set('),
+    );
   });
 });
