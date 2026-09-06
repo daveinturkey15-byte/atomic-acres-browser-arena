@@ -46,12 +46,6 @@ export const BLOCK_COURSE_M = 0.20;
 export const BLOCK_STRETCHER_M = 0.40;
 
 export type ConcreteVariant = 'apron' | 'kerb' | 'block';
-/**
- * DAY-VISUAL-A (HF-535): tidy kerbs. The kerb variant keeps its tide-mark
- * damp band but at this fraction of the wall strength, so the kerb line
- * reads poured-and-kept rather than rain-streaked. Apron and block unchanged.
- */
-export const KERB_TIDY_DAMP_SCALE = 0.6;
 
 export function concreteSpec(name: string, baseSrgb: number, polygonOffset?: number): Nuketown2MaterialSpec {
   return assertSpec({
@@ -106,9 +100,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const footY = uniforms.concreteFootY;
   const apronDamp = smoothstep(float(0.75), float(0.0), wear.soilMask.mul(float(1.6)));
   const verticalDamp = smoothstep(footY.add(float(0.24)), footY.add(float(0.02)), p.y);
-  const damp = isApron.select(apronDamp, verticalDamp).mul(
-    isApron.select(float(1), isBlock.select(float(1), float(KERB_TIDY_DAMP_SCALE))),
-  );
+  const damp = isApron.select(apronDamp, verticalDamp);
   const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
     .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
   const spall = isApron.select(float(0), blockSpall);

@@ -123,70 +123,6 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
 });
 
 /**
- * DAY-VISUAL-A (HF-535): layered haze per ring, nearest to farthest.
- *
- * The three ridge rings wash into HAZE_COLOR by these amounts (near, mid,
- * far). Order is the contract: a future refactor must keep
- * near < mid < far or the massif stops receding. Values unchanged from the
- * inline literals they replace (foothills 0.34, ridge 0.6, far range 0.82).
- */
-export const NUKETOWN_MOUNTAIN_HAZE_NEAR = 0.34;
-export const NUKETOWN_MOUNTAIN_HAZE_MID = 0.6;
-export const NUKETOWN_MOUNTAIN_HAZE_FAR = 0.82;
-/**
- * Warm low-sun haze band toward the sun, cool elsewhere (HF-535 day shift).
- *
- * HAZE_COLOR is the cool recession tone. HAZE_WARM_SUN is the same hue family
- * lifted toward the estate-golden-hour key (0xfff1ce): ridge faces on the sun
- * side wash into it, faces away wash into the cool tone. Kept below the
- * measured sunset-sky luminance so the far rows recede instead of glowing
- * (same constraint HAZE_COLOR documents).
- */
-export const NUKETOWN_MOUNTAIN_HAZE_WARM_SUN = 0x8a7a5e;
-/** How far the sun-side haze swings warm, 0..1. */
-export const NUKETOWN_MOUNTAIN_HAZE_WARM_BAND = 0.55;
-/**
- * Two-tone rock lighting (HF-535 day shift): warm sunlit faces, cool
- * blue-violet shadow faces, both multiplied over the altitude-banded rock.
- * Mid-grey bases so the product keeps the authored palette, not replaces it.
- */
-export const NUKETOWN_MOUNTAIN_SUN_WARM = 0xffe0b8;
-export const NUKETOWN_MOUNTAIN_SHADE_COOL = 0x9aa0d0;
-/**
- * Contrast floor: fully-lit rock over fully-shaded rock, same base colour,
- * must read at least this different or the massif flattens to one cut-out.
- * The mountain test pins it.
- */
-export const NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR = 1.35;
-/**
- * Apply the two-tone rock light to a base colour.
- *
- * Pure (no THREE renderer needed) so the contract test can pin the contrast
- * floor directly: `lambert` 0 = full shade, 1 = full sun.
- */
-export function mountainTwoTone(
-  baseR: number,
-  baseG: number,
-  baseB: number,
-  lambert: number,
-  out: [number, number, number],
-): [number, number, number] {
-  const t = Math.min(1, Math.max(0, lambert));
-  // sRGB mixes read better here than linear: the shift is a surface tint,
-  // not a light transport term.
-  const sunR = 1.0;
-  const sunG = 0xe0 / 255;
-  const sunB = 0xb8 / 255;
-  const shadeR = 0x9a / 255;
-  const shadeG = 0xa0 / 255;
-  const shadeB = 0xd0 / 255;
-  out[0] = baseR * (shadeR + (sunR - shadeR) * t);
-  out[1] = baseG * (shadeG + (sunG - shadeG) * t);
-  out[2] = baseB * (shadeB + (sunB - shadeB) * t);
-  return out;
-}
-
-/**
  * Atmospheric-perspective haze, derived FROM the arena's fog colour 0xb1c0be
  * (nuketown2-lighting/presets.ts, fog 58..148 m) rather than picked freehand.
  * Raw fog colour cannot be used directly: v4 measured it at relative
@@ -275,12 +211,6 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   const mid = new THREE.Color(spec.footColor).lerp(new THREE.Color(spec.crestColor), 0.55);
   const crest = new THREE.Color(spec.crestColor);
   const vertexColor = new THREE.Color();
-  const hazeWarm = new THREE.Color(NUKETOWN_MOUNTAIN_HAZE_WARM_SUN);
-  const hazeTarget = new THREE.Color();
-  const toneRgb: [number, number, number] = [0, 0, 0];
-  // Sun azimuth in ring-angle convention (x = cos, z = sin): the haze band
-  // and the two-tone both key off it, so the warm side is the sun side.
-  const sunAzimuth = Math.atan2(SUN_DIRECTION.z, SUN_DIRECTION.x);
 
   // Ridged octave: 1-|sin| gives sharp peaks at the sine zero crossings.
   const ridged = (angle: number, phase: number): number => {
@@ -344,13 +274,7 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       const radialT = THREE.MathUtils.clamp(
         (radius - spec.innerRadius) / Math.max(1e-3, spec.outerRadius - spec.innerRadius), 0, 1,
       );
-      // DAY-VISUAL-A (HF-535): the haze target swings warm on the sun side.
-      // `facing` is cos(angle - sunAzimuth): 1 toward the sun, -1 away.
-      const facing = Math.cos(angle - sunAzimuth);
-      hazeTarget.copy(HAZE_COLOR).lerp(
-        hazeWarm, NUKETOWN_MOUNTAIN_HAZE_WARM_BAND * (0.5 + 0.5 * facing),
-      );
-      vertexColor.lerp(hazeTarget, spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95));
+      vertexColor.lerp(HAZE_COLOR, spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95));
       // Baked directional shading. The ring materials are unlit (see the v4
       // note in the file header), so the sun has to be painted in or the
       // massif reads as one flat cut-out. Slope normal is approximated from
@@ -359,18 +283,13 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       const rise = row === 0 ? 0 : ringRows[row][1] - ringRows[row - 1][1];
       const run = row === 0 ? 1 : Math.max(1e-3, ringRows[row][0] - ringRows[row - 1][0]);
       const slope = Math.atan2(rise, run);
-      const slopeFacing = Math.cos(angle) * SUN_DIRECTION.x + Math.sin(angle) * SUN_DIRECTION.z;
+      const facing = Math.cos(angle) * SUN_DIRECTION.x + Math.sin(angle) * SUN_DIRECTION.z;
       const lambert = THREE.MathUtils.clamp(
-        0.5 + 0.5 * (Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * slopeFacing), 0, 1,
+        0.5 + 0.5 * (Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * facing), 0, 1,
       );
-      // DAY-VISUAL-A (HF-535): two-tone rock light replaces the flat shade
-      // multiplier — warm sunlit faces, cool blue-violet shade — then the
-      // per-segment tonal variation rides on top. `shadeStrength` still sets
-      // how far the ring swings between the two tones.
-      const litT = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
-      mountainTwoTone(vertexColor.r, vertexColor.g, vertexColor.b, litT, toneRgb);
-      const tone = 0.94 + varA * 0.12;
-      colors.push(toneRgb[0] * tone, toneRgb[1] * tone, toneRgb[2] * tone);
+      const shade = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
+      const tone = (0.94 + varA * 0.12) * shade;
+      colors.push(vertexColor.r * tone, vertexColor.g * tone, vertexColor.b * tone);
     }
   }
 
@@ -514,7 +433,7 @@ export function buildNuketownMountainBackdrop(
       footColor: 0x2f3a2c,
       crestColor: 0x3d4735,
       phase: 1.9,
-      haze: NUKETOWN_MOUNTAIN_HAZE_NEAR,
+      haze: 0.34,
       shadeStrength: 0.55,
     }),
     ridgeMaterial,
@@ -533,7 +452,7 @@ export function buildNuketownMountainBackdrop(
       footColor: 0x2d3444,
       crestColor: 0x3b4358,
       phase: 4.7,
-      haze: NUKETOWN_MOUNTAIN_HAZE_MID,
+      haze: 0.6,
       shadeStrength: 0.42,
     }),
     ridgeMaterial,
@@ -556,7 +475,7 @@ export function buildNuketownMountainBackdrop(
       footColor: 0x323a51,
       crestColor: 0x414a63,
       phase: 8.3,
-      haze: NUKETOWN_MOUNTAIN_HAZE_FAR,
+      haze: 0.82,
       shadeStrength: 0.3,
     }),
     ridgeMaterial,

@@ -29,33 +29,15 @@
  */
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
-import { boxUv, buildWear, linearSwatch } from '../wear';
+import { boxUv, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
-import { hash2 } from '../../map3/noise';
 
-const { clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } =
+const { clamp, float, floor, fract, mix, positionWorld, smoothstep } =
   TSL as unknown as Record<string, any>;
 
 /** Mown checker cell, metres. Measured off the BO2-2025 aerial reference. */
 export const MOWER_CELL_M = 2.2;
-/**
- * DAY-VISUAL-A (HF-535): mow-stripe Michelson contrast, full swing cell to
- * cell. 0.14 reads at the overhead and street stations; the lane test pins
- * the floor so a future re-key cannot silently flatten the checker.
- */
-export const LAWN_STRIPE_CONTRAST = 0.14;
-/**
- * DAY-VISUAL-A (HF-535): dry late-summer verge straw on the scrub variant
- * (the beyond-fence plain). Warm yellow-green dryness, same shared graph.
- */
-export const LAWN_SCRUB_STRAW = 0.9;
-/**
- * DAY-VISUAL-A (HF-535): scattered yellow wildflowers on the scrub verge.
- * Hash threshold per ~0.33 m cell — sparse dots, never a meadow. Scrub only;
- * the kept turf stays clean.
- */
-export const LAWN_WILDFLOWER_THRESHOLD = 0.975;
 
 export type LawnVariant = 'turf' | 'scrub' | 'hedge';
 
@@ -106,19 +88,15 @@ function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const cellZ = floor(p.z.div(float(MOWER_CELL_M)));
   const parity = fract(cellX.add(cellZ).mul(float(0.5))).mul(float(2));
   const striped = uniforms.baseColor.mul(wear.albedoMul)
-    .mul(isTurf.select(float(1 - LAWN_STRIPE_CONTRAST / 2).add(parity.mul(float(LAWN_STRIPE_CONTRAST))), float(0.95)));
+    .mul(float(0.950).add(isTurf.select(parity.mul(float(0.100)), float(0))));
   const thin = smoothstep(float(0.42), float(0.78), wear.soilMask);
   const bare = smoothstep(float(0.76), float(0.93), wear.soilMask);
   const earth = uniforms.soilColor;
   const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(isHedge.select(float(0.35), float(1.0))));
-  const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(isScrub.select(float(LAWN_SCRUB_STRAW), float(0.35)));
   const worn = mix(thinned, earth, bare.mul(isHedge.select(float(0.15), float(0.60))));
+  const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(isScrub.select(float(0.8), float(0.35)));
   lawnGraph = {
-    colorNode: mix(
-      mix(worn, worn.mul(float(1.42)), straw),
-      linearSwatch(0xd8b93c).mul(wear.albedoMul),
-      isScrub.select(smoothstep(float(LAWN_WILDFLOWER_THRESHOLD), float(0.992), hash2(floor(vec2(p.x, p.z).mul(float(3.0))))), float(0)).mul(float(0.85)),
-    ),
+    colorNode: mix(worn, worn.mul(float(1.42)), straw),
     roughnessNode: clamp(wear.roughness.sub(bare.mul(float(0.06))).sub(straw.mul(float(0.04))), float(0.60), float(1.0)),
   };
   return lawnGraph;
