@@ -87,9 +87,15 @@ export const THRESHOLDS = Object.freeze({
 // channels and would read a pure-red surface as dark; the clamp signature this
 // gate looks for is ALL channels at zero, so the max channel is the right
 // statistic and the only one that separates "dark" from "clamped".
+// HF-536 night-defects-3b: the default Lanczos-3 kernel has negative lobes and
+// undershoots BELOW the input minimum, so a frame whose true minimum is 10
+// reported 69 "newly black" pixels that exist in no frame. Blackness is a
+// per-pixel clamp signature, so it is measured on a nearest-neighbour resample
+// that can only ever return values the frame actually contains. The delta
+// metrics keep Lanczos (a smooth resample is what a region diff wants).
 const maxChannel = async (path) => {
   const { data } = await sharp(path)
-    .resize(ANALYSIS_W, ANALYSIS_H, { fit: 'fill' })
+    .resize(ANALYSIS_W, ANALYSIS_H, { fit: 'fill', kernel: 'nearest' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
