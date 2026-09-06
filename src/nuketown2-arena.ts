@@ -210,6 +210,27 @@ import {
 import { type ForgeKitBox, getLampPoolMaterial, gutterRunParts, kerbCourseParts, lampPoolParts, lanternHeadParts } from './forge-kit';
 // HF-536 night-gemini14: lamp atmospheric light cones and dust motes (critic gap #5)
 import { buildNuketown2LampFx } from './nuketown2-lamp-fx';
+// HF-536 night-gemini15: utility pole power lines, catenary spans, eaves drops, pole transformer (critic gap #1)
+import {
+  buildNuketown2PowerLines,
+  POWER_POLE_HEIGHT,
+  POWER_CROSSARM_Y,
+  POWER_INSULATOR_Y,
+  POWER_CROSSARM_SIZE,
+  NORTH_POLE_POSITIONS,
+  SOUTH_POLE_POSITIONS,
+  deriveNuketown2PowerLinesTelemetry,
+} from './nuketown2-power-lines';
+export {
+  buildNuketown2PowerLines,
+  POWER_POLE_HEIGHT,
+  POWER_CROSSARM_Y,
+  POWER_INSULATOR_Y,
+  POWER_CROSSARM_SIZE,
+  NORTH_POLE_POSITIONS,
+  SOUTH_POLE_POSITIONS,
+  deriveNuketown2PowerLinesTelemetry,
+};
 // HF-536 night-muse-windows: window dressing kit (frames, mullions, sills, curtains, blinds).
 import { type WindowPart, type WindowRole, windowDressing } from './forge-kit/window';
 // HF-536 night-facade-port: the facade module's recipe, as PARTS.
@@ -1380,7 +1401,7 @@ function streetVehicle(
 // Materials — original, authored for this arena
 // ---------------------------------------------------------------------------
 
-type Nuketown2Materials = Readonly<{
+export type Nuketown2Materials = Readonly<{
   ground: THREE.Material;
   lawn: THREE.Material;
   asphalt: THREE.Material;
@@ -4959,6 +4980,9 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
     pair(builder, decal.name, [...decal.position], [...decal.size], decal.material,
       { solid: false, shots: false, cast: false });
   }
+
+  // HF-536 night-gemini15: utility pole power lines, catenary spans, eaves drops, pole transformer
+  buildNuketown2PowerLines(builder, m);
 
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
   buildNuketown2Rooflines(builder, {
