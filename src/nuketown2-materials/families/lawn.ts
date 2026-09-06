@@ -33,11 +33,45 @@ import { boxUv, buildWear } from '../wear';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 
-const { clamp, float, floor, fract, mix, positionWorld, smoothstep } =
+const { clamp, cos, float, floor, fract, mix, positionWorld, sin, smoothstep, vec3 } =
   TSL as unknown as Record<string, any>;
 
 /** Mown checker cell, metres. Measured off the BO2-2025 aerial reference. */
 export const MOWER_CELL_M = 2.2;
+
+/**
+ * HF-536 look-2b CORRECTION ROUND, and the measurement that forced it.
+ *
+ * The first cut of this lane put dry-grass variety on the BLADE INSTANCES
+ * only. It was captured over 29 stations and measured: north-yard/lawnNear
+ * luma stddev 15.70 -> 16.07 (x1.02) and ZERO straw-classified pixels either
+ * side; diff-arena-viewpoints called 15 of 29 stations MATCH and the other 14
+ * DYNAMIC_ONLY. In other words the change was real but invisible, because in a
+ * lawn box the thin blades are a small share of the pixels and the GROUND
+ * PLATE under them is what the camera reads.
+ *
+ * Reading this file then showed why the plate could not carry it. There IS a
+ * dry term here already - `straw`, driven by `wear.scuff` - but it is keyed to
+ * the 60 mm scuff octave, which is below one screen pixel at any camera in the
+ * review set, and it only MULTIPLIES VALUE (x1.42). A brighter green is not
+ * dry grass. So the plate's dryness was, in effect, a uniform 5 % lift: exactly
+ * the "uniform green strip" the critic named.
+ *
+ * The fix is a metre-scale field that shifts HUE, at the SAME period and the
+ * same phase as the blade field in `instanced-grass-field.ts`, so the plate and
+ * the blades go dry in the same places instead of disagreeing.
+ */
+export const LAWN_DRY_PATCH_M = 4.5;
+/** Mix weight toward the straw albedo inside a patch (the brief's 0.35). */
+export const LAWN_DRY_PATCH_WEIGHT = 0.35;
+/** Field threshold pair - the same numbers `grassDryness` derives from coverage 0.34. */
+export const LAWN_DRY_PATCH_THRESHOLDS = Object.freeze([0.66, 0.847] as const);
+/**
+ * Straw albedo, LINEAR. sRGB ~ (0.58, 0.52, 0.27): late-summer dead grass over
+ * thatch. It is a hue and a value step away from the 0x496438 turf, which is
+ * the whole point - the term it replaces could only brighten.
+ */
+export const LAWN_DRY_ALBEDO_LINEAR = Object.freeze([0.300, 0.235, 0.062] as const);
 
 export type LawnVariant = 'turf' | 'scrub' | 'hedge';
 
@@ -95,8 +129,32 @@ function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(isHedge.select(float(0.35), float(1.0))));
   const worn = mix(thinned, earth, bare.mul(isHedge.select(float(0.15), float(0.60))));
   const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(isScrub.select(float(0.8), float(0.35)));
+
+  // HF-536 look-2b: the metre-scale dry patch. Same warped sin/cos field, same
+  // period and same phase as `grassDryness` in instanced-grass-field.ts, so the
+  // plate and the blades standing in it go dry together. Turf and scrub only -
+  // a clipped hedge is watered and does not get dry spots, and giving it one
+  // would make the cover read as damaged.
+  const k = (Math.PI * 2) / LAWN_DRY_PATCH_M;
+  const warp = cos(p.z.mul(float(k * 0.83)).add(float(1.7))).mul(float(0.9));
+  const dryField = sin(p.x.mul(float(k)).add(warp))
+    .mul(cos(p.z.mul(float(k * 0.71)).sub(float(0.9))))
+    .mul(float(0.5)).add(float(0.5));
+  const dryPatch = smoothstep(
+    float(LAWN_DRY_PATCH_THRESHOLDS[0]), float(LAWN_DRY_PATCH_THRESHOLDS[1]), dryField,
+  ).mul(isHedge.select(float(0), float(LAWN_DRY_PATCH_WEIGHT)));
+  // The straw albedo still takes the surface's own wear modulation, so a dry
+  // patch that crosses a desire line is still worn where the line is.
+  const dryAlbedo = vec3(
+    float(LAWN_DRY_ALBEDO_LINEAR[0]), float(LAWN_DRY_ALBEDO_LINEAR[1]), float(LAWN_DRY_ALBEDO_LINEAR[2]),
+  ).mul(wear.albedoMul);
+  const patchy = mix(worn, dryAlbedo, dryPatch);
+
   lawnGraph = {
-    colorNode: mix(worn, worn.mul(float(1.42)), straw),
+    // Additive by construction: where dryPatch is 0 - every hedge surface, and
+    // every turf position outside a patch - `patchy` IS `worn`, so this
+    // composes exactly as it did before.
+    colorNode: mix(patchy, patchy.mul(float(1.42)), straw),
     roughnessNode: clamp(wear.roughness.sub(bare.mul(float(0.06))).sub(straw.mul(float(0.04))), float(0.60), float(1.0)),
   };
   return lawnGraph;

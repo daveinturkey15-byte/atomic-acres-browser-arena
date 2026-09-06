@@ -40,6 +40,12 @@ import {
   nuketownLawnPlacementAllowed,
 } from './nuketown-lawn-field';
 import { buildNuketown2 } from './nuketown2-arena';
+import {
+  LAWN_DRY_ALBEDO_LINEAR,
+  LAWN_DRY_PATCH_M,
+  LAWN_DRY_PATCH_THRESHOLDS,
+  LAWN_DRY_PATCH_WEIGHT,
+} from './nuketown2-materials/families/lawn';
 import { GRASS_MAX_HEIGHT } from './grass-placement';
 import { grassClumpTintPeak, grassDryness } from './rendering/instanced-grass-field';
 
@@ -458,6 +464,32 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     // ...and the leaf is a GREEN, not a wash: the green channel dominates.
     expect(leaf[1]!).toBeGreaterThan(leaf[0]! * 1.4);
     expect(leaf[1]!).toBeGreaterThan(leaf[2]! * 1.4);
+  });
+
+  it('keys the ground PLATE dry patch to the same field as the blades', () => {
+    // THE CORRECTION ROUND'S CONTRACT. The first cut put dryness on the blade
+    // instances only and it measured invisible (north-yard/lawnNear luma
+    // stddev 15.70 -> 16.07, zero straw pixels either side, 15 of 29 stations
+    // MATCH on the viewpoint diff), because the ground plate under the blades
+    // is most of the pixels in a lawn box. Plate and blades must therefore go
+    // dry in the SAME PLACES - two fields at different periods would read as
+    // noise, not as patches - so the period and the threshold pair are pinned
+    // across the two modules here rather than duplicated by hand.
+    const dry = NUKETOWN2_LAWN_TINT.dry!;
+    expect(LAWN_DRY_PATCH_M).toBe(dry.patchM);
+    expect(LAWN_DRY_PATCH_WEIGHT).toBe(dry.weight);
+    // grassDryness derives its ramp from `coverage`; the plate takes the same
+    // two numbers as literals, so this is the equality that keeps them honest.
+    const lo = 1 - dry.coverage;
+    expect(LAWN_DRY_PATCH_THRESHOLDS[0]).toBeCloseTo(lo, 6);
+    expect(LAWN_DRY_PATCH_THRESHOLDS[1]).toBeCloseTo(lo + (1 - lo) * 0.55, 3);
+    // ...and the plate's dry albedo must be a HUE step, not a brightness step:
+    // the term it replaces was a x1.42 value multiply, which is why the plate
+    // read as one flat green however dry the field said it was.
+    const [r, g, b] = LAWN_DRY_ALBEDO_LINEAR;
+    const turf = new THREE.Color(0x496438);
+    expect(r / g).toBeGreaterThan((turf.r / turf.g) * 1.8);
+    expect(b / g).toBeLessThan(turf.b / turf.g);
   });
 
   it('builds the clover deterministically', () => {
