@@ -38,9 +38,14 @@ import {
 } from './arena-layout';
 import type { Box2 } from './collision';
 import { GRASS_GROUND_REGIONS, GRASS_MAX_HEIGHT, grassPlacementAllowed } from './grass-placement';
+import { nuketown2HandedX } from './nuketown2-layout';
 import {
   buildInstancedGrassField,
+  GRASS_BLADE_LEAN_MAX_DEG,
+  GRASS_NEAR_BAND_DENSITY_FACTOR,
+  GRASS_NEAR_BAND_RADIUS_M,
   type GrassClumpTint,
+  type GrassNearBandSpec,
   type GrassRegionRect,
   type InstancedGrassField,
   type InstancedGrassFieldStats,
@@ -351,6 +356,48 @@ export const NUKETOWN2_LAWN_TINT: GrassClumpTint = Object.freeze({
     coverage: 0.34,
   }),
 });
+/**
+ * HF-536 muse-lawn2 blade read — the authored numbers behind the contrast.
+ *
+ * BASE/TIP: blade-root composed luma 0.55x the plate, tip 1.35x (the tip
+ * catches the sun). The root shade below is the per-channel multiplier whose
+ * composed luma lands the 0.55 ratio against the 0x646536 plate; the tip tint
+ * lives in instanced-grass-field.ts (GRASS_BLADE_TIP_TINT) with the 20 %
+ * sun-catch hash. Pinned in src/nuketown2-lawn-blades.test.ts.
+ */
+export const NUKETOWN2_LAWN_ROOT_SHADE: readonly [number, number, number] = Object.freeze([0.485, 0.562, 0.427]);
+/**
+ * Height jitter 0.7x–1.4x: per-instance scale in [0.7, 1.0] against the
+ * 0.22 m authored geometry, so the shortest tuft is 0.7x nominal and the
+ * tallest (1.0 / 0.7 = 1.43x the shortest) never clears the art-only cap.
+ * The max stays clamped to 1.0 by construction in the field builder.
+ */
+export const NUKETOWN2_LAWN_SCALE_RANGE: readonly [number, number] = Object.freeze([0.7, 1.0]);
+/**
+ * Near-band density x1.6 within 4 m of the review-close camera footprints:
+ * the five ground-level yard stations' eyes and targets (authored coords put
+ * through the handedness mirror at build time, so a map mirror carries the
+ * band with the cameras). The overhead is aerial, not near turf, by design.
+ */
+export function nuketown2LawnNearBandPoints(): Array<readonly [number, number]> {
+  const authored: Array<readonly [number, number]> = [
+    [-12, -31], [-1.25, -21.5],
+    [12, 31], [1.25, 21.5],
+    [-5.4, -29.1], [-2.0, -33.2],
+    [12.0, -29.4], [8.6, -33.6],
+    [17.3, -22.5], [14.2, -25.6],
+  ];
+  return authored.map(([x, z]) => [nuketown2HandedX(x), z] as const);
+}
+export const NUKETOWN2_LAWN_NEAR_BAND_RADIUS_M = GRASS_NEAR_BAND_RADIUS_M;
+export const NUKETOWN2_LAWN_NEAR_BAND_DENSITY = GRASS_NEAR_BAND_DENSITY_FACTOR;
+export function nuketown2LawnNearBand(): GrassNearBandSpec {
+  return {
+    points: nuketown2LawnNearBandPoints(),
+    radiusM: NUKETOWN2_LAWN_NEAR_BAND_RADIUS_M,
+    densityFactor: NUKETOWN2_LAWN_NEAR_BAND_DENSITY,
+  };
+}
 
 /** Clover/flower tuft cap - the brief's ceiling, enforced by construction. */
 export const NUKETOWN2_CLOVER_BUDGET = 400;
@@ -455,8 +502,9 @@ export function buildNuketownRebuildLawnField(
     seed: NUKETOWN_LAWN_SEED ^ 0x0002_6426,
     regions: nuketownRebuildLawnRegions(options.dressing),
     // The shipped map's own cell sizes, unchanged. Measured on the rebuild's
-    // 1,144 m2 of lawn: 9,953 tufts / 149 k triangles / 8 draws, against an
-    // arena budget of 650 k triangles and 420 draws whose solid geometry is
+    // lawn: 8,303 tufts / 124,545 triangles / 11 draws pre-muse-lawn2 (the old
+    // comment's 9,953 / 149 k / 8 predates the turning-head re-tile), against
+    // an arena budget of 650 k triangles and 420 draws whose solid geometry is
     // 230 boxes. A sparser cell was tried first and rejected - the owner's
     // standing note on this map's grass is that it "still feels poor", and
     // there is no budget reason here to under-plant it.
@@ -465,7 +513,12 @@ export function buildNuketownRebuildLawnField(
     bladeWidthM: 0.062,
     bladeBendM: 0.055,
     bladesPerTuft: reduced || compatRoute ? 2 : 3,
-    scaleRange: [0.68, 1.0],
+    // HF-536 muse-lawn2: 0.7x-1.4x height jitter (max/min 1.43x, cap holds),
+    // 0-25 deg lean jitter, and x1.6 density within 4 m of the review-close
+    // camera footprints. Twins reuse the region meshes: draws never move.
+    scaleRange: [...NUKETOWN2_LAWN_SCALE_RANGE] as [number, number],
+    nearBand: reduced || compatRoute ? null : nuketown2LawnNearBand(),
+    leanMaxDeg: GRASS_BLADE_LEAN_MAX_DEG,
     placementAllowed: (x, z) => !keepOuts.some((box) => (
       x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
       && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
@@ -479,6 +532,8 @@ export function buildNuketownRebuildLawnField(
       // green (see NUKETOWN2_LAWN_BASE_COLOR). HF-536 muse-lawn: the tip/backlit
       // translucency follows the lawn to the boards olive (0xa4cb55 hue 79.8 sat
       // 58.1% -> 0x9aa04e hue 64.4 sat 51.2%, measured with the lawn boxes).
+      // HF-536 muse-lawn2: the root sits at 0.55x the plate luma so the blades
+      // separate from the ground they stand in (was 0.56/0.65/0.50).
       color: NUKETOWN2_LAWN_BASE_COLOR,
       roughness: 0.89,
       metalness: 0.02,
@@ -486,7 +541,7 @@ export function buildNuketownRebuildLawnField(
       windSpeed: 0.8,
       sssColor: 0x9aa04e,
       sssStrength: 0.29,
-      rootShade: [0.56, 0.65, 0.5],
+      rootShade: [...NUKETOWN2_LAWN_ROOT_SHADE] as [number, number, number],
     },
     tint: NUKETOWN2_LAWN_TINT,
   });

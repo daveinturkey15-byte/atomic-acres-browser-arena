@@ -115,8 +115,8 @@ let lawnGraph: { colorNode: any; roughnessNode: any } | null = null;
 function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any } {
   if (lawnGraph) return lawnGraph;
   // Shared graph input only (wear sizes/variant; colour comes from each material's
-  // own uniforms): kept on the registry plate 0x6a6b3a (HF-536 muse-lawn).
-  const spec = lawnSpec('nuketown2-lawn-shared', 0x6a6b3a, 'turf');
+  // own uniforms): kept on the registry plate 0x646536 (HF-536 muse-lawn2 -6 %).
+  const spec = lawnSpec('nuketown2-lawn-shared', 0x646536, 'turf');
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
   const variant = uniforms.lawnVariant as any;

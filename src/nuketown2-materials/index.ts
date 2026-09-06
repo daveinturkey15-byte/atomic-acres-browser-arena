@@ -225,12 +225,15 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // HF-536 muse-lawn: olive turf toward the measured boards (interim-4 boards
     // grassNear hue 70.3 sat 62.2%, lawnSouth hue 55.5 sat 56.5% at p50 23-33;
     // ours was lime hue 96.8 sat 44% at p50 71-74). 0x6a6b3a = hue 61.2 sat 45.8%.
-    // Scrub follows the same step so the verge stays one palette as the lawn.
+    // HF-536 muse-lawn2 [MEASURED]: the plate drops one -6 % luma step to
+    // 0x646536 (displayed luma 103.2 -> 97.4, hue 61.2 -> 61.3, sat 45.8 ->
+    // 46.5 %) so the 1.35x sunlit blade tips separate from the ground they
+    // stand in. Scrub stays: it is a 55 m backdrop, not review-close turf.
     ground: createLawnMaterial('nuketown2-ground-scrub', 0x5e5f3c, {
       variant: 'scrub',
       readDistanceM: 55,
     }),
-    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x6a6b3a, { variant: 'turf', polygonOffset: -2 }),
+    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x646536, { variant: 'turf', polygonOffset: -2 }),
 
     // Damp asphalt with a sun streak: baseRoughness 0.95 -> 0.66 and
     // trafficRoughness 0.10 -> 0.16, soil 0.080 -> 0.110 for the kerb-channel

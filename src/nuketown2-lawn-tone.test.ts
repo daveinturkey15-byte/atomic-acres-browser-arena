@@ -104,7 +104,10 @@ describe('HF-536 muse-lawn — authored turf lands on the boards olive', () => {
     );
     // Lawn plate 0x496438 (hue 96.8) -> olive; scrub and planter move with it so
     // the yard stays one palette.
-    expect(hexOf('lawn')).toBe(0x6a6b3a);
+    // HF-536 muse-lawn2 [MEASURED]: the plate drops one -6 % luma step so the
+    // 1.35x blade tips separate from it (displayed luma 103.2 -> 97.4, hue and
+    // saturation unchanged). Design-constant move, not a gate edit.
+    expect(hexOf('lawn')).toBe(0x646536);
     expect(hexOf('ground')).toBe(0x5e5f3c);
     expect(hexOf('planter')).toBe(0x57602f);
     // Blade green pull-down: the lime composition is gone.

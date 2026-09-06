@@ -499,7 +499,7 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     expect(leaf[1]!).toBeGreaterThan(leaf[2]! * 1.4);
   });
 
-  it('keys the OLIVE ground PLATE dry patch to the same field as the blades (HF-536 muse-lawn measured ratchet: plate 0x496438 -> 0x6a6b3a, hue step 1.8 -> 1.15)', () => {
+  it('keys the OLIVE ground PLATE dry patch to the same field as the blades (HF-536 muse-lawn measured ratchet: plate 0x496438 -> 0x6a6b3a, hue step 1.8 -> 1.15; muse-lawn2: plate -> 0x646536, same hue, -6 % luma)', () => {
     // THE CORRECTION ROUND'S CONTRACT. The first cut put dryness on the blade
     // instances only and it measured invisible (north-yard/lawnNear luma
     // stddev 15.70 -> 16.07, zero straw pixels either side, 15 of 29 stations
@@ -522,7 +522,10 @@ describe('HF-536 look-2b nuketown2 lawn variety', () => {
     // turf is olive now (R/G 0.98, not lime 0.53), so the straw's measured R/G
     // step is 1.42x; the B/G drop below the turf is the rest of the hue proof.
     const [r, g, b] = LAWN_DRY_ALBEDO_LINEAR;
-    const turf = new THREE.Color(0x6a6b3a);
+    // HF-536 muse-lawn2: tracks the registry plate (0x6a6b3a -> 0x646536, same
+    // hue, -6 % luma); the linear scale keeps every channel ratio, so the hue
+    // step below is unchanged.
+    const turf = new THREE.Color(0x646536);
     expect(r / g).toBeGreaterThan((turf.r / turf.g) * 1.15);
     expect(b / g).toBeLessThan(turf.b / turf.g);
   });

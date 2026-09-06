@@ -47,9 +47,67 @@ import {
   positionWorld,
   sin,
   smoothstep,
+  step,
   uniform,
   vec3,
 } from 'three/tsl';
+
+// ---------------------------------------------------------------------------
+// HF-536 muse-lawn2 blade read: base/tip contrast, sun-catch tips, taper.
+// ---------------------------------------------------------------------------
+
+/**
+ * Blade-root composed luma as a fraction of the lawn PLATE luma. The root sits
+ * in the plate's shadow line, so it renders darker than the ground it stands
+ * in; the tip catches the sun (see TIP below). Pinned by
+ * `src/nuketown2-lawn-blades.test.ts` against the composed plate+blade mix.
+ */
+export const GRASS_BLADE_BASE_LUMA_RATIO = 0.55;
+/**
+ * Blade-tip composed luma as a fraction of the lawn PLATE luma. Reached via
+ * TIP_TINT below: tip = base x (0.3 + 0.7 x tint-luma), so tint-luma 1.50
+ * composes to 1.35x the plate.
+ */
+export const GRASS_BLADE_TIP_LUMA_RATIO = 1.35;
+/**
+ * Warm sun-catch tint at the blade tip, per channel. Luma 1.50: with the 0.7
+ * gradient mix the composed tip lands on TIP_LUMA_RATIO above the plate.
+ */
+export const GRASS_BLADE_TIP_TINT: readonly [number, number, number] = Object.freeze([1.52, 1.47, 1.06]);
+/**
+ * Fraction of blades whose tips catch extra sun (per-instance hash). The
+ * boards' turf is not a uniform gradient: ~1 blade in 5 carries a brighter
+ * tip against the darker base.
+ */
+export const GRASS_BLADE_SUN_CATCH_FRACTION = 0.2;
+/** Additive tip boost for a sun-catch blade, in units of the base colour. */
+export const GRASS_BLADE_SUN_CATCH_BOOST = 0.35;
+/**
+ * Pure helper so the lane test can pin the distribution without a GPU: a
+ * uniform hash stream lands exactly FRACTION of blades on the boost.
+ */
+export function grassBladeSunCatchBoost(hash01: number): number {
+  return hash01 >= 1 - GRASS_BLADE_SUN_CATCH_FRACTION ? GRASS_BLADE_SUN_CATCH_BOOST : 0;
+}
+/**
+ * Blade width taper per unit height: half-width = (w/2) x (1 - t x TAPER),
+ * then a single tip vertex. 0.92 leaves the top row at 39 % of the root so
+ * the silhouette is a blade, not a card (was 0.82 / 45 %).
+ */
+export const GRASS_BLADE_TAPER = 0.92;
+/**
+ * Per-instance lean jitter ceiling, degrees. 0 disables lean (the historical
+ * behaviour for every field except the nuketown2 lawn).
+ */
+export const GRASS_BLADE_LEAN_MAX_DEG = 25;
+/**
+ * Near-camera density band: inside RADIUS_M of a band point the field plants
+ * DENSITY_FACTOR x the tufts (a deterministic twin chance of FACTOR - 1 per
+ * accepted candidate), so the review-close turf carries blade silhouettes
+ * instead of plate. Twins reuse the region's own InstancedMesh: no new draws.
+ */
+export const GRASS_NEAR_BAND_RADIUS_M = 4;
+export const GRASS_NEAR_BAND_DENSITY_FACTOR = 1.6;
 
 // ---------------------------------------------------------------------------
 // Public configuration surface
@@ -161,6 +219,15 @@ export type GrassFieldMaterialOptions = Readonly<{
    * on a bright kept lawn; suburban presets pass a lighter shade. */
   rootShade?: readonly [number, number, number];
 }>;
+/**
+ * Near-camera density band spec. `points` are world XZ footprints (review
+ * camera eyes and targets); `densityFactor` 1.6 = 60 % twin chance.
+ */
+export type GrassNearBandSpec = Readonly<{
+  points: ReadonlyArray<readonly [number, number]>;
+  radiusM: number;
+  densityFactor: number;
+}>;
 
 export interface InstancedGrassFieldOptions {
   /** Mesh name prefix, e.g. 'nuketown-lawn'. */
@@ -185,6 +252,20 @@ export interface InstancedGrassFieldOptions {
    * A 3-blade tuft triples visual density per instance for the same
    * instance count - the vegetation skill's merged-geometry recipe. */
   bladesPerTuft?: number;
+  /**
+   * Near-camera density band (HF-536 muse-lawn2). Inside `radiusM` of any
+   * band point each accepted candidate twins with chance `densityFactor - 1`,
+   * so the review-close turf reads as blades. Twins are clamped to their
+   * region and re-checked against `placementAllowed`, and they reuse the
+   * region's InstancedMesh, so draws never move.
+   */
+  nearBand?: GrassNearBandSpec | null;
+  /**
+   * Per-instance lean jitter ceiling, degrees (0 = upright, historical).
+   * Random tilt direction, magnitude uniform in [0, ceiling]; vertical blade
+   * height only shrinks (cos), so the art-only height cap holds.
+   */
+  leanMaxDeg?: number;
   /** Ground height lookup; default flat 0. */
   groundY?: (x: number, z: number) => number;
   /** Arena keep-out truth: return false to reject a candidate. */
@@ -235,7 +316,7 @@ export function createGrassBladeGeometry(
     const t = row / BLADE_SEGMENTS;
     const cy = t * bendM * 0.55 + t * t * (heightM - bendM * 0.55);
     const cz = t * bendM * 0.55 + t * t * (bendM - bendM * 0.55);
-    const halfWidth = (widthM / 2) * (1 - t * 0.82);
+    const halfWidth = (widthM / 2) * (1 - t * GRASS_BLADE_TAPER);
     positions.push(-halfWidth, cy, cz);
     positions.push(halfWidth, cy, cz);
   }
@@ -379,13 +460,25 @@ function makeFieldMaterial(
   const swayZ = g2.sub(tb.mul(0.7)).mul(gust).mul(bend).mul(opts.swayAmount);
   mat.positionNode = positionLocal.add(vec3(swayX, float(0), swayZ)) as unknown as Node<'vec3'>;
 
-  // ---- root-to-tip gradient + optional backlit translucency ----
+  // ---- root-to-tip gradient + sun-catch tips + optional backlit translucency ----
+  // HF-536 muse-lawn2: the tip carries the sun (TIP_TINT composes to
+  // TIP_LUMA_RATIO above the plate) and a hashed 1-in-5 blades burn brighter
+  // still, so the turf reads as individual blades against the darker base.
   const baseV = vec3(materialColor as unknown as Node<'vec3'>);
   const [shadeR, shadeG, shadeB] = opts.rootShade ?? [0.42, 0.5, 0.38];
   const rootShade = baseV.mul(vec3(shadeR, shadeG, shadeB));
   const grad = smoothstep(0, 0.55, hN);
   let col = mix(rootShade, baseV, grad);
-  col = mix(col, baseV.mul(vec3(1.14, 1.08, 0.8)), hN.mul(0.7)) as unknown as Node<'vec3'>;
+  col = mix(
+    col,
+    baseV.mul(vec3(GRASS_BLADE_TIP_TINT[0], GRASS_BLADE_TIP_TINT[1], GRASS_BLADE_TIP_TINT[2])),
+    hN.mul(0.7),
+  ) as unknown as Node<'vec3'>;
+  // Per-blade hash: the top SUN_CATCH_FRACTION of the stream adds BOOST at the
+  // tip (quadratic falloff, so the root stays in shadow). Mirrors
+  // grassBladeSunCatchBoost for the test seam.
+  const lucky = step(float(1 - GRASS_BLADE_SUN_CATCH_FRACTION), instanceHash(7));
+  col = col.add(baseV.mul(lucky).mul(hN.mul(hN)).mul(GRASS_BLADE_SUN_CATCH_BOOST)) as unknown as Node<'vec3'>;
   const sssStrength = opts.sssStrength ?? 0;
   if (sssStrength > 0) {
     const L = normalize(vec3(-0.45, 0.62, -0.35));
@@ -502,11 +595,28 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
 
   const meshes: THREE.InstancedMesh[] = [];
   let blades = 0;
+  const band = options.nearBand ?? null;
+  const bandRadiusSq = band ? band.radiusM * band.radiusM : 0;
+  const twinChance = band ? Math.min(1, Math.max(0, band.densityFactor - 1)) : 0;
+  const inBand = band && band.points.length > 0 && twinChance > 0
+    ? (x: number, z: number): boolean => {
+      for (const point of band.points) {
+        const dx = x - point[0];
+        const dz = z - point[1];
+        if (dx * dx + dz * dz <= bandRadiusSq) return true;
+      }
+      return false;
+    }
+    : null;
+  const leanMaxRad = ((options.leanMaxDeg ?? 0) * Math.PI) / 180;
   for (let regionIndex = 0; regionIndex < options.regions.length; regionIndex += 1) {
     const region = options.regions[regionIndex];
     // Deterministic candidate pass — the RNG stream is consumed identically
     // regardless of rejections, so a keep-out change never rearranges the
-    // rest of the field.
+    // rest of the field. Twin/lean draws extend the same seeded stream, so
+    // two builds with the same options are identical on every peer; enabling
+    // the band reshuffles downstream placements, which is why the blade-count
+    // ratchet in nuketown2-fidelity.test.ts is re-measured, not historic.
     const instances: Array<{ x: number; z: number; yaw: number; scale: number }> = [];
     for (let pz = region.minZ; pz < region.maxZ; pz += cell) {
       for (let px = region.minX; px < region.maxX; px += cell) {
@@ -517,6 +627,13 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
         if (x > region.maxX || z > region.maxZ) continue;
         if (!allowed(x, z)) continue;
         instances.push({ x, z, yaw, scale });
+        if (inBand && inBand(x, z) && rng() < twinChance) {
+          const tx = Math.min(region.maxX, Math.max(region.minX, x + (rng() - 0.5) * cell * 0.8));
+          const tz = Math.min(region.maxZ, Math.max(region.minZ, z + (rng() - 0.5) * cell * 0.8));
+          if (allowed(tx, tz)) {
+            instances.push({ x: tx, z: tz, yaw: rng() * Math.PI * 2, scale: scaleMin + rng() * (scaleMax - scaleMin) });
+          }
+        }
       }
     }
     if (instances.length === 0) continue;
@@ -525,7 +642,16 @@ export function buildInstancedGrassField(options: InstancedGrassFieldOptions): I
     mesh.name = `${options.name}-region-${regionIndex}`;
     for (let k = 0; k < instances.length; k += 1) {
       const inst = instances[k];
-      euler.set(0, inst.yaw, 0);
+      if (leanMaxRad > 0) {
+        const leanMag = rng() * leanMaxRad;
+        const leanDir = rng() * Math.PI * 2;
+        // YXZ: yaw first, then the two orthogonal tilts compose to exactly
+        // leanMag (acos(cos a x cos c) <= mag), so the ceiling holds. XYZ
+        // would stack them to 1.41x the ceiling (measured 33.3 deg).
+        euler.set(Math.cos(leanDir) * leanMag, inst.yaw, Math.sin(leanDir) * leanMag, 'YXZ');
+      } else {
+        euler.set(0, inst.yaw, 0);
+      }
       quaternion.setFromEuler(euler);
       position.set(inst.x, groundY(inst.x, inst.z) - rootSink, inst.z);
       scaleVec.set(0.85 + (k % 5) * 0.05, inst.scale, 0.9 + (k % 3) * 0.06);
