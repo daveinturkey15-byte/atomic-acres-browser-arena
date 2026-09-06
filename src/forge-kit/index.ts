@@ -78,3 +78,28 @@ export {
   windowUnit,
 } from './facade';
 export type { FacadeMaterials, FacadeRole, HouseFacadeOptions } from './facade';
+// HF-536 night-facade-port: the same facade recipe as PARTS, for arenas.
+export {
+  FACADE_BOARD_BED,
+  FACADE_BOARD_H,
+  FACADE_BOARD_T,
+  FACADE_COURSE_H,
+  FACADE_MAX_PROUD,
+  FACADE_REVEAL_SETBACK,
+  FACADE_REVEAL_T,
+  FACADE_SHINGLE_COURSE,
+  facadePartsTriangles,
+  lapSidingParts,
+  panelDoorParts,
+  shingleRoofParts,
+  windowRevealParts,
+} from './facade';
+export type {
+  FacadeFacing,
+  FacadePart,
+  FacadePartRole,
+  LapSidingPartsOptions,
+  PanelDoorPartsOptions,
+  ShingleRoofPartsOptions,
+  WindowRevealPartsOptions,
+} from './facade';

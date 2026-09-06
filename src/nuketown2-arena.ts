@@ -197,6 +197,15 @@ import {
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
 import { type ForgeKitBox, gutterRunParts, kerbCourseParts, lanternHeadParts } from './forge-kit';
+// HF-536 night-facade-port: the facade module's recipe, as PARTS.
+import {
+  type FacadePart,
+  type FacadePartRole,
+  lapSidingParts,
+  panelDoorParts,
+  shingleRoofParts,
+  windowRevealParts,
+} from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -385,6 +394,8 @@ const GARAGE_CAR_LENGTH = 3.7;
 /** Body only. The cabin above it is presentation, so there is no walk-under gap. */
 const GARAGE_CAR_BODY_H = 1.45;
 
+/** Garage wall height, metres. Shared by `garage()` and the house's east elevation. */
+const GARAGE_H = 3.4;
 const GARAGE_SETBACK = 6;
 const GARAGE_FRONT_Z = HOUSE_FRONT_Z - GARAGE_SETBACK;            // -16
 const GARAGE_BACK_Z = HOUSE_BACK_Z;                               // -23, flush with the house
@@ -1557,6 +1568,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // (`nt2025-aerial-boii.jpg`). Colour only, one geometry.
   pair(builder, 'house roof deck', [cx, ROOF_Y0 + ROOF_T / 2, zMid], [HOUSE_WIDTH, ROOF_T, HOUSE_DEPTH],
     [m.roof, m.roofGlazing]);
+  // HF-536 night-facade-port: SHINGLE COURSES AND AN EAVES OVERHANG. The deck
+  // stopped dead on the wall line, which is the single strongest "extruded,
+  // not built" tell from the street and from `overhead`. 250 mm of eave with a
+  // fascia under it, and 300 mm courses whose 20 mm gaps show the deck below
+  // as a dark line - the same construction as the wall reveal, so again no
+  // coplanar face anywhere. The existing eaves gutter hangs UNDER this; it is
+  // reused, not duplicated.
+  facadePair(builder, m, 'house roof shingles', [cx, ROOF_Y0 + ROOF_T / 2, zMid],
+    shingleRoofParts({ width: HOUSE_WIDTH, depth: HOUSE_DEPTH, slabTop: ROOF_T / 2, overhang: 0.25 }));
 
   // West side wall. SPLIT AT THE STOREY LINE (HF-477) so the north house can be
   // orange over cream: the upper leaf carries `sidingUpper`, the ground leaf
@@ -1567,6 +1587,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [WALL_T, GROUND_H, HOUSE_DEPTH], siding);
   pair(builder, 'house wall west upper', [HOUSE_X0 + WALL_T / 2, (GROUND_H + ROOF_Y0) / 2, zMid],
     [WALL_T, ROOF_Y0 - GROUND_H, HOUSE_DEPTH], sidingUpper);
+  // HF-536 night-facade-port: the BLIND elevation. 13 m long, 6.2 m tall and
+  // seen from both yards and from the upper windows of the other house - the
+  // largest single flat surface on the map before this pass.
+  facadePair(builder, m, 'house west siding', [HOUSE_X0, 0, zMid],
+    lapSidingParts({ run: HOUSE_DEPTH, height: GROUND_H, facing: 'x-' }));
+  facadePair(builder, m, 'house west siding upper', [HOUSE_X0, GROUND_H, zMid],
+    lapSidingParts({ run: HOUSE_DEPTH, height: ROOF_Y0 - GROUND_H, facing: 'x-', role: 'sidingUpper', courseOffset: 20 }));
 
   // --- east side wall: the garage link doorway is a REAL hole ---------------
   // The previous cut cut a doorway in the garage's shared wall and left the
@@ -1583,6 +1610,25 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     [WALL_T, 0.4, LINK_DOOR[1] - LINK_DOOR[0]], m.trim);
   pair(builder, 'house wall east upper', [HOUSE_X1 - WALL_T / 2, (GROUND_H + ROOF_Y0) / 2, zMid],
     [WALL_T, ROOF_Y0 - GROUND_H, HOUSE_DEPTH], sidingUpper);
+  // The east elevation is only EXPOSED for the 6 m in front of the garage, and
+  // above the garage roof (3.7 m) behind it. Siding what the garage covers
+  // would be 400 boxes nobody can ever see, so the runs are cut to the two
+  // pieces that are actually outdoors.
+  {
+    const openRun = HOUSE_FRONT_Z - GARAGE_FRONT_Z;
+    const openZ = (HOUSE_FRONT_Z + GARAGE_FRONT_Z) / 2;
+    facadePair(builder, m, 'house east siding', [HOUSE_X1, 0, openZ],
+      lapSidingParts({ run: openRun, height: GROUND_H, facing: 'x+' }));
+    facadePair(builder, m, 'house east siding upper', [HOUSE_X1, GROUND_H, openZ],
+      lapSidingParts({ run: openRun, height: ROOF_Y0 - GROUND_H, facing: 'x+', role: 'sidingUpper', courseOffset: 20 }));
+    const overGarageBase = GARAGE_H + 0.3;
+    facadePair(builder, m, 'house east siding over garage',
+      [HOUSE_X1, overGarageBase, (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2],
+      lapSidingParts({
+        run: GARAGE_DEPTH, height: ROOF_Y0 - overGarageBase, facing: 'x+',
+        role: 'sidingUpper', courseOffset: 40,
+      }));
+  }
 
   // --- front wall, ground floor: two windows and the front door ------------
   // Segments are authored as [x0, x1] runs; the gaps between them ARE the
@@ -1598,7 +1644,18 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   groundFrontRuns.forEach((run, index) => {
     pair(builder, `house front pier ${index}`,
       [(run[0] + run[1]) / 2, GROUND_H / 2, zFront], [run[1] - run[0], GROUND_H, WALL_T], siding);
+    // HF-536 night-facade-port: LAP COURSES on the pier, not a painted box.
+    // The board face stands 50 mm proud of the wall's outer plane and beds
+    // 10 mm into it - the parity ceiling exactly, and no coplanar face.
+    facadePair(builder, m, `house front siding ${index}`,
+      [(run[0] + run[1]) / 2, 0, HOUSE_FRONT_Z],
+      lapSidingParts({ run: run[1] - run[0], height: GROUND_H, facing: 'z+' }));
   });
+  // The 300 mm band between the ground storey's head and the upper piers is the
+  // upper FLOOR SLAB's edge - `m.interior` drywall, outdoors, on the map's most
+  // photographed elevation. Siding it is a defect fix as much as a facade one.
+  facadePair(builder, m, 'house front storey band', [cx, GROUND_H, HOUSE_FRONT_Z],
+    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H, facing: 'z+', role: 'sidingUpper', courseOffset: 90 }));
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
   // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
@@ -1653,6 +1710,13 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // race); glass family untouched, no new material, no authority change.
     pair(builder, `house front interior glow strip ${index}`, [wx, 2.68, zFront + WALL_T / 2 + 0.02], [width - 0.10, 0.10, 0.05], m.warmLight,
       { solid: false, shots: false, cast: false });
+    // HF-536 night-facade-port: THE REVEAL. The opening is cut through 300 mm
+    // of wall and the inside of that cut was never surfaced, so the window
+    // read as a hole in card. Four liners, wholly INSIDE the wall body - which
+    // is also why they cannot open a see-through gap - give it real depth
+    // without hiding the room, which is the shot corridor.
+    facadePair(builder, m, `house front window reveal ${index}`, [wx, 1.55, zFront],
+      windowRevealParts({ width, height: 1.1, facing: 'z+', wallThickness: WALL_T }));
   }
   pair(builder, 'house front door lintel',
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
@@ -1665,6 +1729,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house front door casing 1', [FRONT_DOOR[1] + 0.04, DOOR_HEAD_Y / 2, -9.97], [0.08, DOOR_HEAD_Y, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
+  // HF-536 night-facade-port: A PANELLED LEAF, standing OPEN flat against the
+  // wall east of its own opening. Hanging it IN the opening would be a lie -
+  // that doorway is a route every player uses every round - and swinging it to
+  // any other angle would need a rotation, which `pair()` cannot mirror
+  // (rotation is copied, not reflected, so the south leaf would lean the wrong
+  // way). Flat, axis-aligned and beside the hole is the one placement that is
+  // both true and exactly symmetric. Max proud 43 mm.
+  facadePair(builder, m, 'house front door leaf', [FRONT_DOOR[1] + doorW / 2 + 0.10, 0, HOUSE_FRONT_Z],
+    panelDoorParts({ width: doorW, height: DOOR_HEAD_Y - 0.05, facing: 'z+', thickness: 0.03, role: 'trim' }));
   pair(builder, 'house front string course', [cx, GROUND_H, -9.97], [HOUSE_WIDTH + 0.08, 0.10, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house front roof fascia', [cx, ROOF_Y0 + 0.06, -9.95], [HOUSE_WIDTH + 0.16, 0.12, 0.10], m.trim,
@@ -1693,6 +1766,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   upperFrontRuns.forEach((run, index) => {
     pair(builder, `house upper front pier ${index}`,
       [(run[0] + run[1]) / 2, UPPER_Y0 + UPPER_H / 2, zFront], [run[1] - run[0], UPPER_H, WALL_T], sidingUpper);
+    facadePair(builder, m, `house upper front siding ${index}`,
+      [(run[0] + run[1]) / 2, UPPER_Y0, HOUSE_FRONT_Z],
+      lapSidingParts({ run: run[1] - run[0], height: UPPER_H, facing: 'z+', role: 'sidingUpper', courseOffset: 20 }));
   });
   {
     const width = UPPER_WINDOW[1] - UPPER_WINDOW[0];
@@ -1744,6 +1820,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     pair(builder, 'house upper front subwindow drywall',
       [wx, UPPER_Y0 + 0.40, zFront - WALL_T / 2 - 0.01], [width, 0.80, 0.02], m.interior,
       { solid: false, shots: false, cast: false });
+    facadePair(builder, m, 'house upper front window reveal',
+      [wx, (UPPER_Y0 + 0.9 + ROOF_Y0) / 2, zFront],
+      windowRevealParts({ width, height: ROOF_Y0 - (UPPER_Y0 + 0.9), facing: 'z+', wallThickness: WALL_T }));
   }
   // --- back wall: back door and one upper window ---------------------------
   const BACK_DOOR = doorRun('house back door');
@@ -1754,7 +1833,12 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   groundBackRuns.forEach((run, index) => {
     pair(builder, `house back pier ${index}`,
       [(run[0] + run[1]) / 2, GROUND_H / 2, zBack], [run[1] - run[0], GROUND_H, WALL_T], siding);
+    facadePair(builder, m, `house back siding ${index}`,
+      [(run[0] + run[1]) / 2, 0, HOUSE_BACK_Z],
+      lapSidingParts({ run: run[1] - run[0], height: GROUND_H, facing: 'z-' }));
   });
+  facadePair(builder, m, 'house back storey band', [cx, GROUND_H, HOUSE_BACK_Z],
+    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H, facing: 'z-', role: 'sidingUpper', courseOffset: 90 }));
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
     [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
@@ -1784,6 +1868,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   upperBackRuns.forEach((run, index) => {
     pair(builder, `house upper back pier ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], sidingUpper);
+    facadePair(builder, m, `house upper back siding ${index}`,
+      [(run[0]! + run[1]!) / 2, UPPER_Y0, HOUSE_BACK_Z],
+      lapSidingParts({ run: run[1]! - run[0]!, height: UPPER_H, facing: 'z-', role: 'sidingUpper', courseOffset: 20 }));
   });
   // The door's head band: the 0.4 m header between its clear head and the
   // roof deck's underside.
@@ -1841,6 +1928,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house upper back subwindow drywall',
     [backUpperWx, UPPER_Y0 + 0.40, zBack + WALL_T / 2 + 0.01], [backUpperW, 0.80, 0.02], m.interior,
     { solid: false, shots: false, cast: false });
+  facadePair(builder, m, 'house upper back window reveal',
+    [backUpperWx, (UPPER_Y0 + 0.9 + ROOF_Y0) / 2, zBack],
+    windowRevealParts({ width: backUpperW, height: ROOF_Y0 - (UPPER_Y0 + 0.9), facing: 'z-', wallThickness: WALL_T }));
   // --- stair: BACK room, hard against the WEST (blind) wall ----------------
   // Presentation treads remain visible, but one smooth rotated cuboid owns
   // movement for the complete flight. The ramp angle is below Rapier's 50°
@@ -2463,7 +2553,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
  * driveway in front of it is a real 6 m apron rather than a dropped kerb.
  */
 function garage(builder: Builder, m: Nuketown2Materials): void {
-  const H = 3.4;
+  const H = GARAGE_H;
   const zFront = GARAGE_FRONT_Z - WALL_T / 2;
   const zBack = GARAGE_BACK_Z + WALL_T / 2;
   const zMid = (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2;
@@ -3689,6 +3779,71 @@ function forgeKitCentred(
         solid: false, shots: false, cast: false, presentationOnly: true, propId,
         ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
       });
+  }
+}
+
+/**
+ * HF-536 night-facade-port. Resolve one facade ROLE onto THIS arena's registry.
+ *
+ * `src/forge-kit/facade.ts` also ships a `createFacadeMaterials()` that mints
+ * six of its own; it is deliberately NOT called here. Nuke Town already owns a
+ * siding pair, painted trim, a roof pair, drywall and a garage-door paint, and
+ * the pipeline budget is measured in distinct shader GRAPHS - so the port maps
+ * roles onto the existing instances and adds ZERO materials, zero uniforms and
+ * zero samplers. The program set is unchanged, which is the condition the
+ * black-surface lane puts on every forge pass.
+ *
+ * `reveal` is the one role with no same-named registry entry. It is the dark
+ * line at every lap joint, inside every window head and behind every door
+ * panel, and it resolves onto `roof` - the registry's only dark matte
+ * non-metal. Borrowing it costs nothing and keeps the reveal the SAME dark on
+ * both houses, which a two-tone pair material would not.
+ */
+function facadeMaterial(
+  m: Nuketown2Materials,
+  role: FacadePartRole,
+): THREE.Material | readonly [THREE.Material, THREE.Material] {
+  switch (role) {
+    case 'siding': return m.sidingB;
+    // The storey the two houses differ on: terracotta north, cream south.
+    case 'sidingUpper': return [m.sidingA, m.sidingB] as const;
+    case 'garageSiding': return m.garageSiding;
+    case 'reveal': return m.roof;
+    case 'roof': return m.roof;
+    // The north house's dark deck and the south house's pale roof glazing.
+    case 'roofPair': return [m.roof, m.roofGlazing] as const;
+    case 'interior': return m.interior;
+    case 'panel': return m.garageDoor;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * Emit one facade prefab at an authored anchor, through `pair()`.
+ *
+ * Identical contract to `forgeKitPair`: every part is presentation only
+ * (`solid:false, shots:false, cast:false`), so no collider, shot surface or
+ * ballistic row can be created here, and both residential halves stay exact
+ * 180-degree partners because there is still only one authoring call.
+ *
+ * `cast:false` is not an oversight. These are hundreds of 60 mm boards
+ * standing 50 mm off walls that already cast; letting them into the shadow
+ * pass buys acne on every elevation, and the lap line is carried by a recessed
+ * dark box rather than by a shadow precisely so it does not need one.
+ */
+function facadePair(
+  builder: Builder,
+  m: Nuketown2Materials,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly FacadePart[],
+): void {
+  for (const part of parts) {
+    pair(builder, `${propId} ${part.suffix}`,
+      [anchor[0] + part.offset[0], anchor[1] + part.offset[1], anchor[2] + part.offset[2]],
+      [part.size[0], part.size[1], part.size[2]],
+      facadeMaterial(m, part.role),
+      { solid: false, shots: false, cast: false, presentationOnly: true, propId });
   }
 }
 
