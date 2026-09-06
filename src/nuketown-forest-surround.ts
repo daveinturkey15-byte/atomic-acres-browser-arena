@@ -105,6 +105,83 @@ export const FOREST_HEIGHT_JITTER = 0.22;
  */
 export const FOREST_SUN_AZIMUTH = Object.freeze({ x: -0.79, z: -0.61 });
 
+/**
+ * The four authored conifer albedos, darkest-first in the sense that matters:
+ * 0x27412b is the one that reaches exact black on the cool flank.
+ */
+export const FOREST_CONIFER_TONES: readonly number[] = Object.freeze([
+  0x2e4a30, 0x39573a, 0x27412b, 0x435f41,
+]);
+
+/**
+ * The baked underside ramp on each conifer tier (mergeParts `shade.underside`).
+ * The rendered albedo of a tier's lowest ring is the instance colour times
+ * this, so any floor on the instance colour has to be read through it.
+ */
+export const FOREST_CONIFER_UNDERSIDE_SHADE = 0.80;
+
+/**
+ * HF-536 night-defects-3b — MEASURED conifer lightness floor.
+ *
+ * THE TRAP THIS CLOSES. `THREE.Color.setHex()` decodes sRGB into the LINEAR
+ * working colour space, and `offsetHSL()` therefore operates on the LINEAR
+ * triple. The cool-flank line `offsetHSL(.., 0, 0.03 * sunSide)` reads like a
+ * three-percent nudge; it is not. Measured on three r185 with the shipped
+ * tones: 0x27412b has a linear HSL lightness of 0.03657, so at sunSide = -1
+ * the offset removes 82 % of it and leaves L = 0.00657. Its unlit albedo
+ * falls from [26,44,26] to [12,25,13], and through the 0.80 underside ramp to
+ * [10,21,11] — before any lighting multiplier at all. That is the whole
+ * mechanism behind "exact-black conifers": not a NaN, not a missing texture,
+ * an offset applied in the wrong space to a colour that had no room for it.
+ *
+ * WHAT THE NUMBER IS. A floor in the same linear HSL space, applied AFTER the
+ * flank offset, pinned from the rendered-frame measurement in
+ * `artifacts/qa/conifer-darkness-*` (scripts/qa/probe-nuketown2-conifer-darkness.mjs
+ * isolates the conifer pixels exactly by hiding the instanced mesh and diffing,
+ * so this is the darkest ACTUAL conifer pixel, not a region guess). It is a
+ * ratchet, not a look change: the value is at or below what the shipped build
+ * already renders, so today's frames are unchanged and any future edit to the
+ * tones or the flank offsets that would push a tree darker gets clamped
+ * instead of shipping another black treeline.
+ *
+ * Moving it DOWN is a regression and the test says so.
+ */
+export const FOREST_CONIFER_MIN_LINEAR_LIGHTNESS = 0.0065;
+
+const CONIFER_HSL_SCRATCH = { h: 0, s: 0, l: 0 };
+
+/**
+ * The conifer instance colour: authored tone, warm/cool flank bias, then the
+ * measured lightness floor. Exported so the floor is testable as a pure
+ * function of (tone, sunSide) instead of only observable through a 340-slot
+ * InstancedMesh build.
+ *
+ * @param tone    the slot's tone stream in [0,1)
+ * @param sunSide -1 (fully cool flank) .. +1 (fully lit flank)
+ * @param minLightness the floor to apply; defaults to the shipped constant.
+ *   Overridable ONLY so the test can (a) reproduce the unfloored maths with 0
+ *   and measure the trap, and (b) drive the clamp with a floor above the
+ *   darkest authored tone and prove it fires. Production never passes it.
+ */
+export function coniferInstanceColour(
+  tone: number,
+  sunSide: number,
+  target: THREE.Color,
+  minLightness: number = FOREST_CONIFER_MIN_LINEAR_LIGHTNESS,
+): THREE.Color {
+  target.setHex(FOREST_CONIFER_TONES[
+    Math.floor(tone * FOREST_CONIFER_TONES.length) % FOREST_CONIFER_TONES.length
+  ]);
+  // DAY-VISUAL-B: warm sun on the lit flank, cool shadow on the far flank.
+  if (sunSide > 0) target.offsetHSL(0.012 * sunSide, 0.06 * sunSide, 0.028 * sunSide);
+  else target.offsetHSL(0.008 * sunSide, 0, 0.03 * sunSide);
+  target.getHSL(CONIFER_HSL_SCRATCH);
+  if (CONIFER_HSL_SCRATCH.l < minLightness) {
+    target.setHSL(CONIFER_HSL_SCRATCH.h, CONIFER_HSL_SCRATCH.s, minLightness);
+  }
+  return target;
+}
+
 export interface NuketownForestStats {
   conifers: number;
   broadleafs: number;
@@ -413,7 +490,6 @@ export function buildNuketownForestSurround(
   const coniferSlots = ringSlots(envelope, 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
   const conifers = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, coniferSlots.length);
   conifers.name = 'forest-conifers';
-  const coniferTones = [0x2e4a30, 0x39573a, 0x27412b, 0x435f41];
   coniferSlots.forEach((slot, index) => {
     euler.set(0, slot.yaw, 0);
     quaternion.setFromEuler(euler);
@@ -430,12 +506,12 @@ export function buildNuketownForestSurround(
     scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45) * standout * heightJitter, slot.scale);
     matrix.compose(position, quaternion, scaleVec);
     conifers.setMatrixAt(index, matrix);
-    // DAY-VISUAL-B: warm sun on the lit flank, cool shadow on the far flank.
+    // DAY-VISUAL-B warm/cool flank bias, then the HF-536 measured lightness
+    // floor. Both now live in coniferInstanceColour() so the floor is a
+    // testable pure function rather than a line buried in a 340-slot loop.
     const radius = Math.hypot(slot.x, slot.z) || 1;
     const sunSide = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / radius);
-    color.setHex(coniferTones[Math.floor(slot.tone * coniferTones.length) % coniferTones.length]);
-    if (sunSide > 0) color.offsetHSL(0.012 * sunSide, 0.06 * sunSide, 0.028 * sunSide);
-    else color.offsetHSL(0.008 * sunSide, 0, 0.03 * sunSide);
+    coniferInstanceColour(slot.tone, sunSide, color);
     conifers.setColorAt(index, color);
   });
   register(conifers);
