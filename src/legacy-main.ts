@@ -35923,28 +35923,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
     renderRuntime.setExposure(effectiveGraphicsExposure(reviewCamera.exposure));
-    // HF-535: A DETERMINISTIC REVIEW INCLUDES THE SKY. This hook already pinned
-    // position, target, fov, near/far, exposure, the TSL animation time and the
-    // TSL seed - and left the SUN to `DEFAULT_LIGHTING_TIME_CHOICE`, which is
-    // `'random'`. On Nuke Town Rebuild that draws one of three authored skies
-    // from the wall-clock-derived match seed, and the same bundle captured
-    // `nuketown2-coach-elevation` at 4.58%/7.34% exact-black under the 10:30
-    // sky against 25.74%/26.87% under the 14:00 and 17:36 skies (7 sessions,
-    // 2026-09-06). Every viewpoint diff taken against a single stored baseline
-    // was reading that dice roll rather than the candidate.
-    const reviewLightingOverride = reviewCaptureLightingOverride({
-      requestedOverride: lightingTimeChoiceOverride,
-      fixedHour: lightingCaptureFixedHour,
-      hosted: privateLobbySnapshot !== null,
-    });
+    // HF-535: a deterministic review pins the SKY too - the random per-session sky confounded every viewpoint diff (see src/rendering/deterministic-review-lighting.ts).
+    const reviewLightingOverride = reviewCaptureLightingOverride({ requestedOverride: lightingTimeChoiceOverride, fixedHour: lightingCaptureFixedHour, hosted: privateLobbySnapshot !== null });
     if (reviewLightingOverride !== null) lightingTimeChoiceOverride = reviewLightingOverride;
     applyLightingConditionUniforms(true);
-    assertDeterministicReviewLighting({
-      cameraId: reviewCamera.id,
-      choice: activeLightingTimeChoice(),
-      fixedHour: lightingCaptureFixedHour,
-      hosted: privateLobbySnapshot !== null,
-    });
+    assertDeterministicReviewLighting({ cameraId: reviewCamera.id, choice: activeLightingTimeChoice(), fixedHour: lightingCaptureFixedHour, hosted: privateLobbySnapshot !== null });
     pass64TslSystems?.setReviewCamera(reviewCamera);
     activeArenaReviewCameraId = reviewCamera.id;
     activeArenaReviewFixedTimeMs = reviewCamera.fixedTimeMs;
