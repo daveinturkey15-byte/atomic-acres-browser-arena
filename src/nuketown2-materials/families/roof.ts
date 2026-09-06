@@ -76,7 +76,15 @@ function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const tabU = p.x.add(courseIdx.mul(float(SHINGLE_TAB_M * 0.5))).div(float(SHINGLE_TAB_M));
   const tabIdx = floor(tabU);
   const keyway = smoothstep(float(0.010), float(0.0), abs(fract(tabU).sub(float(0.5))).mul(float(SHINGLE_TAB_M)));
-  const buttShadow = smoothstep(float(0.90), float(1.0), withinCourse);
+  // SHADOW LENGTH IS A SUN ANGLE, NOT A TASTE. The butt step is 4 mm and the
+  // arena key sits at ~14 deg elevation (bearing (-0.853, +0.522),
+  // arenas/nuketown2.ts), so the shadow it throws down-slope is
+  // 4 mm / tan(14 deg) = 16 mm, plus the shingle mat itself. 20 mm of a 143 mm
+  // course is the last 14 %. The shipped 10 % band was 14 mm, which is 1.1 px
+  // at the 20 m the roofs are read from on overhead and north-yard - below the
+  // 2 px floor spec.ts sets, i.e. a course rhythm that did not exist in any
+  // frame that scores it.
+  const buttShadow = smoothstep(float(0.86), float(1.0), withinCourse);
   const shingleTone = hash2(vec2(tabIdx, courseIdx)).sub(float(0.5)).mul(float(0.16));
   const granuleLoss = smoothstep(float(0.35), float(0.72), wear.scuff);
   const matAsphalt = linearSwatch(0x2a2b2b);
