@@ -136,3 +136,24 @@ export function createGlassMaterial(
 
   return mat;
 }
+
+/**
+ * DAY-VISUAL-C: lit street-lamp diffuser head. Opaque warm glass through the
+ * same shared graph as every other opaque glazing role, so no new WGSL
+ * program: the bloom-picking lift is a scalar `emissive`/`emissiveIntensity`
+ * rather than an `emissiveNode`. Node slots participate in the
+ * pipeline-budget graph key and a new slot would mint a ninth family graph;
+ * the scalar path renders the same HDR value through the default emissive
+ * term (`MeshStandardNodeMaterial` falls back to `emissive`/`emissiveIntensity`
+ * while `emissiveNode` is null — three r185 `MeshStandardNodeMaterial.js`).
+ *
+ * Numbers: base 0xd9a45c warm-amber diffuser; emissive 0xffb45e at 2.2. The
+ * composed R/G channels clear the 1.02 linear bloom threshold at golden hour
+ * without pushing blue, so the head reads lit rather than white-hot.
+ */
+export function createLampHeadMaterial(): MeshStandardNodeMaterial {
+  const mat = createGlassMaterial('nuketown2-lamp-head', 0xd9a45c, { opacity: 1 });
+  mat.emissive.setHex(0xffb45e);
+  mat.emissiveIntensity = 2.2;
+  return mat;
+}

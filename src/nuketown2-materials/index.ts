@@ -39,7 +39,7 @@ import { createRoofMaterial } from './families/roof';
 import { createAsphaltMaterial, createMarkingMaterial } from './families/asphalt';
 import { createConcreteMaterial } from './families/concrete';
 import { createTimberMaterial } from './families/timber';
-import { createGlassMaterial } from './families/glass';
+import { createGlassMaterial, createLampHeadMaterial } from './families/glass';
 import { createPaintedMetalMaterial } from './families/painted-metal';
 import { createLawnMaterial } from './families/lawn';
 import { NUKETOWN2_APPLIANCE_BLUE } from '../nuketown2-layout';
@@ -59,7 +59,7 @@ export { createRoofMaterial, roofSpec } from './families/roof';
 export { asphaltSpec, createAsphaltMaterial, createMarkingMaterial, markingSpec } from './families/asphalt';
 export { concreteSpec, createConcreteMaterial } from './families/concrete';
 export { createTimberMaterial, timberSpec } from './families/timber';
-export { createGlassMaterial, glassSpec } from './families/glass';
+export { createGlassMaterial, createLampHeadMaterial, glassSpec } from './families/glass';
 export { createPaintedMetalMaterial, paintedMetalSpec } from './families/painted-metal';
 export { createLawnMaterial, lawnSpec } from './families/lawn';
 
@@ -115,6 +115,8 @@ export interface Nuketown2MaterialRegistry {
   readonly busTrim: MeshStandardNodeMaterial;
   /** Coach glazing band — a DIELECTRIC, which is what it was not. Decal tier -1. */
   readonly coachGlass: MeshStandardNodeMaterial;
+  /** DAY-VISUAL-C: lit street-lamp diffuser heads — opaque warm glass, scalar emissive. */
+  readonly lampHead: MeshStandardNodeMaterial;
 }
 
 /**
@@ -146,7 +148,7 @@ export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
   'ground', 'lawn', 'asphalt', 'kerb', 'drive', 'driveDecal', 'trimDecal',
   'block', 'sidingA', 'sidingB', 'garageDoor', 'trim', 'roof', 'roofGlazing',
   'fence', 'sign', 'planter', 'applianceRed', 'applianceBlue', 'busTrim',
-  'coachGlass',
+  'coachGlass', 'lampHead',
 ] as const);
 
 /**
@@ -261,5 +263,9 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
       opacity: 1,
       polygonOffset: -1,
     }),
+    // DAY-VISUAL-C: the verge lamp heads stop being painted timber and start
+    // being lit diffusers. Glass family, opaque path (same shared graph as the
+    // coach band — no new WGSL program), scalar emissive for the bloom read.
+    lampHead: createLampHeadMaterial(),
   });
 }
