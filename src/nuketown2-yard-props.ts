@@ -320,10 +320,11 @@ export function nuketown2YardPropSolids(
     position: readonly [number, number, number],
     size: readonly [number, number, number],
     material: THREE.Material | readonly [THREE.Material, THREE.Material],
-    opts: Readonly<{ solid: boolean; shots: boolean; cast: boolean }>,
+    opts: Readonly<{ solid: boolean; shots: boolean; cast: boolean; presentationOnly?: boolean; propId?: string }>,
   ): void => {
     if (options.reduced === true && tier === 'detail') return;
-    out.push(Object.freeze({ name, tier, position, size, material, options: opts }));
+    const finalOpts = tier === 'detail' ? { ...opts, presentationOnly: true } : opts;
+    out.push(Object.freeze({ name, tier, position, size, material, options: finalOpts }));
   };
 
   // ---- the appliance bank: THE chirality anchor --------------------------
@@ -381,16 +382,104 @@ export function nuketown2YardPropSolids(
       [g.x + sx * (g.width / 2 - 0.05), (g.height - 0.10) / 2, g.z],
       [0.10, g.height - 0.10, g.depth + 0.06], m.frame, DRESSING);
   }
-  // DETAIL. Glazing bars every ~0.5 m across the long face, and a door reveal.
-  for (let i = 0; i < 5; i += 1) {
-    const t = (i + 1) / 6 - 0.5;
-    push(`yard glasshouse bar ${i}`, 'detail',
-      [g.x + t * g.width, g.height / 2, g.z], [0.045, g.height - 0.2, g.depth + 0.05], m.frame, DRESSING);
-  }
-  push('yard glasshouse door frame', 'detail',
-    [g.x + g.width / 2 - 0.42, 0.95, g.z - g.depth / 2 - 0.012],
-    [0.78, 1.90, 0.03], m.frame, DRESSING);
+  // DETAIL. HF-536: plinth, mullion grid, corner posts, door, gutter, vents.
+  // 1. Timber plinth skirt 0.30 m high x 0.04 m proud around the base (4 faces).
+  const plinthH = 0.30;
+  const plinthProud = 0.04;
+  push('yard glasshouse plinth front', 'detail',
+    [g.x, plinthH / 2, g.z + g.depth / 2 + plinthProud / 2],
+    [g.width + plinthProud * 2, plinthH, plinthProud], m.timber, DRESSING);
+  push('yard glasshouse plinth back', 'detail',
+    [g.x, plinthH / 2, g.z - g.depth / 2 - plinthProud / 2],
+    [g.width + plinthProud * 2, plinthH, plinthProud], m.timber, DRESSING);
+  push('yard glasshouse plinth left', 'detail',
+    [g.x - g.width / 2 - plinthProud / 2, plinthH / 2, g.z],
+    [plinthProud, plinthH, g.depth], m.timber, DRESSING);
+  push('yard glasshouse plinth right', 'detail',
+    [g.x + g.width / 2 + plinthProud / 2, plinthH / 2, g.z],
+    [plinthProud, plinthH, g.depth], m.timber, DRESSING);
 
+  // 2. Corner posts 0.06 m (4 corners, standing 0.02 m proud of both faces).
+  const postSize = 0.06;
+  const barProud = 0.02;
+  for (const [ix, sx] of [-1, 1].entries()) {
+    for (const [iz, sz] of [-1, 1].entries()) {
+      push(`yard glasshouse corner post ${ix}_${iz}`, 'detail',
+        [g.x + sx * (g.width / 2 + barProud - postSize / 2), g.height / 2, g.z + sz * (g.depth / 2 + barProud - postSize / 2)],
+        [postSize, g.height, postSize], m.frame, DRESSING);
+    }
+  }
+
+  // 3. Mullion grid on every glazed face: verticals every 0.60 m, bars 0.04 x 0.04 m, 0.02 m proud.
+  // Long faces (3.0 m wide): 4 vertical mullions at dx = [-0.90, -0.30, 0.30, 0.90].
+  // Adjacent spacing is exactly 0.60 m; distance to corner (+-1.50) is 0.60 m.
+  const barW = 0.04;
+  const mH = g.height - plinthH;
+  const mY = plinthH + mH / 2;
+  const longMullionDx = [-0.90, -0.30, 0.30, 0.90];
+  for (const [i, dx] of longMullionDx.entries()) {
+    // Yard-facing (+Z)
+    push(`yard glasshouse mullion v front ${i}`, 'detail',
+      [g.x + dx, mY, g.z + g.depth / 2 + barProud - barW / 2],
+      [barW, mH, barW], m.frame, DRESSING);
+    // Back (-Z)
+    push(`yard glasshouse mullion v back ${i}`, 'detail',
+      [g.x + dx, mY, g.z - g.depth / 2 - barProud + barW / 2],
+      [barW, mH, barW], m.frame, DRESSING);
+  }
+  // Short faces (2.2 m deep): 2 vertical mullions at dz = [-0.30, 0.30] (spacing 0.60 m).
+  const shortMullionDz = [-0.30, 0.30];
+  for (const [i, dz] of shortMullionDz.entries()) {
+    // Left (-X)
+    push(`yard glasshouse mullion v left ${i}`, 'detail',
+      [g.x - g.width / 2 - barProud + barW / 2, mY, g.z + dz],
+      [barW, mH, barW], m.frame, DRESSING);
+    // Right (+X)
+    push(`yard glasshouse mullion v right ${i}`, 'detail',
+      [g.x + g.width / 2 + barProud - barW / 2, mY, g.z + dz],
+      [barW, mH, barW], m.frame, DRESSING);
+  }
+  // Horizontals at 0.90 m and at eaves (2.28 m), 0.02 m proud.
+  for (const [label, hy] of [['mid', 0.90], ['eaves', g.height - barW / 2]] as const) {
+    push(`yard glasshouse mullion h front ${label}`, 'detail',
+      [g.x, hy, g.z + g.depth / 2 + barProud - barW / 2],
+      [g.width, barW, barW], m.frame, DRESSING);
+    push(`yard glasshouse mullion h back ${label}`, 'detail',
+      [g.x, hy, g.z - g.depth / 2 - barProud + barW / 2],
+      [g.width, barW, barW], m.frame, DRESSING);
+    push(`yard glasshouse mullion h left ${label}`, 'detail',
+      [g.x - g.width / 2 - barProud + barW / 2, hy, g.z],
+      [barW, barW, g.depth], m.frame, DRESSING);
+    push(`yard glasshouse mullion h right ${label}`, 'detail',
+      [g.x + g.width / 2 + barProud - barW / 2, hy, g.z],
+      [barW, barW, g.depth], m.frame, DRESSING);
+  }
+
+  // 4. Door on the yard-facing long side (+Z): frame 0.9 x 2.0 m, 0.03 m proud, chrome handle box.
+  const doorW = 0.90;
+  const doorH = 2.00;
+  const doorProud = 0.03;
+  push('yard glasshouse door frame', 'detail',
+    [g.x, doorH / 2, g.z + g.depth / 2 + doorProud - barW / 2],
+    [doorW, doorH, barW], m.frame, DRESSING);
+  push('yard glasshouse door handle', 'detail',
+    [g.x + doorW / 2 - 0.08, 1.00, g.z + g.depth / 2 + 0.045 - 0.015],
+    [0.03, 0.12, 0.03], m.chrome, DRESSING);
+
+  // 5. Roof edge/gutter strip 0.08 m tall along the eaves (+Z).
+  const gutterH = 0.08;
+  push('yard glasshouse gutter', 'detail',
+    [g.x, g.height - gutterH / 2, g.z + g.depth / 2 + 0.03 - 0.015],
+    [g.width + 0.06, gutterH, 0.03], m.frame, DRESSING);
+
+  // 6. Two chrome roof-vent stubs on roof (0.04 m proud of roof plane at 2.30 m).
+  const ventSize = 0.28;
+  const ventH = 0.06;
+  for (const [i, vx] of [-0.65, 0.65].entries()) {
+    push(`yard glasshouse roof vent ${i}`, 'detail',
+      [g.x + vx, g.height + 0.04 - ventH / 2, g.z],
+      [ventSize, ventH, ventSize], m.chrome, DRESSING);
+  }
   // ---- the garden pod ----------------------------------------------------
   const pd = NUKETOWN2_GARDEN_POD;
   // SILHOUETTE. Same reasoning as the glasshouse: a boxy garden room, not a
@@ -405,11 +494,84 @@ export function nuketown2YardPropSolids(
     [pd.x, pd.height - 0.16, pd.z], [pd.width + 0.09, 0.20, pd.depth + 0.09], m.podShell, DRESSING);
   push('yard garden pod roof cap', 'structure',
     [pd.x, pd.height + 0.05, pd.z], [pd.width - 0.34, 0.10, pd.depth - 0.34], m.podShell, DRESSING);
-  // DETAIL. The pod's one big glazed opening, and its threshold.
-  push('yard garden pod window', 'detail',
-    [pd.x, 1.30, pd.z - pd.depth / 2 - 0.012], [pd.width - 0.44, 0.95, 0.03], m.glazing, DRESSING);
-  push('yard garden pod sill', 'detail',
-    [pd.x, 0.80, pd.z - pd.depth / 2 - 0.02], [pd.width - 0.38, 0.06, 0.06], m.frame, DRESSING);
+  // DETAIL. HF-536: panel seams, porthole ring, door frame + handle, step, roof cap.
+  // 1. Panel seams dividing each of 4 faces into 3 panels (2 vertical seam bars per face).
+  const seamW = 0.03;
+  const seamH = pd.height;
+  const seamProud = 0.02;
+  const seamOffset = 0.38;
+  for (const [i, offset] of [-seamOffset, seamOffset].entries()) {
+    // Yard-facing (-Z)
+    push(`yard garden pod seam front ${i}`, 'detail',
+      [pd.x + offset, seamH / 2, pd.z - pd.depth / 2 - seamProud + seamW / 2],
+      [seamW, seamH, seamW], m.frame, DRESSING);
+    // Back (+Z)
+    push(`yard garden pod seam back ${i}`, 'detail',
+      [pd.x + offset, seamH / 2, pd.z + pd.depth / 2 + seamProud - seamW / 2],
+      [seamW, seamH, seamW], m.frame, DRESSING);
+    // Left (-X)
+    push(`yard garden pod seam left ${i}`, 'detail',
+      [pd.x - pd.width / 2 - seamProud + seamW / 2, seamH / 2, pd.z + offset],
+      [seamW, seamH, seamW], m.frame, DRESSING);
+    // Right (+X)
+    push(`yard garden pod seam right ${i}`, 'detail',
+      [pd.x + pd.width / 2 + seamProud - seamW / 2, seamH / 2, pd.z + offset],
+      [seamW, seamH, seamW], m.frame, DRESSING);
+  }
+
+  // 2. Porthole ring: 12-gon torus approximated by 12 thin boxes, 0.6 m diameter (R = 0.3 m) on left face (-X).
+  const portholeR = 0.30;
+  const portholeY = 1.30;
+  const portholeThick = 0.03;
+  const portholeX = pd.x - pd.width / 2 - seamProud + portholeThick / 2;
+  for (let k = 0; k < 12; k += 1) {
+    const angle = (k * Math.PI) / 6;
+    const dz = portholeR * Math.cos(angle);
+    const dy = portholeR * Math.sin(angle);
+    const absC = Math.abs(Math.cos(angle));
+    const absS = Math.abs(Math.sin(angle));
+    const boxZ = absC > 0.7 ? 0.16 : (absS > 0.7 ? 0.05 : 0.10);
+    const boxY = absS > 0.7 ? 0.16 : (absC > 0.7 ? 0.05 : 0.10);
+    push(`yard garden pod porthole ${k}`, 'detail',
+      [portholeX, portholeY + dy, pd.z + dz],
+      [portholeThick, boxY, boxZ], m.frame, DRESSING);
+  }
+
+  // 3. Door frame on yard-facing side (-Z): frame 0.9 x 1.85 m, 0.03 m proud with chrome handle.
+  const podDoorW = 0.90;
+  const podDoorH = 1.85;
+  const podDoorProud = 0.03;
+  push('yard garden pod door frame', 'detail',
+    [pd.x, podDoorH / 2, pd.z - pd.depth / 2 - podDoorProud + barW / 2],
+    [podDoorW, podDoorH, barW], m.frame, DRESSING);
+  push('yard garden pod door handle', 'detail',
+    [pd.x + podDoorW / 2 - 0.08, 0.95, pd.z - pd.depth / 2 - 0.045 + 0.015],
+    [0.03, 0.12, 0.03], m.chrome, DRESSING);
+
+  // 4. Timber deck step 1.2 x 0.4 x 0.12 m in front of the door (0.05 m proud of host face, within footprint + 0.06 m).
+  const stepW = 1.20;
+  const stepH = 0.12;
+  const stepD = 0.40;
+  push('yard garden pod deck step', 'detail',
+    [pd.x, stepH / 2, pd.z - pd.depth / 2 - 0.05 + stepD / 2],
+    [stepW, stepH, stepD], m.timber, DRESSING);
+
+  // 5. Roof cap strip 0.06 m proud along the top edges (4 edges).
+  const capH = 0.06;
+  const capW = 0.05;
+  const capProud = 0.05;
+  push('yard garden pod roof cap front', 'detail',
+    [pd.x, pd.height - capH / 2, pd.z - pd.depth / 2 - capProud + capW / 2],
+    [pd.width + capProud * 2, capH, capW], m.frame, DRESSING);
+  push('yard garden pod roof cap back', 'detail',
+    [pd.x, pd.height - capH / 2, pd.z + pd.depth / 2 + capProud - capW / 2],
+    [pd.width + capProud * 2, capH, capW], m.frame, DRESSING);
+  push('yard garden pod roof cap left', 'detail',
+    [pd.x - pd.width / 2 - capProud + capW / 2, pd.height - capH / 2, pd.z],
+    [capW, capH, pd.depth], m.frame, DRESSING);
+  push('yard garden pod roof cap right', 'detail',
+    [pd.x + pd.width / 2 + capProud - capW / 2, pd.height - capH / 2, pd.z],
+    [capW, capH, pd.depth], m.frame, DRESSING);
 
   // ---- the sand pit ------------------------------------------------------
   const s = NUKETOWN2_SAND_PIT;
