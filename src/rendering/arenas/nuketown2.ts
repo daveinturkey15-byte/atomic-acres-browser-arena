@@ -95,7 +95,12 @@ export const definition = createProceduralArenaVisualDefinition({
   },
   fog: { color: 0xb1c0be, near: 58, far: 148 },
   shadows: { enabled: true, mapSize: 2048, maximumDistance: 150, normalBias: 0.044 },
-  atmosphere: { preset: 'estate-golden-hour', mist: 0.42, dust: 0.28, clouds: true },
+  // HF-536 forge-nature PASS 1: preset id ONLY. 'nuketown2-golden-hour' is a
+  // fork of 'estate-golden-hour' (R6 - test2 still owns the original), with the
+  // horizon band lowered in value and raised in chroma so the sun side stops
+  // clipping to white at exposure 1.08. Sun disc, mist/dust/cloud numbers and
+  // the whole light rig above are untouched (R5).
+  atmosphere: { preset: 'nuketown2-golden-hour', mist: 0.42, dust: 0.28, clouds: true },
   colorPipeline: colorPipeline('pass85.nuketown2.hdr.v1', 1.08),
   budgets: budgets({ maximumDrawCalls: 420, maximumTriangles: 650_000 }),
   reviewCameras: [

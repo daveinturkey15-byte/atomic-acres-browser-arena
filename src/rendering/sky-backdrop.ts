@@ -8,7 +8,8 @@ export type SkyBackdropPreset =
   | 'jungle-golden-hour'
   | 'open-ocean-day'
   | 'range-midmorning'
-  | 'estate-golden-hour';
+  | 'estate-golden-hour'
+  | 'nuketown2-golden-hour';
 
 export const SKY_BACKDROP_TEXTURE_SIZE = Object.freeze({ width: 2_048, height: 1_024 });
 export const ATOMIC_ACRES_GENERATED_SKY_ASSET_URL = './assets/original/skies/atomic-acres-sunset.webp';
@@ -265,6 +266,25 @@ const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly Gradie
     [0.72, '#c2a87f'],
     [1, '#8a7657'],
   ] as const),
+  // Nuke Town fork of estate-golden-hour: same zenith and same below-horizon
+  // valley, but the horizon band is warm without blowing out (mid stops pulled
+  // toward amber/rust instead of the estate's hot highlight).
+  'nuketown2-golden-hour': Object.freeze([
+    [0, '#1d4a8c'],
+    [0.16, '#2f5c9b'],
+    [0.30, '#3f6a9e'],
+    [0.40, '#5b7aa6'],
+    [0.462, '#b08a80'],
+    [0.482, '#dd9458'],
+    [0.4985, '#f0b874'],
+    [0.506, '#eab89e'],
+    [0.522, '#9d8fbe'],
+    [0.552, '#8177ac'],
+    [0.582, '#a691ae'],
+    [0.612, '#d7b287'],
+    [0.72, '#c2a87f'],
+    [1, '#8a7657'],
+  ] as const),
 });
 
 /**
@@ -382,6 +402,13 @@ export const SKY_BACKDROP_CLOUDS: Readonly<Record<SkyBackdropPreset, Readonly<{
     rgb: [255, 243, 228] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
     alpha: 0.56, scale: 0.5,
   }),
+  // Nuke Town fork of estate-golden-hour: same deck geometry and count, paler
+  // lit tops and a touch less alpha so the low sun reads warm, not blown.
+  'nuketown2-golden-hour': Object.freeze({
+    count: 32, bandTop: 0.20, bandBottom: 0.505,
+    rgb: [255, 238, 214] as [number, number, number], shadowRgb: [88, 84, 134] as [number, number, number],
+    alpha: 0.50, scale: 0.5,
+  }),
 });
 
 function skyRandom(seed: number): () => number {
@@ -474,6 +501,16 @@ export const SKY_BACKDROP_SUN: Readonly<Record<SkyBackdropPreset, Readonly<{
     aureole: Object.freeze({ reachDegrees: 20, coreDegrees: 4, strength: 0.66, anisotropy: 0.8 }),
   }),
   'estate-golden-hour': Object.freeze({
+    x: 0.913, y: 0.398,
+    coreRgb: [255, 242, 208] as [number, number, number], glowRgb: [255, 190, 116] as [number, number, number],
+    coreRadius: 17, glowRadius: 19,
+    // dust 0.08: less aerosol, so a dimmer halo, but fine haze scatters over a
+    // broader lobe (lower g) and the low warm key makes it read amber.
+    aureole: Object.freeze({ reachDegrees: 22, coreDegrees: 5.2, strength: 0.52, anisotropy: 0.7 }),
+  }),
+  // Nuke Town fork: verbatim copy of estate-golden-hour — the disc must not
+  // move because the light rig is frozen.
+  'nuketown2-golden-hour': Object.freeze({
     x: 0.913, y: 0.398,
     coreRgb: [255, 242, 208] as [number, number, number], glowRgb: [255, 190, 116] as [number, number, number],
     coreRadius: 17, glowRadius: 19,
@@ -719,6 +756,7 @@ export function skyBackdropPreset(preset: string): SkyBackdropPreset {
     || preset === 'jungle-golden-hour' || preset === 'open-ocean-day'
     // Owner 2026-08-30: Test1/Test2 daylight presets, both authored procedural.
     || preset === 'range-midmorning' || preset === 'estate-golden-hour'
+    || preset === 'nuketown2-golden-hour'
     ? preset
     : 'airport-dawn';
 }

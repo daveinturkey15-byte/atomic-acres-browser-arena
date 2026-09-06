@@ -17,6 +17,10 @@ import * as THREE from 'three';
 import { buildArena } from './map';
 import {
   buildNuketownMountainBackdrop,
+  mountainTwoTone,
+  NUKETOWN_MOUNTAIN_SHADE_COOL,
+  NUKETOWN_MOUNTAIN_SUN_WARM,
+  NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR,
   NUKETOWN_BACKDROP_MAX_HEIGHT_M,
   NUKETOWN_BACKDROP_MAX_RADIAL_M,
   NUKETOWN_BACKDROP_MIN_RADIAL_M,
@@ -128,5 +132,69 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
       expect(Array.from(firstMeshes[index].geometry.getAttribute('position').array))
         .toEqual(Array.from(secondMeshes[index].geometry.getAttribute('position').array));
     }
+  });
+
+  /**
+   * HF-536 forge-nature PASS 1 (R21 warm/cool sides, T1 in the lane brief).
+   *
+   * The rock light must actually SEPARATE a sunlit facet from a shaded one, or
+   * the massif is one flat cut-out however many octaves the crest carries. The
+   * floor is a luminance RATIO of full sun over full shade on the same base
+   * colour, so it cannot be met by simply brightening everything.
+   */
+  it('separates sunlit from shaded rock by at least the two-tone floor', () => {
+    const lit: [number, number, number] = [0, 0, 0];
+    const shade: [number, number, number] = [0, 0, 0];
+    // Mid-grey rock base: the ratio is a property of the light, not the albedo.
+    mountainTwoTone(0.5, 0.5, 0.5, 1, lit);
+    mountainTwoTone(0.5, 0.5, 0.5, 0, shade);
+    const luma = (c: readonly [number, number, number]): number => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    expect(luma(lit) / luma(shade)).toBeGreaterThanOrEqual(NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR);
+    // ... and the hue direction is the point: sun warm (R > B), shade cool (B > R).
+    expect(lit[0]).toBeGreaterThan(lit[2]);
+    expect(shade[2]).toBeGreaterThan(shade[0]);
+    // Constants stay the authored swing rather than drifting to neutral grey.
+    expect(NUKETOWN_MOUNTAIN_SUN_WARM).toBe(0xffe0b8);
+    expect(NUKETOWN_MOUNTAIN_SHADE_COOL).toBe(0x8f96c8);
+  });
+
+  /**
+   * HF-536 forge-nature PASS 1 (R20 jagged edge, T1 in the lane brief).
+   *
+   * The crest function already carried four ridged octaves; what it did not
+   * have was enough angular SAMPLES to put them on the silhouette. This pins
+   * the resolved result on the real built geometry - the count of local maxima
+   * along the crest row - so a future refactor cannot quietly drop the segment
+   * counts back and re-alias the ridgeline into a smooth band.
+   */
+  it('resolves a jagged crest line on the built ridge rings', () => {
+    const backdrop = buildNuketownMountainBackdrop(new THREE.Group());
+    const meshes = ridgeMeshes(backdrop.group);
+    // Row 2 of 5 is the crest row (buildRidgeRing's ringRows table).
+    const crestOf = (mesh: THREE.Mesh): number[] => {
+      const position = mesh.geometry.getAttribute('position');
+      const heights: number[] = [];
+      for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
+      // Drop the duplicated closing segment so the wrap-around is not counted twice.
+      return heights.slice(0, -1);
+    };
+    const localMaxima = (series: readonly number[]): number => {
+      let count = 0;
+      for (let i = 0; i < series.length; i += 1) {
+        const previous = series[(i - 1 + series.length) % series.length];
+        const next = series[(i + 1) % series.length];
+        if (series[i] > previous && series[i] > next) count += 1;
+      }
+      return count;
+    };
+    // The two rings that form the visible silhouette from inside the arena.
+    const silhouette = meshes.filter((mesh) => crestOf(mesh).length >= 150);
+    expect(silhouette.length).toBe(2);
+    for (const mesh of silhouette) {
+      const crest = crestOf(mesh);
+      expect(localMaxima(crest)).toBeGreaterThanOrEqual(14);
+      expect(Math.max(...crest) / Math.min(...crest)).toBeGreaterThanOrEqual(1.5);
+    }
+    backdrop.dispose();
   });
 });

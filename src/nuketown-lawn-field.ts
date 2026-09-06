@@ -119,11 +119,24 @@ export function nuketownLawnPlacementAllowed(x: number, z: number): boolean {
  * silhouetted individually. Pulling the base value down and the warm
  * sun-bleach back seats them into the plate. Costs nothing: same tuft count,
  * same draws, same triangles - only the instance tint constants moved.
+ *
+ * v3 2026-09-06 (HF-536 forge-nature PASS 1). Late-summer verge warmth: the
+ * sun-bleach clumps swing a little further warm (rWarm 0.18 -> 0.22, gWarm
+ * 0.09 -> 0.10, bWarm -0.09 -> -0.11, visual-a's measured values) so the kept
+ * turf carries a dry August cast on its lit patches instead of one flat cool
+ * green. BASE values are untouched, so the unlit/shaded turf hue does not move
+ * - which is what the pass's T4 "lawn hue unchanged" box measures. This is
+ * instance-colour data only: no material, no uniform, no graph (R2).
+ *
+ * Gotcha "material.color tint cannot lighten" applies to the whole family:
+ * these are multipliers over the blade material's 0x5e9e41 base, capped at
+ * white, so a warm tint can only ever REMOVE green - never add brightness.
+ * `grassClumpTintPeak(...) <= 1` in the lane test is the arithmetic guard.
  */
 export const NUKETOWN_LAWN_TINT: GrassClumpTint = Object.freeze({
-  rBase: 0.63, rWarm: 0.18,
-  gBase: 0.88, gWarm: 0.09,
-  bBase: 0.5, bWarm: -0.09,
+  rBase: 0.63, rWarm: 0.22,
+  gBase: 0.88, gWarm: 0.10,
+  bBase: 0.5, bWarm: -0.11,
   valueBase: 0.855, valuePatch: 0.06, valueJitter: 0.045,
 });
 

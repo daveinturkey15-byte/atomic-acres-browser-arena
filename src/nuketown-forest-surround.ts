@@ -84,6 +84,26 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
   groundY: () => NUKETOWN2_FOREST_GROUND_Y,
   groundNormal: (_x: number, _z: number, target: THREE.Vector3) => target.set(0, 1, 0),
 });
+/** World-space height of the conifer prototype, trunk base to leader tip. */
+export const FOREST_CONIFER_HEIGHT_M = 10.3;
+/** Every Nth conifer is a standout grown above the treeline. Deterministic. */
+export const FOREST_STANDOUT_EVERY = 13;
+/** Height multiplier for standouts. */
+export const FOREST_STANDOUT_BOOST = 1.28;
+/**
+ * HF-536 forge-nature PASS 1 (R22): extra deterministic height spread on top
+ * of the tone band, applied as `scaleY *= 0.89 + FOREST_HEIGHT_JITTER * h`.
+ * With the tone band (0.9..1.35) and the 1-in-13 standout this spans roughly
+ * 8.2 - 14.6 m of world height; the lane test pins the stddev floor.
+ */
+export const FOREST_HEIGHT_JITTER = 0.22;
+/**
+ * Fixed aesthetic sun side for the warm/cool tone bias: the reference holds
+ * warm sun on one flank of the treeline and cool shadow on the other.
+ * Presentation-only tint bias, not a light rig claim.
+ * Derived from the arena key bearing (-0.853, +0.522) at src/rendering/arenas/nuketown2.ts:167, normalised and mirrored to the treeline's lit flank.
+ */
+export const FOREST_SUN_AZIMUTH = Object.freeze({ x: -0.79, z: -0.61 });
 
 export interface NuketownForestStats {
   conifers: number;
@@ -202,22 +222,105 @@ function ringSlots(
 }
 
 /** Merge helper (vegetation skill): non-indexed accumulate with transforms. */
-function mergeParts(parts: Array<{ geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }>, name: string): THREE.BufferGeometry {
+/**
+ * HF-536 forge-nature PASS 1: a part may carry a vertical VALUE ramp that is
+ * baked into the merged geometry's `color` attribute.
+ *
+ * `underside` is the multiplier at the part's own local minimum y, `top` at
+ * its local maximum. Both are <= 1 on purpose: this rides on top of the
+ * per-instance colour and the white material base, and the gotcha
+ * "material.color tint cannot lighten" is the whole family's arithmetic - a
+ * multiply capped at white can only ever REMOVE light. So a tier separates
+ * from the tier below it by DARKENING its own underside, never by lightening
+ * its top. Parts with no ramp contribute 1.0 and are unchanged.
+ */
+type MergePart = {
+  geometry: THREE.BufferGeometry;
+  matrix: THREE.Matrix4;
+  shade?: { underside: number; top: number };
+};
+
+function mergeParts(parts: MergePart[], name: string): THREE.BufferGeometry {
   const positions: number[] = [];
+  const colors: number[] = [];
+  let shaded = false;
   for (const part of parts) {
     const clone = part.geometry.clone();
     clone.applyMatrix4(part.matrix);
     const nonIndexed = clone.index ? clone.toNonIndexed() : clone;
     const attribute = nonIndexed.getAttribute('position');
-    for (let i = 0; i < attribute.count; i += 1) positions.push(attribute.getX(i), attribute.getY(i), attribute.getZ(i));
+    // Local extent AFTER the part matrix, so the ramp keys off the part's own
+    // cone from base ring to apex rather than the whole merged tree.
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 0; i < attribute.count; i += 1) {
+      const y = attribute.getY(i);
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const span = Math.max(1e-4, maxY - minY);
+    for (let i = 0; i < attribute.count; i += 1) {
+      positions.push(attribute.getX(i), attribute.getY(i), attribute.getZ(i));
+      if (part.shade) {
+        shaded = true;
+        const t = (attribute.getY(i) - minY) / span;
+        const value = part.shade.underside + (part.shade.top - part.shade.underside) * t;
+        colors.push(value, value, value);
+      } else {
+        colors.push(1, 1, 1);
+      }
+    }
     clone.dispose();
     if (nonIndexed !== clone) nonIndexed.dispose();
   }
   const merged = new THREE.BufferGeometry();
   merged.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (shaded) merged.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   merged.computeVertexNormals();
   merged.name = name;
   return merged;
+}
+
+/**
+ * HF-536 forge-nature PASS 1 (R20 "every silhouette breaks at three scales").
+ *
+ * Displace the rim vertices of a merged, non-indexed cone stack so the tier
+ * edges are ragged instead of a clean 8- or 12-gon. Deterministic: the hash is
+ * keyed on the QUANTISED position, so the several duplicated vertices that
+ * share a rim corner in a non-indexed mesh all receive the SAME offset and the
+ * surface stays closed (a per-vertex-index hash would tear it open).
+ *
+ * Only vertices outside `minRadius` move: the trunk (r <= 0.34) and the cone
+ * apexes stay put, so the spire tip still reaches FOREST_CONIFER_HEIGHT_M.
+ * Pure geometry - no material, no uniform, no graph (R2).
+ */
+export const FOREST_RIM_RADIAL_JITTER = 0.18;
+export const FOREST_RIM_VERTICAL_JITTER_M = 0.25;
+
+function jitterRim(geometry: THREE.BufferGeometry, seed: number, minRadius: number): void {
+  const attribute = geometry.getAttribute('position') as THREE.BufferAttribute;
+  const hash = (a: number, b: number, c: number): number => {
+    let h = (seed ^ (a * 0x27d4_eb2d) ^ (b * 0x1656_67b1) ^ (c * 0x85eb_ca6b)) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b_3c6d) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 0x297a_2d39) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4_294_967_296;
+  };
+  for (let i = 0; i < attribute.count; i += 1) {
+    const x = attribute.getX(i);
+    const y = attribute.getY(i);
+    const z = attribute.getZ(i);
+    const radius = Math.hypot(x, z);
+    if (radius <= minRadius) continue;
+    // 1 mm quantisation: identical rim corners hash identically.
+    const qx = Math.round(x * 1000);
+    const qy = Math.round(y * 1000);
+    const qz = Math.round(z * 1000);
+    const radial = 1 + FOREST_RIM_RADIAL_JITTER * (hash(qx, qy, qz) - 0.5) * 2;
+    const vertical = FOREST_RIM_VERTICAL_JITTER_M * (hash(qx + 7, qy + 7, qz + 7) - 0.5);
+    attribute.setXYZ(i, x * radial, y + vertical, z * radial);
+  }
+  attribute.needsUpdate = true;
+  geometry.computeVertexNormals();
 }
 
 function triCount(geometry: THREE.BufferGeometry): number {
@@ -281,17 +384,30 @@ export function buildNuketownForestSurround(
     stats.triangles += triCount(mesh.geometry) * mesh.count;
   };
 
-  // ---- conifers: merged trunk + two cone tiers, one instanced draw --------
-  const coniferParts: Array<{ geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }> = [];
+  // ---- conifers: merged trunk + three tiers, one instanced draw --------------
+  // DAY-VISUAL-B: a slim leader spire above tierB, so the ring reads as tall
+  // dark spires with layered branch tiers instead of two stacked cones. The
+  // leader base (r=1.05 at y=6.9) tucks inside tierB's own surface there
+  // (r~1.08), never floating, and the tip reaches FOREST_CONIFER_HEIGHT_M.
+  // HF-536 forge-nature PASS 1: 8 -> 12 radial segments per tier (the rim is
+  // the silhouette the treeline is read by), ragged rims (jitterRim) and a
+  // baked underside/top value ramp per tier so the tiers separate from each
+  // other instead of reading as one flat green cone. Measured cost below.
+  const coniferParts: MergePart[] = [];
   const trunkGeometry = new THREE.CylinderGeometry(0.22, 0.34, 2.2, 7);
-  const tierA = new THREE.ConeGeometry(2.6, 5.6, 8);
-  const tierB = new THREE.ConeGeometry(1.9, 4.4, 8);
+  const tierA = new THREE.ConeGeometry(2.6, 5.6, 12);
+  const tierB = new THREE.ConeGeometry(1.9, 4.4, 12);
+  const tierLeader = new THREE.ConeGeometry(1.05, 3.4, 12);
   coniferParts.push({ geometry: trunkGeometry, matrix: new THREE.Matrix4().makeTranslation(0, 1.1, 0) });
-  coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0) });
-  coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0) });
+  coniferParts.push({ geometry: tierA, matrix: new THREE.Matrix4().makeTranslation(0, 4.6, 0), shade: { underside: 0.62, top: 1 } });
+  coniferParts.push({ geometry: tierB, matrix: new THREE.Matrix4().makeTranslation(0, 7.2, 0), shade: { underside: 0.62, top: 1 } });
+  coniferParts.push({ geometry: tierLeader, matrix: new THREE.Matrix4().makeTranslation(0, 8.6, 0), shade: { underside: 0.62, top: 1 } });
   const coniferGeometry = mergeParts(coniferParts, 'forest-conifer');
-  for (const part of [trunkGeometry, tierA, tierB]) part.dispose();
-  const coniferMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94, metalness: 0, flatShading: true });
+  jitterRim(coniferGeometry, (envelope.seed ^ 0x0000_7e11) >>> 0, 0.5);
+  for (const part of [trunkGeometry, tierA, tierB, tierLeader]) part.dispose();
+  // vertexColors rides on the SAME material instance - no new material, no new
+  // uniform, no sampler (R2, program-set delta 0).
+  const coniferMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.94, metalness: 0, flatShading: true });
   disposables.push(coniferGeometry, coniferMaterial);
 
   const coniferSlots = ringSlots(envelope, 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
@@ -302,22 +418,40 @@ export function buildNuketownForestSurround(
     euler.set(0, slot.yaw, 0);
     quaternion.setFromEuler(euler);
     position.set(slot.x, groundY(slot.x, slot.z) - TRUNK_SINK_M, slot.z);
-    scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45), slot.scale);
+    // DAY-VISUAL-B: every FOREST_STANDOUT_EVERY-th tree grows above the line,
+    // so the treeline has varied heights with a few standouts, deterministically.
+    const standout = index % FOREST_STANDOUT_EVERY === 0 ? FOREST_STANDOUT_BOOST : 1;
+    // HF-536 forge-nature PASS 1 (R22 "heights vary"): an extra deterministic
+    // height jitter on top of the tone-driven band, so the treeline's apex
+    // line is a saw rather than four repeated steps. `slot.yaw` is the slot's
+    // own placement stream, already decorrelated from `slot.tone`.
+    const heightHash = (Math.sin(slot.yaw * 91.7 + index * 0.618) * 0.5 + 0.5);
+    const heightJitter = 0.89 + FOREST_HEIGHT_JITTER * heightHash;
+    scaleVec.set(slot.scale, slot.scale * (0.9 + slot.tone * 0.45) * standout * heightJitter, slot.scale);
     matrix.compose(position, quaternion, scaleVec);
     conifers.setMatrixAt(index, matrix);
-    conifers.setColorAt(index, color.setHex(coniferTones[Math.floor(slot.tone * coniferTones.length) % coniferTones.length]));
+    // DAY-VISUAL-B: warm sun on the lit flank, cool shadow on the far flank.
+    const radius = Math.hypot(slot.x, slot.z) || 1;
+    const sunSide = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / radius);
+    color.setHex(coniferTones[Math.floor(slot.tone * coniferTones.length) % coniferTones.length]);
+    if (sunSide > 0) color.offsetHSL(0.012 * sunSide, 0.06 * sunSide, 0.028 * sunSide);
+    else color.offsetHSL(0.008 * sunSide, 0, 0.03 * sunSide);
+    conifers.setColorAt(index, color);
   });
   register(conifers);
   stats.conifers = coniferSlots.length;
 
   // ---- broadleafs: trunk instances + double-blob canopy instances ---------
   const broadTrunkGeometry = new THREE.CylinderGeometry(0.28, 0.42, 3.4, 7);
+  // HF-536: the same underside ramp as the conifer tiers (x0.7 at the blob's
+  // own bottom), so a canopy reads as a lit crown over a shaded belly rather
+  // than one evenly-lit ball.
   const canopyGeometry = mergeParts([
-    { geometry: new THREE.IcosahedronGeometry(2.3, 1), matrix: new THREE.Matrix4().makeTranslation(0, 0, 0) },
-    { geometry: new THREE.IcosahedronGeometry(1.6, 1), matrix: new THREE.Matrix4().makeTranslation(1.2, 0.9, 0.5) },
+    { geometry: new THREE.IcosahedronGeometry(2.3, 1), matrix: new THREE.Matrix4().makeTranslation(0, 0, 0), shade: { underside: 0.7, top: 1 } },
+    { geometry: new THREE.IcosahedronGeometry(1.6, 1), matrix: new THREE.Matrix4().makeTranslation(1.2, 0.9, 0.5), shade: { underside: 0.7, top: 1 } },
   ], 'forest-broadleaf-canopy');
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.96, metalness: 0 });
-  const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, flatShading: true });
+  const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92, metalness: 0, flatShading: true });
   disposables.push(broadTrunkGeometry, canopyGeometry, trunkMaterial, canopyMaterial);
 
   const broadleafSlots = ringSlots(envelope, 180, broadleafBand[0], broadleafBand[1], envelope.seed ^ 0x00ff_1234, 4.2);
@@ -337,7 +471,13 @@ export function buildNuketownForestSurround(
     position.set(slot.x, floor + 4.3 * slot.scale, slot.z);
     matrix.compose(position, quaternion, scaleVec);
     canopies.setMatrixAt(index, matrix);
-    canopies.setColorAt(index, color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]));
+    // DAY-VISUAL-B: same warm/cool flank bias as the conifers.
+    const canopyRadius = Math.hypot(slot.x, slot.z) || 1;
+    const canopySun = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / canopyRadius);
+    color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]);
+    if (canopySun > 0) color.offsetHSL(0.012 * canopySun, 0.06 * canopySun, 0.028 * canopySun);
+    else color.offsetHSL(0.008 * canopySun, 0, 0.03 * canopySun);
+    canopies.setColorAt(index, color);
   });
   register(broadTrunks);
   register(canopies);

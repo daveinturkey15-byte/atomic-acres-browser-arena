@@ -157,6 +157,18 @@ const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.f
     ] as SmokeCard[]),
   }),
 });
+/**
+ * DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze palette. Warm amber
+ * light side keyed to the 0xfff1ce rig (numbers untouched), cool
+ * violet-grey shade side. The lane test pins warm-above-cool luminance and
+ * the amber hue so a future palette pass cannot silently re-grey it.
+ */
+export const NUKETOWN2_HAZE_PALETTE = Object.freeze({
+  shadow: 0x6f6a88,
+  light: 0xe6b47e,
+  smoke: 0x7d8489,
+  warm: 0xd9a06a,
+});
 
 const MAX_MIST_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.mist.length));
 const MAX_SMOKE_CARDS = Math.max(...Object.values(ATMOSPHERE_LAYOUTS).map((layout) => layout.smoke.length));
@@ -190,6 +202,12 @@ function atmosphereDustLayout(profile: RenderProfile, arenaId: ArenaId): DustLay
   if (arenaId === 'test2') return {
     count: quality ? 48 : 28, minX: -32, maxX: 32, minZ: -24, maxZ: 24, color: 0xe8d0a0, opacity: quality ? 0.1 : 0.07,
   };
+  // DAY-POLISH (HF-535): Nuke Town golden-hour dust hangs with the mist in
+  // the yards and cul-de-sacs, not on the road sightline, and reads lighter
+  // under the amber palette so mid-ground vehicles keep contrast.
+  if (arenaId === 'nuketown2') return {
+    count: quality ? 48 : 32, minX: -26, maxX: 26, minZ: -24, maxZ: 24, color: 0xe8d4a8, opacity: quality ? 0.08 : 0.06,
+  };
   return {
     count: quality ? 32 : 24, minX: -15, maxX: 15, minZ: -44, maxZ: -3, color: 0xc4cbc4, opacity: quality ? 0.12 : 0.09,
   };
@@ -218,6 +236,10 @@ function atmosphereOpacity(profile: RenderProfile, arenaId: ArenaId): Readonly<{
   if (arenaId === 'rustworks-1v1') return quality ? { mist: 0.22, smoke: 0.12 } : { mist: 0.14, smoke: 0.08 };
   if (arenaId === 'skyline-terminal') return quality ? { mist: 0.15, smoke: 0.08 } : { mist: 0.11, smoke: 0.06 };
   if (arenaId === 'high-seas') return quality ? { mist: 0.1, smoke: 0.05 } : { mist: 0.07, smoke: 0.035 };
+  // DAY-POLISH (HF-535): the amber palette reads denser than the neutral
+  // fallthrough it replaced, so Nuke Town runs lighter cards: aerial
+  // perspective on the far treeline, not wash over mid-ground vehicles.
+  if (arenaId === 'nuketown2') return quality ? { mist: 0.09, smoke: 0.05 } : { mist: 0.07, smoke: 0.04 };
   return quality ? { mist: 0.14, smoke: 0.08 } : { mist: 0.1, smoke: 0.06 };
 }
 
@@ -547,6 +569,13 @@ export class AtmosphereSystem {
             ? { shadow: 0x6e6a5c, light: 0xf0dfb4, smoke: 0x8a8172, warm: 0xd8bd8c }
           : arenaId === 'test2'
             ? { shadow: 0x5c6a72, light: 0xffe0a8, smoke: 0x87837a, warm: 0xe3b57e }
+          // DAY-VISUAL-A (HF-535): Nuke Town golden-hour haze. Warm low-sun
+          // light side (amber, keyed to the 0xfff1ce rig without touching its
+          // numbers), cool violet-grey shade side per the reference's violet
+          // shade. Back yards and cul-de-sacs only — the road stays clear by
+          // layout, not by palette.
+          : arenaId === 'nuketown2'
+            ? NUKETOWN2_HAZE_PALETTE
           : { shadow: 0x708083, light: 0xb8c6c4, smoke: 0x77868a, warm: 0xaebdbc };
     (this.material.uniforms.uShadowColor.value as THREE.Color).setHex(palette.shadow);
     (this.material.uniforms.uLightColor.value as THREE.Color).setHex(palette.light);
