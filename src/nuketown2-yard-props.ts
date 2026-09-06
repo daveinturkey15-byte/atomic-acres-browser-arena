@@ -147,15 +147,26 @@ function createCabinetMaterial(): MeshStandardNodeMaterial {
  * bank read as a cooker rather than as a coloured box, and it costs one
  * distance field.
  */
+/**
+ * Hob-ring dimensions, metres. A domestic ring is 0.14-0.22 m across on a
+ * 0.6 m top; the shipped 0.105 m outer radius (0.21 m across, 70 % of the
+ * 0.30 m pitch) sat at the very top of that band and read oversized on the
+ * bank (row 6: appliance-bank-*, street-centre, driveway-apron-close). The
+ * outer radius is now 0.086 m (0.172 m across, mid-band, 57 % of pitch) with
+ * the annulus edges scaled by the same 0.82. Exported for the pattern gate.
+ */
+export const HOB_RING_PITCH_M = 0.3;
+export const HOB_RING_EDGE_M = [0.061, 0.069, 0.077, 0.086] as const;
+export const HOB_RING_OUTER_M = HOB_RING_EDGE_M[3];
 function createHobMaterial(name: string, color: number): MeshStandardNodeMaterial {
   const mat = node(name, color, 0.28, 0.12);
   const p = positionWorld;
-  // Ring grid at 0.30 m pitch, ring radius 0.09 m.
-  const cellX = p.x.div(float(0.3));
-  const cellZ = p.z.div(float(0.3));
-  const local = vec3(fract(cellX).sub(0.5).mul(0.3), float(0), fract(cellZ).sub(0.5).mul(0.3));
+  // Ring grid at HOB_RING_PITCH_M pitch, outer diameter HOB_RING_OUTER_M * 2.
+  const cellX = p.x.div(float(HOB_RING_PITCH_M));
+  const cellZ = p.z.div(float(HOB_RING_PITCH_M));
+  const local = vec3(fract(cellX).sub(0.5).mul(HOB_RING_PITCH_M), float(0), fract(cellZ).sub(0.5).mul(HOB_RING_PITCH_M));
   const r = local.length();
-  const ring = smoothstep(0.075, 0.085, r).mul(float(1).sub(smoothstep(0.095, 0.105, r)));
+  const ring = smoothstep(HOB_RING_EDGE_M[0], HOB_RING_EDGE_M[1], r).mul(float(1).sub(smoothstep(HOB_RING_EDGE_M[2], HOB_RING_EDGE_M[3], r)));
   const base = vec3(
     ((color >> 16) & 255) / 255,
     ((color >> 8) & 255) / 255,
