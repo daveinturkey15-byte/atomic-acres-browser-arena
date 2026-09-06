@@ -32,6 +32,7 @@
  * by the owner via x.com/prasenx/status/2095537643182563778; re-implemented
  * from first principles.
  */
+import * as THREE from 'three';
 import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { createSidingMaterial } from './families/siding';
@@ -156,6 +157,39 @@ export const NUKETOWN2_MATERIAL_ROLES = Object.freeze([
  * every wear term is a node expression compiled into the material's shader at
  * construction time.
  */
+/**
+ * HF-536 PASS 2 - VALUE-ONLY ROLE TUNING (ruleset R10, R2).
+ *
+ * Every number below is a UNIFORM VALUE on a role's own
+ * `material.userData.nuketown2Uniforms` record, read by the shared family
+ * graph through `materialUniform`'s `onObjectUpdate` hook. No graph source
+ * moves, no `uniform()` node is created and no role is minted, so the WGSL
+ * program set is byte-identical - which is the standing condition until the
+ * black-surface (NaN) lane lands (gotcha
+ * `gotcha-nuketown2-black-roofs-shader-program-set.md`).
+ *
+ * The street read as "a black slab with toy props" (owner, 2026-09-06). The
+ * cure at value level is DAMPNESS: dropping base roughness lets the sun leave
+ * a streak down the carriageway instead of a uniform matte tone, and raising
+ * the traffic-scale roughness swing keeps the wheel paths polished against it
+ * (the graph already subtracts `wheel * 0.16` and `seam * 0.40` and clamps at
+ * 0.20, `families/asphalt.ts:96-100`, so the wet look cannot run away).
+ */
+function tuneRoleValues(material: MeshStandardNodeMaterial, values: Record<string, unknown>): MeshStandardNodeMaterial {
+  const bound = material.userData.nuketown2Uniforms as Record<string, unknown> | undefined;
+  if (!bound) throw new Error(`${material.name} carries no nuketown2Uniforms record to tune`);
+  for (const [key, value] of Object.entries(values)) {
+    if (!(key in bound)) throw new Error(`${material.name} has no uniform value named ${key}`);
+    bound[key] = value;
+  }
+  return material;
+}
+
+/** sRGB hex -> the linear colour the uniform record holds. */
+function roleColor(hex: number): THREE.Color {
+  return new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
+}
+
 export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
   return Object.freeze({
     // Beyond the fence: dry scrubland keyed between the backdrop skirt's own
@@ -175,11 +209,28 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     }),
     lawn: createLawnMaterial('nuketown2-lawn-decal', 0x496438, { variant: 'turf', polygonOffset: -2 }),
 
-    asphalt: createAsphaltMaterial(),
-    kerb: createConcreteMaterial('nuketown2-kerb', 0x9a978a, { variant: 'kerb', dampFootY: 0 }),
+    // Damp asphalt with a sun streak: baseRoughness 0.95 -> 0.66 and
+    // trafficRoughness 0.10 -> 0.16, soil 0.080 -> 0.110 for the kerb-channel
+    // stain the reference has and we did not.
+    asphalt: tuneRoleValues(createAsphaltMaterial(), {
+      baseRoughness: 0.66,
+      trafficRoughness: 0.16,
+      soil: 0.110,
+    }),
+    // "Poured and kept" (R15): the kerb run keeps its wear scales and loses
+    // 40 % of its scuff albedo swing, which is the tidy read visual-a reached
+    // by editing the concrete graph - the same result at value level.
+    kerb: tuneRoleValues(createConcreteMaterial('nuketown2-kerb', 0x9a978a, { variant: 'kerb', dampFootY: 0 }), {
+      scuffAlbedo: 0.030,
+    }),
     drive: createConcreteMaterial('nuketown2-drive', 0x8b8879, { variant: 'apron' }),
     driveDecal: createConcreteMaterial('nuketown2-drive-decal', 0x8b8879, { variant: 'apron', polygonOffset: -1 }),
-    trimDecal: createMarkingMaterial(),
+    // Worn, slightly dirty paint. Crisp white dashes read as a racing game;
+    // a real dash is a dirty warm off-white the tyres have scrubbed through.
+    trimDecal: tuneRoleValues(createMarkingMaterial(), {
+      baseColor: roleColor(0xcfc6b0),
+      scuffAlbedo: 0.10,
+    }),
     block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block' }),
 
     // HF-477 SUPERSEDES THE HEXES THIS LANE INHERITED, and it is the accuracy
