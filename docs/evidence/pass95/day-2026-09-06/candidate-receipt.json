@@ -1,12 +1,12 @@
 {
-  "capturedAt": "2026-09-06T09:55:50.689279+00:00",
-  "sourceSha": "bc649bb5e880824037880ca0d788789466b55f15",
+  "capturedAt": "2026-09-06T16:21:34.877667+00:00",
+  "sourceSha": "e993d7a0ee2f5d8114f69e422737bae8eab5b8a9",
   "preview": "http://127.0.0.1:4285/?release=latest&renderer=webgpu&render=quality",
-  "bundle": "legacy-main-B_HlzZdZ.js",
+  "bundle": "legacy-main-DXo_qTQx.js",
   "servedBundleMatchesDisk": true,
-  "bundleSha256": "a1126e4cea2b39018c8e78e89c5f0bde8e1214a587cf04f5b7e483ecafc690bf",
+  "bundleSha256": "ce289220c44ce3aabce4eec62dd2b15055928c1bd4862ef2618ff1f88acaa69e",
   "distFileCount": 606,
-  "distTreeSha256": "599dc7c1efd72f8fcd3bd468f940abb3b9322c04ac5bb6b3d7279e1819e0c9f5",
+  "distTreeSha256": "39abad2063a2c4ef3d332b6f8bdf0fd0a4863ebf6f8ff83e1df5a87f562fb125",
   "files": [
     {
       "path": "assets/additional-maps-B1TWm1Hk.js",
@@ -14,9 +14,9 @@
       "sha256": "4d5600bc6bc6b46cdf23fd0a759664d808472363d388b017a7d364678e9858c4"
     },
     {
-      "path": "assets/atomic-acres-8p2y75kg.js",
+      "path": "assets/atomic-acres-LUf27EZt.js",
       "bytes": 1708,
-      "sha256": "ee84fa7d0f3525af2634a93d39babe6e66a30f9acc9e32682856c556492e9344"
+      "sha256": "bc05f42a5164a43223413cb93766fcf83728fe17598e121d39612250b39053e6"
     },
     {
       "path": "assets/changelog-CasHtdVI.js",
@@ -39,14 +39,14 @@
       "sha256": "1303e9e77e6d84bcb9d4744c1c18af0067547b87be3d5e8c9c7ca96362d64798"
     },
     {
-      "path": "assets/farcrysis-CtY7Fnct.js",
-      "bytes": 1696,
-      "sha256": "1f4a7a20a73f9f050cf4b5cc183148a50cdc403b73a6f04714c9816486df087c"
-    },
-    {
       "path": "assets/farcrysis-DnV8xYWy.js",
       "bytes": 147839,
       "sha256": "cef0073f26fea05600c2202420c1f606940e0825d9b3de87741d57e9ce2eff92"
+    },
+    {
+      "path": "assets/farcrysis-smHb0dda.js",
+      "bytes": 1696,
+      "sha256": "c853b0bd0b8af81aadc51d24401e7cc9472febd6aef639b741bbe712158f8c3a"
     },
     {
       "path": "assets/gameplay-9jgsGpMN.js",
@@ -69,14 +69,9 @@
       "sha256": "a7f62a95bd0162f6e9c8a1f481810ac28280516e23ef82a6f4920fef040c9d7e"
     },
     {
-      "path": "assets/high-seas-DCfeqxyN.js",
+      "path": "assets/high-seas-CEIJIeyt.js",
       "bytes": 2422,
-      "sha256": "ab2e6e688a116b2c6ee317082f8a059dbaba5766af951c3b9266dfd55c442e7c"
-    },
-    {
-      "path": "assets/index-BnW-wk7A.js",
-      "bytes": 4244,
-      "sha256": "607a39aa00542cb413343df7ca2176b78961d520ce340381875173f36e7b4c20"
+      "sha256": "f27f592b484f4af5be8318b30d489f082760a6950d531570fa07ce39487d0830"
     },
     {
       "path": "assets/index-DuippQot.css",
@@ -84,9 +79,9 @@
       "sha256": "c235d2a4f7f758f10ef5e29b90f3ac36190886bfe06d3c814402ec52ff3e52b4"
     },
     {
-      "path": "assets/legacy-main-B_HlzZdZ.js",
-      "bytes": 1976995,
-      "sha256": "a1126e4cea2b39018c8e78e89c5f0bde8e1214a587cf04f5b7e483ecafc690bf"
+      "path": "assets/index-PP-b7vq4.js",
+      "bytes": 4244,
+      "sha256": "a2943746f5f6b509c6b67789e1bfd6c39c69d8e409561a7adca9b54613be3255"
     },
     {
       "path": "assets/legacy-main-BSThLq4n.css",
@@ -94,9 +89,14 @@
       "sha256": "f4ebe7c28937bbfb6499f41ce5d9f3b50f5b3c2dd0e5f9bfdd8e28403e648590"
     },
     {
-      "path": "assets/main-C8iauAM0.js",
+      "path": "assets/legacy-main-DXo_qTQx.js",
+      "bytes": 1985684,
+      "sha256": "ce289220c44ce3aabce4eec62dd2b15055928c1bd4862ef2618ff1f88acaa69e"
+    },
+    {
+      "path": "assets/main-Cw_DjCgT.js",
       "bytes": 1676,
-      "sha256": "dc66726c05d347fb5a6a32393763e1a246ea7e9c5116dbea72b6ddc265ac23aa"
+      "sha256": "dc8c67887a8bef5b95c5b2071ea633e3719d2d5e786029b320b0d0751d83d021"
     },
     {
       "path": "assets/map-CEIQEN1Y.js",
@@ -134,14 +134,14 @@
       "sha256": "7ee3ad0000130240f8df78a870668668798a4ae84c642ec3b11d3d4f82e1f139"
     },
     {
-      "path": "assets/nuke-event-2bpGG7F1.js",
-      "bytes": 156370,
-      "sha256": "5f851f174b6b8a7acf83c2e457eeded55191de0db27ed6c03ef0b0febb21d661"
+      "path": "assets/nuke-event-CvehLAeg.js",
+      "bytes": 160448,
+      "sha256": "da1a548e583a709554ac34cc9693803a1e4075114bd354b27b525cc51fc9d419"
     },
     {
-      "path": "assets/nuketown2-Cf34kImX.js",
-      "bytes": 3826,
-      "sha256": "97553e744fc0bf66a31f937ecac66765e5dd4cbb1750c8b875fc16b6ed98e2d4"
+      "path": "assets/nuketown2-DznlBuL0.js",
+      "bytes": 3829,
+      "sha256": "a641c88a15f8f99a9c355312c418020ad1af7cc11ef7488cca08cc832dde06b5"
     },
     {
       "path": "assets/original/killstreak-demo/adrenaline.jpg",
@@ -2879,9 +2879,9 @@
       "sha256": "5db5ba82eef00d1dee7e86e663098c9427d01183a88d357437daff295aec3e75"
     },
     {
-      "path": "assets/rustworks-1v1-Bo6P3gt3.js",
+      "path": "assets/rustworks-1v1-fQB7NBZp.js",
       "bytes": 2837,
-      "sha256": "7772bcd41c61b15e4f12c2608f41063762c72d4fe6ed56c65ec038130d1be03c"
+      "sha256": "b30df4e4bf359e2b18552e71b341ca3a209a8dd44fd335478f426a9c6fb80f40"
     },
     {
       "path": "assets/shared-B6kQDIU4.js",
@@ -2889,14 +2889,14 @@
       "sha256": "82d6cb6ff265b3a093fd26ad49314ba1aa346dfd7db74146c63bfa634388d4e0"
     },
     {
-      "path": "assets/sky-backdrop-DxBot3Py.js",
-      "bytes": 9524,
-      "sha256": "dab67e806257c6379e53c94ad9e81e1c735bae1240a71135762dbd67216de8bf"
+      "path": "assets/sky-backdrop-Cpw7uhGG.js",
+      "bytes": 10167,
+      "sha256": "e9797dd672d5b244220bf94fa08ea01307ff644da6d86560bd1a1aacee430ee8"
     },
     {
-      "path": "assets/skyline-terminal-CA3tO6LF.js",
+      "path": "assets/skyline-terminal-NfmKeFvs.js",
       "bytes": 1743,
-      "sha256": "87f9669b982850120ff47125fd01074a9c0490069dee7d66509a038cd4449c18"
+      "sha256": "156a12769a6102de8000541203a53eebb5458ee909bec9c7b9bfa6c1b0e614ea"
     },
     {
       "path": "assets/style-Cz5sWwCB.css",
@@ -3026,7 +3026,7 @@
     {
       "path": "index.html",
       "bytes": 1206,
-      "sha256": "ff53e0e8f07d9358ca89ff509737f2abeab22a56bb165a580e0b037130ec3229"
+      "sha256": "26b8a19c7231b478eb71825a4612e93bbb261ee60eaee796381ef5342bd6c43d"
     },
     {
       "path": "map3.html",
