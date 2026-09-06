@@ -509,4 +509,22 @@ describe('forge-kit street-signs prefabs (HF-536 night-gemini5)', () => {
       }
     }
   });
+
+  it('maintains bench-to-wall clearance >= 0.02 m (HF-536)', () => {
+    const map = buildOnce();
+    for (const side of ['north', 'south'] as const) {
+      const wall = map.root.getObjectByName(`nuketown2 ${side} verge low wall`) as THREE.Mesh;
+      expect(wall, `${side} verge low wall exists`).toBeDefined();
+      const wallBox = meshBox(wall);
+
+      const slat = map.root.getObjectByName(`nuketown2 ${side} street-sign bench and bin seat slat 2`) as THREE.Mesh;
+      expect(slat, `${side} bench seat slat 2 exists`).toBeDefined();
+      const slatBox = meshBox(slat);
+
+      const faceClearance = side === 'north'
+        ? Math.abs(slatBox.maxZ - wallBox.maxZ)
+        : Math.abs(slatBox.minZ - wallBox.minZ);
+      expect(faceClearance, `${side} bench-to-wall clearance >= 0.02 m`).toBeGreaterThanOrEqual(0.02);
+    }
+  });
 });

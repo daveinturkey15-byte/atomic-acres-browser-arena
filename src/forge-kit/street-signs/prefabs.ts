@@ -394,7 +394,7 @@ export function streetSignPropPlacements(): readonly StreetSignPropPlacement[] {
     // 6. Bench and bin on the verge near turning head: safe from doorways and vehicles
     Object.freeze({
       propId: 'street-sign bench and bin',
-      anchor: [-5.2, 0, -8.5] as const,
+      anchor: [-5.2, 0, -8.47] as const,
       parts: benchAndBin(),
     }),
     // 7. Fire hydrant dropped from arena placement per BRIEF.md:

@@ -272,4 +272,52 @@ describe('HF-536 glasshouse and garden pod detail proof', () => {
 
     materials.dispose();
   });
+
+  it('HF-536 de-flush: post proud on both axes >= 0.015 m, cill vs plinth reveal >= 0.01 m, eaves bar top vs roof plane >= 0.015 m', () => {
+    const materials = createNuketown2YardPropMaterials();
+    const table = nuketown2YardPropSolids(materials);
+    const g = NUKETOWN2_GLASSHOUSE;
+
+    // 1. Post proud on both axes >= 0.015 m
+    const posts = table.filter((e) => e.name.startsWith('yard glasshouse post '));
+    expect(posts.length).toBe(2);
+    for (const post of posts) {
+      const proudX = Math.abs(post.position[0] - g.x) + post.size[0] / 2 - g.width / 2;
+      const proudZ = Math.abs(post.position[2] - g.z) + post.size[2] / 2 - g.depth / 2;
+      expect(proudX, `${post.name} proud on x`).toBeGreaterThanOrEqual(0.015);
+      expect(proudZ, `${post.name} proud on z`).toBeGreaterThanOrEqual(0.015);
+    }
+
+    // 2. Cill vs plinth reveal difference >= 0.01 m
+    const cill = table.find((e) => e.name === 'yard glasshouse cill');
+    expect(cill).toBeDefined();
+    const plinths = table.filter((e) => e.name.startsWith('yard glasshouse plinth '));
+    expect(plinths.length).toBe(4);
+
+    const cillRevealX = (cill!.size[0] - g.width) / 2;
+    const cillRevealZ = (cill!.size[2] - g.depth) / 2;
+
+    for (const plinth of plinths) {
+      if (plinth.name.includes('front') || plinth.name.includes('back')) {
+        const plinthRevealZ = Math.abs(plinth.position[2] - g.z) + plinth.size[2] / 2 - g.depth / 2;
+        const diff = Math.abs(plinthRevealZ - cillRevealZ);
+        expect(diff, `${plinth.name} vs cill reveal diff`).toBeGreaterThanOrEqual(0.01);
+      } else {
+        const plinthRevealX = Math.abs(plinth.position[0] - g.x) + plinth.size[0] / 2 - g.width / 2;
+        const diff = Math.abs(plinthRevealX - cillRevealX);
+        expect(diff, `${plinth.name} vs cill reveal diff`).toBeGreaterThanOrEqual(0.01);
+      }
+    }
+
+    // 3. Eaves bar top vs roof plane >= 0.015 m
+    const eavesMullions = table.filter((e) => e.name.startsWith('yard glasshouse mullion h') && e.name.endsWith('eaves'));
+    expect(eavesMullions.length).toBe(4);
+    for (const mullion of eavesMullions) {
+      const topY = mullion.position[1] + mullion.size[1] / 2;
+      const diff = Math.abs(g.height - topY);
+      expect(diff, `${mullion.name} top vs roof plane difference`).toBeGreaterThanOrEqual(0.015);
+    }
+
+    materials.dispose();
+  });
 });

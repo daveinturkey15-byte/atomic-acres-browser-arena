@@ -375,12 +375,13 @@ export function nuketown2YardPropSolids(
   push('yard glasshouse eaves', 'structure',
     [g.x, g.height - 0.13, g.z], [g.width + 0.10, 0.12, g.depth + 0.10], m.frame, DRESSING);
   push('yard glasshouse cill', 'structure',
-    [g.x, 0.09, g.z], [g.width + 0.08, 0.18, g.depth + 0.08], m.frame, DRESSING);
+    [g.x, 0.09, g.z], [g.width + 0.05, 0.18, g.depth + 0.05], m.frame, DRESSING);
   for (const [index, sx] of [-1, 1].entries()) {
     // Same rule: the post stops 0.10 m under the roof plane it supports.
+    // HF-536: stands 0.02 m proud on BOTH outer faces (x and z), never flush with shell.
     push(`yard glasshouse post ${index}`, 'structure',
-      [g.x + sx * (g.width / 2 - 0.05), (g.height - 0.10) / 2, g.z],
-      [0.10, g.height - 0.10, g.depth + 0.06], m.frame, DRESSING);
+      [g.x + sx * (g.width / 2 - 0.03), (g.height - 0.10) / 2, g.z],
+      [0.10, g.height - 0.10, g.depth + 0.04], m.frame, DRESSING);
   }
   // DETAIL. HF-536: plinth, mullion grid, corner posts, door, gutter, vents.
   // 1. Timber plinth skirt 0.30 m high x 0.04 m proud around the base (4 faces).
@@ -440,7 +441,8 @@ export function nuketown2YardPropSolids(
       [barW, mH, barW], m.frame, DRESSING);
   }
   // Horizontals at 0.90 m and at eaves (2.28 m), 0.02 m proud.
-  for (const [label, hy] of [['mid', 0.90], ['eaves', g.height - barW / 2]] as const) {
+  // HF-536: eaves mullions lowered by 0.02 m so tops sit 0.02 m under roof plane.
+  for (const [label, hy] of [['mid', 0.90], ['eaves', g.height - barW / 2 - 0.02]] as const) {
     push(`yard glasshouse mullion h front ${label}`, 'detail',
       [g.x, hy, g.z + g.depth / 2 + barProud - barW / 2],
       [g.width, barW, barW], m.frame, DRESSING);
