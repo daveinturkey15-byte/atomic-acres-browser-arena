@@ -393,7 +393,7 @@ import {
   recordClientWorldRepairAttempt,
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
-import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack';
+import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack'; import { canSpendReconnectRepairAttempt, shouldDeclareResumeTimeout, shouldReadmitResumeAuthority } from './guest-rejoin-repair-pacing';
 import { renderPrivateLobbyView } from './mp-lobby-authority-views';
 import { acceptLocalPickupResult as acceptLocalPickupResultAuthority, expirePendingLocalPickup as expirePendingLocalPickupAuthority, type PendingLocalPickup } from './mp-pickup-authority';
 import { createLocalReloadRetryRuntime } from './mp-reload-retry';
@@ -6202,7 +6202,7 @@ const clientWorldRepairFailureTelemetry: { total: number; last: Record<string, u
   last: null,
 };
 let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
-let clientReconnectWorldRepairAttempts = 0; // HF-322: bounded reconnect repair attempts
+let clientReconnectWorldRepairAttempts = 0; let lastReconnectWorldRepairAttemptAtMs: number | null = null; let guestResumeTimedOutLocally = false; let guestResumeHostDeclaredFailure = false; // HF-322/HF-535: bounded AND paced reconnect repair attempts
 let pendingClientWorldRepairTimeout: number | null = null; // HF-322: bounded admission/repair timeout
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
@@ -7709,7 +7709,7 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
     if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
       clientWorldRepairAdmission = null;
       pendingClientReconnectWorldRepairConnectionEpoch = null;
-      clientReconnectWorldRepairAttempts = 0;
+      clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
       clearClientWorldRepairTimeout();
     }
     const admissionToken = matchAdmissionCoordinator.token();
@@ -7817,7 +7817,7 @@ function restoreRoomIdentity(roomCode: string): void {
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
   pendingGuestResumeAuthority = null;
-  clientReconnectWorldRepairAttempts = 0;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
   clearClientWorldRepairTimeout();
   clearGuestResumeTimeout();
   lastGuestResumeNackNonce = null;
@@ -7869,7 +7869,7 @@ function resetPrivateLobbyState(): void {
   localResumeToken = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
-  clientReconnectWorldRepairAttempts = 0;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
   clearClientWorldRepairTimeout();
   hostKillstreakLoadoutAcks.clear();
   localHostConfirmedContinuity = null;
@@ -8992,7 +8992,7 @@ function sendLobbyJoin(): void {
   if (network.role !== 'client') return; const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0; if (!resumingVoluntaryActiveMatch) pendingVoluntaryActiveMatchRejoinRoomCode = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
-  clientReconnectWorldRepairAttempts = 0;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
   clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
@@ -9041,7 +9041,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
   const admission = clientWorldRepairAdmission;
   const reconnectRepair = awaitingCanonicalGuestAuthority
     && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch;
-  if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;
+  if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !(reconnectRepair && canSpendReconnectRepairAttempt({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, repairReadyNow))) return;
   network.send({ type: 'join', player: snapshot() });
   // The reliable state commit is ordered before the loadout intent on the
   // event lane. On a rematch the host has rebuilt the remote at continuity 1;
@@ -9054,7 +9054,7 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
   };
   network.send(loadoutMessage);
   if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission, repairReadyNow);
-  if (reconnectRepair) clientReconnectWorldRepairAttempts += 1;
+  if (reconnectRepair) { clientReconnectWorldRepairAttempts += 1; lastReconnectWorldRepairAttemptAtMs = repairReadyNow; }
   if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null; if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = '';
 }
 
@@ -9139,7 +9139,7 @@ function safeGuestResumeFallbackSnapshot(remote: RemotePlayer, attempt: number):
 }
 
 function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boolean {
-  if (network.role !== 'host' || !gameStarted || !remote.awaitingReplacementState) return false;
+  if (network.role !== 'host' || !gameStarted || !(remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId))) return false;
   const connectionEpoch = hostLobbyConnectionEpochs.get(playerId);
   const pending = pendingGuestAuthorityRepairs.get(playerId);
   if (connectionEpoch && pending?.connectionEpoch === connectionEpoch) {
@@ -9314,7 +9314,7 @@ function handleClientWorldRepairFailure(reason = 'admission-unacknowledged'): vo
   clearClientWorldRepairTimeout();
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
-  clientReconnectWorldRepairAttempts = 0;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
   player.hp = 0;
   player.alive = false;
   clearGameplayInput();
@@ -9332,13 +9332,13 @@ function handleGuestResumeTimeout(): void {
   awaitingCanonicalGuestAuthority = false;
   awaitingAuthoritativeRejoinContinuity = false;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
-  clientReconnectWorldRepairAttempts = 0;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
   player.hp = 0;
   player.alive = false;
   clearGameplayInput();
   weaponView.setPresentationVisible(false);
   setStatus('Match resume authority timed out. Rejoin to retry.', 'error');
-  addFeed('REJOIN AUTHORITY TIMEOUT · RETRY FROM LOBBY');
+  guestResumeTimedOutLocally = true; addFeed('REJOIN AUTHORITY TIMEOUT · RETRY FROM LOBBY');
 }
 
 function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): void {
@@ -9484,7 +9484,7 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
   clearGameplayInput();
   weaponView.setPresentationVisible(false);
   setStatus(`Canonical rejoin failed (${message.reason}). Use Rejoin to retry safely.`, 'error');
-  addFeed('REJOIN AUTHORITY FAILED · RETRY FROM LOBBY');
+  guestResumeHostDeclaredFailure = true; addFeed('REJOIN AUTHORITY FAILED · RETRY FROM LOBBY');
   return true;
 }
 
@@ -9495,7 +9495,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
     const reack: GuestResumeAckMessage = { type: 'guest-resume-ack', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, connectionEpoch: localConnectionEpoch, matchEpoch: killstreakMatchEpoch, authorityNonce: message.nonce, nonce: randomNonce() };
     network.send(reack); network.sendStateCommitReliably(createStateMessage()); return true;
   }
-  if (network.role !== 'client' || !gameStarted || !awaitingCanonicalGuestAuthority) return true;
+  if (shouldReadmitResumeAuthority({ role: network.role, gameStarted, awaitingCanonicalGuestAuthority, timedOutLocally: guestResumeTimedOutLocally, hostDeclaredFailure: guestResumeHostDeclaredFailure, messageConnectionEpoch: message.connectionEpoch, localConnectionEpoch })) { awaitingCanonicalGuestAuthority = true; guestResumeTimedOutLocally = false; } if (network.role !== 'client' || !gameStarted || !awaitingCanonicalGuestAuthority) return true;
   const admission = admitGuestResumeAuthority(message, {
     expectedHostId: privateLobbySnapshot?.hostId ?? null,
     expectedPlayerId: player.id,
@@ -10579,7 +10579,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     awaitingAuthoritativeRejoinContinuity = false;
     pendingGuestResumeAuthority = null;
     pendingClientReconnectWorldRepairConnectionEpoch = null;
-    clientReconnectWorldRepairAttempts = 0;
+    clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
     clearClientWorldRepairTimeout();
   }
   privateMatchConfig = message.snapshot.config;
@@ -13034,7 +13034,7 @@ function onNetworkMessage(message: GameMessage): void {
       // reached let a burst of stale start-of-match snapshots kill the guest
       // at spawn (the HF-347 "can't move" soft-lock).
       handleClientWorldRepairFailure('attempts-exhausted');
-    } else if (awaitingCanonicalGuestAuthority && clientReconnectWorldRepairAttempts >= MAX_CLIENT_WORLD_REPAIR_ATTEMPTS) {
+    } else if (shouldDeclareResumeTimeout({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, performance.now())) {
       // HF-322: surface clear user-visible failure when reconnect resume attempts exhausted
       handleGuestResumeTimeout();
     }

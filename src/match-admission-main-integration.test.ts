@@ -84,7 +84,11 @@ describe('legacy match admission integration', () => {
     expect(stateAt).toBeGreaterThan(joinAt);
     expect(loadoutAt).toBeGreaterThan(stateAt);
     expect(attemptAt).toBeGreaterThan(loadoutAt);
-    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;');
+    // HF-535: the reconnect arm's `&& !reconnectRepair` bypass is now fenced by
+    // canSpendReconnectRepairAttempt. Strictly stronger — it can only refuse a
+    // send this guard previously made — and the ordering above is unchanged.
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !(reconnectRepair && canSpendReconnectRepairAttempt(');
+    expect(repair).not.toContain('&& !reconnectRepair) return;');
   });
 
   it('holds ordinary client traffic until the exact host actor acknowledgement and clears admission across lifecycle boundaries', () => {

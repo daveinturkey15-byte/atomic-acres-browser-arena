@@ -67,7 +67,18 @@ describe('same-browser hosted active-match recovery integration', () => {
 
     const repair = functionBody('sendClientWorldRepairReady', 'rejectLobbyPlayer');
     expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch');
-    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !reconnectRepair) return;');
+    // HF-535: the reconnect arm used to be an unconditional bypass of the
+    // attempt gate (`&& !reconnectRepair`). Two repair-ready sends 0.4 ms apart
+    // — startMatch's own, then the parked killstreak-state replayed later in
+    // the SAME task — therefore spent both of MAX_CLIENT_WORLD_REPAIR_ATTEMPTS
+    // in one millisecond and the guest killed itself before the host's
+    // authority was on the wire (day-mp soak, guestB 225e2719). The arm is
+    // still reachable and the epoch is still consumed exactly once; it now
+    // also has to pass the spacing fence, which can only ever REFUSE a send
+    // this line previously made. Pinned at full strength so a future edit
+    // cannot quietly restore the bypass.
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !(reconnectRepair && canSpendReconnectRepairAttempt({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, repairReadyNow))) return;');
+    expect(repair).toContain('lastReconnectWorldRepairAttemptAtMs = repairReadyNow;');
     expect(repair).toContain('if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;');
     expect(repair.match(/pendingClientReconnectWorldRepairConnectionEpoch = null/g)).toHaveLength(1);
     expect(repair.indexOf('network.send(loadoutMessage);'))
