@@ -13,6 +13,7 @@ import { chromium } from '@playwright/test';
 import {
   ACK_BUDGET_MS,
   PEERS,
+  auditFindings,
   chromeArgs,
   multiplayerArenaRoster,
   openPeer,
@@ -402,6 +403,14 @@ async function runGuestScenarios(role) {
   bundle.scenarios.guests[role].respawnLoadoutReset = loadoutReset;
   bundle.scenarios.guests[role].respawnCheckpoint = summarizeScenario({ dead: dead?.players?.[dead.selfId] ?? null, after: current?.players?.[current.selfId] ?? null, result: respawn });
   const reloadAfterDeath = await runScenario(role, 'reloadAfterDeath', () => scenarioReload(guest, host, peers, role, 'post-death'));
+  // HF-535 (evidence only, no assertion change): this line used to OVERWRITE the
+  // full scenario result recordScenario had just stored with a bare boolean, so
+  // the five-conjunct reload result (ammoAfter > ammoBefore, sentIntent,
+  // gotResult, otherSeesReloading, hostSeesAmmo === ammoAfter) was discarded and
+  // a RED row could not be attributed to a conjunct. Keep both, on the same
+  // `<name>Result` + `<name>` shape the stair probe already uses; the boolean the
+  // gate reads is byte-identical.
+  bundle.scenarios.guests[role].reloadAfterDeathResult = summarizeScenario(reloadAfterDeath);
   bundle.scenarios.guests[role].reloadAfterDeath = reloadAfterDeath?.ok === true;
 }
 
@@ -525,6 +534,17 @@ function formatAdmissionSection() {
 }
 
 async function writeEvidence() {
+  // HF-535 (evidence only): mp-audit keeps its own findings array and the soak
+  // gate kept a different one appended only by noteFailure, so every
+  // RELOAD-UNACKNOWLEDGED / DESYNC-* / PICKUP-* detail the driver recorded was
+  // dropped and bundle.findings shipped as []. Merge, de-duplicated by id.
+  const seenFindingIds = new Set(bundle.findings.map((finding) => finding.id ?? finding.scope));
+  for (const finding of auditFindings) {
+    const key = finding.id ?? JSON.stringify(finding).slice(0, 120);
+    if (seenFindingIds.has(key)) continue;
+    seenFindingIds.add(key);
+    bundle.findings.push(summarizeScenario(finding));
+  }
   bundle.timing.endedAtEpochMs ??= Date.now();
   bundle.timing.playDurationMs = bundle.timing.playDurationMs || Math.max(0, bundle.timing.endedAtEpochMs - bundle.timing.startedAtEpochMs);
   bundle.gate = evaluateMpSoakBundle(bundle);

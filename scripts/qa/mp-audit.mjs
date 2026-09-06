@@ -1515,6 +1515,11 @@ if (isMain) main().then((code) => process.exit(code)).catch((error) => {
 export {
   ACK_BUDGET_MS,
   PEERS,
+  // HF-535: every RELOAD-*/DESYNC-*/PICKUP-* detail recorded during a run lived
+  // in this module-local array and never reached the soak bundle, so a failing
+  // conjunct in the soak (e.g. guestB reload-after-death) was unattributable
+  // from the evidence. Exported read-only for the soak gate to merge.
+  findings as auditFindings,
   chromeArgs,
   markOf,
   multiplayerArenaRoster,
