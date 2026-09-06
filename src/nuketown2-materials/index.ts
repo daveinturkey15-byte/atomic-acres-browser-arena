@@ -175,9 +175,7 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
       variant: 'scrub',
       readDistanceM: 55,
     }),
-    // DAY-POLISH (HF-535): toward the reference vivid emerald from muted sage;
-    // still deep enough that dark operator silhouettes read on it.
-    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x417c33, { variant: 'turf', polygonOffset: -2 }),
+    lawn: createLawnMaterial('nuketown2-lawn-decal', 0x496438, { variant: 'turf', polygonOffset: -2 }),
 
     asphalt: createAsphaltMaterial(),
     kerb: createConcreteMaterial('nuketown2-kerb', 0x9a978a, { variant: 'kerb', dampFootY: 0 }),

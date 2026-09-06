@@ -34,7 +34,7 @@ import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
 import { hash2 } from '../../map3/noise';
 
-const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
+const { clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
 
 /** Mown checker cell, metres. Measured off the BO2-2025 aerial reference. */
@@ -111,22 +111,13 @@ function sharedLawnGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
   const bare = smoothstep(float(0.76), float(0.93), wear.soilMask);
   const earth = uniforms.soilColor;
   const thinned = mix(striped, mix(striped, earth, float(0.30)), thin.mul(isHedge.select(float(0.35), float(1.0))));
-  // DAY-POLISH (HF-535): the scrub plain is one slab inside the fence too,
-  // so straw and wildflowers need a fence mask or they land on driveways and
-  // foundations. Fenced play rectangle |x| <= 18, |z| <= 36
-  // (NUKETOWN2_BOUNDS); 2 m feather so the verge reads continuous.
-  const beyondFence = smoothstep(float(0.0), float(2.0), max(abs(p.x).sub(float(18)), abs(p.z).sub(float(36))));
-  const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(mix(float(0.35), float(LAWN_SCRUB_STRAW), beyondFence));
+  const straw = smoothstep(float(0.45), float(0.85), wear.scuff).mul(isScrub.select(float(LAWN_SCRUB_STRAW), float(0.35)));
   const worn = mix(thinned, earth, bare.mul(isHedge.select(float(0.15), float(0.60))));
-  const wildflower = isScrub.select(smoothstep(float(LAWN_WILDFLOWER_THRESHOLD), float(0.992), hash2(floor(vec2(p.x, p.z).mul(float(3.0))))), float(0)).mul(beyondFence).mul(float(0.85));
-  // DAY-POLISH (HF-535): sparse warm blooms on the kerb planters (hedge
-  // variant). Same hash family, decorrelated cells, no geometry.
-  const planterBloom = isHedge.select(smoothstep(float(0.986), float(0.997), hash2(floor(vec2(p.x, p.z).mul(float(5.0))).add(float(7)))), float(0)).mul(float(0.5));
   lawnGraph = {
     colorNode: mix(
-      mix(mix(worn, worn.mul(float(1.42)), straw), linearSwatch(0xe0a83c).mul(wear.albedoMul), planterBloom),
+      mix(worn, worn.mul(float(1.42)), straw),
       linearSwatch(0xd8b93c).mul(wear.albedoMul),
-      wildflower,
+      isScrub.select(smoothstep(float(LAWN_WILDFLOWER_THRESHOLD), float(0.992), hash2(floor(vec2(p.x, p.z).mul(float(3.0))))), float(0)).mul(float(0.85)),
     ),
     roughnessNode: clamp(wear.roughness.sub(bare.mul(float(0.06))).sub(straw.mul(float(0.04))), float(0.60), float(1.0)),
   };

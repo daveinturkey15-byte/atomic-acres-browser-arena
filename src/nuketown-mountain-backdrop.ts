@@ -151,16 +151,13 @@ export const NUKETOWN_MOUNTAIN_HAZE_WARM_BAND = 0.55;
  * Mid-grey bases so the product keeps the authored palette, not replaces it.
  */
 export const NUKETOWN_MOUNTAIN_SUN_WARM = 0xffe0b8;
-// DAY-POLISH (HF-535): deepened from 0x9aa0d0 so sunlit facets separate from
-// shaded ravines at the overhead's distance; stays blue-violet, still a
-// product tint over the authored palette.
-export const NUKETOWN_MOUNTAIN_SHADE_COOL = 0x8f96c8;
+export const NUKETOWN_MOUNTAIN_SHADE_COOL = 0x9aa0d0;
 /**
  * Contrast floor: fully-lit rock over fully-shaded rock, same base colour,
  * must read at least this different or the massif flattens to one cut-out.
  * The mountain test pins it.
  */
-export const NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR = 1.45;
+export const NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR = 1.35;
 /**
  * Apply the two-tone rock light to a base colour.
  *
@@ -176,14 +173,13 @@ export function mountainTwoTone(
 ): [number, number, number] {
   const t = Math.min(1, Math.max(0, lambert));
   // sRGB mixes read better here than linear: the shift is a surface tint,
-  // not a light transport term. Derived from the exported swing constants so
-  // a palette pass moves the rock with them (DAY-POLISH HF-535).
-  const sunR = ((NUKETOWN_MOUNTAIN_SUN_WARM >> 16) & 255) / 255;
-  const sunG = ((NUKETOWN_MOUNTAIN_SUN_WARM >> 8) & 255) / 255;
-  const sunB = (NUKETOWN_MOUNTAIN_SUN_WARM & 255) / 255;
-  const shadeR = ((NUKETOWN_MOUNTAIN_SHADE_COOL >> 16) & 255) / 255;
-  const shadeG = ((NUKETOWN_MOUNTAIN_SHADE_COOL >> 8) & 255) / 255;
-  const shadeB = (NUKETOWN_MOUNTAIN_SHADE_COOL & 255) / 255;
+  // not a light transport term.
+  const sunR = 1.0;
+  const sunG = 0xe0 / 255;
+  const sunB = 0xb8 / 255;
+  const shadeR = 0x9a / 255;
+  const shadeG = 0xa0 / 255;
+  const shadeB = 0xd0 / 255;
   out[0] = baseR * (shadeR + (sunR - shadeR) * t);
   out[1] = baseG * (shadeG + (sunG - shadeG) * t);
   out[2] = baseB * (shadeB + (sunB - shadeB) * t);
@@ -519,9 +515,7 @@ export function buildNuketownMountainBackdrop(
       crestColor: 0x3d4735,
       phase: 1.9,
       haze: NUKETOWN_MOUNTAIN_HAZE_NEAR,
-      // DAY-POLISH (HF-535): wider facet/ravine swing on the near ring; the
-      // far ring stays lower so it still recedes into haze.
-      shadeStrength: 0.68,
+      shadeStrength: 0.55,
     }),
     ridgeMaterial,
   );
@@ -540,7 +534,7 @@ export function buildNuketownMountainBackdrop(
       crestColor: 0x3b4358,
       phase: 4.7,
       haze: NUKETOWN_MOUNTAIN_HAZE_MID,
-      shadeStrength: 0.52,
+      shadeStrength: 0.42,
     }),
     ridgeMaterial,
   );
@@ -563,7 +557,7 @@ export function buildNuketownMountainBackdrop(
       crestColor: 0x414a63,
       phase: 8.3,
       haze: NUKETOWN_MOUNTAIN_HAZE_FAR,
-      shadeStrength: 0.36,
+      shadeStrength: 0.3,
     }),
     ridgeMaterial,
   );
