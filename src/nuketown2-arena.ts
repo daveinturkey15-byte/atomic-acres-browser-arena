@@ -208,6 +208,16 @@ import {
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
 // HELD by the HF-491 verge ratchet - see REPORT.md blocker B1.
 import { type ForgeKitBox, getLampPoolMaterial, gutterRunParts, kerbCourseParts, lampPoolParts, lanternHeadParts } from './forge-kit';
+// HF-536 night-muse-eaves: roof-edge kit (fascia, gutters, downpipes, soffit).
+import {
+  type EavesPart,
+  type EavesPipeSpec,
+  type EavesRole,
+  fasciaParts,
+  garageGutterParts,
+  houseRetroBracketParts,
+  soffitParts,
+} from './forge-kit/eaves';
 // HF-536 night-gemini14: lamp atmospheric light cones and dust motes (critic gap #5)
 import { buildNuketown2LampFx } from './nuketown2-lamp-fx';
 // HF-536 night-gemini15: utility pole power lines, catenary spans, eaves drops, pole transformer (critic gap #1)
@@ -1893,6 +1903,20 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     gutterRunParts({ run: HOUSE_WIDTH + 0.06, drop: 5.86, facing: 1 }));
   forgeKitPair(builder, m, 'house back gutter', [cx, ROOF_Y0 + 0.06, HOUSE_BACK_Z - 0.05],
     gutterRunParts({ run: HOUSE_WIDTH + 0.06, drop: 5.86, facing: -1 }));
+  // HF-536 (night-muse-eaves): THE ROOF EDGE. The boxed eave band above is
+  // still a bare extrusion lip on three sides, and the two box gutter runs
+  // hang with no brackets and open ends. Fascia + drip on all four eaves, a
+  // soffit strip under the overhang, and brackets + stop-ends bolted onto
+  // the EXISTING runs (troughs, hoppers, pipes and shoes stay exactly as
+  // the night-kit authored them - re-piping would double-pipe the corners).
+  eavesPairKit(builder, m, 'house eaves fascia', [cx, ROOF_Y0 + ROOF_T / 2, zMid],
+    fasciaParts({ width: HOUSE_WIDTH, depth: HOUSE_DEPTH, slabTop: ROOF_T / 2, overhang: 0.25 }));
+  eavesPairKit(builder, m, 'house eaves soffit', [cx, ROOF_Y0 + ROOF_T / 2, zMid],
+    soffitParts({ width: HOUSE_WIDTH, depth: HOUSE_DEPTH, slabTop: ROOF_T / 2, overhang: 0.25 }));
+  eavesPairKit(builder, m, 'house front eaves retrofit', [cx, ROOF_Y0 + 0.06, -9.90],
+    houseRetroBracketParts({ run: HOUSE_WIDTH + 0.06, facing: 1 }));
+  eavesPairKit(builder, m, 'house back eaves retrofit', [cx, ROOF_Y0 + 0.06, HOUSE_BACK_Z - 0.05],
+    houseRetroBracketParts({ run: HOUSE_WIDTH + 0.06, facing: -1 }));
   // --- front wall, upper floor: the power window ---------------------------
   const upperFrontRuns: [number, number][] = [
     [HOUSE_X0 + WALL_T, UPPER_WINDOW[0]],
@@ -2708,6 +2732,22 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
     shingleRoofParts({
       width: GARAGE_WIDTH - 0.2, depth: GARAGE_DEPTH, slabTop: 0.15, overhang: 0.2, role: 'roof',
     }));
+  // HF-536 (night-muse-eaves): THE GARAGE ROOF EDGE. The garage had no eaves
+  // trim at all - bare band, no gutter, no pipe, bare overhang underside.
+  // Fascia + drip and soffit on all four eaves, plus full new gutter runs
+  // (trough, brackets, stop-ends, hoppers, straps, shoes, 8-gon pipes) on
+  // front and back, mirrored through pair() like the houses.
+  eavesPairKit(builder, m, 'garage eaves fascia', [cx + 0.1, H + 0.15, zMid],
+    fasciaParts({ width: GARAGE_WIDTH - 0.2, depth: GARAGE_DEPTH, slabTop: 0.15, overhang: 0.2 }));
+  eavesPairKit(builder, m, 'garage eaves soffit', [cx + 0.1, H + 0.15, zMid],
+    soffitParts({ width: GARAGE_WIDTH - 0.2, depth: GARAGE_DEPTH, slabTop: 0.15, overhang: 0.2 }));
+  for (const facing of [1, -1] as const) {
+    const eave = facing === 1 ? 'front' : 'back';
+    const anchor: readonly [number, number, number] = [cx + 0.1, H + 0.15, zMid + facing * (GARAGE_DEPTH / 2 + 0.2 + 0.02)];
+    const gutters = garageGutterParts({ run: 5.0, facing, overhang: 0.2, shoeBaseY: -H });
+    eavesPairKit(builder, m, `garage ${eave} eaves gutter`, anchor, gutters.boxes);
+    eavesPipePair(builder, m, `garage ${eave} eaves gutter`, anchor, gutters.pipes);
+  }
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
   facadePair(builder, m, 'garage outboard siding', [GARAGE_X1, 0, zMid],
     lapSidingParts({ run: GARAGE_DEPTH, height: H, facing: 'x+', role: 'garageSiding' }));
@@ -4099,6 +4139,77 @@ function forgeKitPair(
         solid: false, shots: false, cast: false, presentationOnly: true, propId,
         ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
       });
+  }
+}
+/**
+ * HF-536 night-muse-eaves. Resolve one eaves ROLE onto THIS arena's registry.
+ * `trim` is the painted timber all fascia/drip/soffit boards share;
+ * `painted-metal` borrows the garage-door paint (the hardware kit's mapping),
+ * so the kit adds zero materials, zero uniforms, zero samplers.
+ */
+function eavesRoleMaterial(m: Nuketown2Materials, role: EavesRole): THREE.Material {
+  switch (role) {
+    case 'painted-metal': return m.garageDoor;
+    case 'trim': default: return m.trim;
+  }
+}
+
+/**
+ * HF-536 night-muse-eaves. Emit one eaves box prefab at an authored anchor,
+ * through `pair()`. Identical contract to `forgeKitPair`: every part is
+ * presentation only (`solid:false, shots:false, cast:false`), so no collider,
+ * shot surface or ballistic row can be created here.
+ */
+function eavesPairKit(
+  builder: Builder,
+  m: Nuketown2Materials,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly EavesPart[],
+): void {
+  for (const part of parts) {
+    pair(builder, `${propId} ${part.suffix}`,
+      [anchor[0] + part.offset[0], anchor[1] + part.offset[1], anchor[2] + part.offset[2]],
+      [part.size[0], part.size[1], part.size[2]],
+      eavesRoleMaterial(m, part.role),
+      { solid: false, shots: false, cast: false, presentationOnly: true, propId });
+  }
+}
+
+/**
+ * HF-536 night-muse-eaves. Emit the 8-gon downpipes as closed cylinders, one
+ * north/south pair per spec with the SAME mirror `pair()` applies (authored
+ * x through `nuketown2HandedX`, south negated on x and z). `box()` cannot
+ * make these - they are not boxes - so this mirrors its registration exactly
+ * minus the authority: never solid, never shots, `presentationOnly` set, and
+ * nothing pushed to `raycastMeshes`, `shotSurfaces`, `colliders` or
+ * `physicsColliders`. One shared geometry per spec; both halves read it.
+ */
+function eavesPipePair(
+  builder: Builder,
+  m: Nuketown2Materials,
+  propId: string,
+  anchor: readonly [number, number, number],
+  specs: readonly EavesPipeSpec[],
+): void {
+  for (const spec of specs) {
+    const geometry = new THREE.CylinderGeometry(spec.radius, spec.radius, spec.height, spec.segments);
+    const material = eavesRoleMaterial(m, spec.role);
+    const authored: readonly [number, number, number] = [
+      anchor[0] + spec.offset[0], anchor[1] + spec.offset[1], anchor[2] + spec.offset[2],
+    ];
+    for (const side of ['north', 'south'] as const) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `nuketown2 ${side} ${propId} ${spec.suffix}`;
+      if (side === 'north') mesh.position.set(nuketown2HandedX(authored[0]), authored[1], authored[2]);
+      else mesh.position.set(-nuketown2HandedX(authored[0]), authored[1], -authored[2]);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.presentationOnly = true;
+      mesh.userData.presentationBatchCandidate = true;
+      mesh.userData.nuketown2Prop = `${side} ${propId}`;
+      builder.root.add(mesh);
+    }
   }
 }
 
