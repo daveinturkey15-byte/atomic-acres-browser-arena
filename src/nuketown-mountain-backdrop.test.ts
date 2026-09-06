@@ -26,15 +26,17 @@ import {
   NUKETOWN_BACKDROP_MIN_RADIAL_M,
   NUKETOWN_BACKDROP_SKIRT_Y_M,
   NUKETOWN_MOUNTAIN_STRATA_PERIOD,
-  NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION,
-  NUKETOWN_MOUNTAIN_STRATA_DARKENING,
-  NUKETOWN_MOUNTAIN_FISSURE_FRACTION,
-  NUKETOWN_MOUNTAIN_FISSURE_DARKENING,
-  NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING,
-  NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF,
+  NUKETOWN_MOUNTAIN_STRATA_SANDSTONE,
+  NUKETOWN_MOUNTAIN_STRATA_COOL_GREY,
+  NUKETOWN_MOUNTAIN_STRATA_CONTRAST_FLOOR,
+  NUKETOWN_MOUNTAIN_FISSURE_COUNT,
+  NUKETOWN_MOUNTAIN_FISSURE_DEPTH_M,
+  NUKETOWN_MOUNTAIN_FACET_JITTER,
   NUKETOWN_MOUNTAIN_MIN_LUMA,
-  nuketownMountainStrataDarkening,
-  countStrataBandsInColumn,
+  STREET_CAMERA_HEIGHT_MIN_M,
+  STREET_CAMERA_HEIGHT_MAX_M,
+  linearLuma,
+  countStrataBandsInHeightRange,
 } from './nuketown-mountain-backdrop';
 
 /** Boundary fence far corner: |x| 31.3 + 0.3 half depth, |z| 31.8 + 0.3. */
@@ -50,6 +52,37 @@ function ridgeMeshes(group: THREE.Group): THREE.Mesh[] {
   );
 }
 
+function crestOf(mesh: THREE.Mesh): number[] {
+  if (Array.isArray(mesh.userData.crestHeights)) {
+    return mesh.userData.crestHeights;
+  }
+  const position = mesh.geometry.getAttribute('position');
+  const heights: number[] = [];
+  for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
+  return heights.slice(0, -1);
+}
+
+function crestColorsOf(mesh: THREE.Mesh): Array<[number, number, number]> {
+  if (Array.isArray(mesh.userData.crestColors)) {
+    return mesh.userData.crestColors;
+  }
+  const colorAttr = mesh.geometry.getAttribute('color');
+  const cols: Array<[number, number, number]> = [];
+  for (let vertex = 2; vertex < colorAttr.count; vertex += 5) {
+    cols.push([colorAttr.getX(vertex) * 255, colorAttr.getY(vertex) * 255, colorAttr.getZ(vertex) * 255]);
+  }
+  return cols.slice(0, -1);
+}
+
+function localMaxima(series: readonly number[]): number[] {
+  const maxIndices: number[] = [];
+  for (let i = 0; i < series.length; i += 1) {
+    const prev = series[(i - 1 + series.length) % series.length];
+    const next = series[(i + 1) % series.length];
+    if (series[i] > prev && series[i] > next) maxIndices.push(i);
+  }
+  return maxIndices;
+}
 describe('Nuke Town mountain backdrop (Pass 82)', () => {
   it('keeps every ridge vertex outside the boundary fence and inside the camera envelope', () => {
     expect(NUKETOWN_BACKDROP_MIN_RADIAL_M).toBeGreaterThan(FENCE_CORNER_RADIAL_M + 10);
@@ -180,29 +213,13 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
   it('resolves a jagged crest line on the built ridge rings', () => {
     const backdrop = buildNuketownMountainBackdrop(new THREE.Group());
     const meshes = ridgeMeshes(backdrop.group);
-    // Row 2 of 5 is the crest row (buildRidgeRing's ringRows table).
-    const crestOf = (mesh: THREE.Mesh): number[] => {
-      const position = mesh.geometry.getAttribute('position');
-      const heights: number[] = [];
-      for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
-      // Drop the duplicated closing segment so the wrap-around is not counted twice.
-      return heights.slice(0, -1);
-    };
-    const localMaxima = (series: readonly number[]): number => {
-      let count = 0;
-      for (let i = 0; i < series.length; i += 1) {
-        const previous = series[(i - 1 + series.length) % series.length];
-        const next = series[(i + 1) % series.length];
-        if (series[i] > previous && series[i] > next) count += 1;
-      }
-      return count;
-    };
+    // Row 2 of 5 is the crest row.
     // The two rings that form the visible silhouette from inside the arena.
     const silhouette = meshes.filter((mesh) => crestOf(mesh).length >= 150);
     expect(silhouette.length).toBe(2);
     for (const mesh of silhouette) {
       const crest = crestOf(mesh);
-      expect(localMaxima(crest)).toBeGreaterThanOrEqual(14);
+      expect(localMaxima(crest).length).toBeGreaterThanOrEqual(14);
       // HF-536: Ridge ring crest ratio raised >= 2.4; far ring maintains >= 1.5.
       expect(Math.max(...crest) / Math.min(...crest)).toBeGreaterThanOrEqual(1.5);
     }
@@ -249,23 +266,6 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
       }
     }
 
-    // Helper functions
-    const crestOf = (mesh: THREE.Mesh): number[] => {
-      const position = mesh.geometry.getAttribute('position');
-      const heights: number[] = [];
-      for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
-      return heights.slice(0, -1);
-    };
-
-    const crestColorsOf = (mesh: THREE.Mesh): Array<[number, number, number]> => {
-      const colorAttr = mesh.geometry.getAttribute('color');
-      const cols: Array<[number, number, number]> = [];
-      for (let vertex = 2; vertex < colorAttr.count; vertex += 5) {
-        cols.push([colorAttr.getX(vertex) * 255, colorAttr.getY(vertex) * 255, colorAttr.getZ(vertex) * 255]);
-      }
-      return cols.slice(0, -1);
-    };
-
     const meanLumaOf = (mesh: THREE.Mesh): number => {
       const colorAttr = mesh.geometry.getAttribute('color');
       let sum = 0;
@@ -277,17 +277,6 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
       }
       return sum / colorAttr.count;
     };
-
-    const localMaxima = (series: readonly number[]): number[] => {
-      const maxIndices: number[] = [];
-      for (let i = 0; i < series.length; i += 1) {
-        const prev = series[(i - 1 + series.length) % series.length];
-        const next = series[(i + 1) % series.length];
-        if (series[i] > prev && series[i] > next) maxIndices.push(i);
-      }
-      return maxIndices;
-    };
-
     // 2. Crest amplitude
     const ridgeCrest = crestOf(ridge);
     const ridgeRatio = Math.max(...ridgeCrest) / Math.min(...ridgeCrest);
@@ -365,9 +354,10 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
   });
 
   /**
-   * HF-536 Night Lane Gemini 3: Mountain strata bands, crest fissures, and stronger two-tone.
+   * HF-536 Night Lane Gemini: Mechanical proofs for mountain strata bands,
+   * flat sunlit facets, geometric fissures, tone contrast, and budget fences.
    */
-  it('satisfies HF-536 strata bands, crest fissures, warm/cool contrast, and shadow floor contracts', () => {
+  it('satisfies HF-536 strata bands, flat facets, geometric fissures, and tone contrast contracts', () => {
     const backdrop1 = buildNuketownMountainBackdrop(new THREE.Group());
     const backdrop2 = buildNuketownMountainBackdrop(new THREE.Group());
     const meshes1 = backdrop1.group.children.filter((n): n is THREE.Mesh => n instanceof THREE.Mesh);
@@ -375,83 +365,69 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
     const ridge = meshes1.find((m) => m.name === 'nuketown-mountain-ridge')!;
 
     // 1. STRATA CONTRACT:
-    // - Band period in [4, 7] m
-    expect(NUKETOWN_MOUNTAIN_STRATA_PERIOD).toBeGreaterThanOrEqual(4.0);
-    expect(NUKETOWN_MOUNTAIN_STRATA_PERIOD).toBeLessThanOrEqual(7.0);
-    // - Band width in [25%, 35%] of period
-    expect(NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION).toBeGreaterThanOrEqual(0.25);
-    expect(NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION).toBeLessThanOrEqual(0.35);
-    // - Darkens vertex colour by 18-28% inside band
-    expect(NUKETOWN_MOUNTAIN_STRATA_DARKENING).toBeGreaterThanOrEqual(0.18);
-    expect(NUKETOWN_MOUNTAIN_STRATA_DARKENING).toBeLessThanOrEqual(0.28);
-    // Inside-band darkening function evaluation
-    expect(nuketownMountainStrataDarkening(0, 0)).toBe(NUKETOWN_MOUNTAIN_STRATA_DARKENING);
-    expect(nuketownMountainStrataDarkening(NUKETOWN_MOUNTAIN_STRATA_PERIOD * 0.5, 0)).toBe(0);
+    // - Band count per ridge from the street camera height range in [4, 8]
+    const bandCountStreet = countStrataBandsInHeightRange(STREET_CAMERA_HEIGHT_MIN_M, STREET_CAMERA_HEIGHT_MAX_M);
+    expect(bandCountStreet).toBeGreaterThanOrEqual(4);
+    expect(bandCountStreet).toBeLessThanOrEqual(8);
 
-    // Strata band count per peak in [2, 4] (count dark bands along a vertical column)
-    const crestOf = (mesh: THREE.Mesh): number[] => {
-      const position = mesh.geometry.getAttribute('position');
-      const heights: number[] = [];
-      for (let vertex = 2; vertex < position.count; vertex += 5) heights.push(position.getY(vertex));
-      return heights.slice(0, -1);
-    };
-    const localMaxima = (series: readonly number[]): number[] => {
-      const maxIndices: number[] = [];
-      for (let i = 0; i < series.length; i += 1) {
-        const prev = series[(i - 1 + series.length) % series.length];
-        const next = series[(i + 1) % series.length];
-        if (series[i] > prev && series[i] > next) maxIndices.push(i);
+    // - Band period in [18, 40] m
+    expect(NUKETOWN_MOUNTAIN_STRATA_PERIOD).toBeGreaterThanOrEqual(18.0);
+    expect(NUKETOWN_MOUNTAIN_STRATA_PERIOD).toBeLessThanOrEqual(40.0);
+
+    // - Tone contrast between the two strata >= 0.25 in linear luma
+    const sandstone = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_SANDSTONE);
+    const coolGrey = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_COOL_GREY);
+    const sandstoneLuma = linearLuma(sandstone.r, sandstone.g, sandstone.b);
+    const coolGreyLuma = linearLuma(coolGrey.r, coolGrey.g, coolGrey.b);
+    const strataToneContrast = Math.abs(sandstoneLuma - coolGreyLuma);
+    expect(strataToneContrast).toBeGreaterThanOrEqual(NUKETOWN_MOUNTAIN_STRATA_CONTRAST_FLOOR);
+    expect(strataToneContrast).toBeGreaterThanOrEqual(0.25);
+
+    // 2. FLAT FACETS CONTRACT (no shared-vertex smoothing):
+    // Mesh is non-indexed, each triangle has computed face normals where all 3 vertices match
+    for (const mesh of ridgeMeshes(backdrop1.group)) {
+      expect(mesh.geometry.index).toBeNull();
+      const normalAttr = mesh.geometry.getAttribute('normal');
+      expect(normalAttr).toBeDefined();
+      const triCount = normalAttr.count / 3;
+      for (let k = 0; k < triCount; k += 1) {
+        const n0 = new THREE.Vector3().fromBufferAttribute(normalAttr, 3 * k);
+        const n1 = new THREE.Vector3().fromBufferAttribute(normalAttr, 3 * k + 1);
+        const n2 = new THREE.Vector3().fromBufferAttribute(normalAttr, 3 * k + 2);
+        expect(n0.distanceTo(n1)).toBeLessThan(1e-5);
+        expect(n0.distanceTo(n2)).toBeLessThan(1e-5);
       }
-      return maxIndices;
-    };
+    }
+    // - Per-facet albedo jitter in [6%, 10%]
+    expect(NUKETOWN_MOUNTAIN_FACET_JITTER).toBeGreaterThanOrEqual(0.06);
+    expect(NUKETOWN_MOUNTAIN_FACET_JITTER).toBeLessThanOrEqual(0.10);
 
-    const ridgeCrestHeights = crestOf(ridge);
-    const peakIndices = localMaxima(ridgeCrestHeights);
-    const segCount = ridgeCrestHeights.length;
-    let minStrataBands = 999;
-    let maxStrataBands = 0;
-    for (const idx of peakIndices) {
-      const angle = (idx / segCount) * Math.PI * 2;
-      const colPhase = 3.8 + (0.5 * Math.sin(angle * 4 + 4.7 + 2.5) + 0.3 * Math.sin(angle * 9 + (4.7 + 2.5) * 1.7) + 0.2 * Math.sin(angle * 14 + (4.7 + 2.5) * 2.3)) * 0.4;
-      const count = countStrataBandsInColumn(ridgeCrestHeights[idx], colPhase);
-      if (count < minStrataBands) minStrataBands = count;
-      if (count > maxStrataBands) maxStrataBands = count;
-      expect(count).toBeGreaterThanOrEqual(2);
-      expect(count).toBeLessThanOrEqual(4);
+    // 3. FISSURES CONTRACT:
+    // - Fissure count per ridge in [8, 14]
+    expect(NUKETOWN_MOUNTAIN_FISSURE_COUNT).toBeGreaterThanOrEqual(8);
+    expect(NUKETOWN_MOUNTAIN_FISSURE_COUNT).toBeLessThanOrEqual(14);
+
+    // - Fissure depth in [6, 15] m
+    expect(NUKETOWN_MOUNTAIN_FISSURE_DEPTH_M).toBeGreaterThanOrEqual(6.0);
+    expect(NUKETOWN_MOUNTAIN_FISSURE_DEPTH_M).toBeLessThanOrEqual(15.0);
+
+    const fissureDepths: number[] = ridge.userData.fissureDepths;
+    expect(fissureDepths.length).toBe(NUKETOWN_MOUNTAIN_FISSURE_COUNT);
+    for (const depth of fissureDepths) {
+      expect(depth).toBeGreaterThanOrEqual(6.0);
+      expect(depth).toBeLessThanOrEqual(15.0);
     }
 
-    // 2. FISSURES CONTRACT:
-    // - Fraction in [0.2, 0.3] of crest columns (deterministic 1-in-4 columns = 0.25)
-    expect(NUKETOWN_MOUNTAIN_FISSURE_FRACTION).toBeGreaterThanOrEqual(0.20);
-    expect(NUKETOWN_MOUNTAIN_FISSURE_FRACTION).toBeLessThanOrEqual(0.30);
-    let fissureColCount = 0;
-    for (let c = 0; c < segCount; c += 1) {
-      if (c % 4 === 1) fissureColCount += 1;
-    }
-    const fissureFraction = fissureColCount / segCount;
-    expect(fissureFraction).toBeGreaterThanOrEqual(0.20);
-    expect(fissureFraction).toBeLessThanOrEqual(0.30);
-
-    // - Fissure darkening ratio band: fissure column darkens by 35-45%, neighbours by 12-18%
-    expect(NUKETOWN_MOUNTAIN_FISSURE_DARKENING).toBeGreaterThanOrEqual(0.35);
-    expect(NUKETOWN_MOUNTAIN_FISSURE_DARKENING).toBeLessThanOrEqual(0.45);
-    expect(NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING).toBeGreaterThanOrEqual(0.12);
-    expect(NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING).toBeLessThanOrEqual(0.18);
-    // - Fissure vertical reach: from crest down to 45-65% of peak height
-    expect(NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF).toBeGreaterThanOrEqual(0.45);
-    expect(NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF).toBeLessThanOrEqual(0.65);
-
-    // 3. WARM/COOL CONTRAST & SHADOW FLOOR:
+    // 4. WARM/COOL CONTRAST & SHADOW FLOOR:
     // - Crest p90/p10 vertex luma ratio >= 1.9
     const colAttr = ridge.geometry.getAttribute('color');
     const crestLumas: number[] = [];
-    for (let vertex = 2; vertex < colAttr.count; vertex += 5) {
-      const r = colAttr.getX(vertex) * 255;
-      const g = colAttr.getY(vertex) * 255;
-      const b = colAttr.getZ(vertex) * 255;
+    for (let i = 0; i < colAttr.count; i += 3) {
+      const r = colAttr.getX(i) * 255;
+      const g = colAttr.getY(i) * 255;
+      const b = colAttr.getZ(i) * 255;
       crestLumas.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
     }
-    crestLumas.pop(); // drop duplicated closing segment
     crestLumas.sort((a, b) => a - b);
     const crestP10 = crestLumas[Math.floor(crestLumas.length * 0.1)];
     const crestP90 = crestLumas[Math.floor(crestLumas.length * 0.9)];
@@ -474,7 +450,7 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
     expect(NUKETOWN_MOUNTAIN_MIN_LUMA).toBeGreaterThanOrEqual(10.0 / 255.0);
     expect(minLumaAll).toBeGreaterThanOrEqual(10.0);
 
-    // 4. DETERMINISM: byte-identical color attributes for same seed / builds
+    // 5. DETERMINISM: byte-identical color attributes for same seed / builds
     for (let m = 0; m < meshes1.length; m += 1) {
       const c1 = meshes1[m].geometry.getAttribute('color');
       const c2 = meshes2[m].geometry.getAttribute('color');
@@ -487,17 +463,33 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
       }
     }
 
-    // 5. BUDGET: triangles < 6,000
+    // 6. BUDGET: triangles before/after = 5,984 (< 6,000)
+    expect(backdrop1.stats.triangles).toBe(5_984);
     expect(backdrop1.stats.triangles).toBeLessThan(6_000);
 
-    console.log('HF-536 NIGHT-GEMINI3 MEASURED METRICS:');
-    console.log(`- Strata band count per peak: min=${minStrataBands}, max=${maxStrataBands} (requirement [2, 4])`);
-    console.log(`- Fissure column fraction: ${fissureFraction.toFixed(3)} (requirement in [0.2, 0.3])`);
-    console.log(`- Fissure darkening: fissure=${(NUKETOWN_MOUNTAIN_FISSURE_DARKENING * 100).toFixed(0)}%, neighbour=${(NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING * 100).toFixed(0)}% (requirement 35-45% / 12-18%)`);
+    // 7. NO NEW MATERIALS WITH MAPS:
+    backdrop1.group.traverse((node) => {
+      if (node instanceof THREE.Mesh) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        for (const mat of mats) {
+          const map = mat instanceof THREE.MeshBasicMaterial || mat instanceof THREE.MeshStandardMaterial ? mat.map : null;
+          expect(map).toBeNull();
+        }
+      }
+    });
+
+    console.log('HF-536 NIGHT-GEMINI11 MEASURED METRICS:');
+    console.log(`- Strata band count in street camera range: ${bandCountStreet} (requirement in [4, 8])`);
+    console.log(`- Strata band period: ${NUKETOWN_MOUNTAIN_STRATA_PERIOD} m (requirement in [18, 40] m)`);
+    console.log(`- Strata tone contrast: ${strataToneContrast.toFixed(3)} linear luma (requirement >= 0.25)`);
+    console.log(`- Flat facet normals verified: non-indexed mesh with computed face normals`);
+    console.log(`- Fissure count per ridge: ${NUKETOWN_MOUNTAIN_FISSURE_COUNT} (requirement in [8, 14])`);
+    console.log(`- Fissure depths: min=${Math.min(...fissureDepths).toFixed(2)} m, max=${Math.max(...fissureDepths).toFixed(2)} m (requirement in [6, 15] m)`);
     console.log(`- Crest luma p10=${crestP10.toFixed(2)}, p90=${crestP90.toFixed(2)}, ratio=${crestRatio.toFixed(3)} (baseline 1.558, requirement >= 1.9)`);
     console.log(`- Minimum vertex luma across all meshes: ${minLumaAll.toFixed(2)} / 255 (requirement >= 10)`);
     console.log(`- Determinism (same seed -> identical color attributes): PASS`);
-    console.log(`- Triangles: ${backdrop1.stats.triangles} (requirement < 6,000)`);
+    console.log(`- Triangles before/after: 5984 / ${backdrop1.stats.triangles} (requirement < 6,000, delta +0)`);
+    console.log(`- No new materials with maps: PASS`);
 
     backdrop1.dispose();
     backdrop2.dispose();

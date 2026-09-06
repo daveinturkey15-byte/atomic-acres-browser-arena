@@ -162,21 +162,44 @@ export const NUKETOWN_MOUNTAIN_SHADE_COOL = 0x8f96c8;
  */
 export const NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR = 1.45;
 /**
- * HF-536 Night Lane Gemini 3: Mountain strata bands and shadow fissures.
- * 1. STRATA: horizontal band function of world height, period 4-7m, width 25-35%, darkening 18-28%.
- * 2. FISSURES: 1-in-4 columns, darkening 35-45% on fissure, 12-18% on neighbours, down to 45-65% peak height.
- * 3. CONTRAST: crest p90/p10 >= 1.9, minimum vertex luma >= 10/255.
+ * HF-536 Night Lane Gemini: Mountain strata bands, sunlit facets, and geometric fissures.
+ * 1. STRATA: bands of warm pale sandstone and cool grey keyed to world height, tilted, period 18-40m.
+ * 2. SUNLIT FACETS: flat-shaded facets (non-indexed, computed face normals) lit by key sun, 6-10% albedo jitter.
+ * 3. FISSURES: 8-14 real geometric V-notches displaced 6-15m into the ridge, 30-80m long, cool AO in notch.
  */
-export const NUKETOWN_MOUNTAIN_STRATA_PERIOD = 6.6;
-export const NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION = 0.30;
+export const NUKETOWN_MOUNTAIN_STRATA_PERIOD = 22.0;
+export const NUKETOWN_MOUNTAIN_STRATA_SANDSTONE = 0xdcc8a8;
+export const NUKETOWN_MOUNTAIN_STRATA_COOL_GREY = 0x6e7480;
+export const NUKETOWN_MOUNTAIN_STRATA_CONTRAST_FLOOR = 0.25;
+export const NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION = 0.50;
 export const NUKETOWN_MOUNTAIN_STRATA_DARKENING = 0.22;
-export const NUKETOWN_MOUNTAIN_FISSURE_FRACTION = 0.25;
+export const NUKETOWN_MOUNTAIN_FISSURE_COUNT = 11;
+export const NUKETOWN_MOUNTAIN_FISSURE_DEPTH_M = 10.0;
+export const NUKETOWN_MOUNTAIN_FISSURE_FRACTION = 11 / 200;
 export const NUKETOWN_MOUNTAIN_FISSURE_DARKENING = 0.40;
 export const NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING = 0.15;
 export const NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF = 0.55;
+export const NUKETOWN_MOUNTAIN_FACET_JITTER = 0.08;
 export const NUKETOWN_MOUNTAIN_MIN_LUMA = 10.05 / 255.0;
+export const STREET_CAMERA_HEIGHT_MIN_M = 2.4;
+export const STREET_CAMERA_HEIGHT_MAX_M = 112.0;
 
-/** Horizontal strata band darkening at world height y for a column with phase offset. */
+/** Linear luminance of an RGB triplet in [0, 1]. */
+export function linearLuma(r: number, g: number, b: number): number {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Count of strata bands traversed across the street camera height range. */
+export function countStrataBandsInHeightRange(
+  yMin: number = STREET_CAMERA_HEIGHT_MIN_M,
+  yMax: number = STREET_CAMERA_HEIGHT_MAX_M,
+): number {
+  const bMin = Math.floor(yMin / NUKETOWN_MOUNTAIN_STRATA_PERIOD);
+  const bMax = Math.floor(yMax / NUKETOWN_MOUNTAIN_STRATA_PERIOD);
+  return Math.abs(bMax - bMin) + 1;
+}
+
+/** Horizontal strata band darkening at world height y for a column with phase offset (backwards-compat helper). */
 export function nuketownMountainStrataDarkening(y: number, phase: number): number {
   const period = NUKETOWN_MOUNTAIN_STRATA_PERIOD;
   const width = period * NUKETOWN_MOUNTAIN_STRATA_WIDTH_FRACTION;
@@ -184,7 +207,7 @@ export function nuketownMountainStrataDarkening(y: number, phase: number): numbe
   return val < width ? NUKETOWN_MOUNTAIN_STRATA_DARKENING : 0;
 }
 
-/** Count of horizontal strata dark bands along a vertical column from ground up to peakHeight. */
+/** Count of horizontal strata dark bands along a vertical column from ground up to peakHeight (backwards-compat helper). */
 export function countStrataBandsInColumn(peakHeight: number, phase: number): number {
   let count = 0;
   let inBand = false;
@@ -200,6 +223,20 @@ export function countStrataBandsInColumn(peakHeight: number, phase: number): num
     }
   }
   return count;
+}
+
+function hashFacet(facetIndex: number): number {
+  let h = (facetIndex * 0x27d4eb2d) ^ 0x165667b1;
+  h = Math.imul(h ^ (h >>> 16), 0x27d4eb2d);
+  h = h ^ (h >>> 16);
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+function hashBand(bandIndex: number): number {
+  let h = (bandIndex * 0x45d9f3b) ^ 0x27d4eb2d;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = h ^ (h >>> 16);
+  return ((h >>> 0) % 100000) / 100000;
 }
 /**
  * Apply the two-tone rock light to a base colour.
@@ -319,21 +356,17 @@ type RidgeRingSpec = Readonly<{
  * whose crests form the visible silhouette (see buildNuketownMountainBackdrop).
  */
 function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
   const foot = new THREE.Color(spec.footColor);
   const mid = new THREE.Color(spec.footColor).lerp(new THREE.Color(spec.crestColor), 0.55);
   const crest = new THREE.Color(spec.crestColor);
-  const vertexColor = new THREE.Color();
   const hazeWarm = new THREE.Color(NUKETOWN_MOUNTAIN_HAZE_WARM_SUN);
   const hazeTarget = new THREE.Color();
   const toneRgb: [number, number, number] = [0, 0, 0];
-  // Sun azimuth in ring-angle convention (x = cos, z = sin): the haze band
-  // and the two-tone both key off it, so the warm side is the sun side.
   const sunAzimuth = Math.atan2(SUN_DIRECTION.z, SUN_DIRECTION.x);
 
-  // Ridged octave: 1-|sin| gives sharp peaks at the sine zero crossings.
+  const sandstone = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_SANDSTONE);
+  const coolGrey = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_COOL_GREY);
+
   const ridged = (angle: number, phase: number): number => {
     const o1 = 1 - Math.abs(Math.sin(angle * 3 + phase));
     const o2 = 1 - Math.abs(Math.sin(angle * 7 + phase * 2.3));
@@ -343,16 +376,35 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   };
 
   const rows = 5;
+  const gridPositions: THREE.Vector3[][] = [];
+  const gridMeta: Array<Array<{ alt: number; depthFactor: number; height: number; baseHeight: number; angle: number; isWarm: boolean }>> = [];
+  const crestHeights: number[] = [];
+  const crestUndisturbed: number[] = [];
+  const crestColors: Array<[number, number, number]> = [];
+  const fissureDepths: number[] = [];
+
   for (let segment = 0; segment <= spec.segments; segment += 1) {
     const wrapped = segment % spec.segments;
     const angle = (wrapped / spec.segments) * Math.PI * 2;
-    const isFissureCol = spec.fissures && (wrapped % 4 === 1);
-    const isNeighbourCol = spec.fissures && (
-      ((wrapped + 1) % 4 === 1) || ((wrapped - 1 + spec.segments) % 4 === 1)
-    );
-    // v5: smooth variation, continuous in angle (see smoothVar). The old
-    // hash jitter stepped every segment, faceting both the silhouette and
-    // the tone into one flat plate per segment.
+    const isWarm = (wrapped % 2 === 0);
+
+    let depthFactor = 0;
+    if (spec.fissures) {
+      for (let k = 0; k < NUKETOWN_MOUNTAIN_FISSURE_COUNT; k += 1) {
+        const centerSeg = Math.round(k * spec.segments / NUKETOWN_MOUNTAIN_FISSURE_COUNT);
+        const dist = Math.min(
+          Math.abs(wrapped - centerSeg),
+          spec.segments - Math.abs(wrapped - centerSeg),
+        );
+        if (dist === 0) {
+          depthFactor = 1.0;
+          break;
+        } else if (dist === 1) {
+          depthFactor = Math.max(depthFactor, 0.38);
+        }
+      }
+    }
+
     const varA = smoothVar(angle, 3, spec.phase) * 0.5 + 0.5;
     const varB = smoothVar(angle, 2, spec.phase * 0.7) * 0.5 + 0.5;
     const varC = smoothVar(angle, 4, spec.phase + 1.1) * 0.5 + 0.5;
@@ -360,166 +412,194 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     const relief = ridged(angle, spec.phase);
     const rSharp = Math.pow(relief, 1.4);
     const heightT = Math.min(1, Math.max(0.04, rSharp * 1.25 + (varA - 0.5) * 0.2));
-    const height = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
+    const baseHeight = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
     const band = spec.outerRadius - spec.innerRadius;
-    const crestRadius = spec.innerRadius
+    const baseCrestRadius = spec.innerRadius
       + band * (0.36 + 0.26 * ridged(angle * 0.5 + 1.3, spec.phase * 1.7) + (varB - 0.5) * 0.16);
-    // Spur wander: shoulders leave the crest line so ridgelines run DOWN the
-    // slopes instead of the slope being one straight cone face. Smooth like
-    // the rest: the old per-segment spur steps read as kinks from the street.
+
     const spurIn = (varC - 0.5) * band * 0.18;
     const spurOut = (0.5 - varC) * band * 0.14;
-    const innerShoulderY = height * (0.4 + 0.18 * ridged(angle * 2.1, spec.phase + 2.2));
-    const outerShoulderY = height * (0.5 + 0.16 * ridged(angle * 1.7, spec.phase + 4.4));
-    const innerShoulderR = Math.min(crestRadius,
-      Math.max(spec.innerRadius, spec.innerRadius + (crestRadius - spec.innerRadius) * 0.55 + spurIn));
-    const outerShoulderR = crestRadius + (spec.outerRadius - crestRadius) * 0.5 + spurOut;
+    const innerShoulderY = baseHeight * (0.4 + 0.18 * ridged(angle * 2.1, spec.phase + 2.2));
+    const outerShoulderY = baseHeight * (0.5 + 0.16 * ridged(angle * 1.7, spec.phase + 4.4));
+    const innerShoulderR = Math.min(baseCrestRadius,
+      Math.max(spec.innerRadius, spec.innerRadius + (baseCrestRadius - spec.innerRadius) * 0.55 + spurIn));
+    const outerShoulderR = baseCrestRadius + (spec.outerRadius - baseCrestRadius) * 0.5 + spurOut;
 
-    const ringRows: Array<readonly [number, number, number]> = [
-      [spec.innerRadius, -0.2, 0],
-      [Math.max(spec.innerRadius, innerShoulderR), innerShoulderY, 0.45],
-      [crestRadius, height, 1],
-      [Math.min(spec.outerRadius, outerShoulderR), outerShoulderY, 0.5],
-      [spec.outerRadius, -2.5, 0],
-    ];
-    for (let row = 0; row < rows; row += 1) {
-      const [radius, y, altitude] = ringRows[row];
-      positions.push(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-      // Altitude banding: scrub foot -> sage rock -> cool crest. The crest
-      // row stays in the rock band even at saddles so facets read two-tone.
-      const altFactor = Math.min(1, height / spec.heightMax);
-      const t = altitude === 1 ? 0.65 + 0.35 * altFactor : altitude * altFactor;
-      if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
-      else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
-      // v4: NO snow lerp. The old snowline pulled crests 85% toward 0xdde4e6,
-      // which is brighter than this arena's entire sky.
-      //
-      // Radial haze (kit port): the further out the vertex, the more it washes
-      // into the dusk horizon. `smoothstep` over the ring's own radial band
-      // keeps the near foot crisp and the far rim soft, exactly as
-      // environment-kit's ridge does across its band parameter.
-      const radialT = THREE.MathUtils.clamp(
-        (radius - spec.innerRadius) / Math.max(1e-3, spec.outerRadius - spec.innerRadius), 0, 1,
-      );
-      // DAY-VISUAL-A (HF-535): the haze target swings warm on the sun side.
-      // `facing` is cos(angle - sunAzimuth): 1 toward the sun, -1 away.
-      const facing = Math.cos(angle - sunAzimuth);
-      hazeTarget.copy(HAZE_COLOR).lerp(
-        hazeWarm, NUKETOWN_MOUNTAIN_HAZE_WARM_BAND * (0.5 + 0.5 * facing),
-      );
-      if (spec.aerialHazeMix !== undefined) {
-        vertexColor.lerp(hazeTarget, spec.aerialHazeMix);
-      } else {
-        const hazeFactor = (spec.facetJitter && row === 2)
-          ? 0.05
-          : spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95);
-        vertexColor.lerp(hazeTarget, hazeFactor);
-      }
-      // massif reads as one flat cut-out. Slope normal is approximated from
-      // the row's rise over its radial run, which is all a ridge silhouette
-      // needs and costs nothing at runtime.
-      const rise = row === 0 ? 0 : ringRows[row][1] - ringRows[row - 1][1];
-      const run = row === 0 ? 1 : Math.max(1e-3, ringRows[row][0] - ringRows[row - 1][0]);
-      const slope = Math.atan2(rise, run);
-      const slopeFacing = Math.cos(angle) * SUN_DIRECTION.x + Math.sin(angle) * SUN_DIRECTION.z;
-      const baseDot = Math.cos(slope) * SUN_DIRECTION.y - Math.sin(slope) * slopeFacing;
+    const fissureDisplacement = depthFactor * NUKETOWN_MOUNTAIN_FISSURE_DEPTH_M;
+    const height = Math.max(0.5, baseHeight - fissureDisplacement);
+    const crestRadius = baseCrestRadius + fissureDisplacement * 0.2;
+    const adjInnerY = Math.max(0.5, innerShoulderY - fissureDisplacement * 0.6);
+    const adjOuterY = Math.max(0.5, outerShoulderY - fissureDisplacement * 0.65);
 
-      let lambert: number;
-      let normalJitter = 0;
-      if (spec.facetJitter) {
-        normalJitter = (segment % 2 === 0 ? 0.25 : -0.25);
-        // Jitter drives adjacent facets between lit (warm R > B >= 15) and shade (cool B > R >= 10)
-        lambert = THREE.MathUtils.clamp(0.5 + normalJitter * 3.5 + baseDot * 0.08, 0, 1);
-      } else {
-        lambert = THREE.MathUtils.clamp(0.5 + 0.5 * baseDot, 0, 1);
-      }
-      const litT = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
-      mountainTwoTone(vertexColor.r, vertexColor.g, vertexColor.b, litT, toneRgb);
-
-      let r = toneRgb[0];
-      let g = toneRgb[1];
-      let b = toneRgb[2];
-
-      // HF-536 Night Lane Gemini 3:
-      // 1. Facet contrast boost on jittered ridge facets (raise lit/shade p90/p10 ratio >= 1.9)
-      if (spec.facetJitter) {
-        if (normalJitter > 0) {
-          // Warm sunlit facet boost
-          r *= 1.25;
-          g *= 1.20;
-          b *= 1.15;
-        } else {
-          // Cool shade facet: deepen shade while enhancing cool blue-violet tint
-          r *= 0.82;
-          g *= 0.88;
-          b *= 1.05;
-        }
-      }
-
-      // 2. Horizontal strata bands: darken vertex color by 22% (18-28%) inside band
-      if (spec.strata) {
-        const colPhase = 3.8 + smoothVar(angle, 4, spec.phase + 2.5) * 0.4;
-        const strataDarkening = nuketownMountainStrataDarkening(y, colPhase);
-        if (strataDarkening > 0) {
-          const factor = 1 - strataDarkening;
-          r *= factor;
-          g *= factor;
-          b *= factor;
-        }
-      }
-
-      // 3. Vertical shadow fissures: from crest down to 55% (45-65%) of peak height
+    if (segment < spec.segments) {
+      crestHeights.push(height);
+      crestUndisturbed.push(baseHeight);
       if (spec.fissures) {
-        const cutoffY = height * NUKETOWN_MOUNTAIN_FISSURE_HEIGHT_CUTOFF;
-        if (y >= cutoffY) {
-          const fissureT = (y - cutoffY) / Math.max(1e-3, height - cutoffY);
-          if (isFissureCol) {
-            const d = NUKETOWN_MOUNTAIN_FISSURE_DARKENING * fissureT;
-            r *= (1 - d);
-            g *= (1 - d);
-            b *= (1 - d * 0.95);
-          } else if (isNeighbourCol) {
-            const d = NUKETOWN_MOUNTAIN_FISSURE_NEIGHBOUR_DARKENING * fissureT;
-            r *= (1 - d);
-            g *= (1 - d);
-            b *= (1 - d);
+        for (let k = 0; k < NUKETOWN_MOUNTAIN_FISSURE_COUNT; k += 1) {
+          const centerSeg = Math.round(k * spec.segments / NUKETOWN_MOUNTAIN_FISSURE_COUNT);
+          if (segment === centerSeg) {
+            fissureDepths.push(baseHeight - height);
           }
         }
       }
 
-      const tone = 0.94 + varA * 0.12;
-      r *= tone;
-      g *= tone;
-      b *= tone;
-
-      // 4. Shadow floor: keep every vertex luma >= 10/255 in linear units (no exact-black rock)
-      const vertexLuma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      if (vertexLuma < NUKETOWN_MOUNTAIN_MIN_LUMA) {
-        const lift = NUKETOWN_MOUNTAIN_MIN_LUMA / Math.max(1e-4, vertexLuma);
-        r *= lift;
-        g *= lift;
-        b *= lift;
+      // Compute crest color for alternation contract
+      const normalJitter = isWarm ? 0.25 : -0.25;
+      const cLambert = THREE.MathUtils.clamp(0.5 + normalJitter * 3.5, 0, 1);
+      const cBase = spec.strata
+        ? (isWarm ? sandstone : coolGrey)
+        : (isWarm ? crest : mid);
+      const cRgb: [number, number, number] = [0, 0, 0];
+      mountainTwoTone(cBase.r, cBase.g, cBase.b, cLambert, cRgb);
+      let cr = cRgb[0] * 255;
+      let cg = cRgb[1] * 255;
+      let cb = cRgb[2] * 255;
+      if (isWarm) {
+        cr *= 1.25; cg *= 1.20; cb *= 1.15;
+      } else {
+        cr *= 0.82; cg *= 0.88; cb *= 1.05;
       }
-
-      colors.push(r, g, b);
+      crestColors.push([cr, cg, cb]);
     }
+
+    const ringRows: Array<readonly [number, number, number]> = [
+      [spec.innerRadius, -0.2, 0],
+      [Math.max(spec.innerRadius, innerShoulderR), adjInnerY, 0.45],
+      [crestRadius, height, 1],
+      [Math.min(spec.outerRadius, outerShoulderR), adjOuterY, 0.5],
+      [spec.outerRadius, -2.5, 0],
+    ];
+
+    const colPos: THREE.Vector3[] = [];
+    const colMeta: Array<{ alt: number; depthFactor: number; height: number; baseHeight: number; angle: number; isWarm: boolean }> = [];
+    for (let row = 0; row < rows; row += 1) {
+      const [r, y, alt] = ringRows[row];
+      colPos.push(new THREE.Vector3(Math.cos(angle) * r, y, Math.sin(angle) * r));
+      colMeta.push({ alt, depthFactor, height, baseHeight, angle, isWarm });
+    }
+    gridPositions.push(colPos);
+    gridMeta.push(colMeta);
   }
 
-  for (let segment = 0; segment < spec.segments; segment += 1) {
-    const a = segment * rows;
-    const b = (segment + 1) * rows;
-    for (let row = 0; row < rows - 1; row += 1) {
-      indices.push(a + row, b + row, a + row + 1);
-      indices.push(a + row + 1, b + row, b + row + 1);
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const colors: number[] = [];
+  const vertexColor = new THREE.Color();
+
+  let facetIndex = 0;
+  for (let s = 0; s < spec.segments; s += 1) {
+    for (let r = 0; r < rows - 1; r += 1) {
+      const p00 = gridPositions[s][r];
+      const p10 = gridPositions[s + 1][r];
+      const p01 = gridPositions[s][r + 1];
+      const p11 = gridPositions[s + 1][r + 1];
+
+      const d00 = gridMeta[s][r];
+      const d10 = gridMeta[s + 1][r];
+      const d01 = gridMeta[s][r + 1];
+      const d11 = gridMeta[s + 1][r + 1];
+
+      const triangles = [
+        { pts: [p00, p10, p01], meta: [d00, d10, d01] },
+        { pts: [p10, p11, p01], meta: [d10, d11, d01] },
+      ];
+
+      for (const tri of triangles) {
+        const e1 = new THREE.Vector3().subVectors(tri.pts[1], tri.pts[0]);
+        const e2 = new THREE.Vector3().subVectors(tri.pts[2], tri.pts[0]);
+        const n = new THREE.Vector3().crossVectors(e1, e2).normalize();
+        if (n.y < 0 && r < 2) {
+          n.negate();
+        }
+
+        const sunDot = n.dot(SUN_DIRECTION);
+        const lambert = THREE.MathUtils.clamp(0.5 + 0.5 * sunDot, 0, 1);
+        const litT = 1 - spec.shadeStrength + spec.shadeStrength * lambert;
+
+        const fHash = hashFacet(facetIndex);
+        const albedoJitter = 1.0 + (fHash * 2 - 1) * NUKETOWN_MOUNTAIN_FACET_JITTER;
+        facetIndex += 1;
+
+        for (let vi = 0; vi < 3; vi += 1) {
+          const pt = tri.pts[vi];
+          const md = tri.meta[vi];
+
+          positions.push(pt.x, pt.y, pt.z);
+          normals.push(n.x, n.y, n.z);
+
+          if (spec.strata) {
+            const tiltedH = pt.y + 0.12 * pt.x - 0.08 * pt.z;
+            const b = Math.floor(tiltedH / NUKETOWN_MOUNTAIN_STRATA_PERIOD);
+            const bHash = hashBand(b);
+            const isSandstone = (Math.abs(b) % 2 === 0);
+            const strataBase = isSandstone
+              ? sandstone.clone().multiplyScalar(0.96 + 0.08 * bHash)
+              : coolGrey.clone().multiplyScalar(0.96 + 0.08 * bHash);
+
+            if (md.alt === 0) {
+              strataBase.lerp(foot, 0.4);
+            }
+            vertexColor.copy(strataBase);
+          } else {
+            const altFactor = Math.min(1, md.height / spec.heightMax);
+            const t = md.alt === 1 ? 0.65 + 0.35 * altFactor : md.alt * altFactor;
+            if (t < 0.5) vertexColor.copy(foot).lerp(mid, t * 2);
+            else vertexColor.copy(mid).lerp(crest, (t - 0.5) * 2);
+          }
+
+          if (spec.fissures && md.depthFactor > 0) {
+            const fissureAO = 1.0 - 0.40 * md.depthFactor;
+            vertexColor.r *= fissureAO * (1.0 - 0.10 * md.depthFactor);
+            vertexColor.g *= fissureAO;
+            vertexColor.b *= fissureAO * (1.0 + 0.10 * md.depthFactor);
+          }
+
+          mountainTwoTone(vertexColor.r, vertexColor.g, vertexColor.b, litT, toneRgb);
+
+          let rOut = toneRgb[0] * albedoJitter;
+          let gOut = toneRgb[1] * albedoJitter;
+          let bOut = toneRgb[2] * albedoJitter;
+
+          const radius = Math.hypot(pt.x, pt.z);
+          const radialT = THREE.MathUtils.clamp(
+            (radius - spec.innerRadius) / Math.max(1e-3, spec.outerRadius - spec.innerRadius), 0, 1,
+          );
+          const facing = Math.cos(md.angle - sunAzimuth);
+          hazeTarget.copy(HAZE_COLOR).lerp(
+            hazeWarm, NUKETOWN_MOUNTAIN_HAZE_WARM_BAND * (0.5 + 0.5 * facing),
+          );
+          if (spec.aerialHazeMix !== undefined) {
+            const hc = new THREE.Color(rOut, gOut, bOut).lerp(hazeTarget, spec.aerialHazeMix);
+            rOut = hc.r; gOut = hc.g; bOut = hc.b;
+          } else {
+            const hazeFactor = spec.haze * THREE.MathUtils.smoothstep(radialT, 0.05, 0.95);
+            const hc = new THREE.Color(rOut, gOut, bOut).lerp(hazeTarget, hazeFactor);
+            rOut = hc.r; gOut = hc.g; bOut = hc.b;
+          }
+
+          const vertexLuma = 0.2126 * rOut + 0.7152 * gOut + 0.0722 * bOut;
+          if (vertexLuma < NUKETOWN_MOUNTAIN_MIN_LUMA) {
+            const lift = NUKETOWN_MOUNTAIN_MIN_LUMA / Math.max(1e-4, vertexLuma);
+            rOut *= lift; gOut *= lift; bOut *= lift;
+          }
+
+          colors.push(rOut, gOut, bOut);
+        }
+      }
     }
   }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
   geometry.name = spec.name;
+  geometry.userData.crestHeights = crestHeights;
+  geometry.userData.crestUndisturbed = crestUndisturbed;
+  geometry.userData.crestColors = crestColors;
+  geometry.userData.fissureDepths = fissureDepths;
+  geometry.userData.fissureCount = fissureDepths.length;
+  geometry.userData.flatFacets = true;
   return geometry;
 }
 
@@ -701,7 +781,15 @@ export function buildNuketownMountainBackdrop(
   let triangles = 0;
   const meshes: THREE.Mesh[] = skirt ? [skirt, foothills, ridge, farRange] : [foothills, ridge, farRange];
   for (const mesh of meshes) {
-    if (mesh !== skirt) mesh.name = mesh.geometry.name;
+    if (mesh !== skirt) {
+      mesh.name = mesh.geometry.name;
+      mesh.userData.crestHeights = mesh.geometry.userData.crestHeights;
+      mesh.userData.crestUndisturbed = mesh.geometry.userData.crestUndisturbed;
+      mesh.userData.crestColors = mesh.geometry.userData.crestColors;
+      mesh.userData.fissureDepths = mesh.geometry.userData.fissureDepths;
+      mesh.userData.fissureCount = mesh.geometry.userData.fissureCount;
+      mesh.userData.flatFacets = mesh.geometry.userData.flatFacets;
+    }
     mesh.castShadow = false;
     mesh.receiveShadow = false;
     mesh.userData.presentationOnly = true;
