@@ -87,10 +87,23 @@ const AGGREGATE_ALBEDO = 0.17;
 const AGGREGATE_RELIEF_M = 0.0009;
 /** A bitumen overband on a sealed joint stands this proud, metres (real: 2-4 mm). */
 const SEAM_RELIEF_M = 0.003;
-/** A cold patch is sawn out and re-laid slightly high; its saw-cut edge is the hardest step on the road. */
-const PATCH_RELIEF_M = 0.004;
-/** A fatigue crack opens this deep, metres. */
-const CRACK_RELIEF_M = -0.005;
+/**
+ * A cold patch is sawn out and re-laid slightly high; its saw-cut edge is the
+ * hardest step on the road.
+ *
+ * MEASURED TRIM (capture night-materials-1, and the render critic found the
+ * same region independently): the patch and crack thresholds are narrow
+ * smoothsteps, so close to camera their edges are the only asphalt terms steep
+ * enough to reach the relief slope clamp - and a clamped tilt on ground that
+ * the authored sky already floors near luma 6 goes exact-black. The critic
+ * cited nuketown2-truck-cab-near (284,709)-(326,719); re-measured on the PNGs
+ * that region holds 0 black pixels in forge-final and 107 of 462 in the
+ * candidate. Halving the depth halves the edge slope; the patch is still a
+ * 3 mm lip, which is what a real re-laid patch is.
+ */
+const PATCH_RELIEF_M = 0.003;
+/** A fatigue crack opens this deep, metres. Trimmed with the patch, same measurement. */
+const CRACK_RELIEF_M = -0.003;
 /** Wheel-path rut depth, metres, spread over the 1.1 m path width. */
 const WHEEL_RUT_M = -0.004;
 /** Ravelled edge within this distance of the kerb line, metres (brief 3a). */
