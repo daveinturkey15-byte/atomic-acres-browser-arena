@@ -332,6 +332,41 @@ export interface PlateDressing {
   readonly width?: number;
   readonly height?: number;
 }
+
+export interface CoachVehicleDetail {
+  /** Front windscreen surround, measured in the coach nose face. */
+  readonly windscreen: Readonly<{ y0: number; y1: number; halfWidth: number }>;
+  readonly destinationBoard: Readonly<{ y: number; width: number; height: number }>;
+  readonly fogLamps: Readonly<{ x: number; y: number; width: number; height: number }>;
+  readonly rearLouvers: Readonly<{ y0: number; y1: number; count: number; halfWidth: number }>;
+  readonly skirt: Readonly<{ y: number; height: number; z0: number; z1: number }>;
+  readonly luggageDoor: Readonly<{ y0: number; y1: number; z: number; width: number }>;
+  readonly rearPlate: Readonly<{ y: number; width: number; height: number }>;
+}
+
+export interface TrailerVehicleDetail {
+  /** Cargo sides are presentation only; the authored box remains authority. */
+  readonly side: Readonly<{ z0: number; z1: number; step: number; y0: number; y1: number }>;
+  readonly rubRail: Readonly<{ y: number; height: number }>;
+  readonly rearDoor: Readonly<{ y0: number; y1: number; halfWidth: number }>;
+  readonly rearLocks: Readonly<{ y0: number; y1: number; x: number[] }>;
+  readonly hinges: Readonly<{ y: number[]; x: number[] }>;
+  readonly mudFlaps: Readonly<{ z: number; y0: number; y1: number }>;
+  readonly sideMarkers: Readonly<{ z: number[]; y: number }>;
+  readonly rearZ: number;
+}
+
+export interface SaloonVehicleDetail {
+  readonly doorShutLines: Readonly<{ z: number[]; y0: number; y1: number }>;
+  readonly sill: Readonly<{ y: number; z0: number; z1: number }>;
+}
+
+export interface VehicleDetailDressing {
+  readonly coach?: CoachVehicleDetail;
+  readonly trailer?: TrailerVehicleDetail;
+  readonly saloon?: SaloonVehicleDetail;
+}
+
 export interface VehicleDressing {
   readonly wheelStyle: WheelStyle;
   /**
@@ -371,6 +406,8 @@ export interface VehicleDressing {
   readonly gutters?: GutterDressing;
   /** Horizontal boot-lid shut line (groove bucket). */
   readonly bootSeam?: BootSeam;
+  /** HF-536 reallocated face detail; all parts remain in existing buckets. */
+  readonly detail?: VehicleDetailDressing;
   /**
    * HF-536 (R14). The dark mass BETWEEN the wheels. Without it a lofted body
    * on four wheels reads as a shell hovering over the road: the sun reaches
@@ -406,8 +443,8 @@ export const CONTACT_SHADOW_PLAN_FRACTION = 0.55;
  * raise it to 0.02 only if a station shows z-fighting (recorded in the report).
  */
 export const CONTACT_SHADOW_Y = 0.012;
-/** Sides of the contact pool's 12-gon: 12 triangles, once per vehicle. */
-const CONTACT_SHADOW_SEGMENTS = 12;
+/** Sides of the contact pool's 8-gon: 8 triangles, enough for a soft pool. */
+const CONTACT_SHADOW_SEGMENTS = 8;
 
 /** Options for the axle-only wheel sets (the truck's bogie under its cargo box). */
 export interface WheelSetDressing {
@@ -450,6 +487,32 @@ function nonIndexed(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   return geometry.index ? geometry.toNonIndexed() : geometry;
 }
 
+/** Remove the downward face from a hidden underbody box. */
+function openBottom(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+  const normal = geometry.getAttribute('normal') as THREE.BufferAttribute;
+  const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  for (let vertex = 0; vertex < position.count; vertex += 3) {
+    const normalY = (normal.getY(vertex) + normal.getY(vertex + 1) + normal.getY(vertex + 2)) / 3;
+    if (normalY < -0.5) continue;
+    for (let offset = 0; offset < 3; offset += 1) {
+      const index = vertex + offset;
+      positions.push(position.getX(index), position.getY(index), position.getZ(index));
+      normals.push(normal.getX(index), normal.getY(index), normal.getZ(index));
+      uvs.push(uv.getX(index), uv.getY(index));
+    }
+  }
+  const trimmed = new THREE.BufferGeometry();
+  trimmed.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  trimmed.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  trimmed.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.dispose();
+  return trimmed;
+}
+
 /** One box, 12 triangles, in the LINING bucket (matte dark grey, no new material): the tyre albedo
  * renders exact black on the camera-facing underbody face in the vehicle's own shadow (HF-536 forge-2
  * measurement), and an exact-black block reads as a hole, not as an underbody. */
@@ -458,12 +521,12 @@ function underbodyBox(
   block: UnderbodyBlock,
   span: { z0: number; z1: number },
 ): THREE.BufferGeometry {
-  return translated(
-    nonIndexed(new THREE.BoxGeometry(halfWidth * 2, Math.max(0.02, block.y1 - block.y0), span.z1 - span.z0)),
+  return markPart(translated(
+    openBottom(nonIndexed(new THREE.BoxGeometry(halfWidth * 2, Math.max(0.02, block.y1 - block.y0), span.z1 - span.z0))),
     0,
     (block.y0 + block.y1) / 2,
     (span.z0 + span.z1) / 2,
-  );
+  ), 'grounding.underbody');
 }
 
 /** One 12-gon, 12 triangles, in the tyre bucket. */
@@ -476,6 +539,9 @@ function contactPool(semiX: number, semiZ: number, centreZ: number): THREE.Buffe
 
 export interface ForgedPartBound {
   readonly bucket: string;
+  readonly part: string;
+  readonly triangles: number;
+  readonly relief?: number;
   readonly min: readonly [number, number, number];
   readonly max: readonly [number, number, number];
 }
@@ -488,6 +554,8 @@ export interface ForgedVehicle {
   readonly stations: number;
   /** Pre-merge part counts per bucket - the detail-pass audit trail. */
   readonly partCounts: Readonly<Record<string, number>>;
+  /** Pre-merge triangle allocations keyed by authored part family. */
+  readonly partTriangles: Readonly<Record<string, number>>;
   /** Pre-merge AABB of every part, vehicle frame - the envelope audit trail. */
   readonly partBounds: readonly ForgedPartBound[];
 }
@@ -501,6 +569,109 @@ const BUCKET_ORDER: readonly Bucket[] = [
 function translated(geometry: THREE.BufferGeometry, x: number, y: number, z: number): THREE.BufferGeometry {
   geometry.applyMatrix4(new THREE.Matrix4().makeTranslation(x, y, z));
   return geometry;
+}
+
+function markPart(geometry: THREE.BufferGeometry, part: string, relief?: number): THREE.BufferGeometry {
+  geometry.userData.forgePart = part;
+  if (relief !== undefined) geometry.userData.forgeRelief = relief;
+  return geometry;
+}
+
+/** A non-indexed 12-triangle box, used only for proud presentation detail. */
+function reliefBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  size: readonly [number, number, number],
+  centre: readonly [number, number, number],
+  relief: number,
+): void {
+  const geometry = nonIndexed(new THREE.BoxGeometry(size[0], size[1], size[2]));
+  translated(geometry, centre[0], centre[1], centre[2]);
+  parts[bucket].push(markPart(geometry, part, relief));
+}
+
+/** A mirrored pair of boxes standing off a side face. */
+function reliefSidePair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  hostX: number,
+  y: number,
+  z: number,
+  height: number,
+  length: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(relief, height, length));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * (hostX + relief / 2), y, z);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+/** A mirrored pair of boxes standing proud of the front face. */
+function reliefFrontPair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(width, height, relief));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * x, y, -relief / 2);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+function reliefFrontBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  width: number,
+  y: number,
+  height: number,
+  relief = 0.012,
+): void {
+  reliefBox(parts, bucket, part, [width, height, relief], [0, y, -relief / 2], relief);
+}
+
+function reliefRearPair(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  z: number,
+  relief = 0.012,
+): void {
+  for (const side of [1, -1] as const) {
+    const geometry = nonIndexed(new THREE.BoxGeometry(width, height, relief));
+    if (side === -1) mirroredToLeft(geometry);
+    translated(geometry, side * x, y, z + relief / 2);
+    parts[bucket].push(markPart(geometry, part, relief));
+  }
+}
+
+function reliefRearBox(
+  parts: Record<Bucket, THREE.BufferGeometry[]>,
+  bucket: Bucket,
+  part: string,
+  width: number,
+  y: number,
+  height: number,
+  z: number,
+  relief = 0.012,
+): void {
+  reliefBox(parts, bucket, part, [width, height, relief], [0, y, z + relief / 2], relief);
 }
 
 /**
@@ -521,24 +692,32 @@ function mirroredToLeft(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
  */
 function summarizeParts(parts: Readonly<Record<string, THREE.BufferGeometry[]>>): {
   partCounts: Record<string, number>;
+  partTriangles: Record<string, number>;
   partBounds: ForgedPartBound[];
 } {
   const partCounts: Record<string, number> = {};
+  const partTriangles: Record<string, number> = {};
   const partBounds: ForgedPartBound[] = [];
   for (const [bucket, geometries] of Object.entries(parts)) {
     partCounts[bucket] = geometries.length;
-    for (const geometry of geometries) {
+    for (const [index, geometry] of geometries.entries()) {
       geometry.computeBoundingBox();
       const box = geometry.boundingBox;
       if (!box) continue;
+      const part = String(geometry.userData.forgePart ?? `${bucket}[${index}]`);
+      const triangles = (geometry.getAttribute('position')?.count ?? 0) / 3;
+      partTriangles[part] = (partTriangles[part] ?? 0) + triangles;
       partBounds.push({
         bucket,
+        part,
+        triangles,
+        relief: typeof geometry.userData.forgeRelief === 'number' ? geometry.userData.forgeRelief : undefined,
         min: [box.min.x, box.min.y, box.min.z],
         max: [box.max.x, box.max.y, box.max.z],
       });
     }
   }
-  return { partCounts, partBounds };
+  return { partCounts, partTriangles, partBounds };
 }
 
 /**
@@ -810,6 +989,8 @@ export function buildForgedVehicle(
   if (dressing.plates) {
     const plateW = dressing.plates.width ?? 0.32;
     const plateH = dressing.plates.height ?? 0.09;
+    // Existing plate cards are retained for audit parity. New lane detail uses
+    // explicit relief boxes below; this legacy surface is not reclassified.
     const rear = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
     parts.accent.push(translated(rear, 0, dressing.plates.y, spec.length + 0.004));
     const front = nonIndexed(new THREE.PlaneGeometry(plateW, plateH));
@@ -854,6 +1035,97 @@ export function buildForgedVehicle(
   if (dressing.bootSeam) {
     const { y, z, halfWidth } = dressing.bootSeam;
     parts.groove.push(translated(chamferedBar(halfWidth, 0.009, 0.009, 0.003), 0, y, z));
+  }
+
+  const detail = dressing.detail;
+  if (detail?.coach) {
+    const coach = detail.coach;
+    const screenY = (coach.windscreen.y0 + coach.windscreen.y1) / 2;
+    const screenHeight = coach.windscreen.y1 - coach.windscreen.y0;
+    reliefFrontPair(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth, screenY, 0.055, screenHeight, 0.012);
+    reliefFrontBox(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth * 2 + 0.11, coach.windscreen.y1, 0.055, 0.012);
+    reliefFrontBox(parts, 'accent', 'detail.coach.destination-board', coach.destinationBoard.width, coach.destinationBoard.y, coach.destinationBoard.height, 0.012);
+    reliefFrontPair(parts, 'headLamp', 'detail.coach.fog-lamp', coach.fogLamps.x, coach.fogLamps.y, coach.fogLamps.width, coach.fogLamps.height, 0.012);
+    for (let index = 0; index < Math.max(1, Math.floor(coach.rearLouvers.count)); index += 1) {
+      const t = (index + 0.5) / Math.max(1, Math.floor(coach.rearLouvers.count));
+      reliefRearBox(
+        parts,
+        'chrome',
+        'detail.coach.engine-louvre',
+        coach.rearLouvers.halfWidth * 2,
+        coach.rearLouvers.y0 + (coach.rearLouvers.y1 - coach.rearLouvers.y0) * t,
+        0.045,
+        spec.length,
+        0.012,
+      );
+    }
+    const skirtZ = (coach.skirt.z0 + coach.skirt.z1) / 2;
+    reliefSidePair(
+      parts,
+      'accent',
+      'detail.coach.skirt-line',
+      flankHalfWidth(spec, coach.skirt.y),
+      coach.skirt.y,
+      skirtZ,
+      coach.skirt.height,
+      coach.skirt.z1 - coach.skirt.z0,
+      0.012,
+    );
+    const luggageY = (coach.luggageDoor.y0 + coach.luggageDoor.y1) / 2;
+    const luggageX = flankHalfWidth(spec, luggageY);
+    const luggageHeight = coach.luggageDoor.y1 - coach.luggageDoor.y0;
+    const luggageHalfWidth = coach.luggageDoor.width / 2;
+    for (const offset of [-luggageHalfWidth, luggageHalfWidth] as const) {
+      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, luggageY, coach.luggageDoor.z + offset, luggageHeight, 0.045, 0.012);
+    }
+    for (const y of [coach.luggageDoor.y0, coach.luggageDoor.y1] as const) {
+      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, y, coach.luggageDoor.z, coach.luggageDoor.width, 0.045, 0.012);
+    }
+    reliefRearBox(parts, 'accent', 'detail.coach.rear-number-plate-box', coach.rearPlate.width, coach.rearPlate.y, coach.rearPlate.height, spec.length, 0.008);
+  }
+
+  if (detail?.trailer) {
+    const trailer = detail.trailer;
+    const sideY = (trailer.side.y0 + trailer.side.y1) / 2;
+    const sideHeight = trailer.side.y1 - trailer.side.y0;
+    const step = Math.max(0.45, Math.min(0.6, trailer.side.step));
+    let battenIndex = 0;
+    for (let z = trailer.side.z0; z <= trailer.side.z1 + 1e-6; z += step) {
+      reliefSidePair(parts, 'accent', 'detail.trailer.corrugation-batten', spec.halfWidth, sideY, z, sideHeight, 0.028, 0.02);
+      battenIndex += 1;
+    }
+    // Keep the loop's count visible to the allocation audit without relying on
+    // a text-only assertion about a floating-point range.
+    if (battenIndex < 2) throw new Error('Trailer detail needs at least two corrugation battens');
+    reliefSidePair(parts, 'chrome', 'detail.trailer.lower-rub-rail', spec.halfWidth, trailer.rubRail.y, (trailer.side.z0 + trailer.side.z1) / 2, trailer.rubRail.height, trailer.side.z1 - trailer.side.z0, 0.012);
+
+    const rearDoor = trailer.rearDoor;
+    const doorHeight = rearDoor.y1 - rearDoor.y0;
+    const doorY = (rearDoor.y0 + rearDoor.y1) / 2;
+    reliefRearPair(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth - 0.035, doorY, 0.07, doorHeight, trailer.rearZ, 0.012);
+    for (const y of [rearDoor.y0, rearDoor.y1] as const) {
+      reliefRearBox(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth * 2, y, 0.07, trailer.rearZ, 0.012);
+    }
+    for (const x of trailer.rearLocks.x) {
+      reliefRearPair(parts, 'chrome', 'detail.trailer.rear-lock-bar', Math.abs(x), doorY, 0.045, doorHeight * 0.86, trailer.rearZ + 0.004, 0.012);
+    }
+    for (const y of trailer.hinges.y) {
+      reliefRearPair(parts, 'chrome', 'detail.trailer.hinge-block', trailer.hinges.x[0] ?? 0.55, y, 0.11, 0.12, trailer.rearZ + 0.006, 0.012);
+    }
+    reliefSidePair(parts, 'lining', 'detail.trailer.mud-flap', spec.halfWidth - 0.08, (trailer.mudFlaps.y0 + trailer.mudFlaps.y1) / 2, trailer.mudFlaps.z, trailer.mudFlaps.y1 - trailer.mudFlaps.y0, 0.08, 0.008);
+    for (const z of trailer.sideMarkers.z) {
+      reliefSidePair(parts, 'headLamp', 'detail.trailer.amber-side-marker', spec.halfWidth, trailer.sideMarkers.y, z, 0.10, 0.12, 0.008);
+    }
+    reliefRearBox(parts, 'accent', 'detail.trailer.number-plate-box', 0.36, trailer.rearDoor.y0 + 0.08, 0.10, trailer.rearZ, 0.008);
+  }
+
+  if (detail?.saloon) {
+    const saloon = detail.saloon;
+    const doorY = (saloon.doorShutLines.y0 + saloon.doorShutLines.y1) / 2;
+    for (const z of saloon.doorShutLines.z) {
+      reliefSidePair(parts, 'groove', 'detail.saloon.door-shut-line', flankHalfWidth(spec, doorY), doorY, z, saloon.doorShutLines.y1 - saloon.doorShutLines.y0, 0.008, 0.004);
+    }
+    reliefSidePair(parts, 'chrome', 'detail.saloon.sill-strip', flankHalfWidth(spec, saloon.sill.y), saloon.sill.y, (saloon.sill.z0 + saloon.sill.z1) / 2, 0.06, saloon.sill.z1 - saloon.sill.z0, 0.008);
   }
 
   if (dressing.surfaceBands) {

@@ -3196,7 +3196,7 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     built: buildForgedVehicle(COACH_SPEC, {
       wheelStyle: 'cover',
       headLamps: { x: 0.94, y: 0.98, radius: 0.13 },
-      tailLamps: { x: 0.94, y: 0.95, radius: 0.12 },
+      tailLamps: { x: 0.94, y: 0.95, radius: 0.16 },
       bumperY: 0.34,
       surfaceBands: [{ y0: 1.78, y1: 2.46, bucket: 'accent', z0: 0.75, z1: 8.35, proud: 0.01 }],
       // A narrow chrome moulding separates the cream lower body from the
@@ -3220,15 +3220,20 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       // number plates and indicator lenses - all existing buckets, no new draw. (Mirror placement kept from night-kit.)
       doorHandles: { y: 1.2, z: [2.0, 6.4] },
       pillars: { z: [3.2, 4.95, 6.7], y0: 1.78, y1: 2.6 },
-      panelSeams: [
-        { x: -1.24, y: 1.15, z: 5.6, height: 0.9 },
-        { x: 1.24, y: 1.15, z: 5.6, height: 0.9 },
-        { x: -1.24, y: 1.15, z: 7.2, height: 0.9 },
-        { x: 1.24, y: 1.15, z: 7.2, height: 0.9 },
-      ],
       vents: { x: 0.45, z: [4.2, 5.6] },
       plates: { y: 0.62 },
       indicators: { y: 0.96, x: 0.94 },
+      detail: {
+        coach: {
+          windscreen: { y0: 1.54, y1: 2.31, halfWidth: 0.62 },
+          destinationBoard: { y: 2.48, width: 1.0, height: 0.18 },
+          fogLamps: { x: 0.62, y: 0.82, width: 0.18, height: 0.14 },
+          rearLouvers: { y0: 1.12, y1: 1.48, count: 4, halfWidth: 0.72 },
+          skirt: { y: 0.50, height: 0.08, z0: 1.0, z1: 8.1 },
+          luggageDoor: { y0: 0.70, y1: 1.35, z: 5.6, width: 1.0 },
+          rearPlate: { y: 0.62, width: 0.32, height: 0.09 },
+        },
+      },
       // HF-536 (R14). The coach floated: sun reached under the whole 9.1 m
       // sill and the far kerb showed through the gap. One dark block between
       // the arches (0.24 -> sill 0.4) and one contact pool inside its own
@@ -3255,16 +3260,6 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
       // W4-374 roof rails: same chrome-merged treatment over the cab roof run.
       roofRails: { x: [0.6, -0.6], z0: 1.9, z1: 4.3, bucket: 'chrome' },
-      panelSeams: [
-        { x: -1.31, y: 1.62, z: 5.82, height: 2.38 },
-        { x: -1.31, y: 1.62, z: 7.44, height: 2.38 },
-        { x: -1.31, y: 1.62, z: 9.06, height: 2.38 },
-        { x: -1.31, y: 1.62, z: 10.68, height: 2.38 },
-        { x: 1.31, y: 1.62, z: 5.82, height: 2.38 },
-        { x: 1.31, y: 1.62, z: 7.44, height: 2.38 },
-        { x: 1.31, y: 1.62, z: 9.06, height: 2.38 },
-        { x: 1.31, y: 1.62, z: 10.68, height: 2.38 },
-      ],
       // HF-536 detail pass (Muse): door pull, hubcap domes on the dished steel
       // faces, cab roof vent, centred exhaust stack, plates and indicators.
       doorHandles: { y: 1.3, z: [2.1] },
@@ -3273,6 +3268,18 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
       stack: { z: 5.0, y0: 1.0, y1: 2.82 },
       plates: { y: 0.62 },
       indicators: { y: 0.95, x: 0.92 },
+      detail: {
+        trailer: {
+          side: { z0: 5.45, z1: 11.45, step: 0.5, y0: 0.65, y1: 2.75 },
+          rubRail: { y: 0.78, height: 0.08 },
+          rearDoor: { y0: 0.68, y1: 2.72, halfWidth: 0.92 },
+          rearLocks: { y0: 0.68, y1: 2.72, x: [0.24] },
+          hinges: { y: [0.86, 2.54], x: [0.55] },
+          mudFlaps: { z: 10.6, y0: 0.28, y1: 0.72 },
+          sideMarkers: { z: [5.45, 6.95, 8.45, 9.95, 11.45], y: 1.10 },
+          rearZ: 11.70,
+        },
+      },
       // HF-536 (R14). The cab-over sits on a 0.6 m sill, the highest on the
       // street, so it floated hardest. Underbody only: the truck is ONE
       // vehicle in two placements and its bogie draws the whole contact pool,
@@ -3366,6 +3373,12 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     indicators: { y: 0.84, x: 0.66 },
     gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
     bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
+    detail: {
+      saloon: {
+        doorShutLines: { z: [1.62, 2.58], y0: 0.65, y1: 1.14 },
+        sill: { y: 0.32, z0: 0.55, z1: 3.85 },
+      },
+    },
     ...groundedDressing,
   };
   // The driveway coupe: same SEDAN_SPEC envelope (the collider boxes own it),
@@ -3390,6 +3403,12 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     indicators: { y: 0.78, x: 0.62 },
     gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
     bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
+    detail: {
+      saloon: {
+        doorShutLines: { z: [1.62, 2.58], y0: 0.65, y1: 1.14 },
+        sill: { y: 0.32, z0: 0.55, z1: 3.85 },
+      },
+    },
     ...groundedDressing,
   };
   // HF-477's two street cars are dressed by the shared forge paint graph. Both

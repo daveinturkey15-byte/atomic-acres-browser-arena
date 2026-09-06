@@ -45,6 +45,7 @@ export type { LampKind, PaintOptions } from './materials';
 export { buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet, createForgeSharedMaterials, mergeForgedPlacements } from './build';
 export type {
   BootSeam,
+  CoachVehicleDetail,
   DoorHandleRow,
   ForgedPartBound,
   ForgedVehicle,
@@ -59,7 +60,10 @@ export type {
   PlateDressing,
   StackDressing,
   SurfaceBand,
+  SaloonVehicleDetail,
+  TrailerVehicleDetail,
   VehicleDressing,
+  VehicleDetailDressing,
   VentDressing,
   WaistStripe,
   ForgeSharedBucket,

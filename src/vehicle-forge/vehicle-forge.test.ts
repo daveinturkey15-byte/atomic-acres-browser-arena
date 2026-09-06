@@ -466,6 +466,7 @@ describe('vehicle-forge HF-536 detail pass', () => {
   // against the same fences in REPORT.md, not here.
   const coachDressing: VehicleDressing = {
     wheelStyle: 'cover',
+    tailLamps: { x: 0.94, y: 0.95, radius: 0.16 },
     bumperY: 0.34,
     surfaceBands: [{ y0: 1.78, y1: 2.46, bucket: 'accent', z0: 0.75, z1: 8.35, proud: 0.01 }],
     stripe: { y: 1.75, bucket: 'chrome', z0: 0.55, z1: 8.55, height: 0.045, proud: 0.014 },
@@ -473,12 +474,19 @@ describe('vehicle-forge HF-536 detail pass', () => {
     mirrors: [{ x: 1.13, y: 2.1, z: 1.2 }],
     doorHandles: { y: 1.2, z: [2.0, 6.4] },
     pillars: { z: [3.2, 4.95, 6.7], y0: 1.78, y1: 2.6 },
-    panelSeams: [
-      { x: -1.24, y: 1.15, z: 6.4, height: 0.9 },
-      { x: 1.24, y: 1.15, z: 6.4, height: 0.9 },
-    ],
     plates: { y: 0.62 },
     indicators: { y: 0.96, x: 0.94 },
+    detail: {
+      coach: {
+        windscreen: { y0: 1.54, y1: 2.31, halfWidth: 0.62 },
+        destinationBoard: { y: 2.48, width: 1.0, height: 0.18 },
+        fogLamps: { x: 0.62, y: 0.82, width: 0.18, height: 0.14 },
+        rearLouvers: { y0: 1.12, y1: 1.48, count: 4, halfWidth: 0.72 },
+        skirt: { y: 0.50, height: 0.08, z0: 1.0, z1: 8.1 },
+        luggageDoor: { y0: 0.70, y1: 1.35, z: 5.6, width: 1.0 },
+        rearPlate: { y: 0.62, width: 0.32, height: 0.09 },
+      },
+    },
   };
   const truckDressing: VehicleDressing = {
     wheelStyle: 'steel',
@@ -487,13 +495,24 @@ describe('vehicle-forge HF-536 detail pass', () => {
     stripe: { y: 1.99, bucket: 'chrome', z0: 0.4, z1: 4.8, height: 0.05, proud: 0.014 },
     grille: { y: 0.92, width: 1.46, height: 0.38, depth: 0.11, barCount: 6 },
     mirrors: [{ x: 1.15, y: 2.03, z: 0.72 }],
-    panelSeams: [...[-1, 1].flatMap((x) => [5.82, 7.44, 9.06, 10.68].map((z) => ({ x: x * 1.31, y: 1.62, z, height: 2.38 })))],
     doorHandles: { y: 1.3, z: [2.1] },
     hubcaps: true,
     vents: { x: 0.45, z: [3.0] },
     stack: { z: 5.0, y0: 1.0, y1: 2.82 },
     plates: { y: 0.62 },
     indicators: { y: 0.95, x: 0.92 },
+    detail: {
+      trailer: {
+        side: { z0: 5.45, z1: 11.45, step: 0.5, y0: 0.65, y1: 2.75 },
+        rubRail: { y: 0.78, height: 0.08 },
+        rearDoor: { y0: 0.68, y1: 2.72, halfWidth: 0.92 },
+        rearLocks: { y0: 0.68, y1: 2.72, x: [0.24] },
+        hinges: { y: [0.86, 2.54], x: [0.55] },
+        mudFlaps: { z: 10.6, y0: 0.28, y1: 0.72 },
+        sideMarkers: { z: [5.45, 6.95, 8.45, 9.95, 11.45], y: 1.10 },
+        rearZ: 11.70,
+      },
+    },
   };
   const saloonDressing: VehicleDressing = {
     wheelStyle: 'whitewall',
@@ -505,33 +524,80 @@ describe('vehicle-forge HF-536 detail pass', () => {
     indicators: { y: 0.84, x: 0.66 },
     gutters: { x: 0.78, y: 1.78, z0: 1.9, z1: 3.0 },
     bootSeam: { y: 1.22, z: 3.55, halfWidth: 0.7 },
+    detail: {
+      saloon: {
+        doorShutLines: { z: [1.62, 2.58], y0: 0.65, y1: 1.14 },
+        sill: { y: 0.32, z0: 0.55, z1: 3.85 },
+      },
+    },
   };
   const FENCED: ReadonlyArray<readonly [VehicleSpec, VehicleDressing, number]> = [
     [COACH_SPEC, coachDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.coach],
     [TRUCK_CAB_SPEC, truckDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.truck],
     [SEDAN_SPEC, saloonDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.saloon],
   ];
+  const EXPECTED_TRIANGLES: Readonly<Record<string, number>> = {
+    'nuketown2-coach': 9964,
+    'nuketown2-truck-cab': 5900,
+    'nuketown2-sedan': 8288,
+  };
+  const EXPECTED_DETAIL_ALLOCATIONS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+    'nuketown2-coach': {
+      'detail.coach.destination-board': 12,
+      'detail.coach.fog-lamp': 24,
+      'detail.coach.windscreen-surround': 36,
+      'detail.coach.engine-louvre': 48,
+      'detail.coach.skirt-line': 24,
+      'detail.coach.luggage-door-frame': 96,
+      'detail.coach.rear-number-plate-box': 12,
+    },
+    'nuketown2-truck-cab': {
+      'detail.trailer.corrugation-batten': 312,
+      'detail.trailer.lower-rub-rail': 24,
+      'detail.trailer.rear-door-frame': 48,
+      'detail.trailer.rear-lock-bar': 24,
+      'detail.trailer.hinge-block': 48,
+      'detail.trailer.mud-flap': 24,
+      'detail.trailer.amber-side-marker': 120,
+      'detail.trailer.number-plate-box': 12,
+    },
+    'nuketown2-sedan': {
+      'detail.saloon.door-shut-line': 48,
+      'detail.saloon.sill-strip': 24,
+    },
+  };
 
   it('keeps every fenced vehicle under its triangle fence', () => {
     for (const [spec, dressing, budget] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `fence-${spec.id}`));
       // The test prints the counts: this line is the headroom ledger.
       console.log(`${spec.id}: ${Math.round(built.triangles)} / ${budget} tris in ${built.drawCalls} draws`);
+      expect(built.triangles, `${spec.id} exact triangle allocation`).toBe(EXPECTED_TRIANGLES[spec.id]);
       expect(built.triangles, `${spec.id} triangles`).toBeLessThanOrEqual(budget);
     }
   });
 
   it('merges detail into the existing buckets: part counts per bucket, draws flat', () => {
     const expected: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-      'nuketown2-coach': { paint: 1, accent: 3, glass: 1, lining: 1, groove: 9, chrome: 21, tyre: 8, headLamp: 2, tailLamp: 2 },
-      'nuketown2-truck-cab': { paint: 1, accent: 3, glass: 1, lining: 1, groove: 9, chrome: 24, tyre: 4, headLamp: 2, tailLamp: 2 },
-      'nuketown2-sedan': { paint: 1, accent: 2, glass: 1, lining: 1, groove: 2, chrome: 26, tyre: 8, headLamp: 2, tailLamp: 2 },
+      'nuketown2-coach': { paint: 1, accent: 7, glass: 1, lining: 1, groove: 15, chrome: 30, tyre: 8, headLamp: 4, tailLamp: 4 },
+      'nuketown2-truck-cab': { paint: 1, accent: 30, glass: 1, lining: 3, groove: 1, chrome: 36, tyre: 4, headLamp: 12, tailLamp: 2 },
+      'nuketown2-sedan': { paint: 1, accent: 2, glass: 1, lining: 1, groove: 6, chrome: 28, tyre: 8, headLamp: 2, tailLamp: 2 },
     };
     for (const [spec, dressing] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x9e1c1c, `buckets-${spec.id}`));
       expect(built.partCounts, `${spec.id} part counts`).toEqual(expected[spec.id]);
-      expect(built.drawCalls, `${spec.id} draws`).toBeLessThanOrEqual(9);
+      expect(built.drawCalls, `${spec.id} draws unchanged`).toBe(9);
       expect(built.group.children.length, `${spec.id} meshes`).toBe(built.drawCalls);
+      for (const [part, triangles] of Object.entries(EXPECTED_DETAIL_ALLOCATIONS[spec.id]!)) {
+        expect(built.partTriangles[part], `${spec.id} ${part} triangles`).toBe(triangles);
+      }
+      const detailParts = built.partBounds.filter((part) => part.part.startsWith('detail.'));
+      expect(detailParts.length, `${spec.id} authored detail parts`).toBeGreaterThan(0);
+      for (const part of detailParts) {
+        expect(part.relief, `${spec.id} ${part.part} relief`).toBeGreaterThanOrEqual(0.004);
+        expect(part.relief, `${spec.id} ${part.part} relief`).toBeLessThanOrEqual(0.03);
+        expect(part.min[1], `${spec.id} ${part.part} underbody plane`).toBeGreaterThanOrEqual(0.18 - 1e-5);
+      }
     }
   });
 

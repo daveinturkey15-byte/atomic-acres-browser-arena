@@ -40,11 +40,11 @@ const CONTACT_SQUASH = 0.035;
 const CONTACT_BULGE = 0.07;
 
 /**
- * 20 segments on a 0.34 m wheel is a 107 mm chord: under 2 px of deviation at
- * the 3 m a player ever stands from a parked car, and four wheels per body is
+ * 16 segments on a 0.34 m wheel keeps the chord below the authored 3 m read
+ * while releasing the hidden excess for face detail; four wheels per body is
  * where a vehicle's triangle budget actually goes.
  */
-const RADIAL_SEGMENTS = 20;
+const RADIAL_SEGMENTS = 16;
 
 /**
  * HF-536 detail pass (Muse): 10 segments for the parts nobody inspects - the
@@ -54,7 +54,7 @@ const RADIAL_SEGMENTS = 20;
 const TRIM_SEGMENTS = 10;
 
 /** The inboard disc faces away from every camera under the arch: 8 is plenty. */
-const DARK_SEGMENTS = 8;
+const DARK_SEGMENTS = 6;
 /**
  * Turn a lathe built about +Y into a wheel whose axle runs along +X, with the
  * outboard face at +x. `rotateZ(-90 deg)` maps `(x, y, z) -> (y, -x, z)`, so the
