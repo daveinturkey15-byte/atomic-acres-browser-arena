@@ -81,6 +81,11 @@ const BROOM_RELIEF_M = 0.0008;
 /** Distance band over which the broom relief is real, metres. See above. */
 const BROOM_RELIEF_NEAR_M = 1.2;
 const BROOM_RELIEF_FAR_M = 3.0;
+/**
+ * Broom-grating period, metres. Exported for the pattern-period gate: 2.5 mm
+ * is 2 px at 1.35 m on the review capture, sub-pixel past ~2 m.
+ */
+export const BROOM_PERIOD_M = 0.0025;
 /** A spalled block face loses this much, metres. */
 const SPALL_RELIEF_M = -0.004;
 /** Height of the rain-wash weathering band above the foot, metres. */
@@ -131,7 +136,16 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const jointZ = smoothstep(float(0.006), float(0.0), abs(fract(p.z.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
   const slabJoint = max(jointX, jointZ);
   const joint = isBlock.select(blockJoint, slabJoint);
-  const relief = isBlock.select(float(0), abs(fract(p.z.div(float(0.0025))).sub(float(0.5))).mul(float(2)));
+  // RING FIX (row 6). The 2.5 mm broom grating fed albedo and roughness
+  // unfaded: point sampling turns it into concentric moire rings past ~2 m
+  // (interim-3 border-path-close, driveway-apron-close), so the "harmless
+  // average" claim in the BROOM comment above holds only for area sampling.
+  // The grating now fades over the same 1.2-3 m band as its relief, which
+  // leaves the height term below byte-identical while the albedo/roughness
+  // moire is gone at walking distance.
+  const broomPeriod = float(BROOM_PERIOD_M);
+  const broomFade = detailFalloff(BROOM_RELIEF_NEAR_M, BROOM_RELIEF_FAR_M);
+  const relief = isBlock.select(float(0), abs(fract(p.z.div(broomPeriod)).sub(float(0.5))).mul(float(2)).mul(broomFade));
   const slabUnit = hash2(vec2(
     floor(p.x.div(float(SLAB_JOINT_M))),
     floor(p.z.div(float(SLAB_JOINT_M))),
@@ -162,7 +176,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
   const weathered = mix(spalled, spalled.mul(float(0.80)).mul(linearSwatch(0xb8b6a4).mul(float(1.35))), weatherBand.mul(float(0.34)));
   // RELIEF. Mortar recess, sawn joint, broom tooth and spall, in metres.
   const height = joint.mul(isBlock.select(float(MORTAR_RECESS_M), float(SLAB_JOINT_RECESS_M)))
-    .add(relief.mul(float(BROOM_RELIEF_M)).mul(detailFalloff(BROOM_RELIEF_NEAR_M, BROOM_RELIEF_FAR_M)))
+    .add(relief.mul(float(BROOM_RELIEF_M)))
     .add(spall.mul(float(SPALL_RELIEF_M)))
     .add(unit.mul(float(0.004)));
   concreteGraph = {
