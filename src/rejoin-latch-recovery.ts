@@ -88,7 +88,7 @@ export function evaluateRejoinLatchRecovery(input: RejoinLatchRecoveryInput): Re
   if (!Number.isFinite(input.nowMs)) return 'idle';
   if (!input.guestEventLaneActive) return 'idle';
   if (input.nowMs - input.armedAtMs >= REJOIN_LATCH_DEADLINE_MS) return 'fail-closed';
-  if (input.lastResendAtMs === null) return 'resend';
+  if (input.lastResendAtMs === null) return input.nowMs - input.armedAtMs >= REJOIN_LATCH_RESEND_INTERVAL_MS ? 'resend' : 'idle';
   return input.nowMs - input.lastResendAtMs >= REJOIN_LATCH_RESEND_INTERVAL_MS ? 'resend' : 'idle';
 }
 

@@ -72,6 +72,19 @@ describe('rejoin latch recovery without bypassing authority', () => {
       .toContain('sendGuestResumeAuthority(playerId, remote)');
   });
 
+  it('mints a retained authority only while the replacement latch is held', () => {
+    const send = source.slice(
+      source.indexOf('function sendGuestResumeAuthority'),
+      source.indexOf('function sendAuthoritativeRemoteSnapshotToPlayer'),
+    );
+    expect(send.length).toBeGreaterThan(200);
+    // Skeptic fix 4: the :9141 gate still admits the pending fast-path resend,
+    // but the mint branch below it must require awaitingReplacementState, or a
+    // guest-authored pose is promoted into the host's retained authority.
+    expect(send).toContain('remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId)');
+    expect(send).toContain('if (!connectionEpoch || !remote.awaitingReplacementState || !member');
+  });
+
   it('re-acknowledges an already-applied resume authority without re-teleporting', () => {
     const applyStart = source.indexOf('function applyGuestResumeAuthority(');
     expect(applyStart).toBeGreaterThanOrEqual(0);

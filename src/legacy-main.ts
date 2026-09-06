@@ -9151,7 +9151,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   const actor = killstreakRuntime.snapshotFor(playerId, performance.now()).actors.find((entry) => entry.actorId === playerId);
   const priorHealth = remoteHealthAuthorities.get(playerId);
   const combatInventory = remoteCombatInventories.get(playerId);
-  if (!connectionEpoch || !member || !score || !actor || !priorHealth || !combatInventory) return false;
+  if (!connectionEpoch || !remote.awaitingReplacementState || !member || !score || !actor || !priorHealth || !combatInventory) return false;
   const now = performance.now();
   const health = advanceRemoteHealthAuthority(priorHealth, now);
   const canonical = canonicalRetainedGuestSnapshot(remote.snapshot, member, score, health);
@@ -9188,7 +9188,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
 }
 function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
 function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); }
-function driveRejoinLatchRecovery(playerId: string, remote: RemotePlayer, nowMs: number, guestEventLaneActive: boolean): void { const latched = remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId); if (!latched) { clearRejoinLatch(playerId); return; } const action = evaluateRejoinLatchRecovery({ nowMs, armedAtMs: rejoinLatchArmedAtMs(playerId), lastResendAtMs: rejoinLatchLastResendAtMs(playerId), guestEventLaneActive, latched }); if (action === 'resend') { noteRejoinLatchResend(playerId, nowMs); sendGuestResumeAuthority(playerId, remote); } else if (action === 'fail-closed') { const pending = pendingGuestAuthorityRepairs.get(playerId); clearRejoinLatch(playerId); if (pending) sendGuestResumeFailure(pending.message, 'retry-ceiling'); } }
+function driveRejoinLatchRecovery(playerId: string, remote: RemotePlayer, nowMs: number, guestEventLaneActive: boolean): void { const latched = remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId); if (!latched) { clearRejoinLatch(playerId); return; } const action = evaluateRejoinLatchRecovery({ nowMs, armedAtMs: rejoinLatchArmedAtMs(playerId), lastResendAtMs: rejoinLatchLastResendAtMs(playerId), guestEventLaneActive, latched }); if (action === 'resend') { noteRejoinLatchResend(playerId, nowMs); sendGuestResumeAuthority(playerId, remote); } else if (action === 'fail-closed') { const pending = pendingGuestAuthorityRepairs.get(playerId); if (pending) { clearRejoinLatch(playerId); sendGuestResumeFailure(pending.message, 'retry-ceiling'); } else { clearRejoinLatch(playerId); armRejoinLatch(playerId, nowMs); } } }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -9495,7 +9495,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
     const reack: GuestResumeAckMessage = { type: 'guest-resume-ack', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, connectionEpoch: localConnectionEpoch, matchEpoch: killstreakMatchEpoch, authorityNonce: message.nonce, nonce: randomNonce() };
     network.send(reack); network.sendStateCommitReliably(createStateMessage()); return true;
   }
-  if (shouldReadmitResumeAuthority({ role: network.role, gameStarted, awaitingCanonicalGuestAuthority, timedOutLocally: guestResumeTimedOutLocally, hostDeclaredFailure: guestResumeHostDeclaredFailure, messageConnectionEpoch: message.connectionEpoch, localConnectionEpoch })) { awaitingCanonicalGuestAuthority = true; guestResumeTimedOutLocally = false; } if (network.role !== 'client' || !gameStarted || !awaitingCanonicalGuestAuthority) return true;
+  const readmit = shouldReadmitResumeAuthority({ role: network.role, gameStarted, awaitingCanonicalGuestAuthority, timedOutLocally: guestResumeTimedOutLocally, hostDeclaredFailure: guestResumeHostDeclaredFailure, messageConnectionEpoch: message.connectionEpoch, localConnectionEpoch }); if (network.role !== 'client' || !gameStarted || (!awaitingCanonicalGuestAuthority && !readmit)) return true;
   const admission = admitGuestResumeAuthority(message, {
     expectedHostId: privateLobbySnapshot?.hostId ?? null,
     expectedPlayerId: player.id,
@@ -9503,7 +9503,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
     expectedMatchEpoch: killstreakMatchEpoch,
     seenNonces: processedNonces,
   });
-  if (!admission.accepted) return true;
+  if (!admission.accepted) return true; if (readmit) { awaitingCanonicalGuestAuthority = true; guestResumeTimedOutLocally = false; }
   if (pendingGuestResumeAuthority?.nonce !== message.nonce) lastGuestResumeNackNonce = null;
   pendingGuestResumeAuthority = message;
   const appliedWorldRevision = interactiveWorldRuntime?.collisions().revision ?? null;

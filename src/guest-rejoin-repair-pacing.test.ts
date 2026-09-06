@@ -174,6 +174,23 @@ describe('src/legacy-main.ts carries the fences (source fence)', () => {
     expect(source).toContain('shouldReadmitResumeAuthority(');
   });
 
+  it('applies the readmit mutation only inside the accepted path', () => {
+    const applyStart = source.indexOf('function applyGuestResumeAuthority(');
+    expect(applyStart).toBeGreaterThanOrEqual(0);
+    const applyEnd = source.indexOf('async function admitLobbyJoin(', applyStart);
+    const apply = source.slice(applyStart, applyEnd);
+    // The readmit predicate only computes a boolean; the state mutation must
+    // run after admission accepts, never before it. A rejected authority
+    // (wrong host, wrong recipient, wrong epoch, replayed nonce) must not
+    // re-arm the guest.
+    expect(apply).toContain('const readmit = shouldReadmitResumeAuthority(');
+    expect(apply).toContain('(!awaitingCanonicalGuestAuthority && !readmit)) return true;');
+    expect(apply.indexOf('admitGuestResumeAuthority(message, {'))
+      .toBeLessThan(apply.indexOf('awaitingCanonicalGuestAuthority = true'));
+    expect(apply.indexOf('if (!admission.accepted) return true;'))
+      .toBeLessThan(apply.indexOf('awaitingCanonicalGuestAuthority = true'));
+  });
+
   it('lets the host resend an authority for the pending-repair half of the latch', () => {
     const send = source.slice(
       source.indexOf('function sendGuestResumeAuthority'),

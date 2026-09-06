@@ -91,9 +91,15 @@ describe('evaluateRejoinLatchRecovery — the policy', () => {
     })).toBe('idle');
   });
 
-  it('resends immediately, then no faster than the throttle', () => {
+  it('waits out the resend interval after arming, then no faster than the throttle', () => {
     const base = { armedAtMs: 0, guestEventLaneActive: true, latched: true };
-    expect(evaluateRejoinLatchRecovery({ ...base, nowMs: 0, lastResendAtMs: null })).toBe('resend');
+    expect(evaluateRejoinLatchRecovery({ ...base, nowMs: 0, lastResendAtMs: null })).toBe('idle');
+    expect(evaluateRejoinLatchRecovery({
+      ...base, nowMs: REJOIN_LATCH_RESEND_INTERVAL_MS - 1, lastResendAtMs: null,
+    })).toBe('idle');
+    expect(evaluateRejoinLatchRecovery({
+      ...base, nowMs: REJOIN_LATCH_RESEND_INTERVAL_MS, lastResendAtMs: null,
+    })).toBe('resend');
     expect(evaluateRejoinLatchRecovery({
       ...base, nowMs: REJOIN_LATCH_RESEND_INTERVAL_MS - 1, lastResendAtMs: 0,
     })).toBe('idle');
@@ -162,6 +168,10 @@ type SimulationOptions = Readonly<{
   tickRecovery?: boolean;
   /** Guest never accepts; used to exercise the deadline. */
   guestNeverAccepts?: boolean;
+  /** No pending repair record is ever created; the latch is held by awaitingReplacementState alone. */
+  noInitialPending?: boolean;
+  /** Sends refuse (the :9152 guard) below this time, then behave normally. Models data arriving late. */
+  sendAuthorityFailsUntilMs?: number;
 }>;
 
 type SimulationResult = {
@@ -171,12 +181,27 @@ type SimulationResult = {
   maxRemoteSnapshotAgeMs: number;
 };
 
+/**
+ * HF-535 skeptic fix 1 — the sim's fail-closed branch must mirror
+ * `driveRejoinLatchRecovery` in legacy-main.ts, not hardcode the fixed
+ * behaviour, or the falsifier below could not have failed at 2297ee52.
+ * True once the deadline re-arms the latch when no pending record exists.
+ */
+function driveRearmsLatchWithoutPending(): boolean {
+  const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+  const drive = source.slice(source.indexOf('function driveRejoinLatchRecovery'));
+  const body = drive.slice(0, drive.indexOf('\nfunction ', 1));
+  return body.includes('armRejoinLatch(playerId, nowMs)');
+}
+
 function simulateRejoinLatch(options: SimulationOptions): SimulationResult {
   const id = 'sim-guest';
   clearAllRejoinLatches();
   const tickRecovery = options.tickRecovery ?? true;
   const awaitingReplacementState = options.awaitingReplacementState ?? true;
-  let pendingRepair = true;
+  const failsUntilMs = options.sendAuthorityFailsUntilMs ?? Number.NEGATIVE_INFINITY;
+  const sourceRearmsWithoutPending = driveRearmsLatchWithoutPending();
+  let pendingRepair = !(options.noInitialPending ?? false);
   let latched = true;
   let rejectionsLeft = options.silentRejections;
   let lastAdmittedGuestSampleAtMs = 0;
@@ -192,6 +217,10 @@ function simulateRejoinLatch(options: SimulationOptions): SimulationResult {
   // replacement state OR a pending repair record exists.
   const sendAuthority = (nowMs: number): boolean => {
     if (!(awaitingReplacementState || pendingRepair)) return false;
+    // Skeptic fix 1: the :9152 guard refuses the mint while member/score/actor/
+    // health/inventory data is missing. Nothing is sent and, crucially, no
+    // pending record is created.
+    if (nowMs < failsUntilMs) return false;
     authoritiesSent.push(nowMs);
     if (options.guestNeverAccepts) return true;
     if (rejectionsLeft > 0) { rejectionsLeft -= 1; return true; } // silent discard
@@ -206,7 +235,9 @@ function simulateRejoinLatch(options: SimulationOptions): SimulationResult {
 
   // Seed with the real burst: one authority from the host's join handler, then
   // the two the guest's two reliable state commits triggered 4 ms later. At
-  // 477c3ab6 these three are the only ones that ever go out.
+  // 477c3ab6 these three are the only ones that ever go out. The tick drive
+  // below never duplicates them on its first frame: the first resend waits out
+  // REJOIN_LATCH_RESEND_INTERVAL_MS from the arm (skeptic fix 3).
   armRejoinLatch(id, 0);
   sendAuthority(0);
   if (latched) { armRejoinLatch(id, 4); if (!tickRecovery) sendAuthority(4); else sendAuthority(4); }
@@ -228,11 +259,17 @@ function simulateRejoinLatch(options: SimulationOptions): SimulationResult {
         sendAuthority(nowMs);
       } else if (action === 'fail-closed') {
         // The EXISTING guest-resume-failure path: visible, bounded, and it does
-        // NOT clear awaitingReplacementState.
+        // NOT clear awaitingReplacementState. With a pending record the host
+        // fails closed; with none the fixed branch re-arms the bounded cycle
+        // (skeptic fix 1) instead of disarming into a permanently idle latch.
         clearRejoinLatch(id);
-        pendingRepair = false;
-        latched = false;
-        result.resolution = 'fail-closed';
+        if (pendingRepair) {
+          pendingRepair = false;
+          latched = false;
+          result.resolution = 'fail-closed';
+        } else if (sourceRearmsWithoutPending) {
+          armRejoinLatch(id, nowMs);
+        }
       }
     }
     result.maxRemoteSnapshotAgeMs = Math.max(result.maxRemoteSnapshotAgeMs, nowMs - lastAdmittedGuestSampleAtMs);
@@ -257,6 +294,9 @@ describe('rejoin latch recovery — behavioural falsifier over a virtual clock',
   it('recovers a guest that discarded the whole opening burst', () => {
     const after = simulateRejoinLatch({ silentRejections: 3 });
     expect(after.authoritiesSent.length).toBeGreaterThan(3);
+    // Skeptic fix 3: the tick never duplicates the join-handler burst on its
+    // first frame — no tick-driven resend may precede the resend interval.
+    expect(after.authoritiesSent.filter((t) => t > 4 && t < REJOIN_LATCH_RESEND_INTERVAL_MS)).toHaveLength(0);
     expect(after.resolution).toMatch(/^(ack|fail-closed)$/u);
     expect(after.latchedAtEndMs ?? 0).toBeLessThanOrEqual(REJOIN_LATCH_DEADLINE_MS + REJOIN_LATCH_RESEND_INTERVAL_MS);
     expect(after.maxRemoteSnapshotAgeMs).toBeLessThan(12_000);
@@ -278,4 +318,33 @@ describe('rejoin latch recovery — behavioural falsifier over a virtual clock',
       3 + Math.ceil(REJOIN_LATCH_DEADLINE_MS / REJOIN_LATCH_RESEND_INTERVAL_MS),
     );
   });
+
+  it('re-arms the latch at the deadline when no pending record exists', () => {
+    const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    const drive = source.slice(source.indexOf('function driveRejoinLatchRecovery'));
+    const body = drive.slice(0, drive.indexOf('\nfunction ', 1));
+    expect(
+      body,
+      'When sendGuestResumeAuthority refuses every mint for a whole deadline window '
+        + 'no pending record exists; clearing without re-arming disarms the recovery while '
+        + 'awaitingReplacementState stays true, and the latch goes idle forever.',
+    ).toContain('armRejoinLatch(playerId, nowMs)');
+  });
+
+  it('keeps the bounded cycle alive when every send fails for a whole deadline window', () => {
+    // Skeptic fix 1: the latch is held by awaitingReplacementState alone with
+    // NO pending record — reachable whenever sendGuestResumeAuthority returns
+    // false for the whole 8 s window via the :9152 guard. Once the data
+    // arrives the next resend must still go out; 2297ee52 had disarmed by then
+    // and stayed 'still-latched' forever.
+    const after = simulateRejoinLatch({
+      silentRejections: 0,
+      noInitialPending: true,
+      sendAuthorityFailsUntilMs: 9_000,
+    });
+    expect(after.resolution).not.toBe('still-latched');
+    expect(after.resolution).toBe('ack');
+    expect(after.maxRemoteSnapshotAgeMs).toBeLessThan(12_000);
+  });
+
 });
