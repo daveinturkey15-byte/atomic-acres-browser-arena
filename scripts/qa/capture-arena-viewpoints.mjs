@@ -31,7 +31,7 @@
 //        [--serve-dist <dir>] [--out artifacts/viewpoint-regression/<label>]
 //        [--samples 3]
 import { chromium } from '@playwright/test';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -84,7 +84,14 @@ let SERVE_CHILD = null;
 const killServeChild = () => {
   if (!SERVE_CHILD || SERVE_CHILD.pid == null) return;
   if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
+    // HF-535: the fire-and-forget taskkill raced process exit and the vite
+    // process under npx survived, squatting :41931 for the next run. Kill the
+    // tree synchronously, then sweep whatever still listens on OUR port - we
+    // refused to start if anyone else held it, so any listener here is ours.
+    spawnSync('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
+    spawnSync('powershell', ['-NoProfile', '-Command',
+      'Get-NetTCPConnection -State Listen -LocalPort 41931 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }'],
+      { stdio: 'ignore' });
   } else {
     SERVE_CHILD.kill('SIGTERM');
   }
