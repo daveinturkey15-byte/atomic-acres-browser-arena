@@ -34932,13 +34932,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     weaponReady: weaponView.isReady(),
     weaponPresentation: {
       ...weaponView.presentationState(),
-      // HF-536: this was the literal `true` for as long as the field existed,
-      // and it is how "the gun no longer clips" kept passing while the owner
-      // kept seeing the gun clip. The only depth-cleared viewmodel overlay in
-      // this codebase lives in AtomicSignalPass, and `atomicSignal` above is
-      // hardcoded null, so the shipped frame draws the rig INSIDE the world
-      // pass on the world depth buffer. Report what is true.
-      depthSeparatedFromWorld: atomicSignal !== null,
+      depthSeparatedFromWorld: atomicSignal !== null, // HF-536: was a literal `true`; only AtomicSignalPass clears depth and it is null.
     },
     railgunScope: {
       ...railgunScopeState,
