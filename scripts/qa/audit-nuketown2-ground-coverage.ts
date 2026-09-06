@@ -15,7 +15,9 @@
  * by `batchPresentationOnlyBoxes`, so a batch's AABB is the union of tiles
  * scattered across the map and would report cover that does not exist.
  *
- * Usage: tsx scripts/qa/audit-nuketown2-ground-coverage.ts [--out FILE] [--cell 0.25]
+ * Usage: tsx scripts/qa/audit-nuketown2-ground-coverage.ts [--out FILE] [--cell 0.25] [--margin <m>]
+ * `--margin <m>` widens the rasterised box beyond NUKETOWN2_BOUNDS by <m> metres
+ * on every side (default 0, so the existing call is unchanged).
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -28,6 +30,9 @@ const cellIndex = process.argv.indexOf('--cell');
 export const CELL_M = cellIndex >= 0 ? Number(process.argv[cellIndex + 1]) : 0.25;
 const outIndex = process.argv.indexOf('--out');
 const outPath = outIndex >= 0 ? process.argv[outIndex + 1] : undefined;
+const marginIndex = process.argv.indexOf('--margin');
+const parsedMargin = marginIndex >= 0 ? Number(process.argv[marginIndex + 1]) : 0;
+export const MARGIN_M = Number.isFinite(parsedMargin) && parsedMargin >= 0 ? parsedMargin : 0;
 
 /** A surface below this is under the world; above it, it is a roof or a shelf. */
 export const GROUND_BAND_MIN_Y = -1.5;
@@ -50,7 +55,7 @@ export type GroundCoverage = {
   gaps: GroundGap[];
 };
 
-export function auditNuketown2GroundCoverage(cell = CELL_M, root?: THREE.Object3D): GroundCoverage {
+export function auditNuketown2GroundCoverage(cell = CELL_M, root?: THREE.Object3D, margin = 0): GroundCoverage {
   let target = root;
   if (target === undefined) {
     const scene = new THREE.Scene();
@@ -58,10 +63,10 @@ export function auditNuketown2GroundCoverage(cell = CELL_M, root?: THREE.Object3
   }
   target.updateMatrixWorld(true);
 
-  const x0 = NUKETOWN2_BOUNDS.minX;
-  const z0 = NUKETOWN2_BOUNDS.minZ;
-  const nx = Math.ceil((NUKETOWN2_BOUNDS.maxX - x0) / cell);
-  const nz = Math.ceil((NUKETOWN2_BOUNDS.maxZ - z0) / cell);
+  const x0 = NUKETOWN2_BOUNDS.minX - margin;
+  const z0 = NUKETOWN2_BOUNDS.minZ - margin;
+  const nx = Math.ceil((NUKETOWN2_BOUNDS.maxX + margin - x0) / cell);
+  const nz = Math.ceil((NUKETOWN2_BOUNDS.maxZ + margin - z0) / cell);
   const covered = new Uint8Array(nx * nz);
 
   const a = new THREE.Vector3();
@@ -181,12 +186,14 @@ export function auditNuketown2GroundCoverage(cell = CELL_M, root?: THREE.Object3
 }
 
 if (process.argv[1]?.endsWith('audit-nuketown2-ground-coverage.ts')) {
-  const audit = auditNuketown2GroundCoverage();
+  const audit = auditNuketown2GroundCoverage(CELL_M, undefined, MARGIN_M);
   const sha = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   const lines = [
     '# nuketown2 GROUND COVERAGE (HF-536 night-defects-3a)',
-    `# head ${sha} · generated ${new Date().toISOString()} · cell ${audit.cell} m`,
-    `# bounds x[${NUKETOWN2_BOUNDS.minX},${NUKETOWN2_BOUNDS.maxX}] z[${NUKETOWN2_BOUNDS.minZ},${NUKETOWN2_BOUNDS.maxZ}]`,
+    `# head ${sha} · generated ${new Date().toISOString()} · cell ${audit.cell} m · margin ${MARGIN_M} m`,
+    `# bounds x[${NUKETOWN2_BOUNDS.minX},${NUKETOWN2_BOUNDS.maxX}] z[${NUKETOWN2_BOUNDS.minZ},${NUKETOWN2_BOUNDS.maxZ}]`
+    + ` · box x[${NUKETOWN2_BOUNDS.minX - MARGIN_M},${NUKETOWN2_BOUNDS.maxX + MARGIN_M}]`
+    + ` z[${NUKETOWN2_BOUNDS.minZ - MARGIN_M},${NUKETOWN2_BOUNDS.maxZ + MARGIN_M}]`,
     `# cells ${audit.cellsCovered}/${audit.cellsTotal} covered · UNCOVERED ${audit.cellsUncovered}`
     + ` = ${audit.uncoveredAreaM2} m2 in ${audit.gaps.length} regions`,
     '',

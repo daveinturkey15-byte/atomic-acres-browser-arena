@@ -3617,6 +3617,40 @@ function allNuketown2GroundCuts(): readonly Nuketown2GroundCut[] {
 }
 
 /**
+ * HF-536 night-muse-skirt — GROUND UNDER THE TREE BELT. The tiled outdoor slab
+ * ends at NUKETOWN2_BOUNDS, so from the garage roof the belt stands on nothing
+ * and background shows below the horizon (44 of the 46 remaining hits). One
+ * flat ring laps under the slab on all four sides and runs out past the belt.
+ *
+ * An extrusion, not boxes, for the same reason the turning-head pocket states:
+ * only the real shape (a rect with a rectangular hole) both laps the plate
+ * without a coplanar race and closes the gap — and a non-box body is skipped
+ * by the axis coplanar scan and can never raise an oriented finding, so the
+ * tier below the datum cannot become a z-fighting row.
+ *
+ * Material: the verge's own lawn tier. The belt brings no floor of its own —
+ * its trees plant on the datum (groundY() === 0) — so lawn is what it stands on.
+ */
+export const NUKETOWN2_GROUND_SKIRT = Object.freeze({
+  /** Inner hole half-extents: 0.02 m INSIDE the slab edge, so the ring laps under it. */
+  innerX: NUKETOWN2_BOUNDS.maxX - 0.02,
+  innerZ: NUKETOWN2_BOUNDS.maxZ - 0.02,
+  /**
+   * Outer half-extents. Belt trunks reach |x| 68.92 and |z| 68.37 (measured on
+   * the seeded envelope), so 73 clears belt + 4 m on x; 82 also covers the full
+   * margin-40 audit box in z, putting ground under the foothill feet as well.
+   */
+  outerX: 73,
+  outerZ: 82,
+  /**
+   * 0.034 m below the outdoor datum: inside the brief's 0.03 ± 0.005, outside
+   * the 0.03 m coplanar near band on both scans.
+   */
+  topY: -0.034,
+  thickness: 0.14,
+});
+
+/**
  * Build the outdoor ground as a tiled cover with exact structure cut-outs.
  * A single 270 m slab used to continue through every house and garage, where
  * it was coplanar with the old interior slabs. The cuts are deliberately
@@ -3649,6 +3683,40 @@ function buildNuketown2Ground(builder: Builder, m: Nuketown2Materials): void {
       tile += 1;
     }
   }
+}
+/**
+ * HF-536 night-muse-skirt. The ring above, emitted as a raw mesh: no collider,
+ * no shot surface, presentation only — movement and shot authority are untouched.
+ */
+function buildNuketown2GroundSkirt(builder: Builder, m: Nuketown2Materials): void {
+  const skirt = NUKETOWN2_GROUND_SKIRT;
+  const shape = new THREE.Shape();
+  shape.moveTo(-skirt.outerX, -skirt.outerZ);
+  shape.lineTo(skirt.outerX, -skirt.outerZ);
+  shape.lineTo(skirt.outerX, skirt.outerZ);
+  shape.lineTo(-skirt.outerX, skirt.outerZ);
+  shape.closePath();
+  const hole = new THREE.Path();
+  hole.moveTo(-skirt.innerX, -skirt.innerZ);
+  hole.lineTo(skirt.innerX, -skirt.innerZ);
+  hole.lineTo(skirt.innerX, skirt.innerZ);
+  hole.lineTo(-skirt.innerX, skirt.innerZ);
+  hole.closePath();
+  shape.holes.push(hole);
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: skirt.thickness, bevelEnabled: false });
+  // Shape space (x, y) is world (x, z); the extrusion axis becomes world y.
+  // Both rects are symmetric in z, so the sign flip this rotation applies to
+  // the shape's y is immaterial — the same note the pocket carries.
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, skirt.topY - skirt.thickness, 0);
+  const ring = new THREE.Mesh(geometry, m.lawn);
+  ring.name = 'nuketown2 ground skirt ring';
+  ring.castShadow = false;
+  ring.receiveShadow = true;
+  ring.userData.presentationOnly = true;
+  ring.userData.presentationBatchCandidate = false;
+  ring.userData.blocksShots = false;
+  builder.root.add(ring);
 }
 
 /**
@@ -4616,6 +4684,9 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   // includes it rejects the entire arena, which is exactly what a first cut of
   // the lawn field did (8 regions, 0 blades, no error anywhere).
   const groundColliderCount = builder.colliders.length;
+  // HF-536 night-muse-skirt: presentation-only ring under the tree belt. It
+  // registers no collider, so the keep-out slice above is unaffected.
+  buildNuketown2GroundSkirt(builder, m);
 
   street(builder, m);
   house(builder, m);
