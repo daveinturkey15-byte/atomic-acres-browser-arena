@@ -90,19 +90,14 @@ function buildShaft(
   rng: () => number,
   group: THREE.Group,
 ): Nuketown2EffectShaft {
-  // DAY-POLISH (HF-535): high, faint beams. Feet stay above ~3 m (centre
-  // 5.2 m minus worst-case vertical half-extent 1.14 m length + 1.0 m rolled
-  // width = 3.06 m), clear of the carriageway, the parked vehicles and both
-  // review-camera eye lines. Barely-there opacity: dust in a beam.
-  const length = 8 + rng() * 4;
-  const width = 1.2 + rng() * 0.8;
-  const baseOpacity = 0.016 + rng() * 0.014;
+  const length = 10 + rng() * 6;
+  const width = 1.6 + rng() * 1.4;
+  const baseOpacity = 0.04 + rng() * 0.03;
   const phase = rng() * Math.PI * 2;
-  // Verge-side anchors toward the low sun, clear of the carriageway
-  // (|z| < 6.5 m) and the kerb-parked cars: high beams over the yards,
-  // heads tipped toward the sun, never a quad across the road at eye level.
-  const anchorX = -16 + rng() * 20;
-  const anchorZ = (rng() < 0.5 ? -1 : 1) * (8 + rng() * 6);
+  // Street corridor anchors: the shafts lean over the carriageway and the
+  // turning head, feet near the asphalt, heads tipped toward the sun.
+  const anchorX = -14 + rng() * 20;
+  const anchorZ = -7 + rng() * 14;
   const roll = rng() * Math.PI * 2;
   const tilt = (rng() - 0.5) * 0.1;
 
@@ -127,7 +122,7 @@ function buildShaft(
   mesh.rotateX(tilt);
   mesh.position.set(
     anchorX + SUN_DIR.x * (length / 2 - 1.5),
-    5.2 + SUN_DIR.y * (length / 2 - 1.5),
+    1.4 + SUN_DIR.y * (length / 2 - 1.5),
     anchorZ + SUN_DIR.z * (length / 2 - 1.5),
   );
   group.add(mesh);
