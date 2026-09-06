@@ -4272,9 +4272,11 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'yard pool ladder rail right', [4.8 - 1.6, 0.45, -29.5 + 0.25], [0.06, 0.55, 0.06], m.chrome,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard pool deck chair 0', [4.8 + 0.7, 0.22, -26.8], [0.70, 0.20, 1.60], m.trim,
+  // HF-536 night-muse-sweep: these slabs floated 0.12 m over the grass with no
+  // legs; rested on the ground (foot 0.01). Non-solid, mirrored, counts unchanged.
+  pair(builder, 'yard pool deck chair 0', [4.8 + 0.7, 0.11, -26.8], [0.70, 0.20, 1.60], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'yard pool deck chair 1', [4.8 - 0.7, 0.22, -26.8], [0.70, 0.20, 1.60], m.trim,
+  pair(builder, 'yard pool deck chair 1', [4.8 - 0.7, 0.11, -26.8], [0.70, 0.20, 1.60], m.trim,
     { solid: false, shots: false, cast: true });
   // Domestic patio BBQ grill & cooler accessories (clear of pool deck and footings):
   pair(builder, 'yard patio grill body', [4.8 + 1.8, 0.45, -25.8], [0.55, 0.60, 0.55], m.block,
