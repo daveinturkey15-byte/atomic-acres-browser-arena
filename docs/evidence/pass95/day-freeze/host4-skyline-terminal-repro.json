@@ -1,0 +1,278 @@
+{
+  "contract": "pass95-frame-hitch-attributor-v1",
+  "measuredAt": "2026-09-06T06:07:26.148Z",
+  "label": "host4-skyline-terminal-repro",
+  "arena": "skyline-terminal",
+  "base": "http://127.0.0.1:4292/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "sampleSeconds": 120,
+  "hitchThresholdMs": 50,
+  "mode": "host",
+  "hostBots": 4,
+  "peerPort": 4392,
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "hardwareConcurrency": 16
+  },
+  "deployMs": 46377,
+  "consoleErrors": [],
+  "matchState": {
+    "matchPhase": "active",
+    "bots": 4,
+    "alive": true
+  },
+  "traceAligned": true,
+  "traceEventsKept": 20672,
+  "frameCount": 10373,
+  "sampledSeconds": 120,
+  "fps": 86.4,
+  "frameMs": {
+    "p50": 11,
+    "p95": 17.7,
+    "p99": 21.3,
+    "p999": 39.1,
+    "max": 61.4
+  },
+  "hitches": {
+    "thresholdMs": 50,
+    "count": 5,
+    "totalMs": 276.7,
+    "worstMs": 61.4,
+    "over100": 0,
+    "over33": 15
+  },
+  "causeTable": [
+    {
+      "cause": "unattributed-present",
+      "count": 3,
+      "totalMs": 125.5,
+      "worstMs": 58.9,
+      "worstFrame": 9007
+    },
+    {
+      "cause": "unattributed-js",
+      "count": 1,
+      "totalMs": 41.5,
+      "worstMs": 41.5,
+      "worstFrame": 9006
+    },
+    {
+      "cause": "gc-major",
+      "count": 1,
+      "totalMs": 22.9,
+      "worstMs": 22.9,
+      "worstFrame": 2383
+    },
+    {
+      "cause": "style-recalculation",
+      "count": 1,
+      "totalMs": 9.7,
+      "worstMs": 9.7,
+      "worstFrame": 2383
+    },
+    {
+      "cause": "gpu-task",
+      "count": 1,
+      "totalMs": 1.9,
+      "worstMs": 1.9,
+      "worstFrame": 2383
+    }
+  ],
+  "hitchFrames": [
+    {
+      "i": 2383,
+      "atMs": 76926.3,
+      "frameMs": 52.2,
+      "jsMs": 11.7,
+      "heapDeltaMb": -21.088,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 9.73,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 1.89,
+          "count": 1
+        },
+        {
+          "id": "gc-major",
+          "ms": 22.88,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 79,
+        "writeBufferBytes": 285102,
+        "writeBufferMs": 0.1,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 52,
+        "triangles": 33785.67,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 12,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 6049,
+      "atMs": 117663.8,
+      "frameMs": 51.3,
+      "jsMs": 21.3,
+      "heapDeltaMb": -39.942,
+      "causes": [
+        {
+          "id": "unattributed-present",
+          "ms": 30,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 309,
+        "writeBufferBytes": 443689,
+        "writeBufferMs": 0.3,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 169,
+        "triangles": 113726.33,
+        "submits": 25,
+        "passes": 48,
+        "canvas2d": 194,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 9006,
+      "atMs": 152642.3,
+      "frameMs": 50.9,
+      "jsMs": 41.5,
+      "heapDeltaMb": -52.817,
+      "causes": [
+        {
+          "id": "unattributed-js",
+          "ms": 41.5,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 200,
+        "writeBufferBytes": 358164,
+        "writeBufferMs": 0.4,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 111,
+        "triangles": 74226.33,
+        "submits": 25,
+        "passes": 24
+      }
+    },
+    {
+      "i": 9007,
+      "atMs": 152703.7,
+      "frameMs": 61.4,
+      "jsMs": 2.5,
+      "heapDeltaMb": -0.069,
+      "causes": [
+        {
+          "id": "unattributed-present",
+          "ms": 58.9,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 200,
+        "writeBufferBytes": 358164,
+        "writeBufferMs": 0.1,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 111,
+        "triangles": 74226.33,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 194
+      }
+    },
+    {
+      "i": 10330,
+      "atMs": 168479.6,
+      "frameMs": 60.9,
+      "jsMs": 24.3,
+      "heapDeltaMb": -47.957,
+      "causes": [
+        {
+          "id": "unattributed-present",
+          "ms": 36.6,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 173,
+        "writeBufferBytes": 371565,
+        "writeBufferMs": 0.2,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 132,
+        "triangles": 75778.33,
+        "submits": 25,
+        "passes": 48,
+        "canvas2d": 194,
+        "canvas2dMs": 0.2
+      }
+    }
+  ],
+  "totals": {
+    "pipelines": 224,
+    "pipelineMs": 6.799999713897705,
+    "shaderModules": 291,
+    "shaderMs": 11.099998712539673,
+    "gpuBuffers": 3529,
+    "gpuBufferBytes": 23987120,
+    "gpuBufferMs": 17.40000021457672,
+    "gpuTextures": 213,
+    "gpuTextureBytes": 0,
+    "gpuTextureMs": 1.4000002145767212,
+    "writeBuffer": 2119323,
+    "writeBufferBytes": 3807934453,
+    "writeBufferMs": 2284.3999931812286,
+    "writeTexture": 23813,
+    "writeTextureBytes": 322895076,
+    "writeTextureMs": 170.59999990463257,
+    "externalImage": 158,
+    "externalImageMs": 89.30000042915344,
+    "draws": 1289889,
+    "triangles": 793437544.666745,
+    "submits": 263477,
+    "passes": 378070,
+    "canvas2d": 266611,
+    "canvas2dMs": 274.4000027179718,
+    "styleReads": 0,
+    "styleReadMs": 0,
+    "layoutReads": 2215,
+    "layoutReadMs": 25.699999928474426,
+    "audioDecode": 0,
+    "audioDecodeMs": 0,
+    "audioStarts": 4679,
+    "geometryBuilds": 0,
+    "geometryBuildMs": 0
+  },
+  "longTasks": {
+    "count": 2,
+    "totalMs": 105,
+    "worstMs": 54
+  },
+  "attributionCoverage": {
+    "attributedMs": 201.5,
+    "hitchTotalMs": 276.7,
+    "pct": 72.8
+  }
+}
