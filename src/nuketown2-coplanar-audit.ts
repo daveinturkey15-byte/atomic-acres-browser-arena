@@ -53,6 +53,15 @@ import {
   NUKETOWN2_CARRIAGEWAY_FOOTPRINTS,
 } from './nuketown2-arena';
 import { nuketown2HandedSpan, nuketown2HandedX } from './nuketown2-layout';
+import { auditNuketown2Oriented, type OrientedAudit } from './nuketown2-oriented-coplanar-audit';
+
+export type { OrientedAudit, OrientedRow, OrientedVerdict, Surfel } from './nuketown2-oriented-coplanar-audit';
+export {
+  auditNuketown2Oriented,
+  ORIENTED_COPLANAR_NEAR_METERS,
+  ORIENTED_MIN_RACE_AREA_M2,
+  PARALLEL_TOLERANCE_DEGREES,
+} from './nuketown2-oriented-coplanar-audit';
 
 /** Two top faces this close race for the same depth samples. */
 export const COPLANAR_NEAR_METERS = 0.03;
@@ -111,6 +120,13 @@ export type CoplanarCounts = {
 
 export type CoplanarAudit = {
   boxes: CoplanarBox[];
+  /**
+   * HF-536: the ORIENTED scan, which covers exactly the meshes `skippedNames`
+   * lists — rotated boxes as OBBs, InstancedMeshes expanded per instance,
+   * non-box meshes by their declared AABB faces. Without it a `skipped: 103`
+   * footer was the whole answer for the kerbs and roof courses the owner named.
+   */
+  oriented: OrientedAudit;
   rows: CoplanarRow[];
   skipped: number;
   skippedNames: string[];
@@ -381,5 +397,5 @@ export function auditNuketown2Coplanar(): CoplanarAudit {
       case 'finding': counts.findings += 1; break;
     }
   }
-  return { boxes, rows, skipped, skippedNames, collisionOnlySlopes, counts };
+  return { boxes, rows, skipped, skippedNames, collisionOnlySlopes, counts, oriented: auditNuketown2Oriented() };
 }

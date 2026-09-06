@@ -45,8 +45,11 @@ import { execSync } from 'node:child_process';
 import {
   COPLANAR_NEAR_METERS,
   MIN_RACE_AREA_M2,
+  ORIENTED_COPLANAR_NEAR_METERS,
+  PARALLEL_TOLERANCE_DEGREES,
   auditNuketown2Coplanar,
   type CoplanarRow,
+  type OrientedRow,
 } from '../../src/nuketown2-coplanar-audit';
 
 const VERDICT_LABEL: Readonly<Record<CoplanarRow['classification'], string>> = Object.freeze({
@@ -92,9 +95,53 @@ function main(): void {
       + ` · SAME-MATERIAL (benign): ${counts.benign}`,
     `# UNAUDITED meshes (instanced / rotated / non-parametric geometry, not covered by`
       + ` the top-face test above): ${audit.skipped}${audit.skippedNames.length > 0 ? ` - ${audit.skippedNames.join(', ')}` : ''}`,
+    `# HF-536: every one of those is covered by the ORIENTED scan below.`,
     '',
   ];
-  const report = [...header, ...lines, ''].join('\n');
+  // ---- HF-536 ORIENTED SCAN -------------------------------------------------
+  // Face-plane vs face-plane, so rotation stops mattering; instances expanded;
+  // non-box meshes declared as AABB bounds. See
+  // src/nuketown2-oriented-coplanar-audit.ts for the classes and their meaning.
+  const oriented = audit.oriented;
+  const orientedLine = (row: OrientedRow): string => [
+    row.classification.replace('oriented-', 'obb-').toUpperCase().padEnd(22),
+    `score=${row.score.toFixed(3)}`,
+    `gap=${row.gap.toFixed(4)}m`,
+    `area=${row.overlap.toFixed(2)}m2`,
+    `n=(${row.first.nx.toFixed(2)},${row.first.ny.toFixed(2)},${row.first.nz.toFixed(2)})`,
+    `at=(${row.first.cx.toFixed(2)},${row.first.cy.toFixed(2)},${row.first.cz.toFixed(2)})`,
+    `[${row.first.name} ${row.first.kind} mat=${row.first.materialName} offset=${row.first.polygonOffsetFactor}]`,
+    `[${row.second.name} ${row.second.kind} mat=${row.second.materialName} offset=${row.second.polygonOffsetFactor}]`,
+  ].join(' ');
+  const isOrientedFinding = (row: OrientedRow): boolean => (
+    row.classification === 'oriented-finding' || row.classification === 'oriented-back-to-back-finding'
+  );
+  const orientedHeader = [
+    '',
+    `# ---- ORIENTED FACE SCAN (HF-536) ----`,
+    `# meshes=${oriented.meshes} · instances expanded=${oriented.instancesExpanded}`
+      + ` · surfels=${oriented.surfels} (exact OBB ${oriented.exactSurfels}, declared AABB ${oriented.approxSurfels})`,
+    `# parallel within ${PARALLEL_TOLERANCE_DEGREES} deg · separation ALONG THE SHARED NORMAL <= ${ORIENTED_COPLANAR_NEAR_METERS} m`,
+    `# OBB-FINDING: ${oriented.counts['oriented-finding']}`
+      + ` · OBB-BACK-TO-BACK-FINDING: ${oriented.counts['oriented-back-to-back-finding']}`
+      + ` · OBB-FENCED: ${oriented.counts['oriented-fenced']}`
+      + ` · OBB-SAME-MATERIAL: ${oriented.counts['oriented-same-material']}`
+      + ` · OBB-CONTACT: ${oriented.counts['oriented-contact']}`
+      + ` · OBB-BURIED (coplanar but the shared plane is inside a third opaque body): ${oriented.counts['oriented-buried']}`
+      + ` · APPROX-CANDIDATE (an AABB bound on at least one side - never a finding): ${oriented.counts['approx-candidate']}`,
+    `# sorted by SCREEN RELEVANCE (shared area x eye-band weight); findings first`,
+    '',
+  ];
+  const report = [
+    ...header,
+    ...lines,
+    ...orientedHeader,
+    ...oriented.rows.filter(isOrientedFinding).map(orientedLine),
+    '',
+    '# --- non-finding oriented rows, top 200 by screen relevance ---',
+    ...oriented.rows.filter((row) => !isOrientedFinding(row)).slice(0, 200).map(orientedLine),
+    '',
+  ].join('\n');
   if (outPath) {
     const out = resolve(outPath);
     mkdirSync(resolve(out, '..'), { recursive: true });
@@ -103,6 +150,8 @@ function main(): void {
   }
   console.log(report);
   process.exitCode = counts.findings === 0
+    && oriented.counts['oriented-finding'] === 0
+    && oriented.counts['oriented-back-to-back-finding'] === 0
     && counts.houseInteriorFindings === 0
     && counts.streetFindings === 0
     && counts.sameMaterialVisibleFindings === 0

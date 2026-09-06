@@ -293,6 +293,19 @@ const ROOF_Y0 = UPPER_Y0 + UPPER_H;                         // 6.2
 const ROOF_T = 0.3;
 
 const WALL_T = 0.3;
+
+/**
+ * HF-536 (owner: "there is still Z fighting around the map in many spots").
+ * The relief a body gets pulled back by when its face would otherwise land
+ * EXACTLY on another body's face. 0.02 m is deliberate, not arbitrary: the
+ * on-foot near plane is 0.02 m with far 180 m, so the depth buffer resolves
+ * about 1 cm at 60 m — the arena's longest sightline — and 20 mm therefore
+ * orders the two surfaces at every range a player can stand at. It is also
+ * small enough to stay inside the 0.3 m wall it hides in, so nothing opens a
+ * gap. The oriented face audit (`src/nuketown2-oriented-coplanar-audit.ts`)
+ * is what found these; `src/nuketown2-fidelity.test.ts` pins them.
+ */
+export const NUKETOWN2_COPLANAR_RELIEF_M = 0.02;
 /** Waist-high cover: breaks a prone or crouched line, and vaultable. */
 const LOW_COVER = 0.95;
 /** Hard cover: clears the 1.65 m standing eye line. */
@@ -1774,15 +1787,29 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // strip carries the well, which runs from the back wall to the landing and
   // nowhere else: 4.34 x 1.95 m in the BACK room, against the previous cut's
   // 6.05 x 1.95 m under the front window.
+  // HF-536 EDGE RELIEF. The slab used to run wall-face to wall-face: its own
+  // outer edge faces landed EXACTLY on the exterior siding planes at
+  // HOUSE_X0/HOUSE_X1 and on the front and back wall planes, so a 13 m x 0.3 m
+  // strip of drywall raced the siding for depth along the upper-floor line of
+  // both houses - visible from the street, from the yards and from the roofs,
+  // which is a fair share of "z fighting around the map in many spots". The
+  // slab is pulled back by NUKETOWN2_COPLANAR_RELIEF_M on every edge that
+  // meets the OUTSIDE world; it still buries 0.28 m of the 0.3 m wall, so no
+  // gap opens and the walkable surface (which stops at the wall's inner face)
+  // does not move.
+  const FLOOR_X0 = HOUSE_X0 + NUKETOWN2_COPLANAR_RELIEF_M;
+  const FLOOR_X1 = HOUSE_X1 - NUKETOWN2_COPLANAR_RELIEF_M;
+  const FLOOR_FRONT_Z = HOUSE_FRONT_Z - NUKETOWN2_COPLANAR_RELIEF_M;
+  const FLOOR_BACK_Z = HOUSE_BACK_Z + NUKETOWN2_COPLANAR_RELIEF_M;
   pair(builder, 'house upper floor east',
-    [(STAIR_X1 + HOUSE_X1) / 2, GROUND_H + FLOOR_T / 2, zMid],
-    [HOUSE_X1 - STAIR_X1, FLOOR_T, HOUSE_DEPTH], m.interior);
+    [(STAIR_X1 + FLOOR_X1) / 2, GROUND_H + FLOOR_T / 2, (FLOOR_FRONT_Z + FLOOR_BACK_Z) / 2],
+    [FLOOR_X1 - STAIR_X1, FLOOR_T, FLOOR_FRONT_Z - FLOOR_BACK_Z], m.interior);
   pair(builder, 'house upper floor west back',
-    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (HOUSE_BACK_Z + STAIRWELL_Z0) / 2],
-    [STAIR_X1 - HOUSE_X0, FLOOR_T, STAIRWELL_Z0 - HOUSE_BACK_Z], m.interior);
+    [(FLOOR_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (FLOOR_BACK_Z + STAIRWELL_Z0) / 2],
+    [STAIR_X1 - FLOOR_X0, FLOOR_T, STAIRWELL_Z0 - FLOOR_BACK_Z], m.interior);
   pair(builder, 'house upper floor west front',
-    [(HOUSE_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (STAIR_HEAD_Z + HOUSE_FRONT_Z) / 2],
-    [STAIR_X1 - HOUSE_X0, FLOOR_T, HOUSE_FRONT_Z - STAIR_HEAD_Z], m.interior);
+    [(FLOOR_X0 + STAIR_X1) / 2, GROUND_H + FLOOR_T / 2, (STAIR_HEAD_Z + FLOOR_FRONT_Z) / 2],
+    [STAIR_X1 - FLOOR_X0, FLOOR_T, FLOOR_FRONT_Z - STAIR_HEAD_Z], m.interior);
 
   // --- internal partitions, both storeys, one doorway each -----------------
   const PARTITION_Z = zMid;
@@ -2172,18 +2199,23 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   pair(builder, 'house upper back ceiling light lens', [-1.25, ROOF_Y0 - 0.07, -19.5], [0.95, 0.02, 0.55], m.warmLight,
     { solid: false, shots: false, cast: false });
 
-  // Doorway architrave casings (symmetrical trim on both jambs and head):
+  // Doorway architrave casings (symmetrical trim on both jambs and head).
+  // HF-536: each jamb casing stands NUKETOWN2_COPLANAR_RELIEF_M proud of the
+  // reveal it lines. Flush, its inner face was exactly coplanar with the
+  // partition's doorway edge - 0.72 m2 of depth race at eye height in the one
+  // opening every player walks through, on both storeys of both houses. Proud
+  // is also the joinery: an architrave sits on the reveal, not in it.
   // Ground partition door (door height is 2.4 m):
-  pair(builder, 'house ground door casing left', [-2.7 - 0.9 - 0.03, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+  pair(builder, 'house ground door casing left', [-2.7 - 0.9 - 0.03 + NUKETOWN2_COPLANAR_RELIEF_M, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'house ground door casing right', [-2.7 + 0.9 + 0.03, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+  pair(builder, 'house ground door casing right', [-2.7 + 0.9 + 0.03 - NUKETOWN2_COPLANAR_RELIEF_M, DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house ground door casing head', [-2.7, DOOR_HEAD_Y + 0.05, PARTITION_Z], [1.92, 0.10, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
   // Upper partition door (door height is 2.4 m, well below 6.2 ceiling):
-  pair(builder, 'house upper door casing left', [-2.7 - 0.9 - 0.03, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+  pair(builder, 'house upper door casing left', [-2.7 - 0.9 - 0.03 + NUKETOWN2_COPLANAR_RELIEF_M, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
-  pair(builder, 'house upper door casing right', [-2.7 + 0.9 + 0.03, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
+  pair(builder, 'house upper door casing right', [-2.7 + 0.9 + 0.03 - NUKETOWN2_COPLANAR_RELIEF_M, UPPER_Y0 + DOOR_HEAD_Y / 2, PARTITION_Z], [0.06, DOOR_HEAD_Y, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house upper door casing head', [-2.7, UPPER_Y0 + DOOR_HEAD_Y + 0.05, PARTITION_Z], [1.92, 0.10, WALL_T + 0.04], m.trim,
     { solid: false, shots: false, cast: true });
