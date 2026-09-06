@@ -32,7 +32,21 @@
 //   DYNAMIC_ONLY   below REGION_CHANGED floor - consistent with actor noise
 //   REGION_CHANGED one or more solid regions moved - read the composite
 //   GLOBAL_CHANGED whole-frame shift - near-certain real change
+//   NEWLY_BLACK    the candidate CLAMPED a lit surface to black - see below
 //   MISSING        a side lacks the capture
+//
+// NEWLY-CLAMPED-BLACK, added HF-535. A grayscale delta cannot tell "the road
+// is a different colour" from "the road is now NaN and the driver clamped it
+// to zero", and the two have opposite verdicts. Rejected commit 947b937f cured
+// a black roof by turning 206,067 px of nuketown2-coach-elevation (22.4% of
+// the frame), 193,130 px of vehicle-far and 140,174 px of street-centre to
+// max-channel <= 6, and drove north-yard grass to 100% R=0 B=0 - and this
+// instrument reported it as DIFFS, the same word a legitimate visual change
+// earns. So the newly-black AREA is now measured per station in RGB and it
+// FAILS on its own tier: a pixel counts when EVERY base sample has
+// max(r,g,b) > newlyBlackFloor and EVERY candidate sample has it <= floor.
+// `healedFraction` is the same measurement with the sides swapped, reported
+// so a genuine repair is visible next to whatever it cost.
 //
 // Usage:
 //   node scripts/qa/diff-arena-viewpoints.mjs \
@@ -55,7 +69,26 @@ export const THRESHOLDS = Object.freeze({
   regionGlobal: 0.15,    // >=15% of frame in >32-delta pixels is GLOBAL_CHANGED
   deltaHard: 32,
   deltaSoft: 8,
+  newlyBlackFloor: 6,      // max-channel <= 6 is the driver's NaN/zero clamp
+  newlyBlackFraction: 0.005, // >=0.5% of frame newly clamped black FAILS
 });
+
+// Per-pixel max(r,g,b) at analysis resolution. Grayscale luminance weights the
+// channels and would read a pure-red surface as dark; the clamp signature this
+// gate looks for is ALL channels at zero, so the max channel is the right
+// statistic and the only one that separates "dark" from "clamped".
+const maxChannel = async (path) => {
+  const { data } = await sharp(path)
+    .resize(ANALYSIS_W, ANALYSIS_H, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const out = new Uint8Array(ANALYSIS_W * ANALYSIS_H);
+  for (let i = 0, p = 0; i < out.length; i += 1, p += 3) {
+    out[i] = Math.max(data[p], data[p + 1], data[p + 2]);
+  }
+  return out;
+};
 
 const grayscale = async (path) => new Promise((resolvePromise, rejectPromise) => {
   sharp(path)
@@ -106,6 +139,10 @@ function largestRegion(over) {
 // diluted by a quiet global mean, and a whole-frame exposure/grade wash
 // (meanAbsDelta >= 6, the r2-calibrated floor) blocks even without one.
 export function verdictFor(metrics) {
+  // Hardest tier, and it runs FIRST: a surface the candidate clamps to black
+  // is a rendering DEFECT, not a visual change, and it must never be diluted
+  // into the same word as a legitimate diff.
+  if ((metrics.newlyBlackFraction ?? 0) >= THRESHOLDS.newlyBlackFraction) return 'NEWLY_BLACK';
   if (metrics.largestRegionFraction >= THRESHOLDS.regionGlobal) return 'GLOBAL_CHANGED';
   if (metrics.meanAbsDelta >= 6) return 'GLOBAL_CHANGED';
   if (metrics.largestRegionFraction >= THRESHOLDS.regionMin) return 'REGION_CHANGED';
@@ -125,6 +162,8 @@ export async function comparePair(basePngs, candPngs) {
   const cands = Array.isArray(candPngs) ? candPngs : [candPngs];
   const [firstBase, ...otherBases] = await Promise.all(bases.map(grayscale));
   const candFrames = await Promise.all(cands.map(grayscale));
+  const baseMax = await Promise.all(bases.map(maxChannel));
+  const candMax = await Promise.all(cands.map(maxChannel));
   const n = firstBase.length;
   const over32 = new Uint8Array(n);
   const persistenceMin = new Uint8Array(n);
@@ -143,9 +182,39 @@ export async function comparePair(basePngs, candPngs) {
     if (d > THRESHOLDS.deltaHard) { over32[i] = 1; hard += 1; }
     if (d > THRESHOLDS.deltaSoft) soft += 1;
   }
+  // Newly-clamped-black, and its mirror. Persistence rule matches the delta
+  // metrics: a pixel counts only when EVERY sample on the relevant side agrees,
+  // so a single dark frame or one bot walking through cannot manufacture it.
+  const floor = THRESHOLDS.newlyBlackFloor;
+  const newlyBlack = new Uint8Array(n);
+  let blackened = 0; let healed = 0;
+  let bx0 = Infinity; let by0 = Infinity; let bx1 = -1; let by1 = -1;
+  for (let i = 0; i < n; i += 1) {
+    let baseAllLit = true; let baseAllBlack = true;
+    for (const frame of baseMax) {
+      if (frame[i] <= floor) baseAllLit = false; else baseAllBlack = false;
+    }
+    let candAllBlack = true; let candAllLit = true;
+    for (const frame of candMax) {
+      if (frame[i] > floor) candAllBlack = false; else candAllLit = false;
+    }
+    if (baseAllLit && candAllBlack) {
+      newlyBlack[i] = 1;
+      blackened += 1;
+      const x = i % ANALYSIS_W; const y = (i / ANALYSIS_W) | 0;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+      if (y < by0) by0 = y; if (y > by1) by1 = y;
+    }
+    if (baseAllBlack && candAllLit) healed += 1;
+  }
   const region = largestRegion(over32);
   return {
     metrics: {
+      newlyBlackFraction: Number((blackened / n).toFixed(5)),
+      newlyBlackPixels: blackened,
+      newlyBlackBox: blackened > 0 ? { x: bx0, y: by0, w: bx1 - bx0 + 1, h: by1 - by0 + 1 } : null,
+      healedFraction: Number((healed / n).toFixed(5)),
+      healedPixels: healed,
       meanAbsDelta: Number((sum / n).toFixed(3)),
       ratioOver8: Number((soft / n).toFixed(5)),
       ratioOver32: Number((hard / n).toFixed(5)),
@@ -273,7 +342,7 @@ async function main() {
       entry.metrics = metrics;
       entry.samplesUsed = { base: bPaths.length, candidate: cPaths.length };
       entry.verdict = verdictFor(metrics);
-      if (entry.verdict === 'REGION_CHANGED' || entry.verdict === 'GLOBAL_CHANGED') {
+      if (entry.verdict === 'REGION_CHANGED' || entry.verdict === 'GLOBAL_CHANGED' || entry.verdict === 'NEWLY_BLACK') {
         entry.composite = resolve(OUT_DIR, `${arena}__${cameraId}.png`);
         await writeComposite(bPaths[0], cPaths[0], entry.composite, persistenceMin);
       }
@@ -283,8 +352,12 @@ async function main() {
 
   const counts = {};
   for (const entry of comparisons) counts[entry.verdict] = (counts[entry.verdict] ?? 0) + 1;
-  const blocking = ['REGION_CHANGED', 'GLOBAL_CHANGED', 'MISSING'];
-  const verdict = comparisons.some((c) => blocking.includes(c.verdict)) ? 'DIFFS' : 'CLEAN';
+  const blocking = ['NEWLY_BLACK', 'REGION_CHANGED', 'GLOBAL_CHANGED', 'MISSING'];
+  // FAIL outranks DIFFS: a station the candidate clamps to black is a defect,
+  // and it must not be reported with the same word as a legitimate change.
+  const verdict = comparisons.some((c) => c.verdict === 'NEWLY_BLACK')
+    ? 'FAIL'
+    : (comparisons.some((c) => blocking.includes(c.verdict)) ? 'DIFFS' : 'CLEAN');
   const report = {
     contract: 'arena-viewpoint-regression-diff-v1',
     verdict,
@@ -303,7 +376,9 @@ async function main() {
     if (!blocking.includes(entry.verdict)) continue;
     const m = entry.metrics;
     console.error(`[viewpoint-diff] ${entry.verdict.padEnd(14)} ${entry.arena}/${entry.cameraId}`
-      + (m ? ` mean=${m.meanAbsDelta} r32=${m.ratioOver32} region=${m.largestRegionFraction}` : ` (${entry.missingSide} missing)`));
+      + (m ? ` mean=${m.meanAbsDelta} r32=${m.ratioOver32} region=${m.largestRegionFraction}`
+        + ` newlyBlack=${m.newlyBlackFraction} (${m.newlyBlackPixels}px) healed=${m.healedFraction}`
+        : ` (${entry.missingSide} missing)`));
   }
   process.exit(verdict === 'CLEAN' ? 0 : 1);
 }

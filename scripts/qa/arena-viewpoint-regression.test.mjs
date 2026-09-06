@@ -196,6 +196,12 @@ test('diff thresholds stay at calibrated strictness', async () => {
     regionGlobal: 0.15,
     deltaHard: 32,
     deltaSoft: 8,
+    // HF-535, ADDED not loosened: newly-clamped-black area per station. Every
+    // value above is untouched. 947b937f blackened 22.4% of a frame and this
+    // instrument said DIFFS; 0.5% is two orders of magnitude below that and
+    // above any measured same-build self-diff.
+    newlyBlackFloor: 6,
+    newlyBlackFraction: 0.005,
   });
 });
 
@@ -224,6 +230,12 @@ test('diff gates verdicts on cross-sample persistence at unchanged strictness', 
     regionGlobal: 0.15,
     deltaHard: 32,
     deltaSoft: 8,
+    // HF-535, ADDED not loosened: newly-clamped-black area per station. Every
+    // value above is untouched. 947b937f blackened 22.4% of a frame and this
+    // instrument said DIFFS; 0.5% is two orders of magnitude below that and
+    // above any measured same-build self-diff.
+    newlyBlackFloor: 6,
+    newlyBlackFraction: 0.005,
   });
 });
 
@@ -254,6 +266,36 @@ test('diff verdicts come from an exported verdictFor pinned to the documented ti
   );
   assert.equal(verdictFor({ ...quiet, meanAbsDelta: 6 }), 'GLOBAL_CHANGED',
     'a whole-frame exposure/grade wash must read GLOBAL_CHANGED');
+  // HF-535: a candidate that CLAMPS a lit surface to black outranks every
+  // other tier, so a relocation like 947b937f can never read as a plain diff.
+  assert.equal(
+    verdictFor({ ...quiet, newlyBlackFraction: THRESHOLDS.newlyBlackFraction }),
+    'NEWLY_BLACK',
+    'newly-clamped-black area at the floor must read NEWLY_BLACK',
+  );
+  assert.equal(
+    verdictFor({ ...quiet, newlyBlackFraction: THRESHOLDS.newlyBlackFraction, largestRegionFraction: THRESHOLDS.regionGlobal }),
+    'NEWLY_BLACK',
+    'newly-black must not be diluted into GLOBAL_CHANGED',
+  );
+  assert.equal(
+    verdictFor({ ...quiet, newlyBlackFraction: THRESHOLDS.newlyBlackFraction * 0.5 }),
+    'MATCH',
+    'below the newly-black floor the other tiers still decide',
+  );
+});
+
+test('the diff FAILS, not merely DIFFS, when a station is newly clamped black', () => {
+  const source = readFileSync(resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'), 'utf8');
+  // The skeptic finding this closes: 108 + 212 green unit tests, a green
+  // pipeline-budget gate and a green fidelity gate all passed on a build that
+  // turned 206,067 px of one station black, and the only instrument that saw
+  // anything said 'DIFFS' - the same word a legitimate change earns.
+  assert.match(source, /NEWLY_BLACK/);
+  assert.match(source, /newlyBlackFraction/);
+  assert.match(source, /maxChannel/);
+  assert.match(source, /'FAIL'/);
+  assert.match(source, /blocking = \['NEWLY_BLACK'/);
 });
 
 test('persistence is symmetric: transient change on EITHER side is absorbed', async () => {
