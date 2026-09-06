@@ -295,30 +295,12 @@ export const SKY_BACKDROP_GRADIENTS: Readonly<Record<SkyBackdropPreset, readonly
   // Reference luma/saturation before -> after: zenith 66/79% -> 50/85%,
   // 0.30 100/60% -> 81/71%, 0.40 118/45% -> 104/58%, 0.462 145/27% (warm)
   // -> 133/10% (neutral). Pinned in src/nuketown2-look-tonal-match.test.ts.
-  //
-  // CORRECTION ROUND, same day, MEASURED: the first move landed sky p50 at a
-  // mean +15.5 of the boards (was +21.7) — real, and not enough, because the
-  // sky pixel is mostly HAZE, not texture. The aerial-perspective inscatter is
-  // additive and takes the fog colour at a sightline the sky is effectively at
-  // infinity along, so roughly a third of the delivered sky value never passes
-  // through these stops at all. The five above-horizon stops are therefore
-  // scaled by 0.86 IN LUMA WITH THE CHANNEL RATIOS PRESERVED — hue and HSV
-  // saturation are byte-for-byte unchanged (85/78/71/57/10 before and after),
-  // because saturation OVERSHOT on the first move (mean sky saturation went
-  // from 12.7% under the boards to 13.4% over) and must not be pushed again.
-  // Luma 54/67/84/106/134 -> 46/58/72/91/115. The warm horizon flare at 0.482
-  // and 0.4985 is NOT scaled: it is the golden hour and it is already right.
-  // SAFE ON THE SHADOW FLOOR BY EVIDENCE, not by hope: the first move darkened
-  // this same band by 14% and the worst ground-box p10 over 29 stations stayed
-  // at exactly 11 of 255, unmoved — which is the measurement saying the PMREM'd
-  // background contributes essentially nothing to the shaded ground on this
-  // route, so a second 14% cannot spend a floor the first one did not touch.
   'nuketown2-golden-hour': Object.freeze([
-    [0, '#0f3265'],
-    [0.16, '#193e73'],
-    [0.30, '#254d7e'],
-    [0.40, '#3a608a'],
-    [0.462, '#7b707c'],
+    [0, '#123a75'],
+    [0.16, '#1d4886'],
+    [0.30, '#2b5a93'],
+    [0.40, '#4470a0'],
+    [0.462, '#8f8290'],
     [0.482, '#d28d55'],
     [0.4985, '#edb069'],
     [0.506, '#eab89e'],
