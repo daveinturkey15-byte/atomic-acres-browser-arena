@@ -27,6 +27,17 @@ const criticKeep = {
 };
 
 describe('keep-rule', () => {
+  it('waives ONLY a declared protected box and prints the waiver', () => {
+    const prev = scoreWith({ st2: { file: 'st2.png', newlyBlack: 0, healed: 0, boxes: { sky: box(150, 10), road: box(40, 5) } } });
+    const cand = scoreWith({ st2: { file: 'st2.png', newlyBlack: 0, healed: 0, boxes: { sky: box(120, 10), road: box(40, 5) } } });
+    const undeclared = decide(prev, cand, { critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'] });
+    assert.equal(undeclared.verdict, 'FAIL');
+    const declared = decide(prev, cand, { critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'], declaredMoves: ['st2::sky'] });
+    assert.equal(declared.verdict, 'KEEP');
+    assert.ok(declared.reasons.some((r) => r.startsWith('DECLARED move st2::sky')));
+    const wrongBox = decide(prev, cand, { critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'], declaredMoves: ['st2::road'] });
+    assert.equal(wrongBox.verdict, 'FAIL');
+  });
   it('KEEPs a targeted-axis gain on two judged stations', () => {
     const prev = scoreWith();
     const cand = scoreWith();

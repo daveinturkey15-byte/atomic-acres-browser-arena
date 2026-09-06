@@ -4,7 +4,11 @@
 // Usage:
 //   node scripts/forge/keep-rule.mjs --prev <score.json> --candidate <score.json> \
 //     [--critic <critic.json> --target-axis <axis> --judged <station,station>] \
-//     [--newly-black-fail 0.005]
+//     [--newly-black-fail 0.005] [--declared-moves station::box,station::box]
+//
+//   --declared-moves waives the protected-box gate for the named boxes ONLY,
+//   because the pass brief declares them as its targets (e.g. every sky box for
+//   a sky-preset pass). Each waiver is printed as a DECLARED reason line.
 //
 // Verdicts:
 //   FAIL - a hard gate tripped: a station gained newly-black area at or above
@@ -40,6 +44,7 @@ export function decide(prev, cand, options = {}) {
   const failReasons = [];
   const holdReasons = [];
   const newlyBlackFail = options.newlyBlackFail ?? 0.005;
+  const declaredMoves = new Set(options.declaredMoves ?? []);
   const prevStations = prev.stations ?? {};
   const candStations = cand.stations ?? {};
 
@@ -62,6 +67,13 @@ export function decide(prev, cand, options = {}) {
     }
     for (const [name, box] of Object.entries(candStations[station].boxes ?? {}).sort()) {
       if (!box.protected) continue;
+      if (declaredMoves.has(`${station}::${name}`)) {
+        // A pass may DECLARE that a protected box is one of its targets (e.g. a
+        // global sky preset change). The declaration is printed so the verdict
+        // shows exactly which protections were waived; nothing else is relaxed.
+        reasons.push(`DECLARED move ${station}::${name}: protected-box gate waived by the pass brief`);
+        continue;
+      }
       const pb = p.boxes?.[name];
       if (!pb) {
         failReasons.push(`FAIL protected box ${station}::${name} missing from previous-kept score`);
@@ -136,10 +148,12 @@ async function main() {
   const criticPath = arg('--critic');
   const critic = criticPath ? read(criticPath) : null;
   const judged = (arg('--judged', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const declaredMoves = (arg('--declared-moves', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const { verdict, reasons } = decide(prev, cand, {
     critic,
     targetAxis: arg('--target-axis'),
     judged,
+    declaredMoves,
     newlyBlackFail: Number(arg('--newly-black-fail', '0.005')),
   });
   process.stdout.write(`VERDICT: ${verdict}\n${reasons.map((r) => `- ${r}\n`).join('')}`);
