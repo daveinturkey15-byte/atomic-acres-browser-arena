@@ -100,5 +100,18 @@ export function reliefNormal(heightM: any): any {
   const r2 = vN.cross(sigmaX);
   const fDet = sigmaX.dot(r1).mul(faceDirection);
   const vGrad = fDet.sign().mul(gx.mul(r1).add(gy.mul(r2)));
-  return fDet.abs().mul(vN).sub(vGrad).normalize();
+  const perturbed = fDet.abs().mul(vN).sub(vGrad);
+
+  // DEGENERATE-FRAME GUARD, and it is not defensive padding. Three's own
+  // `perturbNormalArb` ends on a bare `.normalize()`, and `normalize(vec3(0))`
+  // is NaN. `fDet` is the determinant of the screen-space tangent frame, so it
+  // is exactly zero on a degenerate triangle, on a face seen perfectly
+  // edge-on, and on the first quad of a freshly-resized target - and a NaN
+  // normal is a black pixel that spreads with the lighting, which is precisely
+  // the failure class this arena has been chasing all day
+  // (gotcha-nuketown2-black-roofs-shader-program-set: an exact-zero NaN whose
+  // victim moves with the program set). Falling back to the geometric normal
+  // costs one compare and closes the class.
+  const len = length(perturbed);
+  return len.greaterThan(float(1e-6)).select(perturbed.div(len), vN);
 }

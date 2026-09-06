@@ -88,3 +88,74 @@ table, plus every id predicate — `npx tsc --noEmit` names the ones you miss if
 exhaustive over the union.
 
 **[OPEN]** Realised effect on the into-sun sky box is not yet measured — see the pass report.
+
+---
+
+## R-005 — A structural feature that lives only in albedo is a picture of a surface
+
+**Subject:** the whole map reading as flat, "Roblox or something 20 years old" (owner, 2026-09-06
+18:05). **Pass:** `night-materials`. **Files:** `src/nuketown2-materials/relief.ts` (new), the six
+family graphs under `families/`.
+
+**The finding.** The families were not short of detail. Asphalt had tar seams, cold patches, wheel
+paths and cracks; siding had lap courses, drip shadows, nails and butt joints; blockwork had mortar
+joints in half bond; the roof had shingle courses and keyways. Every one of those was an **albedo
+step and nothing else** — `grep -rn 'normalNode' src/nuketown2-materials` returned nothing. An
+albedo step is the same value from every direction at every sun angle, so a mortar joint painted
+into the colour is a printed line on a card. Under a 14° key the thing that says "wall" is that the
+joint is *recessed*: the top lip shades, the bottom lip catches, and the pair flips as the sun moves.
+
+**Method.** One shared node, `reliefNormal(heightM)`: Mikkelsen's surface-gradient bump
+(mm_sfgrad_bump.pdf listing 2 — the same maths as three's own `perturbNormalArb`) evaluated on an
+arbitrary scalar height node instead of a texture fetch, because three's `bumpMap()` takes a
+`TextureNode` and re-samples it, and our height is a composition of a dozen procedural terms.
+
+Two decisions worth copying:
+1. **World-rate gradients.** `dFdx(height)` is divided by `|dFdx(positionView)|`, the world size of
+   one pixel, so `dH/dx` is a slope in m/m. That is what lets a family author "the mortar joint is
+   5 mm deep" and get 5 mm at every range, and what lets a test pin the number. Three's own bump
+   node skips the divide and its strength therefore drifts with distance and resolution.
+2. **Clamp the slope.** A lap course or a shingle butt is a genuine STEP; differentiated across one
+   pixel that is an unbounded slope (a 10 mm step at 2 m spans a 1.2 mm pixel → slope 8) and the
+   normal flips past grazing and sparkles. `MAX_RELIEF_SLOPE = 2.5` (tan 68°) keeps the step as a
+   hard lit/shadow pair that can never render as a hole.
+
+**Why not a normal map.** Six families × one sampler is six against a device budget that rejects
+`requestDevice` **silently** at 17 samplers and rolls the arena back with no error text
+(gotcha `silent-arena-rollback-device-limit`). This costs zero samplers, zero textures, zero load.
+
+**Constants (metres, all real dimensions per R17):** siding lap proud 0.010 (11 mm milled butt);
+shingle butt proud 0.004; mortar recess −0.005 (struck joint); sawn slab joint −0.006; tar-seam
+overband +0.003; cold-patch +0.004; road aggregate ±0.0012; timber board gap −0.019; door panel
+joint −0.006; marking film 0.0028; orange peel 0.00006.
+
+**Cost:** program-set delta 8 → 8 registry family graph keys, 43 → 43 distinct arena graphs, six
+keys replaced, zero net new.
+
+---
+
+## R-006 — Author the scale the frame actually reads, not the scale the spec table has a row for
+
+**Subject:** the carriageway reading as one flat value at 8–25 m. **Pass:** `night-materials`.
+**Files:** `src/nuketown2-materials/families/asphalt.ts`.
+
+**The finding.** `wear.ts` fades grain out by 3 m and scuffs by 18 m, which is correct — below those
+ranges they alias. But asphalt's three authored scales are 1.0 mm / 35 mm / 2.6 m, so from the
+distance every street station actually views the road, the **only** live term was the 2.6 m traffic
+gradient. One term at one scale across a 40 m plane. The bands in `spec.ts` (grain 0.5–1.5 mm,
+scuff 20–80 mm, traffic 0.5–3 m) are a *vocabulary*, not a complete description: a family is free to
+add a term at the size its own material is made of, and asphalt's is 10–20 mm stone.
+
+**Method.** `AGGREGATE_M 0.022` (fitted to the generated reference tile's autocorrelation feature
+size, 31 mm at an assumed 2 m span), ±8.5 % albedo, +0.12 roughness, 1.2 mm relief, faded 14 → 30 m
+rather than the scuff's 18 m because at 22 mm it is still 3.6 px at 20 m — above the 2 px floor.
+
+**Same trap, second instance: the markings.** Paint wear rode `wear.scuff`, so it was gone beyond
+18 m — and every station the critic scores a lane marking from is further away than that. That is
+the entire mechanism behind gap #3, "razor-sharp unweathered dashed centre line". Paint loss now
+rides its own field carried to 44 m, thresholded to a **measured** 0.30 of the bar (scanned over the
+shipped LUT, pinned in `relief.test.ts`), with the chip edge modulated by the *road's own* aggregate
+noise so the bar and the surface under it are one material and not two.
+
+**The general rule.** Before adding contrast, check whether the term you are strengthening is even
+alive at the range the frame reads it from. Twice on this map the answer was no.
