@@ -27,9 +27,15 @@ import {
   AVENUE_RECT_MARGIN_M,
   AVENUE_TREE_BUDGET,
   HEDGE_SPECIES,
+  LEAF_ALPHA_TEST,
+  LEAF_ATLAS_CELLS,
+  LEAF_ATLAS_SIZE,
+  LEAF_SPRIG_CARDS,
   NUKETOWN2_HEDGE_DRESSING,
   TREE_SPECIES,
   buildNuketown2Vegetation,
+  createLeafAtlasData,
+  leafSprigGeometry,
   nuketown2AvenueTreePositions,
 } from './nuketown2-vegetation';
 
@@ -102,8 +108,11 @@ describe('Nuke Town Rebuild vegetation', () => {
       vegetationNodes += 1;
       expect(node.userData.presentationOnly, node.name).toBe(true);
     });
-    // 8 hedge runs x (1 LOD + 3 meshes) + 4 avenue sectors x (1 + 3) = 48.
-    expect(vegetationNodes).toBe(48);
+    // 8 hedge runs x (1 LOD + 3 meshes) + 4 avenue sectors x (1 + 3) = 48,
+    // plus HF-536 look-2b's ONE leaf-card InstancedMesh = 49. The count is
+    // still an EXACT pin, and it still fails if anything else appears under
+    // either prefix - which is the property it was written to defend.
+    expect(vegetationNodes).toBe(49);
     for (const mesh of bare.raycastMeshes) {
       expect(mesh.name.startsWith('nuketown2-hedges')).toBe(false);
       expect(mesh.name.startsWith('nuketown2-avenue')).toBe(false);
@@ -191,10 +200,16 @@ describe('Nuke Town Rebuild vegetation', () => {
     // Worst case = every one of the 12 LODs showing level 0 at once. It is a
     // BOUND, not the normal case: the four avenue sectors are 40 m apart and
     // cannot all be inside one camera's 26 m near tier.
-    expect(vegetation.stats.worstCaseDrawCalls).toBe(12);
+    // 12 LODs + HF-536 look-2b's ONE leaf-card InstancedMesh, which covers all
+    // eight hedge runs from a single instanced draw rather than one per run.
+    expect(vegetation.stats.worstCaseDrawCalls).toBe(13);
     // Measured 2026-09-04: 40,376. The ceiling is that measurement plus ~11 %
     // headroom, and it is 7 % of the arena's 650 k triangle budget. If a future
     // edit blows it, the thing to change is the geometry, not this number.
+    // MEASURED AFTER look-2b: 44,384 (the leaf layer is 160 sprigs x 8 tris =
+    // 1,280 of that). The ceiling is NOT moved - the pass fits under the number
+    // it inherited, with 616 triangles to spare, and the next pass that wants
+    // more geometry here has to earn it rather than raise the bar.
     expect(vegetation.stats.worstCaseTriangles).toBeLessThan(45_000);
     vegetation.dispose();
   });
@@ -209,6 +224,139 @@ describe('Nuke Town Rebuild vegetation', () => {
     expect(HEDGE_TOP_TINT.g).toBeGreaterThan(HEDGE_TOP_TINT.b);
     // And the base is a deep clipped green, near-black in shadow.
     expect(HEDGE_SPECIES.color).toBe(0x33592b);
+  });
+
+  // -------------------------------------------------------------------------
+  // HF-536 look-2b: the procedurally drawn leaf atlas and the cards it feeds
+  // -------------------------------------------------------------------------
+
+  it('draws sixteen DIFFERENT leaf silhouettes into the atlas', () => {
+    const data = createLeafAtlasData();
+    const cell = LEAF_ATLAS_SIZE / LEAF_ATLAS_CELLS;
+    expect(data.length).toBe(LEAF_ATLAS_SIZE * LEAF_ATLAS_SIZE * 4);
+    const coverage: number[] = [];
+    for (let cy = 0; cy < LEAF_ATLAS_CELLS; cy += 1) {
+      for (let cx = 0; cx < LEAF_ATLAS_CELLS; cx += 1) {
+        let opaque = 0;
+        for (let py = 0; py < cell; py += 1) {
+          for (let px = 0; px < cell; px += 1) {
+            const alpha = data[(((cy * cell + py) * LEAF_ATLAS_SIZE) + (cx * cell + px)) * 4 + 3]!;
+            if (alpha >= LEAF_ALPHA_TEST * 255) opaque += 1;
+          }
+        }
+        coverage.push(opaque / (cell * cell));
+      }
+    }
+    expect(coverage.length).toBe(16);
+    for (const value of coverage) {
+      // A leaf, not a full square and not an empty cell. Measured band on the
+      // shipped atlas is 0.247..0.407.
+      expect(value).toBeGreaterThan(0.15);
+      expect(value).toBeLessThan(0.55);
+    }
+    // ...and no two cells are the same silhouette. Rounded to 1e-3, sixteen
+    // distinct coverages means sixteen distinct leaves.
+    expect(new Set(coverage.map((v) => v.toFixed(3))).size).toBe(16);
+  });
+
+  it('keeps a transparent gutter so no cell bleeds into its neighbour', () => {
+    // The failure this exists for, measured on the first cut: the leaf's BASE
+    // nub reached the bottom row of its own cell in all sixteen cells (four at
+    // alpha 255), so bilinear filtering and the mip chain smeared one leaf into
+    // the next cell and every card grew a grey fringe.
+    const data = createLeafAtlasData();
+    const cell = LEAF_ATLAS_SIZE / LEAF_ATLAS_CELLS;
+    let worst = 0;
+    for (let cy = 0; cy < LEAF_ATLAS_CELLS; cy += 1) {
+      for (let cx = 0; cx < LEAF_ATLAS_CELLS; cx += 1) {
+        for (let py = 0; py < cell; py += 1) {
+          for (let px = 0; px < cell; px += 1) {
+            const onBorder = px <= 1 || py <= 1 || px >= cell - 2 || py >= cell - 2;
+            if (!onBorder) continue;
+            worst = Math.max(worst, data[(((cy * cell + py) * LEAF_ATLAS_SIZE) + (cx * cell + px)) * 4 + 3]!);
+          }
+        }
+      }
+    }
+    expect(worst, 'the outer two texels of every atlas cell must be fully transparent').toBe(0);
+  });
+
+  it('instances the leaf cards as ONE draw inside the 80-per-run cap', () => {
+    const parent = new THREE.Group();
+    const vegetation = buildNuketown2Vegetation(parent);
+    const cards = vegetation.group.children.filter(
+      (node) => (node as THREE.InstancedMesh).isInstancedMesh === true
+        && node.name === 'nuketown2-hedges-leaf-cards',
+    ) as THREE.InstancedMesh[];
+    expect(cards.length, 'the whole leaf layer must be one instanced draw').toBe(1);
+    const mesh = cards[0]!;
+    // The brief's cap, and it is per RUN, not in total.
+    expect(vegetation.stats.leafCardsPerRun).toBeLessThanOrEqual(80);
+    expect(vegetation.stats.leafCards)
+      .toBe(vegetation.stats.leafCardsPerRun * NUKETOWN2_HEDGE_DRESSING.length * 2);
+    expect(mesh.userData.presentationOnly).toBe(true);
+    expect(mesh.userData.blocksShots).toBe(false);
+    // SHADOWS OFF, and this assertion is the record of WHY. three r185's
+    // WebGPU shadow pass sets scene.overrideMaterial to one shared opaque
+    // NodeMaterial with no alpha test (ShadowNode.js:746 ->
+    // ShadowFilterNode.js:196), so an alpha-tested card casts its whole quad.
+    expect(mesh.castShadow, 'an alpha-tested card would cast a solid rectangle on r185 WebGPU').toBe(false);
+    expect(mesh.receiveShadow).toBe(true);
+    // Frustum-culling gotcha: the bounds must wrap every instance, not the
+    // sprig at the origin. The runs span both halves of an 84 m map.
+    expect(mesh.boundingSphere).not.toBeNull();
+    expect(mesh.boundingSphere!.radius).toBeGreaterThan(8);
+    vegetation.dispose();
+  });
+
+  it('gives the sprig one atlas COLUMN per card and keeps it two triangles wide', () => {
+    const sprig = leafSprigGeometry();
+    const uvAttribute = sprig.getAttribute('uv');
+    expect(uvAttribute, 'the cards need UVs to address the atlas').toBeTruthy();
+    const triangleCount = sprig.index
+      ? sprig.index.count / 3
+      : sprig.getAttribute('position').count / 3;
+    expect(triangleCount).toBe(LEAF_SPRIG_CARDS * 2);
+    // Every u must land inside ONE atlas column, and the four cards must use
+    // FOUR different columns - otherwise the sprig is one leaf drawn 4 times.
+    const columns = new Set<number>();
+    for (let i = 0; i < uvAttribute.count; i += 1) {
+      const u = uvAttribute.getX(i);
+      const v = uvAttribute.getY(i);
+      expect(u).toBeGreaterThanOrEqual(-1e-6);
+      expect(u).toBeLessThanOrEqual(1 + 1e-6);
+      // Row 0 only: the material adds the row per instance.
+      expect(v).toBeLessThanOrEqual(1 / LEAF_ATLAS_CELLS + 1e-6);
+      columns.add(Math.round(u * LEAF_ATLAS_CELLS - 0.5));
+    }
+    expect(columns.size).toBeGreaterThanOrEqual(LEAF_SPRIG_CARDS);
+    sprig.dispose();
+  });
+
+  it('builds hedge lobes at two sizes with a lean, at the same triangle cost', () => {
+    // critic gap #5: "flat-shaded blobs". Two lobe sizes and a per-lobe lean
+    // break the row of identical domes. A lobe costs 80 triangles at ANY
+    // scale, so this must not have moved the LOD ordering or the ceiling -
+    // which the budget test above re-checks.
+    const parent = new THREE.Group();
+    const vegetation = buildNuketown2Vegetation(parent);
+    const lod = vegetation.group.children.find(
+      (node) => node.name === 'nuketown2-hedges-north-verge-front-hedge',
+    ) as THREE.LOD;
+    const near = (lod.levels[0]!.object as THREE.Mesh).geometry;
+    const position = near.getAttribute('position');
+    // Read the lobe band (above the clipped body top) and measure how many
+    // DISTINCT heights the lobe crowns sit at: one size and no lean would put
+    // every crown on one plane.
+    const run = NUKETOWN2_HEDGE_DRESSING.find((entry) => entry.id === 'verge front hedge')!;
+    const bodyTop = (run.topY + HEDGE_CLAD_TOP_M) * 0.88;
+    const crowns = new Set<string>();
+    for (let i = 0; i < position.count; i += 1) {
+      const y = position.getY(i);
+      if (y > bodyTop) crowns.add(y.toFixed(3));
+    }
+    expect(crowns.size, 'the lobe crowns must not all sit on one plane').toBeGreaterThan(12);
+    vegetation.dispose();
   });
 
   it('leans avenue trunks seed-stably without moving their stations', () => {

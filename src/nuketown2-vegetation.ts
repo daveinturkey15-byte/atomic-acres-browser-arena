@@ -65,6 +65,9 @@ import { NUKETOWN2_BOUNDS, nuketown2HandedX } from './nuketown2-layout';
 
 const {
   float,
+  floor,
+  fract,
+  instanceIndex,
   mix,
   normalize,
   positionLocal,
@@ -72,7 +75,10 @@ const {
   positionWorld,
   sin,
   smoothstep,
+  texture,
   uniform,
+  uv,
+  vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
 
@@ -104,6 +110,137 @@ export const AVENUE_MIN_SEPARATION_M = 4.6;
 
 /** Hard ceiling on avenue trunks, so this module cannot grow into a forest. */
 export const AVENUE_TREE_BUDGET = 54;
+
+// ---------------------------------------------------------------------------
+// HF-536 look-2b: the procedurally DRAWN leaf atlas
+// ---------------------------------------------------------------------------
+
+/** Atlas edge in texels. 4 x 4 cells of 128 => one leaf per 128^2 cell. */
+export const LEAF_ATLAS_SIZE = 512;
+/** Cells per axis. */
+export const LEAF_ATLAS_CELLS = 4;
+/** Alpha cut. Below this a texel is discarded, so the card has a leaf outline. */
+export const LEAF_ALPHA_TEST = 0.45;
+/** Quads in one instanced sprig (a small leaf cluster). */
+export const LEAF_SPRIG_CARDS = 4;
+/** Sprigs per hedge run. LEAF_SPRIG_CARDS x this is the brief's 80-card cap. */
+export const LEAF_SPRIGS_PER_RUN = 20;
+/** Half-edge of one leaf card, metres. */
+export const LEAF_CARD_HALF_M = 0.082;
+
+/**
+ * The atlas is COMPUTED, not painted on a canvas.
+ *
+ * `<canvas>` would have meant a `typeof document` guard, a silent no-texture
+ * path in node, and a generator no unit test could look inside. A plain
+ * Uint8Array filled by an ovate-leaf field is identical in the browser and in
+ * vitest, so `nuketown2-vegetation.test.ts` can assert the thing that actually
+ * matters - that every one of the 16 cells has leaf-shaped alpha coverage in a
+ * plausible band, that the cells DIFFER from one another, and that each cell's
+ * border is transparent so neighbours never bleed across a cell edge under
+ * bilinear filtering.
+ *
+ * Leaf model, per cell, in cell-local (u, v) with u,v in [-1, 1]:
+ *   t         = (v + 1) / 2, base (0) to tip (1)
+ *   halfWidth = A * sin(pi * t^shape) * (1 - taper * t)   ovate: widest below
+ *               the middle, drawn to a point at the tip
+ *   serrated  = halfWidth * (1 + 0.075 * sin(t * teeth + phase))
+ *   alpha     = 1 inside, ramped over ~2 texels at the edge
+ *   albedo    = a base-to-tip green ramp plus a lighter midrib at |u| < 0.055
+ * Every per-cell constant is a pure function of the cell index, so the atlas is
+ * deterministic and identical on every peer and every build.
+ */
+export function createLeafAtlasData(
+  size = LEAF_ATLAS_SIZE,
+  cells = LEAF_ATLAS_CELLS,
+): Uint8Array {
+  const data = new Uint8Array(size * size * 4);
+  const cell = size / cells;
+  for (let cy = 0; cy < cells; cy += 1) {
+    for (let cx = 0; cx < cells; cx += 1) {
+      const index = cy * cells + cx;
+      // Per-cell shape parameters. Spread over the 16 cells so no two leaves
+      // are the same silhouette - the row 24 "several species" property,
+      // applied inside one atlas.
+      const amplitude = 0.50 + (index % 5) * 0.055;
+      const shape = 0.60 + ((index * 3) % 7) * 0.045;
+      const taper = 0.22 + ((index * 5) % 4) * 0.075;
+      const teeth = 13 + (index % 6) * 3;
+      const phase = index * 1.37;
+      const lean = ((index % 3) - 1) * 0.16;
+      const hueShift = ((index % 4) - 1.5) * 0.055;
+      for (let py = 0; py < cell; py += 1) {
+        for (let px = 0; px < cell; px += 1) {
+          const u0 = (px + 0.5) / cell * 2 - 1;
+          const v = (py + 0.5) / cell * 2 - 1;
+          const t = (v + 1) / 2;
+          // Lean bends the midrib, so a cell is not mirror-symmetric.
+          const u = u0 - lean * t * t;
+          let half = amplitude * Math.sin(Math.PI * t ** shape) * (1 - taper * t);
+          half *= 1 + 0.075 * Math.sin(t * teeth + phase);
+          const d = Math.abs(u) - half;
+          // ~2-texel edge ramp; alphaTest turns it into a crisp outline while
+          // the ramp keeps the mip chain from eating the leaf at distance.
+          const edge = 2 / cell * 2;
+          let alpha = d <= -edge ? 1 : d >= 0 ? 0 : -d / edge;
+          // CELL GUTTER, measured not assumed. Without it the leaf's BASE nub
+          // touches the bottom row of its cell (probe: every one of the 16
+          // cells leaked, four at alpha 255), and bilinear filtering plus the
+          // mip chain then smears one cell's leaf into its neighbour's - which
+          // shows up as a grey fringe along every card, not as a leaf. Three
+          // texels of forced transparency on all four sides costs 4.6 % of the
+          // cell and removes the class.
+          const gutter = 3;
+          const fade = (Math.min(
+            px + 0.5, py + 0.5, cell - 0.5 - px, cell - 0.5 - py,
+          ) - 1.5) / gutter;
+          if (fade < 1) alpha *= Math.max(0, fade);
+          const write = ((cy * cell + py) * size + (cx * cell + px)) * 4;
+          if (alpha <= 0) {
+            data[write] = 0; data[write + 1] = 0; data[write + 2] = 0; data[write + 3] = 0;
+            continue;
+          }
+          // Base-to-tip value ramp plus a pale midrib.
+          const ramp = 0.62 + 0.38 * t;
+          const midrib = Math.abs(u) < 0.055 ? 0.22 : 0;
+          const r = Math.min(1, (0.29 + hueShift) * ramp + midrib * 0.5);
+          const g = Math.min(1, (0.55 + hueShift * 0.4) * ramp + midrib * 0.6);
+          const b = Math.min(1, (0.19 - hueShift * 0.5) * ramp + midrib * 0.35);
+          data[write] = Math.round(r * 255);
+          data[write + 1] = Math.round(g * 255);
+          data[write + 2] = Math.round(b * 255);
+          data[write + 3] = Math.round(alpha * 255);
+        }
+      }
+    }
+  }
+  return data;
+}
+
+let leafAtlasTexture: THREE.DataTexture | null = null;
+
+/**
+ * ONE atlas for the whole map, cached at module scope - the census in
+ * `docs/forge/sampler-census.json` is what admits it, and it admits exactly
+ * one. Building a second would spend a second sampler for no visual gain.
+ */
+export function nuketown2LeafAtlas(): THREE.DataTexture {
+  if (leafAtlasTexture) return leafAtlasTexture;
+  const texture = new THREE.DataTexture(
+    createLeafAtlasData(), LEAF_ATLAS_SIZE, LEAF_ATLAS_SIZE, THREE.RGBAFormat,
+  );
+  texture.name = 'nuketown2-leaf-atlas';
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  leafAtlasTexture = texture;
+  return texture;
+}
 
 // ---------------------------------------------------------------------------
 // Species (row 38's "species parameter sets", restated)
@@ -326,10 +463,16 @@ function mergeTransformed(
   return merged;
 }
 
-function place(x: number, y: number, z: number, yaw = 0, sx = 1, sy = 1, sz = 1): THREE.Matrix4 {
+function place(
+  x: number, y: number, z: number, yaw = 0, sx = 1, sy = 1, sz = 1,
+  // HF-536 look-2b: a lobe that only yaws stays a level row of identical
+  // domes. `tiltX`/`tiltZ` let a lobe lean, which is what makes a clipped
+  // hedge read as grown-and-cut rather than extruded.
+  tiltX = 0, tiltZ = 0,
+): THREE.Matrix4 {
   return new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z),
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(tiltX, yaw, tiltZ, 'YXZ')),
     new THREE.Vector3(sx, sy, sz),
   );
 }
@@ -374,17 +517,30 @@ function hedgeSegmentGeometry(level: 0 | 1 | 2, height: number, depth: number): 
   // height) so the run reads as a clipped flat top with crisp box corners
   // and a scalloped foliage ridge, not a row of puffs. Triangle counts are
   // untouched - only transforms move, so every LOD ordering pin still holds.
+  // HF-536 look-2b (critic gap #5, "flat-shaded blobs"). TWO LOBE SIZES and a
+  // LEAN. Every other lobe is a small infill lobe at 0.62 of the run lobe,
+  // dropped and pushed to the opposite face, and every lobe leans on both
+  // axes by a deterministic amount derived from its index. Triangle count is
+  // IDENTICAL - a lobe costs the same 80 triangles at any scale - so the LOD
+  // ordering pins and the 45 k worst-case ceiling are untouched; the only
+  // thing that changed is the transform, which is what buys the broken
+  // silhouette and the darker interstices between the lobes.
   for (let i = 0; i < lobeCount; i += 1) {
     const t = (i + 0.5) / lobeCount;
-    const off = (i % 2 === 0 ? 1 : -1) * depth * 0.14;
+    const small = i % 2 === 1;
+    const size = small ? 0.62 : 1;
+    const off = (small ? -1 : 1) * depth * (small ? 0.22 : 0.12);
+    const drop = small ? height * 0.055 : 0;
     parts.push({
       geom: lobe,
       matrix: place(
-        (t - 0.5) * 0.98, height * 0.87, off,
+        (t - 0.5) * 0.98, height * 0.87 - drop, off,
         i * 1.13,
-        lobeSpanX * (0.94 + (i % 3) * 0.08),
-        height * 0.24,
-        depth * (0.80 + (i % 2) * 0.12),
+        lobeSpanX * (0.94 + (i % 3) * 0.08) * size,
+        height * 0.24 * (small ? 0.78 : 1),
+        depth * (0.80 + (i % 2) * 0.12) * size,
+        ((i % 3) - 1) * 0.18,
+        ((i % 5) - 2) * 0.085,
       ),
     });
   }
@@ -392,6 +548,127 @@ function hedgeSegmentGeometry(level: 0 | 1 | 2, height: number, depth: number): 
   body.dispose();
   lobe.dispose();
   return merged;
+}
+
+/**
+ * One SPRIG: `LEAF_SPRIG_CARDS` alpha-tested quads fanned around a stem, each
+ * quad taking a DIFFERENT atlas COLUMN. The instance material then shifts the
+ * atlas ROW per instance, so 4 columns x 4 rows = 16 distinct leaf silhouettes
+ * are reachable from one geometry and one draw call.
+ *
+ * The quads' base sits at y = 0 and they lean outward, so a sprig reads as a
+ * small cluster growing out of the hedge ridge rather than as a billboard.
+ */
+export function leafSprigGeometry(
+  cards = LEAF_SPRIG_CARDS,
+  halfM = LEAF_CARD_HALF_M,
+): THREE.BufferGeometry {
+  const parts: { geom: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
+  const created: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < cards; i += 1) {
+    const quad = new THREE.PlaneGeometry(halfM * 2, halfM * 2, 1, 1);
+    quad.translate(0, halfM, 0);
+    // UV remap onto one atlas COLUMN of row 0. The material adds the row.
+    const attribute = quad.getAttribute('uv') as THREE.BufferAttribute;
+    const column = i % LEAF_ATLAS_CELLS;
+    for (let k = 0; k < attribute.count; k += 1) {
+      attribute.setXY(
+        k,
+        (column + attribute.getX(k)) / LEAF_ATLAS_CELLS,
+        attribute.getY(k) / LEAF_ATLAS_CELLS,
+      );
+    }
+    attribute.needsUpdate = true;
+    created.push(quad);
+    // Fanned over half a turn (the material is DoubleSide, so half a turn
+    // already covers every viewing angle) with an outward lean and a small
+    // radial offset, which is what stops the four quads reading as a cross.
+    const yaw = (i / cards) * Math.PI + 0.31;
+    const tilt = 0.34 + (i % 2) * 0.19;
+    const matrix = new THREE.Matrix4().compose(
+      new THREE.Vector3(Math.cos(yaw) * halfM * 0.45, halfM * 0.1 * (i % 3), Math.sin(yaw) * halfM * 0.45),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt, yaw, 0, 'YXZ')),
+      new THREE.Vector3(1, 1, 1),
+    );
+    parts.push({ geom: quad, matrix });
+  }
+  const merged = mergeTransformed(parts);
+  for (const geometry of created) geometry.dispose();
+  merged.name = 'nuketown2-leaf-sprig';
+  return merged;
+}
+
+/**
+ * The leaf-card material: the atlas, an alpha test, and the SAME wind graph
+ * the hedge body uses so the leaves ride the hedge instead of standing still
+ * on a swaying mass.
+ *
+ * SHADOWS ARE OFF ON PURPOSE, and this is a measured reason rather than a
+ * budget dodge. three r185's WebGPU shadow pass sets
+ * `scene.overrideMaterial = getShadowMaterial(light)`
+ * (`ShadowNode.js:746`), and that material is one shared `NodeMaterial` with
+ * `colorNode = vec4(0,0,0,1)` and no alpha test at all
+ * (`ShadowFilterNode.js:196-215`). An alpha-tested card therefore casts its
+ * WHOLE QUAD, so `castShadow = true` here would print rows of little black
+ * rectangles on the lawn. The hedge lobes underneath still cast the run's
+ * shadow, so nothing is lost by turning it off.
+ */
+function createLeafCardMaterial(): FoliageMaterial {
+  const atlas = nuketown2LeafAtlas();
+  if (webgl2CompatRoute()) {
+    return {
+      material: new THREE.MeshStandardMaterial({
+        map: atlas,
+        alphaTest: LEAF_ALPHA_TEST,
+        side: THREE.DoubleSide,
+        roughness: 0.86,
+        metalness: 0.02,
+      }),
+      time: null,
+    };
+  }
+  const mat = new MeshStandardNodeMaterial({
+    roughness: 0.86, metalness: 0.02, side: THREE.DoubleSide,
+  });
+  mat.name = 'nuketown2-leaf-cards';
+  mat.type = 'MeshStandardMaterial';
+  mat.alphaTest = LEAF_ALPHA_TEST;
+
+  // Per-instance atlas ROW: a hashed instance index quantised to one of the
+  // four rows. Costs one texture fetch's worth of address arithmetic and no
+  // extra sampler, attribute or draw.
+  const hash = fract(sin(float(instanceIndex).mul(12.9898).add(4.1414)).mul(43758.5453));
+  const row = floor(hash.mul(LEAF_ATLAS_CELLS)).div(LEAF_ATLAS_CELLS);
+  const sampled = texture(atlas, uv().add(vec2(float(0), row)));
+
+  const t = uniform(0);
+  const speed = HEDGE_SPECIES.windSpeed;
+  // Leaves are at the crown of the run, so they take the hedge's full bend
+  // rather than a height-masked fraction of it - a card has no height to mask.
+  const worldPhase = positionWorld.x.mul(0.31).add(positionWorld.z.mul(0.19));
+  const sway = sin(t.mul(1.15 * speed).add(worldPhase));
+  const wave = sin(positionWorld.x.mul(0.14).add(positionWorld.z.mul(0.10)).sub(t.mul(1.7 * speed)));
+  const gust = wave.mul(0.5).add(0.66).clamp(0.15, 1);
+  const turb = sin(t.mul(3.9 * speed).add(worldPhase.mul(2.3))).mul(0.32);
+  const hN = positionLocal.y.div(float(LEAF_CARD_HALF_M * 2)).clamp(0, 1);
+  const swayX = sway.add(turb).mul(gust).mul(hN).mul(float(HEDGE_SPECIES.swayM * 1.6));
+  const swayZ = sin(t.mul(0.93 * speed).add(worldPhase.mul(1.7)))
+    .sub(turb.mul(0.6)).mul(gust).mul(hN).mul(float(HEDGE_SPECIES.swayM * 1.3));
+  mat.positionNode = positionLocal.add(vec3(swayX, float(0), swayZ));
+
+  // The atlas already carries a base-to-tip value ramp; the hedge's own
+  // backlit translucency is added on top so the cards and the mass agree.
+  const L = normalize(vec3(-0.45, 0.62, -0.35));
+  const back = positionViewDirection.dot(L.negate()).clamp(0, 1).pow(3);
+  const sss = vec3(
+    ((HEDGE_SPECIES.sssColor >> 16) & 255) / 255,
+    ((HEDGE_SPECIES.sssColor >> 8) & 255) / 255,
+    (HEDGE_SPECIES.sssColor & 255) / 255,
+  ).mul(back).mul(float(HEDGE_SPECIES.sssStrength));
+  mat.colorNode = sampled.rgb.add(sss);
+  mat.opacityNode = sampled.a;
+
+  return { material: mat, time: t as unknown as { value: number } };
 }
 
 /** Nominal crown top of an unscaled avenue tree, in metres. */
@@ -577,6 +854,10 @@ export interface Nuketown2VegetationStats {
   hedgeSegments: number;
   avenueTrees: number;
   avenueSectors: number;
+  /** Alpha-tested leaf QUADS across every hedge run (HF-536 look-2b). */
+  leafCards: number;
+  /** Leaf quads on the busiest single run - the brief's <= 80 cap. */
+  leafCardsPerRun: number;
   /** Distinct silhouette families - the row 24 "several species" property. */
   species: number;
   /** Draw calls if EVERY LOD showed its level-0 mesh at once (a bound). */
@@ -686,6 +967,68 @@ export function buildNuketown2Vegetation(
     group.add(lod);
   }
 
+  // ---- leaf cards on every hedge ridge ------------------------------------
+  // ONE InstancedMesh for all eight runs, so the whole leaf layer is ONE draw
+  // call and ONE pipeline. The cards do not LOD: at 8 tris an instance the
+  // saving would be noise, and a second geometry would cost a second draw.
+  const cardMat = createLeafCardMaterial();
+  disposables.push(cardMat.material);
+  if (cardMat.time) times.push(cardMat.time);
+  const sprigsPerRun = reduced ? Math.round(LEAF_SPRIGS_PER_RUN * 0.5) : LEAF_SPRIGS_PER_RUN;
+  const sprigGeometry = leafSprigGeometry();
+  disposables.push(sprigGeometry);
+  const cardMatrix = new THREE.Matrix4();
+  const cardPos = new THREE.Vector3();
+  const cardQuat = new THREE.Quaternion();
+  const cardScale = new THREE.Vector3();
+  const cardEuler = new THREE.Euler();
+  const cardMesh = new THREE.InstancedMesh(
+    sprigGeometry, cardMat.material, hedgeRuns.length * sprigsPerRun,
+  );
+  cardMesh.name = 'nuketown2-hedges-leaf-cards';
+  cardMesh.userData.presentationOnly = true;
+  cardMesh.userData.blocksShots = false;
+  // See createLeafCardMaterial: r185's WebGPU shadow pass has ONE opaque
+  // override material with no alpha test, so an alpha-tested card would cast
+  // a solid rectangle. The lobes underneath carry the run's shadow.
+  cardMesh.castShadow = false;
+  cardMesh.receiveShadow = true;
+  let cardInstance = 0;
+  for (const { run } of hedgeRuns) {
+    const cardRng = mulberry32(NUKETOWN2_VEGETATION_SEED ^ 0x1eaf_c0de ^ (cardInstance * 0x9e37));
+    const alongX = run.width >= run.depth;
+    const length = (alongX ? run.width : run.depth) + HEDGE_CLAD_M * 2;
+    const thickness = (alongX ? run.depth : run.width) + HEDGE_CLAD_M * 2;
+    const worldX = handed ? nuketown2HandedX(run.x) : run.x;
+    // Sit the sprig base just BELOW the ridge so the leaves grow out of the
+    // clipped top rather than floating over it.
+    const ridgeY = run.topY + HEDGE_CLAD_TOP_M - LEAF_CARD_HALF_M * 0.55;
+    for (let s = 0; s < sprigsPerRun; s += 1) {
+      const t = (s + 0.5) / sprigsPerRun - 0.5;
+      const across = (cardRng() - 0.5) * thickness * 0.86;
+      const along = t * length + (cardRng() - 0.5) * (length / sprigsPerRun) * 0.7;
+      cardPos.set(
+        worldX + (alongX ? along : across),
+        ridgeY + (cardRng() - 0.5) * 0.035,
+        run.z + (alongX ? across : along),
+      );
+      cardEuler.set((cardRng() - 0.5) * 0.34, cardRng() * Math.PI * 2, (cardRng() - 0.5) * 0.34, 'YXZ');
+      cardQuat.setFromEuler(cardEuler);
+      const s0 = 0.78 + cardRng() * 0.44;
+      cardScale.set(s0, s0 * (0.86 + cardRng() * 0.3), s0);
+      cardMatrix.compose(cardPos, cardQuat, cardScale);
+      cardMesh.setMatrixAt(cardInstance, cardMatrix);
+      cardInstance += 1;
+    }
+  }
+  cardMesh.instanceMatrix.needsUpdate = true;
+  // Skill pitfall: without this the whole leaf layer inherits a 0.2 m bounding
+  // sphere at the origin and vanishes the moment the camera looks off-centre.
+  cardMesh.computeBoundingSphere();
+  group.add(cardMesh);
+  worstDraws += 1;
+  worstTriangles += triangles(sprigGeometry) * cardMesh.count;
+
   // ---- the avenue ---------------------------------------------------------
   const treeMat = createFoliageMaterial(TREE_SPECIES, TREE_HEIGHT_M);
   disposables.push(treeMat.material);
@@ -763,6 +1106,8 @@ export function buildNuketown2Vegetation(
     hedgeSegments,
     avenueTrees: positions.length,
     avenueSectors: sectors.filter((sector) => sector.length > 0).length,
+    leafCards: cardMesh.count * LEAF_SPRIG_CARDS,
+    leafCardsPerRun: sprigsPerRun * LEAF_SPRIG_CARDS,
     species: 2,
     worstCaseDrawCalls: worstDraws,
     worstCaseTriangles: worstTriangles,
