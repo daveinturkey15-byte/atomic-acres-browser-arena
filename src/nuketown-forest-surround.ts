@@ -106,8 +106,11 @@ export const FOREST_HEIGHT_JITTER = 0.22;
 export const FOREST_SUN_AZIMUTH = Object.freeze({ x: -0.79, z: -0.61 });
 
 /**
- * The four authored conifer albedos, darkest-first in the sense that matters:
- * 0x27412b is the one that reaches exact black on the cool flank.
+ * The four authored conifer albedos. Index 2 (0x27412b) is the one the floor
+ * below exists for: it is the tone the cool-flank bias takes closest to black.
+ * Measured 2026-09-06 at e9ba9cd8, it does NOT render black today - the
+ * darkest conifer pixel in the reviewed frames is max-channel 10 - but it gets
+ * there on the post chain's toe, with no albedo headroom of its own.
  */
 export const FOREST_CONIFER_TONES: readonly number[] = Object.freeze([
   0x2e4a30, 0x39573a, 0x27412b, 0x435f41,
