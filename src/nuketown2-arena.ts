@@ -218,6 +218,12 @@ import {
   type StreetSignRole,
   streetSignPropPlacements,
 } from './forge-kit';
+// HF-536 night-muse-street: street wear kit
+import {
+  type StreetPart,
+  type StreetRole,
+  streetPropPlacements,
+} from './forge-kit';
 import {
   type ForgedVehicle,
   COACH_SPEC,
@@ -3906,6 +3912,12 @@ function street(builder: Builder, m: Nuketown2Materials): void {
     if (piece.paired === false) centred(builder, piece.id, position, size, material, decal);
     else pair(builder, piece.id, position, size, material, decal);
   }
+  // HF-536 night-muse-street: street wear kit (manholes, drain grates, tar
+  // patches, gutter litter, kerb chips, pothole rings) on the carriageway
+  // and kerb line, mirrored through pair() like every other kit.
+  for (const placement of streetPropPlacements()) {
+    streetPairKit(builder, placement.propId, placement.anchor, placement.parts, m);
+  }
 }
 
 /**
@@ -4084,6 +4096,59 @@ function streetSignPairKit(
     }
   }
 }
+/**
+ * HF-536 night-muse-street: Resolve one street-wear ROLE onto THIS arena's
+ * existing material registry. Borrows existing arena materials only; adds
+ * zero materials, uniforms, or shader graphs.
+ *
+ * iron -> rubber (the registry's darkest matte: cast-iron read); asphalt ->
+ * asphalt (the only asphalt-family role, darkest by construction); concrete
+ * -> kerb (poured-concrete read, lighter than the pothole fill); mulch ->
+ * planter (the soil/mulch role the yard kit already resolves here).
+ */
+function streetRoleMaterial(m: Nuketown2Materials, role: StreetRole): THREE.Material {
+  switch (role) {
+    case 'iron': return m.rubber;
+    case 'asphalt': return m.asphalt;
+    case 'concrete': return m.kerb;
+    case 'mulch': return m.planter;
+  }
+}
+
+/**
+ * Emit one street-wear prefab at an authored anchor, through `pair()`.
+ * Every part is presentation-only (solid:false, shots:false) with relief
+ * authored in the prefab; every part carries the prefab's propId.
+ */
+function streetPairKit(
+  builder: Builder,
+  propId: string,
+  anchor: readonly [number, number, number],
+  parts: readonly StreetPart[],
+  m: Nuketown2Materials,
+): void {
+  for (const part of parts) {
+    const id = `${propId} ${part.suffix}`;
+    pair(builder, id, [
+      anchor[0] + part.offset[0],
+      anchor[1] + part.offset[1],
+      anchor[2] + part.offset[2],
+    ], [part.size[0], part.size[1], part.size[2]], streetRoleMaterial(m, part.role),
+    {
+      solid: false,
+      shots: false,
+      cast: part.cast,
+      presentationOnly: true,
+      propId,
+      ...(part.rotation ? { rotation: [part.rotation[0], part.rotation[1], part.rotation[2]] as [number, number, number] } : {}),
+    });
+    for (const side of ['north', 'south'] as const) {
+      const mesh = builder.root.getObjectByName(`nuketown2 ${side} ${id}`);
+      if (mesh) mesh.userData.presentationOnly = true;
+    }
+  }
+}
+
 
 /**
  * HF-536 night-facade-port. Resolve one facade ROLE onto THIS arena's registry.

@@ -162,3 +162,25 @@ export {
   type StreetSignPropPlacement,
   type StreetSignRole,
 } from './street-signs';
+// HF-536 night-muse-street: street wear kit (manholes, grates, tar, litter, chips, potholes)
+export {
+  DRAIN_GRATE_TRIANGLES,
+  GUTTER_LITTER_TRIANGLES,
+  KERB_CHIP_TRIANGLES,
+  MANHOLE_COVER_TRIANGLES,
+  POTHOLE_RING_TRIANGLES,
+  STREET_BOX_TRIANGLES,
+  STREET_RELIEF_M,
+  STREET_ROLES,
+  TAR_PATCH_TRIANGLES,
+  drainGrate,
+  gutterLitter,
+  kerbChip,
+  manholeCover,
+  potholeRing,
+  streetPropPlacements,
+  tarPatch,
+  type StreetPart,
+  type StreetPropPlacement,
+  type StreetRole,
+} from './street';
