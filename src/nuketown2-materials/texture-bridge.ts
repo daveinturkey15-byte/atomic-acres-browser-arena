@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import * as TSL from 'three/tsl';
 import { generateTextureSet, type TextureFamily, type TextureSet } from '../forge/textures';
+import { NUKETOWN2_IMAGE_TEXTURE_ASSETS, type Nuketown2ImageTextureAsset } from './generated-texture-assets';
 
 export const NUKETOWN2_TEXTURE_SIZE = 512;
 export const NUKETOWN2_TEXTURE_SEED = 536;
@@ -19,7 +20,7 @@ export const NUKETOWN2_BASELINE_SAMPLERS = 1;
 const GENERATED_SET_CACHE = new Map<string, TextureSet>();
 let measuredDeviceSamplerLimit: number | null = null;
 
-export type Nuketown2TextureFamily = Extract<TextureFamily, 'asphalt' | 'brick' | 'lapSiding' | 'shingle' | 'concrete'>;
+export type Nuketown2TextureFamily = Extract<TextureFamily, 'asphalt' | 'brick' | 'lapSiding' | 'shingle' | 'concrete'> | 'timber';
 
 export type Nuketown2TextureBridgeOptions = Readonly<{
   /** Explicitly disable all generated maps while retaining procedural graphs. */
@@ -46,6 +47,8 @@ export type Nuketown2TextureBridge = Readonly<{
   readonly seed: number;
   readonly deviceSampledTextureLimit: number | null;
   readonly fallbackReason: string | null;
+  readonly sourceRoute: 'codex-built-in-image-generation';
+  readonly assetFamilies: readonly Nuketown2TextureFamily[];
   resource(family: Nuketown2TextureFamily): Nuketown2TextureResource | null;
   dispose(): void;
 }>;
@@ -69,19 +72,53 @@ function mapTexture(
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 8;
   texture.flipY = false;
   // One upload at arena-load time. No render-loop code mutates needsUpdate.
   texture.needsUpdate = true;
   return texture;
 }
 
-function cachedSet(family: Nuketown2TextureFamily, size: 512 | 1024, seed: number): TextureSet {
+function decodeAssetBytes(encoded: string): Uint8ClampedArray {
+  const binary = globalThis.atob(encoded);
+  const bytes = new Uint8ClampedArray(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function imageTextureSet(
+  family: Nuketown2TextureFamily,
+  asset: Nuketown2ImageTextureAsset,
+  seed: number,
+): TextureSet {
+  return {
+    family: family as TextureFamily,
+    size: asset.size,
+    seed,
+    metresPerTile: asset.metresPerTile,
+    mmPerPx: asset.metresPerTile * 1000 / asset.size,
+    albedo: decodeAssetBytes(asset.albedo),
+    normal: decodeAssetBytes(asset.normal),
+    roughness: decodeAssetBytes(asset.roughness),
+    heightMm: new Float32Array(asset.size * asset.size),
+    fractionMostlyZ: asset.fractionMostlyZ,
+    authored: asset.detail,
+    generateMs: 0,
+  };
+}
+
+function cachedSet(family: Nuketown2TextureFamily, size: 512 | 1024, seed: number): TextureSet | null {
   const key = `${family}:${size}:${seed}`;
   const prior = GENERATED_SET_CACHE.get(key);
   if (prior) return prior;
-  const generated = generateTextureSet(family, { size, seed });
+  const assets = NUKETOWN2_IMAGE_TEXTURE_ASSETS as Readonly<Record<string, Nuketown2ImageTextureAsset>>;
+  const imageAsset = size === 512 ? assets[family] : undefined;
+  if (!imageAsset && family === 'timber') return null;
+  const generated = imageAsset
+    ? imageTextureSet(family, imageAsset, seed)
+    : generateTextureSet(family as TextureFamily, { size, seed });
   GENERATED_SET_CACHE.set(key, generated);
   return generated;
 }
@@ -144,9 +181,10 @@ export function createNuketown2TextureBridge(
     const prior = resources.get(family);
     if (prior) return prior;
     const set = cachedSet(family, size, seed);
-    const albedo = mapTexture(set.albedo, size, THREE.RGBAFormat, THREE.SRGBColorSpace, `nuketown2-${family}-albedo`);
-    const normal = mapTexture(set.normal, size, THREE.RGBAFormat, THREE.NoColorSpace, `nuketown2-${family}-normal`);
-    const roughness = mapTexture(set.roughness, size, THREE.RedFormat, THREE.NoColorSpace, `nuketown2-${family}-roughness`);
+    if (!set) return null;
+    const albedo = mapTexture(set.albedo, set.size, THREE.RGBAFormat, THREE.SRGBColorSpace, `nuketown2-${family}-albedo`);
+    const normal = mapTexture(set.normal, set.size, THREE.RGBAFormat, THREE.NoColorSpace, `nuketown2-${family}-normal`);
+    const roughness = mapTexture(set.roughness, set.size, THREE.RedFormat, THREE.NoColorSpace, `nuketown2-${family}-roughness`);
     const created: Nuketown2TextureResource = Object.freeze({
       family,
       set,
@@ -165,6 +203,8 @@ export function createNuketown2TextureBridge(
     seed,
     deviceSampledTextureLimit,
     fallbackReason,
+    sourceRoute: 'codex-built-in-image-generation',
+    assetFamilies: Object.freeze(Object.keys(NUKETOWN2_IMAGE_TEXTURE_ASSETS) as Nuketown2TextureFamily[]),
     resource,
     dispose: () => {
       if (disposed) return;
@@ -211,8 +251,15 @@ export function textureSetSamples(
 export function attachNuketown2TextureBridge(
   material: THREE.Material,
   bridge: Nuketown2TextureBridge,
+  families: readonly Nuketown2TextureFamily[] = [],
 ): void {
   material.userData.nuketown2TextureBridge = bridge;
   material.userData.nuketown2TextureBridgeMode = bridge.useTextureSet ? 'generated' : 'procedural-fallback';
   material.userData.nuketown2TextureDeviceLimit = bridge.deviceSampledTextureLimit;
+  material.userData.nuketown2TextureSourceRoute = bridge.sourceRoute;
+  material.userData.nuketown2TextureSamplerFamilies = [...families];
+  material.userData.nuketown2TextureSamplerCount = families.reduce(
+    (count, family) => count + (bridge.resource(family) ? NUKETOWN2_TEXTURE_SET_SAMPLERS : 0),
+    0,
+  );
 }

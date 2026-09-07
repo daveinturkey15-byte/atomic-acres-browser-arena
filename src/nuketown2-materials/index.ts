@@ -274,7 +274,7 @@ export function createNuketown2MaterialRegistry(
     // Worn, slightly dirty paint. Crisp white dashes read as a racing game;
     // a real dash is a dirty warm off-white the tyres have scrubbed through.
     trimDecal: tuneRoleValues(createMarkingMaterial('nuketown2-trim-decal', textureBridge), {
-      baseColor: roleColor(0xcfc6b0),
+      baseColor: roleColor(MARKING_PAINT_SRGB),
       scuffAlbedo: 0.10,
     }),
     block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block', textureBridge }),
@@ -318,11 +318,11 @@ export function createNuketown2MaterialRegistry(
       panelled: true,
       roughness: 0.34,
     }),
-    trim: createTimberMaterial('nuketown2-trim', 0xf0e4c9, 'painted-trim'),
+    trim: createTimberMaterial('nuketown2-trim', 0xf0e4c9, 'painted-trim', textureBridge),
     // The shipped fence timber, unchanged. This lane re-authors how a surface
     // is WORN, not what colour it is; an earlier revision here drifted the
     // fence a shade lighter and oranger and the review captures showed it.
-    fence: createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence'),
+    fence: createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence', textureBridge),
     sign: createPaintedMetalMaterial('nuketown2-sign', 0xdbd1ba, { roughness: 0.62 }),
     // HF-477 - THE CHIRALITY ANCHORS. Each front lawn carries a three-unit
     // cooker bank, RED tops on the orange house's lawn and BLUE on the white

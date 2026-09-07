@@ -1,0 +1,50 @@
+{
+  "family": "asphalt",
+  "candidate": "candidate-01",
+  "input": "docs/forge/textures/asphalt/candidate-01-source.png",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "resolutions": [
+    {
+      "size": 512,
+      "family": "asphalt",
+      "metresPerTile": 4,
+      "mmPerPixel": 7.8125,
+      "normalStrength": 1,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.9164505004882812,
+      "roughnessBand": [
+        0.72,
+        0.98
+      ],
+      "detail": {
+        "albedoStddev": 0.10630772066244365,
+        "albedoLaplace": 0.21671818848686542,
+        "normalSlopeMean": 0.18606932235596219,
+        "normalZMean": 0.9871425411931796,
+        "roughnessStddev": 0.011180372912600873
+      }
+    },
+    {
+      "size": 1024,
+      "family": "asphalt",
+      "metresPerTile": 4,
+      "mmPerPixel": 3.90625,
+      "normalStrength": 1,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.676396369934082,
+      "roughnessBand": [
+        0.72,
+        0.98
+      ],
+      "detail": {
+        "albedoStddev": 0.11987809970893258,
+        "albedoLaplace": 0.16328532218962977,
+        "normalSlopeMean": 0.3193725038343418,
+        "normalZMean": 0.9617949340255336,
+        "roughnessStddev": 0.01113568578585783
+      }
+    }
+  ]
+}

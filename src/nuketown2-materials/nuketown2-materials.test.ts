@@ -230,7 +230,9 @@ describe('nuketown2 material registry', () => {
     const registry = createNuketown2MaterialRegistry();
     const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
     expect(bridge.useTextureSet).toBe(true);
-    for (const family of ['asphalt', 'lapSiding', 'shingle', 'concrete', 'brick'] as const) {
+    expect(bridge.sourceRoute).toBe('codex-built-in-image-generation');
+    expect(bridge.assetFamilies).toEqual(expect.arrayContaining(['asphalt', 'lapSiding', 'brick', 'concrete', 'shingle', 'timber']));
+    for (const family of ['asphalt', 'lapSiding', 'shingle', 'concrete', 'brick', 'timber'] as const) {
       const resource = bridge.resource(family);
       expect(resource, `${family} resource`).not.toBeNull();
       expect(resource!.set.metresPerTile).toBeGreaterThan(0);
@@ -239,6 +241,10 @@ describe('nuketown2 material registry', () => {
       expect(resource!.roughness.colorSpace, `${family} roughness is linear`).toBe(THREE.NoColorSpace);
       expect(resource!.albedo.wrapS).toBe(THREE.RepeatWrapping);
       expect(resource!.albedo.wrapT).toBe(THREE.RepeatWrapping);
+      expect(resource!.albedo.generateMipmaps).toBe(true);
+      expect(resource!.albedo.anisotropy).toBe(8);
+      expect(resource!.normal.generateMipmaps).toBe(true);
+      expect(resource!.roughness.generateMipmaps).toBe(true);
     }
   });
 
@@ -256,6 +262,9 @@ describe('nuketown2 material registry', () => {
     expect(graphTextureNames(registry.block)).toEqual(expect.arrayContaining([
       'nuketown2-concrete-albedo', 'nuketown2-concrete-normal', 'nuketown2-concrete-roughness',
       'nuketown2-brick-albedo', 'nuketown2-brick-normal', 'nuketown2-brick-roughness',
+    ]));
+    expect(graphTextureNames(registry.fence)).toEqual(expect.arrayContaining([
+      'nuketown2-timber-albedo', 'nuketown2-timber-normal', 'nuketown2-timber-roughness',
     ]));
   });
 

@@ -385,7 +385,7 @@ export function createAsphaltMaterial(
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
-  attachNuketown2TextureBridge(mat, textureBridge);
+  attachNuketown2TextureBridge(mat, textureBridge, ['asphalt']);
   return mat;
 }
 
@@ -431,7 +431,7 @@ export function createMarkingMaterial(
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
-  attachNuketown2TextureBridge(mat, textureBridge);
+  attachNuketown2TextureBridge(mat, textureBridge, ['asphalt']);
   return mat;
 }
 
