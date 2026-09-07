@@ -267,7 +267,24 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-driveway-apron-close', [hx(10.8), 1.45, -10.7], [hx(6.75), 0.026, -12.1], 'geometry', 1.08),
     camera('nuketown2-border-path-close', [4.5, 1.35, -37.6], [0, 0.026, -39.0], 'geometry', 1.08),
     camera('nuketown2-perimeter-wall-long-close', [4.2, 1.45, -40.55], [0, 1.0, -41.588], 'geometry', 1.08),
-    camera('nuketown2-perimeter-wall-end-close', [hx(-16.5), 1.45, -30.5], [hx(-17.588), 1.0, -29.0], 'geometry', 1.08),
+    // HF-541: the AIM, not the position. This station stood 1.05 m off the end
+    // wall's inner face - the same standoff as its long-wall sibling above, and
+    // measured clear of every physics collider (nearest 1.03 m) - but it aimed
+    // 36 degrees INTO that face instead of running along it. Measured offline
+    // against the built geometry (96x54 rays through the shipped 70-degree
+    // frame): the end wall covered 64.6 % of the frame and only 4.0 % was sky,
+    // against 49.8 % / 12.4 % at perimeter-wall-long-close. The wall's inner
+    // face is a pure shade face (it points away from the key at [54, 20, -42]),
+    // so 64.6 % of one unlit surface delivered a frame with 13,025 distinct
+    // colours where every other station in the same run read 40,172-147,991 -
+    // a low-variance sample that made the 29-station tonal aggregate report a
+    // smaller gap than the build had. The target now runs 4.2 m ALONG the wall,
+    // exactly the along-wall run its sibling uses, which measures back at
+    // 50.0 % wall / 11.5 % sky and 67 distinct bodies in frame (was 29). The
+    // eye is unchanged, so this is the same evidence at the same range, framed
+    // the way the sibling frames the same claim. scripts/qa/capture-frame-variety.mjs
+    // fails the capture if any station drifts back into that class.
+    camera('nuketown2-perimeter-wall-end-close', [hx(-16.5), 1.45, -30.5], [hx(-17.588), 1.0, -26.3], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',

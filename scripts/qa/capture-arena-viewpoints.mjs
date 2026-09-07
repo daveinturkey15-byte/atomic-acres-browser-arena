@@ -36,6 +36,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS } from './viewpoint-catalog.mjs';
+import { assessFrameVariety, distinctColours } from './capture-frame-variety.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -363,6 +364,25 @@ try {
           });
         }
         record.ok = record.shots.every((shot) => shot.ok);
+        // HF-541 FLAT-FRAME GATE. A station whose frame is one flat surface
+        // is a low-variance sample, and a low-variance sample averaged into a
+        // station-set aggregate pulls that aggregate toward whatever it is
+        // compared with - so the run reports a SMALLER gap than the build has.
+        // Measured once, on the station this gate was written for: excluding
+        // it moved interim-11's midtone delta +20.90 -> +23.86 and its
+        // highlight delta -4.66 -> +1.00. That is why a flat frame fails the
+        // CAPTURE rather than being noted downstream: every artefact derived
+        // from it is already wrong by then. See scripts/qa/capture-frame-variety.mjs.
+        record.frameVariety = CAMERAS
+          ? { status: 'skipped', reason: `station subset (--cameras, ${stationsFor(arena).length} of ${VIEWPOINT_CATALOG[arena].length}); the median is only a bar over a full roster`, offenders: [] }
+          : assessFrameVariety(await Promise.all(record.shots.filter((shot) => shot.ok)
+              .map(async (shot) => ({ station: shot.cameraId, distinct: await distinctColours(shot.path) }))));
+        if (record.frameVariety.status === 'fail') {
+          record.ok = false;
+          for (const offender of record.frameVariety.offenders) {
+            console.error(`[viewpoint-capture] FLAT FRAME ${offender.reason}`);
+          }
+        }
       } catch (error) {
         record.error = String(error).slice(0, 160);
         record.diagnostics = await page.evaluate(() => {
