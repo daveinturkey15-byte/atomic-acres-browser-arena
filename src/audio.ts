@@ -846,7 +846,7 @@ export class ArenaAudio {
   /** HF-351: timers owning explosion spatial panner chains (railgun pattern). */
   private readonly explosionSpatialTimers: ReturnType<typeof setTimeout>[] = [];
   private flashbangs = { plays: 0, lastAudioGain: 0, immediateOnsets: 0, scheduledBeeps: 0 };
-  private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number; protectedContinuous: boolean }>();
+  private activeVoices = new Map<AudioScheduledSourceNode, { id: number; bus: AudioBusId; startedAt: number; priority: number; spatial: boolean; distance: number; protectedContinuous: boolean; windowStart: number; windowEnd: number }>();
   private readonly continuousVoiceOwners = new Map<AudioScheduledSourceNode, ContinuousVoiceOwnership>();
   private nextVoiceId = 1;
   private voicesDropped = 0;
@@ -3801,8 +3801,13 @@ export class ArenaAudio {
       return;
     }
     if (source === 'hunter-swarm') {
+      // HF-542 Route A: five 0.44 s voices spaced 0.07 s are all sounding at
+      // once (peak 5 over the announcements cap of 4) even under time-aware
+      // accounting, so the fifth was dropped outright. Spacing 0.12 s keeps
+      // one oscillator per pulse with the same endpoints, volumes and wave
+      // and brings the simultaneous peak to 4. Measured, not tuned by ear.
       this.sweepSequence(Array.from({ length: 5 }, (_, index) => ({
-        startFrequency: 980 + index * 65, endFrequency: 260, duration: 0.44, volume: 0.04, delay: index * 0.07,
+        startFrequency: 980 + index * 65, endFrequency: 260, duration: 0.44, volume: 0.04, delay: index * 0.12,
       })), 'square', this.announcements);
       return;
     }
@@ -4334,13 +4339,33 @@ export class ArenaAudio {
     spatial = false,
     distance = 0,
     protectedContinuous = false,
+    // HF-542 Route B: the voice's audible window in seconds after
+    // context.currentTime. A voice scheduled with a delay occupies its bus
+    // slot only while it is actually sounding, not from the moment it is
+    // scheduled. Callers that pass neither bound overlap everything, which
+    // is exactly today's behaviour for every caller left untouched.
+    startOffsetSeconds?: number,
+    durationSeconds?: number,
   ): boolean {
     const bus = this.busIdentity.get(destination) ?? 'sfx';
     const reservedSpatial = this.spatialReportDestinations.has(destination);
     const admittedSpatial = spatial || reservedSpatial;
     const admittedDistance = reservedSpatial ? this.spatialReportDistances.get(destination) ?? distance : distance;
     const busCap = bus === 'master' ? AUDIO_RUNTIME_BUDGET.globalVoices : AUDIO_RUNTIME_BUDGET.perBus[bus];
-    const busVoices = [...this.activeVoices.entries()].filter(([, voice]) => voice.bus === bus);
+    const now = this.context?.currentTime ?? 0;
+    const candidateStart = startOffsetSeconds === undefined || !Number.isFinite(startOffsetSeconds)
+      ? Number.NEGATIVE_INFINITY
+      : now + Math.max(0, startOffsetSeconds);
+    const candidateEnd = durationSeconds === undefined || !Number.isFinite(durationSeconds)
+      ? Number.POSITIVE_INFINITY
+      : candidateStart + Math.max(0.001, durationSeconds);
+    // Half-open [start, end): a voice ending exactly as the candidate starts
+    // has freed its slot. Unbounded incumbents (continuous loops, callers
+    // without a declared window) overlap every candidate.
+    const overlapsCandidate = (voice: { windowStart: number; windowEnd: number }): boolean =>
+      candidateStart < (voice.windowEnd ?? Number.POSITIVE_INFINITY)
+      && (voice.windowStart ?? Number.NEGATIVE_INFINITY) < candidateEnd;
+    const busVoices = [...this.activeVoices.entries()].filter(([, voice]) => voice.bus === bus && overlapsCandidate(voice));
     const overGlobal = this.activeVoices.size >= AUDIO_RUNTIME_BUDGET.globalVoices;
     const overBus = busVoices.length >= busCap;
     const overSpatial = admittedSpatial && (reservedSpatial
@@ -4379,6 +4404,8 @@ export class ArenaAudio {
       spatial: admittedSpatial,
       distance: admittedDistance,
       protectedContinuous,
+      windowStart: candidateStart,
+      windowEnd: candidateEnd,
     };
     this.activeVoices.set(source, voice);
     source.onended = () => {
@@ -4818,7 +4845,7 @@ export class ArenaAudio {
     }
     source.connect(filter);
     head.connect(gain).connect(destination);
-    if (!this.registerVoice(source, destination, 3)) {
+    if (!this.registerVoice(source, destination, 3, false, 0, false, options.delay ?? 0, options.duration)) {
       filter.disconnect();
       gain.disconnect();
       for (const node of extras) node.disconnect();
@@ -4882,7 +4909,7 @@ export class ArenaAudio {
     const saturator = shaping.drive ? this.createSaturator(shaping.drive) : null;
     if (saturator) oscillator.connect(saturator).connect(gain).connect(destination);
     else oscillator.connect(gain).connect(destination);
-    if (!this.registerVoice(oscillator, destination, 3)) {
+    if (!this.registerVoice(oscillator, destination, 3, false, 0, false, delay, duration)) {
       gain.disconnect();
       saturator?.disconnect();
       return;

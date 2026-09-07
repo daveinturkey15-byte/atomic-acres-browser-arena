@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { AUDIO_RUNTIME_BUDGET } from './spatial-audio';
 import { ArenaAudio } from './audio';
 
 /**
@@ -182,13 +183,17 @@ export type CueInventory = {
   liveVoicesByBus: Record<string, number>; peakConcurrentByBus: Record<string, number>;
 };
 
-function measureOne(spec: CueSpec): CueInventory {
+function freshRig(): { audio: ArenaAudio; context: FakeAudioContext } {
   FakeAudioContext.instances.length = 0;
   vi.stubGlobal('AudioContext', FakeAudioContext);
   const audio = new ArenaAudio();
   audio.unlock();
   audio.updateListener({ x: 0, y: 1.7, z: 0 }, 0);
-  const context = FakeAudioContext.instances[0]!;
+  return { audio, context: FakeAudioContext.instances[0]! };
+}
+
+function measureOne(spec: CueSpec): CueInventory {
+  const { audio, context } = freshRig();
   const before = {
     gains: context.gains.length,
     osc: context.oscillators.length,
@@ -286,7 +291,7 @@ describe('HF-542 killstreak audio inventory', () => {
     const rows = CUES.map(measureOne);
     mkdirSync('docs/evidence/pass95/killstreak-audio', { recursive: true });
     writeFileSync(
-      'docs/evidence/pass95/killstreak-audio/inventory-baseline.json',
+      process.env.KS_INVENTORY_OUT ?? 'docs/evidence/pass95/killstreak-audio/inventory-baseline.json',
       JSON.stringify(rows, null, 2),
     );
     // Structural sanity only: numbers are evidence in the JSON, not pins.
@@ -297,5 +302,36 @@ describe('HF-542 killstreak audio inventory', () => {
       expect(row.admittedVoices).toBe(row.scheduledVoices - row.dropped);
       expect(Number.isFinite(row.peakSum)).toBe(true);
     }
+  });
+  it('time-aware occupancy admits delayed pulses while the budget still bites', () => {
+    const caps = AUDIO_RUNTIME_BUDGET.perBus as unknown as Record<string, number>;
+    // Delayed pulses share one slot across time: zero drops, peak within cap.
+    for (const label of ['nukeWarning', 'scoutSweep', 'BURST nuke sequence', 'BURST tri-pass activation']) {
+      const row = measureOne(CUES.find((c) => c.cue === label)!);
+      expect(row.dropped).toBe(0);
+      expect(row.stolen).toBe(0);
+      for (const [bus, peak] of Object.entries(row.peakConcurrentByBus)) {
+        expect(peak).toBeLessThanOrEqual(caps[bus] ?? Number.MAX_SAFE_INTEGER);
+      }
+    }
+    // Anti-cheat: genuinely simultaneous voices still hit the cap. Three
+    // hostile stings at one instant stack 6 announcements voices over a cap
+    // of 4, so at least 2 must drop. Without this, "zero drops" would only
+    // prove a disabled budget.
+    const rig = freshRig();
+    const dropBefore = rig.audio.telemetry().runtime.dropped;
+    rig.audio.killstreakAnnounce('hostile');
+    rig.audio.killstreakAnnounce('hostile');
+    rig.audio.killstreakAnnounce('hostile');
+    expect(rig.audio.telemetry().runtime.dropped - dropBefore).toBeGreaterThan(0);
+    // Advancing time frees windows: a second long cue fired after the first
+    // cue's last voice ends drops nothing. Under the old bookkeeping the
+    // accumulated (never-released in the fake) voices would drop 6 of 10.
+    const rig2 = freshRig();
+    const dropBefore2 = rig2.audio.telemetry().runtime.dropped;
+    rig2.audio.nukeWarning();
+    rig2.context.currentTime += 100;
+    rig2.audio.scoutSweep();
+    expect(rig2.audio.telemetry().runtime.dropped - dropBefore2).toBe(0);
   });
 });
