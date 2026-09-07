@@ -204,10 +204,27 @@ export function sustainedMobileLookDelta(
 
 export function isTouchCapableDevice(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  return ('ontouchstart' in window) || (navigator.maxTouchPoints ?? 0) > 0;
+  const hasTouchCapability = ('ontouchstart' in window) || (navigator.maxTouchPoints ?? 0) > 0;
+  if (!hasTouchCapability) return false;
+  if (typeof window.matchMedia === 'function') {
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const isFine = window.matchMedia('(pointer: fine)').matches;
+    return isCoarse && !isFine;
+  }
+  return hasTouchCapability;
 }
 
 export function readMobileControlsPreference(): boolean {
+  try {
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const params = new URLSearchParams(window.location.search);
+      const urlPref = params.get('touch') ?? params.get('mobileControls');
+      if (urlPref === 'off' || urlPref === '0' || urlPref === 'false') return false;
+      if (urlPref === 'on' || urlPref === '1' || urlPref === 'true') return true;
+    }
+  } catch {
+    // Ignore malformed search params.
+  }
   try {
     const stored = window.localStorage.getItem(MOBILE_CONTROLS_STORAGE_KEY);
     if (stored === 'on') return true;

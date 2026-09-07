@@ -29289,7 +29289,7 @@ function pollMobileTouch(dt: number): void {
   // The overlay only ever intercepts input while a match is live and the menu
   // is closed; otherwise it stays hidden so menus, lobby and options remain
   // tappable even when the mobile-controls toggle is enabled.
-  const inMatch = gameStarted && matchState.phase === 'active' && menu.classList.contains('hidden');
+  const inMatch = gameStarted && matchState.phase === 'active' && menu.classList.contains('hidden') && activeArenaReviewHud !== 'hidden';
   touch.setInMatch(inMatch);
   const live = inMatch && touch.isEnabled();
   if (live !== mobilePresentationActive) {
@@ -35934,7 +35934,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     activeArenaReviewSeed = reviewCamera.seed;
     activeArenaReviewExposure = reviewCamera.exposure;
     activeArenaReviewHud = reviewCamera.hud;
-    hudRoot.hidden = reviewCamera.hud === 'hidden';
+    hudRoot.hidden = reviewCamera.hud === 'hidden'; if (reviewCamera.hud === 'hidden') mobileTouchControls?.setInMatch(false);
     debugCaptureCameraPosition.copy(camera.position);
     debugCaptureCameraQuaternion.copy(camera.quaternion);
     debugCaptureCameraUsesQuaternion = true;

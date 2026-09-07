@@ -175,7 +175,7 @@ const browser = await chromium.launch({
 });
 let exitCode = 0;
 try {
-  const page = await browser.newPage({ viewport: VIEWPORT });
+  const page = await browser.newPage({ viewport: VIEWPORT, hasTouch: false });
   const session = await page.context().newCDPSession(page);
   // Guarantee foreground ownership instead of hoping a window manager grants
   // it; an unfocused surface is timer-throttled and reads like a wedged arena.
@@ -185,7 +185,7 @@ try {
   page.on('pageerror', (error) => errors.push(String(error).slice(0, 240)));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text().slice(0, 240)); });
 
-  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0${extraQuery ? `&${extraQuery}` : ''}`;
+  const url = `${BASE}/?release=latest&renderer=${RENDERER}&render=quality&seed=${SEED}&previewTime=0&touch=0${extraQuery ? `&${extraQuery}` : ''}`;
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: 180_000 });
 

@@ -2,9 +2,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  MOBILE_CONTROLS_STORAGE_KEY,
   MOBILE_TOUCH_ACTION_GROUPS,
+  isTouchCapableDevice,
   mobileOverlayVisible,
   mobileTouchFireBypassesPointerLock,
+  readMobileControlsPreference,
   shouldSuppressMobileBrowserSelection,
   sustainedMobileLookDelta,
   touchStickAxis,
@@ -87,5 +90,133 @@ describe('mobile touch controls', () => {
     const diagonal = touchStickAxis(220, 320, bounds);
     expect(diagonal.x).toBeCloseTo(Math.SQRT1_2, 5);
     expect(diagonal.y).toBeCloseTo(Math.SQRT1_2, 5);
+  });
+
+  it('HF-536: does not auto-mount touch controls on a desktop device with mouse/keyboard even if maxTouchPoints > 0', () => {
+    const originalWindow = globalThis.window;
+    const originalMaxTouchPoints = globalThis.navigator.maxTouchPoints;
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          matchMedia: (query: string) => ({
+            matches: query === '(pointer: fine)' || query === '(hover: hover)',
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+          } as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 10, configurable: true, writable: true });
+
+      expect(isTouchCapableDevice()).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, 'window', { value: originalWindow, configurable: true, writable: true });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true, writable: true });
+    }
+  });
+
+  it('HF-536: auto-mounts touch controls on an actual touch device (coarse pointer, no fine mouse)', () => {
+    const originalWindow = globalThis.window;
+    const originalMaxTouchPoints = globalThis.navigator.maxTouchPoints;
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          matchMedia: (query: string) => ({
+            matches: query === '(pointer: coarse)' || query === '(hover: none)',
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+          } as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 5, configurable: true, writable: true });
+
+      expect(isTouchCapableDevice()).toBe(true);
+    } finally {
+      Object.defineProperty(globalThis, 'window', { value: originalWindow, configurable: true, writable: true });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true, writable: true });
+    }
+  });
+
+  it('HF-536: readMobileControlsPreference honors URL query override over storage and device', () => {
+    const originalWindow = globalThis.window;
+    const originalMaxTouchPoints = globalThis.navigator.maxTouchPoints;
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          location: { search: '?touch=1' } as Location,
+          localStorage: { getItem: () => null } as unknown as Storage,
+          matchMedia: () => ({ matches: false } as unknown as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 0, configurable: true, writable: true });
+      expect(readMobileControlsPreference()).toBe(true);
+
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          location: { search: '?touch=0' } as Location,
+          localStorage: { getItem: () => 'on' } as unknown as Storage,
+          matchMedia: (q: string) => ({ matches: q === '(pointer: coarse)' } as unknown as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 5, configurable: true, writable: true });
+      expect(readMobileControlsPreference()).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, 'window', { value: originalWindow, configurable: true, writable: true });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true, writable: true });
+    }
+  });
+
+  it('HF-536: readMobileControlsPreference honors explicit localStorage preference', () => {
+    const originalWindow = globalThis.window;
+    const originalMaxTouchPoints = globalThis.navigator.maxTouchPoints;
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          location: { search: '' } as Location,
+          localStorage: {
+            getItem: (key: string) => (key === MOBILE_CONTROLS_STORAGE_KEY ? 'on' : null),
+          } as unknown as Storage,
+          matchMedia: (q: string) => ({ matches: q === '(pointer: fine)' } as unknown as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 0, configurable: true, writable: true });
+      expect(readMobileControlsPreference()).toBe(true);
+
+      Object.defineProperty(globalThis, 'window', {
+        value: {
+          location: { search: '' } as Location,
+          localStorage: {
+            getItem: (key: string) => (key === MOBILE_CONTROLS_STORAGE_KEY ? 'off' : null),
+          } as unknown as Storage,
+          matchMedia: (q: string) => ({ matches: q === '(pointer: coarse)' } as unknown as MediaQueryList),
+        } as unknown as Window & typeof globalThis,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: 5, configurable: true, writable: true });
+      expect(readMobileControlsPreference()).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, 'window', { value: originalWindow, configurable: true, writable: true });
+      Object.defineProperty(globalThis.navigator, 'maxTouchPoints', { value: originalMaxTouchPoints, configurable: true, writable: true });
+    }
   });
 });
