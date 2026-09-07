@@ -27,6 +27,7 @@ import {
   WEAR_BANDS,
   albedoWearStep,
   createNuketown2MaterialRegistry,
+  createNuketown2TextureBridge,
   linearRgb,
   maxDarkening,
   type Nuketown2MaterialSpec,
@@ -76,6 +77,22 @@ const FAMILIES: ReadonlyArray<{
   { family: 'painted-metal', spec: paintedMetalSpec('gate-painted-metal', 0xaebdc1), roughness: [0.25, 0.65], metalness: [0, 0.30] },
   { family: 'lawn', spec: lawnSpec('gate-lawn', 0x496438, 'turf'), roughness: [0.90, 1.00], metalness: [0, 0.02] },
 ];
+
+function graphTextureNames(material: THREE.Material): string[] {
+  const names = new Set<string>();
+  const seen = new Set<object>();
+  const visit = (value: unknown): void => {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    const record = value as Record<string, unknown>;
+    if (record.isTexture === true && typeof record.name === 'string') names.add(record.name);
+    for (const child of Object.values(record)) visit(child);
+  };
+  for (const slot of ['colorNode', 'roughnessNode', 'normalNode']) {
+    visit((material as unknown as Record<string, unknown>)[slot]);
+  }
+  return [...names].sort();
+}
 
 describe('nuketown2 materials — per-family physical authoring', () => {
   for (const row of FAMILIES) {
@@ -191,12 +208,9 @@ describe('nuketown2 material registry', () => {
   });
 
   it('loads no texture: every surface is generated', () => {
-    // GENERATED is the property, not "textureless". Since HF-491 the wear
-    // engine samples one shared noise tile through a TSL `texture()` node -
-    // a DataTexture whose bytes are computed on the CPU at first use (no
-    // file, no fetch, no decode; noise-lut.ts). That is generation, not
-    // loading, and it is pinned here on the bytes: an in-memory Uint8Array
-    // with no source URL. The classic map slots stay empty as before.
+    // GENERATED is the property, not "textureless". The classic map slots
+    // stay empty: the TSL bridge below owns generated DataTextures so WebGPU
+    // and the compatibility backend share one authored graph.
     const registry = createNuketown2MaterialRegistry() as unknown as Record<string, Record<string, unknown>>;
     const mapSlots = [
       'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap',
@@ -210,6 +224,60 @@ describe('nuketown2 material registry', () => {
     const lut = noiseLutTexture();
     expect(lut.image.data, 'the noise tile is CPU bytes').toBeInstanceOf(Uint8Array);
     expect((lut.image as { src?: string }).src ?? null, 'the noise tile has no URL').toBeNull();
+  });
+
+  it('binds generated PBR maps with the authored colour spaces and metre tile sizes', () => {
+    const registry = createNuketown2MaterialRegistry();
+    const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
+    expect(bridge.useTextureSet).toBe(true);
+    for (const family of ['asphalt', 'lapSiding', 'shingle', 'concrete', 'brick'] as const) {
+      const resource = bridge.resource(family);
+      expect(resource, `${family} resource`).not.toBeNull();
+      expect(resource!.set.metresPerTile).toBeGreaterThan(0);
+      expect(resource!.albedo.colorSpace, `${family} albedo is sRGB`).toBe(THREE.SRGBColorSpace);
+      expect(resource!.normal.colorSpace, `${family} normal is linear`).toBe(THREE.NoColorSpace);
+      expect(resource!.roughness.colorSpace, `${family} roughness is linear`).toBe(THREE.NoColorSpace);
+      expect(resource!.albedo.wrapS).toBe(THREE.RepeatWrapping);
+      expect(resource!.albedo.wrapT).toBe(THREE.RepeatWrapping);
+    }
+  });
+
+  it('samples the generated maps in the shared family graphs', () => {
+    const registry = createNuketown2MaterialRegistry();
+    expect(graphTextureNames(registry.asphalt)).toEqual(expect.arrayContaining([
+      'nuketown2-asphalt-albedo', 'nuketown2-asphalt-normal', 'nuketown2-asphalt-roughness',
+    ]));
+    expect(graphTextureNames(registry.sidingA)).toEqual(expect.arrayContaining([
+      'nuketown2-lapSiding-albedo', 'nuketown2-lapSiding-normal', 'nuketown2-lapSiding-roughness',
+    ]));
+    expect(graphTextureNames(registry.roof)).toEqual(expect.arrayContaining([
+      'nuketown2-shingle-albedo', 'nuketown2-shingle-normal', 'nuketown2-shingle-roughness',
+    ]));
+    expect(graphTextureNames(registry.block)).toEqual(expect.arrayContaining([
+      'nuketown2-concrete-albedo', 'nuketown2-concrete-normal', 'nuketown2-concrete-roughness',
+      'nuketown2-brick-albedo', 'nuketown2-brick-normal', 'nuketown2-brick-roughness',
+    ]));
+  });
+
+  it('falls back to the procedural graph when the measured sampler limit cannot fit the bridge', () => {
+    const registry = createNuketown2MaterialRegistry({ deviceSampledTextureLimit: 3 });
+    const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
+    expect(bridge.useTextureSet).toBe(false);
+    expect(bridge.fallbackReason).toMatch(/maxSampledTexturesPerShaderStage=3/);
+    expect(bridge.resource('asphalt')).toBeNull();
+  });
+
+  it('disposes every generated DataTexture once per arena bridge', () => {
+    const bridge = createNuketown2TextureBridge({ deviceSampledTextureLimit: 16 });
+    const resource = bridge.resource('asphalt')!;
+    let disposed = 0;
+    for (const texture of [resource.albedo, resource.normal, resource.roughness]) {
+      texture.addEventListener('dispose', () => { disposed += 1; });
+    }
+    bridge.dispose();
+    bridge.dispose();
+    expect(disposed).toBe(3);
+    expect(bridge.resource('asphalt')).toBeNull();
   });
 
   it('builds no light object', () => {

@@ -44,6 +44,7 @@ import { createGlassMaterial } from './families/glass';
 import { createPaintedMetalMaterial } from './families/painted-metal';
 import { createLawnMaterial } from './families/lawn';
 import { NUKETOWN2_APPLIANCE_BLUE } from '../nuketown2-layout';
+import { createNuketown2TextureBridge, type Nuketown2TextureBridgeOptions } from './texture-bridge';
 
 export type { Nuketown2MaterialSpec, Nuketown2MaterialFamily, WearScale } from './spec';
 export {
@@ -82,6 +83,16 @@ export { createTimberMaterial, timberSpec } from './families/timber';
 export { createGlassMaterial, glassSpec } from './families/glass';
 export { createPaintedMetalMaterial, paintedMetalSpec } from './families/painted-metal';
 export { createLawnMaterial, lawnSpec } from './families/lawn';
+export {
+  createNuketown2TextureBridge,
+  getNuketown2TextureDeviceLimit,
+  setNuketown2TextureDeviceLimit,
+  NUKETOWN2_BASELINE_SAMPLERS,
+  NUKETOWN2_TEXTURE_SET_SAMPLERS,
+  NUKETOWN2_TEXTURE_SIZE,
+  NUKETOWN2_TEXTURE_SEED,
+} from './texture-bridge';
+export type { Nuketown2TextureBridge, Nuketown2TextureBridgeOptions } from './texture-bridge';
 
 /**
  * The roles the arena asks for.
@@ -209,7 +220,12 @@ function roleColor(hex: number): THREE.Color {
   return new THREE.Color().setHex(hex, THREE.SRGBColorSpace);
 }
 
-export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
+export type Nuketown2MaterialRegistryOptions = Nuketown2TextureBridgeOptions;
+
+export function createNuketown2MaterialRegistry(
+  options: Nuketown2MaterialRegistryOptions = {},
+): Nuketown2MaterialRegistry {
+  const textureBridge = createNuketown2TextureBridge(options);
   return Object.freeze({
     // Beyond the fence: dry scrubland keyed between the backdrop skirt's own
     // two authored ground colours, so the plain and the tree line read as the
@@ -238,7 +254,7 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // Damp asphalt with a sun streak: baseRoughness 0.95 -> 0.66 and
     // trafficRoughness 0.10 -> 0.16, soil 0.080 -> 0.110 for the kerb-channel
     // stain the reference has and we did not.
-    asphalt: tuneRoleValues(createAsphaltMaterial(), {
+    asphalt: tuneRoleValues(createAsphaltMaterial('nuketown2-asphalt-road', textureBridge), {
       baseRoughness: 0.66,
       trafficRoughness: 0.16,
       soil: 0.110,
@@ -246,18 +262,22 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // "Poured and kept" (R15): the kerb run keeps its wear scales and loses
     // 40 % of its scuff albedo swing, which is the tidy read visual-a reached
     // by editing the concrete graph - the same result at value level.
-    kerb: tuneRoleValues(createConcreteMaterial('nuketown2-kerb', KERB_CONCRETE_SRGB, { variant: 'kerb', dampFootY: 0 }), {
+    kerb: tuneRoleValues(createConcreteMaterial('nuketown2-kerb', KERB_CONCRETE_SRGB, {
+      variant: 'kerb', dampFootY: 0, textureBridge,
+    }), {
       scuffAlbedo: 0.030,
     }),
-    drive: createConcreteMaterial('nuketown2-drive', DRIVEWAY_APRON_SRGB, { variant: 'apron' }),
-    driveDecal: createConcreteMaterial('nuketown2-drive-decal', DRIVEWAY_APRON_SRGB, { variant: 'apron', polygonOffset: -1 }),
+    drive: createConcreteMaterial('nuketown2-drive', DRIVEWAY_APRON_SRGB, { variant: 'apron', textureBridge }),
+    driveDecal: createConcreteMaterial('nuketown2-drive-decal', DRIVEWAY_APRON_SRGB, {
+      variant: 'apron', polygonOffset: -1, textureBridge,
+    }),
     // Worn, slightly dirty paint. Crisp white dashes read as a racing game;
     // a real dash is a dirty warm off-white the tyres have scrubbed through.
-    trimDecal: tuneRoleValues(createMarkingMaterial(), {
-      baseColor: roleColor(MARKING_PAINT_SRGB),
+    trimDecal: tuneRoleValues(createMarkingMaterial('nuketown2-trim-decal', textureBridge), {
+      baseColor: roleColor(0xcfc6b0),
       scuffAlbedo: 0.10,
     }),
-    block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block' }),
+    block: createConcreteMaterial('nuketown2-block', 0x9d9a8c, { variant: 'block', textureBridge }),
 
     // HF-477 SUPERSEDES THE HEXES THIS LANE INHERITED, and it is the accuracy
     // lane's call, not this one's: `docs/references/nuketown-2025/FINDINGS.md`
@@ -276,9 +296,9 @@ export function createNuketown2MaterialRegistry(): Nuketown2MaterialRegistry {
     // geometry, and a second mechanism for it would only buy a SECOND siding
     // node graph on the cold-compile path this candidate is fighting. Same
     // picture, one pipeline.
-    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper'),
-    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream'),
-    roof: createRoofMaterial(),
+    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper', { textureBridge }),
+    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream', { textureBridge }),
+    roof: createRoofMaterial('nuketown2-roof-shingles', textureBridge),
     // HF-477: the white house's PALE BLUE-GREY ROOF GLAZING, the aerial's
     // single strongest identifier for that house (measured #aebdc0/#b6c6c9 on
     // `nt2025-aerial-boii.jpg`). Authored 0xaebdc1 - within 1/255 of the

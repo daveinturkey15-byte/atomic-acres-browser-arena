@@ -20,6 +20,7 @@ import {
   waitForVisibleBrowserPreparation,
 } from '../browser-preparation-scheduler';
 import { createNuketown2ClusteredLighting } from './clustered-lights';
+import { setNuketown2TextureDeviceLimit } from '../nuketown2-materials/texture-bridge';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -1417,6 +1418,10 @@ export class WebGpuRenderRuntime {
     // Ask with the intersected list, and fall back a step at a time rather than
     // killing the whole renderer if a driver rejects what it advertised.
     const device = await requestNegotiatedDevice(adapter, requiredFeatures, requiredLimits);
+    // HF-536: material families consult the measured adapter limit before
+    // binding generated map sets. This is intentionally set only after the
+    // adapter was queried; the texture bridge never guesses a device limit.
+    setNuketown2TextureDeviceLimit(requiredLimits.maxSampledTexturesPerShaderStage);
     // Chrome 153 Tint chained-swizzle workaround (PASS 93): wrap createShaderModule
     // on the device this runtime negotiated, before the renderer builds its first
     // pipeline. Applied to the DEVICE, not to navigator.gpu, so the feature

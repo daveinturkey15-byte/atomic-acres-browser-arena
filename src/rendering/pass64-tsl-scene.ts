@@ -1184,12 +1184,16 @@ function disposeRoot(root: THREE.Group): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
+  const textureBridges = new Set<{ dispose: () => void }>();
   root.traverse((node) => {
     const mesh = node as THREE.Mesh;
     if (mesh.geometry) geometries.add(mesh.geometry);
     const nodeMaterials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
     for (const material of nodeMaterials) {
       materials.add(material);
+      const bridge = (material.userData as Record<string, unknown> | undefined)
+        ?.nuketown2TextureBridge as { dispose?: () => void } | undefined;
+      if (bridge && typeof bridge.dispose === 'function') textureBridges.add(bridge as { dispose: () => void });
       const map = (material as THREE.Material & { map?: THREE.Texture | null }).map;
       if (map) textures.add(map);
     }
@@ -1198,6 +1202,7 @@ function disposeRoot(root: THREE.Group): void {
   for (const geometry of geometries) geometry.dispose();
   for (const material of materials) material.dispose();
   for (const texture of textures) texture.dispose();
+  for (const bridge of textureBridges) bridge.dispose();
   root.clear();
 }
 

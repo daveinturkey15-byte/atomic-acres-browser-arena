@@ -28,6 +28,12 @@ import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { lutFbm, lutRidgedFbm } from '../noise-lut';
 import { reliefNormal } from '../relief';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
+import {
+  attachNuketown2TextureBridge,
+  createNuketown2TextureBridge,
+  textureSetSamples,
+  type Nuketown2TextureBridge,
+} from '../texture-bridge';
 
 const { abs, clamp, float, fract, max, min, mix, positionWorld, smoothstep, vec2, vec3 } =
   TSL as unknown as Record<string, any>;
@@ -234,11 +240,12 @@ export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialS
   });
 }
 
+type AsphaltGraph = { colorNode: any; roughnessNode: any; normalNode: any };
+const asphaltGraphs = new WeakMap<object, AsphaltGraph>();
 
-let asphaltGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
-
-function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
-  if (asphaltGraph) return asphaltGraph;
+function sharedAsphaltGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): AsphaltGraph {
+  const cached = asphaltGraphs.get(textureBridge);
+  if (cached) return cached;
   const spec = asphaltSpec('nuketown2-asphalt-shared');
   const p = positionWorld;
   const uv = groundUv();
@@ -337,16 +344,30 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roug
   // it has not, so the bar has a real edge to catch the sun on.
   const markingHeight = mix(float(MARKING_FILM_M), roadHeight, paintLoss);
 
+  const textureSamples = textureSetSamples(textureBridge, 'asphalt', uv);
+  const texturedRoadColor = textureSamples ? roadColor.mul(textureSamples.albedo) : roadColor;
+  const texturedMarkingColor = textureSamples ? markingColor.mul(textureSamples.albedo) : markingColor;
+  const texturedRoadRoughness = textureSamples
+    ? clamp(roadRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.20), float(1.0))
+    : roadRoughness;
+  const texturedMarkingRoughness = textureSamples
+    ? clamp(markingRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.20), float(1.0))
+    : markingRoughness;
+
   const isMarking = (uniforms.asphaltMarking as any).greaterThan(float(0.5));
-  asphaltGraph = {
-    colorNode: isMarking.select(markingColor, roadColor),
-    roughnessNode: isMarking.select(markingRoughness, roadRoughness),
-    normalNode: reliefNormal(isMarking.select(markingHeight, roadHeight)),
-  };
-  return asphaltGraph;
+  const relief = reliefNormal(isMarking.select(markingHeight, roadHeight));
+  asphaltGraphs.set(textureBridge, {
+    colorNode: isMarking.select(texturedMarkingColor, texturedRoadColor),
+    roughnessNode: isMarking.select(texturedMarkingRoughness, texturedRoadRoughness),
+    normalNode: textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief,
+  });
+  return asphaltGraphs.get(textureBridge)!;
 }
 
-export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStandardNodeMaterial {
+export function createAsphaltMaterial(
+  name = 'nuketown2-asphalt-road',
+  textureBridge: Nuketown2TextureBridge = createNuketown2TextureBridge(),
+): MeshStandardNodeMaterial {
   const spec = asphaltSpec(name);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
@@ -360,10 +381,11 @@ export function createAsphaltMaterial(name = 'nuketown2-asphalt-road'): MeshStan
 
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 0);
-  const shared = sharedAsphaltGraph(uniforms);
+  const shared = sharedAsphaltGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge);
   return mat;
 }
 
@@ -390,7 +412,10 @@ export function markingSpec(name = 'nuketown2-trim-decal'): Nuketown2MaterialSpe
   });
 }
 
-export function createMarkingMaterial(name = 'nuketown2-trim-decal'): MeshStandardNodeMaterial {
+export function createMarkingMaterial(
+  name = 'nuketown2-trim-decal',
+  textureBridge: Nuketown2TextureBridge = createNuketown2TextureBridge(),
+): MeshStandardNodeMaterial {
   const spec = markingSpec(name);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
@@ -402,10 +427,11 @@ export function createMarkingMaterial(name = 'nuketown2-trim-decal'): MeshStanda
 
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 1);
-  const shared = sharedAsphaltGraph(uniforms);
+  const shared = sharedAsphaltGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge);
   return mat;
 }
 
