@@ -23,6 +23,12 @@ import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms } from '../material-uniforms';
+import {
+  attachNuketown2TextureBridge,
+  createNuketown2TextureBridge,
+  textureSetSamples,
+  type Nuketown2TextureBridge,
+} from '../texture-bridge';
 
 const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -63,10 +69,12 @@ export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpe
   });
 }
 
-let roofGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
+type RoofGraph = { colorNode: any; roughnessNode: any; normalNode: any };
+const roofGraphs = new WeakMap<object, RoofGraph>();
 
-function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
-  if (roofGraph) return roofGraph;
+function sharedRoofGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): RoofGraph {
+  const cached = roofGraphs.get(textureBridge);
+  if (cached) return cached;
   const spec = roofSpec('nuketown2-roof-shared');
   const p = positionWorld;
   const wear = buildWear(spec, vec2(p.x, p.z), undefined, uniforms);
@@ -101,19 +109,28 @@ function sharedRoofGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughne
     .add(wear.grain.mul(float(GRANULE_RELIEF_M)))
     .add(granuleLoss.mul(float(GRANULE_LOSS_RELIEF_M)))
     .add(shingleTone.mul(float(0.006)));
-  roofGraph = {
-    colorNode: mix(shaded, shaded.mul(float(0.74)), streak.mul(float(0.5))),
-    roughnessNode: clamp(
+  const proceduralColor = mix(shaded, shaded.mul(float(0.74)), streak.mul(float(0.5)));
+  const proceduralRoughness = clamp(
       wear.roughness.add(granuleLoss.mul(float(-0.12))).add(streak.mul(float(0.10))).sub(buttShadow.mul(float(0.05))),
       float(0.25),
       float(1.0),
-    ),
-    normalNode: reliefNormal(height),
-  };
-  return roofGraph;
+    );
+  const textureSamples = textureSetSamples(textureBridge, 'shingle', vec2(p.x, p.z));
+  const relief = reliefNormal(height);
+  roofGraphs.set(textureBridge, {
+    colorNode: textureSamples ? proceduralColor.mul(textureSamples.albedo) : proceduralColor,
+    roughnessNode: textureSamples
+      ? clamp(proceduralRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.25), float(1.0))
+      : proceduralRoughness,
+    normalNode: textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief,
+  });
+  return roofGraphs.get(textureBridge)!;
 }
 
-export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStandardNodeMaterial {
+export function createRoofMaterial(
+  name = 'nuketown2-roof-shingles',
+  textureBridge: Nuketown2TextureBridge = createNuketown2TextureBridge(),
+): MeshStandardNodeMaterial {
   const spec = roofSpec(name);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
@@ -121,10 +138,11 @@ export function createRoofMaterial(name = 'nuketown2-roof-shingles'): MeshStanda
   mat.color.setHex(spec.baseSrgb);
 
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
-  const shared = sharedRoofGraph(uniforms);
+  const shared = sharedRoofGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge);
   return mat;
 }
 
