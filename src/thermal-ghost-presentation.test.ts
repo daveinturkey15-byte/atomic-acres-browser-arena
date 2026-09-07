@@ -1,32 +1,119 @@
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   THERMAL_GHOST_HALO_SCALE,
   THERMAL_GHOST_MAX_BODY_LAYERS,
   THERMAL_GHOST_MAX_OWNED_MATERIALS,
+  THERMAL_GHOST_MAX_TARGETS,
+  THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS,
   THERMAL_GHOST_ORANGE_HEX,
   THERMAL_GHOST_PRESENTATION_CONTRACT,
   ThermalGhostPresentation,
 } from './thermal-ghost-presentation';
 
+const OPERATOR_ASSETS = '../public/assets/original/models/operators';
+
+/**
+ * Every third-person body the reveal can be asked to draw. The M14, Railgun and
+ * Chopper Gunner all render through one pool, so an asset family missing from
+ * this list is an asset family whose reveal nobody is pinning.
+ */
+const SHIPPED_OPERATOR_BODIES: ReadonlyArray<Readonly<{ asset: string; primitives: number }>> = [
+  { asset: `${OPERATOR_ASSETS}/pass65-third-person-operator-lod0.glb`, primitives: 9 },
+  { asset: `${OPERATOR_ASSETS}/pass65-third-person-operator-lod1.glb`, primitives: 9 },
+  { asset: `${OPERATOR_ASSETS}/pass65-third-person-operator-lod2.glb`, primitives: 9 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb`, primitives: 30 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb`, primitives: 30 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb`, primitives: 42 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb`, primitives: 42 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb`, primitives: 46 },
+  { asset: `${OPERATOR_ASSETS}/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb`, primitives: 46 },
+];
+
+/**
+ * GLTFLoader emits one Mesh per glTF primitive, splitting multi-primitive
+ * meshes into a Group, so primitives -- not mesh nodes -- are the layer count
+ * the pool actually has to serve.
+ */
+function readOperatorBody(asset: string): Readonly<{ primitives: number; materials: number }> {
+  const bytes = readFileSync(new URL(asset, import.meta.url));
+  const jsonLength = bytes.readUInt32LE(12);
+  const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8')) as {
+    meshes: Array<{ primitives: unknown[] }>;
+    materials: unknown[];
+  };
+  return {
+    primitives: gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
+    materials: gltf.materials.length,
+  };
+}
+
 describe('M14 thermal ghost residency', () => {
-  it('freezes the complete shipped operator body below the exact-layer bound', () => {
-    for (const asset of [
-      '../public/assets/original/models/operators/pass65-third-person-operator-lod0.glb',
-      '../public/assets/original/models/operators/pass65-third-person-operator-lod1.glb',
-    ]) {
-      const bytes = readFileSync(new URL(asset, import.meta.url));
-      const jsonLength = bytes.readUInt32LE(12);
-      const gltf = JSON.parse(bytes.subarray(20, 20 + jsonLength).toString('utf8')) as {
-        meshes: Array<{ primitives: unknown[] }>;
-        materials: unknown[];
-      };
-      const bodyPrimitives = gltf.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0);
-      expect(bodyPrimitives, asset).toBe(9);
-      expect(bodyPrimitives, asset).toBeLessThanOrEqual(THERMAL_GHOST_MAX_BODY_LAYERS);
-      expect(gltf.materials, asset).toHaveLength(4);
+  it('sizes the exact-layer pool for the largest body the shipped corpus can reveal', () => {
+    let corpusMaximum = 0;
+    for (const { asset, primitives } of SHIPPED_OPERATOR_BODIES) {
+      const body = readOperatorBody(asset);
+      expect(body.primitives, asset).toBe(primitives);
+      // The Pass 74 skins are 3.3-5.1x the pass65 operator this bound was
+      // originally derived from; that gap is what silently blacked out the M14,
+      // Railgun and Chopper Gunner reveals. A future body above the bound must
+      // fail here, where it is one constant away from a fix, not in a match.
+      expect(body.primitives, asset).toBeLessThanOrEqual(THERMAL_GHOST_MAX_BODY_LAYERS);
+      // Five material slots per admitted target only holds while a body owns
+      // four appearance materials; the instance resolver caches one clone per
+      // source material, so mesh count does not multiply this.
+      expect(body.materials, asset).toBe(4);
+      corpusMaximum = Math.max(corpusMaximum, body.primitives);
     }
+    expect(corpusMaximum).toBe(46);
+    // Derived capacity, not a round number: layers per body x simultaneous
+    // bodies. Shrinking either factor below the corpus maximum fails here.
+    expect(THERMAL_GHOST_MAX_BODY_LAYERS).toBeGreaterThanOrEqual(corpusMaximum);
+    expect(THERMAL_GHOST_MAX_TARGETS).toBe(16);
+    expect(THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS).toBe(THERMAL_GHOST_MAX_BODY_LAYERS * THERMAL_GHOST_MAX_TARGETS);
+    expect(THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS).toBeGreaterThanOrEqual(corpusMaximum * THERMAL_GHOST_MAX_TARGETS);
+  });
+
+  it('reveals a full 16-target set of corpus-maximum bodies without exhausting the pool', () => {
+    const scene = new THREE.Scene();
+    const geometry = new THREE.BoxGeometry();
+    const corpusMaximum = 46;
+    const targets = Array.from({ length: THERMAL_GHOST_MAX_TARGETS }, (_, targetIndex) => {
+      const root = new THREE.Group();
+      const visual = new THREE.Group();
+      visual.name = 'rigged-operator-visual';
+      // One instance owns four appearance materials however many meshes it has.
+      const materials = Array.from({ length: 4 }, (_, materialIndex) => (
+        new THREE.MeshStandardMaterial({ color: 0x101010 + targetIndex * 0x100 + materialIndex })
+      ));
+      for (let layer = 0; layer < corpusMaximum; layer += 1) {
+        visual.add(new THREE.Mesh(geometry, materials[layer % materials.length]));
+      }
+      root.add(visual);
+      scene.add(root);
+      return { id: `symbiote-${targetIndex}`, relation: 'hostile' as const, root };
+    });
+    const presentation = new ThermalGhostPresentation();
+
+    presentation.sync(targets, true);
+    expect(presentation.telemetry()).toMatchObject({
+      trackedTargets: THERMAL_GHOST_MAX_TARGETS,
+      activeTargets: THERMAL_GHOST_MAX_TARGETS,
+      activeModelLayers: corpusMaximum * THERMAL_GHOST_MAX_TARGETS,
+      activeHaloLayers: corpusMaximum * THERMAL_GHOST_MAX_TARGETS,
+      maxObservedBodyLayers: corpusMaximum,
+      bodyLayerBudgetExceeded: false,
+      oversizedBodyRejections: 0,
+      materialBudgetExceeded: false,
+      completeOperatorModels: true,
+      incompleteTargets: 0,
+      throughGeometry: true,
+      orangeHalo: true,
+    });
+    expect(presentation.telemetry().activeModelLayers).toBeLessThanOrEqual(THERMAL_GHOST_MAX_TOTAL_BODY_LAYERS);
+    presentation.terminalDispose();
+    geometry.dispose();
   });
 
   it('retains exact live-id ghost records across inactive ADS frames', () => {
@@ -485,15 +572,17 @@ describe('M14 thermal ghost residency', () => {
     presentation.terminalDispose();
   });
 
-  it('fails closed instead of drawing a partial body above the frozen layer bound', () => {
+  it('fails closed loudly instead of drawing a partial body above the frozen layer bound', () => {
     const root = new THREE.Group();
     const visual = new THREE.Group();
     visual.name = 'rigged-operator-visual';
     const material = new THREE.MeshBasicMaterial();
-    for (let index = 0; index < THERMAL_GHOST_MAX_BODY_LAYERS + 1; index += 1) {
+    const oversized = THERMAL_GHOST_MAX_BODY_LAYERS + 1;
+    for (let index = 0; index < oversized; index += 1) {
       visual.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
     }
     root.add(visual);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const presentation = new ThermalGhostPresentation();
     presentation.sync([{ id: 'oversized-body', relation: 'hostile', root }], true);
     expect(presentation.telemetry()).toMatchObject({
@@ -505,9 +594,21 @@ describe('M14 thermal ghost residency', () => {
       incompleteTargets: 1,
       throughGeometry: false,
       orangeHalo: false,
+      // Exhaustion is the thing that regressed silently three times. It must
+      // name the measured overflow, not just decline to draw.
+      bodyLayerBudgetExceeded: true,
+      oversizedBodyRejections: 1,
+      maxObservedBodyLayers: oversized,
+      maxBodyLayers: THERMAL_GHOST_MAX_BODY_LAYERS,
     });
     expect(root.getObjectsByProperty('name', 'through-wall-exact-operator-model')).toHaveLength(0);
     expect(root.getObjectsByProperty('name', 'through-wall-operator-orange-halo')).toHaveLength(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toContain(`${oversized} body layers exceed`);
+    // Deduped per distinct size: a per-frame reveal must not spam the console.
+    presentation.sync([{ id: 'oversized-body-2', relation: 'hostile', root }], true);
+    expect(warn).toHaveBeenCalledTimes(1);
     presentation.terminalDispose();
+    warn.mockRestore();
   });
 });

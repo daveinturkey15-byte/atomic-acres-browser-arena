@@ -81,10 +81,6 @@ function frozenPoint(x: number, y: number, z: number): Point3 {
   return Object.freeze({ x, y, z });
 }
 
-function localToWorld(house: HouseArchitecture, x: number, y: number, z: number): Point3 {
-  return frozenPoint(house.origin.x + x, y, house.origin.z + house.origin.facing * z);
-}
-
 function houseWallFragment(
   house: HouseArchitecture,
   suffix: 'front-ground-centre' | 'rear-ground-centre',
@@ -133,6 +129,12 @@ function houseRoofFragment(house: HouseArchitecture, side: -1 | 1): HouseFragmen
 
 function houseFurnitureFragment(house: HouseArchitecture): HouseFragmentDefinition {
   const side = house.team === 0 ? 1 : -1;
+  // HF-387: the locker is now a real movement solid (house-navigation.ts), and this
+  // fragment derives its box FROM it - one authored volume for movement, ballistics
+  // and presentation, exactly how the wall fragments already work. Before this the
+  // sourceId below named a solid that did not exist.
+  const lockerSolid = house.solids.find((candidate) => candidate.id === `${house.id}:authored-storage-locker`);
+  if (!lockerSolid) throw new TypeError(`Missing canonical locker solid ${house.id}:authored-storage-locker`);
   return Object.freeze({
     id: `${house.id}:furniture-storage-locker`,
     houseId: house.id,
@@ -140,8 +142,8 @@ function houseFurnitureFragment(house: HouseArchitecture): HouseFragmentDefiniti
     sourceKind: 'authored-furniture',
     sourceId: `${house.id}:authored-storage-locker`,
     profileOwnedPresentation: false,
-    position: localToWorld(house, side * 6.75, 0.82, -5.65),
-    halfExtents: frozenPoint(0.62, 0.82, 0.36),
+    position: frozenPoint(lockerSolid.position[0], lockerSolid.position[1], lockerSolid.position[2]),
+    halfExtents: frozenPoint(lockerSolid.size[0] / 2, lockerSolid.size[1] / 2, lockerSolid.size[2] / 2),
     rotation: Object.freeze({ x: 0, y: 0, z: 0, w: 1 }),
     ballisticMaterial: 'thin-metal',
     presentationMaterialId: 'storage-locker',

@@ -1,4 +1,10 @@
 import choreographyJson from '../../source-assets/menu/pass65-preview-masters/choreography.json';
+import highSeasChoreographyJson from '../../source-assets/menu/pass75-high-seas-preview/choreography.json';
+import farcrysisChoreographyJson from '../../source-assets/menu/pass77-farcrysis-preview/choreography.json';
+import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-arena-previews/choreography.json';
+import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
+import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
+import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -122,7 +128,68 @@ type ChoreographyRecipe = Readonly<{
   arenas: Readonly<Record<ArenaId, ArenaRecipe>>;
 }>;
 
-const CHOREOGRAPHY = choreographyJson as unknown as ChoreographyRecipe;
+const RETAINED_CHOREOGRAPHY = choreographyJson as unknown as ChoreographyRecipe;
+const HIGH_SEAS_CHOREOGRAPHY = highSeasChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ 'high-seas': HelicopterRecipe }>;
+}>;
+// HF-372: farcrysis had no camera recipe at all, so the menu could only ever
+// show a "PREVIEW STANDBY" placeholder for it. Its recipe lives in its own
+// extension file for the same reason high-seas does: the Pass 66 masters
+// choreography is digest-pinned by the retained production gate, so a new
+// arena is added beside it rather than by rewriting accepted history.
+const FARCRYSIS_CHOREOGRAPHY = farcrysisChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ farcrysis: HelicopterRecipe }>;
+}>;
+// Test1/Test2 (owner 2026-08-30): same extension pattern — the Pass 66 masters
+// choreography stays digest-pinned, so the new arenas ride beside it.
+const TEST_ARENAS_CHOREOGRAPHY = testArenasChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ test1: HelicopterRecipe; test2: HelicopterRecipe }>;
+}>;
+// MAP3 (owner 2026-09-02, HF-405): same extension pattern again. The camera
+// recipe is authored here even though no media has been captured against it
+// yet - a card cannot leave standby without one, and authoring it now is what
+// makes the capture a mechanical step rather than a design step.
+const MAP3_CHOREOGRAPHY = map3ChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ map3: HelicopterRecipe }>;
+}>;
+// NUKETOWN2 (owner 2026-09-02, HF-407): same extension pattern again. The
+// camera recipe is authored here BEFORE any capture exists, for the reason the
+// Map 3 note gives: a card cannot leave standby without one, and authoring it
+// now makes the capture a mechanical step rather than a design step. The orbit
+// runs along the street rather than around a roof, because the street IS the
+// map - see the note in the JSON.
+const NUKETOWN2_CHOREOGRAPHY = nuketown2ChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ nuketown2: HelicopterRecipe }>;
+}>;
+// RAID2 (owner 2026-09-02, HF-408): same extension pattern once more, and the
+// same honesty as Map 3's entry - the camera recipe is authored here before any
+// media has been captured against it, because a card cannot leave standby
+// without one and authoring it now makes the capture a mechanical step rather
+// than a design step. The orbit is fitted to RAID2_BOUNDS, not inherited.
+const RAID2_CHOREOGRAPHY = raid2ChoreographyJson as unknown as Readonly<{
+  recipeId: string;
+  arenas: Readonly<{ raid2: HelicopterRecipe }>;
+}>;
+const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
+  ...RETAINED_CHOREOGRAPHY,
+  arenas: Object.freeze({
+    ...RETAINED_CHOREOGRAPHY.arenas,
+    // ARENA_SELECTIONS order: farcrysis is seventh, high-seas eighth after HF-495.
+    // The offline
+    // authoring roster check compares against that order, so keep it here too.
+    ...FARCRYSIS_CHOREOGRAPHY.arenas,
+    ...HIGH_SEAS_CHOREOGRAPHY.arenas,
+    ...TEST_ARENAS_CHOREOGRAPHY.arenas,
+    ...MAP3_CHOREOGRAPHY.arenas,
+    ...NUKETOWN2_CHOREOGRAPHY.arenas,
+    ...RAID2_CHOREOGRAPHY.arenas,
+  }),
+});
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;
 
 export type MenuPreviewVariance = Readonly<{
@@ -299,7 +366,7 @@ export function menuPreviewDefinition(arenaId: ArenaId): MenuPreviewDefinition {
   return Object.freeze({
     ...CHOREOGRAPHY.arenas[arenaId],
     durationMs: DURATION_MS,
-    recipeId: CHOREOGRAPHY.recipeId,
+    recipeId: arenaId === 'high-seas' ? HIGH_SEAS_CHOREOGRAPHY.recipeId : CHOREOGRAPHY.recipeId,
     reviewFrames: CHOREOGRAPHY.reviewFrames,
   });
 }

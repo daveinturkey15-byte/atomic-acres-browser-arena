@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 
 const baseUrl = process.env.ATOMIC_ACRES_BASE_URL ?? 'http://127.0.0.1:5173/';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const errors = [];
 const shaderErrors = [];
 try {

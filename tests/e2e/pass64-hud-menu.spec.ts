@@ -2,7 +2,24 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { PLAYER_PROFILE_STORAGE_KEY } from '../../src/player-profile';
-import { UI_HIGH_DPI_REVIEW_VIEWPORT, UI_REVIEW_VIEWPORTS } from '../../src/ui/surface-registry';
+import {
+  HUD_MOTION_TARGETS,
+  UI_HIGH_DPI_REVIEW_VIEWPORT,
+  UI_REVIEW_VIEWPORTS,
+} from '../../src/ui/surface-registry';
+import { ARENA_SELECTIONS, SELECTABLE_ARENAS } from '../../src/map-selection';
+import { GRAPHICS_PROFILE_DESCRIPTIONS } from '../../src/ui/graphics-profile-descriptions';
+import { RTX_NATIVE_RUNTIME_OPTION_LABEL } from '../../src/ui/rtx-native-runtime-explainer';
+
+// The GRAPHICS MODE select, as shipped: every rung in the description registry
+// in ladder order, then CUSTOM (no fixed control set, so it has no registry
+// row), then the RTX native-runtime explainer, which is not a preset at all.
+const EXPECTED_GRAPHICS_OPTION_LABELS = [
+  ...GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => profile.label),
+  'CUSTOM',
+  RTX_NATIVE_RUNTIME_OPTION_LABEL,
+];
+
 
 type ReviewViewport = Readonly<{ id: string; width: number; height: number }>;
 
@@ -30,12 +47,44 @@ async function captureReview(page: Page, testInfo: TestInfo, state: string, view
   await testInfo.attach(`${state}-${viewport.id}`, { path, contentType: 'image/png' });
 }
 
+/**
+ * PASS 87 Lane AR, item 1 (skeptic follow-up). Three of this spec's four
+ * remaining reds are match ADMISSION, not layout, and an unattributed
+ * `waitForFunction` timeout on `matchPhase === 'active'` reads exactly like a
+ * HUD regression - which is what the brief asked to rule out by pinning the run
+ * to installed Chrome with a real adapter (PASS73_NATIVE_WEBGPU=1).
+ *
+ * A config flag cannot express "a real adapter is present", so the fail-fast is
+ * here: when admission does not complete, the error names whether the page had a
+ * WebGPU adapter at all and what the deployment stream was last saying. A run
+ * without an adapter now fails with ADMISSION/NO-WEBGPU-ADAPTER instead of a
+ * bare timeout, and cannot be mistaken for the layout assertions above.
+ */
+async function admissionDiagnostics(page: Page): Promise<string> {
+  return page.evaluate(async () => {
+    let adapter = 'unknown';
+    try {
+      adapter = navigator.gpu ? (await navigator.gpu.requestAdapter() ? 'present' : 'absent') : 'no-navigator.gpu';
+    } catch (error) { adapter = `threw: ${String(error)}`; }
+    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot() as { matchPhase?: string };
+    const status = document.querySelector<HTMLElement>('#deploy-status, #loading-status, [data-deploy-progress]')?.textContent?.trim();
+    return `webgpuAdapter=${adapter} matchPhase=${String(snapshot.matchPhase)} deployStatus=${status ?? 'none'}`;
+  });
+}
+
 async function startDeterministicSolo(page: Page): Promise<void> {
   await page.evaluate(() => {
     window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(false);
     window.__ATOMIC_ACRES_DEBUG__.startSolo();
   });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+  try {
+    await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__.snapshot().matchPhase === 'active', undefined, { timeout: 60_000 });
+  } catch (error) {
+    const diagnostics = await admissionDiagnostics(page);
+    const kind = diagnostics.includes('webgpuAdapter=absent') || diagnostics.includes('no-navigator.gpu')
+      ? 'ADMISSION/NO-WEBGPU-ADAPTER' : 'ADMISSION/STALLED';
+    throw new Error(`${kind}: solo never reached matchPhase 'active' in 60 s. This is match admission, NOT the HUD or menu layout asserted elsewhere in this spec. ${diagnostics}\n${String(error)}`);
+  }
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true));
   await page.waitForTimeout(2_500);
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setRenderPaused(true));
@@ -51,22 +100,68 @@ async function refreshPausedCanvasAfterViewportChange(page: Page): Promise<void>
 }
 
 test.describe('Pass 64 command HUD and menu contract', () => {
+  test('keeps frame-driven HUD variables on their consuming elements', async ({ page }) => {
+    await ready(page);
+    const contract = await page.evaluate((definitions) => ({
+      targets: definitions.map((definition) => ({
+        selector: definition.selector,
+        role: definition.role,
+        properties: definition.properties.map((property) => ({
+          property,
+          value: getComputedStyle(document.querySelector<HTMLElement>(definition.selector)!).getPropertyValue(property).trim(),
+        })),
+      })),
+      root: definitions.flatMap(({ properties }) => properties),
+    }), HUD_MOTION_TARGETS);
+    const rootValues = await page.evaluate((properties) => properties.map((property) => ({
+      property,
+      value: document.querySelector<HTMLElement>('#hud')!.style.getPropertyValue(property).trim(),
+    })), [...new Set(contract.root)]);
+    expect(rootValues).toEqual(rootValues.map(({ property }) => ({ property, value: '' })));
+    expect(contract.targets.every(({ role, properties }) => properties.every(({ value }) => value === (role === 'health' ? '1' : '0')))).toBe(true);
+  });
+
   test('uses one ordered arena registry with new labels and stable machine ids', async ({ page }) => {
     await ready(page);
     const cards = page.locator('.map-card');
-    await expect(cards).toHaveCount(4);
-    await expect(cards).toHaveText([
-      /NUKE TOWN/, /TERMINAL/, /RUSTRIG/, /GUN RANGE/,
-    ]);
+    /**
+     * PASS 87 Lane AR, item 1. This used to pin a frozen six-row list, and by
+     * PASS 86 it named an arena the menu did not then offer (farcrysis, hidden
+     * from 2026-08-28 to HF-423, which ships it again in PASS 87 as a preview
+     * card) and missed four it does (test1, test2, map3, nuketown2). A hand-written
+     * roster in a browser gate is a second source of truth: it goes stale on
+     * the pass that adds an arena, and the red it produces looks like a menu
+     * regression rather than a stale test.
+     *
+     * Derived from SELECTABLE_ARENAS - the same export the menu builds its
+     * cards from - so Raid Rebuild and anything after it are covered the day
+     * they land. The ORDER and the machine ids are still asserted exactly;
+     * that is the contract this test owns.
+     */
+    await expect(cards).toHaveCount(SELECTABLE_ARENAS.length);
     expect(await cards.evaluateAll((elements) => elements.map((element) => ({
       id: (element as HTMLElement).dataset.arenaId,
       route: (element as HTMLElement).dataset.arenaRoute,
-    })))).toEqual([
-      { id: 'atomic-acres', route: 'nuke-town' },
-      { id: 'skyline-terminal', route: 'terminal' },
-      { id: 'rustworks-1v1', route: 'rustrig' },
-      { id: 'gun-range', route: 'gun-range' },
-    ]);
+    })))).toEqual(SELECTABLE_ARENAS.map((arena) => ({ id: arena.id, route: arena.routeId })));
+    // HF-495 (owner, 2026-09-04): Nuke Town Rebuild leads the cards and Raid
+    // Rebuild is second; the following two retained cards stay next.
+    await expect(cards.nth(0)).toContainText(/NUKE TOWN REBUILD/u);
+    await expect(cards.nth(1)).toContainText(/RAID REBUILD/u);
+    await expect(cards.nth(2)).toContainText(/TERMINAL/u);
+    await expect(cards.nth(3)).toContainText(/RUSTRIG/u);
+    /**
+     * A hidden arena must never reach the deployment shell - asserted as the
+     * CONTRACT, naming no arena. The first version of this line named farcrysis,
+     * and it was stale before it was written: HF-423 sets farcrysis
+     * selectable: true at the integration head (FARCRYSIS - PREVIEW ships in
+     * PASS 87), so a hand-written exclusion would have red-ed pass64-hud-contracts
+     * for every contributor on merge - the exact failure mode the derivation above
+     * exists to end.
+     */
+    const hiddenArenaIds = ARENA_SELECTIONS.filter((arena) => arena.selectable === false).map((arena) => arena.id);
+    const renderedArenaIds = await cards.evaluateAll((elements) => elements.map((element) => (element as HTMLElement).dataset.arenaId));
+    expect(renderedArenaIds.filter((id) => hiddenArenaIds.includes(id as typeof hiddenArenaIds[number])),
+      'no arena marked selectable: false may render a card').toEqual([]);
 
     await expect(page.locator('#menu-showcase > #game')).toHaveCount(0);
     await expect(page.locator('#menu-preview-video')).toBeVisible();
@@ -74,14 +169,18 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await expect(page.locator('#menu-preview-label')).toContainText('NUKE TOWN');
 
     await cards.nth(1).click();
+    await expect(page.locator('#arena-title')).toHaveText('RAID REBUILD');
+    await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
+    await expect(page.locator('#menu-preview-label')).toContainText('RAID REBUILD');
+    await cards.nth(2).click();
     await expect(page.locator('#arena-title')).toHaveText('TERMINAL');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('TERMINAL');
-    await cards.nth(2).click();
+    await cards.nth(3).click();
     await expect(page.locator('#arena-title')).toHaveText('RustRig');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'helicopter');
     await expect(page.locator('#menu-preview-label')).toContainText('RUSTRIG');
-    await cards.nth(3).click();
+    await cards.nth(4).click();
     await expect(page.locator('#arena-title')).toHaveText('GUN RANGE');
     await expect(page.locator('#menu-preview-frame')).toHaveAttribute('data-frame', 'cat');
     await expect(page.locator('#menu-preview-label')).toContainText('CAT-CAM');
@@ -124,31 +223,90 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await ready(page);
     await page.locator('#menu-tab-options').click();
-    await expect(page.locator('#graphics-profile option')).toHaveText(['QUALITY', 'PERFORMANCE', 'MAX', 'CUSTOM']);
+    // PASS 81: re-pinned to the SHIPPED five-option list. The RAY TRACED
+    // preset landed in src/ui/pass64-shell.ts and src/pass65-settings.ts and
+    // is pinned by src/ui/pass64-shell.test.ts, but these browser assertions
+    // still named the old four, so the change shipped with its own e2e red.
+    //
+    // HF-418 (PASS 85): re-pinned AGAIN, to the SHIPPED seven-entry ladder.
+    // AGENTS.md makes this spec mandatory for every HUD/menu change, so this
+    // is the site that must never go stale: BALANCED joined the ladder, the
+    // list CLIMBS, and the last entry is the RTX native-runtime EXPLAINER,
+    // which is not a preset and changes no renderer setting.
+    // PASS 89: DERIVED, not re-typed. This list has now gone stale twice for
+    // the same reason - a rung moved in the shipped ladder and three browser
+    // assertions kept naming the old one. The ladder's order and labels stay
+    // pinned literally, ONCE, in src/graphics-profile-contract.test.ts; here
+    // we assert the rendered DOM equals that shipped ladder.
+    // HF-438: the RAY TRACED rung retired; the derived roster follows the
+    // registry without another manual edit here.
+    await expect(page.locator('#graphics-profile option')).toHaveCount(EXPECTED_GRAPHICS_OPTION_LABELS.length);
+    await expect(page.locator('#graphics-profile option')).toHaveText(EXPECTED_GRAPHICS_OPTION_LABELS);
     await expect(page.locator('#advanced-graphics')).not.toHaveAttribute('open', '');
     await expect(page.locator('#graphics-target-fps')).toBeHidden();
     await page.locator('#advanced-graphics summary').click();
     await expect(page.locator('#graphics-target-fps')).toBeVisible();
     await expect(page.locator('#graphics-target-fps')).toHaveAttribute('max', '360');
     await expect(page.locator('#graphics-target-fps-marks option[value="240"]')).toHaveCount(1);
-    await expect(page.locator('[data-graphics-setting]')).toHaveCount(22);
-    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]')).toHaveCount(6);
     await expect(page.locator('#graphics-frame-rate-limit')).toHaveAttribute('max', '361');
     await expect(page.locator('#graphics-frame-rate-limit-value')).toHaveText('UNCAPPED');
     const registry = await page.evaluate(() => (
       window.__ATOMIC_ACRES_DEBUG__.snapshot().settings as {
-        advancedGraphicsRegistry: { registeredKeys: string[]; controls: Array<{ runtimeConsumer: string }> };
+        advancedGraphicsRegistry: {
+          registeredKeys: string[];
+          controls: Array<{ key: string; runtimeConsumer: string }>;
+          unavailableCapabilities: Array<{ id: string; reason: string }>;
+        };
       }
     ).advancedGraphicsRegistry);
-    expect(registry.registeredKeys).toHaveLength(22);
+    /**
+     * PASS 87 Lane AR, item 1. These two were frozen counts - 22 controls and 6
+     * disabled capabilities - and the shipped renderer-feature inventory has
+     * since grown to 40, so this spec failed on a number rather than on a
+     * contract. AGENTS.md states the contract itself: the panel is GENERATED
+     * from the canonical inventory and every visible control must have a real
+     * runtime consumer. Asserted that way, this now catches what a frozen count
+     * never could - a control rendered with no registry row behind it, or a
+     * registry row that renders nothing - and it does not go stale when the
+     * inventory grows.
+     *
+     * The bijection alone would still pass on an inventory that had silently
+     * collapsed from 40 controls to 1, so it carries a ONE-DIRECTIONAL floor
+     * beside it. 40 is measured, not guessed: ADVANCED_GRAPHICS_CONTROLS.length
+     * in src/graphics-settings-registry.ts is 40 at this commit. Growth is free;
+     * shrinkage needs a deliberate edit to this line and a reason for it.
+     *
+     * No floor on unavailableCapabilities: that list is what the RUNTIME adapter
+     * could not offer, so its length is a property of the test machine's GPU, not
+     * of the shipped inventory. The contract asserted for it - one disabled
+     * control per unavailable capability, each with a reason - is the part that
+     * is machine-independent.
+     */
+    expect(registry.registeredKeys.length, 'the advanced panel must be generated from a non-empty inventory')
+      .toBeGreaterThan(0);
+    expect(registry.registeredKeys.length, 'the shipped renderer-feature inventory was 40 controls; it must not shrink silently')
+      .toBeGreaterThanOrEqual(40);
+    await expect(page.locator('[data-graphics-setting]')).toHaveCount(registry.registeredKeys.length);
+    const renderedKeys = await page.locator('[data-graphics-setting]')
+      .evaluateAll((elements) => elements.map((element) => (element as HTMLElement).dataset.graphicsSetting));
+    expect([...renderedKeys].sort(), 'every registry key renders exactly one control, and no control is orphaned')
+      .toEqual([...registry.registeredKeys].sort());
     expect(registry.controls.every(({ runtimeConsumer }) => runtimeConsumer.length > 0)).toBe(true);
+    await expect(page.locator('[data-graphics-capability][aria-disabled="true"]'))
+      .toHaveCount(registry.unavailableCapabilities.length);
+    expect(registry.unavailableCapabilities.every(({ reason }) => reason.length > 0),
+      'a disabled capability must say why').toBe(true);
     const layout = await page.evaluate(() => ({
       pageOverflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       panelOverflowX: document.querySelector<HTMLElement>('#menu-panel-options')!.scrollWidth
         - document.querySelector<HTMLElement>('#menu-panel-options')!.clientWidth,
       labelFontPx: Number.parseFloat(getComputedStyle(document.querySelector<HTMLElement>('.graphics-preset-row label')!).fontSize),
     }));
-    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 12 });
+    // HF-362 raised the --pass66-copy floor from 12px to 13px so settings
+    // labels clear the AGENTS.md >= 12px minimum with margin rather than
+    // sitting exactly on it. Overflow must still be zero, which is the part of
+    // this assertion that actually guards layout.
+    expect(layout).toEqual({ pageOverflowX: 0, panelOverflowX: 0, labelFontPx: 13 });
     const directory = resolve(process.cwd(), 'artifacts/pass65/graphics-options');
     mkdirSync(directory, { recursive: true });
     const screenshot = resolve(directory, 'advanced-webgpu-controls-1280x720.png');
@@ -381,6 +539,25 @@ test.describe('Pass 64 command HUD and menu contract', () => {
       expect(layout.contract).toBe('pass64-command-v2');
       expect(layout.pageOverflowX).toBe(0);
       expect(layout.menuOverflowX).toBe(0);
+      /**
+       * PASS 87 Lane AR, item 1. The cheapest way to make the line above green
+       * is to give #menu `overflow: clip`, which makes scrollWidth equal
+       * clientWidth for everything, forever. This proves the measurement is
+       * still able to see an overflow: inject one, confirm it is reported, take
+       * it out again. Without this, a future "fix" could blind the assertion
+       * and nothing would say so.
+       */
+      const sensitivity = await page.evaluate(() => {
+        const menu = document.querySelector<HTMLElement>('#menu')!;
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:absolute;left:0;top:0;width:200%;height:1px;pointer-events:none';
+        menu.appendChild(probe);
+        const overflow = menu.scrollWidth - menu.clientWidth;
+        probe.remove();
+        return { overflow, restored: menu.scrollWidth - menu.clientWidth };
+      });
+      expect(sensitivity.overflow, 'menuOverflowX must still be able to report an overflow').toBeGreaterThan(0);
+      expect(sensitivity.restored, 'and the probe must leave nothing behind').toBe(0);
       expect(layout.withinViewport).toBe(true);
       expect(layout.mapWithinMenu).toBe(true);
       expect(layout.showcaseInsideWorkspace).toBe(true);
@@ -420,7 +597,9 @@ test.describe('Pass 64 command HUD and menu contract', () => {
         pageOverflowX: 0,
         menuOverflowX: 0,
         withinViewport: true,
-        mapCardCount: 4,
+        // Lane AR item 1: was a frozen 6. Derived, for the reason written on
+        // the registry test above.
+        mapCardCount: SELECTABLE_ARENAS.length,
       });
       await captureReview(page, testInfo, 'setup', highDpiViewport);
     } finally {
@@ -460,6 +639,19 @@ test.describe('Pass 64 command HUD and menu contract', () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await ready(page);
     await startDeterministicSolo(page);
+
+    await page.keyboard.press('F3');
+    await expect(page.locator('#netcode-diagnostics-overlay')).toBeVisible();
+    await expect.poll(async () => page.locator('#netcode-diagnostics-overlay').evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        pointerEvents: style.pointerEvents,
+        zIndex: style.zIndex,
+        fontPx: Number.parseFloat(style.fontSize),
+      };
+    })).toEqual({ pointerEvents: 'none', zIndex: '70', fontPx: 12 });
+    await page.keyboard.press('F3');
+    await expect(page.locator('#netcode-diagnostics-overlay')).toBeHidden();
 
     for (const selector of ['#hud', '#matchbar', '#crosshair', '#minimap', '#health-block', '#weapon-block', '#equipment-block', '#support-block']) {
       await expect(page.locator(selector)).toBeVisible();

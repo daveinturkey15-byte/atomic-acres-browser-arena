@@ -73,15 +73,56 @@ export function shouldBotThrowGrenade(sense: BotGrenadeSense): boolean {
     && sense.random < 0.32;
 }
 
-/** Ten-defeat Nuke Town reinforcements, capped so an uncapped score race stays performant. */
-export function soloBotTargetForDeaths(botDeaths: number): number {
+/**
+ * Ten-defeat reinforcements, capped so an uncapped score race stays performant.
+ *
+ * HF-491 (owner, 2026-09-04): the ladder is now the rule for EVERY arena that
+ * declares a maximum, not a single hard-coded arena id, so `initialBots` and
+ * `maximumBots` are parameters read off the arena catalog. Both default to the
+ * Pass 66 constants, so an arena that declares nothing behaves exactly as it
+ * did before this change - that is what keeps the Pass 66 contract true.
+ */
+export function soloBotTargetForDeaths(
+  botDeaths: number,
+  initialBots: number = SOLO_BOT_COUNT,
+  maximumBots: number = MAX_SOLO_BOTS,
+): number {
   const deaths = Number.isFinite(botDeaths) ? Math.max(0, Math.floor(botDeaths)) : 0;
-  return Math.min(MAX_SOLO_BOTS, SOLO_BOT_COUNT + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
+  const start = Number.isFinite(initialBots) ? Math.max(0, Math.floor(initialBots)) : SOLO_BOT_COUNT;
+  const ceiling = Number.isFinite(maximumBots) ? Math.max(0, Math.floor(maximumBots)) : MAX_SOLO_BOTS;
+  return Math.min(ceiling, start + Math.floor(deaths / BOT_DEATHS_PER_REINFORCEMENT));
 }
 
 /** Yaw that points Atomic Acres' authoritative -Z operator-forward axis toward a target. */
 export function operatorYawToward(from: { x: number; z: number }, target: { x: number; z: number }): number {
   return Math.atan2(-(target.x - from.x), -(target.z - from.z));
+}
+
+/** Eye height a bot aims FROM, matching the standing eye used by its sight checks. */
+export const BOT_AIM_ORIGIN_HEIGHT_M = 1.42;
+
+/**
+ * Pass 77 / HF-375. Aim pitch toward a target, positive up, matching the camera
+ * and protocol pitch convention (`aimDirection` builds its ray with
+ * `Euler(pitch, yaw, 0, 'YXZ')`, whose Y component is `sin(pitch)`).
+ *
+ * Every bot `poseOperator` call passed a literal 0 for pitch, so a bot firing up
+ * a stairwell or down off a superstructure stood perfectly level. Bots aim in 3D
+ * already - `botHasLineOfSight` raycasts from eye height to a target's eyes -
+ * so the number existed; nothing had ever computed it for presentation.
+ */
+export function operatorPitchToward(
+  from: { x: number; y: number; z: number },
+  target: { x: number; y: number; z: number },
+  originHeightM = BOT_AIM_ORIGIN_HEIGHT_M,
+): number {
+  const dx = target.x - from.x;
+  const dz = target.z - from.z;
+  const dy = target.y - (from.y + originHeightM);
+  const horizontal = Math.hypot(dx, dz);
+  if (!Number.isFinite(dy) || !Number.isFinite(horizontal)) return 0;
+  if (horizontal < 1e-4) return dy > 0 ? Math.PI / 2 : dy < 0 ? -Math.PI / 2 : 0;
+  return Math.atan2(dy, horizontal);
 }
 
 export type SpawnCandidate = {

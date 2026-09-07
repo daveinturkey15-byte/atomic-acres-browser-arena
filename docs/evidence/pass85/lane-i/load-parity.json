@@ -1,0 +1,1767 @@
+{
+  "generatedAt": "2026-09-02T16:00:46.609Z",
+  "label": "pass85b",
+  "base": "http://127.0.0.1:41947",
+  "gitSha": "6be910acb5c91e9b08f1112697a56d78f93e2ae8",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "seed": "iblparity",
+  "machine": {
+    "comfyUi": "idle",
+    "gpuFreeMiB": 4343,
+    "gpuTotalMiB": 16303
+  },
+  "arenas": {
+    "atomic-acres": {
+      "warmupArena": "skyline-terminal",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "nuke-town-overview",
+            "nuke-town-plan",
+            "nuke-town-street-axis",
+            "nuke-town-west-garden",
+            "nuke-town-aqua-upper-roof",
+            "nuke-town-aqua-wall-closed",
+            "nuke-town-aqua-door-open"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+          "sceneEnvironmentIntensity": 0.24,
+          "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "atomic-acres",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-atomic-acres-256",
+            "environmentIntensity": 0.24,
+            "expectedEnvironmentIntensity": 0.24,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "nuke-town-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "nuke-town-plan",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0.5,
+          "meanAbsDelta": 0.0004
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "nuke-town-overview",
+            "nuke-town-plan",
+            "nuke-town-street-axis",
+            "nuke-town-west-garden",
+            "nuke-town-aqua-upper-roof",
+            "nuke-town-aqua-wall-closed",
+            "nuke-town-aqua-door-open"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+          "sceneEnvironmentIntensity": 0.24,
+          "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "atomic-acres",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-atomic-acres-256",
+            "environmentIntensity": 0.24,
+            "expectedEnvironmentIntensity": 0.24,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "nuke-town-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "nuke-town-plan",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0.6,
+          "meanAbsDelta": 0.00042
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "atomic-acres",
+        "second": "atomic-acres"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "nuke-town-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.179,
+          "meanLuminanceSecond": 0.1791,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0.9,
+          "meanAbsDelta": 0.00057
+        },
+        {
+          "cameraId": "nuke-town-plan",
+          "ok": true,
+          "meanLuminanceFirst": 0.1245,
+          "meanLuminanceSecond": 0.1245,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0.4,
+          "meanAbsDelta": 0.00033
+        }
+      ],
+      "noiseFloorPercent": 0.01,
+      "noiseFloorMovedPercent": 0.6
+    },
+    "skyline-terminal": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "terminal-overview",
+            "terminal-cabin-ceiling",
+            "terminal-concourse-wall-closed",
+            "terminal-boarding-open",
+            "terminal-port-wing-authority",
+            "terminal-starboard-wing-authority"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-skyline-terminal-256",
+          "sceneEnvironmentIntensity": 0.22,
+          "sceneBackground": "pass66-generated-sky-backdrop-airport-dawn",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "skyline-terminal",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-skyline-terminal-256",
+            "environmentIntensity": 0.22,
+            "expectedEnvironmentIntensity": 0.22,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-airport-dawn",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "terminal-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "terminal-cabin-ceiling",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1744,
+          "meanLuminanceSecond": 0.1744,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00024
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "terminal-overview",
+            "terminal-cabin-ceiling",
+            "terminal-concourse-wall-closed",
+            "terminal-boarding-open",
+            "terminal-port-wing-authority",
+            "terminal-starboard-wing-authority"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-skyline-terminal-256",
+          "sceneEnvironmentIntensity": 0.22,
+          "sceneBackground": "pass66-generated-sky-backdrop-airport-dawn",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "skyline-terminal",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-skyline-terminal-256",
+            "environmentIntensity": 0.22,
+            "expectedEnvironmentIntensity": 0.22,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-airport-dawn",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "terminal-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "terminal-cabin-ceiling",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1744,
+          "meanLuminanceSecond": 0.1744,
+          "meanLuminanceDeltaPercent": 0.02,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00022
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "skyline-terminal",
+        "second": "skyline-terminal"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "terminal-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.2966,
+          "meanLuminanceSecond": 0.2966,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0.1,
+          "meanAbsDelta": 0.00031
+        },
+        {
+          "cameraId": "terminal-cabin-ceiling",
+          "ok": true,
+          "meanLuminanceFirst": 0.1744,
+          "meanLuminanceSecond": 0.1744,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00025
+        }
+      ],
+      "noiseFloorPercent": 0.02,
+      "noiseFloorMovedPercent": 0
+    },
+    "rustworks-1v1": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "rustrig-overview",
+            "rustrig-tower-support",
+            "rustrig-container-wall",
+            "rustrig-container-dynamic-northwest",
+            "rustrig-container-dynamic-southeast",
+            "rustrig-mounted-work-lights",
+            "rustrig-deck-surface"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-rustworks-1v1-256",
+          "sceneEnvironmentIntensity": 0.14,
+          "sceneBackground": "pass66-generated-sky-backdrop-industrial-night",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "rustworks-1v1",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-rustworks-1v1-256",
+            "environmentIntensity": 0.14,
+            "expectedEnvironmentIntensity": 0.14,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-industrial-night",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "rustrig-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "rustrig-tower-support",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.0444,
+          "meanLuminanceSecond": 0.0444,
+          "meanLuminanceDeltaPercent": -0.11,
+          "pixelsMovedPercent": 0.2,
+          "meanAbsDelta": 0.00019
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "rustrig-overview",
+            "rustrig-tower-support",
+            "rustrig-container-wall",
+            "rustrig-container-dynamic-northwest",
+            "rustrig-container-dynamic-southeast",
+            "rustrig-mounted-work-lights",
+            "rustrig-deck-surface"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-rustworks-1v1-256",
+          "sceneEnvironmentIntensity": 0.14,
+          "sceneBackground": "pass66-generated-sky-backdrop-industrial-night",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "rustworks-1v1",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-rustworks-1v1-256",
+            "environmentIntensity": 0.14,
+            "expectedEnvironmentIntensity": 0.14,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-industrial-night",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "rustrig-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "rustrig-tower-support",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.0444,
+          "meanLuminanceSecond": 0.0444,
+          "meanLuminanceDeltaPercent": 0.03,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00014
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "rustworks-1v1",
+        "second": "rustworks-1v1"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "rustrig-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.0425,
+          "meanLuminanceSecond": 0.0426,
+          "meanLuminanceDeltaPercent": 0.1,
+          "pixelsMovedPercent": 0.1,
+          "meanAbsDelta": 0.00025
+        },
+        {
+          "cameraId": "rustrig-tower-support",
+          "ok": true,
+          "meanLuminanceFirst": 0.0444,
+          "meanLuminanceSecond": 0.0444,
+          "meanLuminanceDeltaPercent": -0.07,
+          "pixelsMovedPercent": 0.4,
+          "meanAbsDelta": 0.00038
+        }
+      ],
+      "noiseFloorPercent": 0.11,
+      "noiseFloorMovedPercent": 0.2
+    },
+    "gun-range": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "gun-range-overview",
+            "gun-range-armory-support",
+            "gun-range-lane-wall",
+            "gun-range-neon-lanes",
+            "gun-range-lateral-targets",
+            "gun-range-test-bay-corridor",
+            "gun-range-test-bay-door-approach",
+            "gun-range-test-bay-door-relief",
+            "gun-range-test-bay-door-bay-face",
+            "gun-range-test-bay-overview"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-gun-range-256",
+          "sceneEnvironmentIntensity": 0.1,
+          "sceneBackground": "pass66-sky-backdrop-indoor-range",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "gun-range",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-gun-range-256",
+            "environmentIntensity": 0.1,
+            "expectedEnvironmentIntensity": 0.1,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-indoor-range",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "gun-range-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "gun-range-armory-support",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.0642,
+          "meanLuminanceSecond": 0.0643,
+          "meanLuminanceDeltaPercent": 0.26,
+          "pixelsMovedPercent": 0.7,
+          "meanAbsDelta": 0.00048
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 3,
+          "reviewCameraIds": [
+            "nuke-town-overview",
+            "nuke-town-plan",
+            "nuke-town-street-axis",
+            "nuke-town-west-garden",
+            "nuke-town-aqua-upper-roof",
+            "nuke-town-aqua-wall-closed",
+            "nuke-town-aqua-door-open"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-atomic-acres-256",
+          "sceneEnvironmentIntensity": 0.24,
+          "sceneBackground": "pass66-generated-sky-backdrop-sunset-farmland",
+          "skyBackdropStatus": "asset-ready",
+          "published": {
+            "arenaId": "atomic-acres",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-atomic-acres-256",
+            "environmentIntensity": 0.24,
+            "expectedEnvironmentIntensity": 0.24,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-generated-sky-backdrop-sunset-farmland",
+            "resolutionTier": 256,
+            "generatedCubeSize": 4096
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "nuke-town-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "nuke-town-plan",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1365,
+          "meanLuminanceSecond": 0.1365,
+          "meanLuminanceDeltaPercent": -0.02,
+          "pixelsMovedPercent": 0.6,
+          "meanAbsDelta": 0.00042
+        },
+        "errors": [
+          "[Gun Range map selection failed] Error: WebGPU queue completion exceeded 12000 ms for submission 614 (completed 613, mode serialized, in-flight 1, pending 12016 ms, probes 614, prior latency 44 ms, fenced draws 770)\n    at http://127.0.0.1:"
+        ],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "gun-range",
+        "second": "atomic-acres"
+      },
+      "selectionFailed": true
+    },
+    "farcrysis": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "farcrysis-beach-golden",
+            "farcrysis-jungle-dapple",
+            "farcrysis-core-interior",
+            "farcrysis-seaplane-throwback",
+            "farcrysis-island-topdown",
+            "farcrysis-west-shoreline"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-farcrysis-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-jungle-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "farcrysis",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-farcrysis-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-jungle-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "farcrysis-beach-golden",
+            "ok": true
+          },
+          {
+            "cameraId": "farcrysis-jungle-dapple",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1718,
+          "meanLuminanceSecond": 0.1718,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00023
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "farcrysis-beach-golden",
+            "farcrysis-jungle-dapple",
+            "farcrysis-core-interior",
+            "farcrysis-seaplane-throwback",
+            "farcrysis-island-topdown",
+            "farcrysis-west-shoreline"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-farcrysis-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-jungle-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "farcrysis",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-farcrysis-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-jungle-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "farcrysis-beach-golden",
+            "ok": true
+          },
+          {
+            "cameraId": "farcrysis-jungle-dapple",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1716,
+          "meanLuminanceSecond": 0.1722,
+          "meanLuminanceDeltaPercent": 0.33,
+          "pixelsMovedPercent": 6.4,
+          "meanAbsDelta": 0.00587
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "farcrysis",
+        "second": "farcrysis"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "farcrysis-beach-golden",
+          "ok": true,
+          "meanLuminanceFirst": 0.2947,
+          "meanLuminanceSecond": 0.2883,
+          "meanLuminanceDeltaPercent": -2.17,
+          "pixelsMovedPercent": 19,
+          "meanAbsDelta": 0.01979
+        },
+        {
+          "cameraId": "farcrysis-jungle-dapple",
+          "ok": true,
+          "meanLuminanceFirst": 0.1718,
+          "meanLuminanceSecond": 0.1716,
+          "meanLuminanceDeltaPercent": -0.12,
+          "pixelsMovedPercent": 21.7,
+          "meanAbsDelta": 0.0172
+        }
+      ],
+      "noiseFloorPercent": 0.33,
+      "noiseFloorMovedPercent": 6.4
+    },
+    "high-seas": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "high-seas-starboard-overview",
+            "high-seas-stern-main-deck",
+            "high-seas-upper-deck-occlusion",
+            "high-seas-bow-lane"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-high-seas-256",
+          "sceneEnvironmentIntensity": 0.2,
+          "sceneBackground": "pass66-sky-backdrop-open-ocean-day",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "high-seas",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-high-seas-256",
+            "environmentIntensity": 0.2,
+            "expectedEnvironmentIntensity": 0.2,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-open-ocean-day",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "high-seas-starboard-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "high-seas-stern-main-deck",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.333,
+          "meanLuminanceSecond": 0.3331,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00035
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "high-seas-starboard-overview",
+            "high-seas-stern-main-deck",
+            "high-seas-upper-deck-occlusion",
+            "high-seas-bow-lane"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-high-seas-256",
+          "sceneEnvironmentIntensity": 0.2,
+          "sceneBackground": "pass66-sky-backdrop-open-ocean-day",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "high-seas",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-high-seas-256",
+            "environmentIntensity": 0.2,
+            "expectedEnvironmentIntensity": 0.2,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-open-ocean-day",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "high-seas-starboard-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "high-seas-stern-main-deck",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.333,
+          "meanLuminanceSecond": 0.333,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00043
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "high-seas",
+        "second": "high-seas"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "high-seas-starboard-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.3373,
+          "meanLuminanceSecond": 0.3373,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00045
+        },
+        {
+          "cameraId": "high-seas-stern-main-deck",
+          "ok": true,
+          "meanLuminanceFirst": 0.3331,
+          "meanLuminanceSecond": 0.333,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00016
+        }
+      ],
+      "noiseFloorPercent": 0.01,
+      "noiseFloorMovedPercent": 0
+    },
+    "test1": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "test1-tower-overview",
+            "test1-firing-line",
+            "test1-container-occlusion",
+            "test1-into-sun-hardpan"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-test1-256",
+          "sceneEnvironmentIntensity": 0.16,
+          "sceneBackground": "pass66-sky-backdrop-range-midmorning",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "test1",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-test1-256",
+            "environmentIntensity": 0.16,
+            "expectedEnvironmentIntensity": 0.16,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "test1-tower-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "test1-firing-line",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.2057,
+          "meanLuminanceSecond": 0.2056,
+          "meanLuminanceDeltaPercent": -0.02,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00025
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "test1-tower-overview",
+            "test1-firing-line",
+            "test1-container-occlusion",
+            "test1-into-sun-hardpan"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-test1-256",
+          "sceneEnvironmentIntensity": 0.16,
+          "sceneBackground": "pass66-sky-backdrop-range-midmorning",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "test1",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-test1-256",
+            "environmentIntensity": 0.16,
+            "expectedEnvironmentIntensity": 0.16,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "test1-tower-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "test1-firing-line",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.2056,
+          "meanLuminanceSecond": 0.2056,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00025
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "test1",
+        "second": "test1"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "test1-tower-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.2464,
+          "meanLuminanceSecond": 0.2465,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0.1,
+          "meanAbsDelta": 0.00031
+        },
+        {
+          "cameraId": "test1-firing-line",
+          "ok": true,
+          "meanLuminanceFirst": 0.2057,
+          "meanLuminanceSecond": 0.2056,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00026
+        }
+      ],
+      "noiseFloorPercent": 0.02,
+      "noiseFloorMovedPercent": 0
+    },
+    "test2": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "test2-estate-overview",
+            "test2-pool-lane",
+            "test2-garden-occlusion",
+            "test2-into-sun-terrace"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-test2-256",
+          "sceneEnvironmentIntensity": 0.22,
+          "sceneBackground": "pass66-sky-backdrop-estate-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "test2",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-test2-256",
+            "environmentIntensity": 0.22,
+            "expectedEnvironmentIntensity": 0.22,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-estate-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "test2-estate-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "test2-pool-lane",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.3219,
+          "meanLuminanceSecond": 0.3219,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00041
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "test2-estate-overview",
+            "test2-pool-lane",
+            "test2-garden-occlusion",
+            "test2-into-sun-terrace"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-test2-256",
+          "sceneEnvironmentIntensity": 0.22,
+          "sceneBackground": "pass66-sky-backdrop-estate-golden-hour",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "test2",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-test2-256",
+            "environmentIntensity": 0.22,
+            "expectedEnvironmentIntensity": 0.22,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-estate-golden-hour",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "test2-estate-overview",
+            "ok": true
+          },
+          {
+            "cameraId": "test2-pool-lane",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.322,
+          "meanLuminanceSecond": 0.322,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00037
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "test2",
+        "second": "test2"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "test2-estate-overview",
+          "ok": true,
+          "meanLuminanceFirst": 0.2457,
+          "meanLuminanceSecond": 0.2457,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00042
+        },
+        {
+          "cameraId": "test2-pool-lane",
+          "ok": true,
+          "meanLuminanceFirst": 0.322,
+          "meanLuminanceSecond": 0.322,
+          "meanLuminanceDeltaPercent": 0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00033
+        }
+      ],
+      "noiseFloorPercent": 0,
+      "noiseFloorMovedPercent": 0
+    },
+    "map3": {
+      "warmupArena": "atomic-acres",
+      "first": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 1,
+          "reviewCameraIds": [
+            "map3-hub-vista",
+            "map3-bay-nature",
+            "map3-volume-hall",
+            "map3-into-sun-hub"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-map3-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-range-midmorning",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "map3",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-map3-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "map3-hub-vista",
+            "ok": true
+          },
+          {
+            "cameraId": "map3-bay-nature",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1924,
+          "meanLuminanceSecond": 0.1924,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00023
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "second": {
+        "ok": true,
+        "backend": "webgpu",
+        "adapter": {
+          "gpu": true,
+          "adapter": true,
+          "device": true,
+          "vendor": "nvidia"
+        },
+        "observation": {
+          "appliedTslArenaDefinitions": 2,
+          "reviewCameraIds": [
+            "map3-hub-vista",
+            "map3-bay-nature",
+            "map3-volume-hall",
+            "map3-into-sun-hub"
+          ],
+          "sceneEnvironment": "pass64-arena-environment-map3-256",
+          "sceneEnvironmentIntensity": 0.18,
+          "sceneBackground": "pass66-sky-backdrop-range-midmorning",
+          "skyBackdropStatus": "procedural-ready",
+          "published": {
+            "arenaId": "map3",
+            "reflectionQuality": "high",
+            "present": true,
+            "environmentName": "pass64-arena-environment-map3-256",
+            "environmentIntensity": 0.18,
+            "expectedEnvironmentIntensity": 0.18,
+            "matchesIblState": true,
+            "sourceTextureName": "pass66-sky-backdrop-range-midmorning",
+            "resolutionTier": 256,
+            "generatedCubeSize": 2048
+          }
+        },
+        "shots": [
+          {
+            "cameraId": "map3-hub-vista",
+            "ok": true
+          },
+          {
+            "cameraId": "map3-bay-nature",
+            "ok": true
+          }
+        ],
+        "noise": {
+          "meanLuminanceFirst": 0.1924,
+          "meanLuminanceSecond": 0.1924,
+          "meanLuminanceDeltaPercent": -0.01,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00023
+        },
+        "errors": [],
+        "combat": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        },
+        "combatAfter": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0
+        }
+      },
+      "committedArena": {
+        "first": "map3",
+        "second": "map3"
+      },
+      "combat": {
+        "first": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        },
+        "second": {
+          "hp": 100,
+          "alive": true,
+          "lowHealthOpacity": 0,
+          "lowHealthActive": false,
+          "damageMarkerOpacity": 0,
+          "after": {
+            "hp": 100,
+            "alive": true,
+            "lowHealthOpacity": 0,
+            "lowHealthActive": false,
+            "damageMarkerOpacity": 0
+          },
+          "clean": true
+        }
+      },
+      "observationDiff": {},
+      "observationParity": true,
+      "cameras": [
+        {
+          "cameraId": "map3-hub-vista",
+          "ok": true,
+          "meanLuminanceFirst": 0.2791,
+          "meanLuminanceSecond": 0.2791,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.0003
+        },
+        {
+          "cameraId": "map3-bay-nature",
+          "ok": true,
+          "meanLuminanceFirst": 0.1924,
+          "meanLuminanceSecond": 0.1924,
+          "meanLuminanceDeltaPercent": 0,
+          "pixelsMovedPercent": 0,
+          "meanAbsDelta": 0.00022
+        }
+      ],
+      "noiseFloorPercent": 0.01,
+      "noiseFloorMovedPercent": 0
+    }
+  }
+}

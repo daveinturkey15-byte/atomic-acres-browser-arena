@@ -1,4 +1,22 @@
-/** In-game release notes shown from the main-menu "Last release" control. */
+/**
+ * In-game release notes shown from the main-menu release badge (top right).
+ *
+ * HF-406 (owner, 2026-09-02, verbatim): "ensure the top right thing is an accurate
+ * update of both the current pass number and features ... Currently it says pass 73
+ * "pass 73?!". He was right, and the cause was here: `CHANGELOG[0]` was still `pass73`
+ * eleven passes after Pass 73 shipped, so the badge rendered
+ * an internal candidate label (no pass number at all) and the panel behind it opened
+ * on PASS 73. Measured on the live PASS 83 channel on 2026-09-02: the string lives in
+ * `channels/pass83/assets/changelog-CgKeduvY.js`, not in index.html.
+ *
+ * THE RULE THIS FILE NOW CARRIES: the top entry IS the build's identity. It is NOT
+ * allowed to import `release-identity.ts` - that module has to stay its own build chunk,
+ * because the publish ritual reads the badge out of `dist/assets/release-identity-*.js`
+ * rather than index.html, and importing it here folds it into this chunk and deletes the
+ * file that check reads. The link is enforced mechanically instead:
+ * `src/ui/release-identity-surfaces.test.ts` fails unless this entry's pass, id and title
+ * all name the stamped pass, so a stamp bump without an entry here cannot ship.
+ */
 
 export type ChangelogEntry = Readonly<{
   id: string;
@@ -49,8 +67,10 @@ export function pass72ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
       ? 'Pass 72 adds host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.'
       : 'Pass 72 is the mechanically gated publication candidate, adding host-authoritative private-lobby controls, combat corrections, teammate-scoped support-shot audio dispatch and squad presentation while preserving the tested release fallbacks.',
     lineage: released
-      ? 'Pass 70 remains the exact retained live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; public owner HITL subsequently identified the corrections tracked in Pass 73'
-      : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
+      // HF-406: no internal review acronym in player-facing copy. Review terminology belongs to the
+      // owner checklist under docs/, never to a rendered release note.
+      ? 'Pass 70 remains the exact retained live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; owner review subsequently identified the corrections tracked in Pass 73'
+      : 'Pass 70 remains the exact previous live runtime, Pass 69 remains the immutable comparison build, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner review follows the protected Pages release',
   });
 }
 
@@ -61,13 +81,59 @@ export function pass73ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
       ? 'Pass 73 corrects first-person arm continuity, thermal target presentation, explosive-crossbow glass authority, first-grenade preparation, live graphics switching, collision integrity and cross-browser performance.'
       : 'Pass 73 is the mechanically gated publication candidate for first-person arm continuity, thermal target presentation, explosive-crossbow glass authority, first-grenade preparation, live graphics switching, collision integrity and cross-browser performance.',
     lineage: released
-      ? 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback while public owner HITL for Pass 73 remains pending'
-      : 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner HITL follows the protected Pages release',
+      // HF-406: same rule; Pass 73 went live on 2026-08-21 and the trailing review
+      // clause was both stale and internal jargon on a player-facing panel.
+      ? 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback'
+      : 'Pass 72 remains the exact previous live runtime, Pass 70 and Pass 69 remain byte-pinned comparison builds, and Pass 63 remains the stable WebGL fallback; publication-first authorization is recorded and public owner review follows the protected Pages release',
   });
 }
 
-const pass73ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: string; lineage: string }> {
+  const released = releasedAt !== PENDING_PRODUCTION_RELEASE;
+  return Object.freeze({
+    summary: released
+      ? 'Pass 84 answers the owner reports from 2026-09-02: a calmer near-wall weapon, a harder-hitting EBR, a chopper ride that stops churning thermal reveals, and a menu that finally tells you which build you are playing.'
+      : 'Pass 84 is the release candidate for the owner reports of 2026-09-02: a calmer near-wall weapon, a harder-hitting EBR, a chopper ride that stops churning thermal reveals, and a menu that finally tells you which build you are playing.',
+    lineage: released
+      ? 'Pass 83 is pinned as the single safe backup and every older channel is retired'
+      : 'On publication Pass 83 becomes the single safe backup and every older channel is retired',
+  });
+}
+
+/**
+ * Pages publication receipt `e138853f` ("PASS 73 from 506d6142ce09b8317279a8c705d2de25fa2ab84b",
+ * 2026-08-21T20:27:27Z). Pass 73 stayed on the pending sentinel in source long after it
+ * went live, which is half of what HF-406 reported: a published pass that still called
+ * itself a candidate, sitting at the front of the list.
+ */
+const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
+const pass94ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 93. */
+const pass93ReleasedAt = '2026-09-04T08:08:44+01:00';
+/** gh-pages publish receipt for PASS 92. */
+const pass92ReleasedAt = '2026-09-03T19:13:03+01:00';
+/** gh-pages publish receipt for PASS 91. */
+const pass91ReleasedAt = '2026-09-03T15:47:27+01:00';
+/** gh-pages publish receipt for PASS 90. */
+const pass90ReleasedAt = '2026-09-03T09:30:35+01:00';
+/** gh-pages publish receipt for PASS 89. */
+const pass89ReleasedAt = '2026-09-03T07:25:14+01:00';
+/** gh-pages publish receipt for PASS 88. */
+const pass88ReleasedAt = '2026-09-03T04:57:44+01:00';
+/** gh-pages publish receipt for PASS 87. */
+const pass87ReleasedAt = '2026-09-03T04:33:06+01:00';
+/** gh-pages publish receipt for PASS 86. */
+const pass86ReleasedAt = '2026-09-03T00:48:11+01:00';
+/** gh-pages publish receipt for PASS 85. */
+const pass85ReleasedAt = '2026-09-02T20:16:44+01:00';
+/** gh-pages publish receipt for PASS 84. */
+const pass84ReleasedAt = '2026-09-02T15:12:39+01:00';
+const pass84Copy = pass84ReleaseCopy(pass84ReleasedAt);
+/** gh-pages publish receipts: 718a5295, 302c1f45 and 8709317d respectively. */
+const pass83ReleasedAt = '2026-09-01T21:36:44+01:00';
+const pass82ReleasedAt = '2026-09-01T21:09:05+01:00';
+const pass81ReleasedAt = '2026-08-28T17:49:47+01:00';
 const pass72ReleasedAt = '2026-08-21T00:25:40Z';
 const pass72Copy = pass72ReleaseCopy(pass72ReleasedAt);
 const pass70ReleasedAt = '2026-08-16T19:32:01Z';
@@ -80,6 +146,245 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass94',
+    pass: 'PASS 94',
+    title: 'Pass 94 · Nuke Town Rebuild, Map Order & Candidate 5',
+    releasedAt: pass94ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'MENUS', 'GAMEPLAY', 'PERFORMANCE', 'AUDIO']),
+    summary: 'Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish.',
+    highlights: Object.freeze([
+      'Nuke Town Rebuild is first in the map selection; old Raid is retired and Raid 2 preview is near the top.',
+      'The approved candidate 5 carries the Chrome 153 WebGPU fix, killstreak tuning, Nuke Town Rebuild, bot/spawn, minimap, vehicle and audio work.',
+      'Pass 93 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass93',
+    pass: 'PASS 93',
+    title: 'Pass 93 · Chrome 153 Hotfix — Arenas Load Again In Stock Chrome',
+    releasedAt: pass93ReleasedAt,
+    areas: Object.freeze(['GRAPHICS', 'ARENAS']),
+    summary: 'Pass 93 is a hotfix: in stock Chrome 153 the shader compiler rejected one render pipeline the moment Nuke Town Rebuild (and any arena using the folded ray-traced post pass) was selected, so the arena never loaded. The WGSL swizzle rewrite now covers every chained swizzle and installs before the first pipeline; a stock-flags boot check in the installed Chrome joins the release gates.',
+    highlights: Object.freeze([
+      'Fix: arenas load again in stock Chrome 153 (chained-swizzle shader rewrite now complete, installed before the first pipeline)',
+      'Gate: honest stock-flags boot check in the installed Chrome added to the cut ritual',
+      'Pass 92 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass92',
+    pass: 'PASS 92',
+    title: 'Pass 92 · Nuke Town Geometry From Owner Play & Profile Fold',
+    releasedAt: pass92ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'GRAPHICS', 'PERFORMANCE']),
+    summary: "Pass 92 fixes the Nuke Town Rebuild from the owner's play session: z-fighting removed with authored depth tiers, stairs walk both ways, upstairs windows are drop-out openings, ground-floor glass, the truck opens on three sides, wider kerb-side cover strips; RAY TRACED folded into Quality and Max; Map 3 street cell relocated; deploy-phase load attribution measured.",
+    highlights: Object.freeze([
+      'Nuke Town: z-fighting removed, stairs walk up and down, upstairs windows drop out, ground-floor glass, truck open on three sides, wider kerb cover',
+      'Graphics: RAY TRACED folded into Quality (light) and Max (more); RTX stays the separate-runtime explainer',
+      'Map 3 street cell relocated; deploy-phase load time attributed (two steps are 60-79% of it)',
+      'Pass 91 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass91',
+    pass: 'PASS 91',
+    title: 'Pass 91 · Nuke Town Rebuild Refined & Crouch Speed',
+    releasedAt: pass91ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'GRAPHICS', 'MOVEMENT']),
+    summary: "Pass 91 refines the Nuke Town Rebuild from the owner's play - stairs, side areas, spawns, walk-through doors and the street vehicles where the reference has them - and gives crouching its own slower speed with no sprint.",
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW refined: the stair, landing and upper hallway where the reference has them, cover on the side areas, spawns re-solved, doors a standing player walks through, and the coach, truck and cars placed as in Black Ops 2 with the 2x core riding the truck',
+      'Crouching now moves at its own slower speed, cannot sprint, and cancels a held sprint the way the drop shot does; stand and press Shift again to run',
+      'GRAPHICS · one ladder, one RTX answer: the separate RAY TRACED mode is gone — QUALITY now carries light ray-traced reflections, MAX the full ray-traced tier, and the RTX entry stays a plain explainer for the future native runtime; a saved RAY TRACED choice loads as QUALITY',
+      'Pass 90 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass90',
+    pass: 'PASS 90',
+    title: 'Pass 90 · Nuke Town Rebuild Made Accurate, Chiptune Rotation & Drop-Shot Sprint',
+    releasedAt: pass90ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'AUDIO', 'MOVEMENT']),
+    summary: "Pass 90 rebuilds the Nuke Town Rebuild preview to the real Black Ops 2 Nuketown layout with the shipped map's approved look, rotates ten chiptune tracks at half volume, and stops a drop shot from sprinting on.",
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW now follows Black Ops 2 Nuketown measured from its own minimaps: the long axis runs across the street, the road ends in a cul-de-sac, the moving truck is the open cover with the 2x core on its roof, the coach is closed, the houses nearly face each other with set-back garages, the fence gaps are back',
+      "The rebuild wears the shipped Nuke Town's approved look: blue, yellow and orange houses, the cream-and-red coach, the lawn field, the forest ring and the mountains re-fitted to the new footprint, with a re-captured menu preview",
+      'Chiptune music plays at half its old volume and rotates ten distinct ninety-second tracks in a shuffled order with no repeats until all ten have played, swapping on the bar',
+      'A drop shot from a sprint no longer resumes sprinting while Shift is held; sprint needs a fresh press after you stand',
+      'Pass 89 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass89',
+    pass: 'PASS 89',
+    title: 'Pass 89 · Balanced Profile, RTX Explainer, Time of Day & Lighting Tiers',
+    releasedAt: pass89ReleasedAt,
+    areas: Object.freeze(['GRAPHICS', 'LIGHTING', 'ARENAS']),
+    summary: 'Pass 89 adds the Balanced graphics profile and an honest RTX explainer, time of day on every arena, baked indirect lighting tiers, and parks Farcrysis for its rework.',
+    highlights: Object.freeze([
+      'A new BALANCED graphics mode sits between Performance and Quality, every mode now says in the menu what it turns on, what it leaves off and what it measured, and the RTX entry opens an explainer instead of quietly changing your renderer: it is a separate desktop application that does not exist yet, no browser can reach ray-tracing hardware, and what you have instead is RAY TRACED, which works on any WebGPU graphics card',
+      'Selecting RTX now explains what it is - a separate native runtime - instead of silently switching the web renderer',
+      'Time of day on every arena, chosen by the host in the private lobby and replicated to everyone, without touching the frozen light set',
+      'Baked indirect lighting as an adjustable tier per profile: colour bleed and soft fill from an offline path-traced probe volume that costs nothing per frame',
+      'Farcrysis is parked off the menu until its rework with the new vegetation, water and interior-lighting techniques',
+      'Pass 88 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass88',
+    pass: 'PASS 88',
+    title: 'Pass 88 · Faster First Loads Without Losing the Switch Fix',
+    releasedAt: pass88ReleasedAt,
+    areas: Object.freeze(['PERFORMANCE', 'ARENAS']),
+    summary: 'Pass 88 keeps every arena switch inside the compile fence while giving cold first loads back the seconds the first attempt cost them, and attributes match admission for the first time.',
+    highlights: Object.freeze([
+      'Switching arenas mid-session no longer fails the compile fence on any of the 56 arena pairs, and a cold first load of Gun Range or High Seas is back to its PASS 86 time (the first attempt had made them up to half slower)',
+      'Match admission - the 14-20 seconds between pressing deploy and playing - is measured step by step for the first time, so the next cut can attack it',
+      'The cold-session shader relief runs only on the arenas measured to need it, with the arena list derived from a pinned authority rather than hardcoded',
+      // HF-418 item 3 (Lane AI, PASS 89 integration). Authored on a branch
+      // where pass85 was the pending top entry; pass85 published before the
+      // merge, so the highlight moved here, to the entry the release stamp
+      // names. src/graphics-profile-contract.test.ts pins that placement.
+      'Pass 87 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass87',
+    pass: 'PASS 87',
+    title: 'Pass 87 · Raid Rebuild, Farcrysis Preview, Residuals & Mobile',
+    releasedAt: pass87ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'MOBILE', 'HUD', 'RELEASE']),
+    summary: 'Pass 87 adds the Raid Rebuild and Farcrysis preview arenas, fixes the crowded menu and the mobile pause tap, gives bots a stance, and moves the 2x core behind a real line of sight.',
+    highlights: Object.freeze([
+      'RAID REBUILD · PREVIEW: a code-authored Raid built to the Black Ops 2 flow - longer sightlines, fewer and bigger cover masses, less roofed ground, all four upper rooms reachable, and real cover you can see',
+      'FARCRYSIS · PREVIEW is back on the menu: solved spawns on the terrain, a ground you can shoot over, and admission measured against Nuke Town',
+      'The menu no longer overflows with eleven arena cards; bots crouch under fire and go prone when hurt, replicated like players; the 2x Damage Core needs a line of sight instead of a height window',
+      'Mobile: the PAUSE tap no longer opens the project map under it; touch controls verified on three emulated devices; the collapsed Advanced Graphics panel no longer lays out over the Options below it',
+      'The minimap redraws at 30 Hz, the review cameras track the real near plane, eye-clearance stage 3 reports again, and the release workflow verifies without publishing',
+      'Pass 86 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass86',
+    pass: 'PASS 86',
+    title: 'Pass 86 · Nuke Town Rebuild Preview, Map 3 Explore & Viewmodel Fit',
+    releasedAt: pass86ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'EXPLORE', 'FIRST-PERSON']),
+    summary: 'Pass 86 brings the code-authored Nuke Town Rebuild preview built to the Black Ops 2 flow, Map 3 as a walkable explore showcase with eight corridors, and a first-person rig that finally sits inside the body.',
+    highlights: Object.freeze([
+      'NUKE TOWN REBUILD · PREVIEW: a new arena beside the shipped Nuke Town with the reference layout - back-yard spawns, the bus on the origin with the 2x core on its roof, open trucks and closed cars as cover, the sheds, and the rare gun in the front upper rooms',
+      'Map 3 is back on the menu as an EXPLORE arena: eight showcase corridors (shoreline sea, colosseum, raymarched gallery, shape-grammar city, forest, physics playground, god rays, seasons), an honest HUD with no clock, and its showcase page live inside the release channel',
+      'The first-person rig is fitted inside the player body: no gun through walls or floors, no held-up pose against a wall, with the camera near plane set on measured evidence',
+      'Eye clearance, walkable surfaces and first-person arms are gated on every arena, the QA corpus is streamlined, and the image-based lighting first-arena path is verified',
+      'Pass 85 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass85',
+    pass: 'PASS 85',
+    title: 'Pass 85 · Drop Shots, Firing Range Roof & First-Person Arms',
+    releasedAt: pass85ReleasedAt,
+    areas: Object.freeze(['MOVEMENT', 'ARENAS', 'FIRST-PERSON']),
+    summary: 'Pass 85 lands the first of the 2026-09-02 evening list: Black Ops 2 style drop shots, the Firing Range roof netting that swallowed players, and first-person arms and knife that stay in frame.',
+    highlights: Object.freeze([
+      'Drop shots work the Black Ops 2 way: hold crouch to go prone while you keep firing, the camera falls through a real transition instead of snapping, hip fire widens while you drop, and other players see your body go down',
+      'The camo netting over the Firing Range container yard is a real floor now; you no longer fall three metres through it',
+      'The firing arm no longer ends in mid-air and the knife swing happens on screen instead of off the right edge; every weapon model was checked for mirrored geometry and none was found',
+      'Pass 84 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    // Integrators: extend these highlights as the other PASS 84 lanes land; the gate
+    // requires the current pass number and a non-empty highlight list, not this text.
+    id: 'pass84',
+    pass: 'PASS 84',
+    title: 'Pass 84 · Owner Corrections, Release Identity & Two-Channel Release',
+    releasedAt: pass84ReleasedAt,
+    areas: Object.freeze(['FIRST-PERSON', 'WEAPONS', 'CHOPPER', 'MENU', 'RELEASE']),
+    summary: pass84Copy.summary,
+    highlights: Object.freeze([
+      'The weapon pulls back half as far when you brush a wall, so close quarters no longer shoves the gun into your chest',
+      'The M14 EBR hits 40 percent harder and fires 25 percent faster',
+      'The chopper gunner ride stops flushing prewarmed thermal-reveal records every frame; the reveal now releases once per activation',
+      'The main-menu badge, the release notes behind it and the project map all read one source, so the build can no longer name an older pass than the one you are playing',
+      'The release chooser keeps exactly this build and the previous pass as its safe backup; every older channel is retired',
+      pass84Copy.lineage,
+    ]),
+  }),
+  Object.freeze({
+    id: 'pass83',
+    pass: 'PASS 83',
+    title: 'Pass 83 · Lobby Build Identity & Correct Release Badge',
+    releasedAt: pass83ReleasedAt,
+    areas: Object.freeze(['MULTIPLAYER', 'LOBBY', 'RELEASE']),
+    summary: 'Pass 83 re-cuts the Pass 82 runtime under its own stamp and adds the lobby build-identity handshake and the visible deployment countdown.',
+    highlights: Object.freeze([
+      'A host refuses a join from a guest running a different published build, so two players can no longer share a lobby and load different worlds',
+      'The lobby deploys on a visible 5-4-3-2-1 countdown once every player is in',
+      'The published build carries its own pass number: the Pass 82 publish had shipped still stamped Pass 81',
+    ]),
+  }),
+  Object.freeze({
+    id: 'pass82',
+    pass: 'PASS 82',
+    title: 'Pass 82 · Cross-Browser Freeze Removal',
+    releasedAt: pass82ReleasedAt,
+    areas: Object.freeze(['STABILITY', 'PERFORMANCE', 'CHROME', 'EDGE', 'FIREFOX']),
+    summary: 'Pass 82 removes the repeated multi-second freezes reported in Chrome, Edge and Firefox by keeping the first-person weapon lights in the scene when the weapon is hidden.',
+    highlights: Object.freeze([
+      'Hiding the first-person weapon used to drop its two structural lights out of the renderer light set, invalidating every material in the scene and rebuilding hundreds of render pipelines mid-combat; hidden is now expressed without touching the light set',
+      'Measured over three 180-second runs: Chrome 8.49 percent frozen to 0, Edge 21.77 percent to 0.13, Firefox 11.49 percent to 0',
+      'In-combat pipeline creations over a 75-second combat window fell from 251 to 0',
+    ]),
+  }),
+  Object.freeze({
+    id: 'pass81',
+    pass: 'PASS 81',
+    title: 'Pass 81 · Wall Clipping, Chopper Exit & Spawns',
+    releasedAt: pass81ReleasedAt,
+    areas: Object.freeze(['FIRST-PERSON', 'CHOPPER', 'SPAWNS', 'RELEASE']),
+    summary: 'Pass 81 corrects the first-person weapon clipping through walls, the camera on leaving the chopper gunner, and the spawn layouts on every map.',
+    highlights: Object.freeze([
+      'The first-person weapon no longer clips through walls on the flagged poses',
+      'Leaving the chopper gunner no longer flings the camera away from the player',
+      'Spawn layouts were rebuilt on every map',
+      'Earlier passes are selectable again, and the build chooser is cache-proof: one document, one generation, one content-addressed script, so two people opening the same link are offered the same builds',
+    ]),
+  }),
   Object.freeze({
     id: 'pass73',
     pass: 'PASS 73',
@@ -550,7 +855,24 @@ export function formatChangelogTimestampDetail(isoTimestamp: string): string {
   return `${formatChangelogTimestamp(isoTimestamp)} · ${parsed.offsetLabel} · ${parsed.hour}:${parsed.minute}:${parsed.second}`;
 }
 
+/**
+ * HF-406: the top-right badge. It ALWAYS leads with the pass the running build is,
+ * published or not. The previous label was an internal candidate label, which named no
+ * pass at all and put an internal review acronym where the version belongs - the exact
+ * surface the owner read as "pass 73 candidate". Review terminology now appears only in
+ * the owner checklist under docs/, never in a player-facing surface.
+ */
 export function lastUpdatedButtonLabel(entry: ChangelogEntry = latestChangelogEntry()): string {
-  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return 'HITL CANDIDATE · NOT LIVE';
-  return `LAST RELEASE · ${formatChangelogTimestamp(entry.releasedAt)}`;
+  if (entry.releasedAt === PENDING_PRODUCTION_RELEASE) return `${entry.pass} · RELEASE CANDIDATE`;
+  return `${entry.pass} · ${formatChangelogTimestamp(entry.releasedAt)}`;
+}
+
+/**
+ * The one-line "what is in this pass" the badge carries under the pass number, derived
+ * from the current entry's own areas rather than written twice. Capped at three areas:
+ * measured at 1600x900, a fourth area is squeezed to an ellipsis by the header flex row
+ * because the badge sizes to its first line.
+ */
+export function releaseFeatureLine(entry: ChangelogEntry = latestChangelogEntry(), maxAreas = 3): string {
+  return entry.areas.slice(0, maxAreas).join(' · ');
 }

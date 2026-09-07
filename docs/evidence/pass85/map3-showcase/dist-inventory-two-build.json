@@ -1,0 +1,187 @@
+{
+ "rows": [
+  {
+   "f": "additional-maps-CYQKaDEE.js",
+   "b": 110645
+  },
+  {
+   "f": "atomic-acres-C4F_6uj5.js",
+   "b": 1703
+  },
+  {
+   "f": "changelog-D7nAbofp.js",
+   "b": 40922
+  },
+  {
+   "f": "combat-feedback-1xrJRg1x.js",
+   "b": 9423
+  },
+  {
+   "f": "deterministic-rng-Cz65iEo8.js",
+   "b": 756
+  },
+  {
+   "f": "farcrysis-C1M0rPEY.js",
+   "b": 1688
+  },
+  {
+   "f": "farcrysis-DHOCdPyF.js",
+   "b": 145646
+  },
+  {
+   "f": "gameplay-mp7sQk2B.js",
+   "b": 501284
+  },
+  {
+   "f": "gun-range-CNoi4ffY.js",
+   "b": 5048
+  },
+  {
+   "f": "gun-range-rack-presentation-D9o7yhBd.js",
+   "b": 3577
+  },
+  {
+   "f": "high-seas-CdBu-F2K.js",
+   "b": 2422
+  },
+  {
+   "f": "high-seas-xUUuNxAw.js",
+   "b": 45428
+  },
+  {
+   "f": "index-CnzZhlWp.css",
+   "b": 203366
+  },
+  {
+   "f": "index-Cx4SOFK9.js",
+   "b": 4897
+  },
+  {
+   "f": "legacy-main-7T6BKd34.js",
+   "b": 1845306
+  },
+  {
+   "f": "legacy-main-BY5wB9kX.css",
+   "b": 16270
+  },
+  {
+   "f": "main-Byt1icY2.js",
+   "b": 1389
+  },
+  {
+   "f": "map-CLUkQUqM.js",
+   "b": 43957
+  },
+  {
+   "f": "map3-arena-d8AqcCTb.js",
+   "b": 68
+  },
+  {
+   "f": "map3-arena-UVeLxVdv.js",
+   "b": 69535
+  },
+  {
+   "f": "map3-B8FclXbN.js",
+   "b": 102341
+  },
+  {
+   "f": "map3-BL8yhL04.js",
+   "b": 1186
+  },
+  {
+   "f": "map3-vendor-three-CX6Bc5iF.js",
+   "b": 891482
+  },
+  {
+   "f": "original",
+   "b": 0
+  },
+  {
+   "f": "preload-helper-DYl5dUZ5.js",
+   "b": 1271
+  },
+  {
+   "f": "rapier-USIc5Cek.js",
+   "b": 2236655
+  },
+  {
+   "f": "release-identity-CKz71N3B.js",
+   "b": 518
+  },
+  {
+   "f": "rolldown-runtime-QTnfLwEv.js",
+   "b": 694
+  },
+  {
+   "f": "rustworks-1v1-BmVT9g6j.js",
+   "b": 2837
+  },
+  {
+   "f": "shared-DeCo1P3N.js",
+   "b": 6457
+  },
+  {
+   "f": "sky-backdrop-5XoGW9vY.js",
+   "b": 9524
+  },
+  {
+   "f": "skyline-terminal-D3BTDWHD.js",
+   "b": 1743
+  },
+  {
+   "f": "style-DnVwtB4j.css",
+   "b": 165278
+  },
+  {
+   "f": "test-maps-CXHzTpoQ.js",
+   "b": 51958
+  },
+  {
+   "f": "test1-CvFM-6p2.js",
+   "b": 1209
+  },
+  {
+   "f": "test2-Cxkby9Ge.js",
+   "b": 1301
+  },
+  {
+   "f": "third-party",
+   "b": 0
+  },
+  {
+   "f": "three.webgpu-oc72ejhZ.js",
+   "b": 19224
+  },
+  {
+   "f": "vendor-peer-DW-fpQKQ.js",
+   "b": 86871
+  },
+  {
+   "f": "vendor-three-CwPXx5A7.js",
+   "b": 1567517
+  },
+  {
+   "f": "vendor-three-loaders-BOatHMLM.js",
+   "b": 42898
+  },
+  {
+   "f": "webgpu-adapter-diagnostics-BK_qrMAJ.js",
+   "b": 7750
+  },
+  {
+   "f": "webgpu-adapter-diagnostics-BNE2ATWW.js",
+   "b": 349
+  },
+  {
+   "f": "webgpu-diagnostics-screen-BO3QB7N0.js",
+   "b": 3451
+  }
+ ],
+ "totalAssetsBytes": 8255844,
+ "distFiles": [
+  "assets",
+  "index.html",
+  "map3.html",
+  "qa-webgpu-fence-probe.html"
+ ]
+}

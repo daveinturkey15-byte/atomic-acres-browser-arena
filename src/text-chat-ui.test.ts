@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+// Render logic moved to the controller module (streamlining extraction); the
+// untrusted-content contract follows the code that must enforce it.
+const chatControllerSource = readFileSync(new URL('./text-chat-controller.ts', import.meta.url), 'utf8');
 const shellSource = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url), 'utf8');
 const styleSource = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
@@ -12,7 +15,7 @@ describe('text chat UI contract', () => {
     expect(shellSource).toContain('id="text-chat-input"');
     expect(shellSource).toContain('maxlength="${CHAT_TEXT_MAX_CHARS}"');
     expect(shellSource).toContain('data-visible="false"');
-    expect(styleSource).not.toContain('#text-chat[data-context=lobby]');
+    expect(styleSource).toContain('#text-chat[data-context=lobby]');
     expect(styleSource).toContain('left:24px;right:auto;bottom:150px;transform:none');
     expect(styleSource).toContain('#text-chat[data-visible=false][data-open=false]{opacity:0;pointer-events:none}');
     expect(styleSource).toContain('#text-chat[data-open=true] #text-chat-log');
@@ -23,13 +26,25 @@ describe('text chat UI contract', () => {
     expect(mainSource).toContain("if (event.key === 'Escape')");
     expect(mainSource).toContain("if (document.pointerLockElement === canvas) void document.exitPointerLock();");
     expect(mainSource).toContain("menu.classList.contains('hidden') && !isTextChatTyping()");
-    expect(mainSource).toContain("if (isTextChatTyping()) return;\n  if (document.pointerLockElement !== canvas)");
+    expect(mainSource).toContain("if (isTextChatTyping()) return;\n  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: mouse click = keyboard/mouse scheme\n  if (document.pointerLockElement !== canvas)"); // typing guard stays FIRST in mousedown
     expect(mainSource).toContain("if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;");
   });
 
   it('renders untrusted names and messages through textContent only', () => {
-    expect(mainSource).toContain('sender.textContent = entry.senderName;');
-    expect(mainSource).toContain('message.textContent = entry.text;');
+    expect(chatControllerSource).toContain('sender.textContent = entry.senderName;');
+    expect(chatControllerSource).toContain('message.textContent = entry.text;');
     expect(mainSource).not.toContain('textChatLog.innerHTML');
+    expect(chatControllerSource).not.toContain('innerHTML');
+  });
+
+  it('HF-324: provides lobby and click affordances for text chat', () => {
+    expect(styleSource).toContain('#text-chat[data-context=lobby] #text-chat-form{display:grid}');
+    expect(mainSource).toContain("textChatRoot.addEventListener('pointerdown'");
+    expect(mainSource).toContain("textChatRoot.addEventListener('click'");
+    // HF-324 audit correction: gameplay key handling is scoped to active gameplay so
+    // the lobby is not swallowed, but Tab must survive once a match has started - the
+    // scoreboard is wanted precisely while dead, during warmup and at match end, all of
+    // which report gameplayInputEnabled() false. Assert the guard itself, not prose.
+    expect(mainSource).toContain("if (!gameplayInputEnabled() && (event.code !== 'Tab' || !gameStarted)) return;");
   });
 });

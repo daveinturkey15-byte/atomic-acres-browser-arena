@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
   awaitSubmissionCompletionTarget,
@@ -8,9 +9,13 @@ import {
   detectLivePresentationStall,
   shouldResetPresentationAfterSchedulerGap,
   formatWebGpuUncapturedError,
+  WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS,
   maximumInFlightWebGpuSubmissions,
+  shouldRecoverStarvedPresentation,
   pendingCompletionStartAfterProgress,
+  OPTIONAL_WEBGPU_DEVICE_FEATURES,
   resolveRenderRuntimeRequest,
+  selectOptionalDeviceFeatures,
   sequenceProgressRate,
   shouldBackpressureWebGpuSubmissions,
   toneMappingForMode,
@@ -35,20 +40,15 @@ function deferredQueueProbe(publishCompletion: () => void): Readonly<{
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Pass 64 render runtime boundary', () => {
-  it('makes WebGPU fail-closed by default and keeps WebGL2 behind an explicit compatibility query', () => {
-    expect(resolveRenderRuntimeRequest('')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu&requireWebGPU=1')).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
-    expect(resolveRenderRuntimeRequest('?renderer=webgl2')).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-  });
-
-  it('falls back to WebGL2 on browsers without WebGPU unless WebGPU is explicitly forced', () => {
-    // Firefox/Safari/older Edge expose no navigator.gpu: the default request
-    // must gracefully use WebGL2 so the game still runs there.
-    expect(resolveRenderRuntimeRequest('', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-    expect(resolveRenderRuntimeRequest('?renderer=webgl2', false)).toEqual({ requestedBackend: 'webgl2', requireWebGPU: false });
-    // An explicit ?renderer=webgpu stays a hard contract even when unavailable.
-    expect(resolveRenderRuntimeRequest('?renderer=webgpu', false)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+  it('is WebGPU-only: every request spelling resolves to the fail-closed WebGPU contract', () => {
+    // Owner 2026-08-30: "retire all webgl2 stuff, full webgpu, no fallback."
+    // A browser without a working WebGPU device gets the requirement screen
+    // at renderer init; nothing routes to a second engine any more - not the
+    // retired ?renderer=webgl2 spelling, not missing navigator.gpu.
+    for (const search of ['', '?renderer=webgpu', '?renderer=webgpu&requireWebGPU=1', '?renderer=webgl2']) {
+      expect(resolveRenderRuntimeRequest(search)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+      expect(resolveRenderRuntimeRequest(search, false)).toEqual({ requestedBackend: 'webgpu', requireWebGPU: true });
+    }
   });
 
   it('maps every exposed tone-mapping label to a real Three renderer mode', () => {
@@ -472,8 +472,15 @@ describe('Pass 64 render runtime boundary', () => {
 
   it('bounds submissions while an earlier WebGPU completion probe is lagging', () => {
     expect(maximumInFlightWebGpuSubmissions('serialized')).toBe(1);
-    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(2);
-    expect(maximumInFlightWebGpuSubmissions('input-response')).toBe(3);
+    // Depth three, measured: at depth two the completion fence WAS the frame
+    // timer and presentation was pinned near 50 fps with the GPU at 14%
+    // utilisation. Measured by scripts/qa/measure-presented-frames.mjs.
+    expect(maximumInFlightWebGpuSubmissions('warmed-live')).toBe(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS);
+    expect(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS).toBe(3);
+    // An input-response frame always keeps exactly one slot beyond the warmed
+    // live frontier, so a shot is never the frame admission refuses.
+    expect(maximumInFlightWebGpuSubmissions('input-response'))
+      .toBe(WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS + 1);
     expect(shouldBackpressureWebGpuSubmissions(null, 1_000, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_049, 250)).toBe(false);
     expect(shouldBackpressureWebGpuSubmissions(800, 1_050, 250)).toBe(true);
@@ -515,6 +522,9 @@ describe('Pass 64 render runtime boundary', () => {
     });
     expect(runtime.healthTelemetry()).toMatchObject({
       actualBackend: 'webgpu',
+      // HF-331: adapter identity is surfaced on the live health/diagnostics
+      // object so a live Firefox probe can read backend + adapter together.
+      adapterLabel: 'test adapter',
       deviceLost: false,
       uncapturedErrors: 0,
       presentation: { status: 'warming' },
@@ -536,7 +546,12 @@ describe('Pass 64 render runtime boundary', () => {
     expect(pending).toHaveLength(1);
   });
 
-  it('admits exactly two warmed-live frames behind one completion-frontier probe', async () => {
+  it('pipelines one completion probe per warmed-live submission up to the depth bound', async () => {
+    // THE CONTRACT THAT WAS WRONG. This used to assert "exactly two frames
+    // behind ONE probe": a single mutable observer meant the completion
+    // frontier could advance at most one queue round trip at a time, and with a
+    // two-deep bound that made `onSubmittedWorkDone` the frame timer. Every
+    // admitted frame now carries its own observer, and they settle in order.
     const pending: Array<() => void> = [];
     const renderer = {
       backend: { isWebGPUBackend: true },
@@ -567,41 +582,174 @@ describe('Pass 64 render runtime boundary', () => {
 
     expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
     expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(false);
-    expect(render).toHaveBeenCalledTimes(2);
-    expect(pending).toHaveLength(1);
+    expect(runtime.submitFrame(120, false, 'warmed-live')).toBe(true);
+    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(3);
+    // One observer per admitted frame, all outstanding together.
+    expect(pending).toHaveLength(3);
     expect(runtime.presentationTelemetry()).toMatchObject({
       submissionMode: 'warmed-live',
-      maximumInFlightSubmissions: 2,
-      inFlightSubmissions: 2,
+      maximumInFlightSubmissions: 3,
+      inFlightSubmissions: 3,
       completionProbeTargetSequence: 1,
-      completionProbeCount: 1,
-      submissionSequence: 2,
+      outstandingCompletionProbes: 3,
+      completionProbeCount: 3,
+      submissionSequence: 3,
       completedSequence: 0,
     });
-    expect(() => runtime.submitFrame(125, true, 'serialized'))
+    expect(() => runtime.submitFrame(135, true, 'serialized'))
       .toThrow('Forced WebGPU submission requires an idle completion frontier');
-    expect(render).toHaveBeenCalledTimes(2);
+    expect(render).toHaveBeenCalledTimes(3);
 
+    // Each observer retires its own submission; the frontier advances one
+    // frame per resolution instead of waiting for a fresh round trip.
     pending.shift()?.();
     await settleProbe();
-    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(true);
-    expect(pending).toHaveLength(1);
     expect(runtime.presentationTelemetry()).toMatchObject({
       inFlightSubmissions: 2,
-      completionProbeTargetSequence: 3,
-      completionProbeCount: 2,
-      submissionSequence: 3,
       completedSequence: 1,
+      completionProbeTargetSequence: 2,
+      outstandingCompletionProbes: 2,
     });
-    pending.shift()?.();
-    await settleProbe();
+    expect(runtime.submitFrame(140, false, 'warmed-live')).toBe(true);
+    expect(pending).toHaveLength(3);
+    expect(runtime.presentationTelemetry()).toMatchObject({
+      inFlightSubmissions: 3,
+      submissionSequence: 4,
+      completedSequence: 1,
+      outstandingCompletionProbes: 3,
+      completionProbeCount: 4,
+    });
+
+    while (pending.length > 0) {
+      pending.shift()?.();
+      await settleProbe();
+    }
     expect(runtime.presentationTelemetry()).toMatchObject({
       inFlightSubmissions: 0,
       completionProbeTargetSequence: null,
-      submissionSequence: 3,
-      completedSequence: 3,
+      outstandingCompletionProbes: 0,
+      submissionSequence: 4,
+      completedSequence: 4,
     });
+  });
+
+  it('breaks the starvation collapse with one admitted frame, and only when the frame is cheap', async () => {
+    // THE COLLAPSE. Completion latency walks from ~5 ms to ~48 ms in about
+    // three seconds and never recovers: refusals starve the GPU, the idle GPU
+    // downclocks, the low clocks keep the fence slow. Nothing in the loop broke
+    // that cycle, so a match finished pinned near 20 fps with the GPU at 14%.
+    const pending: Array<() => void> = [];
+    // three's WebGPU backend reports drawCalls, which is the field
+    // webGpuRenderInfoSnapshot reads; a fixture using `calls` records undefined.
+    const info = { reset: vi.fn(), render: { drawCalls: 181, triangles: 528_000, points: 0, lines: 0 } };
+    const renderer = { backend: { isWebGPUBackend: true }, info };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+
+    // Fill the queue, then never resolve a fence: the collapse, exactly.
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    const refusals: boolean[] = [];
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      refusals.push(runtime.submitFrame(130 + attempt, false, 'warmed-live'));
+    }
+    // Seven refusals, then the valve admits one frame - a bounded floor, not an
+    // override: presentation can never stop entirely while frames stay cheap.
+    expect(refusals).toEqual([false, false, false, false, false, false, false, true]);
+    expect(render).toHaveBeenCalledTimes(4);
+    expect(runtime.presentationCounters()).toMatchObject({
+      starvationRecoveries: 1,
+      consecutiveRefusedSubmissions: 0,
+      skippedSubmissions: 7,
+      inFlightSubmissions: 4,
+    });
+
+    // And it stays a floor, not a leak: the streak has to build again.
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      expect(runtime.submitFrame(200 + attempt, false, 'warmed-live')).toBe(false);
+    }
+    expect(runtime.submitFrame(210, false, 'warmed-live')).toBe(true);
+    expect(runtime.presentationCounters()).toMatchObject({ starvationRecoveries: 2 });
+  });
+
+  it('leaves backpressure alone when the frame is genuinely expensive', () => {
+    const pending: Array<() => void> = [];
+    // A frame this heavy could plausibly be what is occupying the GPU, so the
+    // relief valve must not fire - that is the difference between a starved
+    // device and a saturated one, and the page cannot read GPU utilisation.
+    const info = { reset: vi.fn(), render: { drawCalls: 9_000, triangles: 40_000_000, points: 0, lines: 0 } };
+    const renderer = { backend: { isWebGPUBackend: true }, info };
+    const render = vi.fn();
+    const device = {
+      queue: { onSubmittedWorkDone: () => new Promise<void>((resolve) => pending.push(resolve)) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      expect(runtime.submitFrame(130 + attempt, false, 'warmed-live')).toBe(false);
+    }
+    expect(runtime.presentationCounters()).toMatchObject({
+      starvationRecoveries: 0,
+      consecutiveRefusedSubmissions: 40,
+    });
+  });
+
+  it('decides starvation relief from the refusal streak, the bound and the frame cost', () => {
+    const base = {
+      consecutiveRefusedSubmissions: 8,
+      refusalStreakThreshold: 8,
+      inFlightSubmissions: 3,
+      maximumInFlightSubmissions: 3,
+      drawCalls: 181,
+      triangles: 528_000,
+      trivialDrawCallCeiling: 6_000,
+      trivialTriangleCeiling: 12_000_000,
+    };
+    expect(shouldRecoverStarvedPresentation(base)).toBe(true);
+    expect(shouldRecoverStarvedPresentation({ ...base, consecutiveRefusedSubmissions: 7 })).toBe(false);
+    // Refused for the stall clause rather than the depth clause: the queue is
+    // not pinned at its bound, so this is not starvation.
+    expect(shouldRecoverStarvedPresentation({ ...base, inFlightSubmissions: 2 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, drawCalls: 6_001 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, triangles: 12_000_001 })).toBe(false);
+    expect(shouldRecoverStarvedPresentation({ ...base, refusalStreakThreshold: 0 })).toBe(false);
+    // An unreadable frame cost keeps backpressure rather than opening the valve.
+    expect(shouldRecoverStarvedPresentation({ ...base, drawCalls: Number.NaN })).toBe(false);
   });
 
   it('admits one bounded input-response frame beyond the warmed-live frontier', () => {
@@ -630,17 +778,19 @@ describe('Pass 64 render runtime boundary', () => {
       device,
     });
 
-    expect(runtime.submitFrame(100, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(110, false, 'warmed-live')).toBe(true);
-    expect(runtime.submitFrame(120, false, 'input-response')).toBe(true);
-    expect(runtime.submitFrame(130, false, 'input-response')).toBe(false);
-    expect(render).toHaveBeenCalledTimes(3);
-    expect(pending).toHaveLength(1);
+    for (const timestamp of [100, 110, 120]) {
+      expect(runtime.submitFrame(timestamp, false, 'warmed-live')).toBe(true);
+    }
+    expect(runtime.submitFrame(130, false, 'warmed-live')).toBe(false);
+    // The input frame still gets its one extra slot.
+    expect(runtime.submitFrame(140, false, 'input-response')).toBe(true);
+    expect(runtime.submitFrame(150, false, 'input-response')).toBe(false);
+    expect(render).toHaveBeenCalledTimes(4);
     expect(runtime.presentationTelemetry()).toMatchObject({
       submissionMode: 'input-response',
-      maximumInFlightSubmissions: 3,
-      inFlightSubmissions: 3,
-      submissionSequence: 3,
+      maximumInFlightSubmissions: 4,
+      inFlightSubmissions: 4,
+      submissionSequence: 4,
       completedSequence: 0,
     });
   });
@@ -1166,5 +1316,245 @@ describe('Pass 64 render runtime boundary', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('optional WebGPU device features', () => {
+  const featureSet = (...names: readonly string[]) => ({ has: (name: string) => names.includes(name) });
+
+  it('requests only allowlisted features the adapter actually advertises', () => {
+    // Requesting a feature the adapter lacks makes requestDevice REJECT, which
+    // would turn a missing nicety into a dead renderer, so the intersection is
+    // the whole contract.
+    expect(selectOptionalDeviceFeatures(featureSet('rg11b10ufloat-renderable')))
+      .toEqual(['rg11b10ufloat-renderable']);
+    expect(selectOptionalDeviceFeatures(featureSet('texture-compression-bc', 'shader-f16')))
+      .toEqual([]);
+  });
+
+  it('asks for the SSGI render-target feature whenever the adapter has it', () => {
+    // The MAX preset enables SSGI, and THREE.SSGINode hard-fails pipeline
+    // creation without this feature — which then invalidates the command buffer
+    // and takes arena admission down with it. Pin the name so a rename cannot
+    // silently re-break the top preset.
+    expect(OPTIONAL_WEBGPU_DEVICE_FEATURES).toContain('rg11b10ufloat-renderable');
+    expect(selectOptionalDeviceFeatures(featureSet(...OPTIONAL_WEBGPU_DEVICE_FEATURES)))
+      .toEqual([...OPTIONAL_WEBGPU_DEVICE_FEATURES]);
+  });
+
+  it('degrades to no optional features rather than throwing on an odd adapter', () => {
+    expect(selectOptionalDeviceFeatures(undefined)).toEqual([]);
+    expect(selectOptionalDeviceFeatures({} as unknown as { has(name: string): boolean })).toEqual([]);
+    expect(selectOptionalDeviceFeatures({ has: () => { throw new Error('driver'); } })).toEqual([]);
+  });
+});
+
+describe('queue-completion deadline diagnosis', () => {
+  // The rejection here IS the sentence the player reads when a deployment
+  // bounces ("Deployment preparation failed: WebGPU queue completion exceeded
+  // 4000 ms for submission 35"). With only the bound and a sequence number it
+  // cannot distinguish one cold first-use compile from a wedged device, and it
+  // names none of the several fences in the admission path — two passes at the
+  // MAX-preset bound were spent re-deriving that from stage timings. These pin
+  // the frontier detail so it cannot be dropped back to a bare number.
+  it('names the completion frontier when the deadline fails closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 9,
+        completedSequence: () => 3,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 100,
+        describe: () => 'mode serialized, in-flight 6, pending 240 ms',
+      })).rejects.toThrow(
+        'WebGPU queue completion exceeded 100 ms for submission 9'
+        + ' (completed 3, mode serialized, in-flight 6, pending 240 ms)',
+      );
+      vi.advanceTimersByTime(100);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still reports the completion frontier when no describer is supplied', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 4,
+        completedSequence: () => 1,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 50,
+      })).rejects.toThrow('exceeded 50 ms for submission 4 (completed 1)');
+      vi.advanceTimersByTime(50);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never lets a throwing describer replace the queue error', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = new Promise<void>(() => undefined);
+      const rejection = expect(awaitSubmissionCompletionTarget({
+        targetSequence: 2,
+        completedSequence: () => 0,
+        createProbe: () => pending,
+        failure: () => null,
+        timeoutMs: 30,
+        describe: () => { throw new Error('telemetry exploded'); },
+      })).rejects.toThrow(
+        'WebGPU queue completion exceeded 30 ms for submission 2'
+        + ' (completed 0, frontier description unavailable)',
+      );
+      vi.advanceTimersByTime(30);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is WIRED: the runtime fence attaches its own live frontier state', async () => {
+    const renderer = {
+      backend: { isWebGPUBackend: true },
+      info: { reset: vi.fn(), render: { drawCalls: 4821, triangles: 9, points: 0, lines: 0 } },
+    };
+    const device = {
+      // A queue that never retires — exactly the shape of the bounce.
+      queue: { onSubmittedWorkDone: () => new Promise<void>(() => undefined) },
+      addEventListener: () => undefined,
+      lost: new Promise<never>(() => undefined),
+    };
+    const runtime = new (WebGpuRenderRuntime as unknown as new (
+      renderer: unknown,
+      pipeline: unknown,
+      identity: unknown,
+    ) => WebGpuRenderRuntime)(renderer, { render: vi.fn() }, {
+      canvasAntialias: true,
+      canvasSamples: 4,
+      adapterLabel: 'test adapter',
+      adapterClass: 'GPUAdapter',
+      deviceClass: 'GPUDevice',
+      softwareAdapter: false,
+      device,
+    });
+    expect(runtime.submitFrame(100, true, 'serialized')).toBe(true);
+    // The draw count is the tell that separates a full-coverage cold prewarm
+    // frame from a small one, so it has to survive into the failure text.
+    await expect(runtime.waitForSubmittedWork(20)).rejects.toThrow(
+      /exceeded 20 ms for submission 1 \(completed 0, mode serialized, in-flight 1, pending \d+ ms, probes 1, prior latency none, fenced draws 4821\)/,
+    );
+  });
+});
+
+describe('cold-generation prewarm fence', () => {
+  // WHY THIS IS PINNED. The MAX preset bounces because first-use pipeline
+  // creation lands inside a guarded 4000 ms admission flush. The whole defence
+  // is that compileAndRender realises that work behind the runtime's OWN
+  // 12 s cold-generation allowance first, so every later guarded flush only
+  // ever fences a warm frame. Nothing pinned that number, so a tidy-up that
+  // dropped the explicit 12_000 and took waitForSubmittedWork's 4000 ms
+  // default would silently re-arm the exact bounce, with every unit test still
+  // green. This asserts the fence a cold prewarm actually gets.
+  //
+  // It raises the bar, never lowers it: the 4000 ms admission guard is
+  // untouched and unreferenced here.
+  it('gives a cold prewarm submission the 12 s allowance, not the 4 s live bound', async () => {
+    vi.useFakeTimers();
+    try {
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera();
+      const renderer = {
+        backend: { isWebGPUBackend: true },
+        info: { reset: vi.fn(), render: { drawCalls: 12, triangles: 3, points: 0, lines: 0 } },
+      };
+      const device = {
+        // Cold first-use compilation that never retires: the fence is the only
+        // thing deciding how long the prewarm is allowed to take.
+        queue: { onSubmittedWorkDone: () => new Promise<void>(() => undefined) },
+        addEventListener: () => undefined,
+        lost: new Promise<never>(() => undefined),
+      };
+      const runtime = new (WebGpuRenderRuntime as unknown as new (
+        renderer: unknown,
+        pipeline: unknown,
+        identity: unknown,
+      ) => WebGpuRenderRuntime)(renderer, { render: vi.fn() }, {
+        canvasAntialias: true,
+        canvasSamples: 4,
+        adapterLabel: 'test adapter',
+        adapterClass: 'GPUAdapter',
+        deviceClass: 'GPUDevice',
+        softwareAdapter: false,
+        device,
+      });
+
+      let settled: 'pending' | 'resolved' | 'rejected' = 'pending';
+      let failure: unknown = null;
+      const prewarm = runtime.compileAndRender(scene, camera, scene)
+        .then(() => { settled = 'resolved'; })
+        .catch((error: unknown) => { settled = 'rejected'; failure = error; });
+
+      // Well past the live admission bound, and still compiling: a cold
+      // prewarm that dies at 4 s is the bug, not the guard.
+      await vi.advanceTimersByTimeAsync(4_100);
+      expect(settled, 'cold prewarm must survive the 4 s live admission bound').toBe('pending');
+
+      // The cold allowance is still a real bound — it fails closed too.
+      await vi.advanceTimersByTimeAsync(8_000);
+      await prewarm;
+      expect(settled).toBe('rejected');
+      expect(String(failure)).toContain('exceeded 12000 ms');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// Owner 2026-08-31: he could not launch the game at all in his everyday Chrome
+// while a fresh Chrome, a copy of his GPU caches and a pristine profile all
+// acquired an adapter on the same machine, same URL, same second. The cause was
+// that the runtime asked for powerPreference 'high-performance' and gave up on
+// the whole game when that returned null. powerPreference is a HINT: a browser
+// may legitimately return null for it while a usable default adapter exists.
+describe('WebGPU adapter acquisition falls back rather than refusing to run', () => {
+  const gpuThatOnlyAnswersUnhinted = () => {
+    const calls: Array<Record<string, unknown> | undefined> = [];
+    return {
+      calls,
+      gpu: {
+        requestAdapter: async (options?: Record<string, unknown>) => {
+          calls.push(options);
+          // The exact real-world shape: the hinted request yields nothing, the
+          // unhinted one yields a perfectly good adapter.
+          if (options?.powerPreference === 'high-performance') return null;
+          return { features: new Set<string>(), info: { vendor: 'nvidia', architecture: 'blackwell' } };
+        },
+      },
+    };
+  };
+
+  it('retries without the power hint before declaring WebGPU unavailable', async () => {
+    const { calls, gpu } = gpuThatOnlyAnswersUnhinted();
+    const first = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+    expect(first, 'precondition: the hinted request returns null').toBeNull();
+    const second = await gpu.requestAdapter();
+    expect(second, 'an unhinted request must still be tried, and here it succeeds').not.toBeNull();
+    expect(calls).toHaveLength(2);
+  });
+
+  it('keeps the fallback wired in the shipped source, not just in this test', () => {
+    const source = readFileSync(new URL('./render-runtime.ts', import.meta.url), 'utf8');
+    // The old code threw on the hinted result directly. It must not come back.
+    expect(source).not.toContain("if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available')");
+    expect(source).toContain('adapter = await gpu.requestAdapter();');
+    expect(source).toContain("adapterFallback = 'default'");
+    // And the failure that remains must be the honest one: no adapter AT ALL.
+    expect(source).toContain('no GPU adapter was available at all');
   });
 });

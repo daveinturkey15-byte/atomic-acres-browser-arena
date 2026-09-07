@@ -116,8 +116,9 @@ for (const viewport of UI_MOBILE_REVIEW_VIEWPORTS) {
     ));
     expect(hudCollisions).toEqual([]);
     for (const rect of rects) {
-      expect(rect.right - rect.left, `${rect.label} width`).toBeGreaterThanOrEqual(44);
-      expect(rect.bottom - rect.top, `${rect.label} height`).toBeGreaterThanOrEqual(44);
+      // HF-357: verify touch targets meet the raised >=48px standard
+      expect(rect.right - rect.left, `${rect.label} width`).toBeGreaterThanOrEqual(48);
+      expect(rect.bottom - rect.top, `${rect.label} height`).toBeGreaterThanOrEqual(48);
     }
 
     const aimRoi: RectRecord = {
@@ -473,4 +474,26 @@ test('routes mobile USE and PAUSE through the live interaction and menu lifecycl
     window.__ATOMIC_ACRES_DEBUG__.snapshot().menuLifecycle.surface
   ))).toBe('paused-match');
   await expect(page.locator('#mobile-touch-controls')).toBeHidden();
+});
+
+// HF-357: verify zero HUD overlap and >=48px touch targets at 375x812 (portrait) and 812x375 (landscape)
+test('verifies no HUD overlap at 375x812 portrait and 812x375 landscape (HF-357)', async ({ page }) => {
+  const targetViewports = [
+    { id: 'mobile-portrait-375x812', width: 375, height: 812 },
+    { id: 'mobile-landscape-812x375', width: 812, height: 375 },
+  ];
+  for (const vp of targetViewports) {
+    await ready(page, vp.width, vp.height);
+    const rects = await visibleControlRects(page);
+    const hudRects = await visibleHudPanelRects(page);
+    const hudCollisions = hudRects.flatMap((hudRect) => (
+      rects.filter((controlRect) => overlaps(hudRect, controlRect))
+        .map((controlRect) => `${hudRect.label}↔${controlRect.label}`)
+    ));
+    expect(hudCollisions, `No HUD collision in ${vp.id}`).toEqual([]);
+    for (const rect of rects) {
+      expect(rect.right - rect.left, `${vp.id} ${rect.label} width`).toBeGreaterThanOrEqual(48);
+      expect(rect.bottom - rect.top, `${vp.id} ${rect.label} height`).toBeGreaterThanOrEqual(48);
+    }
+  }
 });

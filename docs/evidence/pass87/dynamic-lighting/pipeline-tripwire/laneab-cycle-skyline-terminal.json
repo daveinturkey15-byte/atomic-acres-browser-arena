@@ -1,0 +1,990 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-03T01:58:51.799Z",
+  "label": "laneab-cycle-skyline-terminal",
+  "arena": "skyline-terminal",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-lighting\\dist-lane-ab",
+  "seconds": 75,
+  "tod": "cycle",
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.134,
+    "rafCallbacks": 2243,
+    "stallCount": 141,
+    "stallsPerMinute": 112.6,
+    "frozenFractionPercent": 20.77,
+    "medianStallMs": 105.6,
+    "maxStallMs": 189
+  },
+  "pipelines": {
+    "beforeWindow": 300,
+    "inWindow": 1,
+    "perMinuteInWindow": 0.8,
+    "inStall": 1,
+    "inStallSharePercent": 100,
+    "expectedIfUnrelatedPercent": 20.77,
+    "enrichment": 4.81
+  },
+  "shaderModules": {
+    "beforeWindow": 346,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 20.77,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 83396,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 93410,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 95430,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 103373,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 105391,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 116854,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 118927,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 127362,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 129396,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 137095,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 139129,
+      "alive": true,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 147357,
+      "alive": false,
+      "weapon": "carbine"
+    },
+    {
+      "atMs": 149365,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [
+    {
+      "atMs": 93238,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Gunmetal:0:2",
+        "MAT_Pass65_carbine_Lens:0:2",
+        "MAT_Pass65_carbine_Polymer_PBR:0:2",
+        "MAT_Pass65_carbine_Primary_PBR:0:2",
+        "MAT_Pass65_carbine_Rubber:0:2"
+      ],
+      "materialsLost": []
+    },
+    {
+      "atMs": 103458,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 116895,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 123214,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 127218,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 133315,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 136932,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 146706,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 147199,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    },
+    {
+      "atMs": 157197,
+      "lightsGained": [],
+      "lightsLost": [],
+      "materialsGained": [],
+      "materialsLost": []
+    }
+  ],
+  "cacheKeyDiffCount": 10,
+  "determinantFlips": [
+    {
+      "atMs": 83119,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 93238,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 103457,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 116895,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.00e+0",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 123213,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 127217,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 133315,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.57e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.57e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 136931,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 146706,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 147198,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Glove_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:1.16e-14",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:1.16e-14",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    },
+    {
+      "atMs": 157265,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:4.82e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:4.82e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:4.82e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:4.82e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 11,
+  "samplePipelineLabels": [
+    {
+      "atMs": 95218,
+      "syncMs": 0.7,
+      "label": "renderPipeline_MeshBasicMaterial_774",
+      "stack": "at GPUDevice.patched [as createRenderPipeline] (<anonymous>:31:50) <- at iG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4644:12500) <- at wG.createRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4645:29414) <- at sN._getRenderPipeline (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:96560) <- at sN.getForRender (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:95356) <- at sN.updateForRender (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4130:96185) <- at OG._renderObjectDirect (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:70133) <- at OG.renderObject (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:68962) <- at OG._renderObjects (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:66141) <- at OG._renderTransparents (http://127.0.0.1:4193/assets/vendor-three-DMMu-fsD.js:4136:65982)"
+    }
+  ],
+  "stalls": [
+    {
+      "startMs": 83316,
+      "endMs": 83416,
+      "durationMs": 100
+    },
+    {
+      "startMs": 83560,
+      "endMs": 83660,
+      "durationMs": 100
+    },
+    {
+      "startMs": 84065.3,
+      "endMs": 84171,
+      "durationMs": 105.7
+    },
+    {
+      "startMs": 84544,
+      "endMs": 84644,
+      "durationMs": 100
+    },
+    {
+      "startMs": 85793.3,
+      "endMs": 85960,
+      "durationMs": 166.7
+    },
+    {
+      "startMs": 86060.4,
+      "endMs": 86166,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 86810.4,
+      "endMs": 86916,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 88532.4,
+      "endMs": 88638,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 88638.5,
+      "endMs": 88744,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 89282.2,
+      "endMs": 89460,
+      "durationMs": 177.8
+    },
+    {
+      "startMs": 89565.9,
+      "endMs": 89666,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 91399,
+      "endMs": 91499,
+      "durationMs": 100
+    },
+    {
+      "startMs": 93282,
+      "endMs": 93421,
+      "durationMs": 139
+    },
+    {
+      "startMs": 93521.4,
+      "endMs": 93627,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 95032.3,
+      "endMs": 95149,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 95149.4,
+      "endMs": 95266,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 95332.6,
+      "endMs": 95449,
+      "durationMs": 116.4
+    },
+    {
+      "startMs": 95570.9,
+      "endMs": 95682,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 95849.6,
+      "endMs": 95983,
+      "durationMs": 133.4
+    },
+    {
+      "startMs": 96049.3,
+      "endMs": 96166,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 96287.9,
+      "endMs": 96399,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 96566,
+      "endMs": 96666,
+      "durationMs": 100
+    },
+    {
+      "startMs": 96799.6,
+      "endMs": 96905,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 97071,
+      "endMs": 97171,
+      "durationMs": 100
+    },
+    {
+      "startMs": 97232.1,
+      "endMs": 97360,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 97359.9,
+      "endMs": 97471,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 97548.9,
+      "endMs": 97649,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 98305,
+      "endMs": 98405,
+      "durationMs": 100
+    },
+    {
+      "startMs": 99299,
+      "endMs": 99399,
+      "durationMs": 100
+    },
+    {
+      "startMs": 99798.9,
+      "endMs": 99899,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 100316,
+      "endMs": 100427,
+      "durationMs": 111
+    },
+    {
+      "startMs": 100799.4,
+      "endMs": 100905,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 101049.4,
+      "endMs": 101155,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 101315.6,
+      "endMs": 101421,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 102794,
+      "endMs": 102894,
+      "durationMs": 100
+    },
+    {
+      "startMs": 103271.9,
+      "endMs": 103394,
+      "durationMs": 122.1
+    },
+    {
+      "startMs": 104293.8,
+      "endMs": 104394,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 104787.9,
+      "endMs": 104888,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 105027,
+      "endMs": 105127,
+      "durationMs": 100
+    },
+    {
+      "startMs": 105310.4,
+      "endMs": 105416,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 105554.5,
+      "endMs": 105660,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 105754.5,
+      "endMs": 105860,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 105860.4,
+      "endMs": 105977,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 106049.4,
+      "endMs": 106155,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 106304.5,
+      "endMs": 106410,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 106565.5,
+      "endMs": 106671,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 106799.5,
+      "endMs": 106905,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 107032.9,
+      "endMs": 107133,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 107293.9,
+      "endMs": 107394,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 107810.1,
+      "endMs": 107938,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 108038.5,
+      "endMs": 108144,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 108293.5,
+      "endMs": 108399,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 108537.9,
+      "endMs": 108649,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 108648.9,
+      "endMs": 108760,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 108821.8,
+      "endMs": 108933,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 109049.4,
+      "endMs": 109155,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 109277.1,
+      "endMs": 109405,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 109559.8,
+      "endMs": 109660,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 109815.4,
+      "endMs": 109921,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 110054.5,
+      "endMs": 110160,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 110293.8,
+      "endMs": 110405,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 111527,
+      "endMs": 111716,
+      "durationMs": 189
+    },
+    {
+      "startMs": 112049.5,
+      "endMs": 112155,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 112559.9,
+      "endMs": 112671,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 112793.3,
+      "endMs": 112910,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 113066.3,
+      "endMs": 113183,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 113310.1,
+      "endMs": 113438,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 113549.5,
+      "endMs": 113655,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 113798.9,
+      "endMs": 113910,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 114049,
+      "endMs": 114149,
+      "durationMs": 100
+    },
+    {
+      "startMs": 114304.8,
+      "endMs": 114416,
+      "durationMs": 111.2
+    },
+    {
+      "startMs": 114554.5,
+      "endMs": 114660,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 114749.6,
+      "endMs": 114855,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 114854.2,
+      "endMs": 114982,
+      "durationMs": 127.8
+    },
+    {
+      "startMs": 115054.4,
+      "endMs": 115160,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 115310,
+      "endMs": 115410,
+      "durationMs": 100
+    },
+    {
+      "startMs": 115710.7,
+      "endMs": 115844,
+      "durationMs": 133.3
+    },
+    {
+      "startMs": 115893.9,
+      "endMs": 116005,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 116055,
+      "endMs": 116205,
+      "durationMs": 150
+    },
+    {
+      "startMs": 116321.4,
+      "endMs": 116427,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 116565.8,
+      "endMs": 116688,
+      "durationMs": 122.2
+    },
+    {
+      "startMs": 117048.9,
+      "endMs": 117160,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 117526.9,
+      "endMs": 117638,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 117788.5,
+      "endMs": 117905,
+      "durationMs": 116.5
+    },
+    {
+      "startMs": 118049.4,
+      "endMs": 118155,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 118188.6,
+      "endMs": 118294,
+      "durationMs": 105.4
+    },
+    {
+      "startMs": 118532.4,
+      "endMs": 118649,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 118832.4,
+      "endMs": 118949,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 119054.2,
+      "endMs": 119171,
+      "durationMs": 116.8
+    },
+    {
+      "startMs": 119304.4,
+      "endMs": 119421,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 119799.5,
+      "endMs": 119905,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 120310.4,
+      "endMs": 120416,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 120565.4,
+      "endMs": 120682,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 120810.4,
+      "endMs": 120927,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 121065.8,
+      "endMs": 121188,
+      "durationMs": 122.2
+    },
+    {
+      "startMs": 121298.9,
+      "endMs": 121410,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 121410.5,
+      "endMs": 121516,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 121577,
+      "endMs": 121677,
+      "durationMs": 100
+    },
+    {
+      "startMs": 121804.5,
+      "endMs": 121910,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 122032.1,
+      "endMs": 122160,
+      "durationMs": 127.9
+    },
+    {
+      "startMs": 122271.4,
+      "endMs": 122377,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 122554.5,
+      "endMs": 122660,
+      "durationMs": 105.5
+    },
+    {
+      "startMs": 122810.4,
+      "endMs": 122916,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 123049,
+      "endMs": 123160,
+      "durationMs": 111
+    },
+    {
+      "startMs": 123565.4,
+      "endMs": 123671,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 124049,
+      "endMs": 124149,
+      "durationMs": 100
+    },
+    {
+      "startMs": 124304.9,
+      "endMs": 124405,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 124482.4,
+      "endMs": 124588,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 125060.4,
+      "endMs": 125166,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 126282.4,
+      "endMs": 126399,
+      "durationMs": 116.6
+    },
+    {
+      "startMs": 126554.4,
+      "endMs": 126699,
+      "durationMs": 144.6
+    },
+    {
+      "startMs": 126815.9,
+      "endMs": 126916,
+      "durationMs": 100.1
+    },
+    {
+      "startMs": 127809.9,
+      "endMs": 127921,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 128033,
+      "endMs": 128133,
+      "durationMs": 100
+    },
+    {
+      "startMs": 129310.4,
+      "endMs": 129416,
+      "durationMs": 105.6
+    },
+    {
+      "startMs": 130299,
+      "endMs": 130449,
+      "durationMs": 150
+    },
+    {
+      "startMs": 131055,
+      "endMs": 131155,
+      "durationMs": 100
+    },
+    {
+      "startMs": 131309.8,
+      "endMs": 131410,
+      "durationMs": 100.2
+    },
+    {
+      "startMs": 131571.3,
+      "endMs": 131688,
+      "durationMs": 116.7
+    },
+    {
+      "startMs": 133044,
+      "endMs": 133144,
+      "durationMs": 100
+    }
+  ]
+}

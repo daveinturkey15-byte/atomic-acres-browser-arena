@@ -1,0 +1,2446 @@
+{
+  "port": 4216,
+  "sampleMs": [
+    500,
+    1000,
+    2000,
+    3000,
+    5500,
+    8000,
+    12000,
+    20000,
+    30000
+  ],
+  "runs": [
+    {
+      "run": 1,
+      "startedAt": "2026-09-03T02:25:01.883Z",
+      "poses": {
+        "corridor-3-grammar": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 142,
+              "trisK": 338
+            },
+            {
+              "tMs": 1000,
+              "draws": 142,
+              "trisK": 338
+            },
+            {
+              "tMs": 2000,
+              "draws": 145,
+              "trisK": 278
+            },
+            {
+              "tMs": 3000,
+              "draws": 144,
+              "trisK": 278
+            },
+            {
+              "tMs": 5500,
+              "draws": 145,
+              "trisK": 278
+            },
+            {
+              "tMs": 8000,
+              "draws": 148,
+              "trisK": 277
+            },
+            {
+              "tMs": 12000,
+              "draws": 150,
+              "trisK": 277
+            },
+            {
+              "tMs": 20000,
+              "draws": 144,
+              "trisK": 278
+            },
+            {
+              "tMs": 30000,
+              "draws": 159,
+              "trisK": 281
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 8,
+            "dDrawsMax": 8,
+            "dDrawsMode": 8,
+            "dTrisMin": 12888,
+            "dTrisMax": 12936,
+            "dTrisMode": 12916,
+            "samples": [
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279308,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266396,
+                "onTris": 279288,
+                "dTris": 12892
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266372,
+                "onTris": 279300,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279304,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266372,
+                "onTris": 279288,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266400,
+                "onTris": 279288,
+                "dTris": 12888
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266384,
+                "onTris": 279296,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266384,
+                "onTris": 279280,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266344,
+                "onTris": 279256,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266328,
+                "onTris": 279244,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266332,
+                "onTris": 279268,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266352,
+                "onTris": 279256,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266340,
+                "onTris": 279272,
+                "dTris": 12932
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266352,
+                "onTris": 279268,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266352,
+                "onTris": 279260,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266040,
+                "onTris": 278948,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266032,
+                "onTris": 278968,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266048,
+                "onTris": 278960,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266060,
+                "onTris": 278960,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266036,
+                "onTris": 278952,
+                "dTris": 12916
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 7,
+            "dDrawsMax": 8,
+            "dDrawsMode": 8,
+            "dTrisMin": 12192,
+            "dTrisMax": 12936,
+            "dTrisMode": 12908,
+            "samples": [
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266056,
+                "onTris": 278964,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266036,
+                "onTris": 278964,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 153,
+                "dDraws": 7,
+                "offTris": 266048,
+                "onTris": 278872,
+                "dTris": 12824
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265956,
+                "onTris": 278872,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265952,
+                "onTris": 278864,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265940,
+                "onTris": 278876,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265944,
+                "onTris": 278876,
+                "dTris": 12932
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265956,
+                "onTris": 278864,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 152,
+                "dDraws": 7,
+                "offTris": 265952,
+                "onTris": 278144,
+                "dTris": 12192
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265232,
+                "onTris": 278136,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265228,
+                "onTris": 278136,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265224,
+                "onTris": 278148,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265216,
+                "onTris": 278124,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265228,
+                "onTris": 278112,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265236,
+                "onTris": 278128,
+                "dTris": 12892
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265232,
+                "onTris": 278072,
+                "dTris": 12840
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265132,
+                "onTris": 277988,
+                "dTris": 12856
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265048,
+                "onTris": 277920,
+                "dTris": 12872
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 151,
+                "dDraws": 7,
+                "offTris": 264976,
+                "onTris": 277740,
+                "dTris": 12764
+              },
+              {
+                "offDraws": 143,
+                "onDraws": 151,
+                "dDraws": 8,
+                "offTris": 264776,
+                "onTris": 277652,
+                "dTris": 12876
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": -72.34,
+              "y": 46.48,
+              "z": 83.71
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 5
+          }
+        },
+        "corridor-3-street-cell": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 130,
+              "trisK": 241
+            },
+            {
+              "tMs": 1000,
+              "draws": 132,
+              "trisK": 241
+            },
+            {
+              "tMs": 2000,
+              "draws": 131,
+              "trisK": 242
+            },
+            {
+              "tMs": 3000,
+              "draws": 130,
+              "trisK": 242
+            },
+            {
+              "tMs": 5500,
+              "draws": 127,
+              "trisK": 242
+            },
+            {
+              "tMs": 8000,
+              "draws": 123,
+              "trisK": 242
+            },
+            {
+              "tMs": 12000,
+              "draws": 128,
+              "trisK": 242
+            },
+            {
+              "tMs": 20000,
+              "draws": 129,
+              "trisK": 242
+            },
+            {
+              "tMs": 30000,
+              "draws": 130,
+              "trisK": 244
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 8,
+            "dDrawsMax": 9,
+            "dDrawsMode": 8,
+            "dTrisMin": 12884,
+            "dTrisMax": 13632,
+            "dTrisMode": 12904,
+            "samples": [
+              {
+                "offDraws": 122,
+                "onDraws": 130,
+                "dDraws": 8,
+                "offTris": 230744,
+                "onTris": 243648,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 130,
+                "dDraws": 8,
+                "offTris": 230756,
+                "onTris": 243644,
+                "dTris": 12888
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 131,
+                "dDraws": 9,
+                "offTris": 230756,
+                "onTris": 243708,
+                "dTris": 12952
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230788,
+                "onTris": 243712,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230796,
+                "onTris": 243704,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230792,
+                "onTris": 243704,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 132,
+                "dDraws": 9,
+                "offTris": 230808,
+                "onTris": 244440,
+                "dTris": 13632
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231528,
+                "onTris": 244456,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231536,
+                "onTris": 244440,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231528,
+                "onTris": 244452,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231540,
+                "onTris": 244448,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 133,
+                "dDraws": 9,
+                "offTris": 231524,
+                "onTris": 244744,
+                "dTris": 13220
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231836,
+                "onTris": 244720,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231832,
+                "onTris": 244736,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231840,
+                "onTris": 244736,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231816,
+                "onTris": 244744,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231836,
+                "onTris": 244732,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231820,
+                "onTris": 244752,
+                "dTris": 12932
+              },
+              {
+                "offDraws": 126,
+                "onDraws": 134,
+                "dDraws": 8,
+                "offTris": 232368,
+                "onTris": 245264,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 126,
+                "onDraws": 134,
+                "dDraws": 8,
+                "offTris": 232376,
+                "onTris": 245284,
+                "dTris": 12908
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 15,
+            "dDrawsMax": 16,
+            "dDrawsMode": 15,
+            "dTrisMin": 23992,
+            "dTrisMax": 25932,
+            "dTrisMode": 25824,
+            "samples": [
+              {
+                "offDraws": 126,
+                "onDraws": 141,
+                "dDraws": 15,
+                "offTris": 232372,
+                "onTris": 256364,
+                "dTris": 23992
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 142,
+                "dDraws": 15,
+                "offTris": 232192,
+                "onTris": 258016,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 142,
+                "dDraws": 15,
+                "offTris": 232232,
+                "onTris": 258064,
+                "dTris": 25832
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 143,
+                "dDraws": 16,
+                "offTris": 232288,
+                "onTris": 258220,
+                "dTris": 25932
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258256,
+                "dTris": 25832
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258236,
+                "dTris": 25812
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258248,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232420,
+                "onTris": 258256,
+                "dTris": 25836
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232420,
+                "onTris": 258256,
+                "dTris": 25836
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232432,
+                "onTris": 258236,
+                "dTris": 25804
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258248,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232728,
+                "onTris": 258548,
+                "dTris": 25820
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232720,
+                "onTris": 258524,
+                "dTris": 25804
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232704,
+                "onTris": 258544,
+                "dTris": 25840
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258528,
+                "dTris": 25812
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232712,
+                "onTris": 258536,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258532,
+                "dTris": 25816
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232720,
+                "onTris": 258540,
+                "dTris": 25820
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258544,
+                "dTris": 25828
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232728,
+                "onTris": 258512,
+                "dTris": 25784
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": -102.78,
+              "y": 37.04,
+              "z": -49.64
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 7
+          }
+        },
+        "corridor-3-street-kerbside": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 137,
+              "trisK": 246
+            },
+            {
+              "tMs": 1000,
+              "draws": 137,
+              "trisK": 246
+            },
+            {
+              "tMs": 2000,
+              "draws": 139,
+              "trisK": 246
+            },
+            {
+              "tMs": 3000,
+              "draws": 141,
+              "trisK": 246
+            },
+            {
+              "tMs": 5500,
+              "draws": 142,
+              "trisK": 244
+            },
+            {
+              "tMs": 8000,
+              "draws": 134,
+              "trisK": 242
+            },
+            {
+              "tMs": 12000,
+              "draws": 130,
+              "trisK": 242
+            },
+            {
+              "tMs": 20000,
+              "draws": 124,
+              "trisK": 242
+            },
+            {
+              "tMs": 30000,
+              "draws": 128,
+              "trisK": 242
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 7,
+            "dDrawsMax": 8,
+            "dDrawsMode": 7,
+            "dTrisMin": 12884,
+            "dTrisMax": 13512,
+            "dTrisMode": 12904,
+            "samples": [
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228612,
+                "onTris": 241496,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228596,
+                "onTris": 241488,
+                "dTris": 12892
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228596,
+                "onTris": 241516,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228616,
+                "onTris": 241520,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 228632,
+                "onTris": 241548,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 228644,
+                "onTris": 241544,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228536,
+                "onTris": 241452,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228556,
+                "onTris": 241464,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228560,
+                "onTris": 241464,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228556,
+                "onTris": 241452,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228560,
+                "onTris": 241464,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228524,
+                "onTris": 241444,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228552,
+                "onTris": 241452,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 129,
+                "dDraws": 8,
+                "offTris": 228548,
+                "onTris": 242060,
+                "dTris": 13512
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242064,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242056,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242064,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242056,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242052,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229160,
+                "onTris": 242052,
+                "dTris": 12892
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 7,
+            "dDrawsMax": 7,
+            "dDrawsMode": 7,
+            "dTrisMin": 12876,
+            "dTrisMax": 12936,
+            "dTrisMode": 12912,
+            "samples": [
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242056,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229136,
+                "onTris": 242060,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229156,
+                "onTris": 242056,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242048,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242060,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242064,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242056,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242056,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242028,
+                "dTris": 12876
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229120,
+                "onTris": 242056,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242064,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242060,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242060,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242044,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242072,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242064,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229136,
+                "onTris": 242056,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229156,
+                "onTris": 242052,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242056,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242052,
+                "dTris": 12908
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": 20.39,
+              "y": 76.87,
+              "z": -89.87
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 5
+          }
+        }
+      }
+    },
+    {
+      "run": 2,
+      "startedAt": "2026-09-03T02:26:42.225Z",
+      "poses": {
+        "corridor-3-grammar": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": null,
+              "trisK": null
+            },
+            {
+              "tMs": 1000,
+              "draws": 142,
+              "trisK": 277
+            },
+            {
+              "tMs": 2000,
+              "draws": 146,
+              "trisK": 279
+            },
+            {
+              "tMs": 3000,
+              "draws": 144,
+              "trisK": 278
+            },
+            {
+              "tMs": 5500,
+              "draws": 146,
+              "trisK": 278
+            },
+            {
+              "tMs": 8000,
+              "draws": 148,
+              "trisK": 277
+            },
+            {
+              "tMs": 12000,
+              "draws": 150,
+              "trisK": 277
+            },
+            {
+              "tMs": 20000,
+              "draws": 144,
+              "trisK": 278
+            },
+            {
+              "tMs": 30000,
+              "draws": 157,
+              "trisK": 280
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 8,
+            "dDrawsMax": 8,
+            "dDrawsMode": 8,
+            "dTrisMin": 12880,
+            "dTrisMax": 12936,
+            "dTrisMode": 12908,
+            "samples": [
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279304,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266392,
+                "onTris": 279304,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279300,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279308,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266372,
+                "onTris": 279308,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266384,
+                "onTris": 279292,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266388,
+                "onTris": 279268,
+                "dTris": 12880
+              },
+              {
+                "offDraws": 148,
+                "onDraws": 156,
+                "dDraws": 8,
+                "offTris": 266360,
+                "onTris": 279296,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266344,
+                "onTris": 279264,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266340,
+                "onTris": 279256,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266340,
+                "onTris": 279248,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266364,
+                "onTris": 279252,
+                "dTris": 12888
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266348,
+                "onTris": 279256,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266352,
+                "onTris": 279264,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 147,
+                "onDraws": 155,
+                "dDraws": 8,
+                "offTris": 266348,
+                "onTris": 279268,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266044,
+                "onTris": 278948,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266048,
+                "onTris": 278956,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266052,
+                "onTris": 278952,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266048,
+                "onTris": 278956,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266052,
+                "onTris": 278944,
+                "dTris": 12892
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 7,
+            "dDrawsMax": 8,
+            "dDrawsMode": 8,
+            "dTrisMin": 12172,
+            "dTrisMax": 12936,
+            "dTrisMode": 12912,
+            "samples": [
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266048,
+                "onTris": 278960,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266024,
+                "onTris": 278960,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 146,
+                "onDraws": 154,
+                "dDraws": 8,
+                "offTris": 266012,
+                "onTris": 278924,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265948,
+                "onTris": 278852,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265940,
+                "onTris": 278868,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265948,
+                "onTris": 278872,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265948,
+                "onTris": 278872,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265956,
+                "onTris": 278864,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 153,
+                "dDraws": 8,
+                "offTris": 265948,
+                "onTris": 278852,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 145,
+                "onDraws": 152,
+                "dDraws": 7,
+                "offTris": 265968,
+                "onTris": 278140,
+                "dTris": 12172
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265236,
+                "onTris": 278148,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265228,
+                "onTris": 278140,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265220,
+                "onTris": 278144,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265232,
+                "onTris": 278148,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265232,
+                "onTris": 278112,
+                "dTris": 12880
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265232,
+                "onTris": 278116,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265160,
+                "onTris": 278036,
+                "dTris": 12876
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 265052,
+                "onTris": 277924,
+                "dTris": 12872
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 152,
+                "dDraws": 8,
+                "offTris": 264964,
+                "onTris": 277816,
+                "dTris": 12852
+              },
+              {
+                "offDraws": 144,
+                "onDraws": 151,
+                "dDraws": 7,
+                "offTris": 264836,
+                "onTris": 277620,
+                "dTris": 12784
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": -72.71,
+              "y": 46.36,
+              "z": 83.45
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 5
+          }
+        },
+        "corridor-3-street-cell": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 132,
+              "trisK": 242
+            },
+            {
+              "tMs": 1000,
+              "draws": 132,
+              "trisK": 241
+            },
+            {
+              "tMs": 2000,
+              "draws": 131,
+              "trisK": 242
+            },
+            {
+              "tMs": 3000,
+              "draws": 130,
+              "trisK": 242
+            },
+            {
+              "tMs": 5500,
+              "draws": 129,
+              "trisK": 242
+            },
+            {
+              "tMs": 8000,
+              "draws": 123,
+              "trisK": 242
+            },
+            {
+              "tMs": 12000,
+              "draws": 128,
+              "trisK": 242
+            },
+            {
+              "tMs": 20000,
+              "draws": 129,
+              "trisK": 242
+            },
+            {
+              "tMs": 30000,
+              "draws": 127,
+              "trisK": 243
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 8,
+            "dDrawsMax": 9,
+            "dDrawsMode": 8,
+            "dTrisMin": 12880,
+            "dTrisMax": 13472,
+            "dTrisMode": 12920,
+            "samples": [
+              {
+                "offDraws": 122,
+                "onDraws": 130,
+                "dDraws": 8,
+                "offTris": 230756,
+                "onTris": 243656,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 130,
+                "dDraws": 8,
+                "offTris": 230748,
+                "onTris": 243672,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 130,
+                "dDraws": 8,
+                "offTris": 230744,
+                "onTris": 243664,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 131,
+                "dDraws": 9,
+                "offTris": 230756,
+                "onTris": 243712,
+                "dTris": 12956
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230804,
+                "onTris": 243712,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230792,
+                "onTris": 243716,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 123,
+                "onDraws": 131,
+                "dDraws": 8,
+                "offTris": 230796,
+                "onTris": 243716,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231536,
+                "onTris": 244456,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231540,
+                "onTris": 244436,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231532,
+                "onTris": 244452,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231532,
+                "onTris": 244440,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 124,
+                "onDraws": 132,
+                "dDraws": 8,
+                "offTris": 231524,
+                "onTris": 244440,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231816,
+                "onTris": 244744,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231836,
+                "onTris": 244716,
+                "dTris": 12880
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231828,
+                "onTris": 244744,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231828,
+                "onTris": 244736,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231816,
+                "onTris": 244736,
+                "dTris": 12920
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 133,
+                "dDraws": 8,
+                "offTris": 231836,
+                "onTris": 244732,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 125,
+                "onDraws": 134,
+                "dDraws": 9,
+                "offTris": 231824,
+                "onTris": 245296,
+                "dTris": 13472
+              },
+              {
+                "offDraws": 126,
+                "onDraws": 134,
+                "dDraws": 8,
+                "offTris": 232364,
+                "onTris": 245284,
+                "dTris": 12920
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 13,
+            "dDrawsMax": 16,
+            "dDrawsMode": 15,
+            "dTrisMin": 23296,
+            "dTrisMax": 26120,
+            "dTrisMode": 25816,
+            "samples": [
+              {
+                "offDraws": 126,
+                "onDraws": 139,
+                "dDraws": 13,
+                "offTris": 232364,
+                "onTris": 255660,
+                "dTris": 23296
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 142,
+                "dDraws": 15,
+                "offTris": 232304,
+                "onTris": 258156,
+                "dTris": 25852
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 142,
+                "dDraws": 15,
+                "offTris": 232248,
+                "onTris": 258084,
+                "dTris": 25836
+              },
+              {
+                "offDraws": 127,
+                "onDraws": 143,
+                "dDraws": 16,
+                "offTris": 232276,
+                "onTris": 258172,
+                "dTris": 25896
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232372,
+                "onTris": 258216,
+                "dTris": 25844
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258248,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232436,
+                "onTris": 258252,
+                "dTris": 25816
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232428,
+                "onTris": 258244,
+                "dTris": 25816
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232404,
+                "onTris": 258248,
+                "dTris": 25844
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232436,
+                "onTris": 258244,
+                "dTris": 25808
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232424,
+                "onTris": 258252,
+                "dTris": 25828
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 143,
+                "dDraws": 15,
+                "offTris": 232428,
+                "onTris": 258248,
+                "dTris": 25820
+              },
+              {
+                "offDraws": 128,
+                "onDraws": 144,
+                "dDraws": 16,
+                "offTris": 232428,
+                "onTris": 258548,
+                "dTris": 26120
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232720,
+                "onTris": 258528,
+                "dTris": 25808
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258540,
+                "dTris": 25824
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232708,
+                "onTris": 258536,
+                "dTris": 25828
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232708,
+                "onTris": 258540,
+                "dTris": 25832
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232704,
+                "onTris": 258532,
+                "dTris": 25828
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258532,
+                "dTris": 25816
+              },
+              {
+                "offDraws": 129,
+                "onDraws": 144,
+                "dDraws": 15,
+                "offTris": 232716,
+                "onTris": 258532,
+                "dTris": 25816
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": -102.22,
+              "y": 37.22,
+              "z": -50.66
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 7
+          }
+        },
+        "corridor-3-street-kerbside": {
+          "series": [
+            {
+              "tMs": 500,
+              "draws": 136,
+              "trisK": 246
+            },
+            {
+              "tMs": 1000,
+              "draws": 137,
+              "trisK": 246
+            },
+            {
+              "tMs": 2000,
+              "draws": 138,
+              "trisK": 246
+            },
+            {
+              "tMs": 3000,
+              "draws": 141,
+              "trisK": 246
+            },
+            {
+              "tMs": 5500,
+              "draws": 142,
+              "trisK": 244
+            },
+            {
+              "tMs": 8000,
+              "draws": 136,
+              "trisK": 243
+            },
+            {
+              "tMs": 12000,
+              "draws": 129,
+              "trisK": 242
+            },
+            {
+              "tMs": 20000,
+              "draws": 124,
+              "trisK": 242
+            },
+            {
+              "tMs": 30000,
+              "draws": 128,
+              "trisK": 242
+            }
+          ],
+          "paired": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 6,
+            "dDrawsMax": 8,
+            "dDrawsMode": 7,
+            "dTrisMin": 12820,
+            "dTrisMax": 12936,
+            "dTrisMode": 12900,
+            "samples": [
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228608,
+                "onTris": 241496,
+                "dTris": 12888
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228608,
+                "onTris": 241512,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228600,
+                "onTris": 241524,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228612,
+                "onTris": 241512,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228592,
+                "onTris": 241516,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228584,
+                "onTris": 241520,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 129,
+                "dDraws": 8,
+                "offTris": 228600,
+                "onTris": 241536,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 228644,
+                "onTris": 241528,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 128,
+                "dDraws": 6,
+                "offTris": 228640,
+                "onTris": 241460,
+                "dTris": 12820
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228548,
+                "onTris": 241448,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228564,
+                "onTris": 241460,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228532,
+                "onTris": 241468,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228552,
+                "onTris": 241452,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228552,
+                "onTris": 241460,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228552,
+                "onTris": 241456,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228524,
+                "onTris": 241460,
+                "dTris": 12936
+              },
+              {
+                "offDraws": 121,
+                "onDraws": 128,
+                "dDraws": 7,
+                "offTris": 228548,
+                "onTris": 241448,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229164,
+                "onTris": 242048,
+                "dTris": 12884
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242056,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242064,
+                "dTris": 12924
+              }
+            ]
+          },
+          "castShadowVariant": {
+            "found": true,
+            "n": 20,
+            "dDrawsMin": 7,
+            "dDrawsMax": 7,
+            "dDrawsMode": 7,
+            "dTrisMin": 12892,
+            "dTrisMax": 12928,
+            "dTrisMode": 12912,
+            "samples": [
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229140,
+                "onTris": 242052,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242064,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242048,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242052,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242056,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242056,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242068,
+                "dTris": 12916
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242068,
+                "dTris": 12924
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229120,
+                "onTris": 242028,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242052,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242072,
+                "dTris": 12928
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229160,
+                "onTris": 242064,
+                "dTris": 12904
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242056,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242060,
+                "dTris": 12912
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229160,
+                "onTris": 242060,
+                "dTris": 12900
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229144,
+                "onTris": 242040,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242040,
+                "dTris": 12892
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229148,
+                "onTris": 242056,
+                "dTris": 12908
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229152,
+                "onTris": 242048,
+                "dTris": 12896
+              },
+              {
+                "offDraws": 122,
+                "onDraws": 129,
+                "dDraws": 7,
+                "offTris": 229160,
+                "onTris": 242064,
+                "dTris": 12904
+              }
+            ]
+          },
+          "shadowVolume": {
+            "sunPosition": {
+              "x": 21.6,
+              "y": 77.31,
+              "z": -89.2
+            },
+            "orthoHalfExtent": 34,
+            "cellMeshes": 8,
+            "cellMeshesInsideShadowVolume": 5
+          }
+        }
+      }
+    }
+  ]
+}

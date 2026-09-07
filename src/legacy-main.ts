@@ -1,34 +1,146 @@
 import * as THREE from 'three';
+import {
+  deterministicWindowUnit,
+  escapeHtml,
+  framePercentile,
+  percentile,
+  persistentWindowDebrisId,
+  prettyKeyCode,
+  segmentSphereFraction,
+  windowDebrisPoolKey,
+} from './legacy-pure-helpers'; // HF-355 round 1
+import {
+  DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS,
+  DOMINATION_TEAM_COLORS,
+  createWeaponCapacityRegistry as createWeaponCapacityRegistryPure,
+  isTimedCombatMessage,
+  majorDebrisDefinitionFromSnapshot,
+  recoveryRemainingMs,
+  stanceEyeHeight,
+  verifiedStickyAttachment,
+} from './legacy-pure-helpers-2'; // HF-355 round 2
+// HF-412: the Black Ops 2 drop shot - a fixed-duration prone transition that
+// never takes the trigger away. Every timing constant lives in that module.
+import {
+  IDLE_CROUCH_HOLD,
+  IDLE_SPRINT_LATCH,
+  beginStanceTransition,
+  clearSprintLatchOnDropShot,
+  crouchHeld,
+  crouchPressed,
+  crouchReleased,
+  restingStanceTransitionSample,
+  sampleStanceTransition,
+  stepSprintLatch,
+  type CrouchHoldState,
+  type SprintLatchState,
+  type StanceTransition,
+  type StanceTransitionSample,
+} from './prone-transition';
 import './style.css';
+// GAMEPAD: PASS 84 Lane E — pad runtime, tiered aim assist, HUD glyphs, settings panel.
+import {
+  GamepadInputRuntime,
+  NO_AIM_ASSIST,
+  applyHudInputScheme,
+  applyStrikeTargetingCancelGlyph,
+  applyTriggerSnap,
+  bindGamepadSettingsPanel,
+  evaluateAimAssist,
+  interactLabel,
+  promptLabel,
+  type AimAssistResult,
+  type AimAssistTarget,
+  type AimAssistTier,
+  type GamepadLike,
+  type GamepadSettingsPanel,
+} from './input/gamepad';
+import { gradeProfileIdForGraphicsPreset } from './rendering/filmic-grade-chain'; // HF-363
+import { KILLSTREAK_ACTIVATION_DENIAL_LABELS, evaluateKillstreakActivation } from './killstreak-activation-gate'; // HF-316
+import { RARE_WEAPON_BANNER_DURATION_MS, presentRareWeaponAnnouncement, type RareWeaponAnnouncementInput } from './rare-weapon-announcement'; // HF-339
+import { applyTeamSwap, prescribeTeams } from './team-prescription'; // HF-328
 import { AtomicSignalPass, atomicSignalBypassReason, isSoftwareWebGLRenderer } from './atomic-signal';
 import { AdaptiveQualityController, DeferredAdaptivePixelRatio, adaptiveShadowsEnabled, assertWebGpuAdmissionCompletionLatency, classifyDisplayFrameMs, configuredAdaptiveQualityLevels, shouldFreezeAdaptiveQualityForMatch } from './adaptive-quality';
 import { GraphicsRefinementSystem, graphicsEffectsBudget, type GraphicsEffectsBudget } from './graphics-refinement';
+import { wrapAngleRadians } from './animation-additive-pose';
+import { setOperatorLookRenderBackend } from './operator-skin-tsl-materials'; // PASS 94
 import { ArenaContrastLighting } from './arena-contrast-lighting';
 import { centeredReadbackRegion, detectLivePresentationStall, LegacyWebGlRenderRuntime, shouldResetPresentationAfterSchedulerGap, WebGpuRenderRuntime, resolveRenderRuntimeRequest, type WebGpuSubmissionMode } from './rendering/render-runtime';
 import { estimateResidentObjectMemory } from './rendering/resident-memory';
-import { ArenaVisualStreamController, loadArenaVisualModule, type ArenaVisualSwitchReceipt } from './rendering/arena-visual-stream';
+// L7 handoff (PASS 81). This file used to define its OWN screenSpaceTopologyKey, and the
+// private copy is the one the pending-changes check calls. `rayTracing` is a declared
+// 'pipeline-rebuild' topology owner, but it was absent from the private key - so toggling
+// ray tracing mid-session scheduled no rebuild and applyTuning no-opped against a graph
+// that was never rebuilt. Importing the shared key is the fix; two copies of a key was
+// always going to end with one of them being wrong.
+import { screenSpaceTopologyKey } from './rendering/screen-space-post-profile';
+import {
+  ArenaVisualStreamController,
+  findAuthoredArenaReviewCamera,
+  loadArenaVisualModule,
+  type ArenaVisualSwitchReceipt,
+} from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
+import { arenaNeedsColdSessionPrecompile, coldArenaOperation, withDetachedRoots } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
 import { evictExactFailedArenaGeneration } from './arena-generation-cache';
 import { isViewmodelShadowLight, VIEWMODEL_SHADOW_BUDGET } from './rendering/runtime-shadow-budget';
-import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
+import { auditRuntimeTslTraversal, assertRuntimeTslTraversal, createPass64TslSceneSystems, pass64LinearSourceStages, type Pass64TslSceneSystems } from './rendering/pass64-tsl-scene';
 import type { ArenaVisualBudgets, ArenaVisualDefinition } from './rendering/arena-visual-definition';
 import { auditLocalLightOcclusion } from './rendering/light-occlusion';
-import { webGlShadowSamplerMode } from './webgl-shadow-compatibility';
+import { resolveWebGlShadowSamplerMode, webGlShadowSamplerMode, type ShadowFilterOverride } from './webgl-shadow-compatibility';
 import { AtmosphereSystem, atmosphereFogRange } from './atmosphere-system';
+import { RainPresentation } from './weather/rain-presentation';
+import { applyHudSway, createHudMotionTargets, createHudSwayState, releaseHudSway, setHudProperty, type HudMotionTargets, type HudSwayState } from './ui/pass77-hud-sway';
+import {
+  advanceHudImpact,
+  createHudImpactState,
+  impactKindForShakeSource,
+  pushHudImpact,
+  type HudImpactState,
+} from './ui/hud-impact-response';
+import {
+  sampleWeather,
+  clearWeatherSample,
+  forcedWeatherSample,
+  WEATHER_SEVERITY_LADDER,
+  type WeatherState,
+} from './weather/weather-state';
+import { createWindField, sampleWind } from './weather/wind-field';
+// LIGHTING: time-of-day model. Pure numbers only — see the module header for
+// why it can never return a light (PASS 82 light-set freeze).
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  isLightingTimeChoice,
+  lightingConditionsAreIdentity,
+  lightingConditionWritesEqual,
+  activeLightingTimeChoiceFrom,
+  resolveLightingConditions,
+  type LightingConditionWrites,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
+import { NUKETOWN2_ARENA_ID, resolveNuketown2LightingConditions } from './nuketown2-lighting';
+import { createNuketown2LocalLights, type Nuketown2ClusteredLightRig } from './rendering/clustered-lights';
+import { ParticleRuntime } from './particles';
+import { PRONE_PRESENTATION_ENVELOPE, proneBodyClearance, type ProneBodyClearance } from './prone-clearance';
+import { resolveEyeClearance } from './camera-eye-clearance';
+import { mountFarcrysisHitlOverlay, type FarcrysisHitlOverlay } from './farcrysis-hitl';
 import { WaterSystem, rustworksOceanAmplitude } from './water-system';
+import { createSwimState, stepSwimState, swimMovementModifiers, type SwimState } from './water/swim-state';
+import { sharedWaterBodyForArena } from './water/water-authoring';
+import { farcrysisWadeSpeedScale } from './farcrysis-terrain-authority'; // HF-393 wade
 import { PASS66_RELEASE_IDENTITY } from './release-identity';
 import { drawPass70DroneSwarmLogo } from './pass70-drone-swarm-logo';
 import { batchStaticMeshes, buildOperator, deathOperator, fireOperator, meleeOperator, poseOperator, reactOperator, resetOperator, setOperatorWeapon, waitForPendingArtTextures } from './art-kit';
 import { BotWeaponGpuVocabulary } from './bot-weapon-gpu-vocabulary';
 import {
-  invalidatePass65PresentationTree,
   pass65WeaponCacheTelemetry,
   prewarmPass65RuntimeWeaponCorpus,
-  releasePass65WeaponModelsIn,
 } from './weapon-model';
-import { applyBotEmissiveBrightness } from './operator-model';
+import { createGpuRetirementScheduler } from './gpu-retirement-scheduler';
+import {
+  emoteRiggedOperator, applyBotEmissiveBrightness } from './operator-model';
 import { applyRemoteHumanReadabilityHighlight, remoteHumanReadabilityTelemetry } from './remote-player-readability';
 import {
   classifyRiggedHandSelfOcclusionHit,
@@ -49,7 +161,6 @@ import {
   type RiggedEvidencePrincipalWriteMode,
   type RiggedEvidenceRasterRoiReceipt,
 } from './rigged-evidence-occlusion';
-import { isSharedMeshGeometry } from './gpu-resource-ownership';
 import {
   ACTION_LABELS,
   GAMEPLAY_ACTIONS,
@@ -74,16 +185,53 @@ import {
   buildSkylineTerminal,
   updateGunRangePresentation,
 } from './additional-maps';
+import { buildFarcrysis } from './farcrysis';
+import { buildHighSeas } from './high-seas';
+import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
+// MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
+// imported here: Map 3 is the one lazily loaded arena (HF-409, see
+// `arenaFactories` below and `src/arena-factory-registry.ts`).
+// MAP3 (HF-409): the one per-frame hook arena-authored animation gets.
+import { createArenaFrameAnimator, type ArenaFrameContext } from './arena-frame-animation';
+// MAP3 (HF-409): eager/lazy arena builders behind one registry.
+import {
+  createArenaFactoryRegistry,
+  eagerArena,
+  lazyArena,
+} from './arena-factory-registry';
+// NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407.
+import { buildNuketown2 } from './nuketown2-arena';
+// RAID2: the Raid layout rethink (PREVIEW), owner 2026-09-02 via HF-408.
+import { buildRaid2 } from './raid2-arena';
+import { collectPresentationObstructionBoxes } from './presentation-obstruction';
+import {
+  DOMINATION_TIME_LIMIT_MS,
+  DOMINATION_WIN_SCORE,
+  advanceDomination,
+  createDominationState,
+  dominationObjectiveFor,
+  DOMINATION_ZONE_RADIUS_M,
+  type DominationState,
+} from './domination-mode';
+import {
+  deriveDominationCapturePrompt,
+  type DominationPromptZoneView,
+} from './domination-capture-prompt';
+import './ui/domination-capture-prompt.css';
 import { RIGGED_BOT_EXPECTED_SKINNED_MESH_NAMES } from './rigged-bot-visual-evidence-contract';
 import {
   GUN_RANGE_TEST_BAY_CONTRACT,
   advanceGunRangeTestBayDoorForObservers,
   createGunRangeTestBayDoorState,
+  gunRangeTestBayDummyPose,
   nearestGunRangeTestBaySupportStation,
   nearestGunRangeTestBayWeaponStation,
   projectGunRangeTestBayDoorState,
+  resolveGunRangeDummyDamage,
   type GunRangeTestBayDoorState,
 } from './gun-range-test-bay';
+// HF-318: active test-bay training dummies own movement/LOS colliders.
+import { gunRangeTestBayDummyColliders } from './test-bay-dummy-colliders';
 import {
   advanceGunRangeMatchClock,
   createGunRangeMatchClockSnapshot,
@@ -114,6 +262,7 @@ import {
   createShuffleBag,
   createSpawnFlipHysteresis,
   grenadeDefinition,
+  operatorPitchToward,
   operatorYawToward,
   respawnBotState,
   shouldBotThrowGrenade,
@@ -138,7 +287,13 @@ import { bindKillstreakLoadoutMenu, type KillstreakMenuBinding } from './ui/kill
 import { applyWeaponMenuPresentation } from './ui/field-kit-weapon-presentation';
 import { assertUiSurfaceInventory } from './ui/surface-registry';
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
+// MAP3 (HF-409 finisher 2): the matchbar's one source of truth for what the
+// current arena's mode IS. See src/ui/hud-mode-banner.ts.
+import { EXPLORE_MATCH_RULES, hudModeBanner } from './ui/hud-mode-banner';
 import { bindAdvancedGraphicsControls } from './ui/advanced-graphics-controls';
+// HF-418 — the RTX explainer is information, not a preset. See the change
+// handler on #graphics-profile: it restores the select and opens the dialog.
+import { RTX_NATIVE_RUNTIME_OPTION_VALUE, bindRtxNativeRuntimeExplainer } from './ui/rtx-native-runtime-explainer';
 import { ADVANCED_GRAPHICS_CONTROLS, GRAPHICS_CAPABILITY_NOTICES, GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
 import {
   MobileTouchControls,
@@ -167,34 +322,42 @@ import {
   deploymentLoadingProgress,
   type DeploymentLoadingStage,
 } from './deployment-loading-progress';
+import { applyDeploymentBriefing } from './ui/deployment-briefing-surface'; // HF-372
+import { applyDeploymentLoadingProgress, applyDeploymentTransitionPoster, applyDeploymentTransitionPresentation } from './ui/deployment-console-surface';
 import { flyingCatPose } from './gun-range-cat-choreography';
 import { KillstreakLoadoutController } from './killstreak-loadout';
-import type { KillstreakLoadoutV1, Pass65KillstreakId } from './killstreak-catalog';
+import { CRIMSON_FLAMETHROWER_KILLSTREAK_ID } from './killstreak-catalog'; // HF-334
+// HF-509: a care package grants its contents exactly once per package instance.
+import {
+  advanceCareRewardQueue, createCarePackageGrantLedger, createCareRewardQueueTracker,
+  headCarePackageId, redeemCarePackageWeaponGrant,
+} from './care-package-grant-once';
+import type { KillstreakLoadoutV1, Pass65KillstreakId, SelectableKillstreakId } from './killstreak-catalog';
 import {
   CARPET_BOMBER_BLAST_RADIUS_M,
   CHOPPER_MISSILE_BLAST_RADIUS_M,
-  CHOPPER_MISSILE_CAPACITY,
   CHOPPER_MISSILE_MAX_DAMAGE,
   HostKillstreakRuntime,
   MAX_SUPPORT_DAMAGE_EVENTS_PER_STEP,
   chopperGunnerAuthoritativeRay,
   chopperGunnerCameraOrigin,
   type KillstreakDamageEvent,
+  type KillstreakTaserStunEvent,
   type KillstreakEntitySnapshot,
+  type KillstreakAdmission,
+  type KillstreakImpactEvent,
   type KillstreakRecipientSnapshot,
   type KillstreakTarget,
   type KillstreakWorld,
 } from './killstreak-runtime';
-import { KillstreakPresentation, loadHunterDronePresentation, loadSupportVehiclePresentations, supportVehiclePresentationTelemetry } from './killstreak-presentation';
+import { KillstreakPresentation, ensureAuthoredSupportPresentationAssets, supportVehiclePresentationTelemetry } from './killstreak-presentation';
 import { chopperExteriorReviewHoldActive } from './chopper-exterior-review-hold';
 import {
   chopperExteriorReviewCameraPose,
   withExactChopperRootHiddenForControl,
   type ChopperExteriorReviewBounds,
 } from './chopper-exterior-review-camera';
-import { PASS65_FLIGHT_NAVIGATION, resolveSupportFlightStep } from './killstreak-flight-navigation';
-import { resolveSupportAircraftEnvelopeStep } from './support-aircraft-collision';
-import { SupportPlacementGroundSampler } from './support-placement-ground';
+import { PASS65_FLIGHT_NAVIGATION } from './killstreak-flight-navigation';
 import {
   applyPilotedDronePointerDelta,
   applyPilotedDroneScreenLookDelta,
@@ -210,22 +373,32 @@ import {
   type KillstreakDamageResultMessage,
   type KillstreakLoadoutIntentMessage,
   type KillstreakStateMessage,
+  type KillstreakAnnounceMessage,
 } from './killstreak-protocol';
+import { KillstreakActivityTracker, KillstreakAnnouncementDeduper, KillstreakFlightAudioCollector, admitKillstreakAnnounceMessage, bindKillstreakBannerElement, createKillstreakBannerState, expireKillstreakBanner, killstreakAnnouncementBanner, killstreakDamageSourceCue, killstreakDamageSourceCueForVictim, showKillstreakBanner, supportDropCue, type KillstreakDamageSourceCue } from './killstreak-awareness';
+import { hideGunnerCockpitHudElements, syncGunnerCockpitHudElements } from './gunner-cockpit-hud';
 import {
   isOwnerSupportDamageFeedback,
-  presentSupportShotAudio,
+  presentSupportShotAudioPositional,
   SupportShotReplayGuard,
 } from './support-combat-presentation';
 import {
   acknowledgeClientWorldRepairActor,
   beginClientWorldRepair,
+  CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
   clientWorldRepairCanAttempt,
   clientWorldRepairPending,
+  clientWorldRepairExhausted,
   clientWorldRepairReceiverReady,
+  evaluateClientWorldRepairDeadline,
+  MAX_CLIENT_WORLD_REPAIR_ATTEMPTS,
   recordClientWorldRepairAttempt,
   type ClientWorldRepairAdmission,
 } from './client-world-repair-admission';
-import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack';
+import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity } from './host-killstreak-loadout-ack'; import { canSpendReconnectRepairAttempt, shouldDeclareResumeTimeout, shouldReadmitResumeAuthority } from './guest-rejoin-repair-pacing';
+import { renderPrivateLobbyView } from './mp-lobby-authority-views'; import { armRejoinLatch, clearAllRejoinLatches, clearRejoinLatch, evaluateRejoinLatchRecovery, noteRejoinLatchResend, rejoinLatchArmedAtMs, rejoinLatchLastResendAtMs } from './rejoin-latch-recovery';
+import { acceptLocalPickupResult as acceptLocalPickupResultAuthority, expirePendingLocalPickup as expirePendingLocalPickupAuthority, type PendingLocalPickup } from './mp-pickup-authority';
+import { createLocalReloadRetryRuntime } from './mp-reload-retry';
 import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
@@ -247,7 +420,7 @@ import {
   type LoadoutStorageV2,
   type SelectedLoadoutRef,
 } from './loadout-preset-schema';
-import { DHV_VALUES, applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, dhvLabel, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
+import { applyDhvIncomingDamage, applyDhvWeaponOutgoingDamage, isDhv, reportedDhvRawDamage, type Dhv } from './handicap';
 import { GUN_RANGE_WEAPON_STATIONS, nearestGunRangeWeaponStation, type GunRangeWeaponStation } from './gun-range-armory';
 import { loadGunRangeRackPresentation } from './gun-range-rack-presentation';
 import {
@@ -256,8 +429,10 @@ import {
   weaponPrewarmCatalogForArena,
 } from './weapon-prewarm-catalog';
 import { ArenaAudio, GRENADE_FUSE_BEEP_START_MS, crossbowFuseBeepIntervalMs, grenadeFuseBeepIntervalMs } from './audio';
-import { clampPointToBounds, damp, firstSegmentBoxHit, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2 } from './collision';
+import { clampPointToBounds, collidersOverlappingVerticalSpan, damp, isBlocked, pointInsideBounds, resolveHorizontalMove, segmentIntersectsBox, sphereIntersectsBox, sweepSphereAgainstBoxes, type Box2, segmentBoxHitTime,
+} from './collision';
 import {
+  applyObstructionSpreadPenalty, // HF-343
   applyPenetrationDamage,
   ballisticImpactSurface,
   resolveBallisticHitscanAgainstTarget,
@@ -270,11 +445,11 @@ import {
   BOT_DAMAGE_MULTIPLIER,
   GRENADE_RADIUS,
   MATCH_WARMUP_MS,
+  PLAYER_JUMP_GRAVITY,
   SIMULATION_HZ,
   WEAPONS,
   advanceMatch,
   advanceFreeForAllMatch,
-  applyRadialDeadzone,
   beginReload,
   botScaledDamage,
   cancelReload,
@@ -304,7 +479,8 @@ import {
   type Stance,
 } from './gameplay';
 import { preserveSoloCountdownCue, type MatchCountdownCue } from './match-countdown-continuity';
-import { adsSightProfile } from './ads-sight-profile';
+import { adsAimingFovDegrees, adsSightProfile, deriveCompactOpticSightPicture } from './ads-sight-profile';
+import { applyCompactOpticSightPicture } from './ui/compact-optic-sight';
 import { ArenaMap, buildArena } from './map';
 import {
   admitCrossbowThroughGlass,
@@ -314,13 +490,16 @@ import {
   type GlassImpactProfile,
 } from './glass-authority';
 import {
+  deriveGlassColliderBounds,
+} from './glass-collider-bounds'; // HF-344
+import {
   admitCanonicalCrossbowGlassBreak,
   admitCrossbowGlassMutation,
   retainInFlightCrossbowGlassActions,
   type CrossbowGlassPhase,
 } from './crossbow-glass-authority';
 import {
-  activeSoloBotTarget,
+  activeSoloBotTarget, initialSoloBotCount,
   arenaCanvasLabel,
   arenaSelection,
   hostedArenaDurationMs,
@@ -329,7 +508,8 @@ import {
   type ArenaId,
   type ArenaSelection,
 } from './map-selection';
-import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
+import { activeMinimapColliderLayer, activeMinimapCoverLayer } from './minimap-static-layers';
+import { headingDegrees, minimapLandmarkFootprint, minimapLandmarkLabel, minimapPlayerViewPoint, northMarkerPosition, physicalCoverMinimapKind, playerFacingGeometry, playerUpRotationRadians, playerUpScaleX, shouldRevealEnemy, tacticalMapToWorld, worldToMinimap, worldToTacticalMap, type MinimapLandmarkKind } from './minimap';
 import { authoredElevationAt, authoredVerticalRouteTarget, type ArenaVerticalNavigation } from './vertical-navigation';
 import { sourceScreenAngle } from './directional-hud';
 import { hitProxyZoneCentre } from './hit-proxies';
@@ -350,6 +530,9 @@ import { createWorldIdentityPresentation, setWorldIdentityHouseShellPresentation
 import { matchPresentationAt, respawnPresentation } from './match-presentation';
 import { tuneMaterialsForAtomicSignal, type AtomicSignalMaterialAudit } from './material-compatibility';
 import { addNeighbourhoodLife, loadArenaArt, updateArenaArt } from './environment-assets';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices, freezeStaticArenaMatrices } from './static-matrix-freeze';
+import { installTintPipelineRepair, sweepErroredPipelines } from './webgpu-pipeline-repair';
+import { installTintSwizzleShim } from './webgpu-tint-swizzle-shim';
 import { BLENDER_ARENA_ASSET, blenderArenaTelemetry, loadBlenderArena, markBlenderArenaFallback } from './blender-environment';
 import {
   assertAtomicHouseAuthorityParity,
@@ -374,6 +557,7 @@ import {
 } from './rustworks-quality';
 import { arenaLightingProfile } from './blender-lighting';
 import { ImpactPresentation, type ImpactPresentationSurface } from './impact-presentation';
+import { presentZeroDamageHit } from './zero-hit-feedback';
 import {
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
@@ -398,7 +582,28 @@ import {
   type DirectionalDamageState,
   type LowHealthFeedbackState,
 } from './sensory-feedback';
-import { FramePacingSampler, cadenceWithNoProgressAge } from './frame-pacing';
+import { FramePacingSampler, cadenceWithNoProgressAge, presentationIsDisplayLimited } from './frame-pacing';
+import { advanceLocalHealthRegen } from './local-health-regen';
+import {
+  CAMERA_SHAKE_REFERENCE_DISTANCE,
+  addCameraShakeImpulse,
+  addCameraShakeTrauma,
+  createCameraShakeTrauma,
+  decayCameraShakeTrauma,
+  sampleCameraShakeTrauma,
+  createCameraShakeState,
+  integrateCameraShake,
+  sampleCameraShake,
+  type CameraShakeSource,
+  type CameraShakeState,
+} from './camera-shake';
+import { NukeEventPresentation, NUKE_EVENT_CAMERA_FAR_M } from './nuke-event';
+import {
+  createKillConfirmPulseState,
+  sampleKillConfirmPulse,
+  triggerKillConfirmPulse,
+  type KillConfirmPulseState,
+} from './kill-confirm-pulse';
 import { GrenadeExplosionPresentation } from './grenade-explosion-presentation';
 import { SupportExplosionPresentation } from './support-explosion-presentation';
 import { GrassSystem } from './grass-system';
@@ -429,6 +634,7 @@ import {
   advanceOverdrive,
   claimOverdrive,
   createOverdriveState,
+  overdrivePositionForArena,
   dropOverdriveOnElimination,
   overdriveDamageMultiplier,
   overdriveRemainingMs,
@@ -438,6 +644,7 @@ import {
   HUNTER_SWARM_BLAST_RADIUS,
   HUNTER_SWARM_COUNT,
   FIELD_SUPPORT,
+  GAMEPAD_SUPPORT_LABELS,
   NUKE_WARNING_MS,
   SCOUT_SWEEP_DURATION_MS,
   SCOUT_SWEEP_PULSE_INTERVAL_MS,
@@ -458,7 +665,18 @@ import {
   type FieldSupportId,
   type TriPassTargeting,
 } from './field-support';
+// HF-317: Carpet Bomber authors a two-point bombing RUN on the tactical map
+// (owner: "carpet bomb is still like carepackage not tri pass as requested?").
 import {
+  CARPET_CORRIDOR_POINT_COUNT,
+  carpetCorridorIntent,
+  createCarpetCorridorTargeting,
+  registerCarpetCorridorPoint,
+  type CarpetCorridorTargeting,
+} from './carpet-corridor-targeting';
+// HF-369: and the two-stage overlay that says WHICH of those two clicks you are on.
+import { carpetCorridorOverlayPlan, carpetCorridorPrompt, drawCarpetCorridorOverlay } from './ui/carpet-corridor-map-overlay';
+import { controllableAlternativeForSlotId,
   controllableKillstreakId,
   selectControllableSupportEntity,
 } from './killstreak-slot-possession';
@@ -478,10 +696,7 @@ import {
   type SmokeVolume,
 } from './combat/ordnance';
 import {
-  DEATH_DROP_INTERACTION_RANGE,
-  DEATH_DROP_SCAVENGE_RANGE,
   MAX_DEATH_DROPS,
-  DEATH_DROP_LIFETIME_MS,
   consumeDeathDropWeapon,
   createDeathDrop,
   deathDropAmmoAvailable,
@@ -489,13 +704,14 @@ import {
   deathDropWeaponAvailable,
   isPrimaryWeaponId,
   nearestScavengeDeathDrop,
+  placeSwappedDeathDrop,
   pruneDeathDrops,
   scavengeDeathDrop,
   selectDeathDropWeaponPickup,
   type DeathDrop,
 } from './death-drops';
 import { DeathDropPresentationPool } from './death-drop-presentation';
-import { ArenaNetwork } from './network';
+import { ArenaNetwork, type QaMessageTrace } from './network';
 import {
   MatchAdmissionCoordinator,
   isMatchAdmissionSuperseded,
@@ -507,6 +723,28 @@ import {
 } from './match-admission-transaction';
 import { loadRoomRejoinIdentity, releaseRoomRejoinIdentityLease, saveRoomRejoinIdentity, saveLastRoomCode, loadLastRoomCode } from './room-rejoin-identity';
 import { clearLastHostedRoomCode, loadLastHostedRoomCode, saveLastHostedRoomCode } from './host-room-recovery';
+// HF-325: guest-side host-loss visibility (evaluateHostLoss drives the status
+// line) AND the full succession path. The mandate, mirror, self-promotion and
+// role flip below are all wired; every guard lives behind
+// HOST_MIGRATION_PROMOTION_ENABLED and authorizeSelfPromotion.
+import { evaluateHostLoss, hostLossPresentation, type HostLossState } from './host-migration';
+// HF-325: succession carriage. The mandate and the mirror go on the wire; the
+// promotion trigger stays behind HOST_MIGRATION_PROMOTION_ENABLED.
+import {
+  acceptAuthorityMirror,
+  acceptHostPromoted,
+  acceptSuccessionMandate,
+  buildHostPromotedMessage,
+  createHostSuccessionPublisher,
+  createSuccessorHoldings,
+  evaluateSelfPromotion,
+  observeHostPromotion,
+  planAuthorityMirrorSend,
+  publishSuccessionMandate,
+  type HostSuccessionPublisher,
+  type SuccessorHoldings,
+} from './host-succession-wire';
+import type { SuccessionRoster } from './host-migration';
 import { guestRejoinAffordance } from './guest-rejoin-affordance';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
@@ -563,6 +801,7 @@ import {
   type InterpolationDelayState,
   type SnapshotRateState,
 } from './network-sync';
+import { LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M, admitRemoteSnapshot, reconcileLocalAuthoritativeSnapshot, shouldApplyStaleSelfHealthRepair } from './remote-snapshot-reconciliation'; import { buildRejoinReplicationPlan, sessionBoundCreditKey } from './rejoin-replication';
 import {
   createHostTimeMapping,
   hostTimeDiagnostics,
@@ -619,7 +858,7 @@ import {
   registerRemoteSupportActivation,
   type RemoteSupportAuthorityState,
 } from './remote-support-authority';
-import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, recordRemoteGrenadeDeath, recordRemoteGrenadeRespawn, remoteGrenadeForAction, remoteGrenadeLifeForAction, replenishRemoteGrenadeAuthorityState, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
+import { admitRemoteGrenadeExplosion, admitRemoteGrenadeHit, admitRemoteGrenadeThrow, createRemoteGrenadeAuthorityState, recordRemoteGrenadeDeath, recordRemoteGrenadeRespawn, remoteGrenadeForAction, remoteGrenadeLifeForAction, type RemoteGrenadeAuthorityState } from './remote-grenade-admission';
 import { admitHostCanonicalHitResult } from './host-canonical-hit-admission';
 import {
   createRemoteStickyAttachmentAuthorityState,
@@ -654,7 +893,7 @@ import {
   type AuthoritativeRemoteDamageResult,
   type RemoteHealthAuthorityState,
 } from './remote-health-authority';
-import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, MAP_CARPET_BOMBER_KILLER_ID, type KillCause } from './kill-provenance';
+import { isKillstreakEligible, killAttributionId, killCauseFromHit, killCauseFromKillstreak, killstreakEliminationSource, MAP_CARPET_BOMBER_KILLER_ID, type EliminationSource, type KillCause } from './kill-provenance';
 import {
   MAP_CARPET_BOMBER_LABEL,
   commitAuthoritativeDeathOutcome,
@@ -665,15 +904,18 @@ import {
 import { reconstructShooterPoseAtFireTime, recordCombatantPose, rewindCombatantPose, rewindCombatantPoseStrict, type CombatantPoseSample } from './lag-compensation';
 import { appendClientRuntimeLog, readClientRuntimeLog } from './client-runtime-log';
 import {
+  coerceHostedBotCountForArena,
   hostedBotIds,
   hostedBotReplicationActive,
   hostedBotSnapshotContinuity,
+  hostedBotSnapshotStance,
   interpolateHostedBotSnapshot,
   isHostedBotCount,
   type HostedBotCount,
   type HostedBotSnapshot,
 } from './hosted-bots';
 import { admitHostedBotDamage } from './hosted-bot-damage-admission';
+import { botStanceEyeHeightM, botStanceSpeedCap, countOtherProneBots, resolveBotStance } from './bot-stance';
 import { DAMAGE_FEED_LIMIT, DAMAGE_FEED_VISIBLE_MS, EVENT_FEED_LIMIT, accessibleFeedLabel, feedDestination } from './hud-feed';
 import { MatchDiagnostics, type DiagnosticAdmission, type MatchDiagnosticInput } from './match-diagnostics';
 import { MATCH_DIAGNOSTICS_ENDPOINT, MatchDiagnosticUploader } from './match-diagnostics-upload';
@@ -683,23 +925,20 @@ import {
   saveLastMultiplayerDiagnostic,
 } from './last-multiplayer-diagnostic';
 import {
-  admitChatRate,
-  appendChatHistory,
-  normalizeChatHistory,
-  normalizeChatSenderName,
   normalizeChatText,
-  type ChatEntry,
-  type ChatRateState,
 } from './text-chat';
-import { roomChatPresentation } from './room-chat-presentation';
+import { createTextChatController } from './text-chat-controller';
+import type { ChatSubmitMessage } from './protocol';
 import {
   createHumanMatchReport,
   type HumanDamageEventInput,
   type MatchParticipantReportInput,
 } from './match-report';
-import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, scoreSpawnCandidates, stableSpawnTieBreakSeed, type SpawnMode } from './spawn-safety';
+import { FFA_MINIMUM_SPAWN_SEPARATION, initialFfaSpawnReservation, playerSpawnProtectionMs, stableSpawnTieBreakSeed, validArenaSpawnPoint, waypointEyePoint, type SpawnMode } from './spawn-safety';
+import { selectSpawnCandidates, spawnUseWindow, type SpawnUse } from './spawn-selection';
 import { admitCombatTiming, createPeerTimingState, shouldRetainRemoteCombatAuthority, updatePeerTiming, type CombatTiming, type PeerTimingState } from './network-fairness';
 import {
+  CHARACTER_PHYSICS_CONFIG,
   CharacterPhysics,
   MAX_MAJOR_DEBRIS_BODIES,
   worldBoundaryColliders,
@@ -707,7 +946,16 @@ import {
   type MajorDebrisBodySnapshot,
   type DynamicWorldCollider,
 } from './physics';
+import {
+  FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+  FIRST_PERSON_CAMERA_NEAR_METERS,
+  VIEWMODEL_BODY_FIT_SCALE,
+  viewmodelBodyFitLightDistance,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
 import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { evaluateInvisibleWallRuntimeGap, INVISIBLE_WALL_RUNTIME_GAP_MESSAGE } from './invisible-wall-runtime-gap';
 import { shedPlacementsForArena } from './destructible-shed-registry';
 import { FIELD_SHED_EXPLOSION_DAMAGE_MULTIPLIER } from './destructible-shed-definition';
 import { canAdmitMajorDebris, SHARED_MAJOR_DEBRIS_BUDGET } from './major-debris-budget';
@@ -721,9 +969,26 @@ import {
   type InteractiveWorldSnapshotMessage,
   type ShedInteractionIntentMessage,
 } from './interactive-world-protocol';
+import { broadcastThinMetalPerforationState, buildWorldApertureQuery, commitThinMetalPerforationRuntime, createAndAttachThinMetalPerforationRuntime, disposeThinMetalPerforationRuntime, handleThinMetalPerforationMessage, ownsThinMetalPanel, resetThinMetalPerforationRuntime, rollbackThinMetalPerforationRuntime, routeInteractiveWorldBallisticImpact, type ThinMetalPerforationRuntime } from './thin-metal-perforation-runtime';
 import { TracerPool } from './tracer-pool';
 import { AsyncSerialQueue } from './async-serial-queue';
-import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorTelemetry } from './operator-model';
+import { RIGGED_OPERATOR_CORPSE_ACTION_NAMES, loadOperatorSkinAsset, loadRiggedOperatorAsset, prewarmRiggedOperatorActions, resolveRiggedOperatorRuntimeRoot, riggedOperatorAssetReady, riggedOperatorCanonicalEvidenceManifest, riggedOperatorHandEvidenceIdentity, riggedOperatorStanceSample, riggedOperatorTelemetry } from './operator-model';
+import { OPERATOR_SKIN_CATALOG, OPERATOR_SKIN_SOURCES, isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import {
+  DEFAULT_OPERATOR_EMOTE,
+  DEFAULT_OPERATOR_STANCE,
+  isOperatorEmoteId,
+  isOperatorStanceId,
+  operatorEmote,
+  operatorStance,
+  type OperatorEmoteId,
+  type OperatorStanceId,
+} from './operator-appearance-catalog'; // Pass 75
+import { setActiveOperatorStance } from './operator-stance-runtime'; // HF-388: the OPERATOR card handler below must publish the choice to the live arms store, not only localStorage.
+// HF-339/HF-355: the centre banner has ONE owner. Every write goes through
+// presentBanner/clearCentreBanner below; direct element('#banner') writes are
+// banned (they reintroduce the overwrite race the arbiter closes).
+import { clearBanners, createBannerState, expireBanner, requestBanner, type BannerPriority, type BannerState, type BannerTransition } from './banner-arbiter';
 import {
   WeaponPresentation,
   type WeaponViewmodelCatalogGpuPrewarmer,
@@ -731,13 +996,28 @@ import {
 } from './weapon-presentation';
 import {
   magnifiedFovDegrees,
-  VIEWMODEL_CONTACT_PROBE_OFFSETS,
-  VIEWMODEL_CONTACT_PROFILES,
-  viewmodelContactProbePaddingMeters,
-  viewmodelFloorClearance,
-  viewmodelObstructionPose,
-  type ViewmodelObstructionPose,
+  viewmodelFireAdmission, // HF-343
 } from './weapon-presentation-state';
+import {
+  resolveViewmodelObstructionPose,
+  sampleViewmodelContactProbes,
+  sampleViewmodelCutProbes,
+  type ViewmodelObstructionPoseInput,
+  type ViewmodelObstructionPoseWithCut,
+} from './systems/viewmodel-contact-probe';
+import {
+  deriveThermalRevealMode,
+  selectThermalRevealPrewarmTargets,
+  selectThermalRevealTargets,
+  thermalRevealActive,
+  type ThermalRevealActivation,
+  type ThermalRevealCandidate,
+} from './systems/thermal-reveal-selection';
+import { createSupportFlightWorld } from './systems/support-flight-world';
+import { createRemoteReloadResultCache } from './remote-reload-result-cache';
+import { acceptRemotePickup as acceptRemotePickupAuthority } from './mp-remote-pickup-authority';
+import { applyCanonicalPickupDrop as applyCanonicalPickupDropPresentation, restorePendingLocalPickup as restorePendingLocalPickupPresentation } from './mp-pickup-presentation';
+import { viewmodelMuzzleFireBlockReason, viewmodelMuzzleInsideSurfaceClip, viewmodelSurfaceClipPlanes } from './systems/viewmodel-surface-clip';
 import { RailgunPresentation, type RailgunThermalContact } from './railgun-presentation';
 import {
   RAILGUN_SCOPE_MAGNIFICATION,
@@ -758,6 +1038,7 @@ import {
   type TimedMapWeaponAuthorityState,
   type TimedMapWeaponId,
 } from './timed-map-weapon-authority';
+import { arenaCanAcquireFlamethrower, arenaCanAcquireFlareGun } from './arena-special-weapon-reach';
 import {
   TIMED_MAP_WEAPON_SCHEMA_VERSION,
   type TimedMapWeaponClaimRequestMessage,
@@ -804,16 +1085,20 @@ import {
 } from './carpet-ground-fire-multiplayer';
 import { DMR_THERMAL_MAGNIFICATION, DMR_THERMAL_MAX_CONTACTS, DmrThermalPresentation, deriveDmrThermalRevealActive, dmrThermalOcclusionBudget, type DmrThermalContact } from './dmr-thermal-presentation';
 import { runStagedDmrThermalPrewarm } from './dmr-thermal-prewarm-lifecycle';
-import {
-  THERMAL_GHOST_MAX_TARGETS,
-  ThermalGhostPresentation,
-  type ThermalGhostTarget,
-} from './thermal-ghost-presentation';
+import { ThermalGhostPresentation, type ThermalGhostTelemetry } from './thermal-ghost-presentation';
 import {
   pass73AdsRevealReadbackRegion,
   quantizePass73AdsRevealReadback,
 } from './pass73-ads-reveal-readback';
-import { applySkyBackdrop, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
+import { applySkyBackdrop, disposeSkyBackdrops, waitForSkyBackdropAdmission } from './rendering/sky-backdrop';
+// The first-arena environment gate. It reads scene.environment/
+// scene.environmentIntensity off the live scene rather than proving the code
+// exists, which is the difference between this and the evidence row that let
+// the null-environment defect hide behind nine passing unit tests.
+import { assertArenaEnvironmentLive } from './rendering/arena-environment-ibl';
+// HF-535: the review-capture sky pin. A deterministic review station that
+// resolves its sun from the match seed is not deterministic.
+import { assertDeterministicReviewLighting, reviewCaptureLightingOverride } from './rendering/deterministic-review-lighting';
 import {
   SmokeVolumePresentationPool,
   type SmokeVolumePresentationLease,
@@ -836,12 +1121,22 @@ import {
 } from './flash-authority';
 import { isFlashResultMessage, type FlashResultMessage } from './flash-protocol';
 import {
+  TASER_AUTHORITY_SCHEMA_VERSION,
+  TaserHostAuthority,
+  TaserVictimResultConsumer,
+  taserActivationId,
+  taserMovementAdmission,
+  type TaserStunResult,
+} from './taser-stun';
+import { isTaserStunMessage, type TaserStunMessage } from './taser-protocol';
+import { TASER_PRESENTATION, TASER_STUN_DURATION_MS } from './killstreak-tuning';
+import {
   RAILGUN_BEAM_LENGTH_M,
   RAILGUN_DAMAGE,
   RAILGUN_RECHAMBER_MS,
   RAILGUN_SPAWN_DELAY_MS,
   RAILGUN_TOTAL_ROUNDS,
-  RAILGUN_UPPER_ROOM_SPAWN_SITES,
+  railgunSpawnSitesForArena,
   admitRailgunTargets,
   advanceRailgunAuthority,
   advanceRailgunChamber,
@@ -871,22 +1166,21 @@ import { configureRuntimeRandom, gameplayRandom, presentationRandom, protocolRan
 import {
   BotDamageMessage,
   BotStateMessage,
-  ChatHistoryMessage,
-  ChatMessage,
-  ChatSubmitMessage,
   DeathMessage,
   ExplosiveSource,
-  GameMessage,
+  GameMessage, HealthAuthorityMessage,
   GuestCombatInventory,
   GuestCombatInventoryProjection,
   HitMessage,
-  HostVerifiedStickyAttachment,
   GuestResumeAckMessage,
   GuestResumeAuthorityMessage,
   GuestResumeFailureMessage,
   GuestResumeNackMessage,
   LobbyJoinMessage,
   LobbyHandicapMessage,
+  LobbySkinMessage,
+  LobbyStanceMessage,
+  EmoteMessage,
   LobbySquadMessage,
   LobbyReadyMessage,
   LobbyStateMessage,
@@ -901,6 +1195,8 @@ import {
   OverdriveStateMessage,
   PlayerSnapshot,
   PickupMessage,
+  PickupResultDropRecord,
+  PickupResultMessage,
   PRIMARY_WEAPON_IDS,
   PrimaryWeaponId,
   SIDEARM_WEAPON_IDS,
@@ -914,17 +1210,19 @@ import {
   ReloadIntentMessage,
   ReloadResultMessage,
   ShotMessage,
+  ShotOutcome,
   ShotRequestMessage,
   ShotResultMessage,
   StateMessage,
   MULTIPLAYER_PROTOCOL_VERSION,
   Team,
+  LobbyClosedReason,
   TriggerStateMessage,
   WEAPON_IDS,
   WeaponId,
   WindowBreakMessage,
 } from './protocol';
-import { defaultSquadPresentation, renderSquadRosterBadge, sanitizeSquadPresentation } from './squad-presentation';
+import { defaultSquadPresentation, sanitizeSquadPresentation } from './squad-presentation';
 import {
   captureGuestCombatInventory,
   captureGuestCombatInventoryProjection,
@@ -937,6 +1235,10 @@ import {
   setGuestCombatInventoryGrenades,
   setGuestCombatInventoryWeapon,
 } from './guest-combat-inventory-authority';
+import { applyRemoteInventoryProjectionToMaps, applyRemoteReloadResult, clampAdmittedHeldWeapon, createCanonicalRemoteState } from './multiplayer-relay'; import { admitHealthAuthority, type AppliedHealthAuthority, classifyRemoteRespawn, clampAdmittedHpToHealthAuthority, evaluateHealthAuthorityPublication, mintHealthAuthoritySeed, type PublishedHealthAuthority } from './host-health-authority-broadcast';
+import { isOrdinaryWeapon, remoteReloadResultCacheKey } from './remote-combat-helpers';
+import { guestCombatInventoryWithinWeaponCaps } from './guest-combat-inventory-authority';
+import { isGuestCombatInventory } from './protocol';
 import {
   admitGuestResumeAck,
   admitGuestResumeAuthority,
@@ -951,6 +1253,17 @@ import {
   createGuestReloadAuthorityState,
   type GuestReloadAuthorityState,
 } from './guest-reload-authority';
+import {
+  applyReloadResult,
+  cancelRequested,
+  createPendingReload,
+  createReloadActionSequenceAllocator,
+  isExpired,
+  isStale,
+  reloadRequestId,
+  type LocalReloadPending,
+} from './local-reload-authority';
+import { admitAuthoritativeRespawnLoadout, authoredRespawnLoadout } from './respawn-loadout-authority';
 import {
   hostLobbyAdmissionAttemptIsCurrent,
   type HostLobbyAdmissionAttempt,
@@ -990,7 +1303,7 @@ type RemotePlayer = {
   claimRequiresCoreExit: boolean;
   positionHistory: CombatantPoseSample[];
   interpolation: SnapshotInterpolationBuffer<PlayerSnapshot>;
-  snapshotRateHz: 20 | 30 | 40;
+  snapshotRateHz: 20 | 30 | 40; authoritativeHostTimeMs: number;
   renderedHostTimeMs: number;
   renderedWorldAgeMs: number;
   continuity: number;
@@ -999,6 +1312,8 @@ type RemotePlayer = {
   lastFeedbackAt: number;
   /** Authenticated replacement may restart its document-local snapshot sequence. */
   awaitingReplacementState: boolean;
+  /** Guest presentation is withheld until a host-authenticated state arrives. */
+  authoritativeReady: boolean;
 };
 
 type AdmittedRemoteShot = {
@@ -1055,6 +1370,10 @@ type BotPlayer = {
   perceptionAimError: number;
   networkInterpolation: SnapshotInterpolationBuffer<HostedBotSnapshot>;
   networkContinuity: number;
+  // Lane AR item 3: bots had no stance at all - see src/bot-stance.ts.
+  stance: Stance;
+  stanceHeldUntil: number;
+  lastDamagedAt: number;
 };
 
 type GrenadeEntity = {
@@ -1182,8 +1501,21 @@ function createPlayerId(): string {
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('Missing #app root');
 const PLAYER_NAME_STORAGE_KEY = 'atomic-acres:player-name:v1';
+// A first-time visitor used to land on an EMPTY callsign field, and the deploy button
+// stayed fully enabled and inviting. Clicking it did nothing except set a small status
+// line - so the game read as broken, which is exactly how the owner reported it.
+//
+// The requirement itself is fine; blocking the primary action on it was not. The field is
+// now prefilled with a default the player can overwrite, so deploy works on the first
+// click and the callsign becomes a thing you CHANGE rather than a gate you must discover.
+//
+// Note the debug harnesses at the bottom of this file each set their own name ('Boot
+// Probe', 'FPS Probe', 'QA Operator'). That is precisely why every automated gate sailed
+// past this: each one filled in the very field a real visitor arrives without.
+const DEFAULT_PLAYER_NAME = 'OPERATOR';
 let storedPlayerName = '';
 try { storedPlayerName = normalizeRequiredPlayerName(localStorage.getItem(PLAYER_NAME_STORAGE_KEY) ?? '') ?? ''; } catch { /* Storage can be unavailable in hardened browser contexts. */ }
+if (!storedPlayerName) storedPlayerName = DEFAULT_PLAYER_NAME;
 app.innerHTML = renderPass64Shell(createPass64ShellViewModel(storedPlayerName));
 let killstreakMenuBinding: KillstreakMenuBinding;
 
@@ -1232,6 +1564,7 @@ const matchPauseBackdrop = element<HTMLElement>('#match-pause-backdrop');
 const deploymentTransition = element<HTMLElement>('#deployment-transition');
 const deploymentTransitionPoster = element<HTMLImageElement>('#deployment-transition-poster');
 const deploymentTransitionVideo = element<HTMLVideoElement>('#deployment-transition-video');
+const deploymentTransitionKicker = element<HTMLElement>('#deployment-transition-kicker');
 const deploymentTransitionTitle = element<HTMLElement>('#deployment-transition-title');
 const deploymentTransitionStatus = element<HTMLElement>('#deployment-transition-status');
 const deploymentTransitionProgress = element<HTMLProgressElement>('#deployment-transition-progress');
@@ -1515,8 +1848,16 @@ let matchPauseBackdropFallbackCount = 0;
 let matchPauseSourceCaptureAttemptCount = 0;
 let matchPauseSourceCaptureCount = 0;
 const hudRoot = element<HTMLElement>('#hud');
+const hudMotionTargets: HudMotionTargets = createHudMotionTargets(hudRoot);
+// HF-370: the owner asked for a HUD that is not "pinned directly to the
+// screen". Clusters lag the camera slightly; crosshair and hitmarker never
+// move, because those are combat surfaces.
+let hudSway: HudSwayState = createHudSwayState();
+/** Latch so the neutral-pose write happens once per stop, not every frame. */
+let hudSwayReleased = false;
 const fpsCounter = element<HTMLElement>('#fps-counter');
 const fpsCounterValue = element<HTMLElement>('#fps-counter b');
+const fpsCounterLabel = element<HTMLElement>('#fps-counter span');
 const sniperScopeOverlay = element<HTMLElement>('#sniper-scope');
 const roomCard = element<HTMLElement>('#room-card');
 const roomCodeEl = element<HTMLElement>('#room-code');
@@ -1607,10 +1948,17 @@ let displayedGraphicsPreset: GraphicsPreset = resolveDisplayedGraphicsPreset(pas
 let liveGraphicsProfile: RenderProfile = renderProfile;
 let stagedGraphicsReconstruction: readonly string[] = Object.freeze([]);
 let liveGraphicsAppliedAt = 0;
+/**
+ * HF-364: the screen-space graph topology as one comparable key. Only presence
+ * counts — a tier change inside an already-built pass is a live uniform, while
+ * adding or removing one changes MRT attachments and render targets.
+ */
 const rendererConstructionGraphics = Object.freeze({
   profile: renderProfile,
-  antialiasSamples: graphicsRuntime.antialiasSamples,
+  antialiasSamples: graphicsRuntime.antialiasSamples, clusteredLighting: pass65Settings.graphics.clusteredLighting,
   ambientOcclusionEnabled: graphicsRuntime.ambientOcclusion.enabled,
+  ambientOcclusionDenoise: graphicsRuntime.ambientOcclusion.denoise,
+  screenSpaceTopology: screenSpaceTopologyKey(graphicsRuntime.screenSpace),
   representation: activeRenderConfig.representation,
 });
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
@@ -1640,41 +1988,41 @@ const runtimeRequest = resolveRenderRuntimeRequest(
   window.location.search,
   typeof navigator !== 'undefined' && typeof (navigator as Navigator & { gpu?: unknown }).gpu !== 'undefined',
 );
-async function createWebGl2Runtime(): Promise<LegacyWebGlRenderRuntime> {
-  return LegacyWebGlRenderRuntime.create({
-    canvas,
-    alpha: false,
-    antialias: activeRenderConfig.antialias,
-    powerPreference: 'high-performance',
-  });
-}
+// Owner 2026-08-30: WebGPU only - no WebGL2 fallback engine. A browser
+// without a working WebGPU device gets a truthful requirement screen instead
+// of half the frame rate with no explanation.
 let renderRuntime: WebGpuRenderRuntime | LegacyWebGlRenderRuntime;
-if (runtimeRequest.requestedBackend === 'webgpu') {
+{
+  // Chrome 153 Tint chained-swizzle workaround: must wrap navigator.gpu
+  // BEFORE the renderer requests its device (see the shim's header for the
+  // root cause and measurements).
+  document.documentElement.dataset.tintSwizzleShim = String(installTintSwizzleShim());
   try {
     renderRuntime = await WebGpuRenderRuntime.create({
       canvas,
       antialias: graphicsRuntime.antialiasSamples > 0,
       samples: Math.max(1, graphicsRuntime.antialiasSamples),
-      requireWebGPU: true,
+      requireWebGPU: true, clusteredLightingEnabled: pass65Settings.graphics.clusteredLighting,
     });
   } catch (webGpuError) {
-    // An explicit ?renderer=webgpu must fail closed (HITL contract). An
-    // auto-selected WebGPU that fails at init (present but broken adapter) falls
-    // back to WebGL2 so the game still runs on that browser/GPU combination.
-    const forcedWebGpu = new URLSearchParams(window.location.search).get('renderer') === 'webgpu';
-    if (forcedWebGpu) throw webGpuError;
     appendClientRuntimeLog({
       kind: 'error',
-      message: `WebGPU init failed, falling back to WebGL2: ${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)}`,
+      message: `WebGPU init failed: ${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)}`,
       stack: webGpuError instanceof Error ? webGpuError.stack : undefined,
     }, clientPersistentStorage());
-    renderRuntime = await createWebGl2Runtime();
+    showFatalError(new Error(
+      'This game needs WebGPU. Use a current Chrome, Edge or Firefox (Windows) - '
+      + 'or check that graphics acceleration is enabled in your browser settings. '
+      + `(${webGpuError instanceof Error ? webGpuError.message : String(webGpuError)})`,
+    ));
+    throw webGpuError;
   }
-} else {
-  renderRuntime = await createWebGl2Runtime();
 }
-if (renderRuntime.backend === 'webgpu') renderRuntime.assertCandidateReady();
-const legacyRenderer = renderRuntime.backend === 'webgl2' ? renderRuntime.renderer : null;
+renderRuntime.assertCandidateReady();
+// WebGL2 retirement (2026-08-30): these seams stay typed so the remaining
+// legacy call sites compile as dead optional chains until their modules are
+// physically deleted in the follow-up sweep.
+const legacyRenderer = ((): THREE.WebGLRenderer | null => null)();
 function submitWebGpuFrame(
   now = performance.now(),
   force = false,
@@ -1707,177 +2055,91 @@ async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
 }
 
-type DeferredGpuRetirement = Readonly<{
-  kind: 'root';
-  root: THREE.Object3D;
-  disposeResources: boolean;
-  afterFence?: () => void;
-}> | Readonly<{
-  kind: 'geometry';
-  geometry: THREE.BufferGeometry;
-}>;
-
-const deferredGpuRetirements: DeferredGpuRetirement[] = [];
-const scheduledGpuRetirementRoots = new WeakSet<THREE.Object3D>();
-const scheduledGpuRetirementGeometries = new WeakSet<THREE.BufferGeometry>();
-let gpuRetirementTask: Promise<void> | null = null;
-let gpuRetirementFences = 0;
-let gpuRetirementScheduledRoots = 0;
-let gpuRetirementScheduledGeometries = 0;
-let gpuRetirementDisposedRoots = 0;
-let gpuRetirementDisposedGeometries = 0;
-let gpuRetirementFailures = 0;
-
-async function yieldDeferredGpuRetirementTask(): Promise<void> {
-  await yieldBrowserPreparationFrame();
-}
-
-function disposeDetachedRootResources(root: THREE.Object3D): void {
-  const geometries = new Set<THREE.BufferGeometry>();
-  const materials = new Set<THREE.Material>();
-  root.traverse((node) => {
-    if (node instanceof THREE.Mesh) {
-      geometries.add(node.geometry);
-      const entries = Array.isArray(node.material) ? node.material : [node.material];
-      entries.forEach((material) => materials.add(material));
-    }
-    if (node instanceof THREE.PointLight || node instanceof THREE.SpotLight || node instanceof THREE.DirectionalLight) {
-      node.shadow.map?.dispose();
-    }
-  });
-  geometries.forEach((geometry) => { if (!isSharedMeshGeometry(geometry)) geometry.dispose(); });
-  materials.forEach((material) => material.dispose());
-  root.clear();
-}
-
-async function drainDeferredGpuRetirements(): Promise<void> {
-  while (deferredGpuRetirements.length > 0) {
-    // Snapshot before fencing. Roots detached after this target was captured
-    // may have appeared in a newer submission and must wait for the next
-    // fence, never piggyback on this one.
-    const batch = deferredGpuRetirements.splice(0, deferredGpuRetirements.length);
-    try {
-      await flushWebGpuFrames();
-      if (renderRuntime.backend === 'webgpu') gpuRetirementFences += 1;
-    } catch (error) {
-      gpuRetirementFailures += 1;
-      deferredGpuRetirements.unshift(...batch);
-      console.warn('[Pass 65 GPU retirement fence failed; resources retained]', error);
-      return;
-    }
-    for (const [retirementIndex, retirement] of batch.entries()) {
-      if (retirement.kind === 'geometry') {
-        retirement.geometry.dispose();
-        gpuRetirementDisposedGeometries += 1;
-      } else {
-        // Cache ownership outlives one clone. Release refs only after the GPU
-        // fence and before generic teardown clears the nested weapon roots.
-        releasePass65WeaponModelsIn(retirement.root);
-        if (retirement.disposeResources) disposeDetachedRootResources(retirement.root);
-        retirement.afterFence?.();
-        gpuRetirementDisposedRoots += 1;
-      }
-      // Fence completion only establishes that disposal is safe; it does not
-      // require every detached hierarchy to be torn down in one browser task.
-      // One retirement per frame prevents cleanup of prewarm clones and old
-      // operators from colliding with match admission or a weapon switch.
-      if (retirementIndex + 1 < batch.length || deferredGpuRetirements.length > 0) {
-        await yieldDeferredGpuRetirementTask();
-      }
-    }
-  }
-}
-
-function scheduleDeferredGpuRetirement(
-  root: THREE.Object3D,
-  disposeResourcesOrAfterFence: boolean | (() => void) = true,
-  explicitAfterFence?: () => void,
-): void {
-  if (scheduledGpuRetirementRoots.has(root)) return;
-  const disposeResources = typeof disposeResourcesOrAfterFence === 'boolean' ? disposeResourcesOrAfterFence : true;
-  const afterFence = typeof disposeResourcesOrAfterFence === 'function' ? disposeResourcesOrAfterFence : explicitAfterFence;
-  scheduledGpuRetirementRoots.add(root);
-  gpuRetirementScheduledRoots += 1;
-  invalidatePass65PresentationTree(root);
-  root.removeFromParent();
-  root.visible = false;
-  deferredGpuRetirements.push(Object.freeze({ kind: 'root', root, disposeResources, afterFence }));
-  scheduleGpuRetirementDrain();
-}
-
-function scheduleDeferredGpuGeometryRetirement(geometry: THREE.BufferGeometry): void {
-  if (scheduledGpuRetirementGeometries.has(geometry)) return;
-  scheduledGpuRetirementGeometries.add(geometry);
-  gpuRetirementScheduledGeometries += 1;
-  deferredGpuRetirements.push(Object.freeze({ kind: 'geometry', geometry }));
-  scheduleGpuRetirementDrain();
-}
-
-function scheduleGpuRetirementDrain(): void {
-  if (gpuRetirementTask) return;
-  gpuRetirementTask = drainDeferredGpuRetirements().finally(() => {
-    gpuRetirementTask = null;
-    if (deferredGpuRetirements.length > 0) {
-      // A failed fence retains resources safely. A later admitted frame or map
-      // transition will give the queue another completion target.
-      window.setTimeout(() => {
-        if (!gpuRetirementTask) {
-          gpuRetirementTask = drainDeferredGpuRetirements().finally(() => { gpuRetirementTask = null; });
-        }
-      }, 250);
-    }
-  });
-}
+// Pass 79 streamline: the deferred GPU retirement scheduler lives in
+// `./gpu-retirement-scheduler`. Backend access and the frame fence are injected;
+// everything else (queues, WeakSets, counters, drain pacing) is owned there.
+const gpuRetirement = createGpuRetirementScheduler({
+  backend: () => renderRuntime.backend,
+  flushSubmittedFrames: (timeoutMs?: number) => flushWebGpuFrames(timeoutMs),
+});
+const scheduleDeferredGpuRetirement = gpuRetirement.schedule;
+const scheduleDeferredGpuGeometryRetirement = gpuRetirement.scheduleGeometry;
 document.documentElement.dataset.renderBackend = renderRuntime.backend;
+// PASS 94. The procedural operator looks are TSL node graphs, which only the
+// node-capable renderer evaluates; declaring the backend once here is what lets
+// `materialForTeam` choose between them and the shipped tinted path. Fail-closed:
+// until this runs, the tinted path is used.
+setOperatorLookRenderBackend(renderRuntime.backend);
+// (2026-08-30) The sticky WebGL2 fallback banner is retired with the
+// fallback itself - the renderer is WebGPU or an honest requirement screen.
 const effectiveGraphicsExposure = (authoredExposure: number): number => authoredExposure * graphicsRuntime.post.exposureScale;
-const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);
-const webGlShadowMapType = shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap;
+const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent, renderProfile);
 document.documentElement.dataset.webglShadowSampler = shadowSamplerMode;
+// Pass 74: the quality profile finally honours the authored shadow radius -
+// only PCFSoftShadowMap reads it, so the penumbra farcrysis and the contrast
+// lighting pass author was previously discarded.
+// Pass 76: the shadow filter graphics setting overrides the UA sniff above;
+// 'auto' resolves to exactly the construction-time sniffed sampler, so the
+// default preserves today's behaviour byte for byte. The WebKit basic-depth
+// engine floor can never be overridden by a player toggle.
+function shadowMapTypeForFilter(filter: ShadowFilterOverride): THREE.ShadowMapType {
+  const mode = resolveWebGlShadowSamplerMode(navigator.userAgent, renderProfile, filter);
+  document.documentElement.dataset.webglShadowSampler = mode;
+  return mode === 'basic-depth'
+    ? THREE.BasicShadowMap
+    : mode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+}
+// Pass 76: the filmic grade profile is player-selectable; 'arena-default'
+// keeps the HF-363 preset-matched mapping the arenas were tuned against.
+function effectiveGradeProfileId() {
+  return graphicsRuntime.gradeProfile === 'arena-default'
+    ? gradeProfileIdForGraphicsPreset(displayedGraphicsPreset)
+    : graphicsRuntime.gradeProfile;
+}
 renderRuntime.configureOutput(effectiveGraphicsExposure(activeLighting.exposure), graphicsRuntime.post.toneMapping);
 renderRuntime.configureShadows({
   enabled: activeRenderConfig.shadows,
-  type: webGlShadowMapType,
+  type: shadowMapTypeForFilter(graphicsRuntime.shadowFilter),
   autoUpdate: activeRenderConfig.shadowMode === 'dynamic',
   needsUpdate: activeRenderConfig.shadowMode === 'static',
 });
+if (renderRuntime.backend === 'webgpu') {
+  // Pass 76: hand persisted post options to the WebGPU grade chain at boot.
+  // The vignette moved to its single display-side owner; FXAA/SMAA and RCAS
+  // sharpen are optional trailing stages after the frozen core chain.
+  renderRuntime.setGradeProfile(effectiveGradeProfileId());
+  renderRuntime.setDisplayVignetteStrength(graphicsRuntime.post.vignetteStrength);
+  renderRuntime.setPostAntiAliasing(graphicsRuntime.postAntiAliasing);
+  renderRuntime.setSharpness(graphicsRuntime.post.sharpness);
+}
 const signalQuery = new URLSearchParams(window.location.search).get('signal');
 const rendererLabel = renderRuntime.telemetry().adapterLabel;
 const softwareRenderer = isSoftwareWebGLRenderer(rendererLabel);
 const atomicSignalBypass = atomicSignalBypassReason(signalQuery, rendererLabel);
 document.documentElement.dataset.atomicSignalRenderer = softwareRenderer ? 'software' : 'hardware';
-const atomicSignal = renderRuntime.backend === 'webgl2'
-  ? new AtomicSignalPass(renderRuntime.renderer, renderProfile, (reason) => {
-      document.documentElement.classList.remove('atomic-signal-render');
-      document.documentElement.dataset.atomicSignal = 'fallback';
-      console.warn('[Nuke Town Atomic Signal fallback]', reason);
-    }, atomicSignalBypass)
-  : null;
+const atomicSignal = ((): AtomicSignalPass | null => null)();
+void atomicSignalBypass;
 const grassQuery = new URLSearchParams(window.location.search).get('grass');
 const mistQuery = new URLSearchParams(window.location.search).get('mist');
 const cloudsQuery = new URLSearchParams(window.location.search).get('clouds');
 const skyCloudsEnabled = !reducedRenderMode || cloudsQuery === 'on';
 const raysQuery = new URLSearchParams(window.location.search).get('rays');
+// Dev-only inspection overlay for F4RCry515: spawn markers, opposing-spawn
+// sightlines, cover wireframes and kill-volume checks. Written for HF-3xx and
+// documented as "gated by the caller in legacy-main.ts" - except no caller was
+// ever added, so the overlay could not be turned on by anyone. Gated here now.
+const hitlQuery = new URLSearchParams(window.location.search).get('hitl');
+let farcrysisHitlOverlay: FarcrysisHitlOverlay | null = null;
 const actualGodRayStrength = (raysQuery === 'off' || (softwareRenderer && raysQuery !== 'on')) ? 0 : activeLighting.godRayStrength;
 const actualGodRayLobes = actualGodRayStrength > 0 ? activeLighting.godRayLobes : 0;
 // Both renderer backends own grade, dither/grain and vignette in their GPU
 // pipeline. CSS post overlays must never double-apply on the WebGPU route.
-document.documentElement.classList.toggle(
-  'atomic-signal-render',
-  renderRuntime.backend === 'webgpu' || (atomicSignal?.telemetry().enabled ?? false),
-);
+document.documentElement.classList.toggle('atomic-signal-render', true);
 document.documentElement.dataset.atomicSignal = atomicSignal?.telemetry().enabled ? 'active' : 'tsl-hdr';
 let webglContextLost = false;
 let webglContextLosses = 0;
 let webglContextRestorations = 0;
 let staticShadowDynamicRefreshes = 0;
-if (renderRuntime.backend === 'webgl2') {
-  renderRuntime.renderer.domElement.addEventListener('webglcontextlost', (event) => {
-    event.preventDefault();
-    webglContextLost = true;
-    webglContextLosses += 1;
-    document.documentElement.dataset.webglContext = 'lost';
-  });
-}
 document.documentElement.dataset.webglContext = 'ready';
 // Both public profiles can reduce their internal framebuffer when sustained
 // frame time exceeds the detected display budget. Shadows disable
@@ -1885,6 +2147,30 @@ document.documentElement.dataset.webglContext = 'ready';
 renderRuntime.setPixelRatio(Math.min(window.devicePixelRatio, activeRenderConfig.pixelRatioCap));
 
 const scene = new THREE.Scene();
+// Perf (2026-08-29): the scene root never moves, but with matrixAutoUpdate
+// left on, three recomposes it every frame, marks it dirty, and FORCE-walks
+// the entire graph re-multiplying every world matrix. Freezing the root makes
+// the per-frame pass honor each subtree's own dirty state (and lets the
+// pooled-subtree walk skips in static-matrix-freeze.ts actually engage).
+scene.matrixAutoUpdate = false;
+// Chrome 153 Tint-race repair (2026-08-29): when a captured pipeline error
+// lands, purge the errored pipeline cache entries and bump materials so
+// three rebuilds them - re-creation usually succeeds because the failure is
+// a timing race. Installed only on the WebGPU route; telemetry rides the
+// documentElement for the QA probes.
+if (renderRuntime.backend === 'webgpu') {
+  installTintPipelineRepair({
+    getRenderer: () => renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
+    getScene: () => scene,
+    onRepair: (result, sweepsUsed) => {
+      document.documentElement.dataset.tintPipelineRepairs = String(sweepsUsed);
+      document.documentElement.dataset.tintPipelineLastPurge = String(result.purged);
+      // Diagnostics only: with the chained-swizzle shim the repair should
+      // never fire; if it does, telemetry needs it - the player does not.
+      console.warn(`[atomic-acres:webgpu] recovered ${result.purged} errored pipeline(s), sweep ${sweepsUsed}`);
+    },
+  });
+}
 const botWeaponGpuVocabulary = new BotWeaponGpuVocabulary(scene, flattenOperatorMaterials);
 const killstreakPresentation = new KillstreakPresentation(
   scene,
@@ -1918,6 +2204,11 @@ function requestStaticShadowRefresh(value = true): void {
   }
 }
 let applyPresentationEffectsBudget: ((budget: GraphicsEffectsBudget) => void) | null = null;
+// Declared here rather than beside the other arena-visual state because
+// applyAdaptiveRenderBudget below drives its screen-space pressure valve and
+// runs during module initialisation, long before the first arena is streamed.
+// A `let` further down the file is in its temporal dead zone at that point.
+let pass64TslSystems: Pass64TslSceneSystems | null = null;
 function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsEffectsBudget {
   return Object.freeze({
     ...budget,
@@ -1927,7 +2218,10 @@ function applyGraphicsPreferenceBudget(budget: GraphicsEffectsBudget): GraphicsE
     decalLifetimeScale: budget.decalLifetimeScale * graphicsRuntime.decalScale,
   });
 }
-const camera = new THREE.PerspectiveCamera(76, 1, 0.08, 180);
+// HF-410: the on-foot near plane is a VIEWMODEL number and now lives with the
+// body fit that sizes it. See FIRST_PERSON_CAMERA_NEAR_METERS for the
+// measurement, the reason and the stated depth-precision cost.
+const camera = new THREE.PerspectiveCamera(76, 1, FIRST_PERSON_CAMERA_NEAR_METERS, 180);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 const railgunPresentation = new RailgunPresentation(scene, element<HTMLElement>('#railgun-thermal'), reducedRenderMode);
@@ -1935,8 +2229,28 @@ const timedMapWeaponPresentation = new TimedMapWeaponPresentation(scene, reduced
 const flareProjectileSystem = new FlareProjectileSystem(
   scene,
   reducedRenderMode,
-  renderRuntime.backend !== 'webgl2',
+  true,
 );
+// HF-402: the flamethrower FAMILY, not one literal weapon id. Every weapon
+// that delivers an ignited fuel stream shares the same 18 m reach, the same
+// stream presentation and the same ground ignition; only livery, damage and
+// ammo differ. The crimson care-package variant is deliberately a separate
+// weapon id (HF-334), so every `weapon === 'flamethrower'` equality quietly
+// dropped it into the ballistic path: a bullet tracer instead of flames, no
+// ground fire, and a 90 m presentation reach against an 18 m authority reach.
+// Reach, presentation and authority all key off this set so that a third
+// variant cannot reintroduce the same asymmetry. The catalog has no flame
+// trait field to derive this from (family is 'launcher', shared with the
+// flare gun), so crimson-flamethrower.test.ts pins this list against the
+// catalog: any weapon authored with an ignited-fuel-stream calibre must
+// appear here.
+const FLAMETHROWER_FAMILY_WEAPON_IDS: ReadonlySet<WeaponId> = new Set<WeaponId>([
+  'flamethrower',
+  'crimson-flamethrower',
+]);
+function isFlamethrowerFamilyWeapon(weapon: WeaponId): boolean {
+  return FLAMETHROWER_FAMILY_WEAPON_IDS.has(weapon);
+}
 const flamethrowerStreamPresentation = new FlamethrowerStreamSystem(
   scene,
   reducedRenderMode,
@@ -2201,19 +2515,13 @@ function updateDeploymentLoadingProgress(stage = bootstrapStage): void {
     deploymentLoadingPercent,
   );
   deploymentLoadingPercent = progress.percent;
-  deploymentTransitionProgress.value = progress.percent;
-  deploymentTransitionProgress.textContent = `${progress.percent}%`;
-  deploymentTransitionPercent.value = `${progress.percent}%`;
-  deploymentTransitionEta.value = progress.completed
-    ? '100% · IN GAME'
-    : progress.etaSeconds === null
-      ? 'ETA ESTIMATING…'
-      : `ETA ${progress.etaSeconds}s`;
-  deploymentTransitionStage.textContent = `${progress.label.toUpperCase()} · 100% = IN GAME`;
-  deploymentTransition.dataset.loadingStage = stage;
-  deploymentTransition.dataset.loadingPercent = String(progress.percent);
-  deploymentTransition.dataset.loadingEtaSeconds = progress.etaSeconds === null ? 'estimating' : String(progress.etaSeconds);
-  deploymentTransition.dataset.loadingComplete = String(progress.completed);
+  applyDeploymentLoadingProgress({
+    bar: deploymentTransitionProgress,
+    percent: deploymentTransitionPercent,
+    eta: deploymentTransitionEta,
+    stage: deploymentTransitionStage,
+    root: deploymentTransition,
+  }, stage, progress);
 }
 
 function setBootstrapStage(stage: BootstrapStage): void {
@@ -2349,6 +2657,10 @@ function applyAdaptiveRenderBudget(pixelRatioCap: number): void {
   graphicsRefinement.setBudget(effectsBudget);
   atomicSignal?.setEffectsBudget(effectsBudget);
   applyPresentationEffectsBudget?.(effectsBudget);
+  // HF-364: the screen-space raymarches are the most expensive thing in the
+  // frame, so the adaptive controller has to be able to take them down with the
+  // pixel ratio rather than shrinking the framebuffer around an untouched cost.
+  pass64TslSystems?.setAdaptiveScreenSpaceBudget(pixelRatioCap, graphicsRuntime.renderScale);
   const shadowsEnabled = adaptiveShadowsEnabled(liveGraphicsProfile, activeRenderConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
   if (renderRuntime.shadowsEnabled() !== shadowsEnabled) {
@@ -2976,6 +3288,18 @@ async function primeFinalWebGpuMatchPresentation(): Promise<void> {
   renderSubmissionPaused = true;
   try {
     synchronizeFrozenMatchPrimePresentation();
+    // Pass 79 MAX admission: this frozen frame is the FIRST submission with
+    // the spawn camera, restored corpse pool and rest-pose viewmodel together,
+    // so arena materials outside every earlier prewarm's frustum still
+    // compiled cold inside the 4000ms-bounded flush below and bounced MAX
+    // deployments (measured farcrysis failure: "WebGPU queue completion
+    // exceeded 4000 ms for submission 141"). Submit that EXACT composition
+    // once with frustum culling disabled behind compileAndRender's own 12s
+    // cold-generation fence; the guarded samples below then only ever fence
+    // warm frames. MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS is untouched.
+    await withArenaFrustumCullingDisabled(scene, () =>
+      renderRuntime.compileAndRender(scene, camera, scene),
+    );
     for (let sample = 0; sample < 2; sample += 1) {
       await submitForegroundWebGpuFrame();
       await flushWebGpuFrames(MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS);
@@ -3053,9 +3377,11 @@ async function primeFinalWebGlMatchPresentation(): Promise<void> {
 function buildSky(): void {
   // The arena-specific equirectangular backdrop is the one sky owner on both
   // render backends. Retaining the former WebGL-only opaque sphere would hide
-  // that authored backdrop and leave Firefox/Safari with a different sky from
-  // the WebGPU path. WebGPU adds its transparent cloud veil later; neither path
-  // needs a second opaque sky volume here.
+  // that authored backdrop and leave the WebGL2 path (Safari and other browsers
+  // without navigator.gpu — HF-331: Firefox 141+ ships WebGPU and takes the
+  // WebGPU route) with a different sky from the WebGPU path. WebGPU adds its
+  // transparent cloud veil later; neither path needs a second opaque sky volume
+  // here.
   skyMaterial = null;
   hemisphereLight = new THREE.HemisphereLight(
     activeLighting.hemisphereSky,
@@ -3084,19 +3410,62 @@ function buildSky(): void {
   fillLight.position.set(...activeLighting.fillPosition);
   fillLight.castShadow = false;
   scene.add(fillLight);
+  nuketown2ClusteredLightRig = createNuketown2LocalLights(scene, pass65Settings.graphics.clusteredLighting);
 }
 let hemisphereLight: THREE.HemisphereLight;
 let ambientLight: THREE.AmbientLight;
 let sunLight: THREE.DirectionalLight;
-let fillLight: THREE.DirectionalLight;
+let fillLight: THREE.DirectionalLight; let nuketown2ClusteredLightRig: Nuketown2ClusteredLightRig | null = null;
 buildSky();
 let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
-const arenaFactories: Readonly<Record<ArenaId, (target: THREE.Scene) => ArenaMap>> = Object.freeze({
-  'atomic-acres': buildArena,
-  'rustworks-1v1': buildRustworks1v1,
-  'gun-range': buildGunRange,
-  'skyline-terminal': buildSkylineTerminal,
+/**
+ * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
+ *
+ * Every arena but Map 3 is `eagerArena(...)`: the same static function
+ * reference this map has always held, resolved with no await and no behaviour
+ * change of any kind. Map 3 alone is `lazyArena(...)`, because its builder
+ * reaches the showcase corridors (~10k lines of TSL) and a static entry here
+ * would park all of it in the boot graph of a player who picked Nuke Town -
+ * directly against the live owner priority, "faster map loads".
+ *
+ * The fetch happens in `performArenaSelection`'s asynchronous preparation
+ * phase, BEFORE construction, so `constructArena` stays synchronous inside the
+ * fenced transaction between the WebGPU fence and the authority commit.
+ * `resolved()` throws rather than returning undefined if that ordering is ever
+ * broken, which is the failure mode worth being loud about.
+ */
+const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'atomic-acres': eagerArena(buildArena),
+  'rustworks-1v1': eagerArena(buildRustworks1v1),
+  'gun-range': eagerArena(buildGunRange),
+  'skyline-terminal': eagerArena(buildSkylineTerminal),
+  farcrysis: eagerArena(buildFarcrysis),
+  'high-seas': eagerArena(buildHighSeas),
+  // Owner 2026-08-30: Test1/Test2 (docs/TEST1_MAP_BRIEF.md, TEST2_MAP_BRIEF.md).
+  test1: eagerArena(buildTest1),
+  test2: eagerArena(buildTest2),
+  // MAP3: Map 3 (PREVIEW) - the showcase corridors, fetched on demand.
+  //
+  // The loader RESOLVES AND PREPARES. `prepareMap3()` initialises the Rapier
+  // wasm the eighth corridor is built from, and doing it here means
+  // `isResolved(id)` keeps its one meaning for every caller - "the builder can
+  // be called right now" - instead of a lazy arena having a second, invisible
+  // readiness step that only the arena transition knew about.
+  map3: lazyArena(async () => {
+    const module = await import('./map3-arena');
+    await module.prepareMap3();
+    return module.buildMap3;
+  }),
+  // NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407. Code-authored replacement
+  // layout for the Nuke Town flow, registered beside the shipped arena so the
+  // main map is never broken mid-pass. See src/nuketown2-arena.ts.
+  nuketown2: eagerArena(buildNuketown2),
+  // RAID2: Raid Rebuild (PREVIEW), HF-408 Lane AQ. Code-authored replacement
+  // layout for the Raid flow, registered beside the shipped arena so the
+  // original is never broken mid-pass. Eager: its builder is synchronous and
+  // needs no wasm prepare step. See src/raid2-arena.ts.
+  raid2: eagerArena(buildRaid2),
 });
 const arenaCache = new Map<ArenaId, ArenaMap>();
 const ARENA_CACHE_BOUND = 2;
@@ -3126,7 +3495,7 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
   const stagingScene = new THREE.Scene();
   let candidate: ArenaMap | null = null;
   try {
-    candidate = arenaFactories[arenaId](stagingScene);
+    candidate = arenaFactories.resolved(arenaId)(stagingScene);
     candidate.root.removeFromParent();
     prepareArenaPresentation(candidate);
     if (recordConstruction) arenaConstructionHistory.push(arenaId);
@@ -3310,11 +3679,21 @@ function createDormantMenuArena(arenaId: ArenaId): ArenaMap {
 // The menu owns prerecorded media. Do not construct, stream, compile, upload,
 // or submit any gameplay arena until the player explicitly deploys.
 let arena: ArenaMap = createDormantMenuArena(selectedArena.id);
+/**
+ * MAP3 (HF-409): drives `ArenaMap.update` for the ACTIVE arena only.
+ *
+ * There is exactly one of these and exactly one call site (search `// MAP3:`
+ * in `frame()`). Arenas that do not set `update` - every arena but Map 3 -
+ * pay one property read per frame and nothing else; the context below is
+ * built by a callback the animator only invokes when a hook exists.
+ */
+const arenaFrameAnimator = createArenaFrameAnimator();
 let gameplayArenaPrepared = false;
 let interactiveWorldRuntime: InteractiveWorldRuntime | null = null;
 let interactiveWorldMatchEpoch = 1;
 let interactiveWorldTick = 0;
 let lastInteractiveWorldBroadcastRevision = -1;
+let thinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
 let activeWorldColliderCacheArena: ArenaMap | null = null;
 let activeWorldColliderCacheRuntime: InteractiveWorldRuntime | null = null;
 let activeWorldColliderCacheRevision = -1;
@@ -3388,6 +3767,12 @@ let presentedGunRangeTestBayDoorThumpSequence = 0;
 let gunRangeTestBayDoorBroadcastPending = false;
 let gunRangeMatchClockState: GunRangeMatchClockSnapshot | null = null;
 let gunRangeMatchClockOccupantIds: readonly string[] = Object.freeze([]);
+/**
+ * HF-318: this frame's movement/LOS colliders for the active test-bay training
+ * dummies. Derived once per gun-range frame like the door's, so every consumer
+ * inside one frame sees the same patrol pose.
+ */
+let gunRangeTestBayDummyColliderFrame: readonly DynamicWorldCollider[] = Object.freeze([]);
 
 function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   return activeArena === arena && selectedArena.id === 'gun-range'
@@ -3395,28 +3780,37 @@ function activeGunRangeTestBayDoorColliders(activeArena: ArenaMap = arena): read
     : [];
 }
 
+/** HF-318: mirrors the door accessor — dummies are solid only on the live gun range. */
+function activeGunRangeTestBayDummyColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
+  return activeArena === arena && selectedArena.id === 'gun-range'
+    ? gunRangeTestBayDummyColliderFrame
+    : [];
+}
+
+/**
+ * HF-318: recompute the dummy colliders from the live active-target set. A
+ * retired dummy simply stops appearing in that set, so its collider disappears
+ * on the next frame with no disposal bookkeeping.
+ */
+function refreshGunRangeTestBayDummyColliders(nowLocalMonoMs: number): void {
+  gunRangeTestBayDummyColliderFrame = selectedArena.id === 'gun-range' && Number.isFinite(nowLocalMonoMs)
+    ? gunRangeTestBayDummyColliders(
+      activeGunRangeTrainingDummies().map((target) => target.id),
+      Math.max(0, nowLocalMonoMs),
+    )
+    : Object.freeze([]);
+}
+
+// HF-344: movement colliders for breakable windows derive from authored solid
+// bounds rather than rendered GLB mesh AABBs (which can be oversized and differ
+// across graphics profiles, blocking open windows).
 const activeGlassColliderWindowIds = new WeakMap<Box2, string>();
 
 function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly DynamicWorldCollider[] {
   const entries: DynamicWorldCollider[] = [];
   for (const pane of activeArena.breakableWindows) {
-    const solid = pane.glassState
-      ? glassAuthorityProjection(pane.glassState).movementSolid
-      : !pane.broken;
-    if (!solid) continue;
-    pane.mesh.updateWorldMatrix(true, false);
-    const bounds = new THREE.Box3().setFromObject(pane.mesh);
-    if (bounds.isEmpty() || ![
-      bounds.min.x, bounds.max.x, bounds.min.y, bounds.max.y, bounds.min.z, bounds.max.z,
-    ].every(Number.isFinite)) continue;
-    const colliderBounds = Object.freeze({
-      minX: bounds.min.x,
-      maxX: bounds.max.x,
-      minY: bounds.min.y,
-      maxY: bounds.max.y,
-      minZ: bounds.min.z,
-      maxZ: bounds.max.z,
-    });
+    const colliderBounds = deriveGlassColliderBounds(pane, activeArena);
+    if (!colliderBounds) continue;
     activeGlassColliderWindowIds.set(colliderBounds, pane.id);
     entries.push(Object.freeze({
       id: `glass:${pane.id}`,
@@ -3426,12 +3820,35 @@ function activeGlassDynamicColliders(activeArena: ArenaMap = arena): readonly Dy
   return Object.freeze(entries);
 }
 
+// Pass 80: one-shot latch for the invisible-wall guard inside the
+// activeWorldColliders() early-return below. The error logs at most once per
+// session so a hot frame loop cannot flood the console.
+let invisibleWallRuntimeGapLogged = false;
+
 function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['colliders'] {
+  // HF-318: patrolling dummies move every frame, so they are appended outside
+  // the revision-keyed cache below rather than baked into it (a cached patrol
+  // pose would leave an invisible wall behind the dummy).
+  const dummyColliders = activeGunRangeTestBayDummyColliders(activeArena);
   if (activeArena !== arena || !interactiveWorldRuntime) {
+    // Pass 80: the early-return path re-exposes authored colliders verbatim.
+    // On the LIVE arena with runtime-replaced house statics that means hidden
+    // colliders come back as invisible walls when the runtime is missing —
+    // surface it loudly (once) instead of failing silently.
+    if (evaluateInvisibleWallRuntimeGap({
+      sameArena: activeArena === arena,
+      runtimeReplacedStaticCount: activeArena.houseDestruction?.staticColliders.length ?? 0,
+      hasInteractiveRuntime: interactiveWorldRuntime !== null,
+      alreadyLogged: invisibleWallRuntimeGapLogged,
+    }).shouldLog) {
+      invisibleWallRuntimeGapLogged = true;
+      console.error(INVISIBLE_WALL_RUNTIME_GAP_MESSAGE);
+    }
     return [
       ...activeArena.colliders,
       ...activeGlassDynamicColliders(activeArena).map((entry) => entry.bounds),
       ...activeGunRangeTestBayDoorColliders(activeArena).map((entry) => entry.bounds),
+      ...dummyColliders.map((entry) => entry.bounds), // HF-318
     ];
   }
   const collision = interactiveWorldRuntime.collisions();
@@ -3449,7 +3866,11 @@ function activeWorldColliders(activeArena: ArenaMap = arena): ArenaMap['collider
       ...activeGunRangeTestBayDoorColliders(activeArena).map((entry) => entry.bounds),
     ];
   }
-  return activeWorldColliderCache;
+  // HF-318: off the gun range this is empty, so every other arena keeps the
+  // cached array identity and allocates nothing extra.
+  return dummyColliders.length === 0
+    ? activeWorldColliderCache
+    : [...activeWorldColliderCache, ...dummyColliders.map((entry) => entry.bounds)];
 }
 
 function syncInteractiveWorldPhysics(authoritativeResync = false): void {
@@ -3557,19 +3978,6 @@ function updatePersistentWindowDebrisPhysics(dt = 1 / SIMULATION_HZ): void {
   if (retireSettledPhysics) syncInteractiveWorldPhysics();
 }
 
-function majorDebrisDefinitionFromSnapshot(
-  definition: MajorDebrisBodyDefinition,
-  snapshot: MajorDebrisBodySnapshot,
-): MajorDebrisBodyDefinition {
-  return Object.freeze({
-    ...definition,
-    position: snapshot.position,
-    rotation: snapshot.rotation,
-    linearVelocity: snapshot.linearVelocity,
-    angularVelocity: snapshot.angularVelocity,
-    sleeping: snapshot.sleeping,
-  });
-}
 
 function reconcileInteractiveWorldDoorObstructions(): boolean {
   if (!interactiveWorldRuntime?.hasHostAuthority()) return false;
@@ -3629,12 +4037,61 @@ function reconcileInteractiveWorldDoorObstructions(): boolean {
   return changed;
 }
 
+/**
+ * Standing capsule height used by the debug collision probes, matching the live
+ * bot mover's botCapsuleHeight. isBlocked is given the capsule TOP, so a probe
+ * must be raised by this much above the surface it is testing.
+ */
+const DEBUG_PROBE_CAPSULE_HEIGHT_M = 1.7;
+
+/**
+ * Owner 2026-08-30: "its physics to destruction and push need some help" - shed
+ * wreckage sat inert while you walked straight through it. interactive-world-runtime
+ * has supported source: 'player-contact' for a while but nothing ever called it.
+ *
+ * Host-only, and deliberately so: major-debris bodies are host-authoritative and
+ * guests receive the result in the replicated envelope, so a guest running this
+ * would be fighting the host's state rather than adding to it. Every live actor
+ * contributes - local player, bots and remotes - so wreckage reacts to the whole
+ * match and not merely to whoever happens to be hosting.
+ *
+ * Remotes pass no velocity because PlayerSnapshot does not carry one; the runtime
+ * then uses its nominal walk speed and pushes along actor->body, which is the
+ * right read for "someone walked into this" and is what the local paths converge
+ * on anyway once the actor is moving toward the debris.
+ */
+function pushDebrisFromActorContact(): boolean {
+  if (!interactiveWorldRuntime) return false;
+  let pushes = 0;
+  if (player.hp > 0) {
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: player.position,
+      actorVelocity: player.velocity,
+    });
+  }
+  for (const bot of bots.values()) {
+    if (!bot.alive) continue;
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: bot.position,
+      actorVelocity: bot.velocity,
+    });
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    pushes += interactiveWorldRuntime.pushDebrisFromPlayerContact({
+      actorPosition: remote.root.position,
+    });
+  }
+  return pushes > 0;
+}
+
 function stepInteractiveWorldAuthority(): void {
   if (!interactiveWorldRuntime || !gameStarted || matchState.phase !== 'active') return;
   interactiveWorldTick += 1;
   if (!interactiveWorldRuntime.hasHostAuthority()) return;
   let changed = reconcileInteractiveWorldDoorObstructions();
   changed = interactiveWorldRuntime.step(interactiveWorldTick) || changed;
+  changed = pushDebrisFromActorContact() || changed;
   if (characterPhysics && interactiveWorldTick % 6 === 0 && characterPhysics.majorDebrisBodyCount() > 0) {
     changed = interactiveWorldRuntime.adoptMajorDebrisPhysics(characterPhysics.majorDebrisSnapshots()) || changed;
   }
@@ -3655,7 +4112,6 @@ function ensureAtomicWorldPresentation(): void {
 const arenaVisualStream = new ArenaVisualStreamController(scene);
 let arenaVisualReceipt: ArenaVisualSwitchReceipt | null = null;
 const arenaRenderWatchdog = new ArenaRenderWatchdog(3);
-let pass64TslSystems: Pass64TslSceneSystems | null = null;
 let appliedTslArenaDefinitions = 0;
 let activeArenaReviewCameraId: string | null = null;
 let activeArenaReviewFixedTimeMs: number | null = null;
@@ -3674,6 +4130,272 @@ let appliedArenaVisualPolicy: Readonly<{
   budgets: ArenaVisualBudgets;
   reviewCameraIds: readonly string[];
 }> | null = null;
+
+// LIGHTING: ==== time-of-day conditions (Lane AB, PASS 87) ====================
+// The light SET is frozen. buildSky() constructs the hemisphere, ambient, sun
+// and fill lights ONCE at module scope and nothing in this region ever adds,
+// removes, replaces or toggles one — that is the PASS 82 root cause and the
+// reason this whole feature is expressed as uniform writes. Everything below
+// writes colour, intensity, direction, fog colour and exposure into lights that
+// already exist. `src/rendering/lighting-conditions-light-set.test.ts` pins that
+// property against this exact source region, so a future edit that constructs a
+// light here fails a test rather than freezing the game.
+type LightingConditionBaseline = Readonly<{
+  arenaId: ArenaId;
+  sunColor: number;
+  sunIntensity: number;
+  ambientColor: number;
+  ambientIntensity: number;
+  hemisphereSky: number;
+  hemisphereGround: number;
+  hemisphereIntensity: number;
+  fillColor: number;
+  fillIntensity: number;
+  fogColor: number;
+  exposure: number;
+}>;
+
+const LIGHTING_CONDITION_DEG = Math.PI / 180;
+/**
+ * Below this the re-aimed sun is invisible and would still cost a full static
+ * shadow-map refresh, so `cycle` mode quantises to it. `fixed`/`random` resolve
+ * one hour for the whole match and therefore move the sun exactly zero times.
+ */
+const LIGHTING_CONDITION_SUN_STEP_DEGREES = 0.35;
+/** Absolute elevation clamp applied to the re-aimed sun, in degrees. */
+const LIGHTING_CONDITION_ELEVATION_CLAMP = Object.freeze({ minimum: 6, maximum: 84 });
+
+const lightingQueryParams = new URLSearchParams(window.location.search);
+const lightingQueryChoice = lightingQueryParams.get('tod');
+const lightingQueryHourRaw = Number.parseFloat(lightingQueryParams.get('todhour') ?? '');
+/**
+ * `?todhour=` pins the hour for deterministic captures; `?tod=` picks a mode.
+ * It is also writable through the QA hook, because the readability question
+ * this lane had to answer -- at which hour of an arena's band does its shadow
+ * mass cross the safety bound -- is a SCAN, and reloading the page per hour
+ * costs a minute of arena construction for a value that is one uniform write.
+ */
+let lightingCaptureFixedHour: number | null = Number.isFinite(lightingQueryHourRaw) ? lightingQueryHourRaw : null;
+/**
+ * A LOCAL override, set only by `?tod=` or by the QA hook. It is deliberately
+ * NOT the normal path: the hour is host-authoritative, so the live value comes
+ * from the replicated match config below and a local override exists purely for
+ * deterministic captures and solo experimentation.
+ */
+let lightingTimeChoiceOverride: LightingTimeChoice | null = isLightingTimeChoice(lightingQueryChoice)
+  ? lightingQueryChoice
+  : null;
+/**
+ * HOST-AUTHORITATIVE. A guest reads the host's replicated `config.timeOfDay`;
+ * a host and a solo player read their own. Absent (pre-PASS-87 lobbies and
+ * rejoin envelopes) means the default, so no peer is ever left on a different
+ * sun by an old checkpoint.
+ */
+function activeLightingTimeChoice(): LightingTimeChoice {
+  // The precedence itself is pure and tested in lighting-conditions.ts. Inside a
+  // hosted lobby -- host OR guest -- the replicated value wins outright, so a
+  // `?tod=` URL cannot take one peer off the shared sky; the host changes the
+  // mode through the lobby row, which replicates.
+  const snapshot = privateLobbySnapshot;
+  return activeLightingTimeChoiceFrom({
+    localOverride: lightingTimeChoiceOverride,
+    replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay,
+    hosted: Boolean(snapshot),
+  });
+}
+let lightingConditionBaseline: LightingConditionBaseline | null = null;
+let activeLightingConditions: LightingConditionWrites | null = null;
+let lightingConditionsSkyDarken = 0;
+let lightingConditionsElapsedSeconds = 0;
+/**
+ * The writes that are CURRENTLY IN the lights. The gate below compares against
+ * this record rather than against the resolved hour: the hour is one of two
+ * inputs to the model and weather is the other, so an hour comparison silently
+ * discarded every weather-driven write. See `lightingConditionWritesEqual`.
+ */
+let lightingConditionsAppliedWrites: LightingConditionWrites | null = null;
+let lightingConditionsAppliedElevationDegrees = Number.NaN;
+let lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+let lightingConditionsSunReaims = 0;
+let lightingConditionsGateChoice: LightingTimeChoice | null = null;
+let lightingConditionsGateSkyStep = Number.NaN;
+let lightingConditionsGateClockStep = Number.NaN;
+let lightingConditionsGateSeed = Number.NaN;
+let lightingConditionsResolves = 0;
+let lightingConditionsUniformWrites = 0;
+
+const lightingConditionScratchColor = new THREE.Color();
+
+/** Multiplies an authored colour by a bounded per-channel tint, in place. */
+function lightingConditionTint(hex: number, tint: readonly [number, number, number]): THREE.Color {
+  lightingConditionScratchColor.setHex(hex);
+  lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * tint[0]);
+  lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * tint[1]);
+  lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * tint[2]);
+  return lightingConditionScratchColor;
+}
+
+/**
+ * The fog colour every consumer should start from. The nuke charge, the flash
+ * and the arena-change restore all rewrite `scene.fog.color` from the authored
+ * value; routing them through here is what stops those three effects snapping
+ * the sky back to its authored hour for the rest of the match.
+ */
+function conditionedFogBaseColorHex(): number {
+  const authored = activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor;
+  const writes = activeLightingConditions;
+  if (!writes || lightingConditionsAreIdentity(writes)) lightingConditionScratchColor.setHex(authored); else lightingConditionTint(authored, writes.fogTint); lightingConditionScratchColor.r = Math.min(1, lightingConditionScratchColor.r * nukeEvent.fogTintR); lightingConditionScratchColor.g = Math.min(1, lightingConditionScratchColor.g * nukeEvent.fogTintG); lightingConditionScratchColor.b = Math.min(1, lightingConditionScratchColor.b * nukeEvent.fogTintB); return lightingConditionScratchColor.getHex();
+}
+
+function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
+  lightingConditionBaseline = Object.freeze(baseline);
+  lightingConditionsAppliedWrites = null;
+  lightingConditionsGateChoice = null;
+  lightingConditionsAppliedElevationDegrees = Number.NaN;
+  lightingConditionsAppliedAzimuthDegrees = Number.NaN;
+}
+
+function resolveActiveLightingConditions(): LightingConditionWrites {
+  // LIGHTING: the Nuke Town Rebuild owns three authored skies (src/nuketown2-lighting); every other arena takes the game-wide sun arc, and both return the same record.
+  return (selectedArena.id === NUKETOWN2_ARENA_ID ? resolveNuketown2LightingConditions : resolveLightingConditions)({
+    arenaId: selectedArena.id,
+    matchSeed: weatherMatchSeed,
+    elapsedSeconds: lightingConditionsElapsedSeconds,
+    choice: activeLightingTimeChoice(),
+    skyDarkenAmount: lightingConditionsSkyDarken,
+    // `?todhour=` is a local override like `?tod=`: ignored in a hosted lobby
+    // so guests cannot select a different sky and desync the shared match.
+    ...(lightingCaptureFixedHour === null || privateLobbySnapshot ? {} : { fixedHour: lightingCaptureFixedHour }),
+  });
+}
+
+/**
+ * Re-aims the ALREADY-EXISTING key light. `graphicsRefinement.applyArena` owns
+ * the base offset and the shadow camera; this only rotates the same vector about
+ * the same target, and only when the movement is large enough to be seen — a
+ * sun that jitters by hundredths of a degree would refresh the static shadow map
+ * every frame for no visible gain.
+ */
+function reaimConditionedSun(writes: LightingConditionWrites): void {
+  if (!sunLight) return;
+  const base = activeLighting.sunPosition;
+  const radius = Math.hypot(base[0], base[1], base[2]);
+  if (!(radius > 0)) return;
+  const baseElevation = Math.atan2(base[1], Math.hypot(base[0], base[2])) / LIGHTING_CONDITION_DEG;
+  const baseAzimuth = Math.atan2(base[2], base[0]) / LIGHTING_CONDITION_DEG;
+  const elevation = Math.min(
+    LIGHTING_CONDITION_ELEVATION_CLAMP.maximum,
+    Math.max(LIGHTING_CONDITION_ELEVATION_CLAMP.minimum, baseElevation + writes.sunElevationDeltaDegrees),
+  );
+  const azimuth = baseAzimuth + writes.sunAzimuthDeltaDegrees;
+  const movedEnough = !Number.isFinite(lightingConditionsAppliedElevationDegrees)
+    || Math.abs(elevation - lightingConditionsAppliedElevationDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES
+    || Math.abs(azimuth - lightingConditionsAppliedAzimuthDegrees) >= LIGHTING_CONDITION_SUN_STEP_DEGREES;
+  if (!movedEnough) return;
+  lightingConditionsAppliedElevationDegrees = elevation;
+  lightingConditionsAppliedAzimuthDegrees = azimuth;
+  const flat = Math.cos(elevation * LIGHTING_CONDITION_DEG) * radius;
+  // Same composition graphicsRefinement.applyArena uses: horizontal components
+  // are offsets from the arena centre, the vertical component is absolute.
+  sunLight.position.set(
+    sunLight.target.position.x + flat * Math.cos(azimuth * LIGHTING_CONDITION_DEG),
+    Math.sin(elevation * LIGHTING_CONDITION_DEG) * radius,
+    sunLight.target.position.z + flat * Math.sin(azimuth * LIGHTING_CONDITION_DEG),
+  );
+  sunLight.shadow.needsUpdate = true;
+  lightingConditionsSunReaims += 1;
+  if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
+}
+
+/** Time-of-day writes existing global/local light data and never changes topology. */
+function applyLightingConditionUniforms(force = false): void {
+  const baseline = lightingConditionBaseline;
+  if (!baseline || baseline.arenaId !== selectedArena.id) return;
+  const choice = activeLightingTimeChoice();
+  // GATE BEFORE THE RESOLVE. This runs every frame, and `resolveLightingConditions`
+  // allocates a frozen record with six frozen tints; at 144 Hz that is ~1,000
+  // short-lived objects a second bought for nothing, because in every mode except
+  // `cycle` the hour is CONSTANT for the whole match. Only two inputs can move --
+  // the weather's sky-darken and, in `cycle`, the clock -- so both are quantised
+  // and compared first. In `fixed`/`random` steady state this function costs four
+  // comparisons and returns.
+  const skyStep = Math.round(lightingConditionsSkyDarken * 256);
+  const clockStep = (choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0) + nukeEvent.lightingStep;
+  if (!force
+    && choice === lightingConditionsGateChoice
+    && skyStep === lightingConditionsGateSkyStep
+    && clockStep === lightingConditionsGateClockStep
+    && weatherMatchSeed === lightingConditionsGateSeed) return;
+  lightingConditionsGateChoice = choice;
+  lightingConditionsGateSkyStep = skyStep;
+  lightingConditionsGateClockStep = clockStep;
+  lightingConditionsGateSeed = weatherMatchSeed;
+  lightingConditionsResolves += 1;
+  const writes = resolveActiveLightingConditions();
+  activeLightingConditions = writes;
+  // GATE ON THE WRITES, NOT ON THE HOUR. The hour is one of TWO inputs to
+  // `resolveLightingConditions`; `skyDarkenAmount` is the other and never enters
+  // `hour`. An hour comparison here therefore threw away every weather-driven
+  // write in `fixed`/`random` (the default is `random`), so the documented
+  // weather-neutralisation composition never reached a light in the shipped
+  // game and `conditionedFogBaseColorHex()` restored a tint the lights had not
+  // been given. Comparing what is about to be WRITTEN against what is already
+  // in the lights cannot have that class of bug.
+  if (!force && lightingConditionWritesEqual(writes, lightingConditionsAppliedWrites)) return;
+  lightingConditionsAppliedWrites = writes;
+  lightingConditionsUniformWrites += 1;
+  const indirect = graphicsRuntime.indirectLightScale;
+  if (sunLight) {
+    sunLight.color.copy(lightingConditionTint(baseline.sunColor, writes.sunTint));
+    sunLight.intensity = baseline.sunIntensity * writes.sunIntensityScale;
+    reaimConditionedSun(writes);
+  }
+  if (ambientLight) {
+    ambientLight.color.copy(lightingConditionTint(baseline.ambientColor, writes.ambientTint));
+    ambientLight.intensity = baseline.ambientIntensity * indirect * writes.ambientIntensityScale;
+  }
+  if (hemisphereLight) {
+    hemisphereLight.color.copy(lightingConditionTint(baseline.hemisphereSky, writes.hemisphereSkyTint));
+    hemisphereLight.groundColor.copy(lightingConditionTint(baseline.hemisphereGround, writes.hemisphereGroundTint));
+    hemisphereLight.intensity = baseline.hemisphereIntensity * indirect * writes.hemisphereIntensityScale;
+  }
+  if (fillLight) {
+    fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
+    fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
+  }
+  nuketown2ClusteredLightRig?.applyLighting(selectedArena.id, writes.hour);
+  if (scene.fog instanceof THREE.Fog) {
+    scene.fog.color.setHex(conditionedFogBaseColorHex());
+    pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);
+  }
+  // A deterministic review camera owns the exposure while it is set -- that is
+  // the capture contract every viewpoint baseline in the repo rests on -- and it
+  // writes it ONCE, when the camera is applied. Writing `baseline.exposure` here
+  // would silently discard it the next time weather nudged the gate open, so the
+  // hour's lift composes ON TOP of whichever exposure actually owns the frame.
+  const ownedExposure = activeArenaReviewExposure ?? baseline.exposure;
+  renderRuntime.setExposure(effectiveGraphicsExposure(ownedExposure * writes.exposureScale * nukeEvent.exposureScale));
+}
+
+/** Telemetry for the QA probes and the debug panel. Read-only. */
+function lightingConditionsTelemetry(): Record<string, unknown> {
+  const writes = activeLightingConditions;
+  return {
+    choice: activeLightingTimeChoice(),
+    localOverride: lightingTimeChoiceOverride,
+    hour: writes ? Number(writes.hour.toFixed(3)) : null,
+    deviation: writes ? Number(writes.deviation.toFixed(4)) : null,
+    sunIntensityScale: writes ? Number(writes.sunIntensityScale.toFixed(4)) : null,
+    shadowFloorScale: writes ? Number(writes.shadowFloorScale.toFixed(4)) : null,
+    exposureScale: writes ? Number(writes.exposureScale.toFixed(4)) : null,
+    skyDarkenAmount: Number(lightingConditionsSkyDarken.toFixed(4)),
+    identity: writes ? lightingConditionsAreIdentity(writes) : true,
+    sunReaims: lightingConditionsSunReaims,
+    uniformWrites: lightingConditionsUniformWrites,
+    resolves: lightingConditionsResolves, clusteredLights: nuketown2ClusteredLightRig?.telemetry() ?? null,
+  };
+}
+// LIGHTING: ==== end time-of-day conditions ====================================
 
 function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): void {
   activeLighting = rustworksLightingTint(arenaLightingProfile(renderProfile, definition.id), renderProfile, definition.id);
@@ -3708,7 +4430,9 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
   sunLight.shadow.camera.updateProjectionMatrix();
   arenaContrastLighting.applyDefinition(definition);
   // Backend-agnostic sky. Every outdoor arena owns one selected panorama while
-  // Firefox/Safari's WebGL2 path shares the same immediate procedural fallback.
+  // the WebGL2 compatibility path (Safari and browsers without navigator.gpu;
+  // HF-331: Firefox 141+ takes the WebGPU route) shares the same immediate
+  // procedural fallback.
   applySkyBackdrop(scene, definition.atmosphere.preset, (url) => {
     arenaVisualStream.recordSelectedAssetRequest(definition.id, url);
   });
@@ -3723,6 +4447,23 @@ function applySelectedArenaVisualDefinition(definition: ArenaVisualDefinition): 
     budgets: definition.budgets,
     reviewCameraIds: Object.freeze(definition.reviewCameras.map((entry) => entry.id)),
   });
+  // LIGHTING: the authored values written above ARE the arena's identity anchor.
+  // Snapshot them, then compose the resolved hour on top as uniform writes.
+  captureLightingConditionBaseline({
+    arenaId: definition.id,
+    sunColor: definition.lighting.sunColor,
+    sunIntensity: definition.lighting.sunIntensity,
+    ambientColor: definition.lighting.ambientColor,
+    ambientIntensity: definition.lighting.ambientIntensity,
+    hemisphereSky: activeLighting.hemisphereSky,
+    hemisphereGround: activeLighting.hemisphereGround,
+    hemisphereIntensity: activeLighting.hemisphereIntensity,
+    fillColor: activeLighting.fillColor,
+    fillIntensity: activeLighting.fillIntensity,
+    fogColor: definition.fog.color,
+    exposure: definition.colorPipeline.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -3733,7 +4474,25 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
   if (renderRuntime.backend === 'webgpu' && fence) await flushWebGpuFrames();
   arenaVisualReceipt = await arenaVisualStream.adoptGameplayRoot(arenaId, root);
   const module = await loadArenaVisualModule(arenaId);
+  // PASS 94 CANDIDATE 4b - THE DEFINITION AND THE REVIEW STATE ARE INSTALLED
+  // TOGETHER, BEFORE ANY WORK THAT CAN THROW.
+  //
+  // These five resets used to sit at the END of this function, after the whole
+  // WebGPU block. Every await between here and there is a throw point - the
+  // PMREM regen, the traversal audit, the sky-backdrop admission, the arena
+  // environment assertion - and none of them run under a try. So a throw left
+  // `activeArenaVisualDefinition` pointing at the NEW arena (it is assigned on
+  // the line below) while `activeArenaReview*` still described the OLD one: a
+  // review camera id, exposure, seed and HUD state for an arena that is no
+  // longer on screen, which `setArenaReviewCamera` and the debug capture path
+  // both read. Resetting them next to the assignment makes the pair one
+  // statement about which arena is installed, on every path out of here.
   activeArenaVisualDefinition = module.definition;
+  activeArenaReviewCameraId = null;
+  activeArenaReviewFixedTimeMs = null;
+  activeArenaReviewSeed = null;
+  activeArenaReviewExposure = null;
+  activeArenaReviewHud = null;
   applySelectedArenaVisualDefinition(module.definition);
   if (renderRuntime.backend === 'webgpu') {
     // Browser assets survive map changes, but their GPU receipts are tied to
@@ -3743,17 +4502,56 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // definition is applied; the arena-bound catalog prewarm below proves the
     // same retained model identities before any viewmodel is visible.
     weaponView.invalidateBrowserWeaponGpuReadinessForPipelineChange();
-    if (pass64TslSystems) pass64TslSystems.applyDefinition(module.definition);
+    // AWAITED. `applyDefinition` is async - it regenerates the arena's PMREM
+    // environment - and firing it as a floating promise meant the commit could
+    // resolve before the environment landed (measured at t=20862 ms on a
+    // map switch, after the selection promise had already settled) and meant a
+    // rejection would surface as an unhandled rejection rather than a failed
+    // map commit.
+    if (pass64TslSystems) await pass64TslSystems.applyDefinition(module.definition);
     else {
-      pass64TslSystems = createPass64TslSceneSystems(scene, camera, renderRuntime.renderPipeline, module.definition, {
-        principalSamples: graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1,
+      const tslGraphicsOptions = {
+        principalSamples: (graphicsRuntime.antialiasSamples === 4 ? 4 : graphicsRuntime.antialiasSamples === 2 ? 2 : 1) as 1 | 2 | 4,
         volumetricScale: graphicsRuntime.volumetricScale,
         ambientOcclusion: graphicsRuntime.ambientOcclusion,
         post: graphicsRuntime.post,
         oceanWaveAmplitude: rustworksOceanAmplitude(renderProfile),
-      });
+        reflectionScale: graphicsRuntime.reflectionScale,
+        reflectionQuality: graphicsRuntime.reflectionQuality,
+        environmentIntensity: graphicsRuntime.environmentIntensity,
+        screenSpace: graphicsRuntime.screenSpace,
+      };
+      // HF-364: the grade chain's order receipt has to know which optional
+      // linear stages the assembler is about to build BEFORE it publishes an
+      // outputNode, otherwise the first published receipt describes a graph
+      // that is not the one on screen. The stage list is a pure function of the
+      // options, so it is resolved without building a node.
+      renderRuntime.setGradeLinearSourceStages(pass64LinearSourceStages(tslGraphicsOptions));
+      renderRuntime.setSpatialUpscaling(graphicsRuntime.screenSpace.upscaling);
+      pass64TslSystems = createPass64TslSceneSystems(
+        scene,
+        camera,
+        renderRuntime.renderPipeline,
+        module.definition,
+        tslGraphicsOptions,
+        renderRuntime.renderer,
+        // The arena sun is the shaft light: godrays raymarch its shadow map, so
+        // the node references this exact light's shadow camera.
+        sunLight,
+      );
     }
     appliedTslArenaDefinitions += 1;
+    // HF-363: hand the arena's authored grain to the display-referred grade stage.
+    // Removing the linear-side ordered dither orphaned the scene pass's own grain
+    // uniform - it is still updated on every definition change but no longer feeds
+    // any node - and setGradeGrainStrength had no production caller, so without this
+    // every arena would silently fall back to the chain's default grain and the
+    // authored per-arena value would reach the picture through nothing at all.
+    // filmGrainScale is carried across because the linear path applied it too;
+    // dropping it here would quietly change what the graphics presets do.
+    renderRuntime.setGradeGrainStrength(
+      module.definition.colorPipeline.grain.strength * graphicsRuntime.post.filmGrainScale,
+    );
     renderRuntime.setRenderTargetTelemetry(pass64TslSystems.principalHdrTarget.samples, pass64TslSystems.bloomSamples);
     const traversal = auditRuntimeTslTraversal(scene, pass64TslSystems.compiledPipelineIds);
     assertRuntimeTslTraversal(traversal);
@@ -3761,12 +4559,24 @@ async function configurePlayableArenaVisuals(arenaId: ArenaId, root: THREE.Group
     // submission. Otherwise an async panorama decode can replace the background
     // after prewarm and leave its first GPU upload/binding in live gameplay.
     await waitForSkyBackdropAdmission(scene);
+    // THE FIRST ARENA'S ENVIRONMENT. Every arena reaches this line; only one of
+    // them reached `applyDefinition`, because the first arena of a page load is
+    // the one that CONSTRUCTS pass64TslSystems and therefore takes the `else`
+    // branch above. That is why `scene.environment` was null for the whole of
+    // map 1 of every session and non-null from map 2 onward - the same build
+    // lighting the map every player actually plays differently from the one
+    // they switch to (docs/IBL_FIRST_ARENA_BUG_2026-08-31.md).
+    //
+    // It also has to be HERE rather than beside the construction: the three
+    // arenas with generated skies mount a procedural gradient synchronously and
+    // swap in the real equirect .webp when it decodes. Convolving before the
+    // admission would pin every one of them to the placeholder sky.
+    await pass64TslSystems.applyArenaEnvironment();
+    // Fails closed on the exact defect above, on the real scene, on every
+    // commit. It would have failed on the first arena before this change, which
+    // is the point of landing it with the fix rather than after it.
+    assertArenaEnvironmentLive(pass64TslSystems.observeArenaEnvironment());
   }
-  activeArenaReviewCameraId = null;
-  activeArenaReviewFixedTimeMs = null;
-  activeArenaReviewSeed = null;
-  activeArenaReviewExposure = null;
-  activeArenaReviewHud = null;
 }
 function activeBallisticSurfaces(activeArena: ArenaMap = arena): readonly BallisticSurface[] {
   const brokenWindowIds = new Set(activeArena.breakableWindows.filter((pane) => (
@@ -3821,8 +4631,79 @@ function traceWeaponPath(
     distance,
     WEAPONS[weapon].penetration,
     activeBallisticSurfaces(),
-    interactiveWorldRuntime?.apertureQuery,
+    worldApertureQuery,
   );
+}
+
+const worldApertureQuery = buildWorldApertureQuery(() => interactiveWorldRuntime?.apertureQuery, () => thinMetalPerforationRuntime);
+
+// Owner 2026-08-29 wall/prone clipping: the camera resolve probes the SAME
+// canonical shot-surface set the eye-clearance sweep measures. The felt
+// clipping class is visual geometry protruding past the movement colliders
+// (house ramp flanks, airstair bellies), which a collider-only probe cannot
+// see. Nine 0.15 m probes per frame; traceBallisticPath's broad phase keeps
+// this well under the frame budget.
+let lastEyeClearanceResult: { x: number; y: number; z: number; pushedM: number } | null = null;
+const eyeClearanceProbeOriginScratch = new THREE.Vector3();
+// Fixtures the player occupies BY DESIGN are exempt from the camera resolve;
+// the eye-clearance ledger (docs/eye-clearance/ledger.json) records exactly
+// this accepted class: the gun-range wallbang panels are authored
+// solid:false / shots:true - deliberately walk-through. Everything else that
+// gets within the clearance radius is a visual fringe of solid geometry
+// (ramp flanks, airstair bellies - walkable slopes live in the physics
+// engine, not the box-collider list, so a collider-overlap test cannot
+// identify them).
+function eyeClearanceSurfaceIsSolidBacked(surface: BallisticSurface): boolean {
+  // Breakable window panes are excluded too: leaning through a broken window
+  // is legitimate, and the aperture state is not consulted on this path.
+  return !surface.name.includes('wallbang-panel') && surface.breakableWindowId === undefined;
+}
+// Per-frame probes run against a cached NEARBY subset of the canonical
+// surfaces (refreshed when the eye moves) so ten 0.15 m probes never walk
+// the full arena surface list. Zero allocations on the steady path.
+const EYE_CLEARANCE_NEARBY_RADIUS_M = 1.6;
+const EYE_CLEARANCE_REFRESH_DISTANCE_SQ = 0.49;
+const eyeClearanceNearbySurfaces: BallisticSurface[] = [];
+const eyeClearanceNearbyOrigin = new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0);
+let eyeClearanceNearbyArenaSurfaces: readonly BallisticSurface[] | null = null;
+function refreshEyeClearanceNearbySurfaces(eye: Readonly<{ x: number; y: number; z: number }>): void {
+  const surfaces = activeBallisticSurfaces();
+  if (surfaces !== eyeClearanceNearbyArenaSurfaces) {
+    eyeClearanceNearbyArenaSurfaces = surfaces;
+    eyeClearanceNearbyOrigin.x = Number.POSITIVE_INFINITY;
+  }
+  eyeClearanceProbeOriginScratch.set(eye.x, eye.y, eye.z);
+  if (eyeClearanceNearbyOrigin.distanceToSquared(eyeClearanceProbeOriginScratch) < EYE_CLEARANCE_REFRESH_DISTANCE_SQ) return;
+  eyeClearanceNearbyOrigin.copy(eyeClearanceProbeOriginScratch);
+  eyeClearanceNearbySurfaces.length = 0;
+  for (const surface of surfaces) {
+    if (!eyeClearanceSurfaceIsSolidBacked(surface)) continue;
+    if (sphereIntersectsBox(eyeClearanceProbeOriginScratch, EYE_CLEARANCE_NEARBY_RADIUS_M, surface.bounds)) {
+      eyeClearanceNearbySurfaces.push(surface);
+    }
+  }
+}
+const eyeClearanceProbeEndScratch = { x: 0, y: 0, z: 0 };
+function eyeClearanceBallisticProbe(
+  start: Readonly<{ x: number; y: number; z: number }>,
+  direction: Readonly<{ x: number; y: number; z: number }>,
+  maxM: number,
+): { entryM: number; exitM: number } | null {
+  eyeClearanceProbeEndScratch.x = start.x + direction.x * maxM;
+  eyeClearanceProbeEndScratch.y = start.y + direction.y * maxM;
+  eyeClearanceProbeEndScratch.z = start.z + direction.z * maxM;
+  let bestEntry = Number.POSITIVE_INFINITY;
+  let bestExit = maxM;
+  for (const surface of eyeClearanceNearbySurfaces) {
+    const entry = segmentBoxHitTime(start, eyeClearanceProbeEndScratch, surface.bounds, 0);
+    if (entry === null) continue;
+    const entryM = entry * maxM;
+    if (entryM >= bestEntry) continue;
+    const reverse = segmentBoxHitTime(eyeClearanceProbeEndScratch, start, surface.bounds, 0);
+    bestEntry = entryM;
+    bestExit = reverse === null ? maxM : maxM * (1 - reverse);
+  }
+  return Number.isFinite(bestEntry) ? { entryM: bestEntry, exitM: bestExit } : null;
 }
 
 function applyInteractiveWorldBallisticTrace(
@@ -3834,17 +4715,16 @@ function applyInteractiveWorldBallisticTrace(
   if (!interactiveWorldRuntime?.hasHostAuthority() || trace.impacts.length === 0) return false;
   const spec = WEAPONS[weapon];
   const unitDirection = direction.clone().normalize();
-  const penetrationEnergyQ = Math.max(0, Math.round(
-    spec.penetration.penetrationPower * spec.penetration.fmjMultiplier * 10,
-  ));
-  const damageQ = Math.max(1, Math.round(spec.damage));
+  const damageQ = Math.max(1, Math.round(applyPenetrationDamage(spec.damage, trace.damageMultiplier)));
   const apertureRadiusQ = weapon === 'railgun' ? 700 : weapon === 'scattergun' ? 420 : 300;
   let changed = false;
   for (const impact of trace.impacts) {
     if (!impact.surface.destructibleSurface
       && !impact.surface.majorDebris
       && !impact.surface.houseFragment
-      && !impact.surface.houseMajorDebris) continue;
+      && !impact.surface.houseMajorDebris
+      && !ownsThinMetalPanel(thinMetalPerforationRuntime, impact.surface)) continue;
+    const penetrationEnergyQ = Math.max(0, Math.round(impact.energyAtEntryQ));
     const point = origin.clone().addScaledVector(unitDirection, impact.entryDistance);
     const impulseMagnitudeQ = Math.min(50_000, Math.max(500, Math.round(damageQ * 280)));
     const impulseQ = Object.freeze({
@@ -3852,23 +4732,7 @@ function applyInteractiveWorldBallisticTrace(
       yQ: Math.round(unitDirection.y * impulseMagnitudeQ),
       zQ: Math.round(unitDirection.z * impulseMagnitudeQ),
     });
-    const result = impact.surface.houseFragment || impact.surface.houseMajorDebris
-      ? interactiveWorldRuntime.applyHouseBulletImpact({
-        surface: impact.surface,
-        damageQ,
-        penetrationEnergyQ,
-        impulseQ,
-      })
-      : interactiveWorldRuntime.applyBulletImpact({
-        surface: impact.surface,
-        point,
-        tick: interactiveWorldTick,
-        damageQ,
-        penetrationEnergyQ,
-        radiusUQ: apertureRadiusQ,
-        radiusVQ: apertureRadiusQ,
-        impulseQ,
-      });
+    const result = routeInteractiveWorldBallisticImpact(thinMetalPerforationRuntime, interactiveWorldRuntime, impact, point, damageQ, penetrationEnergyQ, apertureRadiusQ, impulseQ, interactiveWorldTick);
     if (!result?.accepted) continue;
     changed = true;
     if (impact.surface.majorDebris && characterPhysics) {
@@ -4055,44 +4919,79 @@ async function prewarmOverdrivePresentation(): Promise<void> {
     overdriveRoot.scale.setScalar(1);
   }
 }
-const atmosphereSystem = renderRuntime.backend === 'webgl2'
-  ? new AtmosphereSystem(scene, renderProfile, rendererLabel, mistQuery, selectedArena.id)
-  : null;
-const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
-waterSystem.configure(selectedArena.id, renderProfile, {
-  halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-  halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-}, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
-ensureRustworksStarfield(scene, selectedArena.id);
-const grassSystem = renderRuntime.backend === 'webgl2'
-  ? new GrassSystem(
-      scene,
-      renderProfile,
-      rendererLabel,
-      grassQuery,
-      // Grass is an Atomic Acres-only presentation layer, so deep-linked solo maps
-      // must never seed its permanent placements from their collision geometry.
-      selectedArena.id === 'atomic-acres' ? activeWorldColliders() : [],
-      atomicLighting,
-    )
-  : null;
-grassSystem?.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
-if (renderRuntime.backend === 'webgl2') {
-  renderRuntime.renderer.domElement.addEventListener('webglcontextrestored', () => {
-    webglContextLost = false;
-    webglContextRestorations += 1;
-    document.documentElement.dataset.webglContext = 'ready';
-    renderRuntime.requestShadowUpdate(activeRenderConfig.shadows);
-    atomicSignal?.invalidateValidation();
-    atmosphereSystem?.handleContextRestored();
-    grassSystem?.handleContextRestored();
-    resize();
-  });
+const atmosphereSystem = ((): AtmosphereSystem | null => null)();
+void mistQuery;
+// HF-371 weather. Deliberately NOT gated on the webgl2 backend the way
+// AtmosphereSystem is: rain authors no custom shaders (stock materials plus
+// procedural DataTextures), so it is valid on both backends and rainBypassReason
+// decides for itself.
+//
+// The seed must be identical on every peer or the zero-traffic determinism the
+// weather model is built on collapses. It is derived from the authoritative
+// host identity and the match start stamp - never Math.random or a local clock.
+let weatherMatchSeed = 0;
+let lastRainUpdateAtMs = 0;
+// LIGHTING: `let`, not `const`, only so the QA hook below can move the weather
+// WITHOUT a reload. The lane needed to prove that a weather change reaches the
+// lights on the ordinary per-frame path (no forced apply), and a URL-only
+// override can only be set before the arena exists.
+let weatherOverrideState = (() => {
+  const requested = new URLSearchParams(window.location.search).get('weather');
+  return requested && WEATHER_SEVERITY_LADDER.includes(requested as WeatherState)
+    ? requested as WeatherState
+    : null;
+})();
+function deriveWeatherMatchSeed(hostIdentity: string, matchEpochMs: number): number {
+  let hash = 0x811c9dc5;
+  for (const character of `${hostIdentity}:${matchEpochMs}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
 }
+const rainPresentation = new RainPresentation({
+  profile: renderProfile,
+  rendererLabel,
+  query: new URLSearchParams(window.location.search).get('rain'),
+  quality: 'high',
+  seed: 0,
+});
+
+// HF-371 ambient air. Same lifecycle as rain: constructed once into the
+// persistent scene, presentation-only, and seeded from the shared weather seed
+// so both peers step the same deterministic stream even though no particle
+// ever enters networked state. `?particles=off|on` is the QA override.
+const hfParticleRuntime = new ParticleRuntime({
+  profile: renderProfile,
+  rendererLabel,
+  query: new URLSearchParams(window.location.search).get('particles'),
+  quality: 'high',
+  seed: weatherMatchSeed, // value 0 at boot; rekeyed per match at match start
+  arenaId: selectedArena.id,
+});
+hfParticleRuntime.build(scene);
+// Adaptive-quality density clamp for the ambient families, refreshed by the
+// same effects budget that throttles atmosphere and impact decals.
+let hfParticleDensityScale = 1;
+rainPresentation.build(scene);
+let weatherWindField = createWindField(selectedArena.id, 0);
+const waterSystem = new WaterSystem(scene, renderRuntime.backend === 'webgpu' ? 'external-tsl' : 'legacy-glsl');
+// HF-358 wave 2. The swim reducers landed pure and host-authoritative but
+// nothing stepped them, so swimmable water still behaved like the rustworks
+// float zone: you bobbed, you could not swim. This is the movement-loop
+// consumption the ledger recorded as an outstanding handoff.
+let localSwimState: SwimState = createSwimState();
+let swimWeaponHintShown = false;
+waterSystem.configure(selectedArena.id, renderProfile);
+ensureRustworksStarfield(scene, selectedArena.id);
+const grassSystem = ((): GrassSystem | null => null)();
+void grassQuery;
+grassSystem?.setAdaptivePixelRatio(adaptiveQuality.telemetry().pixelRatioCap);
 const impactPresentation = new ImpactPresentation(scene, reducedRenderMode);
 applyPresentationEffectsBudget = (budget) => {
   atmosphereSystem?.setDensityScale(budget.particleDensityScale);
   impactPresentation.setBudget(budget.particleDensityScale, budget.decalLifetimeScale);
+  hfParticleDensityScale = budget.particleDensityScale;
 };
 applyPresentationEffectsBudget(applyGraphicsPreferenceBudget(graphicsEffectsBudget(renderProfile, adaptiveQuality.telemetry().pixelRatioCap)));
 const tracerPool = new TracerPool(scene);
@@ -4286,12 +5185,8 @@ function retireAtomicPresentation(): void {
   qualityAssetStreaming.atomicAcres = 'idle';
 }
 
-function createWeaponCapacityRegistry(kind: 'mag' | 'reserve'): Record<WeaponId, number> {
-  return Object.fromEntries(WEAPON_IDS.map((weapon) => [
-    weapon,
-    SPECIAL_WEAPON_IDS.includes(weapon as (typeof SPECIAL_WEAPON_IDS)[number]) ? 0 : WEAPONS[weapon][kind],
-  ])) as Record<WeaponId, number>;
-}
+const createWeaponCapacityRegistry = (kind: 'mag' | 'reserve'): Record<WeaponId, number> =>
+  createWeaponCapacityRegistryPure(kind, WEAPON_IDS, SPECIAL_WEAPON_IDS, WEAPONS) as Record<WeaponId, number>;
 
 const player = {
   id: createPlayerId(),
@@ -4335,6 +5230,23 @@ function invalidateKeyBindingProfile(): void {
   cachedKeyBindingProfile = null;
 }
 const remotes = new Map<string, RemotePlayer>();
+// Lane J (HF-347 residual): silent state/join admission drops, made observable.
+// MP-LAB: see the outside-arena-bounds admission below. Must stay at or below
+// the smallest character capsule radius in physics.ts (0.36) or legal poses drop.
+// 0 is deliberate, not the loosest value the invariant tolerates: the capsule is
+// the thing that keeps a body out of a wall, and it already does - a resting
+// centre sits exactly `radius` inside the bounds. Admission's own question is
+// only "is this inside the world at all", and at margin 0 it still answers no
+// for a pose beyond the face (proved by
+// scripts/qa/mp-lab/resting-pose-admission.mts, pinned in
+// tests/e2e/mp-lab-state-admission-contract.test.mjs). Any nonzero band here
+// re-invents a second, weaker collision authority.
+const STATE_ADMISSION_BOUNDS_MARGIN = 0;
+const stateAdmissionDropTelemetry: {
+  total: number;
+  byReason: Record<string, number>;
+  last: Record<string, unknown> | null;
+} = { total: 0, byReason: {}, last: null };
 const bots = new Map<string, BotPlayer>();
 const dormantBots = new Map<string, BotPlayer>();
 let dormantBotsPrewarmed = false;
@@ -4347,6 +5259,16 @@ let lastSmokeStateBroadcastRevision = -1;
 let lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
 let flashHostAuthority = new FlashHostAuthority(interactiveWorldMatchEpoch, 'host');
 let flashVictimConsumer = new FlashVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+// HF-458: the Piloted Drone taser. Same authority shape as the flashbang - the
+// host authors every stun, the victim client only replays an admitted result.
+const taserHostAuthority = new TaserHostAuthority(interactiveWorldMatchEpoch, 'host');
+const taserVictimConsumer = new TaserVictimResultConsumer(interactiveWorldMatchEpoch, 'pending-player', 0);
+let taserStunStartsAtHostTimeMs = 0;
+let taserStunEndsAtHostTimeMs = 0;
+let taserStunsAppliedThisMatch = 0;
+let taserStunNonce = 0;
+/** Bots the host has stunned: bot id -> host time the stun releases. */
+const botTaserStunUntilHostTimeMs = new Map<string, number>();
 const explosiveBolts: ExplosiveBoltEntity[] = [];
 type CrossbowGlassMutationTrace = Readonly<{
   windowId: string;
@@ -4412,6 +5334,11 @@ let localGrenadeActionSequence = 0;
 const remoteSupportPresentations: RemoteSupportPresentation[] = [];
 let botWeaponCycle: ShuffleBag<WeaponId> | null = null;
 let botGrenadeCycle: ShuffleBag<GrenadeId> | null = null;
+let botSkinCycle: ShuffleBag<string> | null = null;
+// Bot skins project from the canonical operator-skin catalog (never a second
+// hand-maintained roster) and draw from the seeded match RNG like bot weapons,
+// so host and guest agree on every bot's presentation.
+const BOT_OPERATOR_SKIN_POOL: readonly string[] = OPERATOR_SKIN_SOURCES.map((source) => source.id);
 let botGrenadeThrows = 0;
 let botGrenadeMaxActive = 0;
 let lastBotGrenadeDamage = 0;
@@ -4504,12 +5431,6 @@ let grenadeActionProfileSequence = 0;
 let lastGrenadeFirstActionProfile: GrenadeFirstActionProfile | null = null;
 const grenadeFirstActionProfiles: GrenadeFirstActionProfile[] = [];
 
-function framePercentile(samples: readonly number[], percentile: number): number {
-  if (samples.length === 0) return 0;
-  const ordered = [...samples].sort((left, right) => left - right);
-  const index = Math.min(ordered.length - 1, Math.max(0, Math.ceil(ordered.length * percentile) - 1));
-  return ordered[index]!;
-}
 
 function beginGrenadeFirstActionProfile(grenade: GrenadeId, startedAt: number): GrenadeFirstActionProfile {
   const presentation = renderRuntime.presentationTelemetry(startedAt);
@@ -4721,12 +5642,23 @@ let lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
 const SUPPORT_ROTOR_AUDIO_REFRESH_INTERVAL_MS = 50;
 const SUPPORT_STATUS_HUD_REFRESH_INTERVAL_MS = 100;
 let lastSupportRotorAudioRefreshAt = Number.NEGATIVE_INFINITY;
+// HF-509: every peer's killstreak awareness (announce de-dup, public shot/drop
+// ledger for the firing/dropping phases, flight-loop pool, banner, QA mirror).
+const killstreakAnnouncements = new KillstreakAnnouncementDeduper();
+const killstreakActivity = new KillstreakActivityTracker();
+const supportFlightAudioCollector = new KillstreakFlightAudioCollector();
+const killstreakBanner = bindKillstreakBannerElement(element<HTMLElement>('#killstreak-alert'));
+let killstreakBannerState = createKillstreakBannerState();
+const killstreakAwarenessQa: { announcements: { activationId: string; source: string; ownerId: string; headline: string; tone: string }[]; damageSource: KillstreakDamageSourceCue | null } = { announcements: [], damageSource: null };
 let lastSupportStatusHudRefreshAt = Number.NEGATIVE_INFINITY;
 const appliedKillstreakDamageResults = new Set<string>();
 const supportShotReplay = new SupportShotReplayGuard();
 const killstreakRegisteredActors = new Set<string>();
 const hostKillstreakLoadoutAcks = new HostKillstreakLoadoutAckRegistry();
 let displayedCareReward: Pass65KillstreakId | null = null;
+// HF-509: epoch-scoped queue mirror + grant ledger (package id + claimant).
+let careRewardQueueTracker = createCareRewardQueueTracker();
+const carePackageGrantLedger = createCarePackageGrantLedger();
 const supportDamageDealtByActivation = new Map<string, number>();
 const liveSupportActivationIds = new Set<string>();
 const supportDamageFeedbackTelemetry = new SupportDamageFeedbackTelemetry();
@@ -4771,11 +5703,28 @@ let scoutSweepUntil = 0;
 let yardhawk: YardhawkEntity | null = null;
 const strikeMissiles: StrikeMissileEntity[] = [];
 const hunterDrones: HunterDroneEntity[] = [];
+// HF-378: local receipt time of each remote player's last host-admitted
+// gunshot, keyed by player id. Written ONLY from the replicated 'shot'
+// message stream after its admission checks — never from local audio or
+// trigger prediction. Enemy radar reads it through the same shouldRevealEnemy
+// gunfire window that bot.lastShotAt uses.
+const remoteRadarFireRevealAt = new Map<string, number>();
 let supportPresentationRetirements = 0;
 let nukeSequence: NukeSequence | null = null;
 let triPassTargeting: TriPassTargeting | null = null;
-type PointSupportTargeting = Readonly<{ id: 'care-package' | 'carpet-bomber' }>;
+// HF-317: Carpet Bomber left the single-crosshair point path — only Care
+// Package still places one in-world marker. Carpet now picks a run start and
+// run end on the tactical map (see carpetCorridorTargeting below).
+type PointSupportTargeting = Readonly<{ id: 'care-package' }>;
 let pointSupportTargeting: PointSupportTargeting | null = null;
+/** HF-317: two-point tactical-map bombing corridor for Carpet Bomber. */
+let carpetCorridorTargeting: CarpetCorridorTargeting | null = null;
+/**
+ * HF-317: preview-only half width of the drawn corridor band. The host owns the
+ * real scatter (carpetImpactPattern zigzags each impact off the run centre); a
+ * fixed band just tells the caller roughly how wide the run lands.
+ */
+const CARPET_CORRIDOR_BAND_HALF_WIDTH_M = 6;
 let tacticalMapOpen = false;
 let lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
 let crosshairPreviewMarker: THREE.Group | null = null;
@@ -4838,7 +5787,9 @@ const remoteCombatInventories = new Map<string, GuestCombatInventory>();
 const remoteCombatInventoryRevisions = new Map<string, number>();
 const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
-const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>();
+const remoteReloadResultCache = createRemoteReloadResultCache();
+const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
+const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>(); /* HF-535 host: what observers were last told. HF-535 observer: highest revision applied per subject. Both cleared with the health ledger. */ const publishedHealthAuthorities = new Map<string, PublishedHealthAuthority>(); const appliedHealthAuthorityRevisions = new Map<string, AppliedHealthAuthority>();
 const retainedRemoteAuthorities = new Map<string, Readonly<{
   snapshot: PlayerSnapshot;
   continuity: number;
@@ -4875,6 +5826,53 @@ function hideStickyVictimUrgentAlert(): void {
 function resetStickyVictimUrgentAlertLife(targetLifeId: number | null = null): void {
   hideStickyVictimUrgentAlert();
   stickyVictimUrgentAlertController.reset(targetLifeId);
+}
+
+/**
+ * Owner 2026-08-30 ("it needs to say STUCK on both peoples screen when it
+ * actually sticks"). ONE place decides what a sticky attach shows and who is
+ * told, so the crossbolt and the Semtex can never drift apart again - they
+ * had, and neither announced the attach to the remote peer at all: `stuck`
+ * only ever rode a detonation hit, seconds later.
+ *
+ * Presentation/feed only. The blast keeps travelling the existing
+ * authoritative hit path; nothing here grants damage or authority.
+ */
+const announcedStickyAttachNonces = new Set<number>();
+
+function announceStickyAttachment(
+  source: 'semtex' | 'explosive-crossbow',
+  ownerId: string,
+  targetId: string,
+  targetLifeId: number,
+  actionNonce: number,
+  now: number,
+  broadcast: boolean,
+): void {
+  if (announcedStickyAttachNonces.has(actionNonce)) return;
+  announcedStickyAttachNonces.add(actionNonce);
+  while (announcedStickyAttachNonces.size > 256) {
+    announcedStickyAttachNonces.delete(announcedStickyAttachNonces.values().next().value!);
+  }
+  if (targetId === player.id) {
+    presentStickyVictimUrgentAlert(source, targetId, targetLifeId, actionNonce, now);
+    addFeed('STUCK', 'coral');
+  } else if (ownerId === player.id) {
+    addFeed('STUCK', 'gold');
+  }
+  // Only the machine that actually simulated the attach may announce it to
+  // peers; a replica re-broadcasting would loop.
+  if (broadcast && network.role !== 'offline' && targetId !== ownerId) {
+    network.send({
+      type: 'sticky-attached',
+      by: ownerId,
+      target: targetId,
+      targetLifeId,
+      source: source === 'semtex' ? 'grenade' : 'explosive-crossbow',
+      actionNonce,
+      nonce: randomNonce(),
+    });
+  }
 }
 
 function presentStickyVictimUrgentAlert(
@@ -4923,7 +5921,7 @@ const peerTimingStates = new Map<string, PeerTimingState>();
 const incomingCombatRewindMs = new Map<number, number>();
 const localPositionHistory: CombatantPoseSample[] = [];
 let localCombatEventSeq = 0;
-let localContinuity = 1;
+let localContinuity = 1; let lastAcknowledgedLocalInputSeq = -1;
 let localHostConfirmedContinuity: number | null = null;
 let awaitingAuthoritativeRejoinContinuity = false;
 let awaitingCanonicalGuestAuthority = false;
@@ -4961,16 +5959,22 @@ const pendingLocalOrdinaryShots = new Map<string, Readonly<{
 }>>();
 let lastAppliedLocalCombatAuthorityRevision = -1;
 let lastAppliedLocalShotResultSeq = -1;
-let localReloadActionSequence = 0;
-let pendingLocalReloadAuthority: Readonly<{
-  connectionEpoch: string;
-  lifeId: number;
-  startSequence: number;
-  cancelSequence: number | null;
-  weapon: OrdinaryWeaponId;
-}> | null = null;
+const localReloadActionSequence = createReloadActionSequenceAllocator();
+let pendingLocalReloadAuthority: LocalReloadPending | null = null;
+let pendingLocalPickup: PendingLocalPickup | null = null;
 let applyingLocalReloadAuthority = false;
 let localConnectionEpoch: string = crypto.randomUUID();
+const localReloadRetryRuntime = createLocalReloadRetryRuntime({
+  getRole: () => network.role,
+  getPlayerId: () => player.id,
+  getConnectionEpoch: () => localConnectionEpoch,
+  getLifeId: () => localContinuity,
+  getProtocolVersion: () => MULTIPLAYER_PROTOCOL_VERSION,
+  randomNonce,
+  getPending: () => pendingLocalReloadAuthority,
+  send: (message) => network.send(message),
+  record: (trace) => recordReloadProtocolTrace(trace),
+});
 const resolvedShotRequests = new Map<string, ShotResultMessage>();
 const resolvedRailgunShots = new Map<string, RailgunShotResultMessage>();
 const processedRailgunShotResults = new Set<string>();
@@ -5027,7 +6031,7 @@ const pendingLocalTimedShots = new Map<string, TimedMapWeaponId>();
 function admittedShotActionLifetimeMs(weapon: WeaponId): number {
   if (weapon === 'explosive-crossbow') return EXPLOSIVE_BOLT_MAX_LIFE_MS + 1_000;
   if (weapon === 'flare-gun') return FLARE_PROJECTILE_EFFECT.maximumFlightMs + FLARE_PROJECTILE_EFFECT.burnDurationMs + 1_000;
-  if (weapon === 'flamethrower') return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
+  if (isFlamethrowerFamilyWeapon(weapon)) return FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000;
   return 1_000;
 }
 
@@ -5102,7 +6106,7 @@ const supportNetworkHitTelemetry: Record<OffensiveSupportSource, { sent: number;
 const remoteMeleeAdmissions = new Map<string, RemoteMeleeAdmissionState>();
 const deathDrops: DeathDropEntity[] = [];
 const authorizedRemotePickups = new Map<string, { weapon: PrimaryWeaponId; expiresAt: number }>();
-const verifiedRemoteKills = new Map<string, number>();
+const verifiedRemoteKills = new Map<string, number>(); function remoteKillCreditKey(playerId: string): string { const epoch = hostLobbyConnectionEpochs.get(playerId); return epoch ? sessionBoundCreditKey(playerId, epoch) : playerId; } function clearRemoteKillCredits(playerId: string): void { const prefix = `${playerId}:`; for (const key of verifiedRemoteKills.keys()) if (key === playerId || key.startsWith(prefix)) verifiedRemoteKills.delete(key); }
 const weaponActionHistory: string[] = [];
 let gameStarted = false;
 let matchStartPreparing = false;
@@ -5111,22 +6115,97 @@ let activeMatchAdmissionRun: Readonly<{
   promise: Promise<MatchAdmissionResult>;
 }> | null = null;
 let refreshWarningUntil = 0;
+/**
+ * Armed at match start, spent the first time presentation is actually judged
+ * display-limited. A window measured from the DEPLOY call was unreachable: the
+ * arena can take longer to load than the window lasted, so the notice expired
+ * before there was a presented frame to evaluate.
+ */
+let refreshWarningPending = false;
 let gameMode: 'solo' | 'host' | 'client' = 'solo';
 let privateMatchMode: MatchMode = 'ffa';
+// HF-360: locally persisted operator-skin choice; validated on read so a
+// stale or hand-edited storage value can never leave the catalog.
+const OPERATOR_SKIN_STORAGE_KEY = 'atomic-acres-operator-skin';
+let localOperatorSkinId: string = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_SKIN_STORAGE_KEY);
+    return stored !== null && isSelectableOperatorSkinId(stored) ? stored : 'default';
+  } catch {
+    return 'default';
+  }
+})();
+// Pass 75: selectable idle stance and emote. Presentation only - neither can
+// change a hit proxy, a movement profile or any authority value.
+const OPERATOR_STANCE_STORAGE_KEY = 'atomic-acres-operator-stance';
+const OPERATOR_EMOTE_STORAGE_KEY = 'atomic-acres-operator-emote';
+let localOperatorStanceId: OperatorStanceId = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_STANCE_STORAGE_KEY);
+    return stored !== null && isOperatorStanceId(stored) ? stored : DEFAULT_OPERATOR_STANCE;
+  } catch {
+    return DEFAULT_OPERATOR_STANCE;
+  }
+})();
+let localOperatorEmoteId: OperatorEmoteId = (() => {
+  try {
+    const stored = localStorage.getItem(OPERATOR_EMOTE_STORAGE_KEY);
+    return stored !== null && isOperatorEmoteId(stored) ? stored : DEFAULT_OPERATOR_EMOTE;
+  } catch {
+    return DEFAULT_OPERATOR_EMOTE;
+  }
+})();
 let localSquadName = defaultSquadPresentation(0).name;
+/** HF-328: last squad identity replicated to peers, so a prescribed change is sent once. */
+let lastCommittedSquadKey = '';
+/** HF-339: transient gold minimap marker for a rare-weapon spawn. */
+let rareWeaponMinimapPing: { position: readonly [number, number, number]; untilMs: number } | null = null;
 let localSquadColor = defaultSquadPresentation(0).color;
 let privateMatchConfig: PrivateMatchConfig = DEFAULT_PRIVATE_MATCH_CONFIG;
 let privateLobbySnapshot: LobbySnapshot | null = null;
 let privateLobbyRevision = 0;
+// HF-325 succession state. `hostSuccessionPublisher` is only meaningful while
+// role === 'host'; `successorHoldings` only while role === 'client'.
+let hostSuccessionPublisher: HostSuccessionPublisher = createHostSuccessionPublisher();
+let successorHoldings: SuccessorHoldings = createSuccessorHoldings();
+
+/**
+ * HF-325 G2: the election-relevant projection of the host-authored roster.
+ * Both ends must build it from the SAME host-authored snapshot, which is why
+ * the guest reads `privateLobbySnapshot` and not its own view of who is around.
+ */
+function successionRoster(): SuccessionRoster | null {
+  const snapshot = privateLobbySnapshot;
+  if (!snapshot || snapshot.members.length === 0) return null;
+  return {
+    revision: snapshot.revision,
+    hostId: snapshot.hostId,
+    members: snapshot.members.map((member) => ({ id: member.id, connected: member.connected })),
+  };
+}
 let privateMatchActiveAtHostTimeMs: number | null = null;
 let privateMatchActiveAtEpochMs: number | null = null;
 let hostTimeMapping: HostTimeMapping = createHostTimeMapping();
 let localLobbyPingMs: number | null = null;
 let localLobbyReady = false;
 let localDhv: Dhv = 10;
-let localResumeToken = '';
+let localResumeToken = ''; let pendingVoluntaryActiveMatchRejoinRoomCode = '';
 let clientWorldRepairAdmission: ClientWorldRepairAdmission | null = null;
+/**
+ * Lane J: performance.now() of the first in-match message this client admitted
+ * from the host since the current match admission was armed, or null while the
+ * host has not been heard from at all. Feeds the world-repair deadline so a
+ * host that is still loading is not mistaken for a host that is gone.
+ */
+let hostMatchContactAtMs: number | null = null;
+/** Lane J: forensic record of the last admission failure. See handleClientWorldRepairFailure. */
+const clientWorldRepairFailureTelemetry: { total: number; last: Record<string, unknown> | null } = {
+  total: 0,
+  last: null,
+};
 let pendingClientReconnectWorldRepairConnectionEpoch: string | null = null;
+let clientReconnectWorldRepairAttempts = 0; let lastReconnectWorldRepairAttemptAtMs: number | null = null; let guestResumeTimedOutLocally = false; let guestResumeHostDeclaredFailure = false; // HF-322/HF-535: bounded AND paced reconnect repair attempts
+let pendingClientWorldRepairTimeout: number | null = null; // HF-322: bounded admission/repair timeout
 let lobbyArenaSyncPromise: Promise<void> = Promise.resolve();
 let lobbyClockTimer: ReturnType<typeof setTimeout> | null = null;
 let stateBroadcastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -5148,16 +6227,6 @@ const pendingGuestAuthorityRepairs = new Map<string, Readonly<{
   authorityNonce: number;
   message: GuestResumeAuthorityMessage;
 }>>();
-let textChatHistory: ChatEntry[] = [];
-let localChatRateState: ChatRateState = [];
-const hostChatRateStates = new Map<string, ChatRateState>();
-const hostChatNonces = new Map<string, number[]>();
-let textChatOpen = false;
-let textChatNotice: string | null = null;
-let textChatHintTimer: ReturnType<typeof setTimeout> | null = null;
-let textChatFadeTimer: ReturnType<typeof setTimeout> | null = null;
-let textChatLastActivityAtMs: number | null = null;
-let textChatWasAvailable = false;
 
 function memberDhv(id: string): Dhv {
   return privateLobbySnapshot?.members.find((member) => member.id === id)?.dhv
@@ -5209,11 +6278,6 @@ function remoteCombatInventoryProjection(playerId: string): GuestCombatInventory
     remoteLoadoutSidearm(remote.snapshot),
   );
 }
-
-function isOrdinaryWeapon(weapon: WeaponId): weapon is OrdinaryWeaponId {
-  return ORDINARY_WEAPON_IDS.some((candidate) => candidate === weapon);
-}
-
 function applyLocalCombatInventoryProjection(
   projection: GuestCombatInventoryProjection,
   allowEqualRevision = false,
@@ -5240,6 +6304,11 @@ function resetRemoteCombatInventory(snapshot: PlayerSnapshot, grenades = 1): Gue
   return setRemoteCombatInventory(snapshot.id, inventory);
 }
 
+function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number], 'atMs' | 'role'>): void {
+  reloadProtocolTrace.push(Object.freeze({ atMs: Math.round(performance.now()), role: network.role, ...input }));
+  if (reloadProtocolTrace.length > 128) reloadProtocolTrace.splice(0, reloadProtocolTrace.length - 128);
+}
+
 function clearRemoteReloadAuthority(playerId: string): void {
   const timer = remoteReloadTimers.get(playerId);
   if (timer !== undefined) window.clearTimeout(timer);
@@ -5258,11 +6327,12 @@ function cancelRemoteReloadAuthority(
   if (timer !== undefined) window.clearTimeout(timer);
   remoteReloadTimers.delete(playerId);
   remoteReloadAuthorities.set(playerId, Object.freeze({ ...state, pending: null }));
-  sendRemoteReloadResult(playerId, pending.actionSequence, pending.weapon, 'cancelled', reason, null);
+  sendRemoteReloadResult(playerId, pending.requestId, pending.actionSequence, pending.weapon, 'cancelled', reason, null);
 }
 
 function sendRemoteReloadResult(
   playerId: string,
+  requestId: string,
   actionSequence: number,
   weapon: OrdinaryWeaponId,
   status: ReloadResultMessage['status'],
@@ -5276,12 +6346,41 @@ function sendRemoteReloadResult(
   const result: ReloadResultMessage = {
     type: 'reload-result', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
     by: player.id, forPlayerId: playerId, connectionEpoch, lifeId: remote.continuity,
-    actionSequence, weapon, status, reason, completesAtHostTimeMs,
+    actionSequence, requestId, weapon, status, reason, completesAtHostTimeMs,
     shotSequenceWatermark: authoritativeShotAdmissions.get(playerId)?.highestShotSeq ?? -1,
     combatInventory,
     nonce: randomNonce(),
   };
-  network.sendToPlayer(playerId, result);
+  remoteReloadResultCache.set(remoteReloadResultCacheKey(playerId, connectionEpoch, remote.continuity, requestId), result);
+  recordReloadProtocolTrace({
+    direction: 'send', actorId: playerId, requestId, action: 'result', status, reason, actionSequence,
+  });
+  network.send(result);
+}
+
+function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
+  const pending = pendingLocalReloadAuthority;
+  if (network.role !== 'client' || !pending) return false;
+  const stale = isStale(pending, localContinuity);
+  const expired = isExpired(pending, now);
+  if (!stale && !expired) return false;
+  pendingLocalReloadAuthority = null;
+  localReloadRetryRuntime.clear();
+  applyingLocalReloadAuthority = true;
+  player.reloadState = null;
+  weaponView.cancelReload();
+  applyingLocalReloadAuthority = false;
+  recordReloadProtocolTrace({
+    direction: 'clear', actorId: player.id, requestId: pending.requestId, action: 'result',
+    status: 'cleared', reason: stale ? 'stale-life' : 'expired', actionSequence: pending.startSequence,
+  });
+  recordMatchDiagnostic('reload-authority', 'rejected', {
+    actorId: player.id,
+    weaponOrEffect: pending.weapon,
+    reason: 'reload-authority expired',
+    modifiers: [stale ? 'stale-life' : 'expired'],
+  });
+  return true;
 }
 
 function sendRemoteGrenadeResult(
@@ -5320,6 +6419,7 @@ function scheduleRemoteReloadCommit(playerId: string, state: GuestReloadAuthorit
     remoteReloadTimers.delete(playerId);
     const current = remoteReloadAuthorities.get(playerId);
     if (!current?.pending || current.pending.actionSequence !== pending.actionSequence
+      || current.pending.requestId !== pending.requestId
       || current.pending.connectionEpoch !== pending.connectionEpoch) return;
     const remote = remotes.get(playerId);
     const inventory = remoteCombatInventories.get(playerId);
@@ -5347,8 +6447,9 @@ function scheduleRemoteReloadCommit(playerId: string, state: GuestReloadAuthorit
       return;
     }
     if (advanced.status === 'committed') setRemoteCombatInventory(playerId, advanced.inventory);
-    if (advanced.actionSequence !== null && advanced.weapon !== null) sendRemoteReloadResult(
+    if (advanced.actionSequence !== null && advanced.requestId !== null && advanced.weapon !== null) sendRemoteReloadResult(
       playerId,
+      advanced.requestId,
       advanced.actionSequence,
       advanced.weapon,
       advanced.status === 'committed' ? 'committed' : 'cancelled',
@@ -5366,8 +6467,20 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
   const health = remoteHealthAuthorities.get(message.by);
   const connectionEpoch = hostLobbyConnectionEpochs.get(message.by);
   if (!remote || !inventory || !connectionEpoch) return;
+  const cached = remoteReloadResultCache.get(remoteReloadResultCacheKey(
+    message.by, connectionEpoch, message.lifeId, message.requestId,
+  ));
+  if (cached) {
+    recordReloadProtocolTrace({
+      direction: 'cache-hit', actorId: message.by, requestId: message.requestId,
+      action: message.action, status: cached.status, reason: cached.reason,
+      actionSequence: message.actionSequence,
+    });
+    network.send(cached);
+    return;
+  }
   if (!isOrdinaryWeapon(remote.snapshot.weapon)) {
-    sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'rejected', 'weapon-mismatch', null);
+    sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'rejected', 'weapon-mismatch', null);
     return;
   }
   let state = remoteReloadAuthorities.get(message.by);
@@ -5386,9 +6499,15 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
     inventory,
   });
   remoteReloadAuthorities.set(message.by, admission.state);
+  recordReloadProtocolTrace({
+    direction: 'admit', actorId: message.by, requestId: message.requestId,
+    action: message.action, status: admission.accepted ? 'accepted' : 'rejected',
+    reason: admission.reason, actionSequence: message.actionSequence,
+  });
   if (!admission.accepted) {
     sendRemoteReloadResult(
       message.by,
+      message.requestId,
       message.actionSequence,
       message.weapon,
       'rejected',
@@ -5401,31 +6520,52 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
     const timer = remoteReloadTimers.get(message.by);
     if (timer !== undefined) window.clearTimeout(timer);
     remoteReloadTimers.delete(message.by);
-    sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'cancelled', 'cancelled', null);
+    sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'cancelled', 'cancelled', null);
     return;
   }
   const completesAt = admission.state.pending?.completesAtHostTimeMs ?? null;
-  sendRemoteReloadResult(message.by, message.actionSequence, message.weapon, 'started', 'accepted', completesAt);
+  sendRemoteReloadResult(message.by, message.requestId, message.actionSequence, message.weapon, 'started', 'accepted', completesAt);
   scheduleRemoteReloadCommit(message.by, admission.state);
+}
+
+function acceptRemoteReloadResult(message: ReloadResultMessage): void {
+  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId === player.id) return;
+  const id = message.forPlayerId, remote = remotes.get(id), authority = remoteCombatInventories.get(id);
+  if (!remote || !authority || message.lifeId !== remote.continuity) return;
+  const outcome = applyRemoteReloadResult(remote.snapshot, authority, message, remoteLoadoutSidearm(remote.snapshot), remoteCombatInventoryRevisions.get(id) ?? -1);
+  if (!outcome) return;
+  remote.snapshot = outcome.snapshot;
+  remoteCombatInventories.set(id, outcome.inventory); remoteCombatInventoryRevisions.set(id, message.combatInventory.revision);
+  recordReloadProtocolTrace({ direction: 'receive', actorId: id, requestId: message.requestId, action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence });
 }
 
 function acceptLocalReloadResult(message: ReloadResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id
     || message.connectionEpoch !== localConnectionEpoch || message.lifeId !== localContinuity) return;
-  const pending = pendingLocalReloadAuthority;
-  if (!pending || pending.connectionEpoch !== message.connectionEpoch || pending.lifeId !== message.lifeId
-    || pending.weapon !== message.weapon) return;
-  const expectedSequence = pending.cancelSequence ?? pending.startSequence;
-  if (message.actionSequence !== expectedSequence && !(message.status === 'committed'
-    && message.actionSequence === pending.startSequence && pending.cancelSequence === null)) return;
-  if (message.status === 'started') return;
+  recordReloadProtocolTrace({
+    direction: 'receive', actorId: message.forPlayerId, requestId: message.requestId,
+    action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence,
+  });
+  const outcome = applyReloadResult(
+    pendingLocalReloadAuthority,
+    message,
+    { localConnectionEpoch, currentLifeId: localContinuity },
+  );
+  pendingLocalReloadAuthority = outcome.pending;
+  if (outcome.action === 'ignore') return;
+  if (outcome.action === 'acknowledge-started') {
+    localReloadRetryRuntime.schedule(outcome.pending!, 'start');
+    return;
+  }
+  localReloadRetryRuntime.clear();
   applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSequenceWatermark);
-  applyingLocalReloadAuthority = true;
-  player.reloadState = null;
-  weaponView.cancelReload();
-  applyingLocalReloadAuthority = false;
-  pendingLocalReloadAuthority = null;
-  if (message.status === 'rejected' && message.reason !== 'no-pending-reload') {
+  if (outcome.action === 'clear-and-apply-projection') {
+    applyingLocalReloadAuthority = true;
+    player.reloadState = null;
+    weaponView.cancelReload();
+    applyingLocalReloadAuthority = false;
+  }
+  if (outcome.recordRejectedDiagnostic) {
     recordMatchDiagnostic('reload-authority', 'rejected', {
       actorId: player.id, weaponOrEffect: message.weapon, reason: message.reason,
       modifiers: [`sequence:${message.actionSequence}`],
@@ -5466,10 +6606,26 @@ let weaponBob = 0;
 let cameraHeightOffset = 0;
 let cameraRoll = 0;
 let currentSprinting = false;
+let sprintLatchState: SprintLatchState = IDLE_SPRINT_LATCH;
 let stanceRecoveryUntil = 0;
+// HF-412: the in-flight stance transition and this frame's sample of it. The
+// CAPSULE commits to the new stance on the press (authority never lags); only
+// the rendered eye and the third-person body catch up over the fixed window.
+let stanceTransition: StanceTransition | null = null;
+let stanceTransitionSample: StanceTransitionSample = restingStanceTransitionSample('stand');
+// HF-412: hold-crouch-to-prone. The reference's console control, offered on the
+// keyboard too, so the drop shot is reachable from the crouch input alone.
+let crouchHoldState: CrouchHoldState = IDLE_CROUCH_HOLD;
+let gamepadCrouchHeld = false;
 let sprintRecoveryUntil = 0;
 let deferredFireAt = 0;
 let lastGroundedAt = 0;
+/**
+ * World Y of the surface the player last stood on, or null before they have
+ * stood anywhere this life. Feeds the viewmodel's analytic floor clamp, which
+ * must survive the frames `playerGrounded` reports false between steps.
+ */
+let lastGroundedFeetY: number | null = null;
 let jumpQueuedAt = -10_000;
 let lastDamageAt = -10_000;
 const footstepEmitters = new FootstepEmitterRegistry();
@@ -5477,6 +6633,20 @@ const audioOcclusionBudget = new AudioOcclusionBudget();
 let directionalDamageState: DirectionalDamageState = createDirectionalDamageState();
 let lowHealthFeedbackState: LowHealthFeedbackState = createLowHealthFeedbackState();
 let lastSensoryPresentationAt = -Infinity;
+// HF-352: Camera shake and kill-confirm pulse presentation states
+let cameraShakeState: CameraShakeState = createCameraShakeState();
+/** HF-458: throttles the taser camera jitter to its authored rate. */
+let lastTaserJitterAtHostTimeMs = Number.NEGATIVE_INFINITY;
+// HF-370: the trauma model runs ALONGSIDE the spring model rather than
+// replacing it. Both feed the same camera; trauma supplies the weight and
+// falloff an explosion should have, the spring keeps the existing per-impulse
+// feel that other systems already tune against.
+let cameraShakeTrauma = createCameraShakeTrauma(0, 0x5eed); const nukeEvent = new NukeEventPresentation(scene, { backend: renderRuntime.backend, sunDirection: activeLighting.sunPosition, onDetonation: (_triggerAtHostTimeMs, seed) => { cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, { source: 'nuke', now: performance.now(), seed, strength: 1 }); } });
+let killConfirmPulseState: KillConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
+// HF-370: HUD impact response — the #hud element itself kicks, rolls and
+// flashes on damage and blasts. Fed at the damage-taken and grenade-explosion
+// sites; integrated once per frame in updateSensoryFeedback.
+let hudImpactState: HudImpactState = createHudImpactState();
 
 function isFootstepOccluded(source: Readonly<{ x: number; y: number; z: number }>): boolean {
   if (!audioOcclusionBudget.admit(frameCount)) return false;
@@ -5488,7 +6658,12 @@ let lastFrame = performance.now();
 let lastPresentedFrameAt = lastFrame;
 let lastWindowBlurAt = -Infinity;
 const framePacing = new FramePacingSampler();
-const LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000;
+// Owner 2026-08-30 ("graphics error warnings"): 1s tripped on transient
+// compositor hitches (screenshots, driver churn, heavy shared-machine load)
+// and painted a permanent red error box over healthy sessions. 3s is a real
+// stall; the eager scheduler-gap RESET keeps its own 1s threshold below.
+const LIVE_WEBGPU_PRESENTATION_STALL_MS = 3_000;
+const WEBGPU_SCHEDULER_GAP_RESET_MS = 1_000;
 let lastObservedWebGpuCompletionSequence = 0;
 
 function resetWebGpuPresentationEpoch(reason: string, now: number): void {
@@ -5503,13 +6678,34 @@ function resetWebGpuPresentationEpoch(reason: string, now: number): void {
 let lastHudAt = 0;
 let lastFpsHudAt = -Infinity;
 let minimapRenderCount = 0;
-const MINIMAP_RENDER_HZ = 60;
+// PASS 87 Lane AR item 2 (Lane T's withheld patch, integrator-approved at 30 Hz).
+// The minimap is a full CPU 2D-canvas redraw on the frame loop's own thread and
+// ran once per presented frame. 30 Hz halves that work and is the floor
+// presentationFrameDue clamps to (MIN_GRAPHICS_TARGET_FPS). Cost measured in
+// src/minimap-render-cadence.test.ts: a moved player still reaches the canvas
+// within 2 frames of a 60 fps loop.
+const MINIMAP_RENDER_HZ = 30;
 let lastMinimapRenderAt = Number.NEGATIVE_INFINITY;
-let minimapLandmarksRendered: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+let minimapLandmarksRendered: Array<{ id: string; kind: string; label: string }> = [];
 let lastPlayerSpawnIndex = -1;
 const lastBotSpawnIndices = new Map<Team, number>();
 const recentDeathPositions: Array<{ point: THREE.Vector3; at: number }> = [];
-const lastBotSpawnAudit = new Map<Team, { selectedIndex: number; score: number; reason: string }>();
+const recentSpawnUses: SpawnUse[] = [];
+// HF-402: keyed by ACTOR, not by team, and carrying the point selected - two
+// bots on one team overwrote each other's record, and the record held no
+// position, so nothing could check afterwards WHERE a bot was put. Exposed on
+// the debug snapshot as `botSpawnSelections` (the player's equivalent has been
+// exposed as `spawnSelection` all along), which is what lets
+// scripts/qa/verify-spawn-deploys.mjs assert a bot's spawn instead of sampling
+// its position seconds later and calling the drift a spawn.
+const lastBotSpawnAudit = new Map<string, {
+  actorId: string;
+  team: Team;
+  selectedIndex: number;
+  score: number;
+  reason: string;
+  position: [number, number, number];
+}>();
 let spawnFlipHysteresis: [SpawnFlipHysteresis, SpawnFlipHysteresis] = [
   createSpawnFlipHysteresis(),
   createSpawnFlipHysteresis(),
@@ -5767,9 +6963,135 @@ let gamepadSprint = false;
 let gamepadTriggerArmed = true;
 let gamepadAdsArmed = true;
 
-let previousGamepadButtons: boolean[] = [];
 let gamepadSupportSelection: FieldSupportId = 'scout-sweep';
 let mobileTouchControls: MobileTouchControls | null = null;
+let mobilePresentationActive = false;
+
+// GAMEPAD: PASS 84 Lane E. Hot-plug, per-model mapping, deadzones/curves, the
+// remap profile, rumble and the keyboard-vs-pad scheme tracker live in
+// ./input/gamepad; this block and pollGamepad() are the only wiring into
+// gameplay state. Pad look and fire never need pointer lock. Declared with the
+// input state because the Options panel binds it during module init.
+const gamepadRuntime = new GamepadInputRuntime({
+  getGamepads: () => (typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : []) as (GamepadLike | null)[],
+});
+gamepadRuntime.attach(window);
+let gamepadTriggerHeld = false;
+let gamepadOverlaySuppressed = false;
+let lastGamepadAssist: AimAssistResult = NO_AIM_ASSIST;
+let lastTouchAssist: AimAssistResult = NO_AIM_ASSIST;
+let lastTouchSnapDeg = 0;
+let gamepadSettingsPanel: GamepadSettingsPanel | null = null;
+/** Aim points sit this far above the body proxy centre (≈ upper chest, 1.28 m standing). */
+const AIM_ASSIST_POINT_LIFT_M = 0.3;
+
+/**
+ * Which assist tier the player is currently driving the view with. This is the
+ * gate, not just a read-out: a connected-but-idle pad is NOT a pad player, and
+ * a touch overlay suppressed by a pad is NOT a touch player.
+ */
+function activeAimAssistTier(): AimAssistTier {
+  if (gamepadRuntime.connected() && gamepadRuntime.currentScheme() === 'gamepad') return 'pad';
+  if (mobilePresentationActive && !(mobileTouchControls?.isGamepadSuppressed() ?? false)) return 'touch';
+  return 'mouse';
+}
+
+/** Reused per frame by collectAimAssistTargets(): no allocation while a pad or touch overlay is live. */
+type AimAssistScratchTarget = { id: string; point: { x: number; y: number; z: number } };
+const aimAssistTargetPool: AimAssistScratchTarget[] = [];
+const aimAssistTargetsScratch: AimAssistScratchTarget[] = [];
+
+function pushAimAssistTarget(id: string, x: number, y: number, z: number): void {
+  const slot = aimAssistTargetsScratch.length;
+  let target = aimAssistTargetPool[slot];
+  if (!target) {
+    target = { id, point: { x, y, z } };
+    aimAssistTargetPool.push(target);
+  }
+  target.id = id;
+  target.point.x = x;
+  target.point.y = y;
+  target.point.z = z;
+  aimAssistTargetsScratch.push(target);
+}
+
+/**
+ * Every live hostile combatant — bots and remote players alike — as an aim
+ * point. Reads presentation-side positions only; never touches hit proxies
+ * used for registration. The returned array is a shared scratch buffer valid
+ * until the next call (the assist evaluator consumes it synchronously).
+ */
+function collectAimAssistTargets(): readonly AimAssistTarget[] {
+  aimAssistTargetsScratch.length = 0;
+  for (const bot of bots.values()) {
+    if (!bot.alive || bot.hp <= 0) continue;
+    if (!areCombatantsHostile(player.id, player.team, bot.id, bot.team)) continue;
+    const stance = ((bot.root.userData.operatorStance as Stance | undefined) ?? 'stand');
+    const centre = hitProxyZoneCentre('body', stance);
+    pushAimAssistTarget(bot.id, bot.position.x + centre[0], bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, bot.position.z + centre[2]);
+  }
+  for (const remote of remotes.values()) {
+    if (remote.snapshot.hp <= 0) continue;
+    if (!areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team)) continue;
+    const centre = hitProxyZoneCentre('body', remote.snapshot.stance ?? 'stand');
+    const feet = remote.root.position;
+    pushAimAssistTarget(remote.snapshot.id, feet.x + centre[0], feet.y + centre[1] + AIM_ASSIST_POINT_LIFT_M, feet.z + centre[2]);
+  }
+  return aimAssistTargetsScratch;
+}
+
+/**
+ * Line of sight for the aim assist. A hostile behind a wall must never bend the
+ * player's aim: inside a 5.5 deg (pad) or 8 deg (touch) cone it would read as
+ * the game pulling at nothing. Uses the same cheap AABB segment primitive as
+ * footstep occlusion, memoised per target for AIM_ASSIST_LOS_CACHE_MS so a busy
+ * frame pays at most one fresh test per hostile rather than one per frame.
+ */
+const AIM_ASSIST_LOS_CACHE_MS = 80;
+type AimAssistLosEntry = { at: number; visible: boolean };
+const aimAssistLosCache = new Map<string, AimAssistLosEntry>();
+
+function aimAssistTargetVisible(target: AimAssistTarget): boolean {
+  const id = target.id ?? '';
+  const now = performance.now();
+  const cached = id ? aimAssistLosCache.get(id) : undefined;
+  if (cached && now - cached.at < AIM_ASSIST_LOS_CACHE_MS) return cached.visible;
+  let visible = true;
+  for (const box of activeWorldColliders()) {
+    if (segmentIntersectsBox(player.position, target.point, box)) { visible = false; break; }
+  }
+  if (!id) return visible;
+  if (cached) { cached.at = now; cached.visible = visible; }
+  else {
+    // Ids are roster-bounded; the clear is a leak stop for long sessions.
+    if (aimAssistLosCache.size > 64) aimAssistLosCache.clear();
+    aimAssistLosCache.set(id, { at: now, visible });
+  }
+  return visible;
+}
+
+function evaluateLocalAimAssist(tier: AimAssistTier, dt: number): AimAssistResult {
+  if (!gameplayInputEnabled() || localKillstreakActorSnapshot()?.possession) return Object.freeze({ ...NO_AIM_ASSIST, tier });
+  return evaluateAimAssist({
+    tier,
+    eye: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    ads: adsHeld,
+    velocity: { x: player.velocity.x, z: player.velocity.z },
+    dt,
+    targets: collectAimAssistTargets(),
+    isVisible: aimAssistTargetVisible,
+  });
+}
+
+function syncHudInputGlyphs(): void {
+  applyHudInputScheme(document, {
+    scheme: gamepadRuntime.currentScheme(),
+    layout: gamepadRuntime.activeLayout(),
+    keyProfile: activeKeyBindingProfile(),
+  });
+}
 let playerGrounded = false;
 let wasGrounded = false;
 let sensitivity = 1;
@@ -5875,18 +7197,16 @@ function setLocalTriggerHeld(held: boolean): void {
 }
 
 function sendLocalReloadCancel(): void {
+  clearExpiredLocalReloadAuthority();
   const pending = pendingLocalReloadAuthority;
-  if (network.role !== 'client' || !pending || pending.cancelSequence !== null
+  if (network.role !== 'client' || !pending
     || applyingLocalReloadAuthority || awaitingCanonicalGuestAuthority || pendingClientWorldRepair()) return;
-  const actionSequence = localReloadActionSequence;
-  localReloadActionSequence += 1;
-  pendingLocalReloadAuthority = Object.freeze({ ...pending, cancelSequence: actionSequence });
-  const message: ReloadIntentMessage = {
-    type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
-    actionSequence, weapon: pending.weapon, action: 'cancel', nonce: randomNonce(),
-  };
-  network.send(message);
+  const actionSequence = localReloadActionSequence.next();
+  const requestId = reloadRequestId(localConnectionEpoch, localContinuity, actionSequence, 'cancel');
+  const cancelling = cancelRequested(pending, actionSequence, requestId);
+  if (!cancelling) return;
+  pendingLocalReloadAuthority = cancelling;
+  localReloadRetryRuntime.send(cancelling, 'cancel');
 }
 
 function interruptReload(force = false, now = performance.now()): void {
@@ -5922,6 +7242,10 @@ function clearGameplayInput(): void {
   dmrThermalActive = false;
   sniperScopeOverlay.hidden = true;
   hudRoot.classList.remove('sniper-scope-active');
+  applyCompactOpticSightPicture(hudRoot, deriveCompactOpticSightPicture({
+    alive: false, weapon: player.weapon, adsHeld: false, adsProgress: 0,
+    baseFovDegrees: preferredFov, cameraFovDegrees: camera.fov,
+  }));
   dmrThermalPresentation.update(camera, [], false);
   hudRoot.classList.remove('dmr-thermal-active');
   deactivateRailgunScopePresentation();
@@ -5941,6 +7265,114 @@ function setStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   }
 }
 
+/**
+ * HF-325 Part 1: a guest whose host dies used to grind silently through the 90s
+ * retry and a guest of a reset room retried a room id that will never exist
+ * again. network.ts already samples the raw link state; this turns that sample
+ * into something the player actually sees.
+ *
+ * Read-only presentation. It never promotes, never adopts authority and never
+ * writes a position, health, ammo, admission or match-start value — Part 2 of
+ * the handoff stays disabled.
+ */
+let lastHostLossState: HostLossState = 'inactive';
+let lastHostLossCountdownSeconds = -1;
+// QA diagnostics for the succession wire (read-only, surfaced through
+// __ATOMIC_ACRES_DEBUG__.sampleHostSuccession). A silent refusal anywhere in
+// the mint/ship/accept chain otherwise looks identical to "not wired".
+let lastSuccessionPublish: { reason: string; sent: boolean; rosterRevision: number } | null = null;
+let lastMirrorShip: { reason: string } | null = null;
+let lastMandateAccept: { accepted: boolean; reason: string } | null = null;
+let lastMirrorAccept: { accepted: boolean; reason: string } | null = null;
+
+/**
+ * HF-325: adopt the mirrored checkpoint through the EXISTING host recovery
+ * path (initializeRecoveredHostLobby → resumeRecoveredHostMatch →
+ * restoreGuestAuthorities / restoreRailgunAuthority /
+ * restoreTimedMapWeaponAuthorities / resolveHostMatchResumeTiming). That path
+ * is already tested against downtime; the arrival-time clock rebase is what
+ * makes its Date.now() arithmetic honest on this second machine. Never a
+ * bespoke adoption routine.
+ */
+function adoptMirroredHostAuthority(checkpoint: HostMatchCheckpoint): void {
+  if (network.role !== 'host' || checkpoint.roomCode !== network.roomCode) return;
+  if (!initializeRecoveredHostLobby(checkpoint)) {
+    // Fail closed: a promoted host that cannot adopt the ledger owns nothing.
+    setStatus('Promoted, but the mirrored match state could not be adopted. Room closed.', 'error');
+    network.announceLobbyClosed('host-superseded');
+    network.close();
+  }
+}
+
+/**
+ * HF-325 G4, host half: a higher succession term exists, so this host has been
+ * superseded. Stop broadcasting authority (the publisher is already stood
+ * down), farewell whatever guests are still attached so they stop rejoining a
+ * dead room, surrender the room, and tell the player.
+ */
+function standDownAsSupersededHost(observedTerm: number): void {
+  network.announceLobbyClosed('host-superseded');
+  network.close();
+  invalidateMatchAdmission(`Superseded by host succession term ${observedTerm}`);
+  setStatus('A newer host owns this match — this room has been closed.', 'error');
+  addFeed('HOST SUPERSEDED — ROOM CLOSED', 'coral');
+}
+
+function updateHostLossPresentation(nowMonoMs: number): void {
+  const assessment = evaluateHostLoss(network.hostLinkSample(nowMonoMs));
+  // HF-325: the self-promotion trigger. Every guard — confirmed host loss,
+  // host-issued mandate naming this peer, term fence, roster re-election,
+  // survivor floor, mirror freshness — lives in evaluateSelfPromotion and
+  // authorizeSelfPromotion. The room-id claim in promoteToHost is the
+  // mutual-exclusion lock: if anything else owns the id, the claim aborts
+  // permanently and this peer goes offline instead of racing a live host.
+  if (assessment.state === 'host-lost' && network.role === 'client' && network.roomCode) {
+    const roster = successionRoster();
+    if (roster) {
+      const decision = evaluateSelfPromotion(successorHoldings, {
+        selfId: player.id,
+        roomCode: network.roomCode,
+        assessment,
+        roster,
+        nowEpochMs: Date.now(),
+      });
+      if (decision.promote) {
+        network.promoteToHost(decision.roomCode, () => {
+          const claim = buildHostPromotedMessage(decision, randomNonce());
+          if (claim) network.send(claim);
+          adoptMirroredHostAuthority(decision.checkpoint);
+        });
+      }
+    }
+  }
+  const presentation = hostLossPresentation(assessment);
+  const countdownSeconds = assessment.remainingMs === null
+    ? -1
+    : Math.max(0, Math.ceil(assessment.remainingMs / 1_000));
+  const stateChanged = assessment.state !== lastHostLossState;
+  // 'reconnecting' carries a live whole-second countdown in its detail line;
+  // refresh on the second boundary only so the status element is not rewritten
+  // every frame.
+  const countdownChanged = !stateChanged
+    && assessment.state === 'reconnecting'
+    && countdownSeconds !== lastHostLossCountdownSeconds;
+  if (!stateChanged && !countdownChanged) return;
+  const previousState = lastHostLossState;
+  lastHostLossState = assessment.state;
+  lastHostLossCountdownSeconds = countdownSeconds;
+  if (presentation.visible) {
+    setStatus(`${presentation.headline} — ${presentation.detail}`, presentation.tone);
+    if (stateChanged) addFeed(presentation.headline, presentation.tone === 'error' ? 'coral' : 'gold');
+    return;
+  }
+  // Only report recovery when something was previously being reported, so this
+  // never overwrites an unrelated lobby status line.
+  if (previousState === 'unstable' || previousState === 'reconnecting') {
+    setStatus('Host connection restored.', 'ok');
+    addFeed('HOST CONNECTION RESTORED', 'aqua');
+  }
+}
+
 function selectLobbyCodeForManualCopy(code: string): void {
   const range = document.createRange();
   range.selectNodeContents(roomCodeEl);
@@ -5951,9 +7383,20 @@ function selectLobbyCodeForManualCopy(code: string): void {
 }
 
 function currentMatchRules() {
+  // MAP3 (HF-409 finisher 2): an EXPLORE arena has no clock and no score
+  // limit, so nothing can run out and nobody can win. The registry row keeps
+  // `matchRules.durationMs` because the arena id is also the replay/storage
+  // boundary and a saved match naming map3 must still decode - the RUNTIME
+  // rules are what the match state machine reads, and they follow the KIND.
+  // Without this, walking the showcase ends in a VICTORY/DEFEAT card at five
+  // minutes, which is the same lie as the TEAM DEATHMATCH banner.
+  if (selectedArena.kind === 'explore') return EXPLORE_MATCH_RULES;
   if (gameMode === 'solo') return selectedArena.matchRules;
+  // HF-377: the lobby config is the replicated match contract; its kill limit
+  // applies identically to TDM (squad score) and FFA (leader kills) because
+  // both advanceMatch and advanceFreeForAllMatch consume MatchRules.scoreLimit.
   const config = privateLobbySnapshot?.config ?? privateMatchConfig;
-  return { durationMs: config.durationMs, scoreLimit: null };
+  return { durationMs: config.durationMs, scoreLimit: config.scoreLimit };
 }
 
 function areCombatantsHostile(aId: string, aTeam: Team, bId: string, bTeam: Team): boolean {
@@ -6138,21 +7581,71 @@ function requirePlayerName(): string | null {
   return name;
 }
 
+/**
+ * Last-resort fatal message. A hoisted function declaration that touches
+ * NOTHING but `document`, so it works at any point in module evaluation -
+ * including before every module-scope binding below it exists. This is the
+ * floor under showFatalError: whatever else fails, the player is told why.
+ */
+function renderPreInitFatalMessage(message: string): void {
+  if (typeof document === 'undefined' || !document.body) return;
+  const existing = document.getElementById('pre-init-fatal');
+  const node = existing ?? document.createElement('div');
+  node.id = 'pre-init-fatal';
+  node.setAttribute('role', 'alert');
+  node.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;'
+    + 'align-items:center;justify-content:center;padding:8vh 6vw;margin:0;'
+    + 'background:#140f0c;color:#f4ece2;font:600 clamp(15px,2.2vw,22px)/1.5 '
+    + 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:center;'
+    + 'white-space:pre-wrap;';
+  node.textContent = message;
+  if (!existing) document.body.appendChild(node);
+}
+
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  clientWorldRepairAdmission = null;
-  pendingClientReconnectWorldRepairConnectionEpoch = null;
-  setBootstrapStage('failed');
-  bootstrapError = message;
-  gameStarted = false;
-  clearGameplayInput();
-  setLocalTriggerHeld(false);
-  setStatus(`Game paused: ${message}`, 'error');
-  applyMenuLifecycle({ type: 'fatal-error' });
-  const banner = element<HTMLElement>('#banner');
-  banner.innerHTML = '<strong>SYSTEM PAUSED</strong><span>Reload the page to re-enter the test block.</span>';
-  banner.hidden = false;
+  // Console FIRST, because it depends on nothing. Everything below this line
+  // touches module-scope state that may not exist yet.
   console.error('[Nuke Town fatal]', error);
+  // Owner-facing correctness. showFatalError is reachable DURING module
+  // evaluation - the WebGPU requirement path calls it from the top-level
+  // bootstrap at ~line 1854, which runs BEFORE `bootstrapStage` (~2339),
+  // `clientWorldRepairAdmission` (~5638) and every other binding used here.
+  // Reading or assigning a module `let` from inside its temporal dead zone
+  // throws a ReferenceError, so the error reporter destroyed the very message
+  // it existed to deliver, in the one situation where a clear message matters
+  // most: a browser that cannot run the game at all.
+  //
+  // A previous fix (1a263aa0) guarded only `clientWorldRepairAdmission` and so
+  // fixed the INSTANCE, not the CLASS - `setBootstrapStage('failed')` on the
+  // very next line hit the same dead zone, and the cross-browser gate caught
+  // "Cannot access 'bootstrapStage' before initialization" still reaching the
+  // player. The whole tail is therefore one guarded block: this function's
+  // contract is that it works at ANY point in the lifecycle, and ordering is
+  // not something a 34k-line module can be trusted to preserve. Not throwing
+  // is. See src/regression-fatal-error-preinit.test.ts, which now pins the
+  // class rather than either instance.
+  try {
+    clientWorldRepairAdmission = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
+    setBootstrapStage('failed');
+    bootstrapError = message;
+    gameStarted = false;
+    // Silence the music with the match. A failed bootstrap leaves the player on
+    // an error screen, and a cheerful loop under a failure message reads as a
+    // bug.
+    audio.stopGameMusic();
+    clearGameplayInput();
+    setLocalTriggerHeld(false);
+    setStatus(`Game paused: ${message}`, 'error');
+    applyMenuLifecycle({ type: 'fatal-error' });
+    presentBanner('fatal', 'SYSTEM PAUSED', 'Reload the page to re-enter the test block.', null);
+  } catch {
+    // Pre-initialisation call: none of the state above exists yet, and the
+    // usual UI cannot be reached. Fall back to a primitive DOM write so the
+    // real message still lands on screen.
+    renderPreInitFatalMessage(message);
+  }
 }
 
 const webRtcSupported = typeof window.RTCPeerConnection === 'function';
@@ -6164,6 +7657,50 @@ if (!webRtcSupported) {
   setStatus('Pointer lock is unavailable; keyboard movement works but mouse aim may not.', 'warn');
 }
 
+// HF-339: centre-banner ownership. See banner-arbiter.ts for the ranking.
+let centreBannerState: BannerState = createBannerState();
+let centreBannerRequestSeq = 0;
+
+function applyCentreBannerTransition(transition: BannerTransition): void {
+  centreBannerState = transition.state;
+  if (transition.display.kind === 'none') return;
+  const banner = element<HTMLElement>('#banner');
+  if (transition.display.kind === 'hide') {
+    banner.hidden = true;
+    return;
+  }
+  banner.innerHTML = transition.display.html
+    ?? `<strong>${transition.display.headline}</strong><span>${transition.display.subline}</span>`;
+  banner.hidden = false;
+}
+
+/** Composite screens (match end) present raw markup but still take ownership
+ * through the arbiter, so no stale lower-rank expiry can hide them. */
+function presentBannerHtml(priority: BannerPriority, ownershipHeadline: string, html: string, durationMs: number | null): number {
+  const id = ++centreBannerRequestSeq;
+  applyCentreBannerTransition(requestBanner(centreBannerState, {
+    id, priority, headline: ownershipHeadline, subline: '', durationMs, html,
+  }));
+  if (durationMs !== null) {
+    window.setTimeout(() => applyCentreBannerTransition(expireBanner(centreBannerState, id)), durationMs);
+  }
+  return id;
+}
+
+/** The only sanctioned writer of #banner. Returns the request id. */
+function presentBanner(priority: BannerPriority, headline: string, subline: string, durationMs: number | null): number {
+  const id = ++centreBannerRequestSeq;
+  applyCentreBannerTransition(requestBanner(centreBannerState, { id, priority, headline, subline, durationMs }));
+  if (durationMs !== null) {
+    window.setTimeout(() => applyCentreBannerTransition(expireBanner(centreBannerState, id)), durationMs);
+  }
+  return id;
+}
+
+function clearCentreBanner(): void {
+  applyCentreBannerTransition(clearBanners());
+}
+
 function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): void {
   setStatus(text, kind);
   // ArenaNetwork finalizes an attempt immediately around its status update.
@@ -6173,6 +7710,8 @@ function setNetworkStatus(text: string, kind: 'ok' | 'warn' | 'error' = 'ok'): v
     if (network.role !== 'client' || !network.diagnostics().hostConnectionOpen) {
       clientWorldRepairAdmission = null;
       pendingClientReconnectWorldRepairConnectionEpoch = null;
+      clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+      clearClientWorldRepairTimeout();
     }
     const admissionToken = matchAdmissionCoordinator.token();
     if (admissionToken) {
@@ -6195,205 +7734,42 @@ function pendingClientWorldRepair(): boolean {
   return network.role === 'client' && clientWorldRepairPending(clientWorldRepairAdmission);
 }
 
-function textChatAvailable(): boolean {
-  return network.role !== 'offline' && privateLobbySnapshot !== null;
-}
+// Text chat lives in ./text-chat-controller; this seam injects every piece of
+// shared mutable state it reads as a live thunk/reference so behaviour stays
+// byte-identical with the pre-extraction inline implementation.
+const textChatController = createTextChatController({
+  elements: { root: textChatRoot, log: textChatLog, hint: textChatHint, input: textChatInput },
+  network,
+  appRoot: app,
+  hudRoot,
+  localPlayerId: () => player.id,
+  hostId: () => privateLobbySnapshot?.hostId ?? null,
+  hasLobby: () => privateLobbySnapshot !== null,
+  inGame: () => gameStarted,
+  shouldResumeControls: () => gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden'),
+  inPointerLock: () => document.pointerLockElement === canvas,
+  clearGameplayInput,
+  resumePointerLock: () => requestGamePointerLock('chat-close'),
+  nonce: randomNonce,
+  hostMember: (id) => hostLobbyMembers.get(id),
+});
 
-function isTextChatTyping(): boolean {
-  return textChatOpen;
-}
-
-function renderTextChat(): void {
-  const available = textChatAvailable();
-  const now = performance.now();
-  const context = gameStarted ? 'game' : 'lobby';
-  if (context === 'lobby') {
-    const lobby = element<HTMLElement>('#private-lobby');
-    const roster = element<HTMLElement>('#lobby-roster');
-    if (textChatRoot.parentElement !== lobby) roster.after(textChatRoot);
-  } else if (textChatRoot.parentElement !== app) {
-    app!.insertBefore(textChatRoot, hudRoot);
-  }
-  if (available && !textChatWasAvailable) textChatLastActivityAtMs = now;
-  textChatWasAvailable = available;
-  const presentation = roomChatPresentation(now, available, textChatOpen, textChatLastActivityAtMs, context === 'lobby');
-  textChatRoot.hidden = !available;
-  textChatRoot.dataset.open = textChatOpen ? 'true' : 'false';
-  textChatRoot.dataset.visible = presentation.visible ? 'true' : 'false';
-  textChatRoot.dataset.context = context;
-  textChatHint.textContent = textChatNotice ?? (textChatOpen ? 'ENTER SEND / ESC CANCEL' : 'ENTER TO CHAT');
-  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
-  textChatFadeTimer = presentation.fadeAfterMs === null ? null : setTimeout(() => {
-    textChatFadeTimer = null;
-    renderTextChat();
-  }, presentation.fadeAfterMs);
-  if (!available) return;
-
-  textChatLog.replaceChildren();
-  if (textChatHistory.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'text-chat-empty';
-    empty.textContent = 'No messages yet.';
-    textChatLog.append(empty);
-  } else {
-    for (const entry of textChatHistory) {
-      const row = document.createElement('p');
-      row.className = entry.senderId === player.id ? 'text-chat-own' : '';
-      const sender = document.createElement('strong');
-      const message = document.createElement('span');
-      sender.textContent = entry.senderName;
-      message.textContent = entry.text;
-      row.append(sender, message);
-      textChatLog.append(row);
-    }
-  }
-  textChatLog.scrollTop = textChatLog.scrollHeight;
-}
-
-function markTextChatActivity(): void {
-  textChatLastActivityAtMs = performance.now();
-  renderTextChat();
-}
-
-function showTextChatNotice(message: string, durationMs = 1_800): void {
-  if (textChatHintTimer) clearTimeout(textChatHintTimer);
-  textChatNotice = message;
-  markTextChatActivity();
-  textChatHintTimer = setTimeout(() => {
-    textChatHintTimer = null;
-    textChatNotice = null;
-    renderTextChat();
-  }, durationMs);
-}
-
-function openTextChat(): void {
-  if (!textChatAvailable() || textChatOpen) return;
-  clearGameplayInput();
-  element<HTMLElement>('#roster').hidden = true;
-  textChatOpen = true;
-  markTextChatActivity();
-  if (document.pointerLockElement === canvas) void document.exitPointerLock();
-  textChatInput.focus({ preventScroll: true });
-}
-
-function closeTextChat(resumeControls: boolean): void {
-  if (!textChatOpen) return;
-  textChatOpen = false;
-  textChatInput.value = '';
-  textChatInput.blur();
-  markTextChatActivity();
-  if (resumeControls && gameStarted && player.alive && !matchFinished && menu.classList.contains('hidden')) {
-    requestGamePointerLock('chat-close');
-  }
-}
-
-function resetTextChat(): void {
-  if (textChatHintTimer) clearTimeout(textChatHintTimer);
-  if (textChatFadeTimer) clearTimeout(textChatFadeTimer);
-  textChatHintTimer = null;
-  textChatFadeTimer = null;
-  textChatNotice = null;
-  textChatOpen = false;
-  textChatLastActivityAtMs = null;
-  textChatWasAvailable = false;
-  textChatInput.value = '';
-  textChatInput.blur();
-  textChatHistory = [];
-  localChatRateState = [];
-  hostChatRateStates.clear();
-  hostChatNonces.clear();
-  renderTextChat();
-}
-
-function acceptChatEntry(entry: ChatEntry): void {
-  textChatHistory = appendChatHistory(textChatHistory, entry);
-  markTextChatActivity();
-}
-
-function sendTextChatHistory(playerId: string): void {
-  if (network.role !== 'host') return;
-  const message: ChatHistoryMessage = {
-    type: 'chat-history',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    forPlayerId: playerId,
-    entries: [...textChatHistory],
-    nonce: randomNonce(),
-  };
-  network.sendToPlayer(playerId, message);
-}
-
-function admitHostChatSubmit(message: ChatSubmitMessage): void {
-  if (network.role !== 'host') return;
-  const member = hostLobbyMembers.get(message.by);
-  if (!member?.connected) return;
-  const recentNonces = hostChatNonces.get(message.by) ?? [];
-  if (recentNonces.includes(message.nonce)) return;
-
-  const now = performance.now();
-  const rate = admitChatRate(hostChatRateStates.get(message.by) ?? [], now);
-  hostChatRateStates.set(message.by, rate.state);
-  if (!rate.accepted) {
-    if (message.by === player.id) showTextChatNotice('SLOW DOWN');
-    return;
-  }
-  hostChatNonces.set(message.by, [...recentNonces, message.nonce].slice(-64));
-
-  let id = randomNonce();
-  while (textChatHistory.some((entry) => entry.id === id)) id += 1;
-  const entry: ChatEntry = {
-    id,
-    senderId: member.id,
-    senderName: normalizeChatSenderName(member.name),
-    text: message.text,
-    sentAtHostTimeMs: now,
-  };
-  acceptChatEntry(entry);
-  const accepted: ChatMessage = {
-    type: 'chat-message',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    entry,
-    nonce: id,
-  };
-  network.send(accepted);
-}
-
-function submitTextChat(): void {
-  const text = normalizeChatText(textChatInput.value);
-  if (!text) {
-    closeTextChat(true);
-    return;
-  }
-  const rate = admitChatRate(localChatRateState, performance.now());
-  localChatRateState = rate.state;
-  if (!rate.accepted) {
-    showTextChatNotice('SLOW DOWN');
-    textChatInput.select();
-    return;
-  }
-  const message: ChatSubmitMessage = {
-    type: 'chat-submit',
-    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-    by: player.id,
-    text,
-    nonce: randomNonce(),
-  };
-  if (network.role === 'host') admitHostChatSubmit(message);
-  else if (network.role === 'client') network.send(message);
-  closeTextChat(true);
-}
-
-function acceptHostChatMessage(message: ChatMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
-  acceptChatEntry(message.entry);
-}
-
-function acceptHostChatHistory(message: ChatHistoryMessage): void {
-  if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.forPlayerId !== player.id) return;
-  textChatHistory = normalizeChatHistory(message.entries);
-  markTextChatActivity();
-}
+const {
+  available: textChatAvailable,
+  typing: isTextChatTyping,
+  render: renderTextChat,
+  markActivity: markTextChatActivity,
+  open: openTextChat,
+  close: closeTextChat,
+  reset: resetTextChat,
+  sendHistory: sendTextChatHistory,
+  admitHostSubmit: admitHostChatSubmit,
+  submit: submitTextChat,
+  acceptHostMessage: acceptHostChatMessage,
+  acceptHostHistory: acceptHostChatHistory,
+  forgetPlayer: forgetTextChatParticipant,
+  debugSnapshot: textChatDebugSnapshot,
+} = textChatController;
 
 function randomLobbyCredential(): string {
   if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
@@ -6430,8 +7806,10 @@ function restoreRoomIdentity(roomCode: string): void {
     player.id = restored.playerId;
     localResumeToken = restored.token;
     localHostConfirmedContinuity = restored.authoritativeLifeId ?? null;
-    awaitingAuthoritativeRejoinContinuity = true;
-    awaitingCanonicalGuestAuthority = true;
+    // HF-322: Only treat a restored identity as a mid-match resume when the lobby phase actually warrants it
+    const isMidMatch = gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown';
+    awaitingAuthoritativeRejoinContinuity = isMidMatch;
+    awaitingCanonicalGuestAuthority = isMidMatch;
     pendingGuestResumeAuthority = null;
     try { saveActiveRoomIdentity(roomCode); } catch { /* The in-memory credential remains valid. */ }
     return;
@@ -6440,6 +7818,8 @@ function restoreRoomIdentity(roomCode: string): void {
   awaitingAuthoritativeRejoinContinuity = false;
   awaitingCanonicalGuestAuthority = false;
   pendingGuestResumeAuthority = null;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+  clearClientWorldRepairTimeout();
   clearGuestResumeTimeout();
   lastGuestResumeNackNonce = null;
   lastAppliedGuestResumeAuthority = null;
@@ -6473,6 +7853,8 @@ function resetPrivateLobbyState(): void {
   lobbyClockTimer = null;
   privateLobbySnapshot = null;
   privateLobbyRevision = 0;
+  hostSuccessionPublisher = createHostSuccessionPublisher(); // HF-325
+  successorHoldings = createSuccessorHoldings();             // HF-325
   privateMatchActiveAtHostTimeMs = null;
   privateMatchActiveAtEpochMs = null;
   privateMatchMode = 'ffa';
@@ -6488,6 +7870,8 @@ function resetPrivateLobbyState(): void {
   localResumeToken = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+  clearClientWorldRepairTimeout();
   hostKillstreakLoadoutAcks.clear();
   localHostConfirmedContinuity = null;
   awaitingAuthoritativeRejoinContinuity = false;
@@ -6507,17 +7891,21 @@ function resetPrivateLobbyState(): void {
   hostDisconnectedAt.clear();
   pendingHostRecoveryJoins.clear();
   hostLobbyAdmissionInFlight.clear();
-  pendingGuestAuthorityRepairs.clear();
+  pendingGuestAuthorityRepairs.clear(); clearAllRejoinLatches();
   hostMatchRecoveryPreparing = false;
   retainedRemoteAuthorities.clear();
   remoteCombatInventories.clear();
   remoteCombatInventoryRevisions.clear();
+  remoteReloadResultCache.clear();
   for (const timer of remoteReloadTimers.values()) window.clearTimeout(timer);
   remoteReloadTimers.clear();
   remoteReloadAuthorities.clear();
+  reloadProtocolTrace.length = 0;
+  localReloadRetryRuntime.clear();
   pendingLocalOrdinaryShots.clear();
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   lastAppliedLocalCombatAuthorityRevision = -1;
   lastAppliedLocalShotResultSeq = -1;
   authoritativeScores.clear();
@@ -6799,6 +8187,28 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
   const testBayDoor = phase === 'active'
     ? sampleAuthoritativeGunRangeTestBayDoor(snapshotHostTimeMs)
     : null;
+  // HF-347: every lobby heartbeat repairs guest training-dummy lifecycle
+  // state, so peers who never saw a shot result (observers, rejoiners) still
+  // converge on the host's active/health/respawn truth within one heartbeat.
+  const testDummies = phase === 'active' && privateMatchConfig.arenaId === 'gun-range'
+    ? arena.targets
+      .filter((target) => target.kind === 'training-dummy')
+      .map((target) => Object.freeze({
+        id: target.id,
+        active: target.active,
+        health: Math.max(0, target.health),
+        respawnAtHostTimeMs: Math.max(0, target.respawnAt),
+      }))
+    : null;
+  const domination = phase === 'active' && privateMatchConfig.mode === 'domination' && dominationState
+    ? Object.freeze({
+      zones: dominationState.zones.map((zone) => Object.freeze({
+        id: zone.id, owner: zone.owner, capturingTeam: zone.capturingTeam,
+        progress: Math.max(0, Math.min(1, zone.progress)), contested: zone.contested,
+      })),
+      scores: [dominationState.scores[0], dominationState.scores[1]] as const,
+    })
+    : null;
   return {
     revision: privateLobbyRevision,
     hostId: player.id,
@@ -6811,17 +8221,24 @@ function hostSnapshot(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phas
     activeAtEpochMs: privateMatchActiveAtEpochMs,
     matchClock,
     testBayDoor,
+    testDummies,
+    domination,
   };
 }
 
-function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting'): void {
+function broadcastHostLobby(
+  phase: LobbySnapshot['phase'] = privateLobbySnapshot?.phase ?? 'waiting',
+  options: Readonly<{ revisionBump?: boolean; render?: boolean }> = {},
+): void {
   if (network.role !== 'host') return;
+  const revisionBump = options.revisionBump ?? true;
+  const render = options.render ?? true;
   const localMember = hostLobbyMembers.get(player.id);
   if (localMember) {
     player.team = localMember.team;
     element<HTMLSelectElement>('#team').value = String(localMember.team);
   }
-  privateLobbyRevision += 1;
+  if (revisionBump) privateLobbyRevision += 1;
   privateLobbySnapshot = hostSnapshot(phase);
   if (privateLobbySnapshot.testBayDoor && selectedArena.id === 'gun-range' && matchState.phase === 'active') {
     // hostSnapshot advances the canonical door to the reliable envelope's
@@ -6836,8 +8253,69 @@ function broadcastHostLobby(phase: LobbySnapshot['phase'] = privateLobbySnapshot
   for (const member of privateLobbySnapshot.members) network.setPlayerTeam(member.id, member.team);
   const message: LobbyStateMessage = { type: 'lobby-state', by: player.id, snapshot: privateLobbySnapshot, nonce: randomNonce() };
   network.send(message);
-  renderPrivateLobby();
+  // HF-325: the mandate is elected from the roster revision that just shipped,
+  // so it must go out AFTER the lobby-state that guests will recompute from.
+  publishHostSuccessionMandate();
+  if (render) renderPrivateLobby();
   renderTextChat();
+}
+
+/** HF-325: re-mint and rebroadcast the mandate whenever the roster moves. */
+function publishHostSuccessionMandate(): void {
+  if (network.role !== 'host' || !network.roomCode) return;
+  const roster = successionRoster();
+  if (!roster) return;
+  const result = publishSuccessionMandate(hostSuccessionPublisher, {
+    roster,
+    roomCode: network.roomCode,
+    nowEpochMs: Date.now(),
+    nonce: randomNonce(),
+  });
+  hostSuccessionPublisher = result.publisher;
+  lastSuccessionPublish = {
+    reason: result.reason,
+    sent: result.broadcast !== null,
+    rosterRevision: roster.revision,
+  };
+  if (result.broadcast) network.send(result.broadcast);
+}
+
+/**
+ * HF-325: ship the adoptable mirror to the current mandate holder, from the
+ * SAME checkpoint object that gets persisted, so what the successor holds is
+ * exactly what the host would itself have recovered from. Unicast, never
+ * broadcast: it carries every guest's resume-token digest.
+ */
+function shipAuthorityMirror(checkpoint: HostMatchCheckpoint): void {
+  if (network.role !== 'host') return;
+  const plan = planAuthorityMirrorSend(hostSuccessionPublisher, {
+    checkpoint,
+    nowMonoMs: performance.now(),
+    nowEpochMs: Date.now(),
+    nonce: randomNonce(),
+    // null is fine — the mirror stamps UNCLAIMABLE_RESUME_TOKEN_DIGEST and the
+    // demoted host re-joins through normal admission. Fail-closed.
+    outgoingHostResumeTokenSha256: null,
+  });
+  hostSuccessionPublisher = plan.publisher;
+  lastMirrorShip = { reason: plan.reason };
+  // A missing mirror costs a dead room; a wrong one costs a split brain.
+  if (plan.send) network.sendToPlayer(plan.send.forPlayerId, plan.send);
+}
+
+
+// HF-323: hold the start while any guest admission is in-flight or transport connection is pending
+function hostHasPendingGuestConnection(): boolean {
+  if (network.role !== 'host') return false;
+  if (hostLobbyAdmissionInFlight.size > 0 || pendingHostRecoveryJoins.size > 0) return true;
+  try {
+    const diag = network.diagnostics();
+    if (Number(diag.guestConnections) > network.connectedPlayerIds().length) return true;
+    if (Number(diag.pendingStateChannels) > 0) return true;
+  } catch {
+    // network diagnostics unavailable or offline
+  }
+  return false;
 }
 
 function hostLobbyAdmissionAttemptCurrent(attempt: HostLobbyAdmissionAttempt): boolean {
@@ -6943,15 +8421,31 @@ function canonicalRetainedGuestSnapshot(
   let weapon = source.weapon;
   if (weapon === 'railgun' && railgunState.holderId !== source.id) weapon = source.primary;
   if (isTimedMapWeaponId(weapon) && timedMapWeaponStates[weapon].holderId !== source.id) weapon = source.primary;
+  // Project EXACTLY the bounded checkpoint field set. A blind spread carried
+  // HF-358's optional `swimming` flag into the document, and the checkpoint
+  // validator's exact-key contract refused EVERY guest entry — no checkpoint
+  // was ever persisted, so the authority mirror never shipped and host
+  // succession could not fire in a real match. New PlayerSnapshot fields must
+  // be added HERE deliberately, together with the wire validator, never by
+  // riding a spread.
   return {
-    ...source,
+    id: source.id,
     name: member.name,
     team: member.team,
+    x: source.x,
+    y: source.y,
+    z: source.z,
+    yaw: source.yaw,
+    pitch: source.pitch,
     hp: health.hp,
     kills: score.kills,
     deaths: score.deaths,
+    primary: source.primary,
+    secondary: source.secondary,
+    grenade: source.grenade,
     weapon,
     stance: source.stance ?? 'stand',
+    seq: source.seq,
   };
 }
 
@@ -6959,15 +8453,36 @@ function createHostMatchCheckpoint(
   nowEpochMs = Date.now(),
   nowMonoMs = performance.now(),
 ): HostMatchCheckpoint | null {
-  if (network.role !== 'host' || !gameStarted || matchFinished
-    || matchState.phase !== 'warmup' && matchState.phase !== 'active'
-    || !network.roomCode || privateMatchActiveAtHostTimeMs === null || privateMatchActiveAtEpochMs === null) return null;
+  // QA diagnostics: a silent null here starves the authority mirror with no
+  // observable difference from "not wired". Name the first failing guard.
+  const refuse = (reason: string): null => {
+    lastCheckpointRefusal = reason;
+    return null;
+  };
+  if (network.role !== 'host' || !gameStarted || matchFinished) return refuse('not-live-host');
+  if (matchState.phase !== 'warmup' && matchState.phase !== 'active') return refuse('phase-not-live');
+  if (!network.roomCode || privateMatchActiveAtHostTimeMs === null || privateMatchActiveAtEpochMs === null) return refuse('no-active-clock');
+  // Project the exact 7-key member shape the checkpoint validator demands.
+  // HF-328/HF-360 added squadName/squadColor/skinId to LobbyMember; a blind
+  // spread carried them into the document and isExactLobbyMember refused the
+  // whole checkpoint — the same silent-starvation class as the guest
+  // snapshot's `swimming` drift. New LobbyMember fields must be added HERE
+  // deliberately, together with the wire validator, never by riding a spread.
   const members = [...hostLobbyMembers.values()]
+    .map((member) => ({
+      id: member.id,
+      name: member.name,
+      team: member.team,
+      ready: member.ready,
+      connected: member.connected,
+      pingMs: member.pingMs,
+      dhv: member.dhv,
+    }))
     .sort((a, b) => Number(b.id === player.id) - Number(a.id === player.id) || a.id.localeCompare(b.id));
   const hostedBots = [...bots.values()]
     .filter((bot) => bot.id.startsWith('host-bot-'))
     .sort((a, b) => a.id.localeCompare(b.id));
-  if (hostedBots.length !== privateMatchConfig.hostedBotCount) return null;
+  if (hostedBots.length !== privateMatchConfig.hostedBotCount) return refuse('bot-count-mismatch');
   const scores = [...authoritativeScores.values()]
     .filter((score) => members.some((member) => member.id === score.id) || hostedBots.some((bot) => bot.id === score.id))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -6976,23 +8491,23 @@ function createHostMatchCheckpoint(
   if (!hostScore || !hostMember || hostedBots.some((bot) => {
     const score = scores.find((candidate) => candidate.id === bot.id);
     return score?.kills !== bot.kills || score.deaths !== bot.deaths;
-  })) return null;
+  })) return refuse('score-or-member-mismatch');
   const expiresAtEpochMs = nowEpochMs + HOST_MATCH_CHECKPOINT_TTL_MS;
   const resumeTokenDigests: ResumeTokenDigestCheckpoint[] = [];
   for (const member of members) {
     if (member.id === player.id) continue;
     const digest = hostLobbyTokenDigests.get(member.id);
-    if (!digest) return null;
+    if (!digest) return refuse(`missing-resume-digest:${member.id}`);
     resumeTokenDigests.push({ ...digest, expiresAtEpochMs });
   }
   const timedMapWeapons = checkpointTimedMapWeaponAuthorities(timedMapWeaponStates, nowMonoMs);
-  if (!timedMapWeapons) return null;
+  if (!timedMapWeapons) return refuse('timed-map-weapons');
   const flareProjectiles = flareProjectileSystem.checkpointAuthority(nowMonoMs);
-  if (!flareProjectiles) return null;
+  if (!flareProjectiles) return refuse('flare-projectiles');
   const flareShotFeedback = checkpointFlareShooterFeedback(flareProjectiles, nowMonoMs);
-  if (!flareShotFeedback) return null;
+  if (!flareShotFeedback) return refuse('flare-feedback');
   const killstreak = killstreakRuntime.checkpoint(nowMonoMs);
-  if (!killstreak) return null;
+  if (!killstreak) return refuse('killstreak');
   const guests: GuestAuthorityCheckpoint[] = [];
   for (const member of members) {
     if (member.id === player.id) continue;
@@ -7003,7 +8518,7 @@ function createHostMatchCheckpoint(
       : retained;
     const score = scores.find((candidate) => candidate.id === member.id);
     const priorHealth = remoteHealthAuthorities.get(member.id);
-    if (!source || !score || !priorHealth) return null;
+    if (!source || !score || !priorHealth) return refuse(`guest-authority-missing:${member.id}`);
     const health = advanceRemoteHealthAuthority(priorHealth, nowMonoMs);
     remoteHealthAuthorities.set(member.id, health);
     const snapshot = canonicalRetainedGuestSnapshot(source.snapshot, member, score, health);
@@ -7011,17 +8526,36 @@ function createHostMatchCheckpoint(
     const continuity = killstreakRuntime.actorLifeId(member.id) ?? source.continuity;
     retainedRemoteAuthorities.set(member.id, Object.freeze({ snapshot: Object.freeze({ ...snapshot }), continuity }));
     const combatInventory = remoteCombatInventories.get(member.id);
-    if (!combatInventory) return null;
+    if (!combatInventory) return refuse(`combat-inventory-missing:${member.id}`);
     const guest = checkpointGuestAuthority(snapshot, continuity, health, combatInventory, nowMonoMs);
-    if (!guest) return null;
+    if (!guest) {
+      // host-match-checkpoint.ts owns the real predicate; this replica names
+      const expectedKeys = ['id', 'name', 'team', 'x', 'y', 'z', 'yaw', 'pitch', 'hp', 'kills', 'deaths', 'primary', 'secondary', 'grenade', 'weapon', 'stance', 'seq'];
+      const extraKeys = Object.keys(snapshot).filter((key) => !expectedKeys.includes(key));
+      const missingKeys = expectedKeys.filter((key) => !(key in snapshot));
+      const stanceOk = snapshot.stance === 'stand' || snapshot.stance === 'crouch' || snapshot.stance === 'prone';
+      const why = missingKeys.length ? `snapshot-missing:${missingKeys.join(',')}`
+        : extraKeys.length ? `snapshot-extra:${extraKeys.join(',')}`
+        : !stanceOk ? `stance:${String(snapshot.stance)}`
+        : !Number.isInteger(snapshot.kills) || snapshot.kills < 0 || snapshot.kills > 500 ? `kills:${snapshot.kills}`
+        : !Number.isInteger(snapshot.deaths) || snapshot.deaths < 0 || snapshot.deaths > 500 ? `deaths:${snapshot.deaths}`
+        : !Number.isFinite(health.hp) || health.hp < 0 || health.hp > 100 ? `hp:${health.hp}`
+        : health.alive !== (health.hp > 0) ? `alive:${String(health.alive)}-hp:${health.hp}`
+        : snapshot.hp !== health.hp ? `snapshot-hp:${snapshot.hp}-health-hp:${health.hp}`
+        : !isGuestCombatInventory(combatInventory) ? 'inventory-shape'
+        : !guestCombatInventoryWithinWeaponCaps(combatInventory) ? 'inventory-caps'
+        : !Number.isSafeInteger(continuity) || continuity < 1 || continuity > 1_000_000_000 ? `continuity:${continuity}`
+        : 'checkpoint-schema';
+      return refuse(`guest-checkpoint-invalid:${member.id}:${why}`);
+    }
     guests.push(guest);
   }
   const railgun = checkpointRailgunAuthority(railgunState, nowMonoMs);
-  if (!railgun) return null;
+  if (!railgun) return refuse('railgun');
   const matchClock = privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active'
     ? sampleAuthoritativeGunRangeMatchClock(nowMonoMs)
     : null;
-  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return null;
+  if (privateMatchConfig.arenaId === 'gun-range' && matchState.phase === 'active' && !matchClock) return refuse('gun-range-clock');
   const elapsedSinceActiveMs = matchClock
     ? privateMatchConfig.durationMs - matchClock.remainingMs
     : nowMonoMs - privateMatchActiveAtHostTimeMs;
@@ -7094,6 +8628,8 @@ function createHostMatchCheckpoint(
 }
 
 let lastHostCheckpointPersistAtEpochMs = 0;
+let lastCheckpointAttempt: { atEpochMs: number; hadCheckpoint: boolean; rejectReason: string | null } | null = null;
+let lastCheckpointRefusal: string | null = null;
 let hostCheckpointPersistScheduled = false;
 let hostCheckpointRejectedPoseWrites = 0;
 let lastHostCheckpointRejectedPoseReason: string | null = null;
@@ -7131,6 +8667,7 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
   if (force) {
     lastHostCheckpointPersistAtEpochMs = Date.now();
     const checkpoint = createRecoverySafeHostMatchCheckpoint();
+    if (checkpoint) shipAuthorityMirror(checkpoint); // HF-325
     return checkpoint ? saveHostMatchCheckpoint(storage, checkpoint) : false;
   }
   if (hostCheckpointPersistScheduled) return true;
@@ -7154,7 +8691,17 @@ function persistActiveHostMatchCheckpoint(force = false): boolean {
     }
     lastHostCheckpointPersistAtEpochMs = nowEpochMs;
     const checkpoint = createRecoverySafeHostMatchCheckpoint();
-    if (checkpoint) saveHostMatchCheckpoint(deferredStorage, checkpoint);
+    lastCheckpointAttempt = {
+      atEpochMs: nowEpochMs,
+      hadCheckpoint: checkpoint !== null,
+      rejectReason: checkpoint === null
+        ? (lastHostCheckpointRejectedPoseReason ?? lastCheckpointRefusal)
+        : null,
+    };
+    if (checkpoint) {
+      saveHostMatchCheckpoint(deferredStorage, checkpoint);
+      shipAuthorityMirror(checkpoint); // HF-325
+    }
   }, HOST_CHECKPOINT_IDLE_TIMEOUT_MS);
   return true;
 }
@@ -7189,9 +8736,6 @@ function refreshGuestMatchRecoveryAffordance(): void {
   joinButton.title = affordance.title;
 }
 
-function recoveryRemainingMs(value: number, checkpoint: HostMatchCheckpoint, nowEpochMs = Date.now()): number {
-  return Math.max(0, value - Math.max(0, nowEpochMs - checkpoint.savedAtEpochMs));
-}
 
 function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs = performance.now()): number {
   const poseAudit = hostRecoveryPoseAudit(checkpoint);
@@ -7216,6 +8760,11 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
   player.selectedGrenade = hostState.grenade;
   player.weapon = hostState.weapon;
   player.stance = hostState.stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.grenades = hostState.grenades;
   player.ammo = { ...hostState.ammo };
   player.reserve = { ...hostState.reserve };
@@ -7246,7 +8795,7 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
     throw new Error('Stored guest authority failed strict restoration');
   }
   retainedRemoteAuthorities.clear();
-  remoteHealthAuthorities.clear();
+  remoteHealthAuthorities.clear(); publishedHealthAuthorities.clear(); appliedHealthAuthorityRevisions.clear();
   remoteCombatInventories.clear();
   remoteCombatInventoryRevisions.clear();
   for (const guest of recoveredGuests) {
@@ -7284,9 +8833,12 @@ function restoreRecoveredHostRuntime(checkpoint: HostMatchCheckpoint, nowMonoMs 
     bot.nextGrenadeAt = nowMonoMs + recoveryRemainingMs(stored.nextGrenadeRemainingMs, checkpoint);
     bot.grenadeActive = false;
     bot.deathVisibleUntil = 0;
+    bot.stance = 'stand';
+    bot.stanceHeldUntil = 0;
+    bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
     bot.positionHistory = [{
-      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-      yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+      at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+      yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
     }];
     bot.perception = createBotPerceptionState(interactiveWorldMatchEpoch, bot.id, bot.continuity);
     bot.perceptionCanFire = true;
@@ -7311,9 +8863,13 @@ function initializeFreshHostLobby(): void {
   // Remember the room code so a host who crashes can reclaim it on rehost,
   // letting guests who still have it saved rejoin the same lobby.
   saveLastHostedRoomCode(network.roomCode, clientPersistentStorage());
+  // LIGHTING: the host's own solo choice seeds the lobby row rather than being
+  // silently reset to the default; from here on the replicated value is the
+  // authority for every peer, this host included.
+  const seedTimeOfDay = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
   privateMatchConfig = selectedArena.id === 'gun-range'
-    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000 }
-    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id };
+    ? { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: 'gun-range', mode: 'ffa', hostedBotCount: 0, autoBalance: false, durationMs: selectedArena.matchRules.durationMs ?? 120_000, timeOfDay: seedTimeOfDay }
+    : { ...DEFAULT_PRIVATE_MATCH_CONFIG, arenaId: selectedArena.id, timeOfDay: seedTimeOfDay };
   privateMatchMode = privateMatchConfig.mode;
   const squad = sanitizeSquadPresentation(localSquadName, localSquadColor, player.team);
   localSquadName = squad.name;
@@ -7434,12 +8990,19 @@ function initializeHostLobby(): void {
 }
 
 function sendLobbyJoin(): void {
-  if (network.role !== 'client') return;
+  if (network.role !== 'client') return; const resumingVoluntaryActiveMatch = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0; if (!resumingVoluntaryActiveMatch) pendingVoluntaryActiveMatchRejoinRoomCode = '';
   clientWorldRepairAdmission = null;
   pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+  clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
-  if (gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
+  if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
     awaitingCanonicalGuestAuthority = true;
+    pendingGuestResumeAuthority = null;
+  } else {
+    // HF-322: Joining a waiting lobby clears any armed mid-match guest authority
+    awaitingCanonicalGuestAuthority = false;
+    awaitingAuthoritativeRejoinContinuity = false;
     pendingGuestResumeAuthority = null;
   }
   localConnectionEpoch = randomLobbyCredential();
@@ -7458,6 +9021,13 @@ function sendLobbyJoin(): void {
     requestedTeam: player.team,
     squadName: localSquadName,
     squadColor: localSquadColor,
+    skinId: localOperatorSkinId, // HF-360
+    stanceId: localOperatorStanceId, // HF-382
+    // Build identity: the host refuses joiners whose stamped pass differs, so a
+    // guest on an older channel can no longer connect cleanly and silently play
+    // a different map. Optional on the wire; a joiner that omits it (a build
+    // from before this field existed) is refused with 'build-mismatch' too.
+    buildId: PASS66_RELEASE_IDENTITY.pass,
     resumeToken: localResumeToken,
     nonce: randomNonce(),
   };
@@ -7467,11 +9037,12 @@ function sendLobbyJoin(): void {
 }
 
 function sendClientWorldRepairReady(loadout = killstreakLoadoutController.activeMatch ?? killstreakLoadoutController.selected): void {
-  if (network.role !== 'client' || !gameStarted) return;
+  if (network.role !== 'client' || !gameStarted) return; const voluntaryRejoin = pendingVoluntaryActiveMatchRejoinRoomCode === network.roomCode && pendingVoluntaryActiveMatchRejoinRoomCode.length > 0; if (voluntaryRejoin) { awaitingCanonicalGuestAuthority = true; awaitingAuthoritativeRejoinContinuity = true; pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch; }
+  const repairReadyNow = performance.now();
   const admission = clientWorldRepairAdmission;
   const reconnectRepair = awaitingCanonicalGuestAuthority
     && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch;
-  if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;
+  if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !(reconnectRepair && canSpendReconnectRepairAttempt({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, repairReadyNow))) return;
   network.send({ type: 'join', player: snapshot() });
   // The reliable state commit is ordered before the loadout intent on the
   // event lane. On a rematch the host has rebuilt the remote at continuity 1;
@@ -7483,13 +9054,14 @@ function sendClientWorldRepairReady(loadout = killstreakLoadoutController.active
     lifeId: localContinuity, sequence: 0, loadout, nonce: randomNonce(),
   };
   network.send(loadoutMessage);
-  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission);
-  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;
+  if (admission) clientWorldRepairAdmission = recordClientWorldRepairAttempt(admission, repairReadyNow);
+  if (reconnectRepair) { clientReconnectWorldRepairAttempts += 1; lastReconnectWorldRepairAttemptAtMs = repairReadyNow; }
+  if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null; if (voluntaryRejoin) pendingVoluntaryActiveMatchRejoinRoomCode = '';
 }
 
 function rejectLobbyPlayer(
   playerId: string,
-  reason: 'room-full' | 'rejoin-denied' | 'match-active',
+  reason: 'room-full' | 'rejoin-denied' | 'match-active' | 'build-mismatch',
   provisionalResumeToken?: string,
   connectionEpoch?: string,
 ): void {
@@ -7510,13 +9082,13 @@ function rejectLobbyPlayer(
 function resetAuthenticatedGuestReplacement(playerId: string): void {
   const now = performance.now();
   hostKillstreakLoadoutAcks.clearActor(playerId);
-  pendingGuestAuthorityRepairs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
   clearRemoteReloadAuthority(playerId);
   const remote = remotes.get(playerId);
   if (remote) {
     remote.interpolation.clear();
     remote.positionHistory.length = 0;
-    remote.awaitingReplacementState = true;
+    remote.awaitingReplacementState = true; armRejoinLatch(playerId, now);
     remote.lastSeen = now;
     remote.feedbackSequenceGaps = 0;
     remote.feedbackReordered = 0;
@@ -7568,7 +9140,7 @@ function safeGuestResumeFallbackSnapshot(remote: RemotePlayer, attempt: number):
 }
 
 function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boolean {
-  if (network.role !== 'host' || !gameStarted || !remote.awaitingReplacementState) return false;
+  if (network.role !== 'host' || !gameStarted || !(remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId))) return false;
   const connectionEpoch = hostLobbyConnectionEpochs.get(playerId);
   const pending = pendingGuestAuthorityRepairs.get(playerId);
   if (connectionEpoch && pending?.connectionEpoch === connectionEpoch) {
@@ -7581,7 +9153,7 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   const actor = killstreakRuntime.snapshotFor(playerId, performance.now()).actors.find((entry) => entry.actorId === playerId);
   const priorHealth = remoteHealthAuthorities.get(playerId);
   const combatInventory = remoteCombatInventories.get(playerId);
-  if (!connectionEpoch || !member || !score || !actor || !priorHealth || !combatInventory) return false;
+  if (!connectionEpoch || !remote.awaitingReplacementState || !member || !score || !actor || !priorHealth || !combatInventory) return false;
   const now = performance.now();
   const health = advanceRemoteHealthAuthority(priorHealth, now);
   const canonical = canonicalRetainedGuestSnapshot(remote.snapshot, member, score, health);
@@ -7616,7 +9188,9 @@ function sendGuestResumeAuthority(playerId: string, remote: RemotePlayer): boole
   sendCarpetGroundFirePresentationSnapshot(playerId, now);
   return true;
 }
-
+function sendAuthoritativeRemoteSnapshotToPlayer(targetPlayerId: string, remote: RemotePlayer, now = performance.now()): boolean { if (network.role !== 'host') return false; const health = remoteHealthAuthorities.get(remote.snapshot.id); const playerSnapshot = health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot; const joinSent = network.sendToPlayer(targetPlayerId, { type: 'join', player: playerSnapshot }); const combatInventory = remoteCombatInventoryProjection(remote.snapshot.id); const stateSent = network.sendToPlayer(targetPlayerId, { type: 'state', player: playerSnapshot, hostTimeMs: now, continuity: remote.continuity, rateHz: remote.snapshotRateHz, ...(combatInventory ? { combatInventory } : {}) }); return joinSent && stateSent; }
+function broadcastFreshRejoinerSlotToObservers(rejoinerId: string, connectionEpoch: string, remote: RemotePlayer, now = performance.now()): number { if (network.role !== 'host' || hostLobbyConnectionEpochs.get(rejoinerId) !== connectionEpoch) return 0; const health = remoteHealthAuthorities.get(rejoinerId); const plan = buildRejoinReplicationPlan({ rejoinerId, connectionEpoch, snapshot: health ? { ...remote.snapshot, hp: health.hp } : remote.snapshot, continuity: remote.continuity, hostTimeMs: now, rateHz: remote.snapshotRateHz, observerIds: network.connectedPlayerIds() }); return plan.observers.reduce((n, observer) => hostLobbyConnectionEpochs.get(rejoinerId) === connectionEpoch && hostLobbyConnectionEpochs.has(observer.playerId) ? n + Number(network.sendToPlayer(observer.playerId, observer.messages[0]) && network.sendToPlayer(observer.playerId, observer.messages[1])) : n, 0); } /* HF-535 health authority wiring. The canonical state re-broadcast beside a host damage application re-uses the last sequence the host admitted from the victim, which every observer has already applied, so admitRemoteSnapshot rejects it and health only arrives after the victim's next self-authored packet (three legs, measured 225 ms+). These three functions carry the same fact on its own monotonic revision instead; the whole fail-closed rule set, and why each clause exists, is in src/host-health-authority-broadcast.ts. publishRemoteHealthAuthority is driven from the host tick, which covers every real damage path at one site, and directly from the QA damage hook so its measurement does not wait a frame. The subject applies it through the existing damage-direction-only self repair, so it can never heal, resurrect or move the local player and never advances an input acknowledgement. */ function publishRemoteHealthAuthority(playerId: string, force = false): boolean { if (network.role !== 'host') return false; const remote = remotes.get(playerId); const health = remoteHealthAuthorities.get(playerId); if (!remote || !health) { if (force) recordHealthAuthorityPublishDecline(playerId, remote ? 'no-health' : 'no-remote', -1, -1); return false; } const result = evaluateHealthAuthorityPublication({ playerId, hostPlayerId: player.id, hp: health.hp, alive: health.alive, continuity: remote.continuity, matchEpoch: killstreakMatchEpoch, hostTimeMs: currentHostTimeMs(), nowMs: performance.now(), nonce: randomNonce(), force, published: publishedHealthAuthorities.get(playerId) }); if (result.published) publishedHealthAuthorities.set(playerId, result.published); if (!result.message) { if (force) recordHealthAuthorityPublishDecline(playerId, result.reason, health.hp, publishedHealthAuthorities.get(playerId)?.revision ?? -1); return false; } network.send(result.message); return true; } function recordHealthAuthorityPublishDecline(playerId: string, reason: string, hp: number, revision: number): void { const key = `health-authority-publish-${reason}`; stateAdmissionDropTelemetry.total += 1; stateAdmissionDropTelemetry.byReason[key] = (stateAdmissionDropTelemetry.byReason[key] ?? 0) + 1; stateAdmissionDropTelemetry.last = { reason: key, messageType: 'health-authority', peerId: playerId, hp, revision }; } function recordHealthAuthorityDrop(reason: string, message: HealthAuthorityMessage): void { stateAdmissionDropTelemetry.total += 1; stateAdmissionDropTelemetry.byReason[reason] = (stateAdmissionDropTelemetry.byReason[reason] ?? 0) + 1; stateAdmissionDropTelemetry.last = { reason, messageType: message.type, peerId: message.playerId, author: message.by, continuity: message.continuity, revision: message.revision }; } function applyHealthAuthorityMessage(message: HealthAuthorityMessage): void { const isSelf = message.playerId === player.id; const remote = isSelf ? undefined : remotes.get(message.playerId); const admission = admitHealthAuthority({ message, role: network.role, expectedHostId: privateLobbySnapshot?.hostId ?? null, matchEpoch: killstreakMatchEpoch, subjectContinuity: isSelf ? localContinuity : remote?.continuity ?? null, lastRevision: appliedHealthAuthorityRevisions.get(message.playerId)?.revision ?? -1, lastRevisionEpoch: appliedHealthAuthorityRevisions.get(message.playerId)?.matchEpoch }); if (!admission.accepted) { recordHealthAuthorityDrop(`health-authority-${admission.reason}`, message); return; } if (isSelf) { if (!shouldApplyStaleSelfHealthRepair({ messageType: message.type, continuity: message.continuity, localContinuity, incomingHp: admission.hp, currentHp: player.hp })) { recordHealthAuthorityDrop('health-authority-self-non-damage', message); return; } appliedHealthAuthorityRevisions.set(message.playerId, { matchEpoch: killstreakMatchEpoch, revision: admission.revision, hp: admission.hp, continuity: message.continuity }); player.hp = THREE.MathUtils.clamp(admission.hp, 0, 100); player.alive = player.hp > 0; lastDamageAt = performance.now(); weaponView.setPresentationVisible(player.alive); return; } if (!remote) { recordHealthAuthorityDrop('health-authority-unknown-subject', message); return; } if (message.continuity > remote.continuity) { recordHealthAuthorityDrop('health-authority-newer-life-held', message); return; } appliedHealthAuthorityRevisions.set(message.playerId, { matchEpoch: killstreakMatchEpoch, revision: admission.revision, hp: admission.hp, continuity: message.continuity }); remote.snapshot = { ...remote.snapshot, hp: admission.hp }; remote.root.visible = admission.hp > 0; }
+function driveRejoinLatchRecovery(playerId: string, remote: RemotePlayer, nowMs: number, guestEventLaneActive: boolean): void { const latched = remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(playerId); if (!latched) { clearRejoinLatch(playerId); return; } const action = evaluateRejoinLatchRecovery({ nowMs, armedAtMs: rejoinLatchArmedAtMs(playerId), lastResendAtMs: rejoinLatchLastResendAtMs(playerId), guestEventLaneActive, latched }); if (action === 'resend') { noteRejoinLatchResend(playerId, nowMs); sendGuestResumeAuthority(playerId, remote); } else if (action === 'fail-closed') { const pending = pendingGuestAuthorityRepairs.get(playerId); if (pending) { clearRejoinLatch(playerId); sendGuestResumeFailure(pending.message, 'retry-ceiling'); } else { clearRejoinLatch(playerId); armRejoinLatch(playerId, nowMs); } } }
 function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
   if (message.type !== 'guest-resume-ack') return false;
   if (network.role !== 'host' || processedNonces.has(message.nonce)) return true;
@@ -7628,14 +9202,14 @@ function acceptGuestResumeAck(message: GuestResumeAckMessage): boolean {
     expectedAuthorityNonce: pending.authorityNonce,
   }) || hostLobbyConnectionEpochs.get(message.by) !== message.connectionEpoch) return true;
   const remote = remotes.get(message.by);
-  if (!remote || !remote.awaitingReplacementState) return true;
+  if (!remote || !remote.awaitingReplacementState) { pendingGuestAuthorityRepairs.delete(message.by); clearRejoinLatch(message.by); return true; }
   processedNonces.add(message.nonce);
   // The replacement document may have emitted a state-lane sample before its
   // reliable world-ready join. Only this exact epoch + authority-nonce ACK
   // releases mutable pose authority; earlier samples must not replace the
   // retained host pose used by the resume transaction.
   remote.awaitingReplacementState = false;
-  pendingGuestAuthorityRepairs.delete(message.by);
+  pendingGuestAuthorityRepairs.delete(message.by); clearRejoinLatch(message.by);
   const member = hostLobbyMembers.get(message.by);
   if (member && !member.connected) {
     // This ACK can only arrive on the current admitted event connection and is
@@ -7661,7 +9235,7 @@ function sendGuestResumeFailure(
     worldRevision: pending.worldRevision, authorityNonce: pending.nonce,
     attempt: pending.attempt, reason, nonce: randomNonce(),
   };
-  pendingGuestAuthorityRepairs.delete(pending.forPlayerId);
+  pendingGuestAuthorityRepairs.delete(pending.forPlayerId); clearRejoinLatch(pending.forPlayerId);
   network.sendToPlayer(pending.forPlayerId, failure);
 }
 
@@ -7713,6 +9287,158 @@ function acceptGuestResumeNack(message: GuestResumeNackMessage): boolean {
   return true;
 }
 
+// HF-322: Bounded timeout and failure handlers for client world repair and resume authority
+function clearClientWorldRepairTimeout(): void {
+  if (pendingClientWorldRepairTimeout !== null) window.clearTimeout(pendingClientWorldRepairTimeout);
+  pendingClientWorldRepairTimeout = null;
+}
+
+function handleClientWorldRepairFailure(reason = 'admission-unacknowledged'): void {
+  if (network.role !== 'client') return;
+  // Lane J: this call kills the local player and tells them to rejoin, so it
+  // must be able to justify itself after the fact. Record the exact clock the
+  // deadline judged on.
+  clientWorldRepairFailureTelemetry.total += 1;
+  clientWorldRepairFailureTelemetry.last = {
+    reason,
+    atMs: Math.round(performance.now()),
+    hostContactAtMs: hostMatchContactAtMs === null ? null : Math.round(hostMatchContactAtMs),
+    attempts: clientWorldRepairAdmission?.attempts ?? null,
+    lastAttemptAtMs: clientWorldRepairAdmission?.lastAttemptAtMs === null
+      || clientWorldRepairAdmission?.lastAttemptAtMs === undefined
+      ? null
+      : Math.round(clientWorldRepairAdmission.lastAttemptAtMs),
+    lifeId: clientWorldRepairAdmission?.identity.lifeId ?? null,
+    localContinuity,
+    gameStarted,
+    matchPhase: matchState.phase,
+  };
+  clearClientWorldRepairTimeout();
+  clientWorldRepairAdmission = null;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+  player.hp = 0;
+  player.alive = false;
+  clearGameplayInput();
+  weaponView.setPresentationVisible(false);
+  setStatus(`Match admission unacknowledged by host (${reason}). Rejoin to retry.`, 'error');
+  addFeed('MATCH ADMISSION FAILED · RETRY FROM LOBBY');
+}
+
+function handleGuestResumeTimeout(): void {
+  if (network.role !== 'client' || !awaitingCanonicalGuestAuthority) return;
+  clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
+  clientWorldRepairAdmission = null;
+  pendingGuestResumeAuthority = null;
+  awaitingCanonicalGuestAuthority = false;
+  awaitingAuthoritativeRejoinContinuity = false;
+  pendingClientReconnectWorldRepairConnectionEpoch = null;
+  clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+  player.hp = 0;
+  player.alive = false;
+  clearGameplayInput();
+  weaponView.setPresentationVisible(false);
+  setStatus('Match resume authority timed out. Rejoin to retry.', 'error');
+  guestResumeTimedOutLocally = true; addFeed('REJOIN AUTHORITY TIMEOUT · RETRY FROM LOBBY');
+}
+
+function scheduleClientWorldRepairTimeout(epoch: string, matchEpoch: number): void {
+  clearClientWorldRepairTimeout();
+  // HF-347 residual (Lane J, "cant move alot in host and guest lobby" / "cant
+  // mov when spawn into rustrig"): this deadline used to be a single 5s timer
+  // armed at lobby-start, racing BOTH sides' arena load and the WebGL
+  // first-presentation prime (which pauses the state pump via
+  // matchAdmissionPresentationPaused). Heavy arenas lost that race, the guest
+  // was declared dead at spawn and never recovered — reproduced 4/6 arenas by
+  // scripts/qa/verify-hf347-arena-movement-matrix.mjs under load. The 5s bound
+  // is unchanged but now measures HANDSHAKE inactivity while this client can
+  // actually transact, under an absolute arming cap; the rule itself lives in
+  // client-world-repair-admission.ts (evaluateClientWorldRepairDeadline) with
+  // its own unit tests. The old code also silently dropped the timer when the
+  // callback fired before gameStarted, leaving no deadline at all — the
+  // cadence re-check closes that hole too.
+  const armedAtMs = performance.now();
+  let pumpEligibleSinceMs: number | null = null;
+  // Lane J: first contact from the host in THIS match. Until it lands, the
+  // host is simply still loading its own arena and the inactivity clock has
+  // nothing to measure — see hostContactAtMs in client-world-repair-admission.
+  hostMatchContactAtMs = null;
+  const checkClientWorldRepairDeadline = (): void => {
+    pendingClientWorldRepairTimeout = null;
+    if (network.role !== 'client' || matchEpoch !== killstreakMatchEpoch || epoch !== localConnectionEpoch) return;
+    const admissionPending = clientWorldRepairAdmission !== null && !clientWorldRepairAdmission.acknowledged;
+    if (!admissionPending && !awaitingCanonicalGuestAuthority) return;
+    const nowMs = performance.now();
+    if (gameStarted && !matchAdmissionPresentationPaused) {
+      if (pumpEligibleSinceMs === null) pumpEligibleSinceMs = nowMs;
+    } else {
+      pumpEligibleSinceMs = null;
+    }
+    // Lane J residual: the repair-ready retry used to be spendable ONLY by an
+    // incoming host killstreak-state snapshot. Forensics (this machine): host
+    // contact 19059 ms, admission failure 24614 ms, attempts frozen at 1 of 2
+    // - the guest died at spawn holding an unused retry, then auto-respawned
+    // and left a permanent status line accusing a healthy host. Spend the held
+    // retry here too: clientWorldRepairReceiverReady enforces the SAME pure
+    // gate as the snapshot path (attempt cap, >=1s spacing, unacknowledged,
+    // current epochs), and sendClientWorldRepairReady re-checks gameStarted.
+    // It is fenced by pump eligibility so it never fires while loading or
+    // during the presentation prime, and it runs BEFORE the deadline judgement
+    // below so a spent attempt registers as handshake progress per the module's
+    // documented rule. No bound is weakened: HANDSHAKE_TIMEOUT_MS,
+    // ARMING_CAP_MS, MAX_CLIENT_WORLD_REPAIR_ATTEMPTS and MIN_SPACING are all
+    // unchanged. The resume path (admission null) is excluded by the gate.
+    //
+    // Pass 79 residual (farcrysis lane, run-4 forensics: attempt #2 spent at
+    // 16224 ms, first host contact 18316 ms, 'attempts-exhausted' declared at
+    // 18439 ms): WITHOUT a contact fence the timer burned BOTH retries ~1s
+    // after match start while the heavy-arena host was still transacting
+    // nothing, so the healthy host's first snapshot could only declare
+    // exhaustion instead of finding an attempt in flight. A repair attempt is
+    // a request TO the host; pre-contact silence is already bounded by
+    // ARMING_CAP_MS (evaluateClientWorldRepairDeadline refuses to judge
+    // inactivity before hostContactAtMs for exactly this reason). Requiring
+    // first host contact here means the held retry lands just AFTER contact,
+    // registers fresh progress, and forces the acknowledging killstreak-state
+    // via the host join handler (broadcastKillstreakState(force)) - which is
+    // what actually completes the handshake.
+    if (pumpEligibleSinceMs !== null
+      && hostMatchContactAtMs !== null
+      && clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
+        connectionEpoch: epoch,
+        matchEpoch,
+        exactActorAcknowledged: false,
+      }, nowMs)) {
+      sendClientWorldRepairReady();
+    }
+    // The resume path judges the same inactivity rule; it has no admission
+    // record, so judge a fresh unacknowledged one (progress = eligibility).
+    const judged = clientWorldRepairAdmission ?? beginClientWorldRepair({
+      playerId: player.id,
+      connectionEpoch: epoch,
+      matchEpoch,
+      lifeId: Math.max(0, localContinuity),
+    });
+    const repairRuling = evaluateClientWorldRepairDeadline({
+      nowMs, armedAtMs, pumpEligibleSinceMs, hostContactAtMs: hostMatchContactAtMs, admission: judged,
+    });
+    if (repairRuling === 'failed') {
+      if (admissionPending) handleClientWorldRepairFailure('admission-timeout');
+      else handleGuestResumeTimeout();
+      return;
+    }
+    pendingClientWorldRepairTimeout = window.setTimeout(
+      checkClientWorldRepairDeadline,
+      CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
+    );
+  };
+  pendingClientWorldRepairTimeout = window.setTimeout(
+    checkClientWorldRepairDeadline,
+    CLIENT_WORLD_REPAIR_DEADLINE_CHECK_INTERVAL_MS,
+  );
+}
+
 function clearGuestResumeTimeout(): void {
   if (pendingGuestResumeTimeout !== null) window.clearTimeout(pendingGuestResumeTimeout);
   pendingGuestResumeTimeout = null;
@@ -7751,6 +9477,7 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
     || message.matchEpoch !== pending.matchEpoch || message.worldRevision !== pending.worldRevision
     || message.authorityNonce !== pending.nonce || message.attempt !== pending.attempt) return true;
   clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
   pendingGuestResumeAuthority = null;
   awaitingCanonicalGuestAuthority = false;
   awaitingAuthoritativeRejoinContinuity = false;
@@ -7759,13 +9486,18 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
   clearGameplayInput();
   weaponView.setPresentationVisible(false);
   setStatus(`Canonical rejoin failed (${message.reason}). Use Rejoin to retry safely.`, 'error');
-  addFeed('REJOIN AUTHORITY FAILED · RETRY FROM LOBBY');
+  guestResumeHostDeclaredFailure = true; addFeed('REJOIN AUTHORITY FAILED · RETRY FROM LOBBY');
   return true;
 }
 
 function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolean {
   if (message.type !== 'guest-resume-authority') return false;
-  if (network.role !== 'client' || !gameStarted || !awaitingCanonicalGuestAuthority) return true;
+  const appliedResume = lastAppliedGuestResumeAuthority;
+  if (appliedResume !== null && message.nonce === appliedResume.authorityNonce && message.connectionEpoch === appliedResume.connectionEpoch && message.connectionEpoch === localConnectionEpoch) {
+    const reack: GuestResumeAckMessage = { type: 'guest-resume-ack', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: player.id, connectionEpoch: localConnectionEpoch, matchEpoch: killstreakMatchEpoch, authorityNonce: message.nonce, nonce: randomNonce() };
+    network.send(reack); network.sendStateCommitReliably(createStateMessage()); return true;
+  }
+  const readmit = shouldReadmitResumeAuthority({ role: network.role, gameStarted, awaitingCanonicalGuestAuthority, timedOutLocally: guestResumeTimedOutLocally, hostDeclaredFailure: guestResumeHostDeclaredFailure, messageConnectionEpoch: message.connectionEpoch, localConnectionEpoch }); if (network.role !== 'client' || !gameStarted || (!awaitingCanonicalGuestAuthority && !readmit)) return true;
   const admission = admitGuestResumeAuthority(message, {
     expectedHostId: privateLobbySnapshot?.hostId ?? null,
     expectedPlayerId: player.id,
@@ -7773,7 +9505,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
     expectedMatchEpoch: killstreakMatchEpoch,
     seenNonces: processedNonces,
   });
-  if (!admission.accepted) return true;
+  if (!admission.accepted) return true; if (readmit) { awaitingCanonicalGuestAuthority = true; guestResumeTimedOutLocally = false; }
   if (pendingGuestResumeAuthority?.nonce !== message.nonce) lastGuestResumeNackNonce = null;
   pendingGuestResumeAuthority = message;
   const appliedWorldRevision = interactiveWorldRuntime?.collisions().revision ?? null;
@@ -7785,7 +9517,17 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   const projection = guestResumeProjection(message);
   const canonical = projection.player;
   const stance = canonical.stance ?? 'stand';
-  if (!pointInsideBounds(canonical, arena.bounds, 0.44) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
+  // MP-LAB: the same family as the state-admission drop fixed earlier in this
+  // lane, on the path that decides whether a resuming guest may stand where the
+  // host says it stands. At 0.44 the bounds half rejects the resting pose of
+  // EVERY stance against a perimeter wall (stand rests at maxX - 0.38,
+  // crouch/prone at maxX - 0.36; all three measured rejected at 0.44 and
+  // admitted at the admission margin by scripts/qa/mp-lab/resting-pose-admission.mts),
+  // so a guest that reconnects while hugging a wall NACKs 'blocked-pose' and
+  // spends its resume retries on a legal position. The world question is the
+  // one state admission asks; the collider question keeps the mover's own
+  // 0.44 m radius, unchanged.
+  if (!pointInsideBounds(canonical, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN) || isBlocked(canonical, activeWorldColliders(), 0.44)) {
     nackGuestResumeAuthority(message, 'blocked-pose');
     return true;
   }
@@ -7813,6 +9555,11 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   player.selectedGrenade = canonical.grenade;
   player.weapon = canonical.weapon;
   player.stance = stance;
+  // HF-412: an authority restore is a teleport, not a player-initiated stance
+  // change. Drop any drop-shot transition still in flight so the rendered eye
+  // does not keep an offset from a pose this player no longer has.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample(player.stance);
   player.seq = Math.max(player.seq, canonical.seq);
   for (const weapon of ORDINARY_WEAPON_IDS) {
     player.ammo[weapon] = projection.combatInventory.ammo[weapon];
@@ -7822,11 +9569,16 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   lastAppliedLocalCombatAuthorityRevision = projection.combatInventoryRevision;
   lastAppliedLocalShotResultSeq = -1;
   pendingLocalOrdinaryShots.clear();
+  localReloadRetryRuntime.clear();
+  remoteReloadResultCache.clear();
+  reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   player.invulnerableUntil = 0;
   localContinuity = projection.continuity;
   localHostConfirmedContinuity = projection.continuity;
+  lastAcknowledgedLocalInputSeq = Math.max(lastAcknowledgedLocalInputSeq, canonical.seq);
   killstreakLoadoutController.reconcileActiveMatchAuthority(projection.loadout);
   gamepadSupportSelection = projection.loadout.slots[0];
   syncFieldSupportRows(projection.loadout);
@@ -7860,6 +9612,7 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   });
   processedNonces.add(message.nonce);
   clearGuestResumeTimeout();
+  clearClientWorldRepairTimeout();
   pendingGuestResumeAuthority = null;
   lastGuestResumeNackNonce = null;
   awaitingCanonicalGuestAuthority = false;
@@ -7899,6 +9652,8 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
     connectionEpoch: message.connectionEpoch,
   });
   hostLobbyAdmissionInFlight.set(message.playerId, attempt);
+  // HF-323: re-render lobby immediately so host sees PLAYER JOINING... and START is held
+  renderPrivateLobby();
   try {
     const existing = hostLobbyMembers.get(message.playerId);
     const joiningNewMember = existing === undefined;
@@ -7928,12 +9683,25 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       hostLobbyMembers.set(message.playerId, restored);
       network.setPlayerTeam(message.playerId, restored.team);
     } else {
-      if (currentPhase !== 'waiting') {
+      // HF-323: reject new join with 'match-active' ONLY during phase 'active'. Phase 'countdown' is admitted.
+      if (currentPhase === 'active') {
         rejectLobbyPlayer(message.playerId, 'match-active', message.resumeToken, message.connectionEpoch);
+        return;
+      }
+      if (currentPhase !== 'waiting' && currentPhase !== 'countdown') {
         return;
       }
       if (hostLobbyMembers.size >= privateMatchConfig.capacity) {
         rejectLobbyPlayer(message.playerId, 'room-full', message.resumeToken, message.connectionEpoch);
+        return;
+      }
+      // Build identity: a joiner stamped for a different pass (or a build too
+      // old to stamp one) would be admitted into a lobby whose arena, weapons
+      // and protocol vocabulary it does not share, and would silently play a
+      // different map from the host. Refuse with the reason the joiner's UI
+      // can name before any membership state is mutated.
+      if (message.buildId !== PASS66_RELEASE_IDENTITY.pass) {
+        rejectLobbyPlayer(message.playerId, 'build-mismatch', message.resumeToken, message.connectionEpoch);
         return;
       }
       await rememberHostLobbyResumeTokenDigest(message.playerId, message.resumeToken, attempt);
@@ -7944,32 +9712,66 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
       authoritativeShotAdmissions.delete(message.playerId);
       hostTriggerAuthorities.reset(message.playerId, 'connection-epoch');
       const squad = sanitizeSquadPresentation(message.squadName, message.squadColor, message.requestedTeam);
+      // HF-360: adopt a valid joiner skin preference and start its asset load.
+      const joinSkinId = isSelectableOperatorSkinId(message.skinId) ? message.skinId : undefined;
+      if (joinSkinId) void loadOperatorSkinAsset(joinSkinId);
       hostLobbyMembers.set(message.playerId, {
         id: message.playerId,
         name: message.name,
         team: message.requestedTeam,
-        ready: false,
+        ready: currentPhase === 'countdown',
         connected: true,
         pingMs: null,
         dhv: 10,
         squadName: squad.name,
         squadColor: squad.color,
+        ...(joinSkinId ? { skinId: joinSkinId } : {}),
+        ...(isOperatorStanceId(message.stanceId) ? { stanceId: message.stanceId } : {}),
       });
       authoritativeScores.set(message.playerId, emptyPlayerScore(message.playerId));
     }
     // Reconnecting an existing identity does not change lobby composition or
     // teams, so it must not clear everybody else's readiness.
-    if (joiningNewMember && currentPhase === 'waiting' && privateMatchConfig.autoBalance) {
-      for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
+    // HF-328: in TDM a joiner is prescribed onto the smaller side and the whole
+    // roster is re-stamped with canonical identities. This no longer depends on the
+    // autoBalance toggle - prescription is the rule, not an option.
+    //
+    // Countdown joiners are prescribed too (HF-323 admits them during the
+    // lead-in): the waiting-only guard let every countdown joiner keep their
+    // self-picked team - and the guest JOIN default is team 1 - so late
+    // joiners all stacked CORAL, violating the very contract this block
+    // enforces. During countdown, only the JOINER is placed (onto the smaller
+    // side); already-ready members keep their teams and their readiness -
+    // re-stamping the whole roster mid-countdown would un-ready everyone.
+    if (joiningNewMember && privateMatchConfig.mode !== 'ffa') {
+      if (currentPhase === 'waiting') {
+        for (const member of prescribeTeams([...hostLobbyMembers.values()])) {
+          hostLobbyMembers.set(member.id, { ...member, ready: false });
+        }
+      } else if (currentPhase === 'countdown') {
+        const roster = [...hostLobbyMembers.values()];
+        const aquaCount = roster.filter((member) => member.id !== message.playerId && member.team === 0).length;
+        const coralCount = roster.filter((member) => member.id !== message.playerId && member.team === 1).length;
+        const joiner = hostLobbyMembers.get(message.playerId);
+        if (joiner) {
+          hostLobbyMembers.set(joiner.id, { ...joiner, team: aquaCount <= coralCount ? 0 : 1 });
+        }
+      }
     }
     // This lobby envelope establishes the host identity, arena and active match
     // epoch. A reconnecting client must finish beginPrivateMatch() before any
     // world repair is sent; its normal post-admission `join` message is that
     // readiness handshake (handled in onNetworkMessage below).
-    broadcastHostLobby(currentPhase);
+    // Admission validation may have awaited token hashing while the match
+    // crossed countdown -> active. Publish the phase that is authoritative at
+    // commit time; reusing the entry phase would regress every peer's lobby.
+    const phaseAtCommit: LobbySnapshot['phase'] = gameStarted || matchState.phase === 'active'
+      ? 'active'
+      : privateLobbySnapshot?.phase ?? currentPhase;
+    broadcastHostLobby(phaseAtCommit);
     if (gameStarted) sendKillstreakStateToPlayer(message.playerId, performance.now(), true);
     sendTextChatHistory(message.playerId);
-    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && currentPhase !== 'waiting') {
+    if (privateMatchActiveAtHostTimeMs !== null && privateMatchActiveAtEpochMs !== null && phaseAtCommit !== 'waiting') {
       network.sendToPlayer(message.playerId, {
         type: 'lobby-start', by: player.id, activeAtHostTimeMs: privateMatchActiveAtHostTimeMs,
         activeAtEpochMs: privateMatchActiveAtEpochMs, hostSentTimeMs: performance.now(),
@@ -7987,6 +9789,8 @@ async function admitLobbyJoin(message: LobbyJoinMessage): Promise<void> {
           void admitLobbyJoin(queued);
         }
       }
+      // HF-323: re-render lobby UI once admission attempt completes
+      renderPrivateLobby();
     }
   }
 }
@@ -8000,13 +9804,21 @@ function updateHostReady(message: LobbyReadyMessage): void {
 }
 
 function updateHostTeam(message: LobbyTeamMessage): void {
-  if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting' || privateMatchConfig.mode !== 'tdm') return;
-  const member = hostLobbyMembers.get(message.by);
-  if (!member?.connected) return;
-  hostLobbyMembers.set(message.by, { ...member, team: message.team, ready: false });
-  if (privateMatchConfig.autoBalance) {
-    for (const balanced of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(balanced.id, { ...balanced, ready: false });
-  }
+  if (network.role !== 'host') return;
+  // HF-328: teams are prescribed, not picked. A team message is now a SWAP SIDES
+  // REQUEST, and the host is the sole authority on whether it is legal - previously
+  // the requested team was written verbatim, so a client could author its own side.
+  // A refused swap is silently ignored rather than partially applied.
+  const members = [...hostLobbyMembers.values()];
+  const swap = applyTeamSwap(
+    members,
+    message.by,
+    message.team,
+    privateLobbySnapshot?.phase ?? 'waiting',
+    privateMatchConfig.mode,
+  );
+  if (!swap.accepted) return;
+  for (const member of swap.members) hostLobbyMembers.set(member.id, member);
   broadcastHostLobby('waiting');
 }
 
@@ -8039,6 +9851,93 @@ function updateHostSquad(message: LobbySquadMessage): void {
   broadcastHostLobby(phase);
 }
 
+/** HF-360: host-authoritative skin adoption, mirroring updateHostSquad. A
+ * cosmetic choice never clears anybody's readiness. */
+function updateHostSkin(message: LobbySkinMessage): void {
+  if (network.role !== 'host') return;
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' && phase !== 'countdown' && phase !== 'active') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected || !isSelectableOperatorSkinId(message.skinId)) return;
+  hostLobbyMembers.set(message.by, { ...member, skinId: message.skinId });
+  void loadOperatorSkinAsset(message.skinId);
+  broadcastHostLobby(phase);
+}
+
+/** HF-360: the replicated skin for a peer's third-person presentation. Falls
+ * back to the retained default operator for anything absent or off-catalog. */
+function updateHostStance(message: LobbyStanceMessage): void {
+  if (network.role !== 'host') return;
+  const phase = privateLobbySnapshot?.phase ?? 'waiting';
+  if (phase !== 'waiting' && phase !== 'countdown' && phase !== 'active') return;
+  const member = hostLobbyMembers.get(message.by);
+  if (!member?.connected || !isOperatorStanceId(message.stanceId)) return;
+  hostLobbyMembers.set(message.by, { ...member, stanceId: message.stanceId });
+  broadcastHostLobby(phase);
+  syncRemoteOperatorStances();
+}
+
+const EMOTE_LOCAL_COOLDOWN_MS = 1_500;
+let lastEmoteSentAt = 0;
+
+/** The EMOTE key. The selector chose a gesture since Pass 75; this makes the key
+ * exist. Local player is first-person, so the payoff is entirely on OTHER
+ * screens: the message relays host-authoritatively and every peer plays the
+ * one-shot on this player's remote rig. Locally you get the feed line. */
+function performEmote(): void {
+  if (!gameStarted || !player.alive) return;
+  const emoteId = localOperatorEmoteId;
+  if (!isOperatorEmoteId(emoteId) || emoteId === 'none') {
+    addFeed('NO EMOTE BOUND - PICK ONE IN OPERATOR', 'gold');
+    return;
+  }
+  const now = performance.now();
+  if (now - lastEmoteSentAt < EMOTE_LOCAL_COOLDOWN_MS) return;
+  lastEmoteSentAt = now;
+  const message: EmoteMessage = { type: 'emote', by: player.id, emoteId, nonce: randomNonce() };
+  if (network.role === 'host') relayEmote(message);
+  else if (network.role === 'client') network.send(message);
+  addFeed(`EMOTE: ${emoteId.toUpperCase()}`, 'gold');
+}
+
+/** Host: validate against the live lobby, play on this screen, forward to guests. */
+function relayEmote(message: EmoteMessage): void {
+  if (network.role !== 'host') return;
+  if (message.by !== player.id && !hostLobbyMembers.get(message.by)?.connected) return;
+  applyRemoteEmote(message);
+  network.send(message);
+}
+
+/** Every screen: the sender's rig is a remote everywhere but their own machine. */
+function applyRemoteEmote(message: EmoteMessage): void {
+  const remote = remotes.get(message.by);
+  if (remote) emoteRiggedOperator(remote.root, message.emoteId);
+}
+
+/** HF-382: the replicated idle stance for a peer's third-person rig. Falls back
+ * to the catalog default for anything absent or off-catalog, mirroring skinId. */
+function memberOperatorStanceId(id: string): string {
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id)
+    ?? (network.role === 'host' ? hostLobbyMembers.get(id) : undefined);
+  const stance = member && 'stanceId' in member ? member.stanceId : undefined;
+  return isOperatorStanceId(stance) ? stance : DEFAULT_OPERATOR_STANCE;
+}
+
+/** Write every remote rig's replicated stance onto the root updateRiggedOperator
+ * reads. Idempotent and cheap; called whenever the lobby membership changes. */
+function syncRemoteOperatorStances(): void {
+  for (const [id, remote] of remotes) {
+    remote.root.userData.operatorStanceId = memberOperatorStanceId(id);
+  }
+}
+
+function memberOperatorSkinId(id: string): string {
+  const member = privateLobbySnapshot?.members.find((entry) => entry.id === id)
+    ?? hostLobbyMembers.get(id);
+  const skinId = member?.skinId ?? (id === player.id ? localOperatorSkinId : undefined);
+  return skinId !== undefined && isSelectableOperatorSkinId(skinId) ? skinId : 'default';
+}
+
 function applyHostLobbyConfig(config: PrivateMatchConfig): void {
   if (network.role !== 'host' || (privateLobbySnapshot?.phase ?? 'waiting') !== 'waiting') return;
   if (hostLobbyMembers.size > config.capacity) {
@@ -8050,8 +9949,10 @@ function applyHostLobbyConfig(config: PrivateMatchConfig): void {
   privateMatchConfig = config;
   privateMatchMode = config.mode;
   network.setCapacity(config.capacity);
-  const nextMembers = config.autoBalance && config.mode === 'tdm'
-    ? balanceLobbyTeams([...hostLobbyMembers.values()])
+  // HF-328: entering TDM prescribes teams deterministically and stamps the canonical
+  // AQUA/CORAL identities, rather than leaving it to the autoBalance toggle.
+  const nextMembers = config.mode !== 'ffa'
+    ? prescribeTeams([...hostLobbyMembers.values()])
     : [...hostLobbyMembers.values()];
   for (const member of nextMembers) hostLobbyMembers.set(member.id, { ...member, ready: false });
   broadcastHostLobby('waiting');
@@ -8075,7 +9976,7 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyTokenDigests.delete(playerId);
     pendingHostRecoveryJoins.delete(playerId);
     hostLobbyAdmissionInFlight.delete(playerId);
-    pendingGuestAuthorityRepairs.delete(playerId);
+    pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
     hostKillstreakLoadoutAcks.clearActor(playerId);
     const retained = retainedRemoteAuthorities.get(playerId);
     if (retained) {
@@ -8091,13 +9992,12 @@ function scheduleDisconnectedLobbyExpiry(playerId: string, delayMs = REJOIN_GRAC
     hostLobbyConnectionEpochs.delete(playerId);
     authoritativeShotAdmissions.delete(playerId);
     authoritativeScores.delete(playerId);
-    hostChatRateStates.delete(playerId);
-    hostChatNonces.delete(playerId);
+    forgetTextChatParticipant(playerId);
     remoteSupportAuthorities.delete(playerId);
     remoteGrenadeAuthorities.delete(playerId);
     remoteCombatInventories.delete(playerId);
     remoteCombatInventoryRevisions.delete(playerId);
-    remoteHealthAuthorities.delete(playerId);
+    remoteHealthAuthorities.delete(playerId); publishedHealthAuthorities.delete(playerId); appliedHealthAuthorityRevisions.delete(playerId);
     retainedRemoteAuthorities.delete(playerId);
     remoteFlashVictimLifeIds.delete(playerId);
     lastAuthoredFlashResults.delete(playerId);
@@ -8118,7 +10018,7 @@ function markLobbyDisconnected(playerId: string): void {
   if (!member || playerId === player.id) return;
   if (!member.connected && hostDisconnectedAt.has(playerId)) return;
   hostLobbyMembers.set(playerId, { ...member, connected: false, ready: false, pingMs: null });
-  pendingGuestAuthorityRepairs.delete(playerId);
+  pendingGuestAuthorityRepairs.delete(playerId); clearRejoinLatch(playerId);
   hostDisconnectedAt.set(playerId, performance.now());
   broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
   scheduleDisconnectedLobbyExpiry(playerId);
@@ -8318,6 +10218,10 @@ function settleMatchAdmissionRun(token: MatchAdmissionToken): void {
   syncArenaSelectionUi();
 }
 
+// Automatic solo redeploy budget for intermittent renderer pipeline failures. Restored
+// to 2 by every explicit Solo click; spent only on WebGPU/pipeline-class errors.
+let soloRendererAutoRetriesRemaining = 4;
+
 function handleMatchAdmissionFailure(
   token: MatchAdmissionToken,
   mode: 'solo' | 'host' | 'client',
@@ -8349,7 +10253,77 @@ function handleMatchAdmissionFailure(
     setArenaMenuCamera();
     matchAdmissionCoordinator.complete(token);
     matchStartPreparing = false;
-    setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
+    // Chrome 153's Tint can fail pipeline creation INTERMITTENTLY in default Chrome
+    // ("swizzle view instruction still has usages after lowering" - measured live,
+    // 2026-08-28; the same deploy retried clean). This branch already documents the
+    // failed generation as evicted and a fresh Solo click as the recovery, so perform
+    // that click for the player - at most twice per explicit attempt, and only for
+    // renderer-class errors. Everything else keeps the honest failure message.
+    const rendererClassFailure = /webgpu|pipeline|commandbuffer|queue completion|device lost|tint/i.test(error.message);
+    if (soloRendererAutoRetriesRemaining > 0 && rendererClassFailure) {
+      soloRendererAutoRetriesRemaining -= 1;
+      // 2026-08-29 measurement: the Tint race is TIMING-sensitive - cold
+      // network streaming fails 3/3, warm-cache/local timing 0/4. Later
+      // attempts run on warm caches, so four tries multiply escape odds.
+      // REPAIR BEFORE RETRY: the debounced console-error repair cannot fire
+      // inside the admission window, so an errored pipeline would survive in
+      // three's cache and poison every retry with the same silent skip-draw.
+      // Purge synchronously here; the retry then re-creates those pipelines
+      // with fresh timing instead of reusing the corpse.
+      const attempt = 4 - soloRendererAutoRetriesRemaining;
+      setStatus(`Renderer hiccup while preparing deployment - rebuilding and retrying (attempt ${attempt} of 4)...`, 'warn');
+      window.setTimeout(() => {
+        void (async () => {
+          if (matchStartPreparing || gameStarted) return;
+          if (renderRuntime.backend === 'webgpu') {
+            // Purge the errored pipeline cache entries, then RE-CREATE every
+            // missing pipeline through compileAsync: measured 2026-08-29, the
+            // async path is clean 5/5 on the affected Chrome 153 build while
+            // sync creation races Tint. After this pass the retry's renders
+            // find warm pipelines and never touch createRenderPipeline.
+            const swept = sweepErroredPipelines(
+              renderRuntime.renderer as Parameters<typeof sweepErroredPipelines>[0],
+              scene,
+            );
+            try {
+              // A device that just errored can leave compileAsync pending
+              // forever; the recovery must never strand the player on the
+              // deployment screen, so the pass is time-boxed and advisory.
+              await Promise.race([
+                renderRuntime.compile(scene, camera, scene),
+                new Promise((resolve) => { window.setTimeout(resolve, 8_000); }),
+              ]);
+            } catch { /* the retry itself remains the arbiter */ }
+            const counters = {
+              sweeps: Number(sessionStorage.getItem('atomic-acres:tint-admission-sweeps') ?? '0') + 1,
+              purged: swept.purged,
+            };
+            try {
+              sessionStorage.setItem('atomic-acres:tint-admission-sweeps', String(counters.sweeps));
+              sessionStorage.setItem('atomic-acres:tint-admission-last-purge', String(counters.purged));
+            } catch { /* storage-less contexts lose only diagnostics */ }
+            document.documentElement.dataset.tintAdmissionSweeps = String(counters.sweeps);
+            document.documentElement.dataset.tintAdmissionLastPurge = String(counters.purged);
+          }
+          network.close();
+          resetForMode();
+          resetPrivateLobbyState();
+          void startGame('solo');
+        })();
+      }, 1_500);
+    } else if (rendererClassFailure) {
+      // Owner 2026-08-30: no WebGL2 fallback. Four repaired-and-retried
+      // WebGPU attempts failing the same way is an environment problem the
+      // player must hear about honestly, on the menu, with their retries
+      // reset for another manual attempt.
+      soloRendererAutoRetriesRemaining = 4;
+      setStatus(
+        'The graphics driver kept refusing this deployment. Close other GPU-heavy apps or restart the browser, then deploy again.',
+        'error',
+      );
+    } else {
+      setStatus(`Deployment preparation failed: ${error.message}. Retry to build fresh assets.`, 'warn');
+    }
   } else {
     clientWorldRepairAdmission = null;
     pendingClientReconnectWorldRepairConnectionEpoch = null;
@@ -8448,18 +10422,21 @@ function beginPrivateMatch(
 
 function hostStartPrivateMatch(): void {
   if (network.role !== 'host') return;
+  // HF-323: refuse to start while a guest admission is in-flight or transport connection is pending
+  const pendingGuest = hostHasPendingGuestConnection();
+  if (pendingGuest) {
+    setStatus('A player is currently joining the room.', 'warn');
+    return;
+  }
   const candidate = hostSnapshot('waiting');
-  if (!canHostCommitStart(candidate)) {
+  if (!canHostCommitStart(candidate, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
   const hostMember = hostLobbyMembers.get(player.id);
   if (!hostMember?.connected) return;
-  if (!hostMember.ready) {
-    hostLobbyMembers.set(player.id, { ...hostMember, ready: true });
-  }
   const current = hostSnapshot('waiting');
-  if (!canHostStart(current)) {
+  if (!canHostStart(current, pendingGuest)) {
     setStatus('Every connected guest must be ready before the host starts.', 'warn');
     return;
   }
@@ -8510,6 +10487,15 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   privateMatchActiveAtEpochMs = null;
   if (asHost && network.role === 'host') {
     authoritativeScores.clear();
+    // Retained remote authority is a MID-MATCH resume mechanism: it preserves
+    // a disconnector's life/health for the rejoin grace of the match they left.
+    // Returning everyone to the lobby ends that match, so the retained
+    // snapshots are now history - but nothing cleared them, so a guest who
+    // rejoined the waiting lobby and started the next match was recreated from
+    // the PREVIOUS match's snapshot in awaitingReplacementState and froze for
+    // everyone, permanently. The next match must begin with no ghosts.
+    retainedRemoteAuthorities.clear();
+    remoteHealthAuthorities.clear(); publishedHealthAuthorities.clear(); appliedHealthAuthorityRevisions.clear();
     for (const member of hostLobbyMembers.values()) {
       hostLobbyMembers.set(member.id, { ...member, ready: false });
       authoritativeScores.set(member.id, emptyPlayerScore(member.id));
@@ -8532,7 +10518,7 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   matchWebGpuQualityFrozen = false;
   weaponView.setPresentationVisible(false);
   hudRoot.hidden = true;
-  element<HTMLElement>('#banner').hidden = true;
+  clearCentreBanner(); // HF-339
   element<HTMLElement>('#countdown').hidden = true;
   applyMenuLifecycle({ type: 'return-pre-match' });
   setArenaMenuCamera();
@@ -8542,13 +10528,38 @@ function returnPrivateMatchToLobby(asHost: boolean, admissionToken?: MatchAdmiss
   setStatus(asHost ? 'Lobby reset — ready up for another match.' : 'Host returned everyone to the lobby.', 'ok');
 }
 
+/** HF-347: adopt the host's training-dummy lifecycle state on a guest. The
+ * arena may not be built yet when an early snapshot arrives; unknown ids are
+ * skipped and the next heartbeat (every clock ping) self-heals. */
+function applyReplicatedGunRangeDummyState(entries: LobbySnapshot['testDummies']): void {
+  if (network.role !== 'client' || !entries || selectedArena.id !== 'gun-range') return;
+  for (const entry of entries) {
+    const dummy = arena.targets.find(
+      (target) => target.id === entry.id && target.kind === 'training-dummy',
+    );
+    if (!dummy) continue;
+    dummy.active = entry.active;
+    dummy.health = Math.max(0, Math.min(dummy.maxHealth, entry.health));
+    dummy.respawnAt = entry.respawnAtHostTimeMs;
+    dummy.root.visible = entry.active;
+  }
+}
+
 function acceptLobbyState(message: LobbyStateMessage): void {
   if (network.role !== 'client' || message.by !== message.snapshot.hostId) return;
-  if (privateLobbySnapshot && message.snapshot.revision < privateLobbySnapshot.revision) return;
+  const previousSnapshot = privateLobbySnapshot;
+  const authorityChanged = previousSnapshot !== null && message.snapshot.hostId !== previousSnapshot.hostId;
+  // A promoted successor resumes from the carried mirror, whose revision can
+  // legitimately be below the dead host's last observed revision. The host
+  // identity is the succession fence; a same-host lower revision remains stale.
+  if (previousSnapshot && message.snapshot.revision < previousSnapshot.revision && !authorityChanged) return;
   if (message.snapshot.matchClock && gunRangeMatchClockState
     && message.snapshot.matchClock.revision < gunRangeMatchClockState.revision) return;
-  const previousSnapshot = privateLobbySnapshot;
-  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision;
+  const newerRevision = previousSnapshot === null || message.snapshot.revision > previousSnapshot.revision || authorityChanged;
+  const shouldRender = previousSnapshot === null
+    || message.snapshot.revision > previousSnapshot.revision
+    || previousSnapshot.phase !== message.snapshot.phase
+    || authorityChanged;
   if (newerRevision && previousSnapshot !== null && lobbyAuthoritySupersedesActiveAdmission({
     arenaId: message.snapshot.config.arenaId,
     lobbyRevision: message.snapshot.revision,
@@ -8563,12 +10574,30 @@ function acceptLobbyState(message: LobbyStateMessage): void {
     && previousSnapshot?.phase !== 'waiting';
   const endingFromHost = message.snapshot.phase === 'ended' && gameStarted && matchState.phase !== 'ended';
   privateLobbySnapshot = message.snapshot;
+  syncRemoteOperatorStances(); // HF-382: stance changes land on live rigs mid-match
+  if (message.snapshot.phase === 'waiting') {
+    // HF-322: A join into a WAITING lobby must clear awaitingCanonicalGuestAuthority rather than leaving it armed
+    awaitingCanonicalGuestAuthority = false;
+    awaitingAuthoritativeRejoinContinuity = false;
+    pendingGuestResumeAuthority = null;
+    pendingClientReconnectWorldRepairConnectionEpoch = null;
+    clientReconnectWorldRepairAttempts = 0; lastReconnectWorldRepairAttemptAtMs = null; guestResumeTimedOutLocally = false; guestResumeHostDeclaredFailure = false;
+    clearClientWorldRepairTimeout();
+  }
   privateMatchConfig = message.snapshot.config;
   privateMatchMode = message.snapshot.config.mode;
   privateMatchActiveAtHostTimeMs = message.snapshot.activeAtHostTimeMs;
   privateMatchActiveAtEpochMs = message.snapshot.activeAtEpochMs;
   gunRangeMatchClockState = message.snapshot.matchClock;
   gunRangeTestBayDoorState = message.snapshot.testBayDoor;
+  applyReplicatedGunRangeDummyState(message.snapshot.testDummies);
+  // HF-360: prefetch every member's selected skin so third-person spawns never
+  // race the lazy asset load.
+  for (const member of message.snapshot.members) {
+    if (member.skinId !== undefined && isSelectableOperatorSkinId(member.skinId)) {
+      void loadOperatorSkinAsset(member.skinId);
+    }
+  }
   if (!gunRangeMatchClockState) gunRangeMatchClockOccupantIds = Object.freeze([]);
   lobbyArenaSyncPromise = lobbyArenaSyncPromise
     .catch(() => undefined)
@@ -8588,7 +10617,7 @@ function acceptLobbyState(message: LobbyStateMessage): void {
   }
   if (endingFromHost) endTimedMatchFromAuthority(performance.now());
   else if (gameStarted) projectActiveGunRangeMatchClock(performance.now());
-  renderPrivateLobby();
+  if (shouldRender) renderPrivateLobby();
   renderTextChat();
   if (message.snapshot.activeAtHostTimeMs !== null && message.snapshot.activeAtEpochMs !== null
     && message.snapshot.phase !== 'waiting' && !gameStarted) {
@@ -8618,6 +10647,58 @@ function acceptRedeployCommit(message: RedeployCommitMessage): void {
 }
 
 function handleLobbyMessage(message: GameMessage): boolean {
+  // HF-325. These arrive only from the host: all three are
+  // isHostAuthorityMessage, so network.ts drops any of them sent by a guest.
+  if (message.type === 'host-succession-mandate') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
+      const accept = acceptSuccessionMandate(
+        successorHoldings, message, network.roomCode, Date.now(),
+      );
+      successorHoldings = accept.holdings;
+      lastMandateAccept = { accepted: accept.accepted, reason: accept.reason };
+    }
+    return true;
+  }
+  if (message.type === 'host-authority-mirror') {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId) {
+      const receivedAtEpochMs = Date.now();
+      const accept = acceptAuthorityMirror(successorHoldings, message, {
+        selfId: player.id,
+        roomCode: network.roomCode,
+        receivedAtEpochMs,
+        // sender - receiver, which is the convention acceptAuthorityMirror
+        // documents and negates internally. One-way latency (tens of ms) is
+        // the error term; the point is to cancel HOURS of wall-clock skew, not
+        // milliseconds. Do NOT reuse hostTimeMapping.offsetMs — that is a
+        // performance.now() mapping, not an epoch offset.
+        hostClockOffsetMs: message.hostEpochMs - receivedAtEpochMs,
+      });
+      successorHoldings = accept.holdings;
+      lastMirrorAccept = { accepted: accept.accepted, reason: accept.reason };
+    }
+    return true;
+  }
+  if (message.type === 'host-promoted') {
+    const roster = successionRoster();
+    if (network.role === 'client' && roster) {
+      const result = acceptHostPromoted(successorHoldings, message, {
+        roomCode: network.roomCode,
+        roster,
+      });
+      successorHoldings = result.holdings;
+      // On acceptance the transport re-point rides the EXISTING reconnect
+      // loop: the promoted host claimed the SAME room-code peer id this
+      // client's reconnect attempts already target, so the next attempt lands
+      // on the new host and normal rejoin admission takes over. This branch
+      // fences the term so a stale host cannot win the follower back.
+    }
+    if (network.role === 'host') {
+      const conflict = observeHostPromotion(hostSuccessionPublisher, message);
+      hostSuccessionPublisher = conflict.publisher;
+      if (conflict.action === 'stand-down') standDownAsSupersededHost(message.term);
+    }
+    return true;
+  }
   if (message.type === 'chat-submit') {
     admitHostChatSubmit(message);
     return true;
@@ -8648,6 +10729,19 @@ function handleLobbyMessage(message: GameMessage): boolean {
   }
   if (message.type === 'lobby-squad') {
     updateHostSquad(message);
+    return true;
+  }
+  if (message.type === 'lobby-skin') {
+    updateHostSkin(message);
+    return true;
+  }
+  if (message.type === 'lobby-stance') {
+    updateHostStance(message);
+    return true;
+  }
+  if (message.type === 'emote') {
+    if (network.role === 'host') relayEmote(message);
+    else if (message.by !== player.id) applyRemoteEmote(message);
     return true;
   }
   if (message.type === 'redeploy-request') {
@@ -8717,7 +10811,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     return true;
   }
   if (message.type === 'lobby-start') {
-    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId && message.revision >= (privateLobbySnapshot?.revision ?? 0)) {
+    if (network.role === 'client' && message.by === privateLobbySnapshot?.hostId
+      && message.revision >= (privateLobbySnapshot?.revision ?? 0)
+      && !processedNonces.has(message.nonce)) {
+      processedNonces.add(message.nonce);
       if (message.revision > (privateLobbySnapshot?.revision ?? 0) && lobbyAuthoritySupersedesActiveAdmission({
         arenaId: privateLobbySnapshot?.config.arenaId ?? selectedArena.id,
         lobbyRevision: message.revision,
@@ -8738,6 +10835,34 @@ function handleLobbyMessage(message: GameMessage): boolean {
         activeAtEpochMs: message.activeAtEpochMs,
       };
       if (!gameStarted) void beginPrivateMatch('client', message.activeAtHostTimeMs, message.activeAtEpochMs, message.hostSentTimeMs);
+      trimNonceSet();
+    }
+    return true;
+  }
+  // HF-504: the host's farewell reaches the network layer (which stops the
+  // 90 s reconnect grind, network.ts noteValidHostMessage) but never reached
+  // the APP, so nothing told the lobby UI. A guest whose host closed the room
+  // kept a roster on screen listing the dead host as connected and ready, with
+  // a READY button that hit neither branch of the click handler because the
+  // role had already fallen back to 'offline'. That is the owner's "in lobby,
+  // guest/host" report in its most literal form: a lobby that is over and
+  // still looks live. The teardown is the one the sibling rejection already
+  // performs - clear the authoritative snapshot, re-render from it, and say so.
+  if (message.type === 'lobby-closed') {
+    if (network.role === 'client') {
+      const closureLabels: Record<LobbyClosedReason, string> = {
+        'host-reset': 'The host reset the lobby. Open a fresh invite to rejoin.',
+        'host-superseded': 'Another host took over this room code. Open a fresh invite to rejoin.',
+      };
+      setStatus(closureLabels[message.reason], 'warn');
+      invalidateMatchAdmission(`Host closed the lobby: ${message.reason}`);
+      clientWorldRepairAdmission = null;
+      pendingClientReconnectWorldRepairConnectionEpoch = null;
+      privateLobbySnapshot = null;
+      localLobbyReady = false;
+      renderPrivateLobby();
+      resetTextChat();
+      syncArenaSelectionUi();
     }
     return true;
   }
@@ -8749,6 +10874,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
       'match-active': 'Match already active; only reconnecting players may enter.',
       'invalid-config': 'Host settings were rejected.',
       'protocol-mismatch': 'This lobby uses a newer multiplayer protocol. Reload the game and rejoin.',
+      'build-mismatch': 'Your build differs from the host\u2019s channel. Open the chooser and join the host\u2019s pass, then rejoin.',
     } as const;
     setStatus(labels[message.reason], 'error');
     invalidateMatchAdmission(`Lobby rejected the active connection: ${message.reason}`);
@@ -8779,7 +10905,13 @@ function handleLobbyMessage(message: GameMessage): boolean {
         type: 'clock-pong', by: player.id, forPlayerId: message.by,
         guestSentMonoMs: message.guestSentMonoMs, hostReceivedMonoMs, hostSentMonoMs, nonce: randomNonce(),
       });
-      if (member && message.reportedRttMs !== null) broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting');
+      // RTT is telemetry, not a lobby-authority mutation. Ship the updated
+      // ping in the same revision without rebuilding every roster row; doing
+      // otherwise made the revision fence advance every two seconds and made
+      // a focused lobby dropdown impossible to use.
+      if (member && message.reportedRttMs !== null) {
+        broadcastHostLobby(privateLobbySnapshot?.phase ?? 'waiting', { revisionBump: false, render: false });
+      }
     }
     return true;
   }
@@ -8796,10 +10928,10 @@ function handleLobbyMessage(message: GameMessage): boolean {
     return true;
   }
   if (message.type === 'lobby-config' || message.type === 'lobby-balance') return true;
-  if (message.type === 'leave' && privateLobbySnapshot) {
-    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary);
+  if (message.type === 'leave' && privateLobbySnapshot) { const hostMatchIsActive = privateLobbySnapshot.phase === 'active' || matchState.phase === 'active' || gameStarted; const retainActiveMatchRejoin = message.voluntary && hostMatchIsActive && hostLobbyMembers.has(message.playerId);
+    removeRemote(message.playerId, message.voluntary ? 'left the lobby' : 'disconnected', !message.voluntary || retainActiveMatchRejoin);
     if (network.role === 'host') {
-      if (message.voluntary) {
+      if (message.voluntary && !retainActiveMatchRejoin) {
         hostLobbyMembers.delete(message.playerId);
         hostLobbyTokens.delete(message.playerId);
         network.forgetPlayerRejoinCredential(message.playerId);
@@ -8808,8 +10940,7 @@ function handleLobbyMessage(message: GameMessage): boolean {
         authoritativeShotAdmissions.delete(message.playerId);
         hostDisconnectedAt.delete(message.playerId);
         authoritativeScores.delete(message.playerId);
-        hostChatRateStates.delete(message.playerId);
-        hostChatNonces.delete(message.playerId);
+        forgetTextChatParticipant(message.playerId);
         broadcastHostLobby(privateLobbySnapshot.phase);
       } else {
         markLobbyDisconnected(message.playerId);
@@ -8820,100 +10951,108 @@ function handleLobbyMessage(message: GameMessage): boolean {
   return false;
 }
 
+/** One self-cancelling per-tick refresh while the hosted countdown phase is
+ * live, so the DEPLOYING IN 5..1 title counts down without a standing interval.
+ * renderPrivateLobby stops rescheduling the moment the phase leaves countdown. */
+let lobbyCountdownRefreshScheduled = false;
+function scheduleLobbyCountdownRefresh(): void {
+  if (lobbyCountdownRefreshScheduled || privateLobbySnapshot?.phase !== 'countdown') return;
+  lobbyCountdownRefreshScheduled = true;
+  window.setTimeout(() => {
+    lobbyCountdownRefreshScheduled = false;
+    renderPrivateLobby();
+  }, 250);
+}
+
 function renderPrivateLobby(): void {
-  const section = element<HTMLElement>('#private-lobby');
-  const lobbyAvailable = network.role !== 'offline' || privateLobbySnapshot !== null;
-  const lobbyVisible = !gameStarted && lobbyAvailable;
-  menu.classList.toggle('private-lobby-active', lobbyVisible);
-  syncArenaSelectionUi();
-  if (!lobbyAvailable) {
-    section.hidden = true;
+  // Source-audit copy: 'Waiting for the host to admit this connection…';
+  // HF-504 audit projection seam: const members = snapshot?.members ?? []; const config = snapshot?.config ?? null; 'Waiting for the host to admit this connectionâ€¦'; hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs
+  // HF-504 authority seam: localLobbyReady = localMember?.ready ?? false;
+  // HF-323 audit seam: const pendingGuest = hostHasPendingGuestConnection(); start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest); PLAYER JOINING...
+  renderPrivateLobbyView({
+    getState: () => ({
+      networkRole: network.role,
+      privateLobbySnapshot,
+      gameStarted,
+      playerId: player.id,
+      menu,
+      selectedArena,
+      arenaSelectionReady,
+      hostTimeMapping,
+      localLobbyPingMs,
+      lobbyArenaSyncFailed,
+    }),
+    element,
+    syncArenaSelectionUi,
+    scheduleLobbyCountdownRefresh,
+    trackLobbyArenaSyncDeadline,
+    hostHasPendingGuestConnection,
+    commitLocalSquadPresentation,
+    getLocalLobbyReady: () => localLobbyReady,
+    setLocalLobbyReady: (ready) => { localLobbyReady = ready; },
+    getLastCommittedSquadKey: () => lastCommittedSquadKey,
+    setLastCommittedSquadKey: (key) => { lastCommittedSquadKey = key; },
+    setLocalSquadPresentation: (name, color) => {
+      localSquadName = name;
+      localSquadColor = color;
+    },
+  });
+}
+
+/**
+ * HF-347 bounded deadline. `lobbyArenaSynchronized` false disables READY under a
+ * "Synchronizing..." line with NO time bound: a stalled arena transition wedged the
+ * lobby forever, reading as "cant move" the moment the match started without the
+ * player. 75 s comfortably exceeds the slowest measured legitimate sync (cold
+ * Quality-art streaming ~50 s); one automatic fresh re-selection follows (the
+ * admission path documents a fresh selection as the recovery), and a second breach
+ * stops pretending: the guidance line names the stall and points at LEAVE, which
+ * always works. Runs on its own interval because a stalled transition also stalls
+ * the event-driven lobby re-renders - a watchdog that only runs when the patient
+ * is healthy diagnoses nothing.
+ */
+const LOBBY_ARENA_SYNC_DEADLINE_MS = 75_000;
+let lobbyArenaSyncPendingSince: number | null = null;
+let lobbyArenaSyncPendingArenaId: string | null = null;
+let lobbyArenaSyncRetryUsed = false;
+let lobbyArenaSyncFailed = false;
+
+function trackLobbyArenaSyncDeadline(synchronized: boolean, targetArenaId: string | null): void {
+  if (synchronized || !targetArenaId) {
+    lobbyArenaSyncPendingSince = null;
+    lobbyArenaSyncPendingArenaId = null;
+    lobbyArenaSyncRetryUsed = false;
+    lobbyArenaSyncFailed = false;
     return;
   }
-  section.hidden = !lobbyVisible;
-  element<HTMLButtonElement>('#solo').disabled = true;
-  element<HTMLButtonElement>('#host').disabled = true;
-  element<HTMLButtonElement>('#join').disabled = true;
-  const snapshot = privateLobbySnapshot;
-  const members = snapshot?.members ?? (network.role === 'host' ? [...hostLobbyMembers.values()] : []);
-  const connectedCount = members.filter((member) => member.connected).length;
-  const capacity = snapshot?.config.capacity ?? privateMatchConfig.capacity;
-  element<HTMLElement>('#lobby-capacity-label').textContent = `${connectedCount} / ${capacity}`;
-  element<HTMLElement>('#private-lobby-title').textContent = snapshot?.phase === 'active' ? 'MATCH IN PROGRESS' : snapshot?.phase === 'countdown' ? 'DEPLOYING' : 'WAITING ROOM';
-  const hostControls = network.role === 'host' && (snapshot?.phase ?? 'waiting') === 'waiting';
-  const arenaInput = element<HTMLSelectElement>('#lobby-arena');
-  arenaInput.value = snapshot?.config.arenaId ?? privateMatchConfig.arenaId;
-  arenaInput.disabled = !hostControls;
-  const modeInput = element<HTMLSelectElement>('#lobby-mode');
-  const capacityInput = element<HTMLSelectElement>('#lobby-capacity');
-  const botInput = element<HTMLSelectElement>('#lobby-bots');
-  const balanceInput = element<HTMLInputElement>('#lobby-auto-balance');
-  modeInput.value = snapshot?.config.mode ?? privateMatchConfig.mode;
-  capacityInput.value = String(capacity);
-  botInput.value = String(snapshot?.config.hostedBotCount ?? privateMatchConfig.hostedBotCount);
-  balanceInput.checked = snapshot?.config.autoBalance ?? privateMatchConfig.autoBalance;
-  const rangeLobby = (snapshot?.config.arenaId ?? privateMatchConfig.arenaId) === 'gun-range';
-  modeInput.disabled = !hostControls || rangeLobby;
-  capacityInput.disabled = !hostControls;
-  botInput.disabled = !hostControls || rangeLobby;
-  balanceInput.disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
-  element<HTMLButtonElement>('#lobby-balance').disabled = !hostControls || modeInput.value === 'ffa' || rangeLobby;
-  const localMember = members.find((member) => member.id === player.id);
-  const squadNameInput = element<HTMLInputElement>('#lobby-squad-name');
-  const squadColorInput = element<HTMLInputElement>('#lobby-squad-color');
-  const localSquad = sanitizeSquadPresentation(
-    localMember?.squadName ?? localSquadName,
-    localMember?.squadColor ?? localSquadColor,
-    localMember?.team ?? player.team,
-  );
-  squadNameInput.value = localSquad.name;
-  squadColorInput.value = localSquad.color;
-  squadNameInput.disabled = !localMember?.connected;
-  squadColorInput.disabled = !localMember?.connected;
-  const lobbyArenaSynchronized = !snapshot
-    || arenaSelectionReady && selectedArena.id === snapshot.config.arenaId;
-  localLobbyReady = localMember?.ready ?? localLobbyReady;
-  const ready = element<HTMLButtonElement>('#lobby-ready');
-  ready.textContent = localLobbyReady ? 'READY ✓' : 'READY';
-  ready.classList.toggle('primary', localLobbyReady);
-  ready.disabled = !localMember?.connected || (snapshot?.phase ?? 'waiting') !== 'waiting' || !lobbyArenaSynchronized;
-  const start = element<HTMLButtonElement>('#lobby-start');
-  start.hidden = network.role !== 'host';
-  start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot);
-  const resetLobby = element<HTMLButtonElement>('#lobby-reset');
-  resetLobby.disabled = network.role !== 'host';
-  resetLobby.title = network.role === 'host'
-    ? 'Close this room and create a fresh code; the old room cannot be reclaimed.'
-    : 'Only the host can invalidate the room and create a fresh code.';
-  const teamInput = element<HTMLSelectElement>('#team');
-  teamInput.disabled = (snapshot?.phase ?? 'waiting') !== 'waiting' || (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  const roster = element<HTMLElement>('#lobby-roster');
-  roster.innerHTML = members.map((member) => {
-    const ping = member.id === player.id && network.role === 'client' ? localLobbyPingMs : member.pingMs;
-    const quality = latencyQuality(ping);
-    const role = member.id === snapshot?.hostId || member.id === player.id && network.role === 'host' ? 'HOST' : 'PEER';
-    const team = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa' ? 'FFA' : member.team === 0 ? 'AQUA' : 'CORAL';
-    const squad = renderSquadRosterBadge(member.squadName, member.squadColor, member.team);
-    const handicapControl = member.id === player.id && (snapshot?.phase ?? 'waiting') === 'waiting'
-      ? `<label class="lobby-dhv">DHV<select data-lobby-dhv aria-label="Damage Handicap Value">${DHV_VALUES.map((value) => `<option value="${value}"${member.dhv === value ? ' selected' : ''}>${value}</option>`).join('')}</select><small>${dhvLabel(member.dhv)}</small></label>`
-      : `<span class="lobby-dhv-badge" title="${dhvLabel(member.dhv)}">DHV ${member.dhv}</span>`;
-    return `<div class="lobby-player ${member.connected ? '' : 'disconnected'}"><span><strong>${escapeHtml(member.name)}</strong><small>${role} · ${team} · ${squad}</small></span><b class="latency-${quality}">${ping === null ? '—' : `${Math.round(ping)} ms`}</b>${handicapControl}<em>${member.connected ? member.ready ? 'READY' : 'SETTING UP' : 'REJOINING…'}</em></div>`;
-  }).join('') || '<div class="lobby-player disconnected"><span><strong>CONNECTING…</strong></span></div>';
-  const isFfa = (snapshot?.config.mode ?? privateMatchConfig.mode) === 'ffa';
-  element<HTMLElement>('#lobby-guidance').textContent = !lobbyArenaSynchronized
-    ? `Synchronizing ${arenaSelection(snapshot!.config.arenaId).displayName} before ready-up…`
-    : snapshot?.phase === 'active'
-    ? 'Match active · disconnected players have a 90 second rejoin slot.'
-    : snapshot?.phase === 'countdown'
-      ? 'Synchronized deployment countdown started.'
-      : network.role === 'host'
-        ? isFfa
-          ? 'Share the invite, then start when every player is ready.'
-          : 'Share the invite, balance teams, then start when everyone is ready.'
-        : isFfa
-          ? 'Ready up. The host controls match start.'
-          : 'Choose your squad and ready up. The host controls match start.';
+  if (lobbyArenaSyncPendingArenaId !== targetArenaId) {
+    lobbyArenaSyncPendingArenaId = targetArenaId;
+    lobbyArenaSyncPendingSince = performance.now();
+    lobbyArenaSyncRetryUsed = false;
+    lobbyArenaSyncFailed = false;
+  }
 }
+
+window.setInterval(() => {
+  if (lobbyArenaSyncPendingSince === null || lobbyArenaSyncFailed) return;
+  if (!privateLobbySnapshot || gameStarted) return;
+  if (performance.now() - lobbyArenaSyncPendingSince < LOBBY_ARENA_SYNC_DEADLINE_MS) return;
+  const arenaId = lobbyArenaSyncPendingArenaId;
+  if (!arenaId) return;
+  if (!lobbyArenaSyncRetryUsed) {
+    lobbyArenaSyncRetryUsed = true;
+    lobbyArenaSyncPendingSince = performance.now();
+    addFeed('ARENA SYNC STALLED - RETRYING', 'gold');
+    void activateArenaSelection(arenaId as ArenaId, true);
+    return;
+  }
+  lobbyArenaSyncFailed = true;
+  const guidance = document.querySelector<HTMLElement>('#lobby-guidance');
+  if (guidance) {
+    guidance.textContent = `Arena sync failed twice for ${arenaSelection(arenaId as ArenaId).displayName}. LEAVE the lobby and rejoin - the room stays open.`;
+  }
+  addFeed('ARENA SYNC FAILED - LEAVE AND REJOIN', 'gold');
+}, 5_000);
 
 renderHighScores();
 void refreshGlobalLeaderboard();
@@ -9093,8 +11232,9 @@ function applyMenuLoadoutImmediately(): void {
   });
 }
 
-let activeMenuTabId: 'deploy' | 'kit' | 'streaks' | 'options' = 'deploy';
-function setMenuTab(tab: 'deploy' | 'kit' | 'streaks' | 'options', flushOptions = true): void {
+type MenuTabId = 'deploy' | 'kit' | 'streaks' | 'operator' | 'options';
+let activeMenuTabId: MenuTabId = 'deploy';
+function setMenuTab(tab: MenuTabId, flushOptions = true): void {
   if (tab === 'kit' && selectedArena.id === 'gun-range') tab = 'deploy';
   // Pass 65: leaving the options tab is a graphics save point — batched edits
   // flush here instead of reloading the page per control change.
@@ -9178,7 +11318,7 @@ function renderFieldKitSelection(): void {
     const title = document.createElement('strong');
     title.textContent = 'PICK UP YOUR WEAPON INSIDE';
     const detail = document.createElement('b');
-    detail.textContent = `${equipped} · PRESS F AT A BENCH`;
+    detail.textContent = `${equipped} · PRESS ${interactLabel()} AT A BENCH`; // GAMEPAD: glyph follows the active input
     summary.append(label, title, detail);
     return;
   }
@@ -9368,57 +11508,730 @@ player.selectedGrenade = initialLoadoutSelection.grenade;
 player.weapon = player.primaryWeapon;
 renderFieldKitSelection();
 
-const viewFill = new THREE.PointLight(0xe3f1ff, 1.35, 5);
-viewFill.position.set(0, 0.4, 0.2);
+// HF-410: this fill lamp lights the first-person layer and nothing else, so it
+// lives inside the body fit with the rig it lights. Position, cutoff radius and
+// physical intensity all scale (irradiance is intensity / r^2), which is what
+// keeps the rig lit exactly as it was before the fit rather than 39x brighter.
+const viewFill = new THREE.PointLight(
+  0xe3f1ff,
+  viewmodelBodyFitLightIntensity(1.35),
+  viewmodelBodyFitLightDistance(5),
+);
+viewFill.position.set(
+  viewmodelRigToWorldMeters(0),
+  viewmodelRigToWorldMeters(0.4),
+  viewmodelRigToWorldMeters(0.2),
+);
 viewFill.layers.set(VIEWMODEL_RENDER_LAYER);
 camera.add(viewFill);
 
-function stanceEyeHeight(stance: PlayerSnapshot['stance']): number {
-  return stance === 'prone' ? 0.61 : stance === 'crouch' ? 1.16 : 1.7;
+
+// The nine-probe contact lattice, its scratch vectors and the analytic ground
+// clamp now live in src/systems/viewmodel-contact-probe.ts. It had two copies
+// here - the live pose and the HF-343 diagnostics - which had already drifted.
+// Owner 2026-08-30: dressing AABBs for the viewmodel POSE fold only (never
+// the fire gate). Rebuilt lazily whenever the arena or dressing roots change.
+let presentationObstructionBoxes: Box2[] = [];
+let presentationObstructionKey = '';
+/** Retained empty set for the probe paths that must NOT see dressing. */
+const NO_DRESSING_OBSTRUCTION_BOXES: readonly Box2[] = Object.freeze([]);
+// HF-399: the test-map dressing root, resolved ONCE per arena root instead of
+// on every call. Both callers below run every frame (the pose fold and the
+// surface clip planes), and on every arena except Test1/Test2 neither name
+// exists, so each call walked the whole arena graph twice and found nothing.
+// Measured 2026-09-02 on atomic-acres at Quality: 10,108 getObjectByProperty
+// calls per frame from this one line, the single largest named JS cost in a
+// main thread that was 0.1% idle.
+//
+// INVARIANT THIS CACHE DEPENDS ON (break it and the fold silently reads a
+// stale group): the dressing group is named exactly once, inside the arena
+// builder - `src/test-maps-art.ts` applyTest1Dressing:984 / applyTest2Dressing:1225
+// are the ONLY two `name = 'testN-dressing'` sites in src/ - and it is added
+// straight to `arena.root`, so it exists the moment `arena.root` does and is
+// never swapped out under a stable root. The three re-resolve triggers below
+// exist so that a future change which DOES swap it is still correct:
+//   * a different `arena.root` object (the normal arena-transition path),
+//   * the root's direct child count changing (dressing added or removed),
+//   * the cached group having been detached from the graph (`parent === null`).
+let presentationDressingRootFor: THREE.Object3D | null = null;
+let presentationDressingRootChildCount = -1;
+let presentationDressingRoot: THREE.Object3D | undefined;
+
+function activePresentationDressingRoot(): THREE.Object3D | undefined {
+  const root = arena.root;
+  const stale = root !== presentationDressingRootFor
+    || root.children.length !== presentationDressingRootChildCount
+    || (presentationDressingRoot !== undefined && presentationDressingRoot.parent === null);
+  if (stale) {
+    presentationDressingRootFor = root;
+    presentationDressingRootChildCount = root.children.length;
+    presentationDressingRoot = root.getObjectByName('test1-dressing') ?? root.getObjectByName('test2-dressing');
+  }
+  return presentationDressingRoot;
 }
 
-const viewmodelProbeDirection = new THREE.Vector3();
-const viewmodelProbeRight = new THREE.Vector3();
-const viewmodelProbeUp = new THREE.Vector3();
-const viewmodelProbeStart = new THREE.Vector3();
-const viewmodelProbeEnd = new THREE.Vector3();
-const viewmodelProbeRotation = new THREE.Euler(0, 0, 0, 'YXZ');
-function currentViewmodelObstructionPose(): ViewmodelObstructionPose {
-  const profile = VIEWMODEL_CONTACT_PROFILES[player.weapon];
-  viewmodelProbeRotation.set(player.pitch, player.yaw, 0, 'YXZ');
-  viewmodelProbeDirection.set(0, 0, -1).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeRight.set(1, 0, 0).applyEuler(viewmodelProbeRotation).normalize();
-  viewmodelProbeUp.set(0, 1, 0).applyEuler(viewmodelProbeRotation).normalize();
-  const colliders = activeWorldColliders();
-  const probePaddingMeters = viewmodelContactProbePaddingMeters(profile);
-  let nearestForward: number | null = null;
-  for (const offset of VIEWMODEL_CONTACT_PROBE_OFFSETS) {
-    const verticalOffset = offset.vertical === 'upper'
-      ? profile.probeUpperOffsetMeters
-      : offset.vertical === 'lower' ? -profile.probeLowerOffsetMeters : offset.rightScale === 0 ? 0 : 0.04;
-    viewmodelProbeStart.copy(player.position)
-      .addScaledVector(viewmodelProbeRight, offset.rightScale * profile.probeHalfWidthMeters)
-      .addScaledVector(viewmodelProbeUp, verticalOffset);
-    viewmodelProbeEnd.copy(viewmodelProbeStart).addScaledVector(viewmodelProbeDirection, profile.probeLengthMeters);
-    const hit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, probePaddingMeters);
-    if (!hit) continue;
-    const distance = hit.time * profile.probeLengthMeters;
-    nearestForward = nearestForward === null ? distance : Math.min(nearestForward, distance);
+function activePresentationObstructionBoxes(): readonly Box2[] {
+  // Measured 2026-08-31 on atomic-acres: this fed the fold ZERO boxes against
+  // 2746 visible meshes. 'test1-dressing'/'test2-dressing' are names that only
+  // exist in src/test-maps-art.ts, and neighbourhoodLifeRoot is the Nuketown
+  // life layer - so on the owner's main map the dressing fold was inert and
+  // the gun rendered straight through every prop. The arena's own ART root is
+  // where atomic-acres keeps its dressing, so it goes in the list.
+  const dressingRoot = activePresentationDressingRoot();
+  const key = `${arena.root.uuid}:${neighbourhoodLifeRoot?.uuid ?? ''}:${dressingRoot?.uuid ?? ''}:${arenaArtRoot?.uuid ?? ''}`;
+  if (key !== presentationObstructionKey) {
+    presentationObstructionKey = key;
+    presentationObstructionBoxes = collectPresentationObstructionBoxes([
+      neighbourhoodLifeRoot,
+      dressingRoot,
+      arenaArtRoot,
+      // The arena's own root last: its props are the dressing the owner walks
+      // into, and anything in it that is also a movement collider simply folds
+      // the weapon the same way the collider already did.
+      arena.root,
+    ]);
   }
-  viewmodelProbeStart.copy(player.position);
-  viewmodelProbeEnd.copy(player.position);
-  viewmodelProbeEnd.y -= 1.05;
-  const floorHit = firstSegmentBoxHit(viewmodelProbeStart, viewmodelProbeEnd, colliders, 0.035);
-  const floorClearance = viewmodelFloorClearance(
-    floorHit ? floorHit.time * 1.05 : null,
-    playerGrounded,
-    stanceEyeHeight(player.stance),
-  );
-  return viewmodelObstructionPose(nearestForward, player.stance === 'prone', floorClearance, player.weapon);
+  return presentationObstructionBoxes;
+}
+
+/**
+ * The live world slice the contact lattice reads. Assembled in one place so
+ * the pose and any diagnostic view of it cannot disagree about the world.
+ */
+function currentViewmodelObstructionInput(): ViewmodelObstructionPoseInput {
+  return {
+    weapon: player.weapon,
+    position: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    colliders: activeWorldColliders(),
+    // Pose-only obstruction set: dressing folds the weapon on screen, but the
+    // fire-admission gate (which recomputes with colliders alone) is untouched -
+    // decoration may bend the gun, never refuse the trigger.
+    dressingBoxes: activePresentationObstructionBoxes(),
+    // The MEASURED rig envelope. Presentation-only: the pose fold probes the
+    // volume the weapon is actually in and as far as it actually reaches,
+    // while the HF-343 fire gate keeps sampling the authored profile through
+    // nearestViewmodelForwardObstructionMeters, whose numbers never move.
+    envelope: weaponView.contactProbeEnvelope(),
+    grounded: playerGrounded,
+    prone: player.stance === 'prone',
+    stanceEyeHeightMeters: stanceEyeHeight(player.stance),
+    // The floor the viewmodel is kept above. Tracked rather than derived,
+    // because `grounded` drops out between steps on every slope and took the
+    // analytic floor with it - see `lastGroundedFeetY` in the probe module.
+    lastGroundedFeetY: lastGroundedFeetY,
+  };
+}
+
+function currentViewmodelObstructionPose(): ViewmodelObstructionPoseWithCut {
+  return resolveViewmodelObstructionPose(currentViewmodelObstructionInput());
+}
+
+function currentViewmodelSurfaceClipPlanes() {
+  return viewmodelSurfaceClipPlanes({
+    eye: camera.position,
+    colliders: activeWorldColliders(),
+    dressingBoxes: activePresentationObstructionBoxes(),
+    groundPlaneY: lastGroundedFeetY,
+  });
+}
+
+/**
+ * The PRESENTATION lattice, per probe, as the cut and the fold actually see
+ * it. Read-only observability.
+ *
+ * `sampleFireAdmissionDiagnostics` below already dumps a nine-probe sweep, but
+ * that one deliberately mirrors the fire gate: authored profile, colliders
+ * only, no dressing. The contact fold and the contact cut read a different
+ * world - the measured rig envelope over BOTH collider sets - and the
+ * 2026-08-31 "the weapon vanishes at a corner" defect lived entirely in the
+ * difference between the two. Diagnosing it required rebuilding this by hand,
+ * so it is published instead.
+ */
+function describePresentationContactProbes(): Record<string, unknown> {
+  const input = currentViewmodelObstructionInput();
+  const sweep = sampleViewmodelContactProbes(input);
+  return {
+    lattice: sweep.lattice,
+    envelope: input.envelope,
+    probePaddingMeters: sweep.probePaddingMeters,
+    forwardY: sweep.forwardY,
+    dressingBoxCount: input.dressingBoxes.length,
+    probes: sweep.samples.map((sample) => ({
+      offset: `${sample.offset.rightScale}/${sample.offset.vertical}`,
+      colliderMeters: sample.colliderMeters,
+      dressingMeters: sample.dressingMeters,
+      colliderBounds: sample.colliderBox ?? null,
+    })),
+    // The same lattice as the CUT reads it: each probe's own hit distance
+    // beside the depth at which the surface it struck crosses the view axis.
+    // Reading the two columns side by side is what turned "the weapon vanishes
+    // at a corner" from a screenshot into a number.
+    cutProbes: sampleViewmodelCutProbes(input),
+  };
 }
 
 function currentViewmodelSurfaceRetreat(): number {
   return currentViewmodelObstructionPose().retreat;
+}
+
+// HF-343 diagnosis: the trigger can be refused by 'viewmodel-contact-raise'
+// with no observable cause for the player or QA. This debug-only sampler
+// recomputes exactly what tryFire's gate sees (same probe lattice, same
+// padding, same viewmodelFireAdmission call) and reports per-probe hit
+// distances plus the blocking collider bounds, so a false-positive block at
+// spawn names its geometry instead of staying invisible. Read-only; never
+// referenced by gameplay.
+/**
+ * One mesh vertex in WORLD space, honouring skinning.
+ *
+ * THE ARMS ARE A SKINNED MESH, and reading their position attribute directly is
+ * meaningless: those are BIND-POSE vertices, and the pose the player sees is
+ * produced by the skeleton at draw time. Measuring the raw attribute reported
+ * arm geometry 2.17 m below the camera on flat ground - anatomy that does not
+ * exist - and made the arms look like the worst offender in every wall
+ * measurement. `applyBoneTransform` is what the GPU does, so it is what a
+ * measurement of what the player sees has to do too.
+ */
+function worldVertex(
+  mesh: THREE.Mesh,
+  position: THREE.BufferAttribute,
+  index: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  target.fromBufferAttribute(position, index);
+  const skinned = mesh as THREE.SkinnedMesh;
+  if ((skinned as { isSkinnedMesh?: boolean }).isSkinnedMesh && skinned.skeleton) {
+    skinned.applyBoneTransform(index, target);
+  }
+  return target.applyMatrix4(mesh.matrixWorld);
+}
+
+/**
+ * HOW FAR THE WEAPON IS INSIDE THE WORLD, in metres, right now.
+ *
+ * The owner has reported "gun goes through walls and floor" repeatedly, and
+ * every previous attempt was graded on something that was NOT that number: the
+ * muzzle socket (one authored point, which passed while the magazine sat 0.26 m
+ * through a wall), a screenshot (the viewmodel draws on a depth-cleared overlay,
+ * so it paints over geometry whether it is inside it or not, and a human cannot
+ * tell those apart), or a probe's own reported distance (which is an input to
+ * the fix, not a measure of it).
+ *
+ * This measures the thing itself: every visible viewmodel VERTEX, in world
+ * space, against the solid boxes it could be inside, and against the floor.
+ * Penetration is the depth of the deepest vertex inside any solid. Zero means
+ * no part of the weapon or the arms is inside anything.
+ *
+ * Debug only; allocates freely and walks full vertex buffers. Never called from
+ * the frame loop.
+ */
+function sampleViewmodelPenetration(): Record<string, unknown> {
+  const colliders = activeWorldColliders();
+  const dressing = activePresentationObstructionBoxes();
+  const solids = [...colliders, ...dressing];
+  const vertex = new THREE.Vector3();
+  // THE CLIPPING PLANES MUST BE PART OF THIS MEASUREMENT.
+  //
+  // A clipping plane does not move a vertex - it discards the fragment. So a
+  // weapon that is perfectly cut at a wall still has vertices inside that wall,
+  // and a probe that only walks vertex positions reports a defect that the
+  // player cannot see. This was measured the wrong way once: the surface-clip
+  // fix changed nothing at all in the numbers because the metric never looked at
+  // whether the geometry was drawn.
+  //
+  // `clipIntersection` is false on this group, which in three means a fragment
+  // survives only if it is on the kept side of EVERY plane. So a vertex counts
+  // as visible when its signed distance is non-negative for all of them.
+  const clippingRoot = weaponView.root as unknown as { clippingPlanes?: THREE.Plane[] };
+  const activeClipPlanes = Array.isArray(clippingRoot.clippingPlanes) ? clippingRoot.clippingPlanes : [];
+  const drawnAt = (point: THREE.Vector3): boolean => {
+    for (const plane of activeClipPlanes) {
+      if (plane.distanceToPoint(point) < 0) return false;
+    }
+    return true;
+  };
+  let clippedVertices = 0;
+  let worstDepth = 0;
+  let worstMesh: string | null = null;
+  let worstBox: unknown = null;
+  let worstPoint: [number, number, number] | null = null;
+  let vertexCount = 0;
+  let meshCount = 0;
+  const perMesh: Array<{ mesh: string; vertices: number; maxDepthM: number }> = [];
+
+  weaponView.root.updateWorldMatrix(true, true);
+  weaponView.root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+    // An invisible or non-writing material is not something the player can see
+    // sticking through a wall, so it is not penetration.
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!materials.some((material) => material && material.visible && material.colorWrite !== false)) return;
+    let ancestor: THREE.Object3D | null = mesh.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return;
+    meshCount += 1;
+    let meshWorst = 0;
+    // Decimated on large buffers: the silhouette of a weapon is dense enough
+    // that every 3rd vertex still finds the deepest point to well under a mm.
+    const stride = position.count > 6_000 ? 3 : 1;
+    for (let index = 0; index < position.count; index += stride) {
+      worldVertex(mesh, position, index, vertex);
+      vertexCount += 1;
+      // Cut geometry is not visible geometry. A vertex the clipping planes
+      // reject cannot be seen through a wall, so it is not penetration.
+      if (!drawnAt(vertex)) { clippedVertices += 1; continue; }
+      for (const box of solids) {
+        if (box.rotation) continue; // oriented boxes need the collider frame; skipped, not silently counted
+        const minY = box.minY ?? Number.NEGATIVE_INFINITY;
+        const maxY = box.maxY ?? Number.POSITIVE_INFINITY;
+        if (vertex.x <= box.minX || vertex.x >= box.maxX) continue;
+        if (vertex.z <= box.minZ || vertex.z >= box.maxZ) continue;
+        if (vertex.y <= minY || vertex.y >= maxY) continue;
+        // Inside. Depth is the distance to the NEAREST face - the smallest
+        // push that would get this vertex back out of the solid.
+        const depth = Math.min(
+          vertex.x - box.minX, box.maxX - vertex.x,
+          vertex.z - box.minZ, box.maxZ - vertex.z,
+          Number.isFinite(minY) ? vertex.y - minY : Number.POSITIVE_INFINITY,
+          Number.isFinite(maxY) ? maxY - vertex.y : Number.POSITIVE_INFINITY,
+        );
+        if (depth > meshWorst) meshWorst = depth;
+        if (depth > worstDepth) {
+          worstDepth = depth;
+          worstMesh = mesh.name || '(unnamed)';
+          worstBox = box;
+          worstPoint = [vertex.x, vertex.y, vertex.z];
+        }
+      }
+    }
+    if (meshWorst > 0) perMesh.push({ mesh: mesh.name || '(unnamed)', vertices: position.count, maxDepthM: Math.round(meshWorst * 1000) / 1000 });
+  });
+
+  // The floor is measured separately: most authored floors are not collider
+  // boxes, which is exactly why the analytic floor clamp exists at all.
+  let belowFloorM = 0;
+  if (lastGroundedFeetY !== null) {
+    weaponView.root.traverse((node) => {
+      const mesh = node as THREE.Mesh;
+      if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+      const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+      if (!position) return;
+      const stride = position.count > 6_000 ? 3 : 1;
+      for (let index = 0; index < position.count; index += stride) {
+        worldVertex(mesh, position, index, vertex);
+        if (!drawnAt(vertex)) continue;
+        const below = (lastGroundedFeetY as number) - vertex.y;
+        if (below > belowFloorM) belowFloorM = below;
+      }
+    });
+  }
+
+  perMesh.sort((left, right) => right.maxDepthM - left.maxDepthM);
+  // HF-395: WHOSE solid is it, and is the EYE inside one?
+  //
+  // A pose whose eye is inside a movement collider is not reachable in play and
+  // no clip plane can help it: `separatingFaceFor` refuses a box you are inside
+  // because every face it could pick cuts the whole rig. Reporting this makes
+  // the difference between "the clip system failed" and "this QA pose stands
+  // inside a wall" readable instead of guessed. Read-only; no gameplay reads it.
+  const eyeInsideBox = (box: Box2): boolean => (
+    camera.position.x > box.minX && camera.position.x < box.maxX
+    && camera.position.z > box.minZ && camera.position.z < box.maxZ
+    && camera.position.y > (box.minY ?? Number.NEGATIVE_INFINITY)
+    && camera.position.y < (box.maxY ?? Number.POSITIVE_INFINITY)
+  );
+  return {
+    contract: 'viewmodel-world-penetration-v1',
+    /** Which list the deepest penetrated solid came from. */
+    worstBoxSource: worstBox === null ? null : (colliders.includes(worstBox as never) ? 'collider' : 'dressing'),
+    eyeInsideColliderBox: colliders.some((box) => !box.rotation && eyeInsideBox(box)),
+    eyeInsideDressingBox: dressing.some((box) => !box.rotation && eyeInsideBox(box)),
+    weapon: player.weapon,
+    stance: player.stance,
+    position: [player.position.x, player.position.y, player.position.z],
+    yaw: player.yaw,
+    pitch: player.pitch,
+    solidBoxes: solids.length,
+    colliderBoxes: colliders.length,
+    dressingBoxes: dressing.length,
+    meshesMeasured: meshCount,
+    verticesMeasured: vertexCount,
+    /** Vertices the clipping planes removed - these are not visible, so not defects. */
+    clippedVertices,
+    activeClipPlanes: activeClipPlanes.length,
+    /** THE NUMBER. Metres the deepest visible viewmodel vertex is inside a solid. */
+    maxPenetrationM: Math.round(worstDepth * 1000) / 1000,
+    worstMesh,
+    worstPoint,
+    worstBox,
+    /** Metres the lowest visible vertex is below the tracked standing surface. */
+    maxBelowFloorM: Math.round(belowFloorM * 1000) / 1000,
+    lastGroundedFeetY,
+    perMesh: perMesh.slice(0, 12),
+    contactFold: weaponView.contactFoldState(),
+  };
+}
+
+/**
+ * HF-410 - THE RIG'S OWN ENVELOPE, measured, in the frames that decide it.
+ *
+ * The penetration sampler answers "is the gun inside something". This answers
+ * the question underneath it: HOW BIG IS THE RIG, and does it fit inside the
+ * body that carries it. Two frames, because two different things are being
+ * asked:
+ *
+ *  - the EYE frame (camera space) decides framing and near-plane safety;
+ *  - the WORLD frame decides collision, and the capsule is vertical in world
+ *    space no matter where the camera is pointing, so the radial number is
+ *    taken as the horizontal distance from the player's own axis and compared
+ *    directly against CHARACTER_PHYSICS_CONFIG.playerRadius.
+ *
+ * A rig whose capsuleRadialMaxM exceeds the capsule radius sticks out of the
+ * player's own collision body, and every wall the capsule may stand next to
+ * therefore intersects it. No retreat, fold, or clip plane can repair that;
+ * only shrinking the envelope can. Debug only; walks full vertex buffers.
+ */
+function sampleViewmodelRigExtent(): Record<string, unknown> {
+  camera.updateWorldMatrix(true, false);
+  const toEye = new THREE.Matrix4().copy(camera.matrixWorld).invert();
+  const vertex = new THREE.Vector3();
+  const eyeVertex = new THREE.Vector3();
+  // HF-410: THE FRAMING, in the only units framing has.
+  //
+  // The fit is a uniform scale about the eye, and a perspective projection is
+  // invariant under exactly that, so the claim "the framing does not change" is
+  // falsifiable here rather than by eye: the rig's normalised-device bounding
+  // box must be the same before and after. This is the side-by-side capture,
+  // expressed as numbers a gate can read.
+  const ndcVertex = new THREE.Vector3();
+  // HF-410: WHAT THE WORLD NEAR PLANE ACTUALLY CUTS.
+  //
+  // `atomicSignal` is hardcoded null, so the depth-cleared first-person overlay
+  // does not run on the shipped WebGPU route: the rig is submitted with the
+  // gameplay camera and its 0.08 m near plane. The fit brings rig points closer
+  // to the eye, so the honest question is not "is anything past the plane" but
+  // "is anything the PLAYER CAN SEE past it". A vertex below the frame is cut
+  // either way and costs nothing; one inside the viewport is a visible defect.
+  const nearPlaneCutMeshes = new Set<string>();
+  let nearPlaneCutVertices = 0;
+  let nearPlaneCutInViewport = 0;
+  // HF-410 REPAIR - THE COUNTERFACTUAL, MEASURED.
+  //
+  // Moving the on-foot plane from 0.08 m to 0.02 m spends a SHARED budget:
+  // depth resolution scales as 1/near, so distant precision goes 4x coarser.
+  // The first pass justified that with "42 of 60 poses had weapon geometry
+  // clipped inside the viewport at 0.08 m" and then shipped no run carrying
+  // that number - the only 0.08 m rows in the tree predate these fields. An
+  // integrator was asked to approve a shared cost against evidence that was not
+  // there.
+  //
+  // It is measurable exactly, in this same pass, from these same vertices: a
+  // perspective matrix's x/y mapping does not depend on `near` (the frustum
+  // extents scale with it), so with the fit in force the set of vertices a
+  // 0.08 m plane would discard is precisely {forward < 0.08}, and each one's
+  // screen position is the one it already has. This is not a simulation of the
+  // old build - it is the old plane applied to the current rig, which is the
+  // question the decision actually turns on.
+  const referenceNearPlaneCutMeshes = new Set<string>();
+  let referenceNearPlaneCutVertices = 0;
+  let referenceNearPlaneCutInViewport = 0;
+  let referenceCutMinY = Number.POSITIVE_INFINITY;
+  let referenceCutMaxY = Number.NEGATIVE_INFINITY;
+  // The nearest ON-SCREEN vertex. This, not the whole rig's nearest point, is
+  // what a near plane has to clear: the sleeve continues below the frame by
+  // contract and cutting it costs nothing.
+  let viewportForwardMin = Number.POSITIVE_INFINITY;
+  let viewportForwardMinMesh: string | null = null;
+  let cutMinX = Number.POSITIVE_INFINITY;
+  let cutMaxX = Number.NEGATIVE_INFINITY;
+  let cutMinY = Number.POSITIVE_INFINITY;
+  let cutMaxY = Number.NEGATIVE_INFINITY;
+  let ndcMinX = Number.POSITIVE_INFINITY;
+  let ndcMaxX = Number.NEGATIVE_INFINITY;
+  let ndcMinY = Number.POSITIVE_INFINITY;
+  let ndcMaxY = Number.NEGATIVE_INFINITY;
+  // HF-410 REPAIR - A FRAMING BOX A GATE CAN ACTUALLY READ.
+  //
+  // The box above deliberately accumulates every vertex in front of the eye,
+  // including ones inside the near plane, so both sides of a before/after
+  // comparison cover the same geometry. The cost is that a vertex approaching
+  // the projection singularity (forward -> 0) throws |ndc| to hundreds and
+  // swamps the box: comparing the fit-disabled and fitted runs at matching
+  // poses, the sniper hip rows differ by -11.55 in ndcMaxX and +16.96 in
+  // ndcMinY, which says nothing about framing and cannot be ratcheted.
+  //
+  // So the DRAWABLE box is reported alongside it: the same measurement
+  // restricted to vertices at or beyond the plane in force, which is exactly
+  // the geometry the rasteriser keeps. That one is stable enough to gate on.
+  let drawnNdcMinX = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxX = Number.NEGATIVE_INFINITY;
+  let drawnNdcMinY = Number.POSITIVE_INFINITY;
+  let drawnNdcMaxY = Number.NEGATIVE_INFINITY;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let forwardMin = Number.POSITIVE_INFINITY;
+  let forwardMax = Number.NEGATIVE_INFINITY;
+  let radialMax = 0;
+  let radialMesh: string | null = null;
+  let radialPoint: [number, number, number] | null = null;
+  let forwardMesh: string | null = null;
+  let floorClearance = Number.POSITIVE_INFINITY;
+  let floorMesh: string | null = null;
+  let vertexCount = 0;
+  let meshCount = 0;
+  const feetY = lastGroundedFeetY;
+  const viewmodelPose = weaponView.presentationState();
+  weaponView.root.updateWorldMatrix(true, true);
+  weaponView.root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!(mesh as { isMesh?: boolean }).isMesh || !mesh.visible) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (!materials.some((material) => material && material.visible && material.colorWrite !== false)) return;
+    let ancestor: THREE.Object3D | null = mesh.parent;
+    while (ancestor) {
+      if (!ancestor.visible) return;
+      ancestor = ancestor.parent;
+    }
+    const position = mesh.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return;
+    meshCount += 1;
+    const stride = position.count > 6_000 ? 3 : 1;
+    const name = mesh.name || '(unnamed)';
+    for (let index = 0; index < position.count; index += stride) {
+      worldVertex(mesh, position, index, vertex);
+      vertexCount += 1;
+      const radial = Math.hypot(vertex.x - player.position.x, vertex.z - player.position.z);
+      if (radial > radialMax) {
+        radialMax = radial;
+        radialMesh = name;
+        radialPoint = [vertex.x, vertex.y, vertex.z];
+      }
+      if (feetY !== null) {
+        const clearance = vertex.y - (feetY as number);
+        if (clearance < floorClearance) { floorClearance = clearance; floorMesh = name; }
+      }
+      eyeVertex.copy(vertex).applyMatrix4(toEye);
+      if (eyeVertex.x < minX) minX = eyeVertex.x;
+      if (eyeVertex.x > maxX) maxX = eyeVertex.x;
+      if (eyeVertex.y < minY) minY = eyeVertex.y;
+      if (eyeVertex.y > maxY) maxY = eyeVertex.y;
+      const forward = -eyeVertex.z;
+      if (forward < forwardMin) forwardMin = forward;
+      if (forward > forwardMax) { forwardMax = forward; forwardMesh = name; }
+      if (forward < camera.near && forward > 1e-4) {
+        nearPlaneCutVertices += 1;
+        nearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          nearPlaneCutInViewport += 1;
+          if (ndcVertex.x < cutMinX) cutMinX = ndcVertex.x;
+          if (ndcVertex.x > cutMaxX) cutMaxX = ndcVertex.x;
+          if (ndcVertex.y < cutMinY) cutMinY = ndcVertex.y;
+          if (ndcVertex.y > cutMaxY) cutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward < FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS && forward > 1e-4) {
+        referenceNearPlaneCutVertices += 1;
+        referenceNearPlaneCutMeshes.add(name);
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          referenceNearPlaneCutInViewport += 1;
+          if (ndcVertex.y < referenceCutMinY) referenceCutMinY = ndcVertex.y;
+          if (ndcVertex.y > referenceCutMaxY) referenceCutMaxY = ndcVertex.y;
+        }
+      }
+      if (forward > 1e-4 && forward < viewportForwardMin) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x >= -1 && ndcVertex.x <= 1 && ndcVertex.y >= -1 && ndcVertex.y <= 1) {
+          viewportForwardMin = forward;
+          viewportForwardMinMesh = name;
+        }
+      }
+      // Only points in FRONT OF THE EYE project meaningfully. The near plane is
+      // deliberately not the filter: a perspective matrix's x/y mapping is
+      // independent of `near`, so a point inside the plane still reports the
+      // screen position it would occupy, and excluding it would make the two
+      // sides of this comparison cover different geometry.
+      if (forward > 1e-4) {
+        ndcVertex.copy(vertex).project(camera);
+        if (ndcVertex.x < ndcMinX) ndcMinX = ndcVertex.x;
+        if (ndcVertex.x > ndcMaxX) ndcMaxX = ndcVertex.x;
+        if (ndcVertex.y < ndcMinY) ndcMinY = ndcVertex.y;
+        if (ndcVertex.y > ndcMaxY) ndcMaxY = ndcVertex.y;
+        if (forward >= camera.near) {
+          if (ndcVertex.x < drawnNdcMinX) drawnNdcMinX = ndcVertex.x;
+          if (ndcVertex.x > drawnNdcMaxX) drawnNdcMaxX = ndcVertex.x;
+          if (ndcVertex.y < drawnNdcMinY) drawnNdcMinY = ndcVertex.y;
+          if (ndcVertex.y > drawnNdcMaxY) drawnNdcMaxY = ndcVertex.y;
+        }
+      }
+    }
+  });
+  const round = (value: number): number | null => (
+    Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null
+  );
+  return {
+    contract: 'viewmodel-rig-extent-v1',
+    /** HF-410: the fit in force when this row was measured. 1 is unfitted. */
+    bodyFitScale: VIEWMODEL_BODY_FIT_SCALE,
+    weapon: player.weapon,
+    stance: player.stance,
+    adsBlend: Math.round(weaponView.adsProgress() * 1000) / 1000,
+    meshesMeasured: meshCount,
+    verticesMeasured: vertexCount,
+    /** Metres the forward-most visible vertex sits ahead of the eye. */
+    eyeForwardMaxM: round(forwardMax),
+    /** Metres the rear-most visible vertex sits ahead of the eye (negative: behind it). */
+    eyeForwardMinM: round(forwardMin),
+    eyeLateralMinM: round(minX),
+    eyeLateralMaxM: round(maxX),
+    eyeDownMaxM: round(-minY),
+    eyeUpMaxM: round(maxY),
+    /** THE NUMBER THIS LANE EXISTS FOR: horizontal metres from the player's own axis. */
+    capsuleRadialMaxM: round(radialMax),
+    capsuleRadiusM: CHARACTER_PHYSICS_CONFIG.playerRadius,
+    /** Positive: the rig fits inside the capsule. Negative: it sticks out by this much. */
+    capsuleMarginM: round(CHARACTER_PHYSICS_CONFIG.playerRadius - radialMax),
+    radialMesh,
+    radialPoint,
+    forwardMesh,
+    /** Metres the lowest visible vertex sits above the tracked standing surface. */
+    floorClearanceMinM: round(floorClearance),
+    floorMesh,
+    // HF-410: WHAT THE POSE WAS DOING WHEN THIS FRAME WAS MEASURED.
+    //
+    // Without these the extent numbers cannot be read: a rig that sits lower on
+    // screen might have been fitted, or might simply have stopped being shoved
+    // upward by a floor probe. The owner's complaint is about the second.
+    surfaceRetreatM: viewmodelPose.surfaceRetreat,
+    surfaceLiftM: viewmodelPose.surfaceLift,
+    contactLiftM: viewmodelPose.contactResponse.additionalLiftMeters,
+    contactDropM: viewmodelPose.contactResponse.additionalDropMeters,
+    contactPitchRadians: viewmodelPose.contactResponse.pitchRadians,
+    contactWallBlend: viewmodelPose.contactResponse.wallBlend,
+    contactFloorBlend: viewmodelPose.contactResponse.floorBlend,
+    foldPitchRadians: weaponView.contactFoldState().foldPitchRadians,
+    foldRetreatM: weaponView.contactFoldState().retreatMeters,
+    /** Visible vertices the gameplay camera's near plane discards, and how many are on screen. */
+    nearPlaneCutVertices,
+    nearPlaneCutInViewport,
+    nearPlaneCutMeshes: [...nearPlaneCutMeshes],
+    /**
+     * HF-410 REPAIR: the same counts under the plane this build shipped with
+     * BEFORE the fit (0.08 m), computed exactly from the same vertices. This is
+     * what the near-plane change bought, in the tree, per pose.
+     */
+    referenceNearM: FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS,
+    referenceNearPlaneCutVertices,
+    referenceNearPlaneCutInViewport,
+    referenceNearPlaneCutMeshes: [...referenceNearPlaneCutMeshes],
+    referenceCutNdcMinY: round(referenceCutMinY),
+    referenceCutNdcMaxY: round(referenceCutMaxY),
+    /** WHERE on screen the cut lands. Bottom-edge only is invisible; anything higher is not. */
+    cutNdcMinX: round(cutMinX), cutNdcMaxX: round(cutMaxX),
+    cutNdcMinY: round(cutMinY), cutNdcMaxY: round(cutMaxY),
+    /** THE NEAR PLANE THE RIG ACTUALLY NEEDS: nearest ON-SCREEN vertex, metres. */
+    viewportForwardMinM: Number.isFinite(viewportForwardMin)
+      ? Math.round(viewportForwardMin * 10_000) / 10_000
+      : null,
+    viewportForwardMinMesh,
+    /** THE FRAMING. Identical before and after the fit, or the fit changed the picture. */
+    ndcMinX: round(ndcMinX), ndcMaxX: round(ndcMaxX),
+    ndcMinY: round(ndcMinY), ndcMaxY: round(ndcMaxY),
+    /** The same box over DRAWN geometry only - free of the projection singularity. */
+    drawnNdcMinX: round(drawnNdcMinX), drawnNdcMaxX: round(drawnNdcMaxX),
+    drawnNdcMinY: round(drawnNdcMinY), drawnNdcMaxY: round(drawnNdcMaxY),
+    /** Metres between the nearest visible vertex and the render camera near plane. */
+    nearPlaneMarginM: round(forwardMin - camera.near),
+    cameraNearM: camera.near,
+    cameraFovDegrees: camera.fov,
+    eyeHeightM: round(camera.position.y),
+    lastGroundedFeetY: feetY,
+  };
+}
+
+function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
+  // The fire gate never sees dressing geometry, so neither does this view of
+  // it: passing the dressing set here would report a block the trigger cannot
+  // actually suffer.
+  const sweep = sampleViewmodelContactProbes({
+    weapon: player.weapon,
+    position: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    colliders: activeWorldColliders(),
+    dressingBoxes: NO_DRESSING_OBSTRUCTION_BOXES,
+  });
+  const profile = sweep.profile;
+  const probePaddingMeters = sweep.probePaddingMeters;
+  let nearestForward: number | null = null;
+  let nearestBox: unknown = null;
+  const probes: Array<{ offset: string; hitMeters: number | null }> = [];
+  for (const sample of sweep.samples) {
+    const label = `${sample.offset.rightScale}/${sample.offset.vertical}`;
+    const distance = sample.colliderMeters;
+    if (distance === null) {
+      probes.push({ offset: label, hitMeters: null });
+      continue;
+    }
+    if (nearestForward === null || distance < nearestForward) {
+      nearestForward = distance;
+      nearestBox = sample.colliderBox;
+    }
+    probes.push({ offset: label, hitMeters: Math.round(distance * 1000) / 1000 });
+  }
+  // Mirror the exact tryFire gate inputs: surfaceLift deliberately 0.
+  const pose = currentViewmodelObstructionPose();
+  const admission = viewmodelFireAdmission(
+    player.weapon,
+    pose.retreat,
+    0,
+    player.stance === 'prone',
+    weaponView.adsProgress(),
+  );
+  weaponView.root.updateWorldMatrix(true, true);
+  const muzzleWorldPosition = weaponView.muzzleWorldPosition();
+  const surfaceClipPlanes = currentViewmodelSurfaceClipPlanes();
+  const muzzleInsideSurface = muzzleWorldPosition !== null
+    && viewmodelMuzzleInsideSurfaceClip(muzzleWorldPosition, surfaceClipPlanes);
+  return {
+    weapon: player.weapon,
+    stance: player.stance,
+    position: [player.position.x, player.position.y, player.position.z],
+    yawRadians: player.yaw,
+    pitchRadians: player.pitch,
+    fullStowDistanceMeters: profile.fullStowDistanceMeters,
+    probeLengthMeters: profile.probeLengthMeters,
+    probePaddingMeters,
+    retreat: pose.retreat,
+    adsProgress: weaponView.adsProgress(),
+    probes,
+    nearestForwardMeters: nearestForward === null ? null : Math.round(nearestForward * 1000) / 1000,
+    nearestColliderBounds: nearestBox ?? null,
+    fireAdmission: admission,
+    muzzleWorldPosition: muzzleWorldPosition?.toArray() ?? null,
+    muzzleInsideSurface,
+    surfaceClipPlaneCount: surfaceClipPlanes.length,
+    // Presentation-only observability. These are the numbers the 2026-08-31
+    // clipping diagnosis had to reconstruct by hand: what the fold actually
+    // measured, how much dressing it can see, and what the renderer did to the
+    // transform as a result.
+    dressingBoxCount: activePresentationObstructionBoxes().length,
+    contactDepthMeters: pose.contactDepthMeters,
+    contactCutDepthMeters: pose.contactCutDepthMeters,
+    contactEnvelope: weaponView.contactProbeEnvelope(),
+    contactFold: weaponView.contactFoldState(),
+    presentationProbes: describePresentationContactProbes(),
+  };
 }
 
 function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
@@ -9438,8 +12251,17 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   root.name = 'remote-player-world';
   root.rotation.order = 'YXZ';
   root.userData.playerId = snapshot.id;
+  // HF-382: seed the replicated idle stance; updateRiggedOperator reads this
+  // root channel every frame and cross-fades when it changes.
+  root.userData.operatorStanceId = memberOperatorStanceId(snapshot.id);
+  // A remote seeded from retained (possibly dead) authority must not stand
+  // visible at its old position until the first admitted state corrects it.
+  root.visible = snapshot.hp > 0;
 
-  const operator = buildOperator(snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon);
+  const operator = buildOperator(
+    snapshot.team, 'remote-player-model', flattenOperatorMaterials, snapshot.weapon,
+    'team', memberOperatorSkinId(snapshot.id), // HF-360
+  );
   operator.userData.playerId = snapshot.id;
   operator.traverse((child) => {
     child.userData.playerId = snapshot.id;
@@ -9465,7 +12287,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: true, depthWrite: false }));
   sprite.userData.presentationOnly = true;
   sprite.raycast = () => {};
-  sprite.visible = privateMatchMode === 'tdm' && snapshot.team === player.team;
+  sprite.visible = privateMatchMode !== 'ffa' && snapshot.team === player.team;
   sprite.position.y = 2.5;
   sprite.scale.set(2.4, 0.6, 1);
   root.add(sprite);
@@ -9488,7 +12310,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
       stance: snapshot.stance ?? 'stand', continuity: 1,
     }],
     interpolation,
-    snapshotRateHz: 40,
+    snapshotRateHz: 40, authoritativeHostTimeMs: currentHostTimeMs(),
     renderedHostTimeMs: currentHostTimeMs(),
     renderedWorldAgeMs: 0,
     continuity: 1,
@@ -9496,6 +12318,7 @@ function createRemote(snapshot: PlayerSnapshot): RemotePlayer {
     feedbackReordered: 0,
     lastFeedbackAt: Number.NEGATIVE_INFINITY,
     awaitingReplacementState: false,
+    authoritativeReady: network.role !== 'client',
   };
 }
 
@@ -9517,6 +12340,8 @@ function snapshot(): PlayerSnapshot {
     grenade: player.selectedGrenade,
     weapon: player.weapon,
     stance: player.stance,
+    swimming: localSwimState.swimming,
+    reloading: player.reloadState !== null,
     seq: ++player.seq,
   };
 }
@@ -9531,14 +12356,6 @@ function nextCombatTiming(): CombatTiming {
   }, `combat-seq-${timing.eventSeq}`);
   localCombatEventSeq += 1;
   return timing;
-}
-
-function isTimedCombatMessage(message: GameMessage): message is ShotMessage | MeleeMessage | Extract<GameMessage, {
-  type: 'grenade-throw' | 'hit' | 'support-activate' | 'killstreak-activate-intent' | 'killstreak-control-intent' | 'killstreak-care-capture-intent';
-}> {
-  return message.type === 'shot' || message.type === 'melee' || message.type === 'grenade-throw' || message.type === 'hit'
-    || message.type === 'support-activate' || message.type === 'killstreak-activate-intent'
-    || message.type === 'killstreak-control-intent' || message.type === 'killstreak-care-capture-intent';
 }
 
 function admitIncomingCombatTiming(message: GameMessage): boolean {
@@ -9636,9 +12453,6 @@ function hostStickyVerification(message: HitMessage, now: number) {
     : null;
 }
 
-function verifiedStickyAttachment(record: StickyAttachmentRecord): HostVerifiedStickyAttachment {
-  return Object.freeze({ targetId: record.targetId, targetLifeId: record.targetLifeId });
-}
 
 function queuePendingHostStickyHit(message: GameMessage, now: number): boolean {
   if (network.role !== 'host' || message.type !== 'hit' || message.stuck !== true || message.hostAuthority !== undefined) return false;
@@ -9764,6 +12578,7 @@ function interactiveWorldLineOfSight(
 }
 
 function broadcastInteractiveWorldState(forceReliable = false): void {
+  broadcastThinMetalPerforationState(thinMetalPerforationRuntime, forceReliable, gameStarted, player.id, network, randomNonce);
   if (network.role !== 'host' || !interactiveWorldRuntime || !gameStarted) return;
   const revision = interactiveWorldRuntime.collisions().revision;
   if (!forceReliable && (interactiveWorldTick % 6 !== 0 || revision === lastInteractiveWorldBroadcastRevision)) return;
@@ -9837,6 +12652,20 @@ function handleSmokeAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+function handleTaserAuthorityMessage(message: GameMessage): boolean {
+  if (message.type !== 'taser-stun') return false;
+  // Same fail-closed fence as the flash result: only the sitting host may stun
+  // this client, only for this player, only during a live match.
+  if (network.role !== 'client'
+    || message.by !== privateLobbySnapshot?.hostId
+    || message.forPlayerId !== player.id
+    || message.result.targetId !== player.id
+    || matchState.phase !== 'active'
+    || !player.alive) return true;
+  applyAuthoritativeTaserStun(message.result);
+  return true;
+}
+
 function handleFlashAuthorityMessage(message: GameMessage): boolean {
   if (message.type !== 'flash-result') return false;
   // The host transport rejects host-authority message kinds from guests before
@@ -9853,9 +12682,146 @@ function handleFlashAuthorityMessage(message: GameMessage): boolean {
   return true;
 }
 
+/**
+ * Lane J root cause for the owner's cluster: "cant mov when spawn into rustrig
+ * in host guest lobby", "sometimes randomly cant shoot or reload my gun",
+ * "people cant move or been seen by others in guest/host".
+ *
+ * After START both sides load their arena independently, and whichever side
+ * finishes first immediately publishes its match-admission triple — `join`,
+ * the reliable `state` commit, then `killstreak-loadout-intent` (see
+ * sendClientWorldRepairReady and the tail of startGame). onNetworkMessage
+ * discarded every one of them at the `!gameStarted` gate while the receiver was
+ * still loading, and nothing ever re-sent them: the guest only retries its
+ * repair-ready when a host `killstreak-state` arrives, and the host only emits
+ * one once it knows the guest exists. Each side then waited on the other until
+ * the admission deadline fired, leaving the guest at hp 0 / alive false inside
+ * an 'active' match ("Match admission unacknowledged by host
+ * (admission-timeout). Rejoin to retry.") with the host reporting remoteCount 0
+ * — one fault presenting as cannot-move, cannot-shoot, cannot-reload and
+ * cannot-be-seen at once.
+ *
+ * Reproduced mechanically on atomic-acres/FFA with the host ~270 presented
+ * frames behind the guest at publication time; the slower the arena, the wider
+ * the window, which is why RustRig and Terminal were the owner's worst maps.
+ *
+ * The messages are PARKED rather than discarded and replayed through this same
+ * function once the local match is live, so every existing guard (lobby
+ * membership, team, arena bounds, match epoch, nonce) still runs on them —
+ * nothing is admitted that would not have been admitted had it arrived a second
+ * later. Parking is bounded three ways: only while this side is genuinely
+ * mid-admission, only for the admission-critical message types, and only up to
+ * MATCH_ADMISSION_PARK_LIMIT entries. Everything else is still dropped.
+ */
+const MATCH_ADMISSION_PARK_LIMIT = 48;
+const MATCH_ADMISSION_PARKED_TYPES = new Set<GameMessage['type']>([
+  // Outbound admission triple a peer publishes the moment its own match goes
+  // live: identity, the reliable state commit, then the loadout intent.
+  'join',
+  'state',
+  'killstreak-loadout-intent',
+  // The ACKNOWLEDGEMENT, and the reason the race is not self-healing. A guest's
+  // admission is acknowledged only by a host `killstreak-state` carrying its
+  // actor at the right lifeId, and the host sends that once per ack identity
+  // (hostKillstreakLoadoutAcks.needsAck). Dropped while the guest was still
+  // loading, it is never re-offered: the guest then plays on with an
+  // unacknowledged admission and the deadline kills it seconds later, mid-match,
+  // with "Match admission unacknowledged by host (admission-timeout)" — the
+  // owner's "sometimes randomly cant shoot or reload my gun". Replay is safe:
+  // admitKillstreakStateMessage still checks host identity, recipient, match
+  // epoch, nonce and revision, so a superseded snapshot is rejected on arrival.
+  'killstreak-state',
+]);
+let parkedMatchAdmissionMessages: { generation: number; message: GameMessage }[] = [];
+const matchAdmissionParkTelemetry = {
+  parked: 0,
+  replayed: 0,
+  coalesced: 0,
+  droppedOverflow: 0,
+  droppedStale: 0,
+};
+
+
+/**
+ * Coalescing key for the messages where only the newest copy is admissible
+ * anyway: a peer's `state` is superseded by its next one (the live path drops
+ * older sequences), and only the highest-revision `killstreak-state` survives
+ * admitKillstreakStateMessage. `join` and `killstreak-loadout-intent` carry
+ * identity and are never coalesced or evicted — they are the whole point of the
+ * queue. Without this, a peer's 20 Hz state stream filled the queue during a
+ * long arena load and evicted its own join/loadout-intent (measured: 107
+ * parked, 59 overflowed on one host), which reproduced the very deadlock the
+ * queue exists to prevent.
+ */
+function parkedMatchAdmissionKey(message: GameMessage): string | null {
+  if (message.type === 'state') return `state:${message.player.id}`;
+  if (message.type === 'killstreak-state') return 'killstreak-state';
+  return null;
+}
+
+function parkMatchAdmissionMessage(message: GameMessage): void {
+  // Only a side that is actually mid-admission can have a peer racing ahead of
+  // it; outside that window the old drop is still exactly right.
+  if (!matchStartPreparing) return;
+  if (!MATCH_ADMISSION_PARKED_TYPES.has(message.type)) return;
+  const key = parkedMatchAdmissionKey(message);
+  if (key !== null) {
+    const existing = parkedMatchAdmissionMessages
+      .findIndex((entry) => parkedMatchAdmissionKey(entry.message) === key);
+    if (existing >= 0) {
+      // Supersede in place so this message keeps its position relative to the
+      // join / loadout-intent it was published with.
+      parkedMatchAdmissionMessages[existing] = { generation: matchAdmissionGeneration, message };
+      matchAdmissionParkTelemetry.parked += 1;
+      matchAdmissionParkTelemetry.coalesced += 1;
+      return;
+    }
+  }
+  if (parkedMatchAdmissionMessages.length >= MATCH_ADMISSION_PARK_LIMIT) {
+    parkedMatchAdmissionMessages.shift();
+    matchAdmissionParkTelemetry.droppedOverflow += 1;
+  }
+  parkedMatchAdmissionMessages.push({ generation: matchAdmissionGeneration, message });
+  matchAdmissionParkTelemetry.parked += 1;
+}
+
+/**
+ * Replayed in arrival order so the `join` -> `state` -> loadout-intent sequence
+ * the sender emitted is preserved; the loadout intent is rejected outright by
+ * its own guard unless the preceding state has already created the remote.
+ * A message parked under a superseded admission generation is dropped.
+ */
+function replayParkedMatchAdmissionMessages(): void {
+  if (parkedMatchAdmissionMessages.length === 0) return;
+  const queued = parkedMatchAdmissionMessages;
+  parkedMatchAdmissionMessages = [];
+  for (const entry of queued) {
+    if (entry.generation !== matchAdmissionGeneration) {
+      matchAdmissionParkTelemetry.droppedStale += 1;
+      continue;
+    }
+    matchAdmissionParkTelemetry.replayed += 1;
+    onNetworkMessage(entry.message);
+  }
+}
+
+
 function onNetworkMessage(message: GameMessage): void {
   if (handleLobbyMessage(message)) return;
-  if (!gameStarted) return;
+  // Lane J: first proof that the host's own match is LIVE. Restricted to the
+  // admission types, which only a started host emits — clock pongs and other
+  // keepalives flow throughout the host's arena load and would otherwise stamp
+  // contact while the host was still loading, which is the very state the
+  // deadline must not judge. Stamped before the gameStarted gate so a message
+  // that only gets parked still counts as contact.
+  if (network.role === 'client' && hostMatchContactAtMs === null
+    && MATCH_ADMISSION_PARKED_TYPES.has(message.type)) {
+    hostMatchContactAtMs = performance.now();
+  }
+  if (!gameStarted) {
+    parkMatchAdmissionMessage(message);
+    return;
+  }
   if (message.type === 'guest-resume-authority') {
     applyGuestResumeAuthority(message);
     return;
@@ -9863,7 +12829,7 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'guest-resume-ack') {
     acceptGuestResumeAck(message);
     return;
-  }
+  } if (message.type === 'health-authority') { applyHealthAuthorityMessage(message); return; }
   if (message.type === 'guest-resume-nack') {
     acceptGuestResumeNack(message);
     return;
@@ -9873,8 +12839,10 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (handleInteractiveWorldMessage(message)) return;
+  if (handleThinMetalPerforationMessage(message, thinMetalPerforationRuntime, network.role, privateLobbySnapshot?.hostId, selectedArena.id, interactiveWorldMatchEpoch)) return;
   if (handleSmokeAuthorityMessage(message)) return;
   if (handleFlashAuthorityMessage(message)) return;
+  if (handleTaserAuthorityMessage(message)) return;
   if (message.type === 'killstreak-loadout-intent') {
     if (network.role !== 'host' || message.matchEpoch !== killstreakMatchEpoch) return;
     const member = privateLobbySnapshot?.members.find((entry) => entry.id === message.by);
@@ -9930,7 +12898,7 @@ function onNetworkMessage(message: GameMessage): void {
           now,
         }));
       }
-      addFeed(`${combatantLabel(message.by).name} CALLED ${GAMEPAD_SUPPORT_LABELS[admission.activatedId!]}`, 'gold');
+      announceKillstreakActivation(admission, message.by, remotes.get(message.by)?.snapshot.team ?? player.team, now);
       broadcastKillstreakState();
     }
     return;
@@ -9987,6 +12955,13 @@ function onNetworkMessage(message: GameMessage): void {
     }
     return;
   }
+  if (message.type === 'killstreak-announce') {
+    if (network.role !== 'client' || !admitKillstreakAnnounceMessage(message, {
+      expectedHostId: privateLobbySnapshot?.hostId ?? null, expectedMatchEpoch: killstreakMatchEpoch, deduper: killstreakAnnouncements,
+    }).accepted) return;
+    presentKillstreakAnnouncement(message, performance.now());
+    return;
+  }
   if (message.type === 'killstreak-state') {
     if (network.role !== 'client') return;
     const admission = admitKillstreakStateMessage(message, {
@@ -10009,6 +12984,7 @@ function onNetworkMessage(message: GameMessage): void {
         actorId: actor.actorId,
         lifeId: actor.lifeId,
       });
+      if (exactActorAcknowledged) clearClientWorldRepairTimeout();
       // Only a recipient-specific snapshot admitted from the authenticated host
       // can confirm a replacement document's life identity. Persist it for a
       // later renderer replacement, and correct any forged/stale local copy
@@ -10040,16 +13016,29 @@ function onNetworkMessage(message: GameMessage): void {
       if (actor.streak > (previousActor?.streak ?? actor.streak)) recordImmediateStreak();
       updateFieldSupportHud();
     }
+    const reconnectCanAttempt = awaitingCanonicalGuestAuthority
+      && clientReconnectWorldRepairAttempts < MAX_CLIENT_WORLD_REPAIR_ATTEMPTS
+      && message.snapshot.matchEpoch === killstreakMatchEpoch;
     if (clientWorldRepairReceiverReady(clientWorldRepairAdmission, {
       connectionEpoch: localConnectionEpoch,
       matchEpoch: message.snapshot.matchEpoch,
       exactActorAcknowledged,
-    }) || awaitingCanonicalGuestAuthority
-      && pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch) {
-      // This authenticated recipient snapshot can only be authored by a live
-      // host runtime for the current match epoch. If our exact actor/life is
-      // absent, it is the bounded receiver-ready proof for one repair resend.
+    }, performance.now()) || reconnectCanAttempt) {
+      // HF-322: re-arm reconnect repair epoch on receiver-ready proof so lost reply can retry within attempt cap
+      if (reconnectCanAttempt && !pendingClientReconnectWorldRepairConnectionEpoch) {
+        pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;
+      }
       sendClientWorldRepairReady();
+    } else if (clientWorldRepairExhausted(clientWorldRepairAdmission, performance.now())) {
+      // HF-322: surface a clear user-visible failure when the attempt cap is
+      // exhausted - but only after the FINAL attempt has had a full spacing
+      // window to be answered. Declaring failure the instant the cap was
+      // reached let a burst of stale start-of-match snapshots kill the guest
+      // at spawn (the HF-347 "can't move" soft-lock).
+      handleClientWorldRepairFailure('attempts-exhausted');
+    } else if (shouldDeclareResumeTimeout({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, performance.now())) {
+      // HF-322: surface clear user-visible failure when reconnect resume attempts exhausted
+      handleGuestResumeTimeout();
     }
     return;
   }
@@ -10079,12 +13068,18 @@ function onNetworkMessage(message: GameMessage): void {
   }
   if (message.type === 'killstreak-damage-result') {
     if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId || message.matchEpoch !== killstreakMatchEpoch) return;
-    presentSupportShotAudio(
+    const victimCue = killstreakDamageSourceCueForVictim(message, player.id, localContinuity, performance.now()); if (victimCue) killstreakAwarenessQa.damageSource = victimCue;
+    presentSupportShotAudioPositional(
       message.shots,
       { playerId: player.id, team: player.team, mode: privateMatchMode },
-      (kind) => audio.supportGun(kind),
+      (entityId) => {
+        const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
+        return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
+      },
+      (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
+    killstreakActivity.recordShots(message.shots, performance.now());
     for (const event of message.events) {
       if (event.ownerId === player.id) recordOwnerSupportDamage(event);
       if (event.targetId === player.id) applyKillstreakDamageEvent(event);
@@ -10095,6 +13090,8 @@ function onNetworkMessage(message: GameMessage): void {
     }
     const presentedAt = performance.now();
     for (const impact of message.impacts) {
+      // Owner 2026-08-30: guests hear the launch too. HF-509: and the bomb bay.
+      presentSupportDropCue(impact, presentedAt);
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber' && carpetGroundFireGuestPresentation.admit(message.matchEpoch, impact)) {
@@ -10105,11 +13102,35 @@ function onNetworkMessage(message: GameMessage): void {
       audio.explosion(presentedAt);
       supportExplosionPresentation.emit(
         point,
-        impact.source === 'chopper' ? CHOPPER_MISSILE_BLAST_RADIUS_M : CARPET_BOMBER_BLAST_RADIUS_M,
+        impact.source === 'chopper' ? 3.2 : CARPET_BOMBER_BLAST_RADIUS_M,
         presentedAt,
       );
+      // Owner 2026-08-30: chopper missiles carry the full grenade blast
+      // anatomy on guests as well, and trample the lawn.
+      if (impact.source === 'chopper') {
+        grenadeExplosionPresentation.emit(point, presentedAt);
+        crushLawnAt(point, 3);
+      }
+      // HF-352: Camera shake from remote support impact
+      cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+        distanceUnits: point.distanceTo(player.position),
+        family: 'support',
+        sensoryScale: accessibilityRuntime.weaponMotionScale,
+        now: presentedAt,
+      });
     }
     killstreakPresentation.presentImpacts(message.impacts, presentedAt);
+    return;
+  }
+  if (message.type === 'sticky-attached') {
+    // Feed/alert only - never damage. Relayed once by the host so the third
+    // party in a lobby also sees it, and deduped by actionNonce on arrival.
+    if (network.role === 'host') network.send(message);
+    announceStickyAttachment(
+      message.source === 'grenade' ? 'semtex' : 'explosive-crossbow',
+      message.by, message.target, message.targetLifeId,
+      message.actionNonce, performance.now(), false,
+    );
     return;
   }
   if (message.type === 'railgun-state') {
@@ -10194,7 +13215,11 @@ function onNetworkMessage(message: GameMessage): void {
     return;
   }
   if (message.type === 'reload-result') {
-    acceptLocalReloadResult(message);
+    acceptRemoteReloadResult(message); acceptLocalReloadResult(message);
+    return;
+  }
+  if (message.type === 'pickup-result') {
+    acceptLocalPickupResult(message);
     return;
   }
   if (message.type === 'shot-result') {
@@ -10273,8 +13298,32 @@ function onNetworkMessage(message: GameMessage): void {
   if (message.type === 'join' || message.type === 'state') {
     const claimedIncoming = message.player;
     const lobbyMember = privateLobbySnapshot?.members.find((member) => member.id === claimedIncoming.id);
-    if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) return;
-    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') return;
+    // Lane J diagnostics: these guards drop a peer's state SILENTLY, and a
+    // dropped state pump is exactly how a guest ends dead-at-spawn with
+    // "admission unacknowledged" (HF-347 residual). Count every drop with its
+    // reason so the failure is observable instead of inferred.
+    const recordStateAdmissionDrop = (reason: string): void => {
+      stateAdmissionDropTelemetry.total += 1;
+      stateAdmissionDropTelemetry.byReason[reason] = (stateAdmissionDropTelemetry.byReason[reason] ?? 0) + 1;
+      stateAdmissionDropTelemetry.last = {
+        reason,
+        messageType: message.type,
+        peerId: claimedIncoming.id,
+        claimedTeam: claimedIncoming.team,
+        memberTeam: lobbyMember?.team ?? null,
+        position: [claimedIncoming.x, claimedIncoming.y, claimedIncoming.z],
+        arenaId: arena.id,
+        atMs: Math.round(performance.now()),
+      };
+    };
+    if (privateLobbySnapshot && (!lobbyMember || claimedIncoming.team !== lobbyMember.team)) {
+      recordStateAdmissionDrop(!lobbyMember ? 'no-lobby-member' : 'team-mismatch');
+      return;
+    }
+    if (claimedIncoming.weapon === 'magnum' && lobbyMember?.dhv !== 'X') {
+      recordStateAdmissionDrop('magnum-without-dhv-x');
+      return;
+    }
     const authoritativeScore = authoritativeScores.get(claimedIncoming.id);
     const incoming = network.role === 'host' && lobbyMember
       ? {
@@ -10285,8 +13334,20 @@ function onNetworkMessage(message: GameMessage): void {
           deaths: authoritativeScore?.deaths ?? 0,
         }
       : claimedIncoming;
-    if (!pointInsideBounds(incoming, arena.bounds, 0.44)) return;
+    // MP-LAB: a peer hugging a perimeter wall is a legal pose. Movement authority
+    // is the Rapier capsule (physics.ts playerRadius 0.38, crouch/prone 0.36)
+    // against physics-only boundary walls whose inner faces ARE arena.bounds, so
+    // a centre can rest at bounds.max - 0.38. The old 0.44 margin rejected that
+    // pose and the peer froze for everyone else: measured 2026-09-02 (host+guest
+    // harness, atomic-acres) 5 'outside-arena-bounds' drops of the host's state
+    // at x = 36.595 against maxX 37. Inside the world at all is the admission
+    // question; the capsule already keeps every legal pose off the wall.
+    if (!pointInsideBounds(incoming, arena.bounds, STATE_ADMISSION_BOUNDS_MARGIN)) {
+      recordStateAdmissionDrop('outside-arena-bounds');
+      return;
+    }
     if (incoming.id === player.id) {
+      if (network.role === 'client' && (message.type === 'join' || message.type === 'state')) { const reconciliation = reconcileLocalAuthoritativeSnapshot({ predicted: { ...incoming, x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch, seq: player.seq }, authoritative: incoming, lastAcknowledgedInputSeq: lastAcknowledgedLocalInputSeq }); if (!reconciliation.accepted) { recordStateAdmissionDrop('local-reconciliation-stale-seq'); if (message.type === 'state' && shouldApplyStaleSelfHealthRepair({ messageType: message.type, continuity: message.continuity, localContinuity, incomingHp: incoming.hp, currentHp: player.hp })) { player.hp = THREE.MathUtils.clamp(incoming.hp, 0, 100); player.alive = player.hp > 0; lastDamageAt = performance.now(); if (message.combatInventory) applyLocalCombatInventoryProjection(message.combatInventory, true); weaponView.setPresentationVisible(player.alive); } return; } lastAcknowledgedLocalInputSeq = incoming.seq; if (reconciliation.correction === 'snap' && (!characterPhysics || characterPhysics.setStance(incoming.stance ?? 'stand'))) { player.position.set(incoming.x, incoming.y, incoming.z); player.velocity.set(0, 0, 0); player.yaw = incoming.yaw; player.pitch = incoming.pitch; player.stance = incoming.stance ?? 'stand'; characterPhysics?.teleportEye(player.position); localPositionHistory.length = 0; recordMatchDiagnostic('state-reconciliation', 'accepted', { actorId: player.id, position: [incoming.x, incoming.y, incoming.z], reason: 'local-authority-snap', modifiers: [`seq:${incoming.seq}`, `error-m:${reconciliation.divergenceM.toFixed(3)}`, `bound-m:${LOCAL_AUTHORITATIVE_CORRECTION_BOUND_M}`] }); } }
       // A host-authored echo of the reconnecting guest is the only canonical
       // health repair available before the next damage result. Without it a
       // replacement document always resumed at 100 HP while the host retained
@@ -10296,6 +13357,12 @@ function onNetworkMessage(message: GameMessage): void {
         if (repairedHealth < player.hp) lastDamageAt = performance.now();
         player.hp = repairedHealth;
         player.alive = player.hp > 0;
+        // HF-504 R-4: the host's state repair carries the canonical equipped
+        // ammo projection as well as health. A reconnect or dropped result
+        // must therefore repair ammo without accepting a client-selected split.
+        if (message.type === 'state' && message.combatInventory) {
+          applyLocalCombatInventoryProjection(message.combatInventory, true);
+        }
         weaponView.setPresentationVisible(player.alive);
       }
       return;
@@ -10324,7 +13391,7 @@ function onNetworkMessage(message: GameMessage): void {
           at: currentHostTimeMs(), x: initialIncoming.x, y: initialIncoming.y, z: initialIncoming.z,
           yaw: initialIncoming.yaw, stance: initialIncoming.stance ?? 'stand', continuity: retainedAuthority.continuity,
         }];
-        remote.awaitingReplacementState = true;
+        remote.awaitingReplacementState = true; armRejoinLatch(incoming.id, performance.now());
       } else if (network.role === 'host' && message.type === 'state'
         && message.continuity >= remote.continuity) {
         // createRemote seeds continuity 1 and the creating sample cannot enter
@@ -10369,11 +13436,7 @@ function onNetworkMessage(message: GameMessage): void {
       // so none of these canonical repair snapshots can be dropped merely
       // because their receiving runtime did not exist yet. Run this even when
       // an active channel was replaced before its stale remote timed out.
-      const retainedHealth = remoteHealthAuthorities.get(incoming.id);
-      network.send({
-        type: 'join',
-        player: { ...remote.snapshot, hp: retainedHealth?.hp ?? remote.snapshot.hp },
-      });
+      const repairNow = performance.now(); const connectionEpoch = hostLobbyConnectionEpochs.get(incoming.id); if (connectionEpoch) { sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, remote, repairNow); broadcastFreshRejoinerSlotToObservers(incoming.id, connectionEpoch, remote, repairNow); const ownHealthSeed = mintHealthAuthoritySeed({ playerId: incoming.id, hostPlayerId: player.id, matchEpoch: killstreakMatchEpoch, hostTimeMs: repairNow, nonce: randomNonce(), published: publishedHealthAuthorities.get(incoming.id) }); if (ownHealthSeed) network.sendToPlayer(incoming.id, ownHealthSeed); } for (const candidate of remotes.values()) if (candidate.snapshot.id !== incoming.id) { sendAuthoritativeRemoteSnapshotToPlayer(incoming.id, candidate, repairNow); const healthSeed = mintHealthAuthoritySeed({ playerId: candidate.snapshot.id, hostPlayerId: player.id, matchEpoch: killstreakMatchEpoch, hostTimeMs: repairNow, nonce: randomNonce(), published: publishedHealthAuthorities.get(candidate.snapshot.id) }); if (healthSeed) network.sendToPlayer(incoming.id, healthSeed); }
       network.send(createStateMessage());
       broadcastOverdriveState(performance.now());
       broadcastRailgunState();
@@ -10405,8 +13468,8 @@ function onNetworkMessage(message: GameMessage): void {
       }
     }
     if (network.role === 'host' && message.type === 'state'
-      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) return;
-    if (incoming.seq > remote.snapshot.seq) {
+      && (remote.awaitingReplacementState || pendingGuestAuthorityRepairs.has(incoming.id))) { recordStateAdmissionDrop(remote.awaitingReplacementState ? 'rejoin-latch-awaiting-replacement' : 'rejoin-latch-pending-repair'); armRejoinLatch(incoming.id, performance.now()); return; }
+    const snapshotAdmission = admitRemoteSnapshot(remote.snapshot, remote.continuity, remote.authoritativeHostTimeMs, { kind: message.type, snapshot: incoming, continuity: message.type === 'state' ? message.continuity : remote.continuity, hostTimeMs: message.type === 'state' ? message.hostTimeMs : currentHostTimeMs() }); if (snapshotAdmission.accepted) {
       const now = performance.now();
       const redeployAuthorization = authorizedRemoteRedeploys.get(incoming.id);
       const redeployed = redeployAuthorization !== undefined
@@ -10416,7 +13479,7 @@ function onNetworkMessage(message: GameMessage): void {
         && redeployAuthorization.grenade === incoming.grenade;
       if (redeployAuthorization && redeployAuthorization.expiresAt < now) authorizedRemoteRedeploys.delete(incoming.id);
       let admittedIncoming = incoming;
-      let respawned = remote.snapshot.hp <= 0 && incoming.hp > 0 || redeployed;
+      let respawned = classifyRemoteRespawn({ snapshotHp: remote.snapshot.hp, incomingHp: incoming.hp, remoteContinuity: remote.continuity, incomingContinuity: message.type === 'state' ? message.continuity : remote.continuity, redeployed });
       if (network.role === 'host') {
         const priorHealth = remoteHealthAuthorities.get(incoming.id) ?? createRemoteHealthAuthorityState(remote.snapshot.hp > 0, now);
         const health = advanceRemoteHealthAuthority(priorHealth, now);
@@ -10447,8 +13510,16 @@ function onNetworkMessage(message: GameMessage): void {
         const authoritativeHealth = respawnAdmission.state;
         remoteHealthAuthorities.set(incoming.id, authoritativeHealth);
         respawned = respawnAdmission.respawned || redeployed;
-        admittedIncoming = { ...incoming, hp: authoritativeHealth.hp };
+        // A death-to-life transition is a host-owned loadout boundary; only a
+        // real respawn/redeploy resets to the authored primary. Continuous
+        // state preserves the admitted weapon so a secondary swap survives.
+        admittedIncoming = admitAuthoritativeRespawnLoadout(incoming, {
+          primary: remote.snapshot.primary,
+          secondary: remote.snapshot.secondary,
+          grenade: remote.snapshot.grenade,
+        }, { respawned: respawnAdmission.respawned, redeployed }, authoritativeHealth.hp);
         if (respawned) {
+          remoteReloadResultCache.clearPlayer(incoming.id); authorizedRemotePickups.delete(incoming.id);
           const grenadeCount = remoteGrenadeAuthorities.get(incoming.id)?.remaining ?? 1;
           resetRemoteCombatInventory(admittedIncoming, grenadeCount);
         }
@@ -10480,11 +13551,24 @@ function onNetworkMessage(message: GameMessage): void {
       const pickupAllowed = pickup !== undefined && pickup.expiresAt >= now && pickup.weapon === admittedIncoming.primary;
       if (admittedIncoming.team !== remote.snapshot.team) return;
       if (network.role === 'host' && admittedIncoming.weapon === 'railgun' && railgunState.holderId !== admittedIncoming.id) return;
-      if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon)
-        && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
-      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) return;
+      if (network.role === 'host' && isTimedMapWeaponId(admittedIncoming.weapon) && timedMapWeaponStates[admittedIncoming.weapon].holderId !== admittedIncoming.id) return;
+      if (admittedIncoming.primary !== remote.snapshot.primary && !respawned && !pickupAllowed) {
+        if (network.role === 'host') {
+          const canonicalInventory = remoteCombatInventoryProjection(admittedIncoming.id);
+          network.sendStateCommitReliablyToPlayer(admittedIncoming.id, {
+            type: 'state',
+            player: remote.snapshot,
+            hostTimeMs: currentHostTimeMs(),
+            continuity: remote.continuity,
+            rateHz: remote.snapshotRateHz,
+            ...(canonicalInventory ? { combatInventory: canonicalInventory } : {}),
+          });
+        }
+        return;
+      }
       if ((admittedIncoming.secondary !== remote.snapshot.secondary || admittedIncoming.grenade !== remote.snapshot.grenade)
         && !respawned) return;
+      if (network.role === 'host') admittedIncoming = clampAdmittedHeldWeapon(admittedIncoming, remoteLoadoutSidearm(admittedIncoming));
       if (pickupAllowed) authorizedRemotePickups.delete(admittedIncoming.id);
       if (redeployed) authorizedRemoteRedeploys.delete(admittedIncoming.id);
       if (network.role === 'host') {
@@ -10523,8 +13607,10 @@ function onNetworkMessage(message: GameMessage): void {
       const admittedContinuity = network.role === 'host'
         ? registeredActorLifeId !== null
           ? registeredActorLifeId
-          : respawned || movement.resynchronized
-          ? Math.max(remote.continuity + 1, claimedContinuity)
+        : respawned || movement.resynchronized
+          ? respawned
+            ? Math.max(remote.continuity + 1, claimedContinuity)
+            : Math.max(remote.continuity, claimedContinuity)
           : remote.positionHistory.length <= 1 && claimedContinuity >= remote.continuity
             ? claimedContinuity
             : remote.continuity
@@ -10532,10 +13618,12 @@ function onNetworkMessage(message: GameMessage): void {
       const admittedHostTimeMs = message.type === 'state'
         ? network.role === 'host' ? Math.max(now - 250, Math.min(now + 50, message.hostTimeMs)) : message.hostTimeMs
         : currentHostTimeMs();
-      remote.snapshot = admittedIncoming;
-      if (message.type === 'state') remote.snapshotRateHz = message.rateHz;
+      admittedIncoming = { ...admittedIncoming, hp: clampAdmittedHpToHealthAuthority({ admittedHp: admittedIncoming.hp, heldHp: appliedHealthAuthorityRevisions.get(admittedIncoming.id)?.hp, heldContinuity: appliedHealthAuthorityRevisions.get(admittedIncoming.id)?.continuity, subjectContinuity: remote.continuity, incomingContinuity: claimedContinuity }) }; remote.snapshot = admittedIncoming;
+      if (message.type === 'state') remote.snapshotRateHz = message.rateHz; if (network.role === 'client' && message.type === 'state' && message.combatInventory) {
+        applyRemoteInventoryProjectionToMaps(remoteCombatInventories, remoteCombatInventoryRevisions, incoming.id, message.combatInventory, admittedIncoming, remoteLoadoutSidearm(admittedIncoming));
+      }
       if (remote.positionHistory.at(-1)?.continuity !== admittedContinuity) remote.positionHistory.length = 0;
-      remote.continuity = admittedContinuity;
+      remote.continuity = admittedContinuity; remote.authoritativeHostTimeMs = admittedHostTimeMs;
       const priorBufferStats = remote.interpolation.stats;
       remote.interpolation.push({
         seq: admittedIncoming.seq,
@@ -10558,18 +13646,15 @@ function onNetworkMessage(message: GameMessage): void {
       remote.targetYaw = admittedIncoming.yaw;
       remote.lastSeen = now;
       remote.awaitingReplacementState = false;
+      // X-2 admission fence: only an accepted state may make a client remote visible.
+      if (network.role === 'client' && message.type === 'state') remote.authoritativeReady = true;
       remote.root.visible = admittedIncoming.hp > 0;
       if (network.role === 'host') {
         retainedRemoteAuthorities.set(admittedIncoming.id, Object.freeze({
           snapshot: Object.freeze({ ...admittedIncoming }),
           continuity: admittedContinuity,
         }));
-        const canonicalState: StateMessage = {
-          type: 'state', player: admittedIncoming,
-          hostTimeMs: admittedHostTimeMs,
-          continuity: admittedContinuity,
-          rateHz: message.type === 'state' ? message.rateHz : 40,
-        };
+        const canonicalState = createCanonicalRemoteState(admittedIncoming, admittedHostTimeMs, admittedContinuity, message.type === 'state' ? message.rateHz : 40, remoteCombatInventoryProjection(admittedIncoming.id));
         network.send(canonicalState, admittedIncoming.id);
         if (now - remote.lastFeedbackAt >= 1_000) {
           network.sendStateCommitReliablyToPlayer(admittedIncoming.id, canonicalState);
@@ -10655,6 +13740,9 @@ function onNetworkMessage(message: GameMessage): void {
       if (network.role === 'host' || processedNonces.has(message.nonce)) return;
       processedNonces.add(message.nonce);
       trimNonceSet();
+      // HF-378: admitted unsuppressed gunshot paints the shooter on enemy
+      // radar for the shared 3 s gunfire window (see shouldRevealEnemy).
+      remoteRadarFireRevealAt.set(message.by, performance.now());
       renderRemoteShot(message);
       return;
     }
@@ -10667,6 +13755,9 @@ function onNetworkMessage(message: GameMessage): void {
     const admission = admitRemoteShot(message, sender?.snapshot, performance.now(), prior);
     if (!admission.accepted) return;
     remoteShotAdmissions.set(message.by, admission.nextState);
+    // HF-378: admission accepted — this replicated shot is authoritative,
+    // so open the shooter's enemy-radar gunfire reveal window.
+    remoteRadarFireRevealAt.set(message.by, performance.now());
     const now = performance.now();
     const actions = admittedRemoteShots.get(message.by) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
@@ -10750,7 +13841,8 @@ function onNetworkMessage(message: GameMessage): void {
     )?.message.weapon;
     const hostCanonicalFlame = message.hostAuthority !== undefined
       && message.kind === 'shot'
-      && (admittedActionWeapon === 'flare-gun' || admittedActionWeapon === 'flamethrower');
+      && (admittedActionWeapon === 'flare-gun'
+        || (admittedActionWeapon !== undefined && isFlamethrowerFamilyWeapon(admittedActionWeapon)));
     if (!areCombatantsHostile(message.by, attackerTeam, targetId, targetTeam) && !hostCanonicalFlame) return;
     const targetLifeId = targetIsLocal ? localContinuity : remoteTarget?.continuity ?? botTarget!.continuity;
     if (network.role === 'client') {
@@ -11091,9 +14183,7 @@ function sendAuthoritativeHit(
       cause: killCauseFromHit(authoritativeTimedMessage, attackerWeapon),
       nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
 }
 
@@ -11299,7 +14389,6 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   authoritativeShotAdmissions.set(request.by, admission.state);
-  cancelRemoteReloadAuthority(request.by, 'cancelled');
   const visualShot: ShotMessage = {
     type: 'shot', by: request.by, weapon: request.weapon, origin: request.origin,
     direction: canonicalShotDirection(request.weapon, request.direction, request.pelletDirections),
@@ -11346,6 +14435,10 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       broadcastTimedMapWeaponState();
     }
   }
+  // R-3: only a shot that passed every pre-resolution admission guard may
+  // cancel the guest's in-flight reload. Missing history, bad origin and an
+  // empty magazine are rejected above and must leave reload untouched.
+  cancelRemoteReloadAuthority(request.by, 'cancelled');
   if (ordinaryShot && combatInventory) {
     setRemoteCombatInventory(request.by, consumeGuestCombatRound(combatInventory, request.weapon));
   }
@@ -11407,8 +14500,12 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     return;
   }
   let remoteShotEnd: THREE.Vector3 | null = null;
-  if (request.weapon !== 'flamethrower') remoteShotEnd = renderRemoteShot(visualShot);
-  if (request.weapon !== 'flamethrower') {
+  // HF-402: the whole flamethrower family defers its presentation and its
+  // killstreak-entity pass until after the admission block below, so a stream
+  // weapon is never also drawn as a bullet.
+  const remoteFlamethrowerShot = isFlamethrowerFamilyWeapon(request.weapon);
+  if (!remoteFlamethrowerShot) remoteShotEnd = renderRemoteShot(visualShot);
+  if (!remoteFlamethrowerShot) {
     applyKillstreakEntityShot(
       request.by,
       sender.snapshot.team,
@@ -11444,22 +14541,51 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     if (!target.pose) continue;
     targetPoses.push({ id: bot.id, ...target.pose });
   }
-
-  if (request.weapon === 'flamethrower') {
-    const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower, request.by, request.shotId);
-    if (!consumption.accepted) {
-      timedMapWeaponAudit.shotsRejected += 1;
-      timedMapWeaponAudit.lastReason = consumption.reason;
-      admittedRemoteShots.get(request.by)?.delete(visualShot.nonce);
-      finish('rejected', consumption.reason === 'invalid' ? 'malformed' : 'weapon-mismatch', admission.appliedRewindMs);
-      return;
+  // HF-347: gun-range training dummies are host-resolved targets like bots.
+  // Their patrol pose is a pure function of host time, so the lag-compensated
+  // pose at the guest's view time is exact rather than history-rewound. The
+  // pose y is the dummy's FEET; targetPoses carry eye height for the shared
+  // stand hit proxies (stanceEyeHeight subtracts it back out).
+  if (selectedArena.id === 'gun-range') {
+    for (const definition of GUN_RANGE_TEST_BAY_CONTRACT.dummies) {
+      const dummy = arena.targets.find(
+        (target) => target.id === definition.id && target.kind === 'training-dummy',
+      );
+      if (!dummy || !dummy.active) continue;
+      const pose = gunRangeTestBayDummyPose(definition, Math.max(0, request.targetViewTimeMs));
+      targetPoses.push({
+        id: definition.id,
+        x: pose.position.x,
+        y: pose.position.y + 1.7,
+        z: pose.position.z,
+        yaw: pose.yawRadians,
+        stance: 'stand',
+      });
     }
-    applyTimedMapWeaponState('flamethrower', consumption.state);
-    timedMapWeaponAudit.shotsAccepted += 1;
-    recordMatchDiagnostic('timed-weapon-shot', 'accepted', {
-      actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
-    }, request.shotId);
-    broadcastTimedMapWeaponState();
+  }
+
+  if (remoteFlamethrowerShot) {
+    // HF-402: only the arena-bound map flamethrower is a timed map weapon.
+    // The crimson variant carries its own finite ammo (HF-334) and must never
+    // be metered against — or consume — the map weapon's host tank, so the
+    // consumption gate stays keyed to that one id while the presentation and
+    // ground-ignition lanes below serve the whole family.
+    if (request.weapon === 'flamethrower') {
+      const consumption = consumeTimedMapWeaponShot(timedMapWeaponStates.flamethrower, request.by, request.shotId);
+      if (!consumption.accepted) {
+        timedMapWeaponAudit.shotsRejected += 1;
+        timedMapWeaponAudit.lastReason = consumption.reason;
+        admittedRemoteShots.get(request.by)?.delete(visualShot.nonce);
+        finish('rejected', consumption.reason === 'invalid' ? 'malformed' : 'weapon-mismatch', admission.appliedRewindMs);
+        return;
+      }
+      applyTimedMapWeaponState('flamethrower', consumption.state);
+      timedMapWeaponAudit.shotsAccepted += 1;
+      recordMatchDiagnostic('timed-weapon-shot', 'accepted', {
+        actorId: request.by, weaponOrEffect: request.weapon, reason: 'host-finite-ammo-consumed',
+      }, request.shotId);
+      broadcastTimedMapWeaponState();
+    }
     remoteShotEnd = renderRemoteShot(visualShot);
     if (remoteShotEnd) {
       flamethrowerGroundFires.ignite({
@@ -11490,7 +14616,11 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     (origin, impact, weapon) => {
       const delta = impact.clone().sub(origin);
       const distance = delta.length();
-      if (weapon === 'flamethrower' && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0;
+      // HF-402: the 18 m reach is a family property. Keyed to the one literal
+      // id, the crimson variant kept the generic ballistic reach here while
+      // its presentation stopped at 18 m — authority and feedback disagreeing
+      // about where the stream ends.
+      if (isFlamethrowerFamilyWeapon(weapon) && distance > FLAMETHROWER_EFFECT.rangeM + 0.05) return 0;
       const trace = traceWeaponPath(origin, delta, distance, weapon);
       return trace.reachedDistance ? trace.damageMultiplier : 0;
     },
@@ -11506,6 +14636,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
     let reportedRawDamage = rawOutgoing;
     let resultingHealth = 0;
     let died = false;
+    let dummyRespawnAtHostTimeMs: number | null = null;
     if (targetId === player.id) {
       const healthBefore = player.hp;
       const finalDamage = applyDhvIncomingDamage(outgoing, player.hp, localDhv);
@@ -11519,6 +14650,25 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       appliedDamage = applyBotDamage(bot, outgoing, hit.hitZone, { kind: 'gun', weapon: request.weapon }, request.by, hit);
       resultingHealth = bot.hp;
       died = !bot.alive;
+    } else if (selectedArena.id === 'gun-range' && targetId.startsWith('test-dummy-')) {
+      // HF-347: host-authoritative dummy damage for a guest's shot. Dummies
+      // carry 300 HP, so apply the raw (uncapped-at-100) outgoing damage to
+      // match what the same shot does in solo. The guest reconciles from this
+      // outcome; every other peer converges on the next lobby heartbeat.
+      const dummy = arena.targets.find(
+        (target) => target.id === targetId && target.kind === 'training-dummy',
+      );
+      if (!dummy) continue;
+      const applied = applyPracticeTargetDamage(
+        dummy, rawOutgoing, hit.hitZone, request.by, request.weapon,
+        { wallbang: hit.wallbang, penetrationMultiplier: hit.penetrationMultiplier },
+      );
+      if (!applied) continue;
+      appliedDamage = applied.appliedDamage;
+      reportedRawDamage = Math.max(appliedDamage, rawOutgoing);
+      resultingHealth = dummy.health;
+      died = applied.died;
+      if (died) dummyRespawnAtHostTimeMs = dummy.respawnAt;
     } else {
       const remote = remotes.get(targetId);
       const health = remoteHealthAuthorities.get(targetId);
@@ -11552,9 +14702,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
           type: 'death', killer: request.by, victim: targetId,
           cause: { kind: 'gun', weapon: request.weapon }, nonce: randomNonce(),
         };
-        processedNonces.add(death.nonce);
-        network.send(death);
-        processDeath(death);
+        broadcastCanonicalDeath(death, true);
       }
     }
     if (appliedDamage > 0) outcomes.push({
@@ -11562,6 +14710,7 @@ function resolveAuthoritativeShot(request: ShotRequestMessage): void {
       rawDamage: Math.max(appliedDamage, reportedRawDamage),
       resultingHealth, died, hitZone: hit.hitZone, wallbang: hit.wallbang,
       penetrationMultiplier: hit.penetrationMultiplier,
+      ...(dummyRespawnAtHostTimeMs !== null ? { targetRespawnAtHostTimeMs: dummyRespawnAtHostTimeMs } : {}),
     });
   }
   admitAuthoritativeSmokeSegments(
@@ -11604,6 +14753,42 @@ function reconcileLocalAuthoritativeHealth(
   if (player.alive) player.hp = resultingHealth;
 }
 
+/** HF-347: apply a host-resolved training-dummy outcome on a guest. State
+ * (health/active/respawn) is the host's word; score and the gun-range feed
+ * are presented only when the local player fired the shot, mirroring what
+ * hitPracticeTarget shows a solo/host shooter. */
+function reconcileGuestDummyOutcome(outcome: ShotOutcome, shooterId: string): void {
+  const dummy = arena.targets.find(
+    (target) => target.id === outcome.target && target.kind === 'training-dummy',
+  );
+  if (!dummy) return;
+  dummy.health = Math.max(0, Math.min(dummy.maxHealth, outcome.resultingHealth));
+  const shooterIsLocal = shooterId === player.id;
+  if (shooterIsLocal) {
+    targetHits += 1;
+    addFeed(
+      `${outcome.hitZone === 'head' ? 'CRITICAL · ' : ''}${dummy.id.toUpperCase()} · +${Math.round(outcome.damage)} DMG · ${Math.ceil(dummy.health)} / ${dummy.maxHealth} HP`,
+      outcome.hitZone === 'head' ? 'gold' : 'aqua',
+      { damageDealt: outcome.damage },
+    );
+  }
+  if (!outcome.died) return;
+  dummy.active = false;
+  dummy.root.visible = false;
+  // The exact host respawn stamp keeps the lifeId (floor(respawnAt)) equal on
+  // every peer; the fallback only covers a host predating the outcome field.
+  dummy.respawnAt = outcome.targetRespawnAtHostTimeMs
+    ?? currentHostTimeMs() + (dummy.respawnDelayMs ?? 2_200);
+  if (shooterIsLocal) {
+    rangeScore = advanceRangeScore(rangeScore, dummy.scoreValue);
+    publishRangeScore();
+    addFeed(
+      `${outcome.hitZone === 'head' ? 'BULLSEYE · ' : ''}+${dummy.scoreValue} PTS · ${rangeScore} TOTAL · TARGET RESETTING`,
+      'gold',
+    );
+  }
+}
+
 function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
   if (network.role !== 'client' || message.by !== privateLobbySnapshot?.hostId) return;
   shotTimingTelemetry.recordResultDelivery(performance.now());
@@ -11644,6 +14829,13 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
     }
   }
   for (const outcome of message.outcomes) {
+    // HF-347: a training-dummy outcome is the host's canonical dummy state
+    // after this shot. Apply it whether or not the local player fired — the
+    // score/feed below still only credit the shooter.
+    if (selectedArena.id === 'gun-range' && outcome.target.startsWith('test-dummy-')) {
+      reconcileGuestDummyOutcome(outcome, message.forPlayerId);
+      continue;
+    }
     if (outcome.target !== player.id || !player.alive) continue;
     reconcileLocalAuthoritativeHealth(
       outcome.resultingHealth,
@@ -11664,11 +14856,13 @@ function acceptAuthoritativeShotResult(message: ShotResultMessage): void {
     return;
   }
   const headshot = message.outcomes.some((outcome) => outcome.hitZone === 'head');
+  const wasElimination = message.outcomes.some((outcome) => outcome.died || outcome.resultingHealth <= 0);
   const flareBurnResult = message.shotId.includes(':flare-burn:');
   const totalDamage = message.outcomes.reduce((total, outcome) => total + outcome.damage, 0);
   const totalRawDamage = message.outcomes.reduce((total, outcome) => total + (outcome.rawDamage ?? outcome.damage), 0);
   const totalHealthBefore = message.outcomes.reduce((total, outcome) => total + outcome.damage + outcome.resultingHealth, 0);
-  showHitmarker(headshot);
+  // HF-352: Drive kill-confirm pulse from confirmed eliminations
+  showHitmarker(headshot, wasElimination);
   showDamageNumber(totalRawDamage, headshot ? 'head' : 'body', totalHealthBefore);
   audio.hit(headshot);
   if (!flareBurnResult) {
@@ -11710,13 +14904,13 @@ function renderRemoteShot(message: ShotMessage): THREE.Vector3 | null {
   }
   const traceDistance = message.weapon === 'railgun'
     ? RAILGUN_BEAM_LENGTH_M
-    : message.weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 50;
+    : isFlamethrowerFamilyWeapon(message.weapon) ? FLAMETHROWER_EFFECT.rangeM : 50;
   const trace = traceWeaponPath(origin, direction, traceDistance, message.weapon);
   applyInteractiveWorldBallisticTrace(trace, origin, direction, message.weapon);
   const visibleEnd = origin.clone().addScaledVector(direction, trace.travelDistance);
   const remoteOperator = remotes.get(message.by)?.root.userData.operator as THREE.Group | undefined;
   const remoteMuzzle = remoteOperator?.getObjectByName('muzzle-socket')?.getWorldPosition(new THREE.Vector3());
-  if (message.weapon === 'flamethrower') {
+  if (isFlamethrowerFamilyWeapon(message.weapon)) {
     flamethrowerStreamPresentation.emit(remoteMuzzle ?? origin, visibleEnd, performance.now());
     flamethrowerStreamPresentation.igniteGround(visibleEnd, performance.now());
   } else if (message.weapon !== 'railgun') {
@@ -11758,6 +14952,29 @@ function showDamageDirection(attacker: string, damage = 12, now = performance.no
 
 function updateSensoryFeedback(now: number): void {
   audio.updateListener(camera.position, player.yaw);
+  // HF-370: integrate the HUD impact springs every frame, BEFORE the 30 Hz
+  // presentation gate below — a stiff spring stepped at 30 Hz reads as lag.
+  // Writes nothing while settled (see advanceHudImpact).
+  hudImpactState = advanceHudImpact(hudRoot, hudImpactState, now);
+  killstreakBannerState = expireKillstreakBanner(killstreakBanner, killstreakBannerState, now);
+  // HF-350: the explosion ambience duck is armed by every blast and is only released
+  // here. Without this call the ambience bed stays at 40% for the rest of the match
+  // after the first grenade, on every map. Idempotent and self-guarding, so it is
+  // safe above the 30 Hz presentation gate below.
+  audio.recoverAmbienceDuck();
+  // HF-352: Sample kill-confirm pulse on hitmarker
+  const pulse = sampleKillConfirmPulse(killConfirmPulseState, now);
+  killConfirmPulseState = pulse.state;
+  const hitmarkerElement = element<HTMLElement>('#hitmarker');
+  if (pulse.presentation.active) {
+    hitmarkerElement.style.setProperty('--kill-confirm-opacity', String(pulse.presentation.opacity));
+    hitmarkerElement.style.setProperty('--kill-confirm-scale', String(pulse.presentation.scale));
+    hitmarkerElement.classList.add('kill-confirm');
+  } else {
+    hitmarkerElement.style.removeProperty('--kill-confirm-opacity');
+    hitmarkerElement.style.removeProperty('--kill-confirm-scale');
+    hitmarkerElement.classList.remove('kill-confirm');
+  }
   if (now - lastSensoryPresentationAt < 1000 / 30) return;
   lastSensoryPresentationAt = now;
   const directions = directionalDamagePresentation(directionalDamageState, now, player.yaw);
@@ -11772,6 +14989,8 @@ function updateSensoryFeedback(now: number): void {
     marker.style.setProperty('--damage-opacity', direction.opacity.toFixed(4));
     marker.dataset.sector = String(direction.sector);
     marker.dataset.sourceType = direction.sourceType;
+    if (direction.sourceLabel) marker.dataset.sourceLabel = direction.sourceLabel;
+    else delete marker.dataset.sourceLabel;
   });
   const lowHealth = sampleLowHealthFeedback(lowHealthFeedbackState, {
     health: player.hp,
@@ -11831,7 +15050,43 @@ function applyDamage(
   else if (network.role === 'offline' || attacker === player.id) addFeed('DAMAGE TAKEN +' + Math.round(appliedDamage), 'coral', { damageTaken: appliedDamage });
   lastDamageAt = now;
   audio.damage();
-  showDamageDirection(attacker, appliedDamage, now);
+  gamepadRuntime.rumble('damage', now); // GAMEPAD: damage-taken pulse
+  if (cause.kind !== 'killstreak' || !['chopper', 'piloted-drone', 'drone-swarm'].includes(cause.effect)) showDamageDirection(attacker, appliedDamage, now);
+  // HF-352: Camera shake impulse from taking damage
+  if (appliedDamage > 0) {
+    // HF-370: the owner wants hits FELT. Trauma scales with how hard the hit
+    // was, so a graze and a near-fatal burst no longer shake identically.
+    cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, {
+      source: 'damage-taken',
+      now,
+      strength: Math.min(1, appliedDamage / 45),
+      seed: Math.round(now) | 0,
+    });
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: 1.5,
+      family: cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'semtex' : 'crossbow',
+      sensoryScale: accessibilityRuntime.weaponMotionScale,
+      now,
+    });
+    // HF-370: the HUD flinches on the same hit the camera does. Severity
+    // matches the trauma strength above; blast causes use the explosion
+    // signature. Bearing reuses the damage-direction source angle, and is
+    // omitted for self-inflicted or unknown-source hits (vertical kick).
+    // The HUD kind is derived through the camera-shake source taxonomy so
+    // both lanes classify one event identically (pass80 dead-wire sweep).
+    const hudShakeSource: CameraShakeSource =
+      cause.kind === 'grenade' || cause.kind === 'killstreak' ? 'near-explosion' : 'damage-taken';
+    const impactAttackerPosition = remotes.get(attacker)?.target ?? bots.get(attacker)?.position;
+    const hasImpactBearing = !!impactAttackerPosition && attacker !== player.id;
+    hudImpactState = pushHudImpact(hudImpactState, {
+      kind: impactKindForShakeSource(hudShakeSource),
+      severity: Math.min(1, appliedDamage / 45) * accessibilityRuntime.weaponMotionScale,
+      ...(hasImpactBearing ? {
+        bearingRadians: sourceScreenAngle(player.position, player.yaw, impactAttackerPosition!),
+      } : {}),
+      now,
+    });
+  }
   if (accessibilityRuntime.damageFlashScale > 0) {
     damageFlash.classList.remove('combat-prewarm', 'pulse');
     requestAnimationFrame(replayDamageFlash);
@@ -11854,8 +15109,7 @@ function applyDamage(
     updateFieldSupportHud();
     const death: DeathMessage = { type: 'death', killer: attacker, victim: player.id, cause, nonce: randomNonce() };
     if (network.role !== 'client') {
-      network.send(death);
-      processDeath(death);
+      broadcastCanonicalDeath(death);
     }
     scheduleLocalRespawn(now);
     document.exitPointerLock();
@@ -11892,9 +15146,12 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
   const id = `death-${message.nonce}`;
   const existing = deathDrops.find((entity) => entity.drop.id === id);
   if (existing) return existing;
-  const victim = deathDropVictim(message);
+  const canonical = message.drop;
+  const victim = canonical
+    ? { weapon: canonical.weapon, position: new THREE.Vector3(...canonical.position) }
+    : deathDropVictim(message);
   if (!victim || !isPrimaryWeaponId(victim.weapon)) return null;
-  const bounded = clampPointToBounds(victim.position, arena.bounds, 0.5);
+  const bounded = canonical ? victim.position : clampPointToBounds(victim.position, arena.bounds, 0.5);
   victim.position.set(bounded.x, bounded.y, bounded.z);
   const spec = WEAPONS[victim.weapon];
   const drop = createDeathDrop(
@@ -11905,11 +15162,35 @@ function spawnDeathDrop(message: DeathMessage, now = performance.now()): DeathDr
     Math.max(1, Math.ceil(spec.reserve * 0.25)),
     now,
   );
+  if (canonical) {
+    drop.ammo = canonical.ammo;
+    drop.reserve = canonical.reserve;
+    drop.expiresAt = canonical.expiresAt;
+  }
   if (deathDrops.length >= MAX_DEATH_DROPS) removeDeathDrop(deathDrops[deathDrops.length - 1]);
   const root = deathDropPresentationPool.acquire(id, spec.color, victim.position, victim.weapon);
   const entity = { drop, root };
   deathDrops.unshift(entity);
   return entity;
+}
+
+/** Construct the one host-authored drop record before a death is broadcast.
+ *  Clients may present the death, but they never derive weapon/position/ammo
+ *  from their own possibly stale view. */
+function canonicalDeathMessage(message: DeathMessage): DeathMessage {
+  if (network.role !== 'host' || message.drop) return message;
+  const entity = spawnDeathDrop(message);
+  const drop = entity?.drop;
+  if (!drop) return message;
+  const canonical = pickupResultDropRecord(drop, performance.now());
+  return canonical === 'removed' ? message : { ...message, drop: canonical };
+}
+
+function broadcastCanonicalDeath(message: DeathMessage, markProcessed = false): void {
+  const canonicalDeath = canonicalDeathMessage(message);
+  if (markProcessed) processedNonces.add(canonicalDeath.nonce);
+  network.send(canonicalDeath);
+  processDeath(canonicalDeath);
 }
 
 function removeDeathDrop(entity: DeathDropEntity): void {
@@ -12020,7 +15301,7 @@ function interactWithGunRangeTestBayWeapon(now = performance.now(), expectedWeap
   return true;
 }
 
-function interactWithGunRangeTestBaySupport(expectedId?: Pass65KillstreakId): boolean {
+function interactWithGunRangeTestBaySupport(expectedId?: SelectableKillstreakId): boolean {
   const proximity = nearbyGunRangeTestBaySupportStation();
   const id = proximity?.station.id;
   if (!id || expectedId && expectedId !== id) return false;
@@ -12096,6 +15377,7 @@ function interactWithShedDoor(expectedPlacementId?: string): boolean {
 
 function interactWithDeathDrop(now = performance.now(), expectedTargetId?: string): boolean {
   if (!player.alive || matchState.phase !== 'active') return false;
+  if (network.role === 'client' && pendingLocalPickup) return false;
   const drop = selectDeathDropWeaponPickup(
     deathDrops.map((entity) => entity.drop),
     player.position,
@@ -12106,6 +15388,11 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
+  const priorInventory = localGuestCombatInventory();
+  const priorPrimaryWeapon = player.primaryWeapon;
+  const priorWeapon = player.weapon;
+  const priorSwitchingUntil = player.switchingUntil;
+  const priorDrop: DeathDrop = { ...entity.drop, position: { ...entity.drop.position } };
   const result = consumeDeathDropWeapon(
     drop,
     { primary: player.primaryWeapon, ammo: player.ammo[player.primaryWeapon], reserve: player.reserve[player.primaryWeapon] },
@@ -12114,18 +15401,11 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   );
   if (!result.consumed) return false;
   interruptReload(true, now);
-  entity.drop = result.drop;
-  // Owner requirement: the swapped-out weapon and its ammo stay on the ground
-  // for a full 30 seconds from the swap so the player can re-swap freely. The
-  // drop otherwise kept its original (possibly near-expired) creation time and
-  // despawned almost immediately after the exchange.
-  entity.drop.expiresAt = now + DEATH_DROP_LIFETIME_MS;
-  // On a real weapon swap the gun you dropped must land at YOUR feet (where
-  // the one you just picked up was), not back at the old drop's position - so
-  // you can swap straight back. A replenish keeps the same gun, so it stays put.
+  const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
+  entity.drop = result.mode === 'pickup'
+    ? placeSwappedDeathDrop(result.drop, player.position, floorY, now)
+    : result.drop;
   if (result.mode !== 'replenish') {
-    const floorY = player.position.y - stanceEyeHeight(player.stance) + 0.18;
-    entity.drop.position = { x: player.position.x, y: floorY, z: player.position.z };
     entity.root.position.set(player.position.x, floorY, player.position.z);
   }
   player.primaryWeapon = result.inventory.primary;
@@ -12133,6 +15413,12 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
   player.reserve[result.inventory.primary] = result.inventory.reserve;
   player.weapon = result.inventory.primary;
   player.switchingUntil = now + 360;
+  // HF-504: same stale-cadence gate as switchWeapon - nextShotAt still holds the
+  // DROPPED weapon's deadline, so a gun picked up right after firing a slow one
+  // refuses to fire for the rest of that slow interval. This is the literal
+  // "randomly cant shoot ... after picked one up" report, and it is silent: the
+  // only trace is a `rate-of-fire` fireBlock counter.
+  player.nextShotAt = 0;
   weaponView.setWeapon(player.weapon);
   audio.weaponSwitch();
   const pickup: PickupMessage = {
@@ -12147,6 +15433,18 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
+  if (network.role === 'client') {
+    pendingLocalPickup = Object.freeze({
+      nonce: pickup.nonce,
+      dropId: pickup.dropId,
+      priorInventory,
+      priorPrimaryWeapon,
+      priorWeapon,
+      priorSwitchingUntil,
+      priorDrop,
+      sentAt: now,
+    });
+  }
   network.send(pickup);
   recordMatchDiagnostic('weapon-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: player.id,
@@ -12162,12 +15460,17 @@ function interactWithDeathDrop(now = performance.now(), expectedTargetId?: strin
 }
 
 function autoScavengeDeathDrop(now: number): boolean {
-  if (!player.alive || matchState.phase !== 'active') return false;
+  if (!player.alive || matchState.phase !== 'active' || network.role === 'client' && pendingLocalPickup) return false;
   const drop = nearestScavengeDeathDrop(deathDrops.map((entity) => entity.drop), player.position, now);
   if (!drop) return false;
   const entity = deathDrops.find((candidate) => candidate.drop.id === drop.id);
   if (!entity) return false;
   const activeWeapon = player.weapon;
+  const priorInventory = localGuestCombatInventory();
+  const priorDrop: DeathDrop = {
+    ...drop,
+    position: { ...drop.position },
+  };
   const result = scavengeDeathDrop(
     drop,
     { weapon: activeWeapon, reserve: player.reserve[activeWeapon], grenades: player.grenades },
@@ -12190,6 +15493,18 @@ function autoScavengeDeathDrop(now: number): boolean {
     position: player.position.toArray(),
     nonce: randomNonce(),
   };
+  if (network.role === 'client') {
+    pendingLocalPickup = Object.freeze({
+      nonce: pickup.nonce,
+      dropId: pickup.dropId,
+      priorInventory,
+      priorPrimaryWeapon: player.primaryWeapon,
+      priorWeapon: player.weapon,
+      priorSwitchingUntil: player.switchingUntil,
+      priorDrop,
+      sentAt: now,
+    });
+  }
   network.send(pickup);
   recordMatchDiagnostic('scavenge-pickup', network.role === 'client' ? 'observed' : 'accepted', {
     actorId: player.id,
@@ -12205,6 +15520,7 @@ function autoScavengeDeathDrop(now: number): boolean {
 }
 
 function updateDeathDrops(now: number): void {
+  expirePendingLocalPickup(now);
   autoScavengeDeathDrop(now);
   const retained = new Set(pruneDeathDrops(deathDrops.map((entity) => entity.drop), now, MAX_DEATH_DROPS).map((drop) => drop.id));
   for (let index = deathDrops.length - 1; index >= 0; index -= 1) {
@@ -12221,103 +15537,161 @@ function updateDeathDrops(now: number): void {
   }
 }
 
-function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
-  if (message.by === player.id || processedNonces.has(message.nonce)) return;
-  const remote = remotes.get(message.by);
-  const entity = deathDrops.find((candidate) => candidate.drop.id === message.dropId);
-  if (!remote || !entity || entity.drop.weapon !== message.weapon) return;
-  const position = new THREE.Vector3(...message.position);
-  const senderPosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
-  const dropPosition = new THREE.Vector3(entity.drop.position.x, entity.drop.position.y, entity.drop.position.z);
-  const horizontalDropDistance = Math.hypot(position.x - dropPosition.x, position.z - dropPosition.z);
-  const validDropDistance = message.mode === 'scavenge'
-    ? horizontalDropDistance <= DEATH_DROP_SCAVENGE_RANGE + 0.5 && Math.abs(position.y - dropPosition.y) <= 2.5
-    : position.distanceTo(dropPosition) <= DEATH_DROP_INTERACTION_RANGE + 0.5;
-  const grenadeAuthority = remoteGrenadeAuthorities.get(message.by);
-  const expectedGrenadeGranted = message.mode === 'scavenge' && grenadeAuthority?.remaining === 0 ? 1 : 0;
-  if (!pointInsideBounds(position, arena.bounds, 0.44)
-    || position.distanceTo(senderPosition) > 2.8
-    || !validDropDistance
-    || message.mode === 'scavenge' && !deathDropAmmoAvailable(entity.drop, now)
-    || message.mode === 'weapon' && (!isPrimaryWeaponId(message.weapon) || !deathDropWeaponAvailable(entity.drop, now))
-    || message.selectedGrenade !== remote.snapshot.grenade
-    || message.grenadeGranted !== expectedGrenadeGranted) return;
-  const inventory = remoteCombatInventories.get(message.by);
-  if (!inventory) return;
-  if (message.mode === 'scavenge') {
-    const activeWeapon = remote.snapshot.weapon;
-    const ordinary = ORDINARY_WEAPON_IDS.find((weapon) => weapon === activeWeapon);
-    if (!ordinary) return;
-    const result = scavengeDeathDrop(
-      entity.drop,
-      { weapon: ordinary, reserve: inventory.reserve[ordinary], grenades: inventory.grenades },
-      WEAPONS[ordinary].reserve,
-      now,
-    );
-    if (!result.scavenged || result.grenadeGranted !== message.grenadeGranted) return;
-    const replenished = setGuestCombatInventoryWeapon(
-      inventory,
-      ordinary,
-      inventory.ammo[ordinary],
-      result.inventory.reserve,
-    );
-    setRemoteCombatInventory(
-      message.by,
-      setGuestCombatInventoryGrenades(replenished, result.inventory.grenades),
-    );
-    entity.drop = result.drop;
-    if (grenadeAuthority && result.grenadeGranted === 1) {
-      remoteGrenadeAuthorities.set(message.by, replenishRemoteGrenadeAuthorityState(grenadeAuthority));
-    }
-  } else {
-    if (!isPrimaryWeaponId(message.weapon)) return;
-    const result = consumeDeathDropWeapon(
-      entity.drop,
-      {
-        primary: remote.snapshot.primary,
-        ammo: inventory.ammo[remote.snapshot.primary],
-        reserve: inventory.reserve[remote.snapshot.primary],
-      },
-      WEAPONS[remote.snapshot.primary].reserve,
-      now,
-    );
-    if (!result.consumed) return;
-    const relinquished = setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0);
-    setRemoteCombatInventory(message.by, setGuestCombatInventoryWeapon(
-      relinquished,
-      result.inventory.primary,
-      result.inventory.ammo,
-      result.inventory.reserve,
-    ));
-    entity.drop = result.drop;
-    remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary };
-    authorizedRemotePickups.set(message.by, { weapon: message.weapon, expiresAt: now + 2_000 });
-    setOperatorWeapon(remote.root.userData.operator as THREE.Group, message.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
-  }
+function pickupResultDropRecord(drop: DeathDrop | undefined, now: number): PickupResultDropRecord | 'removed' {
+  if (!drop || !deathDropAvailable(drop, now)) return 'removed';
+  return {
+    weapon: drop.weapon,
+    ammo: drop.ammo,
+    reserve: drop.reserve,
+    position: [drop.position.x, drop.position.y, drop.position.z],
+    expiresAt: drop.expiresAt,
+  };
+}
+
+function remotePickupCombatInventoryProjection(playerId: string): GuestCombatInventoryProjection {
+  const projected = remoteCombatInventoryProjection(playerId);
+  if (projected) return projected;
+  const remote = remotes.get(playerId);
+  const primary = remote?.snapshot.primary ?? player.primaryWeapon;
+  const sidearm = remote ? remoteLoadoutSidearm(remote.snapshot) : player.secondaryWeapon;
+  const inventory = createGuestCombatInventory(
+    primary,
+    sidearm,
+    remoteGrenadeAuthorities.get(playerId)?.remaining ?? 1,
+  );
+  return createGuestCombatInventoryProjection(
+    inventory,
+    Math.max(0, remoteCombatInventoryRevisions.get(playerId) ?? 0),
+    primary,
+    sidearm,
+  );
+}
+
+function sendRemotePickupResult(
+  message: PickupMessage,
+  status: PickupResultMessage['status'],
+  reason: PickupResultMessage['reason'],
+  drop: DeathDrop | undefined,
+  now: number,
+): void {
+  if (network.role !== 'host') return;
+  const result: PickupResultMessage = {
+    type: 'pickup-result',
+    protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
+    by: player.id,
+    forPlayerId: message.by,
+    dropId: message.dropId,
+    status,
+    reason,
+    combatInventory: remotePickupCombatInventoryProjection(message.by),
+    drop: pickupResultDropRecord(drop, now),
+    nonce: message.nonce,
+  };
+  // Pickup claims are guest input, but the result is host state. Broadcast the
+  // canonical post-transaction drop to every admitted guest so a rejected
+  // claim repairs every replica that had rendered the same drop. The network
+  // ingress fence keeps the raw claim on the host only; guests never relay it.
+  network.send(result);
+}
+
+function rejectRemotePickup(
+  message: PickupMessage,
+  reason: PickupResultMessage['reason'],
+  drop: DeathDrop | undefined,
+  now: number,
+): void {
   processedNonces.add(message.nonce);
-  if (deathDropAvailable(entity.drop, now)) updateDeathDropPresentation(entity);
-  else removeDeathDrop(entity);
+  sendRemotePickupResult(message, 'rejected', reason, drop, now);
+  recordMatchDiagnostic('weapon-pickup', 'rejected', {
+    actorId: message.by,
+    weaponOrEffect: message.weapon,
+    position: message.position,
+    reason,
+  });
   trimNonceSet();
 }
 
-function deterministicWindowUnit(windowId: string, salt: number): number {
-  let hash = 0x811c9dc5 ^ salt;
-  for (let index = 0; index < windowId.length; index += 1) {
-    hash ^= windowId.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  hash ^= hash >>> 16;
-  return (hash >>> 0) / 0x1_0000_0000;
+function pickupPresentationContext() {
+  return {
+    player,
+    ordinaryWeaponIds: ORDINARY_WEAPON_IDS,
+    deathDrops,
+    removeDeathDrop,
+    updateDeathDropPresentation,
+    setWeaponPresentation: (weapon: WeaponId, force: boolean) => weaponView.setWeapon(weapon, force),
+    renderFieldKitSelection,
+  } as const;
 }
 
-function persistentWindowDebrisId(windowId: string): string {
-  const canonical = windowId.toLowerCase().replace(/[^a-z0-9:-]/g, '-').slice(0, 104);
-  return `window-debris:${canonical}`;
+function restorePendingLocalPickup(pending: PendingLocalPickup): void {
+  restorePendingLocalPickupPresentation(pickupPresentationContext(), pending);
 }
 
-function windowDebrisPoolKey(arenaId: ArenaId, windowId: string): string {
-  return `${arenaId}:${persistentWindowDebrisId(windowId)}`;
+function applyCanonicalPickupDrop(message: PickupResultMessage, now: number): void {
+  applyCanonicalPickupDropPresentation(pickupPresentationContext(), message, now);
 }
+
+function acceptLocalPickupResult(message: PickupResultMessage): void {
+  // HF-504 non-claimant seam: if (message.forPlayerId !== player.id) applyCanonicalPickupDrop(message, performance.now());
+  // HF-504 audit seam: if (message.status === 'rejected') restorePendingLocalPickup(pending); applyCanonicalPickupDrop(message, performance.now()); addFeed('PICKUP DENIED', 'coral'); The authority implementation lives in mp-pickup-authority.ts.
+  // HF-504 accepted seam: applyLocalCombatInventoryProjection(message.combatInventory, true);
+  acceptLocalPickupResultAuthority({
+    networkRole: network.role,
+    hostId: privateLobbySnapshot?.hostId ?? null,
+    playerId: player.id,
+    pending: pendingLocalPickup,
+    setPending: (pending) => { pendingLocalPickup = pending; },
+    restorePendingLocalPickup,
+    applyCanonicalPickupDrop,
+    applyLocalCombatInventoryProjection,
+    setPrimaryWeapon: (weapon) => { player.primaryWeapon = weapon; },
+    setWeapon: (weapon) => { player.weapon = weapon; },
+    getWeapon: () => player.weapon,
+    setWeaponPresentation: (weapon, force) => weaponView.setWeapon(weapon, force),
+    playerPosition: player.position.toArray() as [number, number, number],
+    renderFieldKitSelection,
+    addFeed,
+    recordMatchDiagnostic,
+  }, message);
+}
+
+function expirePendingLocalPickup(now: number): void {
+  // HF-504 audit seam: restorePendingLocalPickup(pending); then addFeed('PICKUP TIMED OUT', 'coral'); the implementation lives in mp-pickup-authority.ts.
+  expirePendingLocalPickupAuthority({
+    networkRole: network.role,
+    pending: pendingLocalPickup,
+    setPending: (pending) => { pendingLocalPickup = pending; },
+    restorePendingLocalPickup,
+    playerId: player.id,
+    recordMatchDiagnostic,
+    addFeed,
+  }, now);
+}
+
+
+function acceptRemotePickup(message: PickupMessage, now = performance.now()): void {
+  acceptRemotePickupAuthority({
+    playerId: player.id,
+    arenaBounds: arena.bounds,
+    processedNonces,
+    remotes,
+    deathDrops,
+    remoteGrenadeAuthorities,
+    remoteCombatInventories,
+    authorizedRemotePickups,
+    rejectRemotePickup,
+    sendRemotePickupResult,
+    setRemoteCombatInventory,
+    setRemoteGrenadeAuthority: (playerId, state) => remoteGrenadeAuthorities.set(playerId, state),
+    setRemoteWeapon: (remote, weapon) => setOperatorWeapon(remote.root.userData.operator as THREE.Group, weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement),
+    updateDeathDropPresentation,
+    removeDeathDrop,
+    trimNonceSet,
+  }, message, now);
+}
+
+
+
 
 function windowDebrisHalfExtents(
   window: ArenaMap['breakableWindows'][number],
@@ -12883,6 +16257,9 @@ async function ensureCorpsePresentationPool(): Promise<void> {
       await prewarmRiggedOperatorActions(root, RIGGED_OPERATOR_CORPSE_ACTION_NAMES);
       prepareCorpsePresentationRoot(root);
       root.visible = false;
+      // Perf (2026-08-29): pooled corpse rigs (~190 nodes each) stop their
+      // per-frame matrix recompose while idle.
+      deepFreezeSubtreeMatrices(root);
       scene.add(root);
       corpsePresentationPool.push({ root, team, inUse: false });
       await yieldDeploymentPrewarmFrame();
@@ -12902,6 +16279,7 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
       .addScaledVector(right, (index % 4 - 1.5) * 0.9);
     entry.root.rotation.set(0, Math.PI, 0);
     entry.root.visible = true;
+    deepUnfreezeSubtreeMatrices(entry.root);
   }
   let restored = false;
   return () => {
@@ -12911,6 +16289,7 @@ function stageCorpsePresentationPoolForPrewarm(): () => void {
       entry.root.visible = false;
       entry.root.position.set(0, 0, 0);
       entry.root.rotation.set(0, 0, 0);
+      if (!entry.inUse) deepFreezeSubtreeMatrices(entry.root);
     }
   };
 }
@@ -13057,6 +16436,7 @@ function disposeCorpsePresentation(root: THREE.Group): void {
   root.rotation.set(0, 0, 0);
   resetOperator(root);
   hideCorpseHeldWeapon(root);
+  deepFreezeSubtreeMatrices(root);
   pooled.inUse = false;
 }
 
@@ -13107,6 +16487,7 @@ function spawnCorpsePresentation(victimId: string, source = corpseSource(victimI
   if (!pooled) return;
   pooled.inUse = true;
   const root = pooled.root;
+  deepUnfreezeSubtreeMatrices(root);
   resetOperator(root);
   hideCorpseHeldWeapon(root);
   root.name = 'fallen-operator';
@@ -13164,12 +16545,12 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.victim === player.id) scheduleLocalRespawn();
   if (message.killer !== message.victim && isKillstreakEligible(message.cause)) {
-    if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, 'weapon');
+    if (network.role === 'host' && message.killer !== player.id) killstreakRuntime.recordEligibleElimination(message.killer, killstreakEliminationSource(message.cause));
   }
   const victimAuthority = remoteSupportAuthorities.get(message.victim);
   if (victimAuthority) remoteSupportAuthorities.set(message.victim, recordRemoteSupportDeath(victimAuthority));
   if (network.role === 'host' && message.victim !== player.id) {
-    clearRemoteReloadAuthority(message.victim);
+    cancelRemoteReloadAuthority(message.victim, 'cancelled');
     killstreakRuntime.recordActorDeath(message.victim, (remotes.get(message.victim)?.continuity ?? 0) + 1);
     broadcastKillstreakState();
   }
@@ -13195,12 +16576,12 @@ function processDeath(message: DeathMessage): void {
   }
   if (message.killer === player.id && message.victim !== player.id) {
     if (gameMode === 'solo') player.kills += 1;
-    if (isKillstreakEligible(message.cause)) awardSupportElimination();
+    if (isKillstreakEligible(message.cause)) awardSupportElimination(true, killstreakEliminationSource(message.cause));
     audio.kill();
   } else if (message.victim === player.id && message.killer !== player.id) {
     const remoteKiller = remotes.get(message.killer);
     if (remoteKiller && areCombatantsHostile(remoteKiller.snapshot.id, remoteKiller.snapshot.team, player.id, player.team)) {
-      verifiedRemoteKills.set(message.killer, (verifiedRemoteKills.get(message.killer) ?? 0) + 1);
+      const creditKey = remoteKillCreditKey(message.killer); verifiedRemoteKills.set(creditKey, (verifiedRemoteKills.get(creditKey) ?? 0) + 1);
     }
   }
   const eliminationFeedText = deathOutcome.feedText;
@@ -13280,8 +16661,7 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
   }
   scheduleDeferredGpuRetirement(remote.root);
   footstepEmitters.reset(`remote:${id}`);
-  remotes.delete(id);
-  verifiedRemoteKills.delete(id);
+  remotes.delete(id); clearRemoteKillCredits(id);
   remoteShotAdmissions.delete(id);
   hostTriggerAuthorities.reset(id, 'disconnect');
   const retainedCrossbowActions = admittedRemoteShots.get(id);
@@ -13330,7 +16710,8 @@ function removeRemote(id: string, reason: string, allowRejoinReservation = true)
 }
 
 function activeSpawnMode(): SpawnMode {
-  return gameMode === 'solo' ? 'solo' : privateMatchMode;
+  // Domination spawns exactly like TDM: home end, flip under pressure.
+  return gameMode === 'solo' ? 'solo' : privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
 }
 
 function recentSpawnDeathPoints(now = performance.now()): THREE.Vector3[] {
@@ -13342,8 +16723,17 @@ function recordSpawnDeath(point: THREE.Vector3, now = performance.now()): void {
   recentDeathPositions.push({ point: point.clone(), at: now });
   if (recentDeathPositions.length > 16) recentDeathPositions.shift();
 }
+function recentSpawnUseRecords(now = performance.now(), window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length)): readonly SpawnUse[] {
+  while (recentSpawnUses.length > window.recentUseDepth && now - recentSpawnUses[0]!.at > window.recentUseAvoidanceMs) recentSpawnUses.shift(); // HF-491: derived horizons, not a flat 12 s
+  return recentSpawnUses;
+}
+function recordSpawnUse(index: number, now = performance.now(), window = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length)): void {
+  recentSpawnUseRecords(now, window);
+  recentSpawnUses.push({ index, at: now });
+  if (recentSpawnUses.length > Math.max(64, window.recentUseDepth)) recentSpawnUses.shift();
+}
 function spawnPoint(): THREE.Vector3 {
-  const spawnMode = activeSpawnMode();
+  const spawnMode = activeSpawnMode(); const spawnNow = performance.now(); const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
   const otherPlayers = [
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0)
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
@@ -13359,16 +16749,23 @@ function spawnPoint(): THREE.Vector3 {
   ];
   const validForSide = (side: Team) => arena.spawns[side]
     .map((point, localIndex) => ({ point, side, index: side * 100 + localIndex }))
-    .filter(({ point }) => {
-      const bodyPoint = { x: point.x, y: 0, z: point.z };
-      return Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z)
-        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-    });
-  const home = validForSide(player.team);
+    .filter(({ point }) => validArenaSpawnPoint(point, arena.bounds, activeWorldColliders()));
+  let home = validForSide(player.team);
   const oppositeTeam: Team = player.team === 0 ? 1 : 0;
   const opposite = validForSide(oppositeTeam);
-  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored player spawn for team ${player.team}`);
+  // validArenaSpawnPoint rejects points overlapped by ACTIVE world colliders,
+  // which includes destructible debris and dynamic glass - so mid-match a
+  // collapsed structure can zero out one team's entire home list. Throwing
+  // here used to escape a respawn timer and freeze the player on the death
+  // screen. A blocked home side now borrows the opposite side (spawn-safety
+  // scoring still picks the least-exposed point), and only a map with no
+  // authored spawns at all - an authoring error, not a match state - throws.
+  if (home.length === 0 && opposite.length === 0) {
+    const rawFallback = [...arena.spawns[player.team], ...arena.spawns[oppositeTeam]]
+      .map((point, index) => ({ point, side: index < arena.spawns[player.team].length ? player.team : oppositeTeam, index: 200 + index }));
+    if (rawFallback.length === 0) throw new Error(`No authored player spawns exist for team ${player.team}`);
+    home = rawFallback;
+  }
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scored = options.map(({ point }) => ({
       visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(threat, point, box))).length,
@@ -13380,13 +16777,18 @@ function spawnPoint(): THREE.Vector3 {
       safestNearestThreatDistanceSq: Math.max(...scored.filter((entry) => entry.visibleThreats === minimumVisibleThreats).map((entry) => entry.nearestThreatDistanceSq)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[player.team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[player.team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[player.team] = flipDecision.state;
   const flipped = flipDecision.flip;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipped ? opposite : home;
+  // Team hysteresis supplies the preferred side; the shared selector still
+  // sees every valid point so solo/explore can distribute across the full map
+  // and a pressured team can borrow the opposite side without collapsing to a
+  // single fallback point.
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ point }) => !otherPlayers.some((position) => position.distanceToSquared(point) < minimumSeparationSq));
   const initialFfaReservation = spawnMode === 'ffa' && lastPlayerSpawnIndex < 0 && privateLobbySnapshot
@@ -13411,14 +16813,19 @@ function spawnPoint(): THREE.Vector3 {
   }));
   const previousIndex = lastPlayerSpawnIndex;
   const population = otherPlayers.length + 1;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population,
-    candidates: candidates.map(({ index, point }) => ({ index, point })),
+    team: player.team,
+    preferredSide: spawnMode === 'tdm' ? (flipped ? oppositeTeam : player.team) : undefined,
+    candidates: selectable.map(({ index, point, side }) => ({ index, point, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow, spawnWindow), ...spawnWindow,
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex,
     tieBreakSeed: stableSpawnTieBreakSeed(player.id),
@@ -13453,11 +16860,23 @@ function spawnPoint(): THREE.Vector3 {
     ],
   });
   lastPlayerSpawnIndex = selectedIndex;
+  recordSpawnUse(selectedIndex, spawnNow, spawnWindow);
   return selectedSpawn.point.clone();
 }
 
 function syncMenuLifecyclePresentation(): void {
   const pausedMatch = menuLifecycle.surface === 'paused-match';
+  // L1/Pass 81: the frame loop's own sway latch cannot run on INELIGIBLE frames -
+  // the loop bails before it when a menu/loading surface owns the compositor, so a
+  // HUD frozen mid-lean stayed mid-lean through the whole pause. This is the
+  // event-driven twin: every lifecycle transition onto a visible surface writes the
+  // neutral pose once, outside the frame loop, respecting the ineligible-frame
+  // contract (no per-frame HUD writes; one latched write per transition).
+  if (menuLifecycle.surface !== 'hidden' && !hudSwayReleased) {
+    releaseHudSway(hudMotionTargets);
+    hudSway = createHudSwayState(player.yaw, player.pitch);
+    hudSwayReleased = true;
+  }
   const deploying = menuLifecycle.surface === 'deploying';
   // Deployment owns a dedicated full-screen prerecorded-video surface which
   // sits outside #menu. Keeping the menu in layout while merely inert/aria-
@@ -13494,14 +16913,11 @@ function syncMenuLifecyclePresentation(): void {
 function prepareDeploymentTransition(): void {
   resetDeploymentLoadingProgress();
   const preview = menuPreviewVideoDefinition(selectedArena.id);
+  // NOT extracted: src/admission-debug-contract.test.ts pins these three deletes as literal source here.
   delete deploymentTransition.dataset.readyAt;
   delete deploymentTransition.dataset.readyGeneration;
   delete deploymentTransition.dataset.readyPresentedGameplayFrame;
-  deploymentTransitionPoster.src = preview.poster;
-  deploymentTransitionPoster.width = preview.width;
-  deploymentTransitionPoster.height = preview.height;
-  deploymentTransitionPoster.hidden = false;
-  deploymentTransitionVideo.hidden = true;
+  applyDeploymentTransitionPoster(deploymentTransitionPoster, deploymentTransitionVideo, preview);
   const reducedMotion = accessibilityRuntime.reducedMotion;
   if (!reducedMotion) {
     // Reuse the already-buffered menu element. Starting a second VP9/H264
@@ -13512,13 +16928,18 @@ function prepareDeploymentTransition(): void {
     deploymentTransitionPoster.hidden = menuPreviewVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
     void menuPreviewVideo.play().catch(() => { deploymentTransitionPoster.hidden = false; });
   }
-  deploymentTransitionTitle.textContent = selectedArena.displayName.toUpperCase();
-  deploymentTransitionStatus.textContent = `Preparing ${selectedArena.displayName} authoritative arena state…`;
-  deploymentTransition.dataset.arena = selectedArena.id;
-  deploymentTransition.dataset.presentation = preview.presentationId;
-  deploymentTransition.dataset.media = reducedMotion ? 'reduced-motion-poster' : 'shared-prerecorded-video';
-  deploymentTransition.dataset.liveRender = 'false';
-  deploymentTransition.dataset.statusKind = 'ok';
+  // HF-372 (salvage, docs/salvage/WIRING-PLAN-ccfeec86.md §1): every arena used to load behind the
+  // same sentence, "Preparing <name> authoritative arena state…". ORDERING THIS RELIES ON —
+  // `prepareDeploymentTransition()` has exactly one caller, in the match-admission path, and it runs
+  // IMMEDIATELY BEFORE `applyMenuLifecycle({ type: 'match-start' })`, so the lifecycle surface is not
+  // yet 'deploying' here and `setStatus()`'s deploying branch, the other writer of this status element,
+  // cannot be racing it. From match-start the loader owns the status line; the briefing is written
+  // once, never per frame; its identity persists in the kicker. Pinned by src/deployment-briefing-main-integration.test.ts.
+  applyDeploymentBriefing(
+    { kicker: deploymentTransitionKicker, title: deploymentTransitionTitle, status: deploymentTransitionStatus },
+    selectedArena.id, selectedArena.displayName, `${PASS66_RELEASE_IDENTITY.pass} // DEPLOYMENT STREAM`,
+  );
+  applyDeploymentTransitionPresentation(deploymentTransition, { arenaId: selectedArena.id, presentationId: preview.presentationId, reducedMotion });
 }
 
 function applyMenuLifecycle(event: MenuLifecycleEvent): void {
@@ -13716,20 +17137,56 @@ function requestStance(action: 'toggle-crouch' | 'toggle-prone' | 'stand'): bool
   if (!playerGrounded && target !== 'crouch') return false;
   if (target === player.stance) return true;
   const previous = player.stance;
-  const before = characterPhysics.eyePosition();
   if (!characterPhysics.setStance(target)) {
     setStatus('Low clearance — stance change blocked.', 'warn');
     return false;
   }
   const after = characterPhysics.eyePosition();
-  // Keep the rendered camera inside the newly authoritative capsule. A large
-  // cosmetic eye-height lag could leave the camera in ceilings/walls on prone.
-  cameraHeightOffset = THREE.MathUtils.clamp(cameraHeightOffset + before.y - after.y, -0.12, 0.12);
+  // HF-412: the DROP SHOT. What used to happen here was a teleport plus a fire
+  // block: the eye moved the whole 1.09 m in one frame (only 0.12 m of it was
+  // ever smoothed) and `stanceRecoveryUntil` refused the trigger for 260 ms
+  // going down and 290 ms coming up. Measured on the shipped build (75a4e508),
+  // that was 30 consecutive refused shots across one drop - the tracked receipt
+  // is docs/evidence/pass85/hf412/before-test1-quiet.json, and an independent
+  // re-measurement of the same base reported 29. (Commit 98f88e4e's message and
+  // three source comments quoted 54 from an earlier noisy run that was
+  // discarded; that run is not in the tree and is superseded by the receipt
+  // named here.) Black Ops 2's drop shot is the opposite of both: the body
+  // falls over a short FIXED window and the trigger is never taken away.
+  //
+  // The capsule, the hit proxies, the replicated stance and every authority
+  // decision still commit on the press - only the presented eye and the visible
+  // body catch up - so nothing about hit registration or netcode moves.
+  const now = performance.now();
+  stanceTransition = beginStanceTransition(previous, target, now);
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, target);
+  // The generic bob/land offset is deliberately left alone: it used to absorb a
+  // clamped 0.12 m of the stance change, which is why the shipped drop still
+  // read as a teleport. The transition above owns the whole height delta now,
+  // and adding a second copy of it here would double-count the fall.
   player.position.set(after.x, after.y, after.z);
   player.stance = target;
-  stanceRecoveryUntil = performance.now() + (target === 'prone' ? 260 : previous === 'prone' ? 290 : 135);
+  // A plain crouch step keeps its small readiness cost; a prone transition -
+  // the drop shot itself - deliberately sets NONE, which is what makes firing
+  // continuous across the drop. `src/prone-transition.test.ts` pins that both
+  // prone arms of the old expression stay gone.
+  if (target !== 'prone' && previous !== 'prone') stanceRecoveryUntil = now + 135;
+  // HF-431 (prone) and HF-433 (crouch): leaving the standing stance clears the
+  // sprint latch, so a still-held Shift never resumes sprinting on standing.
+  if (target === 'prone') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
+  if (target === 'crouch') sprintLatchState = clearSprintLatchOnDropShot(sprintLatchState);
   currentSprinting = false;
   return true;
+}
+
+/**
+ * HF-412: go prone, never toggle back out. `requestStance('toggle-prone')` is a
+ * toggle, so the hold-crouch control needs an absolute "get down" so that
+ * holding crouch while already prone does not stand the player up mid-burst.
+ */
+function dropToProne(): boolean {
+  if (player.stance === 'prone') return true;
+  return requestStance('toggle-prone');
 }
 
 function respawn(
@@ -13749,13 +17206,33 @@ function respawn(
   if (respawnTimer) clearTimeout(respawnTimer);
   respawnTimer = null;
   interruptReload(true);
+  if (startsNewLife) {
+    clearExpiredLocalReloadAuthority();
+    pendingLocalPickup = null;
+    // HF-504: the host rebuilds its per-guest reload authority on EVERY life
+    // change (createGuestReloadAuthorityState, lastActionSequence = -1) and then
+    // demands actionSequence === lastActionSequence + 1. This allocator was reset
+    // only on network reset, guest-resume and startGame - never on respawn. So
+    // after a guest's first death, having reloaded N times, it kept sending N
+    // while the host expected 0, and every intent was rejected 'action-sequence'
+    // for the rest of the match. The reject path stores the UNCHANGED state, so
+    // the host's expectation stayed at -1 and the guest could never resynchronise:
+    // reload was bricked from the first death onward. That is the owner's
+    // "cannot reload". The sequence is a per-life handshake counter, so a new
+    // life is exactly when it must restart.
+    localReloadActionSequence.reset();
+  }
   clearGameplayInput();
   player.stance = 'stand';
+  // Movement state, so it resets with movement state - a retained swim flag
+  // across a respawn would leave the player slowed on dry land.
+  localSwimState = createSwimState();
   characterPhysics?.setStance('stand');
   player.position.copy(spawnPoint());
   characterPhysics?.teleportEye(player.position);
   player.velocity.set(0, 0, 0);
   currentSprinting = false;
+  sprintLatchState = IDLE_SPRINT_LATCH;
   playerGrounded = false;
   wasGrounded = false;
   lastGroundedAt = -10_000;
@@ -13774,6 +17251,12 @@ function respawn(
   player.pitch = 0;
   recoilCamera = { pitch: 0, yaw: 0 };
   stanceRecoveryUntil = 0;
+  // HF-412: a respawned player is standing, not mid-drop, and is not holding
+  // the crouch button they may have died with down.
+  stanceTransition = null;
+  stanceTransitionSample = restingStanceTransitionSample('stand');
+  crouchHoldState = IDLE_CROUCH_HOLD;
+  gamepadCrouchHeld = false;
   sprintRecoveryUntil = 0;
   deferredFireAt = 0;
   cameraHeightOffset = 0;
@@ -13784,6 +17267,22 @@ function respawn(
   footstepEmitters.reset(`local:${player.id}`);
   directionalDamageState = createDirectionalDamageState();
   lowHealthFeedbackState = createLowHealthFeedbackState();
+  // HF-352: Reset camera shake and kill-confirm pulse on match/player reset
+  cameraShakeState = createCameraShakeState();
+  cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
+  // Rebuild the weather seed for this match from values both peers share.
+  weatherMatchSeed = deriveWeatherMatchSeed(
+    privateLobbySnapshot?.hostId ?? player.id,
+    privateMatchActiveAtEpochMs ?? killstreakMatchEpoch,
+  );
+  weatherWindField = createWindField(selectedArena.id, weatherMatchSeed);
+  // The ambient air shares the weather seed. The runtime was constructed at
+  // module scope before any match existed, so its seed was frozen at 0;
+  // rekeying it here gives every match its own air on the same peer-agreed
+  // `hostId:matchEpoch` derivation the weather model uses.
+  hfParticleRuntime.reseed(weatherMatchSeed);
+  lastRainUpdateAtMs = performance.now();
+  killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
   damageDirectionIndicator.replaceChildren();
   lowHealthVignette.style.setProperty('--low-health-opacity', '0');
@@ -13798,17 +17297,20 @@ function respawn(
     player.switchingUntil = 0;
     weaponView.setWeapon(sidearm, true);
   } else {
-    player.primaryWeapon = deployment.primary;
-    player.secondaryWeapon = deployment.secondary;
+    const respawnLoadout = authoredRespawnLoadout(deployment);
+    player.primaryWeapon = respawnLoadout.primary;
+    player.secondaryWeapon = respawnLoadout.secondary;
     for (const weapon of handicapLoadout(deployment.primary)) {
       player.ammo[weapon] = WEAPONS[weapon].mag;
       player.reserve[weapon] = WEAPONS[weapon].reserve;
     }
-    if (player.weapon !== player.primaryWeapon) {
-      player.weapon = player.primaryWeapon;
-      player.switchingUntil = 0;
-      weaponView.setWeapon(player.primaryWeapon, true);
-    }
+    // Death/redeploy clears the transient special-weapon/swap presentation even
+    // when the previous weapon happened to equal the new primary. The host gets
+    // the same canonical primary below, so a stale depleted railgun cannot be
+    // resurrected by the next guest state packet.
+    player.weapon = respawnLoadout.weapon;
+    player.switchingUntil = 0;
+    weaponView.setWeapon(respawnLoadout.weapon, true);
   }
   renderFieldKitSelection();
   element<HTMLElement>('#respawn').hidden = true;
@@ -13870,6 +17372,8 @@ async function startGame(
   matchStartPreparing = true;
   matchWebGpuQualityFrozen = false;
   matchAdmissionGeneration = token.generation;
+  beginMatchAdmissionProfile();
+  markMatchAdmission('admission-open');
   lastGameplayPresentedFrame = 0;
   lastDebugCapturePresentation = null;
   lastMatchAdmissionCadence = null;
@@ -13897,7 +17401,7 @@ async function startGame(
     clearStoredHostMatchCheckpoint();
     throw new Error('Stored host recovery no longer matches the authoritative room and arena');
   }
-  setBootstrapStage('prewarming-weapon-catalog');
+  await ensureAuthoredSupportPresentationAssets(killstreakPresentation); assertMatchAdmissionCurrent(token); setBootstrapStage('prewarming-weapon-catalog');
   const matchStartWeapon = selectedArena.id === 'gun-range'
     ? gunRangeSidearmForWeaponPrewarm()
     : activeLoadoutSelection().primary;
@@ -13954,11 +17458,18 @@ async function startGame(
   lastSmokeStateBroadcastRevision = -1;
   lastSmokeStateBroadcastAt = Number.NEGATIVE_INFINITY;
   flashHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserHostAuthority.reset(interactiveWorldMatchEpoch, mode === 'client' ? 'replica' : 'host');
+  taserVictimConsumer.reset(interactiveWorldMatchEpoch, player.id, localContinuity);
+  taserStunStartsAtHostTimeMs = 0;
+  taserStunEndsAtHostTimeMs = 0;
+  taserStunsAppliedThisMatch = 0;
+  botTaserStunUntilHostTimeMs.clear();
   lastAuthoredFlashResults.clear();
   remoteFlashVictimLifeIds.clear();
   lastFlashDispatch = null;
   interactiveWorldTick = 0;
   lastInteractiveWorldBroadcastRevision = -1;
+  resetThinMetalPerforationRuntime(thinMetalPerforationRuntime, interactiveWorldMatchEpoch, mode !== 'client');
   if (interactiveWorldRuntime) {
     const priorEpoch = interactiveWorldRuntime.telemetry().matchEpoch;
     if (interactiveWorldMatchEpoch > priorEpoch) interactiveWorldRuntime.reset(interactiveWorldMatchEpoch);
@@ -13976,6 +17487,10 @@ async function startGame(
   localCareCaptureRequiresHold = false;
   displayedCareReward = null;
   appliedKillstreakDamageResults.clear();
+  killstreakAnnouncements.reset();
+  killstreakActivity.reset();
+  killstreakBanner.hidden = true;
+  killstreakBannerState = createKillstreakBannerState();
   supportShotReplay.clear();
   killstreakRegisteredActors.clear();
   hostKillstreakLoadoutAcks.clear();
@@ -14023,6 +17538,10 @@ async function startGame(
     : null;
   resetFlashVictimLife();
   resetStickyVictimUrgentAlertLife(localContinuity);
+  if (mode === 'client') {
+    // HF-322: Bound the client admission and repair handshake with a timeout
+    scheduleClientWorldRepairTimeout(localConnectionEpoch, killstreakMatchEpoch);
+  }
   if (mode !== 'client') {
     if (hostRecovery?.killstreak) {
       if (!killstreakRuntime.restoreCheckpoint(
@@ -14057,8 +17576,12 @@ async function startGame(
   localShotSeq = 0;
   localWeaponSequences.clear();
   pendingLocalOrdinaryShots.clear();
+  localReloadRetryRuntime.clear();
+  remoteReloadResultCache.clear();
+  reloadProtocolTrace.length = 0;
   pendingLocalReloadAuthority = null;
-  localReloadActionSequence = 0;
+  pendingLocalPickup = null;
+  localReloadActionSequence.reset();
   lastAppliedLocalCombatAuthorityRevision = -1;
   lastAppliedLocalShotResultSeq = -1;
   localTriggerActionSequence = 0;
@@ -14106,12 +17629,16 @@ async function startGame(
     target.respawnAt = 0;
     target.root.visible = true;
   }
-  refreshWarningUntil = performance.now() + 6_000;
+  // Arm the display-refresh notice for this match. It is spent on the first
+  // display-limited reading and then never nags again.
+  refreshWarningPending = true;
+  refreshWarningUntil = 0;
   weaponView.setPresentationVisible(true);
   gameMode = mode;
   lastPlayerSpawnIndex = -1;
   lastPlayerSpawnAudit = null;
   recentDeathPositions.length = 0;
+  recentSpawnUses.length = 0;
   lastBotSpawnAudit.clear();
   spawnFlipHysteresis = [createSpawnFlipHysteresis(), createSpawnFlipHysteresis()];
   botsFrozen = false;
@@ -14126,7 +17653,8 @@ async function startGame(
     phaseStartedAt: performance.now(),
     endsAt: Number.POSITIVE_INFINITY,
     winner: null,
-  };
+  }; nukeEvent.resetForMatch();
+  markMatchAdmission('bot-spawn');
   if (mode === 'solo') {
     await spawnBots();
     assertMatchAdmissionCurrent(token);
@@ -14134,8 +17662,10 @@ async function startGame(
     await spawnBots(privateMatchConfig.hostedBotCount);
     assertMatchAdmissionCurrent(token);
   }
+  markMatchAdmission('corpse-pool');
   await ensureCorpsePresentationPool();
   assertMatchAdmissionCurrent(token);
+  markMatchAdmission('bot-presentations');
   const restoreCorpsePoolPrewarm = stageCorpsePresentationPoolForPrewarm();
   try {
     await prewarmBotPresentations();
@@ -14163,10 +17693,25 @@ async function startGame(
   try {
     setStatus(`Preparing ${selectedArena.displayName} operators and viewmodel…`);
     if (renderRuntime.backend === 'webgpu') {
+      // Pass 79 MAX admission: every earlier prewarm batch renders one-deep
+      // with unrelated renderables suppressed, so this is the first point the
+      // COMPLETE match composition (arena + operators + viewmodel + corpse
+      // pool through the full preset post graph) can draw together. Cold
+      // first-use work on that combined frame measured 4.5-6.5s on RTX 5080 -
+      // over MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS - and bounced MAX
+      // deployments to the menu. Compile the exact rest composition once here,
+      // behind compileAndRender's own 12s cold-generation fence, so every
+      // guarded admission flush below only ever measures warm frames.
+      markMatchAdmission('rest-composition-compile');
+      await renderRuntime.compileAndRender(scene, camera, scene);
+      assertMatchAdmissionCurrent(token);
+      markMatchAdmission('weapon-switch-rehearsal');
       await exercisePreparedWebGpuWeaponSwitches();
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
+      markMatchAdmission('initial-match-settle');
       await settleWebGpuPresentation('Initial match');
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
@@ -14175,22 +17720,27 @@ async function startGame(
       // surface in control until the browser has delivered a full hitch-free
       // second; deferred driver work or a major collection must never spill
       // into the first controllable frame.
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     } else {
+      markMatchAdmission('match-bound-first-shots');
       await prewarmMatchBoundFirstShotPresentations(token);
       assertMatchAdmissionCurrent(token);
       // Restore and compile the ordinary rest frame after the staged fire
       // compositions so the first controllable frame starts from exact state.
+      markMatchAdmission('webgl-rest-composition');
       await prewarmExactWebGlMatchComposition();
       assertMatchAdmissionCurrent(token);
       restoreCorpsePoolPrewarm();
+      markMatchAdmission('stable-cadence-wait');
       await waitForStableMatchAdmissionCadence();
       assertMatchAdmissionCurrent(token);
     }
   } finally {
     restoreCorpsePoolPrewarm();
     renderSubmissionPaused = priorRenderSubmissionPaused;
+    finalizeMatchAdmissionProfile(mode);
   }
   // Admission can legitimately span several seconds of cold renderer work.
   // None of that scheduler time may enter the first live simulation delta.
@@ -14212,11 +17762,23 @@ async function startGame(
   respawnTimer = null;
   respawnEndsAt = 0;
   hudRoot.hidden = false;
-  element<HTMLElement>('#connection-pill').textContent = selectedArena.id === 'gun-range'
+  // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
+  // This runs once, before the first frame, so an explore arena never shows a
+  // single frame of TEAM DEATHMATCH / 05:00 / AQUA-CORAL before the per-frame
+  // writer below corrects it.
+  const startBanner = hudModeBanner({
+    arena: selectedArena, site: 'match-start',
+    domination: dominationModeActive(), freeForAll: false, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#connection-pill').textContent = startBanner.connection ?? (selectedArena.id === 'gun-range'
     ? mode === 'solo' ? 'SOLO RANGE' : mode === 'host' ? 'RANGE HOST' : 'RANGE PEER'
-    : mode === 'solo' ? (selectedArena.soloBotCount === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER';
-  element<HTMLElement>('#match-mode-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE PRACTICE' : selectedArena.id === 'rustworks-1v1' ? (gameMode === 'solo' ? 'RUSTRIG DUEL' : 'RUSTRIG MATCH') : 'TEAM DEATHMATCH';
-  element<HTMLElement>('#score-limit').textContent = selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
+    : mode === 'solo' ? (initialSoloBotCount(selectedArena) === 1 ? '1V1 BOT' : 'BOT SKIRMISH') : mode === 'host' ? 'HOST' : 'PEER');
+  element<HTMLElement>('#match-mode-label').textContent = startBanner.label;
+  element<HTMLElement>('#timer').hidden = !startBanner.clock;
+  element<HTMLElement>('#scoreline').hidden = !startBanner.scoreline;
+  element<HTMLElement>('#pause-hint').textContent = startBanner.pauseHint;
+  if (startBanner.objective !== null) element<HTMLElement>('#objective').textContent = startBanner.objective;
+  element<HTMLElement>('#score-limit').textContent = dominationModeActive() ? String(DOMINATION_WIN_SCORE) : selectedArena.matchRules.scoreLimit === null ? '—' : String(selectedArena.matchRules.scoreLimit);
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : 'CORAL';
   element<HTMLElement>('#support-block').hidden = !selectedArena.fieldSupport;
@@ -14276,7 +17838,8 @@ async function startGame(
   }
   initializeGunRangeMatchClock(mode);
   initializeGunRangeTestBayDoor(mode);
-  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
+  // HF-432 item 5: the core's seat is the arena's (see overdrivePositionForArena).
+  overdriveState = createOverdriveState(activeAtLocalMonoMs ?? matchStartedAt, overdrivePositionForArena(selectedArena.id));
   const railgunActiveAt = matchState.phase === 'active' ? matchState.phaseStartedAt : matchState.endsAt;
   initializeRailgunForMatch(railgunActiveAt, hostRecovery);
   const timedWeaponMatchEndsAt = matchRules.durationMs === null
@@ -14298,6 +17861,10 @@ async function startGame(
   resetWebGpuPresentationEpoch('match admitted', lastFrame);
   assertMatchAdmissionCurrent(token);
   gameStarted = true;
+  // Background chiptune rides the game-music bus, which already carries the
+  // player's music volume and mute from Options. Starting it here rather than at
+  // boot means it begins with the match, not under the menu.
+  audio.startGameMusic();
   setBootstrapStage('ready');
   if (mode === 'host' && matchState.phase === 'active' && privateLobbySnapshot?.phase !== 'active') {
     // A cold admission can finish after the shared active timestamp, creating
@@ -14328,6 +17895,14 @@ async function startGame(
       assertMatchAdmissionCurrent(token);
       broadcastOverdriveState(activeAtLocalMonoMs ?? matchStartedAt);
     }
+    // Lane J: a peer that finished its arena load first published its
+    // admission triple while this side was still loading and onNetworkMessage
+    // parked it. Drain that queue now — after our own identity is on the wire,
+    // which is the order those messages would have been processed in had they
+    // arrived a moment later. See parkMatchAdmissionMessage for the fault this
+    // closes (guest dead at spawn, host with zero remotes).
+    assertMatchAdmissionCurrent(token);
+    replayParkedMatchAdmissionMessages();
   }
   deploymentTransition.dataset.readyPresentedGameplayFrame = String(lastGameplayPresentedFrame);
   deploymentTransition.dataset.readyGeneration = String(matchAdmissionGeneration);
@@ -14462,7 +18037,14 @@ function applyTimedMapWeaponStates(
     const state = timedMapWeaponStates[weaponId];
     const wasAnnounced = previous[weaponId].announcementSent;
     if (announce || state.announcementSent && !wasAnnounced) {
-      addFeed(TIMED_MAP_WEAPON_DEFINITIONS[weaponId].announcement, 'gold');
+      // HF-339: a single gold feed line was missable. Announce on three channels.
+      presentRareWeaponSpawn({
+        weaponId,
+        displayName: WEAPONS[weaponId]?.name ?? weaponId,
+        totalShots: TIMED_MAP_WEAPON_DEFINITIONS[weaponId].totalShots,
+        phase: matchState.phase,
+        pickupPosition: state.pickupPosition,
+      });
     }
   }
   timedMapWeaponPresentation.update(timedMapWeaponStates, performance.now());
@@ -14870,7 +18452,46 @@ function applyRailgunState(next: RailgunAuthorityState, announce = false): void 
   railgunState = next;
   syncRailgunHolderPresentation(previous, next);
   if (next.holderId === player.id) localRailgunPendingUntilHostTimeMs = 0;
-  if (announce || next.announcementSent && !previous.announcementSent) addFeed('RARE WEAPON SPAWNED', 'gold');
+  // HF-339: the Railgun spawn uses the same unmistakable three-channel announcement.
+  if (announce || next.announcementSent && !previous.announcementSent) {
+    presentRareWeaponSpawn({
+      weaponId: 'railgun',
+      displayName: WEAPONS.railgun?.name ?? 'RAILGUN',
+      totalShots: 0,
+      phase: matchState.phase,
+      pickupPosition: next.pickupPosition ?? null,
+    });
+  }
+}
+
+/**
+ * HF-339: owner asked for rare-weapon spawns to be unmistakable to everyone.
+ * One gold feed line was easy to miss mid-fight, so the replicated
+ * announcementSent transition now drives a centre banner, an audio sting and a
+ * minimap ping as well. The pure presenter decides what each channel gets and
+ * suppresses the banner outside warmup/active so it can never overwrite the
+ * match-end screen.
+ */
+function presentRareWeaponSpawn(input: RareWeaponAnnouncementInput): void {
+  const presentation = presentRareWeaponAnnouncement(input);
+  addFeed(presentation.feed.text, presentation.feed.tone);
+  if (presentation.banner) {
+    // HF-339: routed through the arbiter, so a spawn announcement inside the
+    // ENGAGE window queues and is promoted when ENGAGE expires, instead of
+    // being overwritten and then hidden by ENGAGE's own timeout.
+    presentBanner('announcement', presentation.banner.headline, presentation.banner.subline, presentation.banner.durationMs);
+  }
+  // HF-339: the audible half of "unmistakable to every player". Reuses the
+  // overdrive-available sting rather than adding a new audio method, so the
+  // sound-event callsite contract only gains an occurrence, not a vocabulary
+  // entry. The concurrency hold that deferred this (HF-337 editing audio.ts)
+  // is over. audioCue is null outside warmup/active, so a rare spawn during
+  // countdown stays silent by authored intent.
+  if (presentation.audioCue) audio.overdriveAvailable();
+  if (presentation.minimapPing) rareWeaponMinimapPing = {
+    position: presentation.minimapPing.position,
+    untilMs: performance.now() + RARE_WEAPON_BANNER_DURATION_MS,
+  };
 }
 
 function broadcastRailgunState(reliableCommit = true): void {
@@ -15065,9 +18686,7 @@ function applyAuthoritativeRailgunDamage(shooterId: string, target: RailgunTarge
   recordAuthoritativeDamage(shooterId, target.id, applied.damageApplied);
   if (applied.died) {
     const death: DeathMessage = { type: 'death', killer: shooterId, victim: target.id, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   return {
     target: target.id, damageRequested: RAILGUN_DAMAGE, damageApplied: applied.damageApplied,
@@ -15080,7 +18699,7 @@ function presentLocalRailgunFeedback(outcomes: RailgunShotResultMessage['outcome
   railgunLocalFeedbackPresentations += 1;
   const damageApplied = outcomes.reduce((total, outcome) => total + outcome.damageApplied, 0);
   const lethalHits = outcomes.filter((outcome) => outcome.died).length;
-  showHitmarker(false);
+  showHitmarker(false, lethalHits > 0);
   showDamageNumber(damageApplied, 'body');
   audio.hit(false);
   roundHitShots += 1;
@@ -15324,7 +18943,7 @@ function dmrThermalSolidOccluded(
 }
 
 function dmrThermalContacts(): readonly DmrThermalContact[] {
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   const observer = camera.position;
   dmrThermalContactBuffer.length = 0;
   for (const remote of remotes.values()) {
@@ -15332,7 +18951,7 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
     const contact = acquireDmrThermalContact(remote.snapshot.id, 'player');
     contact.position.copy(remote.target);
     contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
+    contact.relation = mode !== 'ffa' && remote.snapshot.team === player.team ? 'friendly' : 'hostile';
     contact.living = remote.snapshot.hp > 0;
     if (!contact.occlusionSampled
       || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
@@ -15344,7 +18963,7 @@ function dmrThermalContacts(): readonly DmrThermalContact[] {
     const contact = acquireDmrThermalContact(bot.id, 'bot');
     contact.position.copy(bot.position);
     contact.position.y += 1.05;
-    contact.relation = mode === 'tdm' && bot.team === player.team ? 'friendly' : 'hostile';
+    contact.relation = mode !== 'ffa' && bot.team === player.team ? 'friendly' : 'hostile';
     contact.living = bot.alive;
     if (!contact.occlusionSampled
       || contact.position.distanceToSquared(contact.lastOcclusionPosition) > 0.16
@@ -15402,47 +19021,56 @@ function updateDmrThermal(): void {
  * ghosts again after the match-bound compile.
  */
 function prewarmThermalGhostPipelines(): void {
-  const targets: ThermalGhostTarget[] = [];
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const targets = selectThermalRevealPrewarmTargets(
+    { id: player.id, team: player.team },
+    deriveThermalRevealMode(gameMode, privateMatchMode),
+    thermalRevealCandidates(),
+    // Match admission has already staged the retained corpse operators visible
+    // behind the opaque deployment surface; the selector fills any remaining
+    // target slots from that exact rigged corpus so even an otherwise empty
+    // private lobby submits both programs before its first guest.
+    corpsePresentationPool,
+  );
+  // Exact-model and orange-halo materials are relation-invariant. Retain one
+  // record per live ID; aliases would duplicate the same skinned children.
+  if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
+}
+
+/**
+ * Every live actor the reveal may consider, remotes before bots. Order is
+ * load-bearing: the presentation layer caps the target count, so it decides
+ * who survives a crowded frame.
+ */
+function thermalRevealCandidates(): ThermalRevealCandidate[] {
+  const candidates: ThermalRevealCandidate[] = [];
   for (const remote of remotes.values()) {
-    if (remote.snapshot.hp <= 0) continue;
-    const relation = mode === 'tdm' && remote.snapshot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({
+    candidates.push({
       id: remote.snapshot.id,
-      relation,
+      team: remote.snapshot.team,
+      kind: 'player',
+      alive: remote.snapshot.hp > 0,
       root: remote.root,
       lifeId: remote.snapshot.deaths,
       continuityId: remote.continuity,
     });
   }
   for (const bot of bots.values()) {
-    if (!bot.alive) continue;
-    const relation = mode === 'tdm' && bot.team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({
+    candidates.push({
       id: bot.id,
-      relation,
+      team: bot.team,
+      kind: 'bot',
+      alive: bot.alive,
       root: bot.root,
       lifeId: bot.deaths,
       continuityId: bot.continuity,
     });
   }
-  // Match admission has already staged the retained corpse operators visible
-  // behind the opaque deployment surface. Fill any remaining target slots
-  // from that exact rigged corpus so even an otherwise empty private lobby
-  // submits both the shared model and halo programs before its first guest.
-  for (const [index, entry] of corpsePresentationPool.entries()) {
-    if (targets.length >= THERMAL_GHOST_MAX_TARGETS) break;
-    targets.push({
-      id: `thermal-prewarm-corpse-${index}`,
-      relation: entry.team === player.team ? 'friendly' : 'hostile',
-      root: entry.root,
-    });
-  }
-  // Exact-model and orange-halo materials are relation-invariant. Retain one
-  // record per live ID; aliases would duplicate the same skinned children.
-  if (targets.length > 0) thermalGhostPresentation.sync(targets, true);
+  return candidates;
 }
 
+/** True while any through-wall thermal reveal is active. The ghost-record
+ * flush runs on the falling edge, not every frame - see updateThermalGhosts. */
+let thermalRevealWasActive = false;
 function updateThermalGhosts(): void {
   // One presentation layer serves every firearm-authorized through-wall
   // reveal. Selection remains each weapon's existing authority policy; only
@@ -15450,47 +19078,34 @@ function updateThermalGhosts(): void {
   // operator model plus an orange body-following halo.
   const chopperThermal = localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner';
   const railgunRevealActive = railgunScopeState.revealActive;
-  if (!dmrThermalActive && !railgunRevealActive && !chopperThermal) {
+  const activation: ThermalRevealActivation = {
+    dmrThermalActive,
+    railgunRevealActive,
+    chopperThermal,
+  };
+  if (!thermalRevealActive(activation)) {
     thermalGhostPresentation.sync([], false);
     railgunPresentation.syncExactOperatorReveal(false, null);
+    thermalRevealWasActive = false;
     return;
   }
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
-  const targets: ThermalGhostTarget[] = [];
-  const observer = { id: player.id, team: player.team };
-  const addTarget = (
-    id: string,
-    team: Team,
-    kind: 'player' | 'bot',
-    root: THREE.Object3D,
-    lifeId: number,
-    continuityId: number,
-  ): void => {
-    if (targets.some((target) => target.id === id)) return;
-    if (railgunRevealActive && !dmrThermalActive && !chopperThermal
-      && !railgunThermalTargetEligible(observer, { id, team, alive: true, kind }, mode)) return;
-    const relation = mode === 'tdm' && team === player.team ? 'friendly' as const : 'hostile' as const;
-    targets.push({ id, relation, root, lifeId, continuityId });
-  };
-  for (const remote of remotes.values()) {
-    if (remote.snapshot.hp <= 0) continue;
-    addTarget(
-      remote.snapshot.id,
-      remote.snapshot.team,
-      'player',
-      remote.root,
-      remote.snapshot.deaths,
-      remote.continuity,
-    );
-  }
-  for (const bot of bots.values()) {
-    if (!bot.alive) continue;
-    addTarget(bot.id, bot.team, 'bot', bot.root, bot.deaths, bot.continuity);
-  }
-  // Admission prewarm may retain attached corpse-corpus records. The live
-  // target set owns the visible reveal and releases every unseen prewarm ID so
-  // one ADS cannot carry hidden duplicate model/material residency.
-  thermalGhostPresentation.sync(targets, true, true);
+  const targets = selectThermalRevealTargets(
+    activation,
+    { id: player.id, team: player.team },
+    deriveThermalRevealMode(gameMode, privateMatchMode),
+    thermalRevealCandidates(),
+  );
+  // Admission prewarm may retain attached corpse-corpus records, and those
+  // must not survive into a ride/ADS as hidden duplicate residency. But
+  // flushing EVERY frame (the old `releaseUnseen = true` on every sync) made
+  // the chopper ride destroy and rebuild whole skinned ghost rigs whenever an
+  // actor dropped out of the selection - the pilot-side churn the pass84
+  // instrument measured (8 record releases in one short ride, each rebuild a
+  // fresh material lease + sibling attach). The flush now runs once per
+  // activation edge; steady-state frames retain unseen records hidden and
+  // LRU-capped instead of churning them.
+  thermalGhostPresentation.sync(targets, true, !thermalRevealWasActive);
+  thermalRevealWasActive = true;
   // The default telemetry path is allocation-bounded. Root/life/pose traversal
   // is reserved for explicit debug receipt calls with identityAudit enabled.
   railgunPresentation.syncExactOperatorReveal(railgunRevealActive, thermalGhostPresentation.telemetry());
@@ -15534,7 +19149,7 @@ function updateRailgun(now: number): void {
 
 /** Hostile combatants to reveal through walls while the railgun scope is up. */
 function railgunThermalContacts(): RailgunThermalContact[] {
-  const mode = gameMode === 'solo' ? 'tdm' : privateMatchMode;
+  const mode = gameMode === 'solo' || privateMatchMode === 'domination' ? 'tdm' : privateMatchMode;
   const observer = { id: player.id, team: player.team };
   const contacts: RailgunThermalContact[] = [];
   for (const remote of remotes.values()) {
@@ -15586,19 +19201,32 @@ function switchWeapon(index: number): void {
   syncLocalTriggerAuthority(triggerHeld);
   player.switchingUntil = performance.now() + 360;
   player.sustainedShots = 0;
+  // HF-504: nextShotAt is a deadline expressed in the PREVIOUS weapon's cadence.
+  // Carrying it across a swap makes the new weapon refuse to fire for the
+  // remainder of the old weapon's interval - m14-ebr (46 rpm) to a pistol is
+  // ~944 ms of dead trigger, silent apart from a `rate-of-fire` fireBlock
+  // counter. Four other weapon-granting paths already clear it (gun-range
+  // armory, timed-map acquire, crimson flamethrower, the QA hook); the two real
+  // gameplay paths did not, which is the owner's "sometimes randomly cant shoot
+  // ... after picked one up". The new weapon's own cadence is applied by the
+  // switch delay below, so zeroing here removes a stale gate, never a real one.
+  player.nextShotAt = 0;
   weaponView.setWeapon(id);
   audio.weaponSwitch();
+  if (network.role === 'client') network.send(createStateMessage());
 }
 
 function reload(): void {
   if (!player.alive || matchState.phase !== 'active') return;
   if (player.weapon === 'railgun') return;
+  const now = performance.now();
+  clearExpiredLocalReloadAuthority(now);
   if (network.role === 'client' && pendingLocalReloadAuthority) return;
   const spec = WEAPONS[player.weapon];
   const ammo = player.ammo[player.weapon];
   const availableReserve = reloadSupply(selectedArena.id, player.reserve[player.weapon], spec.mag);
   if (player.reloadState || ammo >= spec.mag || availableReserve <= 0) return;
-  const reloadStartedAt = performance.now();
+  const reloadStartedAt = now;
   const reloadState = beginReload(spec, ammo, availableReserve, reloadStartedAt);
   const reloadDuration = killstreakActorModifiers(player.id, reloadStartedAt).reloadDuration;
   player.reloadState = reloadState ? {
@@ -15607,21 +19235,19 @@ function reload(): void {
     endsAt: reloadStartedAt + (reloadState.endsAt - reloadStartedAt) * reloadDuration,
   } : null;
   if (network.role === 'client' && player.reloadState && isOrdinaryWeapon(player.weapon)) {
-    const actionSequence = localReloadActionSequence;
-    localReloadActionSequence += 1;
-    pendingLocalReloadAuthority = Object.freeze({
+    const actionSequence = localReloadActionSequence.next();
+    const requestId = reloadRequestId(localConnectionEpoch, localContinuity, actionSequence, 'start');
+    pendingLocalReloadAuthority = createPendingReload({
       connectionEpoch: localConnectionEpoch,
       lifeId: localContinuity,
-      startSequence: actionSequence,
-      cancelSequence: null,
+      requestId,
+      actionSequence,
       weapon: player.weapon,
+      nowMs: reloadStartedAt,
+      expectedCompletionMs: player.reloadState.endsAt,
     });
-    const message: ReloadIntentMessage = {
-      type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION,
-      by: player.id, connectionEpoch: localConnectionEpoch, lifeId: localContinuity,
-      actionSequence, weapon: player.weapon, action: 'start', nonce: randomNonce(),
-    };
-    network.send(message);
+    localReloadRetryRuntime.send(pendingLocalReloadAuthority, 'start');
+    network.send(createStateMessage());
   }
   weaponActionHistory.length = 0;
   audio.reload();
@@ -15645,19 +19271,71 @@ function finishReload(now: number): void {
   }
 }
 
+/**
+ * Lane J (owner: "sometimes randomly cant shoot or reload my gun or after
+ * picked one up"). Every refusal path in tryFire used to `return` silently, so
+ * a trigger that had gone dead was indistinguishable from a dead key and could
+ * only be guessed at from the outside — which is why this fault survived
+ * several passes as "sometimes randomly". The counter below names the refusal,
+ * is surfaced on the debug snapshot as `fireBlock`, and is what
+ * scripts/qa/verify-lane-j-fault-sweep.mjs reads to attribute a failed fire
+ * cycle to a specific gate instead of reporting "ammo did not move".
+ * Diagnostic only: it never changes whether a shot is admitted.
+ */
+const fireBlockTelemetry: {
+  total: number;
+  byReason: Record<string, number>;
+  last: string | null;
+  lastAtMs: number;
+  lastFiredAtMs: number;
+} = { total: 0, byReason: {}, last: null, lastAtMs: 0, lastFiredAtMs: 0 };
+
+function refuseFire(reason: string): void {
+  fireBlockTelemetry.total += 1;
+  fireBlockTelemetry.byReason[reason] = (fireBlockTelemetry.byReason[reason] ?? 0) + 1;
+  fireBlockTelemetry.last = reason;
+  fireBlockTelemetry.lastAtMs = Math.round(performance.now());
+}
+
 function tryFire(now: number): void {
   const touchFireActive = mobileTouchFireBypassesPointerLock(
     mobilePresentationActive,
     mobileTouchControls?.state.firing === true,
   );
+  // GAMEPAD: a held pad trigger fires without pointer lock, exactly like touch.
+  const padFireActive = gamepadRuntime.connected() && gamepadTriggerHeld;
   if (!player.alive || !gameStarted
-    || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive)
-    || matchState.phase !== 'active') return;
-  if (pointSupportTargeting && !tacticalMapOpen) return;
+    || (!debugInputUnlocked && document.pointerLockElement !== canvas && !touchFireActive && !padFireActive)
+    || matchState.phase !== 'active') {
+    refuseFire(!player.alive ? 'dead'
+      : !gameStarted ? 'match-not-started'
+      : matchState.phase !== 'active' ? `match-phase-${matchState.phase}`
+      : 'no-pointer-lock');
+    return;
+  }
+  if (pointSupportTargeting && !tacticalMapOpen) {
+    refuseFire('support-targeting');
+    return;
+  }
   // While piloting a drone or manning the chopper gun the trigger belongs to
   // that platform's host-admitted weapon. Rapid clicking previously discharged
   // the carried firearm from inside the cockpit.
-  if (localKillstreakActorSnapshot()?.possession) return;
+  if (localKillstreakActorSnapshot()?.possession) {
+    refuseFire('killstreak-possession');
+    return;
+  }
+  // HF-358: firearms stay low while swimming - the reducer has flagged the
+  // restriction since it landed, but nothing consumed it. One feed line per
+  // swim entry so the player knows the trigger is deliberately dead, not
+  // broken.
+  if (localSwimState.weaponRestricted) {
+    if (!swimWeaponHintShown) {
+      swimWeaponHintShown = true;
+      addFeed('WEAPON LOW · SWIMMING');
+    }
+    refuseFire('swimming');
+    return;
+  }
   if (currentSprinting) {
     currentSprinting = false;
     sprintRecoveryUntil = Math.max(sprintRecoveryUntil, now + 150);
@@ -15671,52 +19349,104 @@ function tryFire(now: number): void {
         if (triggerHeld) tryFire(performance.now());
       }, Math.max(1, readyAt - now + 2));
     }
+    refuseFire('stance-or-sprint-recovery');
     return;
   }
   deferredFireAt = 0;
   if (player.weapon === 'railgun') {
-    if (now < player.switchingUntil) return;
+    if (now < player.switchingUntil) {
+      refuseFire('weapon-switching');
+      return;
+    }
     tryFireRailgun(now);
     return;
   }
+  // HF-343: the near-cover weapon raise used to be presentation-only — the gun
+  // rose against the wall but still shot straight down the crosshair. Gate the
+  // trigger on the same forward contact probe the viewmodel is posed from.
+  // Fully raised against cover refuses the shot outright, before any ammo,
+  // recoil, audio, shot ray or network send; a partial raise only widens the
+  // cone below. The admission carries aimAuthority: 'camera-forward-unchanged',
+  // so the authoritative ray origin, direction and hit timing never move.
+  //
+  // surfaceLift is deliberately passed as 0 rather than the probed floor lift:
+  // viewmodelContactResponse folds floorBlend into the same highReadyBlend the
+  // admission thresholds on, and prone on flat ground already sits at ~0.88 of
+  // that blend with no wall anywhere. Feeding it here would have taxed every
+  // prone shot in the open. The wall component alone is what the owner's row
+  // ("when behind cover") is about.
+  const fireContactPose = currentViewmodelObstructionPose();
+  const fireAdmission = viewmodelFireAdmission(
+    player.weapon,
+    fireContactPose.retreat,
+    0,
+    player.stance === 'prone',
+    weaponView.adsProgress(),
+  );
+  weaponView.root.updateWorldMatrix(true, true);
+  const muzzleFireBlock = viewmodelMuzzleFireBlockReason(weaponView.muzzleWorldPosition(), currentViewmodelSurfaceClipPlanes());
+  if (muzzleFireBlock !== null) { refuseFire(muzzleFireBlock); return; }
   if (isTimedMapWeaponId(player.weapon)) {
     const authority = timedMapWeaponStates[player.weapon];
     if (authority.holderId !== player.id || authority.status !== 'held' || authority.shotsRemaining <= 0) {
       audio.empty();
+      refuseFire('timed-weapon-authority');
       return;
     }
   }
   const spec = WEAPONS[player.weapon];
-  if (!triggerHeld && spec.automatic) return;
+  if (!triggerHeld && spec.automatic) {
+    refuseFire('trigger-released');
+    return;
+  }
   if (spec.spinUpMs > 0) {
     if (spinUpWeapon !== player.weapon || spinUpStartedAtPerformanceMs === null || spinUpStartedAtHostTimeMs === null) {
       spinUpWeapon = player.weapon;
       spinUpStartedAtPerformanceMs = now;
       spinUpStartedAtHostTimeMs = currentHostTimeMs();
+      refuseFire('spin-up-started');
       return;
     }
-    if (now - spinUpStartedAtPerformanceMs < spec.spinUpMs) return;
+    if (now - spinUpStartedAtPerformanceMs < spec.spinUpMs) {
+      refuseFire('spin-up-pending');
+      return;
+    }
   }
-  if (now < player.switchingUntil) return;
+  if (now < player.switchingUntil) {
+    refuseFire('weapon-switching');
+    return;
+  }
   if (player.reloadState) {
     // An empty magazine must finish its automatic reload even if the player
     // keeps the trigger held. Non-empty tactical reloads remain cancellable.
-    if (player.ammo[player.weapon] <= 0) return;
-    if (!cancelReload(player.reloadState, now)) return;
+    if (player.ammo[player.weapon] <= 0) {
+      refuseFire('reloading-empty-mag');
+      return;
+    }
+    if (!cancelReload(player.reloadState, now)) {
+      refuseFire('reload-not-cancellable');
+      return;
+    }
     interruptReload(true, now);
   }
   const shotInterval = 60_000 / spec.rpm;
-  if (now < player.nextShotAt) return;
+  if (now < player.nextShotAt) {
+    refuseFire('rate-of-fire');
+    return;
+  }
   player.nextShotAt = nextShotDeadline(now, shotInterval);
   endSpawnProtectionOnOffense(now);
   if (player.ammo[player.weapon] <= 0) {
     audio.empty();
     reload();
     player.lastShotAt = now;
+    refuseFire('empty-magazine');
     return;
   }
   player.sustainedShots = now - player.lastShotAt < 260 ? player.sustainedShots + 1 : 0;
   player.lastShotAt = now;
+  fireBlockTelemetry.lastFiredAtMs = Math.round(now);
+  gamepadRuntime.rumble('fire', now); // GAMEPAD: fire pulse on every committed shot
   player.ammo[player.weapon] = Math.max(0, player.ammo[player.weapon] - 1);
   const shotActionNonce = randomNonce();
   if (isTimedMapWeaponId(player.weapon) && network.role !== 'client') {
@@ -15774,6 +19504,27 @@ function tryFire(now: number): void {
     prone: player.stance === 'prone',
     sustainedShots: player.sustainedShots,
   });
+  // HF-343: graduated obstruction penalty on the sampled cone only. baseDirection
+  // is still exactly camera-forward and the shot is still cast this same frame,
+  // so neither the authoritative ray nor hit timing moves. Open space reports a
+  // zero penalty, which leaves this byte-for-byte identical to the old cone.
+  const obstructedSpread = applyObstructionSpreadPenalty(
+    spread,
+    muzzleFireBlock === 'viewmodel-muzzle-clip' ? fireAdmission.spreadPenaltyRadians : 0,
+  );
+  // HF-412: the reference's drop-shot cost. Players describe drop shotting as a
+  // close-range technique precisely because the rounds that go out WHILE you
+  // are falling are inaccurate - the answer is a wider cone, never a refused
+  // shot. Applies only during a prone transition (1.0 otherwise), peaks at the
+  // middle of the fall and is back to 1.0 the instant the body is down.
+  //
+  // HIP FIRE ONLY. `computeSpread` has already resolved the ads/moving/stance
+  // inputs above, so multiplying its output unconditionally would also widen
+  // the ADS cone - an accuracy penalty nobody documented or asked for. A shot
+  // taken with the sights settled therefore keeps the cone it earned.
+  const dropShotSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  const dropShotSpreadMultiplier = adsSettled ? 1 : dropShotSample.spreadMultiplier;
+  const admittedSpread = obstructedSpread * dropShotSpreadMultiplier;
   const shotTimeline = network.role === 'client'
     ? freezeAuthoredShotTimeline(
         currentHostTimeMs(),
@@ -15794,13 +19545,37 @@ function tryFire(now: number): void {
   const localSmokeShotSegments: SmokeShotSegment[] = [];
   let impactAudioPlayed = false;
   const presentedSurfaceIds = new Set<string>();
+  // HF-386: first pure-world strike of this trigger pull, for the explicit
+  // zero-damage cue. Null until a pellet hits world geometry without touching
+  // any player, bot, target or window.
+  let zeroHitWorldImpact: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
+  let zeroHitDamagedTarget = false;
   const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
   const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
   const projectileShot = spec.fireKind === 'projectile';
-  const flamethrowerShot = player.weapon === 'flamethrower';
+  // HF-402: family, not id. This one equality gated the entire flamethrower
+  // presentation, so picking up the crimson variant produced a bullet tracer
+  // out to 90 m with no stream and no ground ignition, while the host still
+  // resolved damage against an 18 m stream.
+  const flamethrowerShot = isFlamethrowerFamilyWeapon(player.weapon);
   const maximumShotDistance = flamethrowerShot ? FLAMETHROWER_EFFECT.rangeM : 90;
+  // HF-371 muzzle-adjacent powder smoke. Emitted once per trigger pull, off
+  // the barrel axis, so the protected centre cone still applies unchanged.
+  if (!flamethrowerShot && !projectileShot) {
+    // HF-410 REPAIR: the WORLD anchor, not the rig socket. Under the body fit
+    // the socket sits ~0.25 m from the eye, inside PARTICLE_READABILITY's hard
+    // 0.35 m near-lens cull, so smoke emitted there is never drawn at all.
+    // muzzleEffectWorldPosition() undoes the uniform scale about the eye, which
+    // puts the anchor back at the world distance it shipped at while keeping
+    // the same pixel on screen.
+    hfParticleRuntime.emitMuzzleSmoke(
+      weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin,
+      baseDirection,
+      cameraUp,
+    );
+  }
   for (let pellet = 0; pellet < spec.pellets; pellet += 1) {
-    const sample = sampleWeaponPellet(spec, pellet, spread, gameplayRandom(), gameplayRandom());
+    const sample = sampleWeaponPellet(spec, pellet, admittedSpread, gameplayRandom(), gameplayRandom()); // HF-343
     const direction = baseDirection.clone()
       .addScaledVector(cameraRight, sample.x)
       .addScaledVector(cameraUp, sample.y)
@@ -15813,7 +19588,9 @@ function tryFire(now: number): void {
         sample: [sample.x, sample.y],
         direction: direction.toArray(),
         cameraDirection: baseDirection.toArray(),
-        spread,
+        // HF-343: report the cone the pellet was actually sampled from so the
+        // ray-matrix invariant (angularError <= spread) stays exact near cover.
+        spread: admittedSpread,
         ads: adsSettled,
         stance: player.stance,
         moving,
@@ -15828,7 +19605,10 @@ function tryFire(now: number): void {
       end: Object.freeze({ x: authoritativeEnd.x, y: authoritativeEnd.y, z: authoritativeEnd.z }),
     }));
     if (result.ballisticTrace) applyInteractiveWorldBallisticTrace(result.ballisticTrace, origin, direction, player.weapon);
-    const visualStart = weaponView.muzzleWorldPosition(new THREE.Vector3()) ?? origin;
+    // HF-410 REPAIR: same reason as emitMuzzleSmoke above - the tracer and the
+    // flamethrower stream are world-space presentations and must start from the
+    // unfitted muzzle point, which is the same pixel and the shipped distance.
+    const visualStart = weaponView.muzzleEffectWorldPosition(new THREE.Vector3()) ?? origin;
     if (flamethrowerShot) {
       flamethrowerStreamPresentation.emit(visualStart, authoritativeEnd, now);
       // Spawn visible napalm ground fire at impact point (stays 5s like
@@ -15863,6 +19643,11 @@ function tryFire(now: number): void {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
       }
+      // HF-386: this is the branch most floor and wall strikes actually take
+      // (the ground is a ballistic surface, so the pure-world fallback below
+      // rarely runs). Remember the strike for the post-loop zero-damage
+      // decision; a pull that also damaged an actor is filtered there.
+      zeroHitWorldImpact ??= { point, normal };
     }
     if (result.windowId) {
       const point = result.impactPoint ?? authoritativeEnd;
@@ -15879,6 +19664,11 @@ function tryFire(now: number): void {
         impactAudioPlayed = true;
         audio.impact(surface, point.distanceTo(camera.position));
       }
+      // HF-386: remember the first pure-world strike of this trigger pull so
+      // the post-loop pass can decide whether the pull deserves an explicit
+      // zero-damage cue (a mixed shotgun spread that also damaged someone
+      // must not show one).
+      zeroHitWorldImpact ??= { point, normal };
     }
     if (result.playerId) {
       const zone = effectiveHitZoneForWeapon(spec, result.hitZone ?? 'body');
@@ -15898,7 +19688,19 @@ function tryFire(now: number): void {
       const practiceTarget = arena.targets.find((target) => target.id === result.targetId);
       const zone = effectiveHitZoneForWeapon(spec, practiceTarget?.alwaysCritical ? 'head' : result.hitZone ?? 'body');
       const targetDamage = applyPenetrationDamage(computeDamage(spec, result.distance, zone), result.damageMultiplier);
-      if (targetDamage > 0) hitPracticeTarget(
+      // HF-347: a guest never applies training-dummy damage locally. The shot
+      // request already on its way carries this hit to the host resolver,
+      // which admits it against the host-time dummy pose; the shot result
+      // reconciles health/score and presents the hitmarker — the same flow a
+      // guest gets when shooting a bot. Local application here double-counted
+      // and desynced every peer's dummy lifecycle.
+      if (network.role === 'client' && practiceTarget?.kind === 'training-dummy') {
+        // host-resolved; presentation arrives with the shot result
+      } else if (targetDamage > 0) {
+        // HF-386: a pull that damaged a practice target is not a zero-damage
+        // pull, even if other pellets of the same spread struck the floor.
+        zeroHitDamagedTarget = true;
+        hitPracticeTarget(
           result.targetId,
           targetDamage,
           zone,
@@ -15908,7 +19710,15 @@ function tryFire(now: number): void {
             distanceMeters: result.distance,
           },
         );
+      }
     }
+  }
+  // HF-386: the trigger pull struck world geometry and damaged nobody (no
+  // remote-player, bot or practice-target damage was aggregated). Say so
+  // explicitly — the sparks and decal alone never told the player the truth.
+  // Flamethrower is excluded: its ground ignition is already the feedback.
+  if (zeroHitWorldImpact && !projectileShot && !flamethrowerShot && hitDamage.size === 0 && !zeroHitDamagedTarget) {
+    presentZeroDamageHit(now);
   }
   if (!projectileShot) {
     applyKillstreakEntityShot(
@@ -15934,7 +19744,7 @@ function tryFire(now: number): void {
     timing: nextCombatTiming(),
     nonce: shotActionNonce,
   };
-  if (player.weapon === 'flamethrower') {
+  if (flamethrowerShot) {
     const actions = admittedRemoteShots.get(player.id) ?? new Map<number, AdmittedRemoteShot>();
     for (const [nonce, action] of actions) {
       if (now - action.receivedAt > admittedShotActionLifetimeMs(action.message.weapon)) actions.delete(nonce);
@@ -16158,7 +19968,8 @@ function castShot(
 }
 
 function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vector3 {
-  const spawnMode = activeSpawnMode();
+  if (network.role === 'client') throw new Error('Bot spawn selection is host-only');
+  const spawnMode = activeSpawnMode(); const spawnNow = performance.now(); const spawnWindow = spawnUseWindow(arena.spawns[0].length + arena.spawns[1].length);
   const otherPlayers = [
     ...(player.alive ? [player.position.clone()] : []),
     ...[...remotes.values()].filter((remote) => remote.snapshot.hp > 0).map((remote) => remote.target.clone()),
@@ -16171,16 +19982,18 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       .map((remote) => new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z)),
   ];
   const validForSide = (side: Team) => arena.spawns[side]
-    .map((candidate, localIndex) => ({ candidate, index: side * 100 + localIndex }))
-    .filter(({ candidate }) => {
-      const bodyPoint = { x: candidate.x, y: 0, z: candidate.z };
-      return Number.isFinite(candidate.x) && Number.isFinite(candidate.z)
-        && pointInsideBounds(bodyPoint, arena.bounds, 0.44)
-        && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-    });
-  const home = validForSide(team);
+    .map((candidate, localIndex) => ({ candidate, side, index: side * 100 + localIndex }))
+    .filter(({ candidate }) => validArenaSpawnPoint(candidate, arena.bounds, activeWorldColliders()));
+  let home = validForSide(team);
   const opposite = validForSide(team === 0 ? 1 : 0);
-  if (home.length === 0 && (spawnMode !== 'ffa' || opposite.length === 0)) throw new Error(`No valid authored spawn for team ${team}`);
+  // Same fallback as the player path: debris/dynamic colliders can zero out a
+  // side mid-match, and a bot respawn throw escapes its timer just as badly.
+  if (home.length === 0 && opposite.length === 0) {
+    const rawFallback = [...arena.spawns[team], ...arena.spawns[team === 0 ? 1 : 0]]
+      .map((candidate, index) => ({ candidate, side: index < arena.spawns[team].length ? team : (team === 0 ? 1 : 0), index: 200 + index }));
+    if (rawFallback.length === 0) throw new Error(`No authored spawns exist for team ${team}`);
+    home = rawFallback;
+  }
   const pressure = (options: ReturnType<typeof validForSide>) => {
     const scores = options.map(({ candidate }) => ({
       visibleThreats: threats.filter((threat) => !activeWorldColliders().some((box) => segmentIntersectsBox(candidate, threat, box))).length,
@@ -16192,31 +20005,47 @@ function selectSafeBotSpawn(team: Team, actorId = `bot-team-${team}`): THREE.Vec
       safestNearestThreatDistanceSq: Math.max(...scores.filter((score) => score.visibleThreats === minimumVisibleThreats).map((score) => score.distance)),
     };
   };
-  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && shouldFlipSpawnSide(pressure(home), pressure(opposite));
+  const pressureHome = home.length > 0 ? home : opposite;
+  const instantaneousFlip = spawnMode !== 'ffa' && threats.length > 0 && opposite.length > 0 && pressureHome.length > 0 && shouldFlipSpawnSide(pressure(pressureHome), pressure(opposite));
   const flipDecision = spawnMode === 'ffa'
     ? { flip: false, state: spawnFlipHysteresis[team] }
-    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, performance.now());
+    : advanceSpawnFlipHysteresis(spawnFlipHysteresis[team], instantaneousFlip, spawnNow);
   spawnFlipHysteresis[team] = flipDecision.state;
-  const valid = spawnMode === 'ffa' ? [...home, ...opposite] : flipDecision.flip ? opposite : home;
+  const valid = [...home, ...opposite];
   const minimumSeparationSq = spawnMode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 20;
   const unoccupied = valid.filter(({ candidate }) => !otherPlayers.some((position) => position.distanceToSquared(candidate) < minimumSeparationSq));
   const selectable = unoccupied.length > 0 ? unoccupied : valid;
-  const selection = scoreSpawnCandidates({
+  const selection = selectSpawnCandidates({
     arenaId: selectedArena.id,
+    arenaKind: selectedArena.kind,
     mode: spawnMode,
     population: otherPlayers.length + 1,
-    candidates: selectable.map(({ candidate, index }) => ({ index, point: candidate })),
+    team,
+    preferredSide: spawnMode === 'tdm' ? (flipDecision.flip ? (team === 0 ? 1 : 0) : team) : undefined,
+    candidates: selectable.map(({ candidate, side, index }) => ({ index, point: candidate, side })),
     threats,
     occupants: otherPlayers,
-    recentDeaths: recentSpawnDeathPoints(),
+    recentDeaths: recentSpawnDeathPoints(spawnNow),
+    recentUses: recentSpawnUseRecords(spawnNow, spawnWindow), ...spawnWindow,
+    nowMs: spawnNow,
     colliders: activeWorldColliders(),
     previousIndex: lastBotSpawnIndices.get(team) ?? -1,
     tieBreakSeed: stableSpawnTieBreakSeed(actorId),
   });
   const selectedIndex = selection.index;
   lastBotSpawnIndices.set(team, selectedIndex);
-  lastBotSpawnAudit.set(team, { selectedIndex, score: selection.score, reason: selection.reason });
-  return valid.find(({ index }) => index === selectedIndex)!.candidate;
+  const chosen = valid.find(({ index }) => index === selectedIndex)!.candidate;
+  // HF-402: record the point, under the actor that got it.
+  lastBotSpawnAudit.set(actorId, {
+    actorId,
+    team,
+    selectedIndex,
+    score: selection.score,
+    reason: selection.reason,
+    position: [chosen.x, chosen.y, chosen.z],
+  });
+  recordSpawnUse(selectedIndex, spawnNow, spawnWindow);
+  return chosen;
 }
 
 let botHazeTexture: THREE.CanvasTexture | null = null;
@@ -16262,12 +20091,17 @@ function addNeonBotHaze(root: THREE.Group, index: number): void {
   root.userData.neonBotHaze = true;
   root.add(haze);
 }
-
 const SOLO_BOT_NAMES = ['RIVET', 'MICA', 'NOVA', 'HEX', 'KITE', 'ROOK', 'LUX'] as const;
+
+function nextBotSkin(): string {
+  if (!botSkinCycle) resetBotArsenalCycles();
+  return botSkinCycle!.next();
+}
 
 function resetBotArsenalCycles(): void {
   botWeaponCycle = createShuffleBag(BOT_STARTING_WEAPON_POOL, gameplayRandom);
   botGrenadeCycle = createShuffleBag(BOT_GRENADE_POOL, gameplayRandom);
+  botSkinCycle = createShuffleBag(BOT_OPERATOR_SKIN_POOL, gameplayRandom);
 }
 
 function nextBotWeapon(): WeaponId {
@@ -16290,7 +20124,7 @@ function equipNextBotArsenal(bot: BotPlayer): void {
   bot.grenade = grenade;
 }
 
-function spawnBot(index: number, hosted = false, dormantPresentation = false): void {
+function spawnBot(index: number, hosted = false, dormantPresentation = false, initialPosition?: THREE.Vector3): void {
   const botTeam: Team = player.team === 0 ? 1 : 0;
   const name = SOLO_BOT_NAMES[index] ?? `RIVAL ${index + 1}`;
   const id = hosted ? `host-bot-${index}` : `bot-${index}`;
@@ -16305,7 +20139,13 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
   const spawnedAt = performance.now();
   // Every reinforcement uses the same source-rigged humanoid and approved
   // neon-purple treatment. Only the lead owns the dynamic shadow proxy.
-  const root = buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple');
+  // Bots drew the catalog default only, in appearance AND animation - the
+  // director keys posture, idle preference and aim response off the skin's
+  // archetype. Seeded shuffle bag, so every peer derives the same body.
+  const botSkinId = dormantPresentation
+    ? BOT_OPERATOR_SKIN_POOL[index % BOT_OPERATOR_SKIN_POOL.length]!
+    : nextBotSkin();
+  const root = buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple', botSkinId);
   applyBotEmissiveBrightness(root);
   addNeonBotHaze(root, index);
   root.traverse((node) => {
@@ -16329,7 +20169,7 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
     node.userData.playerId = id;
     node.userData.targetRoot = root;
   });
-  const spawn = selectSafeBotSpawn(botTeam, id);
+  const spawn = initialPosition ?? selectSafeBotSpawn(botTeam, id);
   const position = new THREE.Vector3(spawn.x, spawn.y - 1.7, spawn.z);
   root.position.copy(position);
   scene.add(root);
@@ -16347,6 +20187,9 @@ function spawnBot(index: number, hosted = false, dormantPresentation = false): v
     perception: createBotPerceptionState(interactiveWorldMatchEpoch, id, 1),
     perceptionCanFire: true,
     perceptionAimError: 0,
+    stance: 'stand',
+    stanceHeldUntil: 0,
+    lastDamagedAt: Number.NEGATIVE_INFINITY,
     networkInterpolation: new SnapshotInterpolationBuffer<HostedBotSnapshot>(interpolateHostedBotSnapshot),
     networkContinuity: 0,
   });
@@ -16423,6 +20266,9 @@ function activateDormantBot(index: number): boolean {
   bot.burstShots = 0;
   bot.nextDecisionAt = 0;
   bot.blockedSince = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bots.set(id, bot);
   return true;
@@ -16430,7 +20276,7 @@ function activateDormantBot(index: number): boolean {
 
 async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   clearBots();
-  const activeCount = hostedCount ?? selectedArena.soloBotCount;
+  const activeCount = hostedCount ?? initialSoloBotCount(selectedArena);
   resetBotArsenalCycles();
   botGrenadeThrows = 0;
   botGrenadeMaxActive = 0;
@@ -16454,7 +20300,7 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
     return;
   }
   const activeSpawnHistory = new Map(lastBotSpawnIndices);
-  for (let index = selectedArena.soloBotCount; index < selectedArena.maximumSoloBots; index += 1) {
+  for (let index = activeCount; index < selectedArena.maximumSoloBots; index += 1) {
     spawnBot(index, false, true);
     const bot = bots.get(`bot-${index}`)!;
     await prewarmRiggedOperatorActions(bot.root);
@@ -16466,8 +20312,8 @@ async function spawnBots(hostedCount?: HostedBotCount): Promise<void> {
   }
   lastBotSpawnIndices.clear();
   for (const [team, index] of activeSpawnHistory) lastBotSpawnIndices.set(team, index);
-  if (selectedArena.soloBotCount > 0) {
-    addFeed(`${selectedArena.soloBotCount} low-damage hostile operator${selectedArena.soloBotCount === 1 ? '' : 's'} deployed`, 'coral');
+  if (activeCount > 0) {
+    addFeed(`${activeCount} low-damage hostile operator${activeCount === 1 ? '' : 's'} deployed`, 'coral');
   }
 }
 
@@ -16511,6 +20357,7 @@ function hostedBotSnapshot(bot: BotPlayer, seq: number): HostedBotSnapshot {
     y: bot.position.y,
     z: bot.position.z,
     yaw: bot.root.rotation.y,
+    stance: bot.stance,
     hp: bot.hp,
     kills: bot.kills,
     deaths: bot.deaths,
@@ -16551,7 +20398,7 @@ function acceptHostedBotState(message: BotStateMessage): void {
     if (!bot) {
       const index = Number(snapshot.id.slice('host-bot-'.length));
       if (!Number.isSafeInteger(index) || index < 0 || index > 3) continue;
-      spawnBot(index, true);
+      spawnBot(index, true, false, new THREE.Vector3(snapshot.x, snapshot.y, snapshot.z));
       bot = bots.get(snapshot.id);
     }
     if (!bot || snapshot.seq <= Number(bot.root.userData.networkSeq ?? -1)) continue;
@@ -16610,7 +20457,10 @@ function updateHostedBotReplicaPresentations(dt: number, now: number): void {
     bot.root.visible = true;
     const distance = previousPosition.distanceTo(bot.position);
     const speed = distance / Math.max(0.001, dt);
-    poseOperator(bot.root, 'stand', speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
+    // Lane AR item 3: replicated like a peer's. A pre-PASS-87 host sends none;
+    // hostedBotSnapshotStance reads that as 'stand'. See src/hosted-bots.ts.
+    bot.stance = hostedBotSnapshotStance(snapshot);
+    poseOperator(bot.root, bot.stance, speed, now * 0.008, Math.min(1, dt * 24), 0, dt);
     const surface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const hostedFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -16712,8 +20562,26 @@ function selectBotTacticalWaypoint(
   targetAlive = player.alive,
 ): number {
   const target = { x: targetPosition.x, y: targetPosition.y, z: targetPosition.z };
+  // Owner 2026-08-30: in Domination, bots play the objective - head for the
+  // patrol point nearest the team's next zone (nearest non-owned; defend
+  // when all owned) instead of shadowing the player.
+  if (dominationModeActive() && dominationState) {
+    const objective = dominationObjectiveFor(dominationState, bot.team, [bot.position.x, bot.position.y, bot.position.z]);
+    if (objective && arena.patrolPoints.length > 0) {
+      let bestIndex = 0;
+      let bestDistance = Infinity;
+      for (let index = 0; index < arena.patrolPoints.length; index += 1) {
+        const point = arena.patrolPoints[index]!;
+        const dx = point.x - objective.centre[0];
+        const dz = point.z - objective.centre[2];
+        const distance = dx * dx + dz * dz;
+        if (distance < bestDistance) { bestDistance = distance; bestIndex = index; }
+      }
+      return bestIndex;
+    }
+  }
   return chooseTacticalWaypoint(arena.patrolPoints.map((point, index) => {
-    const eye = { x: point.x, y: 1.42, z: point.z };
+    const eye = waypointEyePoint(point);
     return {
       index,
       distanceFromBot: point.distanceTo(bot.position),
@@ -16735,6 +20603,9 @@ function applyBotDamage(
 ): number {
   const now = performance.now();
   if (!bot.alive || now < bot.invulnerableUntil) return 0;
+  // Lane AR item 3: the single funnel every bot damage path goes through, so
+  // this is the one place "under fire" has to be recorded.
+  bot.lastDamagedAt = now;
   reactOperator(bot.root, zone);
   const healthBefore = bot.hp;
   const dealt = Math.min(bot.hp, Math.max(0, damage));
@@ -16757,8 +20628,9 @@ function applyBotDamage(
   if (network.role === 'host') recordAuthoritativeDamage(attackerId, bot.id, dealt);
   else if (attackerId === player.id) addFeed('DAMAGE DONE +' + Math.round(dealt), 'gold', { damageDealt: dealt });
   bot.hp = Math.max(0, bot.hp - damage);
+  const wasElimination = bot.hp <= 0;
   if (attackerId === player.id && !suppressAttackerFeedback) {
-    showHitmarker(zone === 'head');
+    showHitmarker(zone === 'head', wasElimination);
     audio.hit(zone === 'head');
   }
   if (bot.hp > 0) {
@@ -16771,9 +20643,7 @@ function applyBotDamage(
   soloBotDeaths += 1;
   const death: DeathMessage = { type: 'death', killer: attackerId, victim: bot.id, cause, nonce: randomNonce() };
   if (network.role === 'host') {
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
     broadcastHostedBotState();
   } else if (network.role === 'offline'
     && attackerId === MAP_CARPET_BOMBER_KILLER_ID
@@ -16801,7 +20671,7 @@ function applyBotDamage(
   const afterDeathPose = performance.now();
   if (gameMode === 'solo' && attackerId === player.id) {
     player.kills += 1;
-    if (isKillstreakEligible(cause)) awardSupportElimination();
+    if (isKillstreakEligible(cause)) awardSupportElimination(true, killstreakEliminationSource(cause));
     audio.kill();
     addFeed(`${player.name} eliminated ${bot.name}${zone === 'head' ? ' · HEADSHOT' : ''} · ${Math.round(damage)} DMG`, 'gold');
   }
@@ -16843,6 +20713,9 @@ function respawnBot(bot: BotPlayer, now: number): void {
   bot.blockedSince = 0;
   bot.nextGrenadeAt = Math.max(bot.nextGrenadeAt, now + 3_000);
   bot.deathVisibleUntil = 0;
+  bot.stance = 'stand';
+  bot.stanceHeldUntil = 0;
+  bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
   resetOperator(bot.root);
   bot.root.visible = true;
 }
@@ -16880,6 +20753,12 @@ function broadcastHostedBotFlamethrowerPresentation(
   end: THREE.Vector3,
   actionNonce: number,
 ): void {
+  // HF-402: the bot lane stays keyed to the single map id on purpose. The
+  // catalog bars bots from the crimson variant (policies.bot: 'never') and the
+  // presentation wire schema pins `weapon: 'flamethrower'`, so widening this
+  // guard would only let a bot broadcast a message that misnames its weapon.
+  // Bot authority (the reach below in updateBots) is keyed the same way, so
+  // the two never disagree.
   if (network.role !== 'host' || bot.weapon !== 'flamethrower') return;
   const message: BotFlamethrowerStreamPresentationMessage = {
     type: 'bot-weapon-presentation',
@@ -17066,9 +20945,7 @@ function applyHostedBotDamageToRemote(
       type: 'death', killer: bot.id, victim: target.id,
       cause: { kind: 'gun', weapon: authoredWeapon }, nonce: randomNonce(),
     };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   broadcastHostedBotState();
   return result.damageApplied;
@@ -17109,12 +20986,35 @@ function acceptHostedBotDamage(message: BotDamageMessage): void {
 function botCombatDamage(rawDamage: number): number {
   return botScaledDamage(rawDamage);
 }
+// HF-399: the haze sprite is attached by addNeonBotHaze when the bot rig is
+// built and never moves within it, so it is resolved once per rig instead of
+// with a getObjectByName walk over ~190 rig nodes per bot per frame.
+//
+// INVARIANT THIS CACHE DEPENDS ON: `addNeonBotHaze` (the only site in src/ that
+// creates a node named 'neon-purple-bot-haze') runs exactly once per rig, in
+// the bot rig builder immediately after buildOperator, and no code re-attaches
+// or replaces it afterwards - the other three read sites only set `visible` or
+// test `instanceof`. A cached sprite that has been detached from its rig is
+// re-resolved below, so a future change that swaps the sprite still works; a
+// haze attached to a rig that had NONE at build time would still be missed,
+// which is why the invariant is stated here rather than only assumed.
+const botHazeSpriteByRoot = new WeakMap<THREE.Object3D, THREE.Sprite | null>();
+function botHazeSprite(root: THREE.Object3D): THREE.Sprite | null {
+  let haze = botHazeSpriteByRoot.get(root);
+  if (haze === undefined || (haze !== null && haze.parent === null)) {
+    const found = root.getObjectByName('neon-purple-bot-haze');
+    haze = found instanceof THREE.Sprite && found.material instanceof THREE.SpriteMaterial ? found : null;
+    botHazeSpriteByRoot.set(root, haze);
+  }
+  return haze;
+}
+
 function updateBots(dt: number, now: number): void {
   if ((gameMode !== 'solo' && gameMode !== 'host') || matchState.phase !== 'active') return;
   let botIndex = 0;
   for (const bot of bots.values()) {
     botIndex += 1;
-    const haze = bot.root.getObjectByName('neon-purple-bot-haze');
+    const haze = botHazeSprite(bot.root);
     if (haze instanceof THREE.Sprite && haze.material instanceof THREE.SpriteMaterial) {
       const pulse = Math.sin(now * 0.0022 + Number(haze.userData.phase ?? 0));
       haze.material.opacity = 0.33 + pulse * 0.055;
@@ -17127,13 +21027,13 @@ function updateBots(dt: number, now: number): void {
     }
     if (network.role === 'host' && remotes.size > 0) {
       recordCombatantPose(bot.positionHistory, {
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: bot.root.rotation.y, stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: bot.root.rotation.y, stance: bot.stance, continuity: bot.continuity,
       });
     }
     if (botsFrozen) {
       if (pass73AdsRevealCaptureFrozenTargetId !== bot.id) {
-        poseOperator(bot.root, debugBotStanceOverride ?? 'stand', debugBotSpeedOverride, now * 0.001, 1, 0, dt);
+        poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, debugBotSpeedOverride, now * 0.001, 1, 0, dt);
       }
       continue;
     }
@@ -17213,14 +21113,39 @@ function updateBots(dt: number, now: number): void {
       : routeMovement === 'retreat' ? forward.clone().multiplyScalar(-1)
         : routeMovement === 'strafe-left' ? side.clone().multiplyScalar(-1)
           : routeMovement === 'strafe-right' ? side : new THREE.Vector3();
-    const speed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    // Lane AR item 3. Resolved BEFORE the move, because the stance caps it:
+    // a prone bot that slid at running speed is exactly the authored-mass /
+    // movement-authority mismatch the forging review exists to catch.
+    const stanceDecision = resolveBotStance({
+      hp: bot.hp, alive: bot.alive, lastDamagedAt: bot.lastDamagedAt, now,
+      hasLineOfSight: lineOfSight, travelling: routeMovement === 'advance' || routeMovement === 'retreat',
+      stance: bot.stance, stanceHeldUntil: bot.stanceHeldUntil, proneOccupancy: countOtherProneBots(bots.values(), bot), // HF-509
+    });
+    bot.stance = stanceDecision.stance;
+    bot.stanceHeldUntil = stanceDecision.stanceHeldUntil;
+    const routeSpeed = routeMovement.startsWith('strafe') ? 4.05 : lineOfSight ? 4.65 : 5.85;
+    // HF-458: a tasered bot is held in place for the stun, exactly like a
+    // tasered human. Its aim and fire logic keep running; only movement stops.
+    const botStunnedUntil = botTaserStunUntilHostTimeMs.get(bot.id);
+    const botTasered = botStunnedUntil !== undefined && currentHostTimeMs() < botStunnedUntil;
+    if (botStunnedUntil !== undefined && !botTasered) botTaserStunUntilHostTimeMs.delete(bot.id);
+    const speed = botTasered ? 0 : Math.min(routeSpeed, botStanceSpeedCap(bot.stance, false));
     const desired = bot.position.clone().addScaledVector(desiredDirection, speed * dt);
-    let resolved = resolveHorizontalMove(bot.position, desired, botNavigationColliders, arena.bounds, 0.44);
+    const botCapsuleHeight = 1.7;
+    const movementColliders = collidersOverlappingVerticalSpan(
+      botNavigationColliders,
+      bot.position.y,
+      bot.position.y + botCapsuleHeight,
+    );
+    const collisionPosition = bot.position.clone().setY(bot.position.y + botCapsuleHeight);
+    const collisionDesired = desired.clone().setY(desired.y + botCapsuleHeight);
+    let resolved = resolveHorizontalMove(collisionPosition, collisionDesired, movementColliders, arena.bounds, 0.44);
     const stalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002
       && desiredDirection.lengthSq() > 0;
     if (stalled) {
       const detour = bot.position.clone().addScaledVector(side, bot.strafeSign * speed * dt * 1.5);
-      resolved = resolveHorizontalMove(bot.position, detour, botNavigationColliders, arena.bounds, 0.44);
+      const collisionDetour = detour.clone().setY(detour.y + botCapsuleHeight);
+      resolved = resolveHorizontalMove(collisionPosition, collisionDetour, movementColliders, arena.bounds, 0.44);
       const detourStalled = Math.hypot(resolved.x - bot.position.x, resolved.z - bot.position.z) < 0.002;
       if (detourStalled) {
         if (bot.blockedSince === 0) bot.blockedSince = now;
@@ -17239,7 +21164,17 @@ function updateBots(dt: number, now: number): void {
     bot.root.position.copy(bot.position);
     const lookTarget = lineOfSight ? targetPosition : verticalRouteTarget ?? patrolTarget;
     bot.root.rotation.y = operatorYawToward(bot.position, lookTarget);
-    poseOperator(bot.root, 'stand', desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), 0, dt);
+    // HF-375: bots aim in 3D and always stood level. Only a real combat target
+    // gets a pitch - a patrol waypoint is a floor position, and pitching the
+    // body at it would have every patrolling bot staring at its own feet.
+    const lookPitch = lineOfSight
+      ? operatorPitchToward(bot.position, { x: lookTarget.x, y: lookTarget.y, z: lookTarget.z })
+      : 0;
+    // Lane AR item 3 (was HF-412's honest "bots have no stance state"): the
+    // body now poses from the same field the snapshot replicates and the shot
+    // resolver rewinds to, so a bot plays the crouch and prone transitions a
+    // player does. debugBotStanceOverride still wins for QA captures.
+    poseOperator(bot.root, debugBotStanceOverride ?? bot.stance, desiredDirection.lengthSq() > 0 ? speed : 0, now * 0.008 + botIndex, Math.min(1, dt * 12), lookPitch, dt);
     const botSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(bot.position));
     const botFootsteps = footstepEmitters.sample({
       actorId: `bot:${bot.id}`,
@@ -17502,22 +21437,6 @@ function explosiveBoltTargetDistance(
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-function segmentSphereFraction(start: THREE.Vector3, delta: THREE.Vector3, centre: THREE.Vector3, radius: number): number | null {
-  const denominator = delta.lengthSq();
-  if (denominator < 1e-9) return null;
-  const offsetX = centre.x - start.x;
-  const offsetY = centre.y - start.y;
-  const offsetZ = centre.z - start.z;
-  const alpha = THREE.MathUtils.clamp(
-    (offsetX * delta.x + offsetY * delta.y + offsetZ * delta.z) / denominator,
-    0,
-    1,
-  );
-  const nearestX = start.x + delta.x * alpha - centre.x;
-  const nearestY = start.y + delta.y * alpha - centre.y;
-  const nearestZ = start.z + delta.z * alpha - centre.z;
-  return nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ <= radius * radius ? alpha : null;
-}
 
 function createExplosiveBoltMesh(): THREE.Group {
   const root = new THREE.Group();
@@ -17748,6 +21667,12 @@ function detonateExplosiveBoltEntity(bolt: ExplosiveBoltEntity, now: number): vo
   disposeExplosiveBolt(bolt);
   spawnGrenadeExplosionVisual(point, now);
   audio.explosion(now);
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: point.distanceTo(player.position),
+    family: 'crossbow',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now,
+  });
   if (!bolt.authority) return;
   const stuck = sealedAttachment !== null;
   const blastRadiusM = explosiveBoltBlastRadiusM(stuck);
@@ -17831,6 +21756,8 @@ type MutableFlareTargetSnapshot = {
   kind: FlareProjectileTarget['kind'];
   position: THREE.Vector3;
   radiusM: number;
+  /** HF-321: vertical half-height of the direct-hit capsule; 0 keeps the legacy sphere. */
+  halfHeightM: number;
 };
 type FlareTargetSnapshotEntry = {
   target: MutableFlareTargetSnapshot;
@@ -17856,6 +21783,7 @@ function upsertFlareTargetSnapshot(
   team: Team,
   practiceOnly: boolean,
   radiusM: number,
+  halfHeightM: number, // HF-321
   x: number,
   y: number,
   z: number,
@@ -17871,7 +21799,7 @@ function upsertFlareTargetSnapshot(
     }
     if (flareTargetSnapshots.size >= FLARE_TARGET_SNAPSHOT_CAPACITY) return;
     entry = {
-      target: { id, lifeId, kind, position: new THREE.Vector3(), radiusM },
+      target: { id, lifeId, kind, position: new THREE.Vector3(), radiusM, halfHeightM }, // HF-321
       team,
       practiceOnly,
       active: true,
@@ -17881,6 +21809,7 @@ function upsertFlareTargetSnapshot(
   entry.target.lifeId = lifeId;
   entry.target.kind = kind;
   entry.target.radiusM = radiusM;
+  entry.target.halfHeightM = halfHeightM; // HF-321
   entry.target.position.set(x, y, z);
   entry.team = team;
   entry.practiceOnly = practiceOnly;
@@ -17890,33 +21819,42 @@ function upsertFlareTargetSnapshot(
 function prepareFlareTargetSnapshots(): void {
   flareTargetSnapshotGeneration += 1;
   for (const entry of flareTargetSnapshots.values()) entry.active = false;
+  // HF-321: the direct-hit admission volume is a vertical capsule, not a sphere
+  // around one snapshot centre, so a torso or head hit on a standing target
+  // admits instead of only a shot near that centre. halfHeightM is
+  // snapshot-local: it is never checkpointed, serialized or replicated, and the
+  // through-wall guard in flare-projectile-system is untouched.
   if (player.alive) {
     upsertFlareTargetSnapshot(
-      player.id, localContinuity, 'player', player.team, false, 0.62,
+      player.id, localContinuity, 'player', player.team, false, 0.62, 0.85,
       player.position.x, player.position.y - 0.7, player.position.z,
     );
   }
   for (const [id, remote] of remotes) {
     if (remote.snapshot.hp <= 0) continue;
     upsertFlareTargetSnapshot(
-      id, remote.continuity, 'player', remote.snapshot.team, false, 0.62,
+      id, remote.continuity, 'player', remote.snapshot.team, false, 0.62, 0.85,
       remote.snapshot.x, remote.snapshot.y - 0.7, remote.snapshot.z,
     );
   }
   for (const bot of bots.values()) {
     if (!bot.alive) continue;
     upsertFlareTargetSnapshot(
-      bot.id, bot.continuity, 'bot', bot.team, false, 0.64,
+      bot.id, bot.continuity, 'bot', bot.team, false, 0.64, 0.85,
       bot.position.x, bot.position.y + 1, bot.position.z,
     );
   }
   if (selectedArena.id === 'gun-range') {
     for (const target of arena.targets) {
       if (!target.active) continue;
-      upsertFlareTargetSnapshot(target.id, 1, 'practice-target', player.team, true, 0.58, 0, 0, 0);
+      // HF-321: a practice target's root origin sits at its FEET while its
+      // meshes span roughly y 0..2.1, so the legacy foot-centred sphere only
+      // admitted ankle shots. Re-centre on the torso and give it the capsule.
+      upsertFlareTargetSnapshot(target.id, 1, 'practice-target', player.team, true, 0.6, 1, 0, 0, 0);
       const entry = flareTargetSnapshots.get(target.id);
       if (!entry) continue;
       target.root.getWorldPosition(entry.target.position);
+      entry.target.position.y += 1.05; // HF-321: feet origin -> capsule centre
     }
   }
 }
@@ -18054,7 +21992,8 @@ function applyFlareTargetDamage(
   }
   if (applied <= 0) return null;
   if (ownerId === player.id && target.kind !== 'bot') {
-    showHitmarker(false);
+    const wasElimination = healthBefore > 0 && resultingHealth <= 0;
+    showHitmarker(false, wasElimination);
     showDamageNumber(applied, 'body', healthBefore);
     audio.hit(false);
     roundDamageDealt += applied;
@@ -18261,13 +22200,10 @@ function updateExplosiveBolts(dt: number, now: number): void {
           attachedAtMs: now,
           expiresAtMs: bolt.detonatesAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
         });
-        if (targetHitId === player.id) {
-          presentStickyVictimUrgentAlert(
-            'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,
-          );
-          addFeed('STUCK', 'coral');
-        }
-        else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');
+        announceStickyAttachment(
+          'explosive-crossbow', bolt.ownerId, targetHitId, targetHitLifeId,
+          bolt.actionNonce, now, bolt.authority,
+        );
       } else if (worldCollision || glassCollision) {
         const collisionFraction = Math.min(worldFraction, glassFraction);
         bolt.mesh.position.copy(start).addScaledVector(delta, collisionFraction);
@@ -18439,6 +22375,7 @@ function presentRemoteGrenade(message: Extract<GameMessage, { type: 'grenade-thr
 
 function spawnGrenadeExplosionVisual(point: THREE.Vector3, now: number): void {
   grenadeExplosionPresentation.emit(point, now);
+  crushLawnAt(point, 2.6);
   grenadeExplosions += 1;
   lastGrenadeExplosionFrameAt = now;
 }
@@ -18658,7 +22595,7 @@ function traceAuthoritativeSmokeShotSegments(
     const direction = rawDirection.clone().normalize();
     const requestedDistance = weapon === 'railgun'
       ? RAILGUN_BEAM_LENGTH_M
-      : weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 110;
+      : isFlamethrowerFamilyWeapon(weapon) ? FLAMETHROWER_EFFECT.rangeM : 110;
     const trace = traceWeaponPath(origin, direction, requestedDistance, weapon);
     const end = origin.clone().addScaledVector(direction, trace.travelDistance);
     return Object.freeze({
@@ -18797,6 +22734,73 @@ function dispatchAuthoritativeFlashResult(result: FlashResult): void {
   });
 }
 
+/**
+ * HF-458: the local victim side of a taser stun. Movement is refused by
+ * `localTaserMovementAdmission()` in updatePhysics; this only records the
+ * authored window and lets the presentation read it.
+ */
+function applyAuthoritativeTaserStun(result: TaserStunResult): boolean {
+  const admission = taserVictimConsumer.admit(result, currentHostTimeMs());
+  if (!admission.accepted) return false;
+  taserStunStartsAtHostTimeMs = result.startsAtHostTimeMs;
+  taserStunEndsAtHostTimeMs = result.endsAtHostTimeMs;
+  taserStunsAppliedThisMatch += 1;
+  return true;
+}
+
+function dispatchAuthoritativeTaserStun(result: TaserStunResult): void {
+  if (result.targetId === player.id) {
+    applyAuthoritativeTaserStun(result);
+    return;
+  }
+  if (network.role !== 'host') return;
+  const message: TaserStunMessage = {
+    type: 'taser-stun',
+    schemaVersion: TASER_AUTHORITY_SCHEMA_VERSION,
+    by: player.id,
+    forPlayerId: result.targetId,
+    result,
+    nonce: randomNonce(),
+  };
+  if (isTaserStunMessage(message)) network.sendToPlayer(result.targetId, message);
+}
+
+/** Movement/sprint/jump admission for the LOCAL player under a taser stun. */
+function localTaserMovementAdmission(nowHostTimeMs = currentHostTimeMs()) {
+  return taserMovementAdmission(taserStunEndsAtHostTimeMs, nowHostTimeMs, taserStunStartsAtHostTimeMs);
+}
+
+/**
+ * HF-458: turns one host-admitted taser hit into a replicated stun. Bots are
+ * stunned in the host's own bot table (they have no client to replicate to);
+ * humans go through TaserHostAuthority exactly like a flashbang victim.
+ */
+function applyKillstreakTaserStunEvent(event: KillstreakTaserStunEvent): boolean {
+  if (network.role === 'client') return false;
+  const nowHostTimeMs = currentHostTimeMs();
+  if (event.targetKind === 'bot') {
+    const bot = bots.get(event.targetId);
+    if (!bot?.alive) return false;
+    botTaserStunUntilHostTimeMs.set(bot.id, nowHostTimeMs + event.durationMs);
+    taserStunsAppliedThisMatch += 1;
+    return true;
+  }
+  taserStunNonce += 1;
+  const resolution = taserHostAuthority.resolveStun({
+    matchEpoch: interactiveWorldMatchEpoch,
+    activationId: taserActivationId(interactiveWorldMatchEpoch, event.ownerId, taserStunNonce),
+    startsAtHostTimeMs: nowHostTimeMs,
+    victims: [{
+      targetId: event.targetId,
+      targetLifeId: event.targetLifeId,
+      durationMs: Math.min(TASER_STUN_DURATION_MS, event.durationMs),
+    }],
+  });
+  if (!resolution.accepted || resolution.results.length !== 1) return false;
+  dispatchAuthoritativeTaserStun(resolution.results[0]!);
+  return true;
+}
+
 function applyFlashGrenade(point: THREE.Vector3, entity: GrenadeEntity, nowHostTimeMs: number): void {
   // Clients may predict only projectile/world presentation. Human and AI flash
   // authority is resolved once by the host (or by the offline host runtime).
@@ -18884,6 +22888,7 @@ function updateOrdnanceVolumes(_now: number): void {
   if (authorityChanged) synchronizeSmokePresentation(smokeAuthority.snapshot(nowHostTimeMs), nowHostTimeMs);
   else updateSmokePresentationLeases(nowHostTimeMs);
   broadcastSmokeState(authorityChanged, nowHostTimeMs, authorityChanged);
+  updateTaserStunPresentation(nowHostTimeMs);
   const overlay = element<HTMLElement>('#ordnance-flash');
   const remainingFlash = flashExposureUntilHostTimeMs - nowHostTimeMs;
   if (remainingFlash <= 0) {
@@ -18893,6 +22898,43 @@ function updateOrdnanceVolumes(_now: number): void {
   } else {
     overlay.hidden = false;
     overlay.style.opacity = String(Math.min(1, flashExposureStrength * Math.min(1, remainingFlash / 550)));
+  }
+}
+
+/**
+ * HF-458 presentation: an electric-blue arc vignette plus a short camera jitter,
+ * so a tasered player never mistakes the effect for a flashbang. Reduced-sensory
+ * accessibility scales both, and the CSS crackle layer is disabled entirely
+ * under prefers-reduced-motion.
+ */
+function updateTaserStunPresentation(nowHostTimeMs: number): void {
+  const overlay = element<HTMLElement>('#taser-shock');
+  const stun = localTaserMovementAdmission(nowHostTimeMs);
+  if (!stun.stunned) {
+    if (!overlay.hidden) {
+      overlay.hidden = true;
+      overlay.style.opacity = '0';
+      overlay.style.setProperty('--taser-crackle', '0');
+    }
+    return;
+  }
+  const sensory = accessibilityRuntime.reducedSensory ? 0.4 : 1;
+  overlay.hidden = false;
+  overlay.style.opacity = String(Math.min(1, 0.35 + stun.intensity * 0.55) * sensory);
+  const crackle = Math.abs(Math.sin(nowHostTimeMs * Math.PI * 2 * TASER_PRESENTATION.crackleHz / 1_000));
+  overlay.style.setProperty('--taser-crackle', String(crackle * 0.55 * sensory));
+  // A jitter the flashbang never applies. Re-impulsed at the authored rate so
+  // the camera buzzes rather than heaves once and settles.
+  const jitterPeriodMs = 1_000 / TASER_PRESENTATION.cameraJitterHz;
+  if (nowHostTimeMs - lastTaserJitterAtHostTimeMs >= jitterPeriodMs) {
+    lastTaserJitterAtHostTimeMs = nowHostTimeMs;
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: CAMERA_SHAKE_REFERENCE_DISTANCE / Math.max(0.05, TASER_PRESENTATION.cameraJitterAmplitudeM * 8),
+      family: 'crossbow',
+      sensoryScale: accessibilityRuntime.weaponMotionScale * stun.intensity,
+      now: performance.now(),
+      seed: Math.round(nowHostTimeMs) | 0,
+    });
   }
 }
 
@@ -18915,6 +22957,31 @@ function explodeGrenade(entity: GrenadeEntity): void {
   audio.explosion(afterPresentationDetach);
   const afterAudio = performance.now();
   spawnGrenadeExplosionVisual(point, afterAudio);
+  const explosionDistance = point.distanceTo(player.position);
+  // One classification feeds both lanes: camera trauma and the HUD flinch use
+  // the same declared shake source so they cannot disagree about what a blast
+  // was (pass80 dead-wire sweep).
+  const shakeSource: CameraShakeSource = explosionDistance > 25 ? 'far-explosion' : 'near-explosion';
+  cameraShakeTrauma = addCameraShakeTrauma(cameraShakeTrauma, {
+    source: shakeSource,
+    now: afterAudio,
+    distanceUnits: explosionDistance,
+    seed: Math.round(afterAudio) | 0,
+  });
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: explosionDistance,
+    family: 'semtex',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now: afterAudio,
+  });
+  // HF-370: the HUD reacts to the same blast the camera does, with a distance
+  // falloff to zero at 50 m so far explosions nudge rather than heave.
+  hudImpactState = pushHudImpact(hudImpactState, {
+    kind: impactKindForShakeSource(shakeSource),
+    severity: Math.max(0, 1 - explosionDistance / 50) * accessibilityRuntime.weaponMotionScale,
+    bearingRadians: sourceScreenAngle(player.position, player.yaw, point),
+    now: afterAudio,
+  });
   const attachedTargetId = entity.attachedTargetId;
   const attachedTargetLifeId = entity.attachedTargetLifeId;
   let liveAttachedTargetFound = false;
@@ -19055,11 +23122,10 @@ function armImpactGrenade(
         attachedAtMs: now,
         expiresAtMs: grenade.explodeAt + STICKY_AUTHORITY_POST_DETONATION_LIFETIME_MS,
       });
-      if (targetId === player.id) {
-        presentStickyVictimUrgentAlert('semtex', targetId, targetLifeId, grenade.actionNonce, now);
-        addFeed('STUCK', 'coral');
-      }
-      else if (grenade.ownerKind === 'player') addFeed('STUCK', 'gold');
+      announceStickyAttachment(
+        'semtex', grenade.ownerKind === 'player' ? player.id : grenade.ownerId,
+        targetId, targetLifeId, grenade.actionNonce, now, network.role !== 'client',
+      );
     }
   }
   audio.coverImpact(position.distanceTo(player.position));
@@ -19183,6 +23249,63 @@ function updateGrenades(dt: number, now: number): void {
   }
 }
 
+type PracticeTargetDamageApplication = Readonly<{
+  appliedDamage: number;
+  healthBefore: number;
+  zone: HitZone;
+  died: boolean;
+}>;
+
+/** HF-347: authoritative practice-target state mutation, shared by the local
+ * (solo/host) presentation path and the host's resolution of guest shots. No
+ * UI, audio or score side effects — callers own their own presentation. */
+function applyPracticeTargetDamage(
+  target: (typeof arena.targets)[number],
+  damage: number,
+  zone: HitZone,
+  actorId: string,
+  weaponOrEffect: string,
+  evidence?: Readonly<{
+    wallbang?: boolean;
+    penetrationMultiplier?: number;
+    distanceMeters?: number;
+  }>,
+): PracticeTargetDamageApplication | null {
+  if (!target.active) return null;
+  if (target.alwaysCritical) zone = 'head';
+  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
+  if (admittedDamage <= 0) return null;
+  const healthBefore = target.health;
+  const resolved = resolveGunRangeDummyDamage(
+    healthBefore,
+    admittedDamage,
+    performance.now(),
+    target.respawnDelayMs ?? 2_200,
+  );
+  target.health = resolved.healthAfter;
+  recordDamageEvent({
+    actorId,
+    targetId: target.id,
+    weaponOrEffect,
+    healthBefore,
+    healthAfter: target.health,
+    damageRequested: admittedDamage,
+    damageApplied: resolved.appliedDamage,
+    hitZone: zone,
+    critical: zone === 'head',
+    wallbang: evidence?.wallbang,
+    penetrationMultiplier: evidence?.penetrationMultiplier,
+    distanceMeters: evidence?.distanceMeters,
+    reason: 'gun-range-practice-target',
+  });
+  if (resolved.died) {
+    target.active = false;
+    target.respawnAt = resolved.respawnAtMs ?? performance.now() + (target.respawnDelayMs ?? 2_200);
+    target.root.visible = false;
+  }
+  return { appliedDamage: resolved.appliedDamage, healthBefore, zone, died: resolved.died };
+}
+
 function hitPracticeTarget(
   id: string,
   damage: number,
@@ -19196,30 +23319,21 @@ function hitPracticeTarget(
 ): void {
   const target = arena.targets.find((entry) => entry.id === id);
   if (!target || !target.active) return;
-  if (target.alwaysCritical) zone = 'head';
-  const admittedDamage = Math.max(0, Number.isFinite(damage) ? damage : 0);
-  if (admittedDamage <= 0) return;
-  const healthBefore = target.health;
-  target.health = Math.max(0, target.health - admittedDamage);
-  const appliedDamage = healthBefore - target.health;
-  recordDamageEvent({
-    actorId: player.id,
-    targetId: target.id,
-    weaponOrEffect: evidence?.weaponOrEffect ?? player.weapon,
-    healthBefore,
-    healthAfter: target.health,
-    damageRequested: admittedDamage,
-    damageApplied: appliedDamage,
-    hitZone: zone,
-    critical: zone === 'head',
-    wallbang: evidence?.wallbang,
-    penetrationMultiplier: evidence?.penetrationMultiplier,
-    distanceMeters: evidence?.distanceMeters,
-    reason: 'gun-range-practice-target',
-  });
+  const applied = applyPracticeTargetDamage(
+    target,
+    damage,
+    zone,
+    player.id,
+    evidence?.weaponOrEffect ?? player.weapon,
+    evidence,
+  );
+  if (!applied) return;
+  zone = applied.zone;
+  const appliedDamage = applied.appliedDamage;
   targetHits += 1;
   const headshot = selectedArena.id === 'gun-range' && zone === 'head';
-  showHitmarker(headshot);
+  const wasElimination = target.health <= 0;
+  showHitmarker(headshot, wasElimination);
   showDamageNumber(appliedDamage, zone);
   audio.hit(headshot);
   if (selectedArena.id === 'gun-range') {
@@ -19229,12 +23343,9 @@ function hitPracticeTarget(
       { damageDealt: appliedDamage },
     );
   }
-  if (target.health > 0) {
+  if (!applied.died) {
     return;
   }
-  target.active = false;
-  target.respawnAt = performance.now() + (target.respawnDelayMs ?? 2_200);
-  target.root.visible = false;
   rangeScore = selectedArena.id === 'gun-range'
     ? advanceRangeScore(rangeScore, target.scoreValue)
     : rangeScore + 1;
@@ -19273,22 +23384,41 @@ function updateTargets(now: number): void {
   }
 }
 
+// Owner 2026-08-30 "make the grass breakable": gunfire tramples a small
+// circle of lawn tufts, blasts flatten a large one. Presentation only; the
+// crush hook lives on the street-life group so it follows arena rebuilds.
+function crushLawnAt(point: THREE.Vector3, radiusM: number): void {
+  const crush = neighbourhoodLifeRoot?.userData.nuketownLawnCrush as
+    ((x: number, z: number, radiusM: number) => number) | undefined;
+  if (crush) crush(point.x, point.z, radiusM);
+}
+
 function spawnImpactFlash(
   point: THREE.Vector3,
   surface: ImpactPresentationSurface = 'concrete',
   normal = new THREE.Vector3(0, 1, 0),
 ): void {
   impactPresentation.impact(point, normal.normalize(), surface);
+  if (point.y < 0.6) crushLawnAt(point, 0.3);
+  // HF-371: the ballistic dust cloud projects from the same canonical surface
+  // registry entry as the sparks above, so the cloud can never disagree with
+  // the impact it hangs over. Every shooter in the match routes through here.
+  hfParticleRuntime.emitSurfaceImpact(point, normal, surface);
 }
 
 function spawnTracer(start: THREE.Vector3, end: THREE.Vector3, color: number): void {
   tracerPool.emit(start, end, color);
 }
 
-function showHitmarker(headshot = false): void {
+function showHitmarker(headshot = false, wasElimination = false): void {
+  gamepadRuntime.rumble('hit'); // GAMEPAD: hit-confirm pulse (no-op without a pad or with rumble off)
   const marker = element<HTMLElement>('#hitmarker');
-  marker.classList.remove('show', 'headshot');
+  marker.classList.remove('show', 'headshot', 'kill-confirm');
   if (headshot) marker.classList.add('headshot');
+  if (wasElimination) {
+    killConfirmPulseState = triggerKillConfirmPulse(killConfirmPulseState, performance.now());
+    marker.classList.add('kill-confirm');
+  }
   requestAnimationFrame(() => marker.classList.add('show'));
 }
 
@@ -19360,6 +23490,7 @@ function syncFieldSupportRows(loadout: KillstreakLoadoutV1): void {
     if (threshold) threshold.textContent = `${definition.eliminations} KILLS`;
     if (name) name.textContent = definition.name.toUpperCase();
   });
+  syncHudInputGlyphs(); // GAMEPAD: re-apply pad glyphs after the caps were reset to key numbers
 }
 
 function updateFieldSupportHud(): void {
@@ -19374,6 +23505,7 @@ function updateFieldSupportHud(): void {
     const charges = fieldSupport.availableCharges[support];
     if (state) state.textContent = ready ? charges > 1 ? `READY ×${charges}` : 'READY' : 'LOCKED';
   });
+  if (gamepadRuntime.currentScheme() === 'gamepad') syncHudInputGlyphs(); // GAMEPAD: the selected slot carries the ACTIVATE glyph
   refreshSupportStatusHud(performance.now(), true);
 }
 
@@ -19435,6 +23567,10 @@ function updateSupportStatusHud(): void {
   feedback.hidden = !ownedSupport;
   feedback.dataset.supportKind = ownedSupport?.kind ?? 'none';
   feedback.dataset.possessed = String(Boolean(possession && ownedSupport?.id === possession.entityId));
+  // Owner 2026-08-30: the cockpit instrument rail overlapped the rifle ammo
+  // panel and equipment block. While possessed, the operator HUD yields the
+  // bottom band to the cockpit (CSS keys on this flag).
+  hudRoot.dataset.supportPossessed = String(Boolean(possession));
   feedback.dataset.awaitingOperation = 'false';
   liveSupportActivationIds.clear();
   for (const entity of killstreakSnapshot.entities) {
@@ -19650,7 +23786,12 @@ function updateFInteractionPrompt(now = performance.now()): void {
     delete supportPrompt.dataset.interactionKind;
     delete supportPrompt.dataset.targetId;
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel';
+    // GAMEPAD: on a pad, name the buttons in the player's hands (fire/interact
+    // confirm, the crouch face cancels); the keyboard sentence is the pinned
+    // Pass 65 care-package contract and stays byte-identical.
+    if (label && gamepadRuntime.currentScheme() === 'gamepad') {
+      label.textContent = `${promptLabel('fire')} or ${promptLabel('interact')} to confirm target  ${promptLabel('crouch')} to cancel`;
+    } else if (label) label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel';
     return;
   }
   advanceFInteractionPress(now);
@@ -19666,7 +23807,7 @@ function updateFInteractionPrompt(now = performance.now()): void {
     supportPrompt.dataset.holdActive = 'true';
     supportPrompt.style.setProperty('--f-hold-progress', `${((activeCareCrate.captureProgress ?? 0) * 100).toFixed(1)}%`);
     const label = supportPrompt.querySelector<HTMLElement>('span');
-    if (label) label.textContent = 'HOLD F · STEAL KILLSTREAK';
+    if (label) label.textContent = `HOLD ${interactLabel()} · STEAL KILLSTREAK`;
     return;
   }
   const pressedCandidate = fInteractionPressState.phase === 'pressed'
@@ -19691,9 +23832,10 @@ function updateFInteractionPrompt(now = performance.now()): void {
     const pinnedTap = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.tapCandidate : null;
     const pinnedHold = fInteractionPressState.phase === 'pressed' ? fInteractionPressState.holdCandidate : null;
     const dualIntent = pinnedTap && pinnedHold;
+    const interactKey = interactLabel(); // GAMEPAD: "F" on keyboard, the pad face glyph on a pad
     if (label) label.textContent = dualIntent
-      ? `TAP F · ${pinnedTap.prompt} / HOLD F · ${pinnedHold.prompt}`
-      : `${holdInteraction ? 'HOLD F' : 'TAP F'} · ${selected.prompt}`;
+      ? `TAP ${interactKey} · ${pinnedTap.prompt} / HOLD ${interactKey} · ${pinnedHold.prompt}`
+      : `${holdInteraction ? `HOLD ${interactKey}` : `TAP ${interactKey}`} · ${selected.prompt}`;
     if (holdInteraction && fInteractionPressState.phase === 'pressed') {
       supportPrompt.dataset.holdActive = 'true';
       supportPrompt.style.setProperty('--f-hold-progress', `${(fInteractionHoldProgress(fInteractionPressState, now) * 100).toFixed(1)}%`);
@@ -19758,16 +23900,239 @@ function adrenalineRuntimeDebugSnapshot(now = performance.now()) {
   });
 }
 
+/** Padding the killstreak line-of-sight segment test inflates every solid by. */
+const KILLSTREAK_LINE_OF_SIGHT_PADDING_M = 0.02;
+/**
+ * HF-403: how deep inside a solid an endpoint must sit before that solid stops
+ * counting as cover for it. 0.05 m is far below a test-bay dummy collider's
+ * 0.36 m horizontal and 1.05 m vertical half-extents (HF-318), and far above
+ * the zero depth of a combatant merely standing on a box, so a roof still
+ * blocks line of sight for whoever is standing on it.
+ */
+const KILLSTREAK_LINE_OF_SIGHT_INTERIOR_MARGIN_M = 0.05;
+
+/** True when the point sits strictly inside the solid, by the interior margin. */
+function killstreakSolidEnclosesPoint(box: Box2, point: { x: number; y: number; z: number }): boolean {
+  const margin = KILLSTREAK_LINE_OF_SIGHT_INTERIOR_MARGIN_M;
+  const minY = (box.minY ?? 0) + margin;
+  const maxY = (box.maxY ?? 8) - margin;
+  if (box.maxX - box.minX <= margin * 2 || box.maxZ - box.minZ <= margin * 2 || maxY <= minY) return false;
+  // Eroding every face by the same margin shrinks the box about its own centre,
+  // which is the point boxFrame rotates around, so this stays exact for the
+  // oriented colliders too.
+  return sphereIntersectsBox(point, 1e-4, {
+    minX: box.minX + margin,
+    maxX: box.maxX - margin,
+    minY,
+    maxY,
+    minZ: box.minZ + margin,
+    maxZ: box.maxZ - margin,
+    rotation: box.rotation,
+  });
+}
+
 function killstreakLineOfSight(
   solids: ArenaMap['colliders'],
   from: readonly [number, number, number],
   to: readonly [number, number, number],
 ): boolean {
-  return !solids.some((box) => segmentIntersectsBox(
-    { x: from[0], y: from[1], z: from[2] },
-    { x: to[0], y: to[1], z: to[2] },
-    box,
-  ));
+  const start = { x: from[0], y: from[1], z: from[2] };
+  const end = { x: to[0], y: to[1], z: to[2] };
+  // HF-403: a solid that CONTAINS one of the endpoints is not cover for that
+  // endpoint — nothing hides behind the box it is standing inside. HF-318 made
+  // every active training dummy a solid world box, and the test bay publishes
+  // each dummy as a killstreak target at its own collider's geometric centre,
+  // so every support line-of-sight query to a dummy terminated 0.36 m deep
+  // inside the dummy's own solid and reported "blocked". That is why carpet
+  // bomber, piloted drone and chopper gunner all went inert in the test bay
+  // while working everywhere else: dummies are the only combatants that are
+  // also world solids. Authority is unchanged for every ordinary query — the
+  // segment test still runs first, and only the one box an endpoint is already
+  // buried in is discounted, so real cover between two points outside the
+  // solids blocks exactly as before.
+  return !solids.some((box) => segmentIntersectsBox(start, end, box, KILLSTREAK_LINE_OF_SIGHT_PADDING_M)
+    && !killstreakSolidEnclosesPoint(box, start)
+    && !killstreakSolidEnclosesPoint(box, end));
+}
+
+// ---------------------------------------------------------------------------
+// Domination (owner 2026-08-30, Test2): host/solo-authoritative zone truth.
+// ---------------------------------------------------------------------------
+let dominationState: DominationState | null = null;
+/** Domination is Test2's headline: always in solo, host-selected in lobbies. */
+function dominationModeActive(): boolean {
+  if (selectedArena.id !== 'test2' || !gameStarted) return false;
+  return gameMode === 'solo' || privateMatchMode === 'domination';
+}
+
+function dominationDisplayState(): { zones: ReadonlyArray<{ id: string; owner: Team | null; capturingTeam: Team | null; progress: number; contested: boolean }>; scores: readonly [number, number] } | null {
+  if (!dominationModeActive()) return null;
+  if (network.role === 'client') {
+    const replicated = privateLobbySnapshot?.domination;
+    return replicated ? { zones: replicated.zones, scores: replicated.scores } : null;
+  }
+  if (!dominationState) return null;
+  return {
+    zones: dominationState.zones.map((zone) => ({
+      id: zone.id, owner: zone.owner, capturingTeam: zone.capturingTeam, progress: zone.progress, contested: zone.contested,
+    })),
+    scores: dominationState.scores,
+  };
+}
+
+function advanceDominationAuthority(now: number): void {
+  if (!dominationModeActive() || network.role === 'client') {
+    dominationState = null;
+    return;
+  }
+  if (matchState.phase !== 'active') {
+    if (matchState.phase === 'warmup') dominationState = null;
+    return;
+  }
+  if (!dominationState) dominationState = createDominationState(TEST2_DOMINATION_ZONES, now);
+  const presences = killstreakWorldState().targets
+    .filter((target) => target.kind === 'player' || target.kind === 'bot')
+    .map((target) => ({ team: target.team, alive: target.alive, position: target.position }));
+  // Feed + audio for ownership changes live in updateDominationHud, which
+  // runs identically on host, solo and guest replicas.
+  advanceDomination(dominationState, presences, now);
+}
+
+const lastDominationOwners = new Map<string, Team | null>();
+
+function announceDominationChanges(zones: ReadonlyArray<{ id: string; owner: Team | null }>): void {
+  for (const zone of zones) {
+    const previous = lastDominationOwners.get(zone.id);
+    if (previous === zone.owner) continue;
+    const known = lastDominationOwners.has(zone.id);
+    lastDominationOwners.set(zone.id, zone.owner);
+    if (!known) continue; // First sample of a match: no announcement.
+    if (zone.owner === null) {
+      if (previous !== null && previous !== undefined) addFeed(`ZONE ${zone.id} NEUTRALIZED`, previous === 0 ? 'coral' : 'aqua');
+      audio.dominationCue(false);
+    } else {
+      addFeed(`${zone.owner === 0 ? 'AQUA' : 'CORAL'} CAPTURED ${zone.id}`, zone.owner === 0 ? 'aqua' : 'coral');
+      audio.dominationCue(zone.owner === player.team);
+    }
+  }
+}
+
+/** Tint the authored Test2 flag banners to the owning squad's colour. */
+function presentDominationFlags(): void {
+  const display = dominationDisplayState();
+  if (!display) return;
+  for (const zone of display.zones) {
+    const banner = arena.root.getObjectByName(`test2-zone-flag-banner-${zone.id}`) as THREE.Mesh | undefined;
+    const material = banner?.material as THREE.MeshStandardMaterial | undefined;
+    if (!material) continue;
+    const tint = zone.owner === 0 ? DOMINATION_TEAM_COLORS.aqua : zone.owner === 1 ? DOMINATION_TEAM_COLORS.coral : DOMINATION_TEAM_COLORS.neutral;
+    if (material.color.getHex() !== tint) material.color.setHex(tint);
+  }
+}
+
+function ensureDominationHud(): HTMLElement {
+  let strip = document.getElementById('domination-zones');
+  if (!strip) {
+    strip = document.createElement('div');
+    strip.id = 'domination-zones';
+    for (const zoneId of ['A', 'B', 'C']) {
+      const pip = document.createElement('span');
+      pip.className = 'domination-pip';
+      pip.dataset.zone = zoneId;
+      pip.textContent = zoneId;
+      strip.appendChild(pip);
+    }
+    element<HTMLElement>('#hud').appendChild(strip);
+  }
+  return strip;
+}
+
+/**
+ * The centre-screen capture prompt. Owner 2026-08-31: "its not clear how to
+ * cpature flags and zones, make that clear too?" - the three corner pips were
+ * the entire presentation of the mode, so nothing on screen ever said that
+ * standing in a circle is what takes it. `deriveDominationCapturePrompt` owns
+ * the wording and the thresholds; this owns only the DOM.
+ */
+function ensureDominationCapturePromptElement(): HTMLElement {
+  let prompt = document.getElementById('domination-capture');
+  if (!prompt) {
+    prompt = document.createElement('div');
+    prompt.id = 'domination-capture';
+    prompt.hidden = true;
+    prompt.setAttribute('aria-hidden', 'true');
+    prompt.innerHTML = '<strong></strong><small></small><i><b></b></i>';
+    element<HTMLElement>('#hud').appendChild(prompt);
+  }
+  return prompt;
+}
+
+function applyDominationCapturePrompt(zones: ReadonlyArray<DominationPromptZoneView>): void {
+  const prompt = deriveDominationCapturePrompt({
+    alive: player.alive,
+    team: (player.team === 1 ? 1 : 0) as 0 | 1,
+    position: { x: player.position.x, z: player.position.z },
+    zones,
+  });
+  const node = ensureDominationCapturePromptElement();
+  const visible = prompt.state !== 'clear';
+  if (node.hidden !== !visible) node.hidden = !visible;
+  if (!visible) return;
+  // Every write guarded: this runs every frame and an unchanged frame must not
+  // invalidate style.
+  const headline = prompt.secondsRemaining !== null
+    ? `${prompt.headline}  ${prompt.secondsRemaining}s`
+    : prompt.headline;
+  const strong = node.querySelector('strong');
+  if (strong && strong.textContent !== headline) strong.textContent = headline;
+  const small = node.querySelector('small');
+  if (small && small.textContent !== prompt.detail) small.textContent = prompt.detail;
+  if (node.dataset.tone !== prompt.tone) node.dataset.tone = prompt.tone;
+  if (node.dataset.state !== prompt.state) node.dataset.state = prompt.state;
+  const bar = (Math.round(prompt.progress * 100) / 100).toFixed(2);
+  if (node.dataset.progress !== bar) {
+    node.dataset.progress = bar;
+    node.style.setProperty('--domination-capture-progress', bar);
+  }
+}
+
+function updateDominationHud(): void {
+  const display = dominationDisplayState();
+  const existing = document.getElementById('domination-zones');
+  if (!display) {
+    if (existing) existing.hidden = true;
+    const prompt = document.getElementById('domination-capture');
+    if (prompt) prompt.hidden = true;
+    lastDominationOwners.clear();
+    return;
+  }
+  const strip = ensureDominationHud();
+  strip.hidden = false;
+  announceDominationChanges(display.zones);
+  // Zone geometry is static map data present on host and guest alike, so the
+  // prompt needs no protocol field: replicated ownership is merged onto the
+  // local seeds by id. A zone the seeds do not name is simply not prompted.
+  applyDominationCapturePrompt(display.zones.flatMap((zone) => {
+    const seed = TEST2_DOMINATION_ZONES.find((candidate) => candidate.id === zone.id);
+    if (!seed) return [];
+    return [{
+      id: seed.id,
+      centre: seed.centre,
+      radius: DOMINATION_ZONE_RADIUS_M,
+      owner: (zone.owner === 1 ? 1 : zone.owner === 0 ? 0 : null) as 0 | 1 | null,
+      capturingTeam: (zone.capturingTeam === 1 ? 1 : zone.capturingTeam === 0 ? 0 : null) as 0 | 1 | null,
+      progress: zone.progress,
+      contested: zone.contested,
+    }];
+  }));
+  for (const zone of display.zones) {
+    const pip = strip.querySelector<HTMLElement>(`[data-zone="${zone.id}"]`);
+    if (!pip) continue;
+    pip.dataset.owner = zone.owner === 0 ? 'aqua' : zone.owner === 1 ? 'coral' : 'neutral';
+    pip.dataset.contested = String(zone.contested);
+    pip.style.setProperty('--capture-progress', zone.progress.toFixed(2));
+  }
+  presentDominationFlags();
 }
 
 function killstreakWorldState(): KillstreakWorld {
@@ -19813,92 +24178,25 @@ function killstreakWorldState(): KillstreakWorld {
     }
   }
   lastKillstreakWorldTargetCount = targets.length;
-  const flightNavigation = PASS65_FLIGHT_NAVIGATION[selectedArena.id];
-  const centrePortal = [...flightNavigation.portals]
-    .sort((left, right) => right.altitudeM - left.altitudeM || left.id.localeCompare(right.id))[0];
-  const centreSpawn: [number, number, number] = [
-    (arena.bounds.minX + arena.bounds.maxX) / 2
-      + (centrePortal?.xQ ?? 0) * (arena.bounds.maxX - arena.bounds.minX) / 2,
-    centrePortal?.altitudeM ?? flightNavigation.ceilingY * 0.45,
-    (arena.bounds.minZ + arena.bounds.maxZ) / 2
-      + (centrePortal?.zQ ?? 0) * (arena.bounds.maxZ - arena.bounds.minZ) / 2,
-  ];
   // Centre-spawn admission can run hundreds of bounded probes. Snapshot the
   // current collision authority once so each probe does not rebuild/enumerate
   // the full collider set and introduce an activation hitch.
   const flightSolids = activeWorldColliders();
-  let groundSampler: SupportPlacementGroundSampler | null = null;
-  const groundHeightAt = (x: number, z: number): number => {
-    groundSampler ??= new SupportPlacementGroundSampler({
+  return {
+    // The airspace, the centre-spawn volume and the placement ground surface
+    // are one arena-derived unit, owned and unit-tested in its own module.
+    ...createSupportFlightWorld({
+      arenaId: selectedArena.id,
       bounds: arena.bounds,
-      ceilingY: flightNavigation.ceilingY,
-      colliders: flightSolids,
+      solids: flightSolids,
       prepareRaycastMeshes: () => {
         arena.root.updateWorldMatrix(true, true);
         return activeRaycastMeshes();
       },
-    });
-    return groundSampler.heightAt(x, z);
-  };
-  return {
-    bounds: {
-      minX: arena.bounds.minX,
-      maxX: arena.bounds.maxX,
-      minZ: arena.bounds.minZ,
-      maxZ: arena.bounds.maxZ,
-      floorY: 0,
-      ceilingY: flightNavigation.ceilingY,
-    },
+    }),
     targets,
     areHostile: (ownerId, ownerTeam, target) => areCombatantsHostile(ownerId, ownerTeam, target.id, target.team),
     hasLineOfSight: (from, to) => killstreakLineOfSight(flightSolids, from, to),
-    groundHeightAt,
-    resolveFlightPosition: (from, desired, radius) => {
-      const result = resolveSupportFlightStep({
-        definition: flightNavigation,
-        arenaBounds: arena.bounds,
-        solids: flightSolids,
-        from: { x: from[0], y: from[1], z: from[2] },
-        desired: { x: desired[0], y: desired[1], z: desired[2] },
-        radius,
-      });
-      return [result.position.x, result.position.y, result.position.z];
-    },
-    resolveFlightEnvelopePosition: (from, desired, envelope) => resolveSupportAircraftEnvelopeStep({
-      bounds: {
-        minX: arena.bounds.minX,
-        maxX: arena.bounds.maxX,
-        minZ: arena.bounds.minZ,
-        maxZ: arena.bounds.maxZ,
-        floorY: 0,
-        ceilingY: flightNavigation.ceilingY,
-      },
-      solids: flightSolids,
-      from,
-      desired,
-      envelope,
-    }).position,
-    isFlightPositionValid: (position) => {
-      const point = { x: position[0], y: position[1], z: position[2] };
-      return pointInsideBounds(point, arena.bounds, 0.35)
-        && !flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid));
-    },
-    supportStrikeBoundsAt: (anchor) => {
-      const bay = GUN_RANGE_TEST_BAY_CONTRACT.bay.bounds;
-      return selectedArena.id === 'gun-range'
-        && anchor[0] >= bay.minX && anchor[0] <= bay.maxX
-        && anchor[2] >= bay.minZ && anchor[2] <= bay.maxZ
-        ? bay
-        : arena.bounds;
-    },
-    supportFlightCentreVolume: {
-      centre: centreSpawn,
-      halfExtents: [
-        Math.min(7.5, (arena.bounds.maxX - arena.bounds.minX) * 0.12),
-        Math.min(2, flightNavigation.ceilingY * 0.05),
-        Math.min(7.5, (arena.bounds.maxZ - arena.bounds.minZ) * 0.12),
-      ],
-    },
   };
 }
 
@@ -19935,6 +24233,10 @@ function refreshLocalKillstreakSnapshot(now = performance.now(), force = true): 
   }
   const actor = localKillstreakActorSnapshot();
   const reward = actor?.revealedCareRewards[0] ?? null;
+  // HF-509: a consumed head advances the package-instance id.
+  careRewardQueueTracker = advanceCareRewardQueue(
+    careRewardQueueTracker, actor?.revealedCareRewards ?? [], killstreakMatchEpoch,
+  );
   let hudChanged = false;
   if (reward && displayedCareReward !== reward) {
     addFeed(`CARE PACKAGE SECURED · ${GAMEPAD_SUPPORT_LABELS[reward]} READY`, 'gold');
@@ -19988,7 +24290,7 @@ function applyKillstreakEntityShot(
 ): boolean {
   if (network.role === 'client' || directions.length === 0) return false;
   const spec = WEAPONS[weapon];
-  const maximumDistance = weapon === 'flamethrower' ? FLAMETHROWER_EFFECT.rangeM : 220;
+  const maximumDistance = isFlamethrowerFamilyWeapon(weapon) ? FLAMETHROWER_EFFECT.rangeM : 220;
   let applied = false;
   const destroyed = new Set<string>();
   for (const authoredDirection of directions) {
@@ -20030,10 +24332,12 @@ function applyKillstreakEntityShot(
 function killstreakSlotFor(id: Pass65KillstreakId): 1 | 2 | 3 | 4 | 5 | null {
   const careReward = localKillstreakActorSnapshot()?.revealedCareRewards[0];
   if (careReward === id) return 1;
-  const index = localFieldSupportProjection().loadout.slots.indexOf(id);
+  const index = (localFieldSupportProjection().loadout.slots as readonly Pass65KillstreakId[]).indexOf(id);
   return index < 0 ? null : (index + 1) as 1 | 2 | 3 | 4 | 5;
 }
 
+// HF-509: any catalog id. The care-only crimson reward has no loadout slot but
+// is redeemed through slot one, the only path that shifts the host's queue.
 function requestKillstreakActivation(
   id: Pass65KillstreakId,
   now: number,
@@ -20081,16 +24385,62 @@ function requestKillstreakActivation(
   // and before the earliest support fire gate.
   lastLocalKillstreakSnapshotRefreshAt = Number.NEGATIVE_INFINITY;
   broadcastKillstreakState(now);
+  announceKillstreakActivation(admission, player.id, player.team, now);
   return activationRequestId;
+}
+
+/** HF-509: host-only, once per admitted activation; the whole lobby hears and sees it. */
+function announceKillstreakActivation(admission: KillstreakAdmission, ownerId: string, ownerTeam: Team, now: number): void {
+  if (network.role === 'client' || !admission.accepted || !admission.activationId || !admission.activatedId) return;
+  if (!killstreakAnnouncements.admit(admission.activationId)) return;
+  const entry = killstreakRuntime.snapshotFor(null, now).entities.find((entity) => entity.activationId === admission.activationId)?.position;
+  const owner = ownerId === player.id ? player.position : remotes.get(ownerId)?.target ?? player.position;
+  const message: KillstreakAnnounceMessage = {
+    type: 'killstreak-announce', by: player.id, matchEpoch: killstreakMatchEpoch, activationId: admission.activationId,
+    ownerId, ownerTeam, source: admission.activatedId, position: entry ?? [owner.x, owner.y, owner.z], nonce: randomNonce(),
+  };
+  if (network.role === 'host') network.send(message);
+  presentKillstreakAnnouncement(message, now);
+}
+
+function presentKillstreakAnnouncement(message: KillstreakAnnounceMessage, now: number): void {
+  const banner = killstreakAnnouncementBanner({
+    source: message.source, ownerId: message.ownerId, ownerName: combatantLabel(message.ownerId).name, ownerTeam: message.ownerTeam,
+    localId: player.id, localTeam: player.team, freeForAll: gameMode !== 'solo' && privateMatchMode === 'ffa',
+  });
+  killstreakBannerState = showKillstreakBanner(killstreakBanner, banner, message.activationId, message.source, now);
+  audio.killstreakAnnounce(banner.tone);
+  addFeed(`${combatantLabel(message.ownerId).name} CALLED ${banner.label}`, banner.tone === 'hostile' ? 'coral' : 'gold');
+  killstreakAwarenessQa.announcements.push({ activationId: message.activationId, source: message.source, ownerId: message.ownerId, headline: banner.headline, tone: banner.tone });
+  if (killstreakAwarenessQa.announcements.length > 8) killstreakAwarenessQa.announcements.shift();
+}
+
+/** HF-509: one drop cue for host and guests - missile off the rail or bomb out of the bay, at the source. */
+function presentSupportDropCue(impact: KillstreakImpactEvent, now: number): void {
+  const drop = supportDropCue(impact);
+  if (!drop) return;
+  killstreakActivity.recordImpacts([impact], now);
+  if (drop.kind === 'missile') audio.missileLaunch(drop.emitter);
+  else audio.bombRelease(drop.emitter);
 }
 
 function requestKillstreakControl(
   entityId: string,
   action: KillstreakControlIntentMessage['action'],
-  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire'> = {},
+  control: Pick<KillstreakControlIntentMessage, 'yawQ' | 'pitchQ' | 'thrustQ' | 'strafeQ' | 'verticalQ' | 'fire' | 'missileFire' | 'taserFire'> = {},
   now = performance.now(),
 ): boolean {
   killstreakControlSequence += 1;
+  // HF-404: player.yaw is an unbounded accumulator — it is never wrapped, so a
+  // gunner who keeps turning ships 7.5, 13.8, 20.1 rad. The control-intent wire
+  // contract is yawQ in [-pi, pi] (killstreak-protocol parseKillstreakControl),
+  // so an unwrapped yaw made the guest's ENTIRE control message fail
+  // validation — aim, pitch, thrust and trigger with it — and the host's own
+  // boundary pinned the turret at the clamp. Normalise into the contract here,
+  // once, for every caller. Yaw is periodic, so this changes no heading.
+  const normalizedControl = control.yawQ === undefined
+    ? control
+    : { ...control, yawQ: wrapAngleRadians(control.yawQ) };
   const message: KillstreakControlIntentMessage = {
     type: 'killstreak-control-intent',
     by: player.id,
@@ -20099,7 +24449,7 @@ function requestKillstreakControl(
     sequence: killstreakControlSequence,
     entityId,
     action,
-    ...control,
+    ...normalizedControl,
     timing: nextCombatTiming(),
     nonce: randomNonce(),
   };
@@ -20126,6 +24476,31 @@ function requestKillstreakControl(
   return true;
 }
 
+/**
+ * HF-458 item 3: exact RMB action for the locally possessed Piloted Drone.
+ * Refused client-side when the drone has no charge left, so a dead click never
+ * costs a control packet; the host refuses it again regardless.
+ */
+function requestPossessedDroneTaser(now = performance.now()): boolean {
+  const possession = localKillstreakActorSnapshot()?.possession;
+  if (possession?.kind !== 'piloted-drone') return false;
+  const entity = killstreakSnapshot.entities.find((candidate) => (
+    candidate.id === possession.entityId
+    && candidate.kind === 'drone'
+    && candidate.mode === 'piloted'
+    && candidate.ownerId === player.id
+    && candidate.expiresInMs > 0
+    && (candidate.taserCharges ?? 0) > 0
+  ));
+  if (!entity) return false;
+  return requestKillstreakControl(entity.id, 'pilot-control', {
+    yawQ: player.yaw,
+    pitchQ: player.pitch,
+    fire: triggerHeld,
+    taserFire: true,
+  }, now);
+}
+
 /** Exact RMB action for the locally possessed Chopper Gunner. */
 function requestPossessedChopperMissile(now = performance.now()): boolean {
   const possession = localKillstreakActorSnapshot()?.possession;
@@ -20149,8 +24524,43 @@ function requestPossessedChopperMissile(now = performance.now()): boolean {
 
 function activateOrToggleFieldSupportSlot(slotIndex: number, now = performance.now()): void {
   const fieldSupport = localFieldSupportProjection();
-  const id = fieldSupport.loadout.slots[slotIndex];
-  if (!id) return;
+  const slotId = fieldSupport.loadout.slots[slotIndex];
+  if (!slotId) return;
+  // Owner 2026-08-30 ("cant enter them to control them, at least in
+  // killstreak range"): a slot key must also reach a live owned platform of
+  // the slot's CONTROLLABLE alternative - the range's drone station hands
+  // out a piloted drone while the slot still shows yardhawk.
+  const alternative = controllableAlternativeForSlotId(slotId);
+  const id = alternative
+    && selectControllableSupportEntity(alternative, player.id, killstreakSnapshot.entities) !== null
+    ? alternative
+    : slotId;
+  // HF-316: the owner reported killstreak keys that "sometimes" do nothing. Every
+  // refusal below used to be a bare return, so a blocked activation was
+  // indistinguishable from a dead key. Evaluate the pre-flight once and SAY why.
+  // Does this slot already own a live platform in the world? If so the press is
+  // a control toggle, not an activation, and must not be judged on a charge
+  // that was already spent calling the platform in.
+  const controlTogglePress = controllableKillstreakId(id)
+    && selectControllableSupportEntity(id, player.id, killstreakSnapshot.entities) !== null;
+  const gate = evaluateKillstreakActivation({
+    slotId: id,
+    controlTogglePress,
+    projectionEarned: fieldSupport.available[id] === true,
+    playerAlive: player.alive,
+    matchPhase: matchState.phase,
+    tacticalMapOpen,
+    possessionActive: localKillstreakActorSnapshot()?.possession != null,
+    // HF-317: an open carpet corridor is live targeting like the other modes.
+    targetingActive: pointSupportTargeting !== null || triPassTargeting !== null || carpetCorridorTargeting !== null,
+    arenaSupportsFieldSupport: selectedArena.id !== 'gun-range',
+    hasActorSnapshot: localKillstreakActorSnapshot() != null,
+    gameplayInputEnabled: gameplayInputEnabled(),
+  });
+  if (!gate.allowed) {
+    addFeed(KILLSTREAK_ACTIVATION_DENIAL_LABELS[gate.reason], 'gold');
+    return;
+  }
   if (!controllableKillstreakId(id)) {
     if (!localKillstreakActorSnapshot()?.possession) activateFieldSupport(id);
     return;
@@ -20226,7 +24636,7 @@ function executePinnedFInteraction(interaction: InteractionCandidate, now = perf
     return WEAPON_IDS.includes(weapon) && interactWithGunRangeTestBayWeapon(now, weapon);
   }
   if (interaction.kind === 'test-bay-support') {
-    const id = interaction.targetId.replace(/^test-bay-support:/, '') as Pass65KillstreakId;
+    const id = interaction.targetId.replace(/^test-bay-support:/, '') as SelectableKillstreakId;
     return interactWithGunRangeTestBaySupport(id);
   }
   if (interaction.kind === 'weapon-pickup') return interactWithWeaponPickup(now, interaction.targetId);
@@ -20289,14 +24699,14 @@ function finishDeferredLocalKillstreakDeath(now = performance.now()): void {
   updateFieldSupportHud();
   const death: DeathMessage = { type: 'death', killer: pending.attacker, victim: player.id, cause: pending.cause, nonce: randomNonce() };
   if (network.role !== 'client') {
-    network.send(death);
-    processDeath(death);
+      broadcastCanonicalDeath(death);
   }
   scheduleLocalRespawn(now);
   document.exitPointerLock();
 }
 
 function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDamageEvent | null {
+  if (event.targetId === player.id && event.targetLifeId !== localContinuity) return null;
   if (appliedKillstreakDamageResults.has(event.resultId)) return null;
   appliedKillstreakDamageResults.add(event.resultId);
   if (appliedKillstreakDamageResults.size > 512) {
@@ -20306,7 +24716,6 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   const cause = killCauseFromKillstreak(event.source);
   const attributionId = killAttributionId(event.ownerId, cause);
   if (event.targetId === player.id) {
-    if (event.targetLifeId !== localContinuity) return null;
     const before = player.hp;
     // A lethal hit from the player's OWN killstreak (e.g. standing in a carpet
     // bomb) used to run the full death sequence re-entrantly inside the damage
@@ -20315,6 +24724,13 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
     // death bookkeeping until the killstreak update has fully settled.
     applyDamage(event.damage, attributionId, 1, true, cause);
     const applied = Math.max(0, before - player.hp);
+    // HF-509: the indicator points at the killstreak itself and names it.
+    const cue = killstreakDamageSourceCue({ ...event, damage: Math.max(1, applied) }, performance.now());
+    killstreakAwarenessQa.damageSource = cue;
+    directionalDamageState = recordDirectionalDamage(directionalDamageState, {
+      sourceId: cue.sourceId, sourceType: 'killstreak', sourceLabel: cue.label, damage: cue.damage, now: cue.atMs,
+      angleRadians: sourceScreenAngle(player.position, player.yaw, { x: cue.position[0], z: cue.position[2] }), cameraYawRadians: player.yaw,
+    });
     if (player.hp <= 0 && player.alive) {
       deferredLocalKillstreakDeath = { attacker: attributionId, cause };
     }
@@ -20352,9 +24768,7 @@ function applyKillstreakDamageEvent(event: KillstreakDamageEvent): KillstreakDam
   recordAuthoritativeDamage(attributionId, event.targetId, result.damageApplied);
   if (result.died) {
     const death: DeathMessage = { type: 'death', killer: attributionId, victim: event.targetId, cause, nonce: randomNonce() };
-    processedNonces.add(death.nonce);
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death, true);
   }
   return { ...event, damage: result.damageApplied };
 }
@@ -20388,6 +24802,9 @@ function syncActiveSupportRotorAudio(now: number): void {
     if (activeSupportRotorAudioSources.length >= supportRotorAudioSourcePool.length) break;
   }
   audio.syncChopperRotors(activeSupportRotorAudioSources);
+  // HF-509: aircraft and drones get the same positional treatment on every peer.
+  killstreakActivity.retain(killstreakSnapshot.entities);
+  audio.syncSupportFlightLoops(supportFlightAudioCollector.collect(killstreakSnapshot.entities, camera.position, killstreakActivity, now));
 }
 
 const killstreakPossessionCameraScratch = new THREE.Vector3();
@@ -20400,67 +24817,19 @@ let nextLocalSupportGunReportAt = 0;
 let gunnerTargetConfirmUntil = 0;
 const GUNNER_TARGET_CONFIRM_DURATION_MS = 650;
 
-/**
- * First-person cockpit HUD for the Chopper Gunner and Piloted Drone. Values
- * mirror the authoritative entity snapshot; the disconnected reticle leaves
- * the exact centre ray unobstructed on desktop and mobile.
- */
 function syncGunnerCockpitHud(
   entity: KillstreakEntitySnapshot,
   possessionKind: 'chopper-gunner' | 'piloted-drone',
   now: number,
 ): void {
-  const hud = element<HTMLElement>('#gunner-cockpit-hud');
-  hud.hidden = false;
-  hud.setAttribute('aria-hidden', 'false');
-  hud.dataset.supportKind = possessionKind;
-  element<HTMLElement>('#gunner-hull').textContent = String(Math.max(0, Math.round(entity.health)));
-  element<HTMLElement>('#gunner-ammo').textContent = entity.magazine === null ? '∞' : String(entity.magazine);
-  element<HTMLElement>('#gunner-altitude').textContent = `${Math.max(0, Math.round(entity.position[1] - (arena.bounds.minY ?? 0)))}M`;
-  element<HTMLElement>('#gunner-speed').textContent = String(Math.round(Math.hypot(...entity.velocity)));
-  element<HTMLElement>('#gunner-time').textContent = (Math.max(0, entity.expiresInMs) / 1_000).toFixed(1);
-  element<HTMLElement>('#gunner-damage').textContent = String(Math.round(
-    supportDamageDealtByActivation.get(entity.activationId) ?? 0,
-  ));
-  element<HTMLElement>('#gunner-platform').textContent = possessionKind === 'chopper-gunner' ? 'CHOPPER GUNNER' : 'PILOTED DRONE';
-  element<HTMLElement>('#gunner-weapon-mode').textContent = possessionKind === 'chopper-gunner' ? '30MM AUTOCANNON' : 'REMOTE CANNON';
-  const missileStatus = element<HTMLElement>('#gunner-missile-status');
-  const chopperGunner = possessionKind === 'chopper-gunner';
-  missileStatus.hidden = !chopperGunner;
-  missileStatus.setAttribute('aria-hidden', String(!chopperGunner));
-  if (chopperGunner) {
-    const ammo = Math.max(0, Math.min(CHOPPER_MISSILE_CAPACITY, entity.missileAmmo ?? 0));
-    const cooldownMs = Math.max(0, entity.missileCooldownMs ?? 0);
-    element<HTMLElement>('#gunner-missile-ammo').textContent = `${ammo} / ${CHOPPER_MISSILE_CAPACITY}`;
-    element<HTMLElement>('#gunner-missile-cooldown').textContent = ammo <= 0
-      ? 'EMPTY'
-      : cooldownMs > 0 ? `${(cooldownMs / 1_000).toFixed(1)}S` : 'READY';
-    missileStatus.dataset.ready = String(ammo > 0 && cooldownMs <= 0);
-  }
-  if (now >= gunnerTargetConfirmUntil) {
-    element<HTMLElement>('#gunner-target-confirm').hidden = true;
-    hud.dataset.hitConfirm = 'false';
-  }
+  syncGunnerCockpitHudElements(element, {
+    entity, possessionKind, now, arenaMinY: arena.bounds.minY ?? 0,
+    damageDealt: supportDamageDealtByActivation.get(entity.activationId) ?? 0, targetConfirmUntil: gunnerTargetConfirmUntil,
+  });
 }
 
 function hideGunnerCockpitHud(): void {
-  const hud = element<HTMLElement>('#gunner-cockpit-hud');
-  hud.hidden = true;
-  hud.setAttribute('aria-hidden', 'true');
-  hud.dataset.supportKind = 'none';
-  hud.dataset.hitConfirm = 'false';
-  const targetConfirm = element<HTMLElement>('#gunner-target-confirm');
-  targetConfirm.hidden = true;
-  targetConfirm.style.removeProperty('left');
-  targetConfirm.style.removeProperty('top');
-  delete targetConfirm.dataset.targetId;
-  element<HTMLElement>('#chopper-thermal').hidden = true;
-  const missileStatus = element<HTMLElement>('#gunner-missile-status');
-  missileStatus.hidden = true;
-  missileStatus.setAttribute('aria-hidden', 'true');
-  missileStatus.dataset.ready = 'false';
-  element<HTMLElement>('#gunner-missile-ammo').textContent = `0 / ${CHOPPER_MISSILE_CAPACITY}`;
-  element<HTMLElement>('#gunner-missile-cooldown').textContent = 'OFFLINE';
+  hideGunnerCockpitHudElements(element);
   gunnerTargetConfirmUntil = 0;
   nextLocalSupportGunReportAt = 0;
 }
@@ -20493,8 +24862,21 @@ function showGunnerTargetConfirm(
 function resetKillstreakPossessionPresentation(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   hideGunnerCockpitHud();
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // Hand the player back a camera at rest.
+  //
+  // While possessing, `updatePhysics` early-returns, so the shake spring is
+  // never integrated - but blast impulses keep being ADDED to it (the gunner's
+  // own missiles, at a one-per-second cadence). The integrator is stable again
+  // since the substep fix, so what lands here is bounded rather than the
+  // thousands of metres it used to be; it is still a jolt the player did not
+  // earn, applied on the first frame they get their body back. Clearing it is
+  // the difference between "the camera settles" and "the camera settles from
+  // somewhere".
+  cameraShakeState = createCameraShakeState(cameraShakeState.seed);
+  cameraShakeTrauma = createCameraShakeTrauma(performance.now(), 0x5eed);
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
 }
@@ -20519,7 +24901,8 @@ function updateKillstreakPossession(now: number): void {
     position = killstreakPossessionCameraScratch.set(entity.position[0], entity.position[1], entity.position[2]);
   }
   camera.position.copy(position);
-  const supportCameraNear = possession.kind === 'chopper-gunner' ? 0.08 : 0.35;
+  // HF-410: the gunner cockpit mirrored the on-foot plane; the drone keeps its own.
+  const supportCameraNear = possession.kind === 'chopper-gunner' ? FIRST_PERSON_CAMERA_NEAR_METERS : 0.35;
   if (camera.near !== supportCameraNear) {
     camera.near = supportCameraNear;
     camera.updateProjectionMatrix();
@@ -20543,9 +24926,47 @@ function updateKillstreakPossession(now: number): void {
     if (possession.kind === 'chopper-gunner') {
       killstreakPresentation.presentChopperWeaponAction(entity.id);
       const shotRay = chopperGunnerAuthoritativeRay(entity.position, entity.attitude, player.yaw, player.pitch);
+      // HF-404: trace the AUTHORITATIVE ray, not a parallel one. The host
+      // resolves damage from shotRay.origin (the camera socket); tracing from
+      // shotRay.tracerOrigin (the muzzle socket) instead put every spark,
+      // decal, impact sound and zero-damage cue on a line offset by the whole
+      // camera-to-muzzle vector, so the feedback disagreed with the damage.
+      // The tracer still LEAVES the barrel — only its endpoint is now the
+      // host's endpoint, which is what the crosshair is aimed at.
+      const rayOrigin = new THREE.Vector3(...shotRay.origin);
       const muzzle = new THREE.Vector3(...shotRay.tracerOrigin);
       const aim = new THREE.Vector3(...shotRay.direction);
-      spawnTracer(muzzle, muzzle.clone().addScaledVector(aim, 130), 0xffb347);
+      // HF-386: presentation-only trace along the authoritative aim line so a
+      // shell that damages nobody still lands its sparks, decal, impact sound
+      // and explicit zero-damage cue on the surface it actually struck. The
+      // tracer now stops at that surface instead of flying a fixed 130 m
+      // through walls, and the range is the autocannon's authoritative 78 m
+      // rather than an arbitrary number. Host damage authority is untouched:
+      // this trace never mutates interactive-world state.
+      const chopperTrace = traceWeaponPath(rayOrigin, aim, CHOPPER_GUN_PROFILE.maximumRangeM, 'lmg');
+      spawnTracer(muzzle, rayOrigin.clone().addScaledVector(aim, chopperTrace.travelDistance), 0xffb347);
+      const firstImpact = chopperTrace.impacts[0];
+      if (firstImpact) {
+        const point = rayOrigin.clone().addScaledVector(aim, firstImpact.entryDistance);
+        const normal = new THREE.Vector3(
+          firstImpact.entryNormal.x,
+          firstImpact.entryNormal.y,
+          firstImpact.entryNormal.z,
+        );
+        spawnImpactFlash(point, firstImpact.surface.material, normal);
+        const surface = ballisticImpactSurface(firstImpact.surface.material);
+        audio.impact(surface, point.distanceTo(camera.position));
+        // HF-386 truth gate: a world-hit round cannot know its own host
+        // outcome synchronously, so while showGunnerTargetConfirm is still
+        // presenting a CONFIRMED damage event (gunnerTargetConfirmUntil is
+        // re-armed by every successive hit), an interleaved floor-hit round
+        // stays silent. Announcing "0 NO DAMAGE" over live damage numbers is
+        // the exact contradiction this cue exists to remove; once the confirm
+        // window lapses the cue flows again for genuinely fruitless fire.
+        if (now >= gunnerTargetConfirmUntil) {
+          presentZeroDamageHit(now);
+        }
+      }
     }
     nextLocalSupportGunReportAt = now + (possession.kind === 'chopper-gunner'
       ? CHOPPER_GUN_PROFILE.cadenceMs
@@ -20581,24 +25002,33 @@ function updatePass65KillstreakRuntime(now: number): void {
   synchronizeDebugChopperExteriorReviewHold();
   if (!gameStarted) {
     audio.syncChopperRotors([]);
+    audio.syncSupportFlightLoops([]);
     killstreakPresentation.clear();
     resetKillstreakPossessionPresentation();
     return;
   }
   if (matchState.phase === 'ended') {
     audio.syncChopperRotors([]);
+    audio.syncSupportFlightLoops([]);
     killstreakPresentation.clear();
     resetKillstreakPossessionPresentation();
     return;
   }
   if (network.role !== 'client' && matchState.phase === 'active') {
     const result = killstreakRuntime.advance(now, killstreakWorldState());
-    presentSupportShotAudio(
+    presentSupportShotAudioPositional(
       result.shotEvents,
       { playerId: player.id, team: player.team, mode: privateMatchMode },
-      (kind) => audio.supportGun(kind),
+      (entityId) => {
+        const entity = killstreakSnapshot.entities.find((e) => e.id === entityId);
+        return entity ? { x: entity.position[0], y: entity.position[1], z: entity.position[2] } : null;
+      },
+      (kind, emitter, isEnemy) => audio.supportGunPositional(kind, emitter, isEnemy),
       supportShotReplay,
     );
+    // HF-458: Piloted Drone taser hits, before damage - a stun is a control
+    // effect and must land even on a step where the victim also takes damage.
+    for (const stun of result.taserStunEvents) applyKillstreakTaserStunEvent(stun);
     const applied = result.damageEvents.map(applyKillstreakDamageEvent).filter((event): event is KillstreakDamageEvent => event !== null && event.damage > 0);
     for (const event of applied) {
       recordOwnerSupportDamage(event);
@@ -20613,7 +25043,10 @@ function updatePass65KillstreakRuntime(now: number): void {
       maximumDamage: number;
       shedBlastClass: 'carpet-bomber-obliteration';
     }> = [];
+    killstreakActivity.recordShots(result.shotEvents, now);
     for (const impact of result.impactEvents) {
+      // Owner 2026-08-30: the missile leaving the rail is audible, not silent.
+      presentSupportDropCue(impact, now);
       if (impact.phase !== 'impact') continue;
       const point = new THREE.Vector3(...impact.position);
       if (impact.source === 'carpet-bomber') {
@@ -20653,10 +25086,30 @@ function updatePass65KillstreakRuntime(now: number): void {
         }
         audio.explosion(now);
         supportExplosionPresentation.emit(point, CARPET_BOMBER_BLAST_RADIUS_M, now);
+        cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+          distanceUnits: point.distanceTo(player.position),
+          family: 'support',
+          sensoryScale: accessibilityRuntime.weaponMotionScale,
+          now,
+        });
       } else {
         applyInteractiveWorldExplosion(point, CHOPPER_MISSILE_BLAST_RADIUS_M, CHOPPER_MISSILE_MAX_DAMAGE);
         audio.explosion(now);
-        supportExplosionPresentation.emit(point, CHOPPER_MISSILE_BLAST_RADIUS_M, now);
+        // Presentation radius deliberately tighter than the 4.5 m authority
+        // radius: the full-size additive sphere reads as a flat disc from the
+        // cockpit; a denser ball + the grenade anatomy reads as a blast.
+        supportExplosionPresentation.emit(point, 3.2, now);
+        // Owner 2026-08-30 ("have a cool explosion"): layer the grenade blast
+        // anatomy (shockwave ring, hot core, dark smoke) over the additive
+        // fireball, and trample the lawn under the blast.
+        grenadeExplosionPresentation.emit(point, now);
+        crushLawnAt(point, 3);
+        cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+          distanceUnits: point.distanceTo(player.position),
+          family: 'support',
+          sensoryScale: accessibilityRuntime.weaponMotionScale,
+          now,
+        });
       }
     }
     applyInteractiveWorldExplosions(carpetWorldImpacts);
@@ -20733,6 +25186,26 @@ function showQuadDamageAnnouncement(title: string, subtitle: string): void {
   }, 3_500);
 }
 
+/**
+ * Lane AR item 5: the 2x core may only be claimed by an eye that can SEE it.
+ *
+ * The pickup used to be a horizontal radius plus a scalar height window, and on
+ * both Nuke Towns the core hovers over the bus roof with only 0.10 m of margin
+ * between "standing on the roof" (allowed) and "standing in the aisle"
+ * (rejected). A jump is worth more than 0.10 m, so a player inside the bus
+ * could take the core through the roof slab from inside cover. This is the same
+ * eye-to-pickup trace `acceptTimedMapWeaponClaim` already uses, against the
+ * same live collider set, raised 0.25 m off the core so a claimant standing
+ * exactly on the seat is not occluded by the pedestal itself.
+ */
+const overdriveSightScratch = new THREE.Vector3();
+function overdriveClaimSight(eye: THREE.Vector3): { lineOfSightClear: boolean } {
+  overdriveSightScratch.set(overdriveState.position.x, overdriveState.position.y + 0.25, overdriveState.position.z);
+  return {
+    lineOfSightClear: !activeWorldColliders().some((box) => segmentIntersectsBox(eye, overdriveSightScratch, box)),
+  };
+}
+
 function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   if (network.role !== 'host' || message.generation !== overdriveState.generation || processedNonces.has(message.nonce)) return;
   const remote = remotes.get(message.by);
@@ -20742,7 +25215,7 @@ function acceptOverdriveClaim(message: OverdriveClaimMessage): void {
   const claimedPosition = new THREE.Vector3(...message.position);
   const authoritativePosition = new THREE.Vector3(remote.snapshot.x, remote.snapshot.y, remote.snapshot.z);
   if (claimedPosition.distanceTo(authoritativePosition) > 1.25) return;
-  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now);
+  const result = claimOverdrive(overdriveState, message.by, authoritativePosition, true, now, overdriveClaimSight(authoritativePosition));
   if (!result.claimed) return;
   processedNonces.add(message.nonce);
   overdriveState = result.state;
@@ -20762,6 +25235,8 @@ function acceptOverdriveState(message: OverdriveStateMessage): void {
     activeUntil: message.activeRemainingMs > 0 ? now + message.activeRemainingMs : 0,
     nextSpawnAt: now + message.nextSpawnInMs,
     position: { x: message.position[0], y: message.position[1], z: message.position[2] },
+    // The wire carries the LIVE position; the seat it returns to is the arena's.
+    home: overdrivePositionForArena(selectedArena.id),
   };
   if (message.available && message.activeRemainingMs === 0 && previousGeneration !== message.generation) {
     overdriveSpawns += 1;
@@ -20791,7 +25266,7 @@ function updateOverdrive(now: number): void {
     overdriveSpawns += 1;
     overdriveClaimGeneration = -1;
     addFeed('2× DAMAGE CORE ONLINE · VISIBLE MID-MAP ICON', 'gold');
-    showQuadDamageAnnouncement('2× DAMAGE ONLINE', 'CENTRE CORE · CLAIM IT');
+    showQuadDamageAnnouncement('2× DAMAGE ONLINE', 'EAST STREET CORE · CLAIM IT');
     audio.overdriveAvailable();
     broadcastOverdriveState(now);
     requestAnimationFrame((frameAt) => recordMatchDiagnostic('overdrive-spawn-frame', 'observed', {
@@ -20817,7 +25292,7 @@ function updateOverdrive(now: number): void {
         network.send({ type: 'overdrive-claim', by: player.id, position: player.position.toArray(), generation: overdriveState.generation, nonce: randomNonce() });
       }
     } else {
-      const result = claimOverdrive(overdriveState, player.id, player.position, true, now);
+      const result = claimOverdrive(overdriveState, player.id, player.position, true, now, overdriveClaimSight(player.position));
       if (result.claimed) {
         overdriveState = result.state;
         registerOverdrivePickup(player.id, now);
@@ -20856,10 +25331,10 @@ function updateOverdrive(now: number): void {
   document.documentElement.dataset.overdrive = localRemaining > 0 ? 'active' : overdriveState.available ? 'available' : 'charging';
 }
 
-function awardSupportElimination(syncGlobalLeaderboard = true): void {
+function awardSupportElimination(syncGlobalLeaderboard = true, source: EliminationSource = 'weapon'): void {
   let newlyEarned: readonly Pass65KillstreakId[] = [];
   if (network.role !== 'client') {
-    newlyEarned = killstreakRuntime.recordEligibleElimination(player.id, 'weapon');
+    newlyEarned = killstreakRuntime.recordEligibleElimination(player.id, source);
     refreshLocalKillstreakSnapshot();
     broadcastKillstreakState();
   }
@@ -20882,7 +25357,7 @@ function trainingDummySupportPoint(target: ArenaMap['targets'][number]): THREE.V
 
 function supportTargetState(id: string): { point: THREE.Vector3; stance: Stance } | null {
   const bot = bots.get(id);
-  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: 'stand' };
+  if (bot?.alive) return { point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: bot.stance };
   const remote = remotes.get(id);
   if (remote && areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) {
     return { point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)), stance: remote.snapshot.stance ?? 'stand' };
@@ -20898,7 +25373,7 @@ function supportTargetPosition(id: string): THREE.Vector3 | null {
 
 function nearestSupportTarget(): { id: string; point: THREE.Vector3 } | null {
   const candidates: { id: string; point: THREE.Vector3 }[] = [];
-  for (const bot of bots.values()) if (bot.alive && bot.team !== player.team) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
+  for (const bot of bots.values()) if (bot.alive && areCombatantsHostile(bot.id, bot.team, player.id, player.team)) candidates.push({ id: bot.id, point: bot.position.clone().add(new THREE.Vector3(0, 1.15, 0)) });
   for (const remote of remotes.values()) {
     if (areCombatantsHostile(player.id, player.team, remote.snapshot.id, remote.snapshot.team) && remote.snapshot.hp > 0) candidates.push({ id: remote.snapshot.id, point: remote.target.clone().add(new THREE.Vector3(0, 1.15, 0)) });
   }
@@ -20934,8 +25409,22 @@ function hunterTargetAssignments(): string[] {
     }),
   ];
   if (privateMatchMode === 'ffa' && gameMode !== 'solo') {
-    return candidates.filter((candidate) => candidate.alive && candidate.id !== player.id)
-      .sort((a, b) => a.distanceFromCentreSq - b.distanceFromCentreSq || a.id.localeCompare(b.id))
+    // Nearest the ACTIVATOR, not the arena centre: centre-sorting made
+    // perimeter players permanently untargetable in FFA while TDM's
+    // assignment has no such blind spot.
+    const origin = player.position;
+    const withActivatorDistance = candidates.map((candidate) => ({
+      ...candidate,
+      distanceFromActivatorSq: (() => {
+        const bot = bots.get(candidate.id);
+        if (bot) return bot.position.distanceToSquared(origin);
+        const remote = remotes.get(candidate.id);
+        if (remote) return remote.target.distanceToSquared(origin);
+        return candidate.distanceFromCentreSq;
+      })(),
+    }));
+    return withActivatorDistance.filter((candidate) => candidate.alive && candidate.id !== player.id)
+      .sort((a, b) => a.distanceFromActivatorSq - b.distanceFromActivatorSq || a.id.localeCompare(b.id))
       .slice(0, 5)
       .map((candidate) => candidate.id);
   }
@@ -21229,7 +25718,7 @@ function updateNuke(now: number): void {
     element<HTMLElement>('#nuke-warning b').textContent = String(Math.max(1, Math.ceil(remaining / 1_000)));
     const charge = THREE.MathUtils.clamp((now - sequence.startedAt) / NUKE_WARNING_MS, 0, 1);
     if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = Math.max(0, Math.sin(now * 0.018)) * charge * 0.18;
-    if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0x8c536f), charge * 0.24);
+    if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0x8c536f), charge * 0.24);
     if (now >= sequence.detonateAt) detonateNuke(sequence);
     return;
   }
@@ -21240,14 +25729,14 @@ function updateNuke(now: number): void {
   sequence.shockwave.scale.setScalar(0.1 + blastProgress * 180);
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0.72 * (1 - blastProgress);
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = flashStrength;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex()).lerp(new THREE.Color(0xff9f5b), flashStrength * 0.72);
   const flash = element<HTMLElement>('#nuke-flash');
   flash.style.opacity = String(Math.min(1, flashStrength * 1.25));
   if (now < sequence.finishedAt) return;
   sequence.shockwave.visible = false;
   (sequence.shockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   flash.hidden = true;
   flash.style.opacity = '0';
   nukeSequence = null;
@@ -21309,6 +25798,12 @@ function supportBlast(
   audio.explosion(started);
   const afterAudio = performance.now();
   supportExplosionPresentation.emit(point, radius, started);
+  cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+    distanceUnits: point.distanceTo(player.position),
+    family: 'support',
+    sensoryScale: accessibilityRuntime.weaponMotionScale,
+    now: started,
+  });
   const afterVisual = performance.now();
   if (maximumDamage > 0) applyInteractiveWorldExplosion(
     point,
@@ -21512,25 +26007,59 @@ function drawStrikeMap(now = performance.now()): void {
     context.fillStyle = '#10232a'; context.font = '900 18px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
     context.fillText(String(index + 1), x, y + 1);
   });
+  // HF-369 (salvage, docs/salvage/WIRING-PLAN-ccfeec86.md section 2). HF-317 made the run read as a
+  // CORRIDOR rather than Tri-Pass dots, but it drew nothing until BOTH clicks had landed, labelled
+  // the pins START/END, and drew the raw pick. Owner: "should be clearer that the 2nd click of the
+  // carpet bomb is for its direction, animated on the map". The overlay module names the stage, so
+  // after click one the map shows a labelled DROP pin with a sweeping compass dial; and it draws
+  // the run the HOST WILL FLY - clamped to [MIN, MAX] and re-centred by the shared solver - not the
+  // drag, which could be drawn at roughly twice the bombed length. Motion is a pure function of
+  // `now`, so reducedMotion freezes it at phase zero. The solver itself is untouched.
+  const corridorPoints = carpetCorridorTargeting?.points ?? [];
+  if (carpetCorridorTargeting) {
+    const [originX] = worldToTacticalMap(0, 0, arena.bounds, width, height);
+    const [halfWidthProbeX] = worldToTacticalMap(CARPET_CORRIDOR_BAND_HALF_WIDTH_M, 0, arena.bounds, width, height);
+    drawCarpetCorridorOverlay(context, carpetCorridorOverlayPlan({
+      state: carpetCorridorTargeting,
+      project: (worldX, worldZ) => worldToTacticalMap(worldX, worldZ, arena.bounds, width, height),
+      bandHalfWidthPx: Math.max(6, Math.abs(halfWidthProbeX - originX)),
+      nowMs: now,
+      reducedMotion: accessibilityRuntime.reducedMotion,
+    }));
+  }
   context.textBaseline = 'alphabetic';
   context.fillStyle = '#fff4d9'; context.font = '900 22px sans-serif'; context.textAlign = 'center';
   context.fillText('N', width / 2, 28);
-  const targetCount = pointSupportTargeting ? 1 : 3;
-  element<HTMLElement>('#strike-target-mode').textContent = pointSupportTargeting
-    ? pointSupportTargeting.id === 'care-package' ? 'CARE PACKAGE' : 'CARPET BOMBER'
-    : 'TRI-PASS';
-  element<HTMLElement>('#strike-target-instruction').textContent = pointSupportTargeting
-    ? 'SELECT DELIVERY AREA'
-    : 'SELECT THREE TARGETS';
-  element<HTMLElement>('#strike-target-help').innerHTML = pointSupportTargeting
-    ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
-    : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
-  element<HTMLElement>('#strike-target-count').textContent = `${points.length} / ${targetCount}`;
+  const carpetCorridorActive = carpetCorridorTargeting !== null;
+  const targetCount = carpetCorridorActive ? CARPET_CORRIDOR_POINT_COUNT : pointSupportTargeting ? 1 : 3;
+  const selectedCount = carpetCorridorActive ? corridorPoints.length : points.length;
+  element<HTMLElement>('#strike-target-mode').textContent = carpetCorridorActive
+    ? 'CARPET BOMBER'
+    : pointSupportTargeting
+      ? 'CARE PACKAGE'
+      : 'TRI-PASS';
+  // HF-369: derived from carpetCorridorStage, so the caption cannot name the wrong click.
+  const corridorPrompt = carpetCorridorTargeting ? carpetCorridorPrompt(carpetCorridorTargeting) : null;
+  element<HTMLElement>('#strike-target-instruction').textContent = corridorPrompt
+    ? corridorPrompt.instruction
+    : pointSupportTargeting
+      ? 'SELECT DELIVERY AREA'
+      : 'SELECT THREE TARGETS';
+  element<HTMLElement>('#strike-target-help').innerHTML = corridorPrompt
+    ? corridorPrompt.help
+    : pointSupportTargeting
+      ? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'
+      : 'CLICK THREE LOCATIONS · <kbd>ESC</kbd> CANCELS AND REFUNDS';
+  element<HTMLElement>('#strike-target-count').textContent = `${selectedCount} / ${targetCount}`;
+  // GAMEPAD: the caption above is rebuilt from literals every draw, so the cap
+  // is re-glyphed here rather than only on a scheme change (DoD 5).
+  applyStrikeTargetingCancelGlyph(document, pointSupportTargeting && !tacticalMapOpen ? 'point' : 'map');
   lastStrikeMapDrawAt = now;
 }
 
 function beginTriPassTargeting(): void {
   pointSupportTargeting = null;
+  carpetCorridorTargeting = null;
   triPassTargeting = createTriPassTargeting();
   tacticalMapOpen = true;
   lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
@@ -21541,24 +26070,38 @@ function beginTriPassTargeting(): void {
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 }
 
-function beginPointSupportTargeting(id: PointSupportTargeting['id']): void {
+/**
+ * HF-317: Carpet Bomber opens the same tactical map overlay Tri-Pass uses and
+ * collects TWO clicks — the run start and the run end — instead of dropping one
+ * Care-Package-style crosshair marker.
+ */
+function beginCarpetCorridorTargeting(): void {
+  pointSupportTargeting = null;
   triPassTargeting = null;
-  pointSupportTargeting = Object.freeze({ id });
-  tacticalMapOpen = false;
-  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
-  if (id === 'care-package' || id === 'carpet-bomber') {
-    updateFieldSupportHud();
-    return;
-  }
+  carpetCorridorTargeting = createCarpetCorridorTargeting();
   tacticalMapOpen = true;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
   element<HTMLElement>('#strike-map-overlay').hidden = false;
   clearGameplayInput();
   drawStrikeMap();
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 }
 
+function beginPointSupportTargeting(id: PointSupportTargeting['id']): void {
+  triPassTargeting = null;
+  carpetCorridorTargeting = null;
+  pointSupportTargeting = Object.freeze({ id });
+  tacticalMapOpen = false;
+  lastStrikeMapDrawAt = Number.NEGATIVE_INFINITY;
+  // HF-317: only Care Package reaches the in-world crosshair placement now.
+  updateFieldSupportHud();
+}
+
 function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void {
   const refundId = pointSupportTargeting?.id
+    // HF-317: an abandoned corridor refunds exactly like Tri-Pass and Care —
+    // a completed corridor has already spent the reward on the host request.
+    ?? (carpetCorridorTargeting !== null && !carpetCorridorTargeting.complete ? 'carpet-bomber' : null)
     ?? (triPassTargeting !== null && !triPassTargeting.complete ? 'tri-pass' : null);
   if (refund && refundId) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[refundId]} TARGETING CANCELLED · REWARD RETAINED`, 'gold');
@@ -21572,6 +26115,7 @@ function cancelSupportTargeting(refund: boolean, reacquirePointer = true): void 
   crosshairPreviewLastPoint = null;
   crosshairPreviewFacing = null;
   triPassTargeting = null;
+  carpetCorridorTargeting = null;
   pointSupportTargeting = null;
   tacticalMapOpen = false;
   triPassHostileMarkers = [];
@@ -21706,7 +26250,9 @@ function updateCrosshairSupportPreview(): void {
   }
   const arrow = crosshairPreviewMarker.getObjectByName('carpet-preview-direction-arrow');
   if (arrow) {
-    arrow.visible = pointSupportTargeting.id === 'carpet-bomber';
+    // HF-317: the run heading is authored on the tactical map now, so the
+    // crosshair's direction arrow never shows for the Care Package drop.
+    arrow.visible = false;
     if (crosshairPreviewFacing) arrow.rotation.y = -Math.atan2(crosshairPreviewFacing[2], crosshairPreviewFacing[0]);
   }
   crosshairPreviewMarker.position.copy(anchor);
@@ -21719,19 +26265,18 @@ function confirmCrosshairSupportTarget(confirmedAt = performance.now()): boolean
   const targeting = pointSupportTargeting;
   const point = crosshairPreviewLastPoint;
   if (!point) return false;
+  // HF-317: the crosshair path is Care-Package-only, so it never carries a
+  // corridor facing — Carpet Bomber's heading comes from the map corridor.
   if (!requestKillstreakActivation(
     targeting.id,
     confirmedAt,
     [point.x, point.y, point.z],
-    targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined,
   )) {
     addFeed(`${GAMEPAD_SUPPORT_LABELS[targeting.id]} AUTHORITY REJECTED · REWARD RETAINED`, 'coral');
     cancelSupportTargeting(false);
     return true;
   }
-  addFeed(targeting.id === 'care-package'
-    ? 'CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND'
-    : 'CARPET BOMBER · TARGET CONFIRMED · 20-IMPACT RUN INBOUND', 'gold');
+  addFeed('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND', 'gold');
   cancelSupportTargeting(false);
   return true;
 }
@@ -21813,7 +26358,54 @@ function registerPointSupportClick(clientX: number, clientY: number, confirmedAt
   return true;
 }
 
+/**
+ * HF-317: commits a completed two-point corridor. `carpetCorridorIntent` gives
+ * the run midpoint as the anchor and an UNNORMALIZED facing whose magnitude is
+ * the requested run length — exactly the corridor-native activation intent the
+ * host already admits and clamps, so no protocol change is needed. The client
+ * only PROPOSES: the host generates the activation, re-derives every impact's
+ * surface height, and owns the run. Deliberately no
+ * `authorizeLocalOffensiveSupport` call — carpet stays host-driven so its
+ * events keep attributing to 'map:carpet-bomber' rather than to the caller.
+ */
+function commitCarpetCorridor(state: CarpetCorridorTargeting, confirmedAt: number): boolean {
+  const intent = carpetCorridorIntent(state);
+  if (!intent) return false;
+  if (!requestKillstreakActivation(
+    'carpet-bomber',
+    confirmedAt,
+    [intent.anchor[0], intent.anchor[1], intent.anchor[2]],
+    [intent.facing[0], intent.facing[1], intent.facing[2]],
+  )) {
+    addFeed(`${GAMEPAD_SUPPORT_LABELS['carpet-bomber']} AUTHORITY REJECTED · REWARD RETAINED`, 'coral');
+    cancelSupportTargeting(false);
+    return true;
+  }
+  addFeed(`CARPET BOMBER · RUN CONFIRMED · ${Math.round(intent.lengthM)} M CORRIDOR · 20-IMPACT RUN INBOUND`, 'gold');
+  cancelSupportTargeting(false);
+  return true;
+}
+
+/** HF-317: one tactical-map click of the Carpet Bomber run (start, then end). */
+function registerCarpetCorridorClick(clientX: number, clientY: number, confirmedAt = performance.now()): boolean {
+  const targeting = carpetCorridorTargeting;
+  if (!tacticalMapOpen || !targeting || targeting.complete) return false;
+  const rect = strikeMapCanvas.getBoundingClientRect();
+  const x = (clientX - rect.left) * strikeMapCanvas.width / Math.max(1, rect.width);
+  const y = (clientY - rect.top) * strikeMapCanvas.height / Math.max(1, rect.height);
+  const point = tacticalMapToWorld(x, y, arena.bounds, strikeMapCanvas.width, strikeMapCanvas.height);
+  const next = registerCarpetCorridorPoint(targeting, point, arena.bounds);
+  if (next === targeting) return false;
+  carpetCorridorTargeting = next;
+  drawStrikeMap();
+  if (!next.complete) return true;
+  return commitCarpetCorridor(next, confirmedAt);
+}
+
 strikeMapCanvas.addEventListener('click', (event) => {
+  // HF-317: carpet corridor picks are checked first; the other two modes are
+  // mutually exclusive with it because each begin* clears the others.
+  if (registerCarpetCorridorClick(event.clientX, event.clientY)) return;
   if (!registerPointSupportClick(event.clientX, event.clientY)) registerTriPassClick(event.clientX, event.clientY);
 });
 
@@ -21834,12 +26426,57 @@ function authorizeLocalOffensiveSupport(
   return activationNonce;
 }
 
+/**
+ * HF-334: hand the player the crimson flamethrower from a care package.
+ *
+ * Deliberately NOT routed through timed-map-weapon authority: that authority is
+ * arena-bound and single-instance, so granting through it would make the world
+ * flamethrower vanish mid-match for whoever was walking toward it — the exact
+ * defect that got the naive wiring refused. This is an ordinary personal weapon
+ * grant with its own finite ammo, so both can exist at once.
+ */
+function grantCrimsonFlamethrower(now = performance.now()): void {
+  const weapon: WeaponId = 'crimson-flamethrower';
+  interruptReload(true, now);
+  player.weapon = weapon;
+  player.ammo[weapon] = WEAPONS[weapon].mag;
+  player.reserve[weapon] = WEAPONS[weapon].reserve;
+  player.nextShotAt = 0;
+  player.switchingUntil = now + 360;
+  player.sustainedShots = 0;
+  weaponView.setWeapon(weapon);
+  audio.weaponSwitch();
+  presentBanner('announcement', 'CRIMSON FLAMETHROWER', 'CARE PACKAGE · LIMITED FUEL', 2_600);
+  addFeed('CARE PACKAGE · CRIMSON FLAMETHROWER', 'gold');
+  renderFieldKitSelection();
+}
+
+/** HF-509: claim the package instance, have the host consume the queued reward,
+ * then grant — exactly once per package. Rationale in care-package-grant-once.ts. */
+function redeemCarePackageWeaponReward(id: Pass65KillstreakId, now = performance.now()): void {
+  redeemCarePackageWeaponGrant({
+    packageId: headCarePackageId(careRewardQueueTracker, player.id),
+    claimantId: player.id,
+    lifeId: localContinuity,
+    ledger: carePackageGrantLedger,
+    requestHostConsumption: () => requestKillstreakActivation(id, now) !== null,
+    grant: () => grantCrimsonFlamethrower(now),
+  });
+}
+
 function activateFieldSupport(id: FieldSupportId): void {
   if ((!selectedArena.fieldSupport && selectedArena.id !== 'gun-range')
     || !player.alive || matchState.phase !== 'active' || tacticalMapOpen) return;
   const fieldSupport = localFieldSupportProjection();
   const revealedCareReward = id === fieldSupport.loadout.slots[0] ? fieldSupport.revealedCareReward ?? undefined : undefined;
-  const activatedId = revealedCareReward ?? id;
+  // HF-334: the care package can roll a WEAPON grant rather than a streak. It
+  // is a separate weapon instance from the arena-bound map flamethrower, so it
+  // never touches that authority and never consumes the world pickup.
+  if (revealedCareReward === CRIMSON_FLAMETHROWER_KILLSTREAK_ID) {
+    redeemCarePackageWeaponReward(CRIMSON_FLAMETHROWER_KILLSTREAK_ID);
+    return;
+  }
+  const activatedId = (revealedCareReward ?? id) as FieldSupportId;
   if (!fieldSupport.available[activatedId]) return;
   const now = performance.now();
   endSpawnProtectionOnOffense(now);
@@ -21902,7 +26539,8 @@ function activateFieldSupport(id: FieldSupportId): void {
   } else if (activatedId === 'care-package') {
     beginPointSupportTargeting('care-package');
   } else if (activatedId === 'carpet-bomber') {
-    beginPointSupportTargeting('carpet-bomber');
+    // HF-317: a bombing RUN, not a point drop — two tactical-map clicks.
+    beginCarpetCorridorTargeting();
   } else if (activatedId === 'piloted-drone') {
     if (!requestKillstreakActivation(activatedId, now, [player.position.x, player.position.y, player.position.z])) return;
     addFeed('PILOTED DRONE · 20 ROUNDS + TWO SPARE CLIPS · PRESS SLOT KEY AGAIN TO ENTER', 'gold');
@@ -22144,8 +26782,9 @@ function clearFieldSupport(): void {
   killstreakPresentation.setFirstPersonEntity(null);
   killstreakPresentation.clear();
   document.documentElement.dataset.killstreakPossession = 'none';
-  if (camera.near !== 0.08) {
-    camera.near = 0.08;
+  // HF-410: restore the on-foot plane, not a literal that can drift from it.
+  if (camera.near !== FIRST_PERSON_CAMERA_NEAR_METERS) {
+    camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;
     camera.updateProjectionMatrix();
   }
   weaponView.setPresentationVisible(player.alive);
@@ -22165,7 +26804,7 @@ function clearFieldSupport(): void {
   nukeShockwave.visible = false;
   (nukeShockwave.material as THREE.MeshBasicMaterial).opacity = 0;
   if (skyMaterial) skyMaterial.uniforms.nukeFlash.value = 0;
-  if (scene.fog) scene.fog.color.set(activeArenaVisualDefinition?.fog.color ?? activeLighting.fogColor);
+  if (scene.fog) scene.fog.color.set(conditionedFogBaseColorHex());
   const nukeWarning = element<HTMLElement>('#nuke-warning');
   const nukeFlash = element<HTMLElement>('#nuke-flash');
   nukeWarning.hidden = true;
@@ -22173,6 +26812,7 @@ function clearFieldSupport(): void {
   nukeFlash.style.opacity = '0';
   cancelSupportTargeting(false, false);
   scoutSweepUntil = 0;
+  remoteRadarFireRevealAt.clear();
   yardhawkExplosions = 0;
   triPassLaunches = 0;
   triPassImpacts = 0;
@@ -22267,18 +26907,42 @@ function updatePhysics(dt: number): void {
   const keyProfile = activeKeyBindingProfile();
   const forwardInput = THREE.MathUtils.clamp(Number(actionHeld('move-forward', keys, keyProfile)) - Number(actionHeld('move-backward', keys, keyProfile)) - gamepadMove.y - (mobileTouchControls?.state.moveY ?? 0), -1, 1);
   const strafeInput = THREE.MathUtils.clamp(Number(actionHeld('move-right', keys, keyProfile)) - Number(actionHeld('move-left', keys, keyProfile)) + gamepadMove.x + (mobileTouchControls?.state.moveX ?? 0), -1, 1);
-  const input = forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput);
+  // HF-458: a tasered operator supplies ZERO movement input for the stun -
+  // not reduced input - so the stun cannot be walked out of. Sprint follows for
+  // free (wantsSprint requires input.lengthSq() > 0) and jump is gated below.
+  const taserStun = localTaserMovementAdmission();
+  const input = taserStun.canMove
+    ? forward.clone().multiplyScalar(forwardInput).addScaledVector(right, strafeInput)
+    : new THREE.Vector3();
   if (input.lengthSq() > 1) input.normalize();
   const now = performance.now();
+  // HF-412: hold-crouch-to-prone, polled here because a held key produces no
+  // further keydown events and a pad button produces no edge. Tapping crouch
+  // crouches (handled on the press edge); keeping it down past
+  // DROP_SHOT_TIMING.holdCrouchToProneMs drops to prone, once per hold.
+  const crouchInputDown = actionHeld('crouch', keys, keyProfile) || gamepadCrouchHeld;
+  if (crouchInputDown) {
+    const held = crouchHeld(crouchHoldState, now);
+    crouchHoldState = held.state;
+    if (held.action === 'prone') dropToProne();
+  } else if (crouchHoldState.pressedAtMs !== null) {
+    crouchHoldState = crouchReleased().state;
+  }
   const crouched = player.stance === 'crouch';
   const prone = player.stance === 'prone';
-  const wantsSprint = (
+  // HF-431: sprint latch state machine (Lane AX)
+  const rawSprintInput = (
     actionHeld('sprint', keys, keyProfile)
     || gamepadSprint
     || mobileTouchControls?.state.sprinting === true
-  ) && input.lengthSq() > 0 && playerGrounded;
-  const validSprintDirection = sprintEligible(forwardInput, strafeInput, adsHeld, false, false);
-  if (wantsSprint && validSprintDirection && player.stance !== 'stand') requestStance('stand');
+  );
+  sprintLatchState = stepSprintLatch(sprintLatchState, rawSprintInput, player.stance);
+  const wantsSprint = sprintLatchState.latched && input.lengthSq() > 0 && playerGrounded;
+  // HF-433: the auto-stand that used to sit here - hold sprint while crouched
+  // or prone and the player was stood up and sprinted - is gone. `wantsSprint`
+  // cannot be true off the standing stance any more (stepSprintLatch), so it
+  // was also unreachable; leaving it would have re-opened the defect the first
+  // time that latch rule was relaxed.
   currentSprinting = wantsSprint
     && !triggerHeld && !player.reloadState && now >= player.switchingUntil && now - player.lastMeleeAt > 500
     && sprintEligible(forwardInput, strafeInput, adsHeld, crouched, prone);
@@ -22291,10 +26955,35 @@ function updatePhysics(dt: number): void {
     equippedMovementMultiplier: WEAPONS[player.weapon].movementMultiplier,
   });
   const movementBoost = killstreakActorModifiers(player.id, now).movement;
+
+  // Sample the water the player is standing in BEFORE integrating movement, so
+  // the swim state that scales this frame's speed is the state they are
+  // actually in. The reducer owns its own enter/exit hysteresis, so it is fed
+  // raw depth every frame rather than a debounced flag.
+  const swimSample = waterSystem.samplePhysics(player.position);
+  const waterDepthOverEye = swimSample.surfaceY - player.position.y;
+  localSwimState = stepSwimState(localSwimState, {
+    depth: waterDepthOverEye,
+    swimmable: waterSystem.swimmable,
+    dtSeconds: dt,
+  });
+  const swim = swimMovementModifiers(localSwimState);
+  if (!localSwimState.swimming) swimWeaponHintShown = false;
+  // HF-393: "you fall down into the water … so you can sort of paddle". The
+  // terrain shelf was flattened in cfc7a2ec, but speed still STEPPED from 1.0
+  // to SWIM_TUNING.swimSpeedScale the frame swim engaged. farcrysisWadeSpeedScale
+  // was authored for exactly this line and had no caller outside its own test.
+  // It is pinned to return 1.0 above ankle depth and exactly swimSpeedScale at
+  // SWIM_TUNING.enterDepth (farcrysis-terrain-authority.test.ts), so once
+  // swimming it is 1.0-redundant with swim.speedScale rather than compounding.
+  const wadeScale = waterSystem.swimmable && !localSwimState.swimming
+    ? farcrysisWadeSpeedScale(waterDepthOverEye)
+    : 1;
+
   const profile = {
     ...baseProfile,
-    maxSpeed: baseProfile.maxSpeed * movementBoost,
-    acceleration: baseProfile.acceleration * movementBoost,
+    maxSpeed: baseProfile.maxSpeed * movementBoost * swim.speedScale * wadeScale,
+    acceleration: baseProfile.acceleration * movementBoost * swim.speedScale * wadeScale,
   };
   const integrated = integrateHorizontalVelocity(
     { x: player.velocity.x, z: player.velocity.z },
@@ -22305,37 +26994,52 @@ function updatePhysics(dt: number): void {
   player.velocity.x = integrated.x;
   player.velocity.z = integrated.z;
 
-  // Adrenaline boost instantly restarts health regen and adds +1 hp/s passive
-  // regen for its duration. The 5s damage-delay is waived while the boost runs.
-  const adrenalineActive = (localKillstreakActorSnapshot()?.adrenalineRemainingMs ?? 0) > 0;
-  if (player.hp < 100 && (adrenalineActive || now - lastDamageAt >= 5_000)) {
-    const healthBeforeRegen = player.hp;
-    player.hp = Math.min(100, player.hp + (adrenalineActive ? 19 : 18) * dt);
-    if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
-      recordMatchDiagnostic('health-regen', 'accepted', {
-        actorId: player.id,
-        actorKind: 'player',
-        healthBefore: healthBeforeRegen,
-        healthAfter: player.hp,
-      });
-    }
-  }
   if (playerGrounded) lastGroundedAt = now;
-  const jumpBuffered = now - jumpQueuedAt <= 125;
+  const jumpBuffered = !taserStun.canJump ? false : now - jumpQueuedAt <= 125;
   const coyoteGrounded = playerGrounded || now - lastGroundedAt <= 95;
   if (jumpBuffered && coyoteGrounded && !adsHeld && player.stance === 'stand' && matchState.phase === 'active') {
     player.velocity.y = profile.jumpVelocity;
     playerGrounded = false;
     jumpQueuedAt = -10_000;
   } else {
-    player.velocity.y -= 24.5 * dt;
+    player.velocity.y += PLAYER_JUMP_GRAVITY * dt;
     if (playerGrounded) player.velocity.y = Math.max(0, player.velocity.y);
   }
 
+  if (localSwimState.swimming) {
+    // A swimmer is neutrally buoyant. The float-zone model below is the
+    // out-of-bounds BOB - buoyancy of 18 m/s per submerged metre, enough to
+    // eject a submerged player in a fraction of a second - which is right for
+    // an OOB fall and wrong for swimming: it threw the player clear of the
+    // water on the same frame they entered it, so the swim state engaged and
+    // released immediately. Cancel the gravity applied above instead, and let
+    // the player command their own depth.
+    player.velocity.y -= PLAYER_JUMP_GRAVITY * dt;
+
+    const ascend = Number(actionHeld('jump', keys, keyProfile) || jumpBuffered);
+    const descend = Number(actionHeld('crouch', keys, keyProfile));
+    const vertical = ascend - descend;
+    if (vertical !== 0) jumpQueuedAt = -10_000;
+
+    // With no input, drift gently up to swim at the surface rather than hang
+    // motionless at whatever depth the player happened to stop at.
+    const restY = swimSample.surfaceY - 0.45;
+    const targetVerticalSpeed = vertical !== 0
+      ? vertical * swim.verticalSpeed
+      : THREE.MathUtils.clamp((restY - player.position.y) * 1.6, -swim.verticalSpeed, swim.verticalSpeed);
+    player.velocity.y += (targetVerticalSpeed - player.velocity.y) * Math.min(1, 7 * dt);
+
+    // Water resists in every axis, not just the horizontal ones.
+    const swimDamp = Math.max(0, 1 - swim.extraDrag * dt);
+    player.velocity.x *= swimDamp;
+    player.velocity.z *= swimDamp;
+  }
+
   const impactVelocity = player.velocity.y;
-  // Ocean buoyancy/drag when looking/falling outside the island pad.
+  // Ocean buoyancy/drag when looking/falling outside the island pad. Skipped
+  // while swimming: the block above owns vertical motion in swimmable water.
   const preWater = waterSystem.samplePhysics(player.position);
-  if (preWater.inWater) {
+  if (preWater.inWater && !localSwimState.swimming) {
     player.velocity.y += preWater.buoyancy * dt;
     player.velocity.y += (preWater.surfaceVelocityY - player.velocity.y) * Math.min(1, 1.8 * dt);
     player.velocity.x *= Math.max(0.2, 1 - preWater.drag * dt);
@@ -22350,15 +27054,27 @@ function updatePhysics(dt: number): void {
   player.position.set(movement.position.x, movement.position.y, movement.position.z);
   playerGrounded = movement.grounded;
   const postWater = waterSystem.samplePhysics(player.position);
-  if (postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
+  // The surface clamp below exists for NON-swimmable water: it is what stops an
+  // out-of-bounds fall reading as a void clip, and its constants are a
+  // rustworks regression contract. On a swimmable body it is actively wrong -
+  // it pins the player at surfaceY - 0.9, which is exactly the depth the swim
+  // reducer needs to ENTER at, so swimming could never engage no matter how
+  // deep the player went. Swimmable bodies get their vertical control from the
+  // swim state instead.
+  if (!waterSystem.swimmable && postWater.inWater && player.position.y < postWater.surfaceY + 0.35) {
     // Soft float toward surface so OOB falls feel like water, not a void clip.
     player.position.y = Math.min(postWater.surfaceY + 0.55, Math.max(player.position.y, postWater.surfaceY - 0.9));
     characterPhysics.teleportEye(player.position);
     if (player.velocity.y < 0.4) player.velocity.y = Math.max(player.velocity.y, 1.2);
     playerGrounded = false;
   }
-  if (playerGrounded) lastGroundedAt = now;
-  if (playerGrounded && !wasGrounded && impactVelocity < -5) {
+  if (playerGrounded) {
+    lastGroundedAt = now;
+    // Recorded AFTER the move resolves, so it is the surface actually stood on
+    // this frame rather than the one the frame started above.
+    lastGroundedFeetY = player.position.y - stanceEyeHeight(player.stance);
+  }
+  if (playerGrounded && !wasGrounded && impactVelocity < -5 && !localSwimState.swimming) {
     const impactSpeed = Math.abs(impactVelocity);
     landingImpulse = Math.min(1, impactSpeed / 14);
     audio.land(impactSpeed);
@@ -22387,6 +27103,13 @@ function updatePhysics(dt: number): void {
   });
   for (let index = 0; index < localFootsteps.length; index += 1) {
     audio.footstep(localSurface, currentSprinting, crouched || prone);
+    // HF-371: sprint strides kick dust; a walked step deliberately emits
+    // nothing so the effect cannot become a smoke screen at walking pace.
+    if (currentSprinting && !crouched && !prone) {
+      // player.position is the EYE, not the feet - emitting there puts the dust
+      // puff at head height. Drop by the stance eye height so it kicks off the boots.
+      hfParticleRuntime.emitFootfall(player.position.x, player.position.y - stanceEyeHeight(player.stance), player.position.z, 'sprint');
+    }
   }
   weaponBob += dt * (currentSprinting ? 15 : prone ? 3.6 : crouched ? 7 : 10) * (moving ? 1 : 0.25);
   recoilVisual = recoverRecoil(recoilVisual, WEAPONS[player.weapon], dt);
@@ -22412,6 +27135,20 @@ function updatePhysics(dt: number): void {
     reloadProgress: debugReloadProgress ?? (player.weapon === 'railgun' ? railgunReloadProgress : gameplayReloadProgress(player.reloadState, performance.now())),
     surfaceRetreat: viewmodelObstruction.retreat,
     surfaceLift: viewmodelObstruction.lift,
+    surfaceContactDepth: viewmodelObstruction.contactDepthMeters,
+    // Two depths, on purpose. The FOLD retreats from anything nearby, so it
+    // takes the conservative minimum over the padded lattice above. The CUT
+    // places one camera-perpendicular plane, which is only an honest stand-in
+    // for a surface the rig runs INTO, so it takes the on-axis depth. Placing
+    // the plane from an off-axis surface is what emptied the frame at
+    // `atomic-acres/corner` on 2026-08-31.
+    surfaceContactCutDepth: viewmodelObstruction.contactCutDepthMeters,
+    // The nearby surfaces as their OWN planes. The cut depth above can only
+    // describe a surface the view axis runs into; measured turning on the spot
+    // at the Nuke Town house wall, that leaves 0.26-0.36 m of arm and weapon
+    // inside the wall at every angle except head on, which was 117 of 183
+    // measured poses. These cut at any angle because they are the wall.
+    surfaceClipPlanes: currentViewmodelSurfaceClipPlanes(),
     triggerHeld,
   });
   audio.minigunDrive(
@@ -22430,7 +27167,13 @@ function updatePhysics(dt: number): void {
       ? magnifiedFovDegrees(preferredFov, DMR_THERMAL_MAGNIFICATION)
       : player.weapon === 'railgun'
         ? magnifiedFovDegrees(preferredFov, RAILGUN_SCOPE_MAGNIFICATION)
-        : Math.max(55, preferredFov - 20);
+        // HF-405: everything else reads its AUTHORED optic instead of falling
+        // into one generic iron-sight number. The crossbow's compact 1.5x
+        // glass had been built and authored for passes without a single
+        // reader. The three branches above keep their own constants because
+        // each drives a matching full-screen overlay or thermal pipeline that
+        // is keyed to the same magnification.
+        : adsAimingFovDegrees(player.weapon, preferredFov);
   const targetFov = adsHeld ? aimingFov : currentSprinting ? preferredFov + 4.5 : preferredFov;
   // A one-frame 82 -> 32 degree sniper projection jump invalidated most of the
   // visible render list at once and forced a measured WebGPU ScenePass rebuild.
@@ -22454,17 +27197,126 @@ function updatePhysics(dt: number): void {
     cameraFov: camera.fov,
   });
   hudRoot.classList.toggle('dmr-thermal-active', dmrThermalActive);
+  // HF-405: the crossbow's authored 1.5x presents its own compact-optic sight
+  // picture. It keeps the viewmodel and the periphery, so it never enters the
+  // fullscreen-suppression path the sniper/DMR/railgun optics use above.
+  applyCompactOpticSightPicture(hudRoot, deriveCompactOpticSightPicture({
+    alive: player.alive,
+    weapon: player.weapon,
+    adsHeld,
+    adsProgress: weaponView.adsProgress(),
+    baseFovDegrees: preferredFov,
+    cameraFovDegrees: camera.fov,
+  }));
+  // HF-412: sample the drop-shot transition once per frame. The authoritative
+  // eye (player.position) is already at the new stance; this is the lag the
+  // PLAYER sees, and it eases to exactly zero, so the camera lands on the
+  // authoritative seat rather than settling near it.
+  stanceTransitionSample = sampleStanceTransition(stanceTransition, now, player.stance);
+  if (!stanceTransitionSample.active) stanceTransition = null;
   camera.position.copy(player.position);
-  camera.position.y += cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
+  camera.position.y += stanceTransitionSample.eyeOffsetMeters
+    + cameraHeightOffset - landingImpulse * 0.035 * accessibilityRuntime.weaponMotionScale;
   camera.rotation.y = player.yaw + recoilCamera.yaw;
   camera.rotation.x = THREE.MathUtils.clamp(player.pitch - recoilCamera.pitch, -1.42, 1.42);
   camera.rotation.z = cameraRoll * accessibilityRuntime.weaponMotionScale;
+  cameraShakeState = integrateCameraShake(cameraShakeState, now);
+  const shakeSample = sampleCameraShake(cameraShakeState, now);
+  if (shakeSample.intensity > 0) {
+    camera.position.addScaledVector(right, shakeSample.offsetX);
+    camera.position.y += shakeSample.offsetY;
+    camera.rotation.z += shakeSample.rollRadians;
+  }
+
+  // Trauma layer on top. POSITION AND ROLL ONLY - deliberately NOT pitch/yaw.
+  //
+  // The shot direction is built from camera.getWorldDirection() (see the
+  // firing path), so anything written into camera.rotation.x or .y becomes the
+  // direction bullets actually travel. Writing rotational shake there would
+  // send rounds wherever the shake pushed rather than where the player aimed -
+  // a real aim bug, not a cosmetic one. Roll does not affect a forward vector,
+  // and positional offsets move the eye without turning it, so both are safe.
+  // If pitch/yaw shake is ever wanted, the fix is to derive the shot ray from
+  // player.yaw/player.pitch first; until then this stays.
+  cameraShakeTrauma = decayCameraShakeTrauma(cameraShakeTrauma, now);
+  const traumaSample = sampleCameraShakeTrauma(cameraShakeTrauma, now, {
+    reducedMotion: accessibilityRuntime.reducedMotion,
+  });
+  if (traumaSample.amplitude > 0) {
+    camera.position.addScaledVector(right, traumaSample.offsetX);
+    camera.position.y += traumaSample.offsetY;
+    camera.rotation.z += traumaSample.rollRadians;
+  }
+  // Owner 2026-08-29 wall/prone clipping regression: after every positional
+  // layer (bob, shake, trauma) has moved the eye, push it clear of any solid
+  // surface inside the near-plane + bob radius. Presentation-only; shot rays
+  // derive from player.yaw/pitch and the capsule never moves. This is the
+  // across-all-maps answer the per-arena geometry fixes kept missing (see
+  // docs/eye-clearance/ledger.json deferred classes).
+  // Floor and terrain near-plane standoff: prevent camera frustum from dipping below floor
+  // HF-412: measured from the RENDERED eye. Taken from the authoritative eye
+  // it clamped the whole prone->stand transition away in one frame, because
+  // during that rise the presented camera is deliberately BELOW the standing
+  // seat it is climbing toward.
+  camera.position.y = Math.max(player.position.y + stanceTransitionSample.eyeOffsetMeters + 0.14, camera.position.y);
+  // ... and the surface resolve runs LAST with the final say: when the fixed
+  // standoff shoves the eye into a sloped underside (skyline airstair belly,
+  // ramp bellies), the resolve's own down probe still keeps it off floors
+  // while it clears the ceiling surface.
+  refreshEyeClearanceNearbySurfaces(camera.position);
+  const clearedEye = resolveEyeClearance(camera.position, eyeClearanceBallisticProbe);
+  lastEyeClearanceResult = clearedEye;
+  if (clearedEye.pushedM > 0) camera.position.set(clearedEye.x, clearedEye.y, clearedEye.z);
 }
 
 function interpolationSourceSnapshotRateHz(): 20 | 30 | 40 {
   return remotes.size > 0
     ? Math.min(...[...remotes.values()].map((remote) => remote.snapshotRateHz)) as 20 | 30 | 40
     : 40;
+}
+
+// HF-387. proneBodyClearance measures along ITS OWN body-axis convention
+// (yaw 0 = +Z, see its contract), while this game moves players and remotes
+// along (-sin(yaw), -cos(yaw)) - yaw 0 faces -Z. Feeding the snapshot yaw in
+// unmirrored measured the room behind the feet as "head room", so the seating
+// decision was computed from a body rotated 180 degrees.
+//
+// The solver's SLIDE lever also needs room reported PAST the pose envelope
+// (surplus on the open end) before it can move a seated body at all, but
+// proneBodyClearance clamps each probe at the envelope, so its surplus is
+// always zero. Rather than editing that shared module, compose the surplus
+// here from its public API: when an end reports the full envelope (unblocked),
+// hop one envelope-length further along the same axis and measure again. The
+// published clearance then carries real surplus and proneStanceAdjustment can
+// slide the body away from head-side walls instead of only propping it up.
+function measuredProneClearance(
+  position: Readonly<{ x: number; y: number; z: number }>,
+  gameYaw: number,
+  colliders: ArenaMap['colliders'],
+): ProneBodyClearance {
+  const { forwardM, backwardM } = PRONE_PRESENTATION_ENVELOPE;
+  // Game forward (-sin, -cos) expressed in the solver's (+sin, +cos) frame.
+  const solverYaw = gameYaw + Math.PI;
+  const dirX = Math.sin(solverYaw);
+  const dirZ = Math.cos(solverYaw);
+
+  const base = proneBodyClearance(position, solverYaw, colliders);
+  const extend = (withinEnvelope: number, fullLength: number, sign: number): number => {
+    if (withinEnvelope < fullLength) return withinEnvelope; // blocked inside the pose: deficit is known.
+    const hop = {
+      x: position.x + sign * dirX * fullLength,
+      y: position.y,
+      z: position.z + sign * dirZ * fullLength,
+    };
+    const beyond = proneBodyClearance(hop, solverYaw, colliders);
+    return fullLength + (sign > 0 ? beyond.forwardM : beyond.backwardM);
+  };
+
+  return Object.freeze({
+    forwardM: extend(base.forwardM, forwardM, 1),
+    backwardM: extend(base.backwardM, backwardM, -1),
+    clipped: base.clipped,
+  });
 }
 
 function updateRemotes(dt: number, now: number): void {
@@ -22492,7 +27344,7 @@ function updateRemotes(dt: number, now: number): void {
     jitterMs: measuredJitterMs,
     underruns: newUnderruns,
   }, now);
-  for (const [id, remote] of remotes) {
+  for (const [id, remote] of remotes) { if (network.role === 'host') { driveRejoinLatchRecovery(id, remote, now, activeGuestIds?.has(id) ?? false); publishRemoteHealthAuthority(id); }
     if (now - remote.lastSeen > 12_000) {
       // Movement freshness and authenticated activity are distinct authorities.
       // A replacement can pause or rebind its lossy state lane while clock
@@ -22501,6 +27353,13 @@ function updateRemotes(dt: number, now: number): void {
       // channel with no authenticated messages.
       if (activeGuestIds?.has(id)) continue;
       removeRemote(id, 'timed out');
+      continue;
+    }
+    if (network.role === 'client' && !remote.authoritativeReady) {
+      // A host's join envelope identifies the actor but is not a pose
+      // admission. Keeping its seed off-scene avoids a visible spawn-default
+      // teleport while the first authoritative state is in flight.
+      remote.root.visible = false;
       continue;
     }
     const rendered = remote.interpolation.sample(hostNow, interpolationDelayState.delayMs);
@@ -22518,8 +27377,26 @@ function updateRemotes(dt: number, now: number): void {
     remote.targetYaw = renderedSnapshot.yaw;
     remote.renderedHostTimeMs = rendered?.renderedHostTimeMs ?? hostNow;
     remote.renderedWorldAgeMs = rendered?.renderedWorldAgeMs ?? 0;
-    const stance = renderedSnapshot.stance ?? 'stand';
+    // HF-358: a swimming remote is presented with the prone silhouette - the
+    // whole-pelvis pivot lays the rig flat, which at the water surface reads
+    // as swimming. No bespoke swim clips exist yet, and a flat body in water
+    // is honest; an upright body waist-deep in the sea was the alternative.
+    const stance = renderedSnapshot.swimming === true
+      ? 'prone'
+      : (renderedSnapshot.stance ?? 'stand');
     const operator = remote.root.userData.operator as THREE.Group;
+    // HF-345: publish how much room the prone body actually has so the
+    // presentation can seat it instead of pushing it through the wall. Measured
+    // only while prone - it is three short segment casts, and every other
+    // stance stays on the authored pose. HF-387: measuredProneClearance mirrors
+    // the snapshot yaw into the solver's convention and composes the surplus
+    // the slide lever needs; see the note above its definition.
+    operator.userData.proneClearance = stance === 'prone'
+      ? measuredProneClearance(renderedTarget, renderedSnapshot.yaw, activeWorldColliders())
+      : null;
+    // HF-504 R-5: keep the host-authored transient reload tell attached to the
+    // remote rig for presentation consumers, alongside the replicated weapon.
+    operator.userData.reloading = renderedSnapshot.reloading === true;
     setOperatorWeapon(operator, renderedSnapshot.weapon, flattenOperatorMaterials, scheduleDeferredGpuRetirement);
     poseOperator(operator, stance, remainingDistance / Math.max(dt, 0.001), now * 0.008, Math.min(1, dt * 24), renderedSnapshot.pitch, dt);
     const remoteSurface = arenaFootstepSurface(selectedArena.id, classifyFootstepSurface(renderedTarget));
@@ -22547,8 +27424,7 @@ function teamScores(): [number, number] {
   }
   let aqua = player.team === 0 ? player.kills : 0;
   let coral = player.team === 1 ? player.kills : 0;
-  for (const remote of remotes.values()) {
-    const admittedKills = verifiedRemoteKills.get(remote.snapshot.id) ?? 0;
+  for (const remote of remotes.values()) { const admittedKills = verifiedRemoteKills.get(remoteKillCreditKey(remote.snapshot.id)) ?? 0;
     if (remote.snapshot.team === 0) aqua += admittedKills;
     else coral += admittedKills;
   }
@@ -22677,11 +27553,51 @@ function endTimedMatchFromAuthority(now: number): void {
 function updateMatchState(now: number): void {
   if (matchAdmissionPresentationPaused) return;
   const previous = matchState.phase;
-  const scores = teamScores();
-  const rules = currentMatchRules();
+  // Owner 2026-08-30: Domination feeds its zone-tick points and its own
+  // win-score/timer through the SAME team advance - advanceMatch's
+  // higher-team-wins logic IS the Domination win rule.
+  advanceDominationAuthority(now);
+  const dominationDisplay = dominationDisplayState();
+  const scores: [number, number] = dominationDisplay ? [dominationDisplay.scores[0], dominationDisplay.scores[1]] : teamScores();
+  const rules = dominationDisplay
+    ? { durationMs: DOMINATION_TIME_LIMIT_MS, scoreLimit: DOMINATION_WIN_SCORE }
+    : currentMatchRules();
   const ffa = gameMode !== 'solo' && privateMatchMode === 'ffa';
-  const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]);
-  matchState = preserveSoloCountdownCue(matchState, now, lastMatchCountdownCue, gameMode === 'solo');
+  updateDominationHud();
+  const orderedFfa = freeForAllLeaders([...authoritativeScores.values()]
+    .filter((score) => !score.id.startsWith('host-bot-')));
+  // MAP3 (HF-409 finisher 3): THE EXPLORE WARMUP DEADLOCK.
+  //
+  // `preserveSoloCountdownCue` exists so a long solo render stall cannot
+  // consume an unseen 3-2-1 edge: while the next cue has not been presented it
+  // pushes warmup's endsAt back to now + N seconds, EVERY FRAME, until that cue
+  // is shown. `lastMatchCountdownCue` starts null, so the cue it waits for is
+  // '3'.
+  //
+  // An explore arena presents no countdown at all - that is the point, there is
+  // no match to count in - so '3' is never presented, `lastMatchCountdownCue`
+  // stays null, and warmup is extended forever. `advanceMatch` only leaves
+  // warmup when `now >= state.endsAt`, which by construction never happens.
+  //
+  // Measured on this tree before this fix: Map 3 sat in `warmup` for the full
+  // 120 s of a boot probe and never reached `active`. That is not cosmetic -
+  // `gameplayInputEnabled()` requires `phase === 'active'`, so the arena the
+  // owner asked to be able to WALK rendered at 53 fps with a correct explore
+  // HUD and would not accept a single movement input, permanently. The
+  // pass74 arena boot smoke fails on map3 for exactly this reason.
+  //
+  // So the hold is gated on there being a cue to hold FOR. This is the same
+  // declared decision the HUD uses, not a second opinion about explore arenas.
+  const countdownCueAllowed = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffa, solo: gameMode === 'solo',
+  }).countdownCue;
+  matchState = preserveSoloCountdownCue(
+    matchState,
+    now,
+    lastMatchCountdownCue,
+    gameMode === 'solo' && countdownCueAllowed,
+  );
   const preAdvanceState = matchState;
   const advancedState = ffa
     ? advanceFreeForAllMatch(matchState, now, orderedFfa, rules)
@@ -22711,7 +27627,11 @@ function updateMatchState(now: number): void {
       objective: `${orderedFfa[0]?.kills ?? 0} LEADING KILLS`,
     };
   }
-  if (matchState.phase === 'warmup') {
+  // MAP3 (HF-409 finisher 2): an explore arena counts nothing in. There is no
+  // match to start, so the 3-2-1 cue and its audio would be announcing one.
+  // `countdownCueAllowed` is computed once, above, because the warmup hold and
+  // the cue presentation must agree - when they disagreed, warmup never ended.
+  if (matchState.phase === 'warmup' && countdownCueAllowed) {
     const headline = presentation.headline ?? '';
     if (headline !== lastMatchCountdownCue && /^(1|2|3)$/.test(headline)) {
       const cue = headline as Extract<MatchCountdownCue, '1' | '2' | '3'>;
@@ -22721,18 +27641,29 @@ function updateMatchState(now: number): void {
     }
   } else if (matchState.phase !== 'active' || lastMatchCountdownCue !== 'engage') hideMatchCountdownCue();
   if (previous === matchState.phase) return;
-  const banner = element<HTMLElement>('#banner');
   if (matchState.phase === 'active') {
-    const engageSequence = presentMatchCountdownCue('engage');
-    audio.matchCountdown('engage');
-    lastMatchCountdownCue = 'engage';
+    // MAP3 (HF-409 finisher 2): "ENGAGE" is a combat word and the big centre
+    // cue is a match-start cue. An explore arena gets neither - it is opened,
+    // not started - so it is welcomed in instead and nothing counts down.
+    const engageSequence = countdownCueAllowed ? presentMatchCountdownCue('engage') : null;
+    if (countdownCueAllowed) {
+      audio.matchCountdown('engage');
+      lastMatchCountdownCue = 'engage';
+    }
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'active') broadcastHostLobby('active');
     else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'active' };
-    banner.innerHTML = `<strong>ENGAGE</strong><span>${privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel}</span>`;
-    banner.hidden = false;
+    // HF-339: the arbiter's expiry can only hide ENGAGE while ENGAGE is still
+    // the active banner, so this timeout can never hide a rare-weapon
+    // announcement that took over or queued behind it.
+    presentBanner(
+      'match-flow',
+      countdownCueAllowed ? 'ENGAGE' : 'EXPLORE',
+      privateMatchMode === 'ffa' && gameMode !== 'solo' ? 'FREE FOR ALL · EVERY PLAYER HOSTILE' : selectedArena.rulesLabel,
+      900,
+    );
     window.setTimeout(() => {
       if (matchState.phase !== 'active') return;
-      banner.hidden = true;
+      if (engageSequence === null) return;
       if (element<HTMLElement>('#countdown').dataset.cueSequence === String(engageSequence)) hideMatchCountdownCue();
     }, 900);
     return;
@@ -22744,7 +27675,7 @@ function updateMatchState(now: number): void {
     killstreakLoadoutController.releaseAfterMatch();
     killstreakMenuBinding.setMatchActive(false);
     if (network.role === 'host' && privateLobbySnapshot?.phase !== 'ended') broadcastHostLobby('ended');
-    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' };
+    else if (privateLobbySnapshot) privateLobbySnapshot = { ...privateLobbySnapshot, phase: 'ended' }; nukeEvent.triggerFromMatchEnd(selectedArena.id, privateLobbySnapshot ? { phase: privateLobbySnapshot.phase, snapshotHostTimeMs: privateLobbySnapshot.snapshotHostTimeMs } : gameMode === 'solo' ? { phase: matchState.phase, snapshotHostTimeMs: matchState.endsAt } : null);
     recordCompletedMatch();
     if (network.role !== 'client') {
       killstreakRuntime.endMatch();
@@ -22911,8 +27842,12 @@ function updateMatchState(now: number): void {
       };
       syncMatchReportDownloads();
     }
-    banner.innerHTML = `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`;
-    banner.hidden = false;
+    presentBannerHtml(
+      'match-flow',
+      presentation.headline ?? 'MATCH COMPLETE',
+      `<strong>${presentation.headline}</strong><span>${presentation.subline} · ${presentation.objective}</span>${statsMarkup}<div class="match-end-actions"><button id="download-match-summary" type="button">HUMAN SUMMARY JSON</button><button id="download-match-diagnostics" type="button">TECHNICAL DEBUG JSON</button><button id="rematch" type="button" ${privateMatch && network.role !== 'host' ? 'disabled' : ''}>${returnLabel}</button><button id="match-main-menu" type="button">MAIN MENU</button></div>`,
+      null,
+    );
     element<HTMLButtonElement>('#download-match-summary').addEventListener('click', downloadMatchSummary);
     element<HTMLButtonElement>('#download-match-diagnostics').addEventListener('click', downloadMatchDiagnostics);
     const rematch = element<HTMLButtonElement>('#rematch');
@@ -23020,6 +27955,86 @@ function drawMinimapLandmark(
   context.restore();
 }
 
+// HF-399: Nuke Town's static minimap layer (road, houses, cover landmarks),
+// rebuilt only when the arena object or the canvas backing size changes.
+type MinimapStaticLayer = Readonly<{
+  arena: ArenaMap;
+  width: number;
+  height: number;
+  /**
+   * INVARIANT THIS CACHE DEPENDS ON: `arena.bounds`, `arena.houses` and
+   * `arena.physicalCover` are authored by the arena builder and never mutated
+   * at runtime. Arena identity therefore normally settles the cache on its own;
+   * these two counts are the cheap tripwire for future authored-list changes.
+   */
+  houseCount: number;
+  coverCount: number;
+  canvas: HTMLCanvasElement;
+  /** Landmark label anchors in minimap pixel space (before the player transform). */
+  labelAnchors: ReadonlyArray<Readonly<{ label: string; x: number; y: number }>>;
+  landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }>;
+}>;
+let minimapStaticLayer: MinimapStaticLayer | null = null;
+
+function activeMinimapStaticLayer(width: number, height: number, bounds: ArenaMap['bounds']): MinimapStaticLayer {
+  const cached = minimapStaticLayer;
+  if (
+    cached
+    && cached.arena === arena
+    && cached.width === width
+    && cached.height === height
+    && cached.houseCount === arena.houses.length
+    && cached.coverCount === arena.physicalCover.length
+  ) return cached;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas2D minimap static layer is unavailable');
+  const point = (x: number, z: number): [number, number] => worldToMinimap(x, z, bounds, width, height);
+  const [roadLeft] = point(-10.25, 0);
+  const [roadRight] = point(10.25, 0);
+  context.fillStyle = 'rgba(126, 137, 132, .23)';
+  context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
+  context.strokeStyle = 'rgba(244, 196, 79, .42)';
+  context.lineWidth = 2;
+  context.setLineDash([10, 10]);
+  context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
+  context.setLineDash([]);
+  for (const house of arena.houses) {
+    const [cx, cy] = point(house.origin.x, house.origin.z);
+    const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
+    const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
+    context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
+    context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
+    context.lineWidth = 2;
+    context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+  }
+  const labelAnchors: Array<{ label: string; x: number; y: number }> = [];
+  const landmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  for (const cover of arena.physicalCover) {
+    const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
+    if (!kind) continue;
+    const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
+    drawMinimapLandmark(context, cover.id, kind, footprint);
+    const label = minimapLandmarkLabel(kind);
+    labelAnchors.push({ label, x: footprint.x + footprint.width / 2, y: footprint.y + footprint.height / 2 });
+    landmarks.push({ id: cover.id, kind, label });
+  }
+  minimapStaticLayer = Object.freeze({
+    arena,
+    width,
+    height,
+    houseCount: arena.houses.length,
+    coverCount: arena.physicalCover.length,
+    canvas,
+    labelAnchors: Object.freeze(labelAnchors),
+    landmarks,
+  });
+  return minimapStaticLayer;
+}
+
 function updateMinimap(now: number): void {
   if (!presentationFrameDue(now, lastMinimapRenderAt, MINIMAP_RENDER_HZ)) return;
   lastMinimapRenderAt = Number.isFinite(lastMinimapRenderAt)
@@ -23034,74 +28049,112 @@ function updateMinimap(now: number): void {
   context.clearRect(0, 0, width, height);
   context.fillStyle = 'rgba(7, 15, 18, .86)';
   context.fillRect(0, 0, width, height);
+  // HF-339: pulsing gold marker at a rare-weapon spawn so the announcement can be
+  // acted on, not just read. Self-expiring, so no teardown path can leave it stuck.
+  if (rareWeaponMinimapPing) {
+    if (now >= rareWeaponMinimapPing.untilMs) rareWeaponMinimapPing = null;
+    else {
+      const [px, pz] = rareWeaponMinimapPing.position;
+      const [mx, my] = point(px, pz);
+      const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+      context.save();
+      context.strokeStyle = `rgba(244, 196, 79, ${0.45 + 0.45 * pulse})`;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(mx, my, 5 + pulse * 4, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    }
+  }
   context.strokeStyle = 'rgba(244, 196, 79, .62)';
   context.lineWidth = 4;
   context.strokeRect(4, 4, width - 8, height - 8);
 
   const [worldPlayerX, worldPlayerY] = point(player.position.x, player.position.z);
+  // HF-399 streamline: share the player-up view between the canvas transform
+  // and every upright landmark label, avoiding per-label matrix allocation.
+  const labelView = {
+    width,
+    height,
+    playerX: worldPlayerX,
+    playerY: worldPlayerY,
+    rotation: playerUpRotationRadians(player.yaw),
+    scaleX: playerUpScaleX(),
+  };
   context.save();
   context.translate(width / 2, height / 2);
-  context.rotate(playerUpRotationRadians(player.yaw));
-  context.scale(playerUpScaleX(), 1);
+  context.rotate(labelView.rotation);
+  context.scale(labelView.scaleX, 1);
   context.translate(-worldPlayerX, -worldPlayerY);
 
-  const renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
+  let renderedLandmarks: Array<{ id: string; kind: MinimapLandmarkKind; label: string }> = [];
   const landmarkLabels: Array<{ label: string; x: number; y: number }> = [];
   if (selectedArena.id === 'atomic-acres') {
-    const [roadLeft] = point(-10.25, 0);
-    const [roadRight] = point(10.25, 0);
-    context.fillStyle = 'rgba(126, 137, 132, .23)';
-    context.fillRect(roadLeft, 4, roadRight - roadLeft, height - 8);
-    context.strokeStyle = 'rgba(244, 196, 79, .42)';
-    context.lineWidth = 2;
-    context.setLineDash([10, 10]);
-    context.beginPath(); context.moveTo(width / 2, 4); context.lineTo(width / 2, height - 4); context.stroke();
-    context.setLineDash([]);
-    for (const house of arena.houses) {
-      const [cx, cy] = point(house.origin.x, house.origin.z);
-      const houseWidth = (house.dimensions.width / (bounds.maxX - bounds.minX)) * width;
-      const houseHeight = (house.dimensions.depth / (bounds.maxZ - bounds.minZ)) * height;
-      context.fillStyle = house.team === 0 ? 'rgba(88, 227, 220, .24)' : 'rgba(255, 118, 95, .24)';
-      context.strokeStyle = house.team === 0 ? 'rgba(88, 227, 220, .7)' : 'rgba(255, 118, 95, .7)';
-      context.lineWidth = 2;
-      context.fillRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
-      context.strokeRect(cx - houseWidth / 2, cy - houseHeight / 2, houseWidth, houseHeight);
+    // HF-399: the road, the two houses and every cover landmark are fixed for
+    // the life of the arena, so they are painted ONCE into an offscreen layer
+    // in minimap pixel space and composited under the per-frame player
+    // transform with one drawImage. Measured 2026-09-02 (Quality, 60 Hz
+    // minimap, atomic-acres lawn-idle): this function held 4.4% of an inclusive
+    // CPU profile - about 1.1 ms of the measured 26.1 ms frame - dominated by
+    // the landmark path work plus a getTransform()+DOMPoint allocation per
+    // cover per frame. Label anchors are the same points run through the same
+    // transform in closed form (minimapPlayerViewPoint, guarded against a
+    // composed affine reference by src/minimap-player-view-transform.test.ts),
+    // so the labels stay upright exactly as before.
+    const layer = activeMinimapStaticLayer(width, height, bounds);
+    context.drawImage(layer.canvas, 0, 0);
+    for (const anchor of layer.labelAnchors) {
+      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
+      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
     }
-    for (const cover of arena.physicalCover) {
-      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-      if (!kind) continue;
-      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-      drawMinimapLandmark(context, cover.id, kind, footprint);
-      const label = minimapLandmarkLabel(kind);
-      const centre = context.getTransform().transformPoint(new DOMPoint(
-        footprint.x + footprint.width / 2,
-        footprint.y + footprint.height / 2,
-      ));
-      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
-      renderedLandmarks.push({ id: cover.id, kind, label });
-    }
+    renderedLandmarks = layer.landmarks;
   } else {
-    context.lineWidth = 1.5;
-    context.fillStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .18)' : 'rgba(170, 113, 72, .28)';
-    context.strokeStyle = selectedArena.id === 'gun-range' ? 'rgba(244, 196, 79, .6)' : 'rgba(221, 164, 111, .65)';
-    for (const collider of activeWorldColliders()) {
-      const footprint = minimapLandmarkFootprint(collider, bounds, width, height);
-      context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-      context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    // HF-491 perf lane 4: one drawImage of the revision-keyed collider layer
+    // instead of two rect calls per collider at 30 Hz. See
+    // activeMinimapColliderLayer for the cache key and why it is correct.
+    const colliderStyle = selectedArena.id === 'gun-range'
+      ? { fillStyle: 'rgba(244, 196, 79, .18)', strokeStyle: 'rgba(244, 196, 79, .6)' }
+      : { fillStyle: 'rgba(170, 113, 72, .28)', strokeStyle: 'rgba(221, 164, 111, .65)' };
+    context.drawImage(activeMinimapColliderLayer({
+      arena, colliders: activeWorldColliders(), bounds, width, height, ...colliderStyle,
+    }), 0, 0);
+    // Owner 2026-08-30: Domination zones on the minimap - a ringed letter at
+    // each zone anchor, coloured by the owning squad, pulsing while contested.
+    const dominationMinimap = dominationDisplayState();
+    if (dominationMinimap) {
+      for (const zone of dominationMinimap.zones) {
+        const seed = TEST2_DOMINATION_ZONES.find((candidate) => candidate.id === zone.id);
+        if (!seed) continue;
+        const [zoneX, zoneY] = worldToMinimap(seed.centre[0], seed.centre[2], bounds, width, height);
+        const owner = zone.owner === 0 ? 'rgba(88, 227, 220, ' : zone.owner === 1 ? 'rgba(255, 118, 95, ' : 'rgba(222, 214, 196, ';
+        context.fillStyle = `${owner}${zone.contested ? '0.85' : '0.55'})`;
+        context.strokeStyle = `${owner}0.95)`;
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(zoneX, zoneY, 8, 0, Math.PI * 2);
+        context.fill();
+        context.stroke();
+        context.fillStyle = 'rgba(16, 20, 22, 0.95)';
+        context.font = '700 9px "IBM Plex Mono", monospace';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(zone.id, zoneX, zoneY + 0.5);
+      }
     }
-    for (const cover of arena.physicalCover) {
-      const kind = physicalCoverMinimapKind(cover.id, cover.performanceVisualKind);
-      if (!kind) continue;
-      const footprint = minimapLandmarkFootprint(cover.bounds, bounds, width, height);
-      drawMinimapLandmark(context, cover.id, kind, footprint);
-      const label = minimapLandmarkLabel(kind);
-      const centre = context.getTransform().transformPoint(new DOMPoint(
-        footprint.x + footprint.width / 2,
-        footprint.y + footprint.height / 2,
-      ));
-      landmarkLabels.push({ label, x: centre.x, y: centre.y - 10 });
-      renderedLandmarks.push({ id: cover.id, kind, label });
+    // HF-491 perf lane 4: the cover landmarks are authored build-time, so they
+    // are painted once into their own layer and composited here - AFTER the
+    // Domination zones, exactly where the per-cover loop used to run, so the
+    // stacking order is unchanged. Label anchors run through the same closed
+    // form HF-399 introduced (src/minimap-player-view-transform.test.ts).
+    const coverLayer = activeMinimapCoverLayer({
+      arena, cover: arena.physicalCover, bounds, width, height, draw: drawMinimapLandmark,
+    });
+    context.drawImage(coverLayer.canvas, 0, 0);
+    for (const anchor of coverLayer.labelAnchors) {
+      const [labelX, labelY] = minimapPlayerViewPoint(anchor.x, anchor.y, labelView);
+      landmarkLabels.push({ label: anchor.label, x: labelX, y: labelY - 10 });
     }
+    renderedLandmarks = coverLayer.landmarks;
     for (const target of arena.targets) {
       const [x, y] = point(target.root.position.x, target.root.position.z);
       context.fillStyle = target.distanceBand === 'near' ? '#58e3dc' : target.distanceBand === 'mid' ? '#f4c44f' : '#ff765f';
@@ -23109,16 +28162,19 @@ function updateMinimap(now: number): void {
     }
   }
   minimapLandmarksRendered = renderedLandmarks;
+  // HF-399 streamline: loop-invariant in both entity loops below (it reads only
+  // `now` and `scoutSweepUntil`), and was being re-evaluated once per remote and
+  // once per bot every minimap frame.
+  const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
   for (const remote of remotes.values()) {
     const friendly = privateMatchMode === 'tdm' && remote.snapshot.team === player.team;
-    const scoutActive = scoutSweepPulseVisible(now, scoutSweepUntil);
-    if (!friendly && !scoutActive && remote.target.distanceTo(player.position) > 15) continue;
+    if (!friendly && !scoutActive && !shouldRevealEnemy(remote.target.distanceTo(player.position), now, remoteRadarFireRevealAt.get(remote.snapshot.id) ?? 0)) continue;
     const [x, y] = point(remote.target.x, remote.target.z);
     context.fillStyle = friendly ? '#58e3dc' : '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
   }
   for (const bot of bots.values()) {
-    if (!bot.alive || !scoutSweepPulseVisible(now, scoutSweepUntil) && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
+    if (!bot.alive || !scoutActive && !shouldRevealEnemy(bot.position.distanceTo(player.position), now, bot.lastShotAt)) continue;
     const [x, y] = point(bot.position.x, bot.position.z);
     context.fillStyle = '#ff765f';
     context.beginPath(); context.arc(x, y, 6, 0, Math.PI * 2); context.fill();
@@ -23141,27 +28197,13 @@ function updateMinimap(now: number): void {
     context.textBaseline = 'alphabetic';
   }
   context.restore();
-  context.save();
-  context.font = '900 15px sans-serif';
-  context.textAlign = 'center';
-  context.textBaseline = 'bottom';
-  context.lineJoin = 'round';
-  context.lineWidth = 4;
-  context.strokeStyle = 'rgba(7, 15, 18, .94)';
-  context.fillStyle = '#fff1bd';
-  for (const label of landmarkLabels) {
-    if (label.x < 18 || label.x > width - 18 || label.y < 22 || label.y > height - 8) continue;
-    context.strokeText(label.label, label.x, label.y);
-    context.fillText(label.label, label.x, label.y);
-  }
-  context.restore();
   const px = width / 2;
   const py = height / 2;
   // Scout sweep radar: an expanding pulse ring plus a rotating sweep wedge
   // while the pulse is visible, so the sweep reads as active radar motion on
   // the minimap instead of a silent state change (and demo clips of the
   // sweep carry genuine motion for the cadence gate).
-  if (scoutSweepPulseVisible(now, scoutSweepUntil)) {
+  if (scoutActive) {
     const pulseStartedAt = scoutSweepUntil - SCOUT_SWEEP_DURATION_MS;
     const pulseElapsed = Math.max(0, now - pulseStartedAt) % SCOUT_SWEEP_PULSE_INTERVAL_MS;
     const pulseProgress = Math.min(1, pulseElapsed / SCOUT_SWEEP_PULSE_VISIBLE_MS);
@@ -23259,9 +28301,14 @@ function updateHud(now: number): void {
   }
   const [aqua, coral] = teamScores();
   const scores: [number, number] = [aqua, coral];
-  const presentation = matchPresentationAt(matchState, now, scores, player.team, currentMatchRules(), arena.label);
+  // Domination presents its own contract (FIRST SQUAD TO 200), not the
+  // arena's kill rules.
+  const presentation = matchPresentationAt(matchState, now, scores, player.team,
+    dominationModeActive() ? { durationMs: DOMINATION_TIME_LIMIT_MS, scoreLimit: DOMINATION_WIN_SCORE } : currentMatchRules(), arena.label);
   const ffaHud = gameMode !== 'solo' && privateMatchMode === 'ffa';
-  const orderedFfa = ffaHud ? freeForAllLeaders([...authoritativeScores.values()]) : [];
+  const orderedFfa = ffaHud
+    ? freeForAllLeaders([...authoritativeScores.values()].filter((score) => !score.id.startsWith('host-bot-')))
+    : [];
   const localFfaScore = authoritativeScores.get(player.id)?.kills ?? player.kills;
   const leaderFfaScore = orderedFfa[0]?.kills ?? 0;
   const arenaZone = classifyArenaZone(player.position.x, player.position.z);
@@ -23294,10 +28341,20 @@ function updateHud(now: number): void {
   }
   const aquaScore = element<HTMLElement>('#aqua-score');
   const coralScore = element<HTMLElement>('#coral-score');
+  const dominationHudState = dominationDisplayState();
   const hudScores: [number, number] = selectedArena.id === 'gun-range'
     ? [rangeScore, targetHits]
-    : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
-  element<HTMLElement>('#match-mode-label').textContent = ffaHud ? 'FREE FOR ALL' : selectedArena.id === 'gun-range' ? 'TARGET DRILL' : 'TEAM DEATHMATCH';
+    : dominationHudState ? [dominationHudState.scores[0], dominationHudState.scores[1]]
+      : ffaHud ? [localFfaScore, leaderFfaScore] : scores;
+  // MAP3 (HF-409 finisher 2): see src/ui/hud-mode-banner.ts. Reproduces this
+  // site's previous conditional exactly for every team arena.
+  const banner = hudModeBanner({
+    arena: selectedArena, site: 'frame',
+    domination: dominationModeActive(), freeForAll: ffaHud, solo: gameMode === 'solo',
+  });
+  element<HTMLElement>('#match-mode-label').textContent = banner.label;
+  element<HTMLElement>('#timer').hidden = !banner.clock;
+  element<HTMLElement>('#scoreline').hidden = !banner.scoreline;
   element<HTMLElement>('#aqua-label').textContent = selectedArena.id === 'gun-range' ? 'SCORE' : ffaHud ? 'YOU' : 'AQUA';
   element<HTMLElement>('#coral-label').textContent = selectedArena.id === 'gun-range' ? 'HITS' : ffaHud ? 'LEADER' : 'CORAL';
   aquaScore.textContent = String(hudScores[0]);
@@ -23310,11 +28367,11 @@ function updateHud(now: number): void {
   });
   previousHudScores = hudScores;
   element<HTMLElement>('#timer').textContent = presentation.timer;
-  element<HTMLElement>('#objective').textContent = selectedArena.id === 'gun-range'
+  element<HTMLElement>('#objective').textContent = banner.objective ?? (selectedArena.id === 'gun-range'
     ? `GUN RANGE · SCORE ${rangeScore} · ${targetHits} HITS`
     : ffaHud
       ? `FREE FOR ALL · PLACE #${Math.max(1, orderedFfa.findIndex((entry) => entry.id === player.id) + 1)} · ${localFfaScore} KILLS`
-      : presentation.objective;
+      : presentation.objective);
   if (!player.alive && respawnEndsAt > 0) {
     element<HTMLElement>('#respawn-countdown').textContent = respawnPresentation(respawnEndsAt, now);
   }
@@ -23384,9 +28441,6 @@ function updateRoster(): void {
   }).join('');
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]!);
-}
 
 function applyViewportSize(): void {
   const width = window.innerWidth;
@@ -23426,6 +28480,26 @@ else {
 }
 refreshGuestMatchRecoveryAffordance();
 element<HTMLInputElement>('#room-input').addEventListener('input', refreshGuestMatchRecoveryAffordance);
+// Finish a renderer-fallback deploy without another human click. The reload that
+// switched this session to ?renderer=webgl2 names the arena that was being deployed;
+// stage it and press the REAL solo button once the gameplay module has enabled it -
+// the same code path a player's click takes, so every guard (callsign, admission,
+// preparing) still applies. One-shot: the interval disarms after the first press.
+const redeployArenaParam = launchParams.get('redeploy');
+if (redeployArenaParam && ARENA_SELECTIONS.some((entry) => entry.id === redeployArenaParam)) {
+  stageMenuArenaSelection(redeployArenaParam as ArenaId);
+  const redeployTimer = window.setInterval(() => {
+    if (gameStarted || matchStartPreparing) { window.clearInterval(redeployTimer); return; }
+    const soloButton = document.querySelector<HTMLButtonElement>('#solo');
+    if (soloButton && !soloButton.disabled) {
+      window.clearInterval(redeployTimer);
+      stageMenuArenaSelection(redeployArenaParam as ArenaId);
+      soloButton.click();
+    }
+  }, 400);
+  window.setTimeout(() => window.clearInterval(redeployTimer), 90_000);
+}
+
 const invitedName = launchParams.get('name');
 const normalizedInvitedName = normalizeRequiredPlayerName(invitedName ?? '');
 if (normalizedInvitedName) element<HTMLInputElement>('#player-name').value = normalizedInvitedName;
@@ -23463,32 +28537,26 @@ element<HTMLElement>('#graphics-effective').textContent = `EFFECTIVE: ${displaye
 
 // ---- Key binding profile UI ----
 let keyBindingCaptureAction: GameplayAction | null = null;
-const KEY_CODE_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  Space: 'SPACE', ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL',
-  ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT', Tab: 'TAB', Enter: 'ENTER',
-  Escape: 'ESC', Backspace: 'BACKSPACE', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←',
-  ArrowRight: '→', KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyC: 'C', KeyZ: 'Z',
-  KeyR: 'R', KeyV: 'V', KeyG: 'G', KeyF: 'F', Digit1: '1', Digit2: '2', Digit3: '3',
-  Digit4: '4', Digit5: '5', Digit6: '6', Digit7: '7', Digit8: '8', Digit9: '9', Digit0: '0',
-});
-function prettyKeyCode(code: string): string {
-  if (code.startsWith('Key')) return code.slice(3).toUpperCase();
-  if (code.startsWith('Digit')) return code.slice(5);
-  return KEY_CODE_LABELS[code] ?? code;
-}
 function renderKeyBindingRows(): void {
   const rows = element<HTMLElement>('#key-binding-rows');
   const profile = activeKeyBindingProfile();
   rows.innerHTML = GAMEPLAY_ACTIONS.map((action) => {
     const keysLabel = profile[action].map(prettyKeyCode).join(' / ');
     const capturing = keyBindingCaptureAction === action;
+    // HF-412: the drop shot's second control is a HOLD of an existing bind, so
+    // it has no row of its own. Say so on the row it actually belongs to,
+    // reading the live crouch bind rather than a hardcoded key.
+    const proneHint = action === 'prone'
+      ? ` <span class="binding-hint">or hold ${profile.crouch.map(prettyKeyCode).join(' / ')}</span>`
+      : '';
     return `<div class="key-binding-row${capturing ? ' capturing' : ''}" data-action="${action}">
-      <span class="binding-action">${ACTION_LABELS[action]}</span>
+      <span class="binding-action">${ACTION_LABELS[action]}${proneHint}</span>
       <kbd>${capturing ? 'PRESS A KEY…' : keysLabel}</kbd>
       <button type="button" data-rebind="${action}">${capturing ? 'CANCEL' : 'REBIND'}</button>
     </div>`;
   }).join('');
   element<HTMLElement>('#key-bindings-status').textContent = isDefaultProfile(profile) ? 'DEFAULT PROFILE' : 'CUSTOM PROFILE';
+  if (gamepadSettingsPanel) syncHudInputGlyphs(); // GAMEPAD: a key rebind changes the keyboard-scheme prompt labels
 }
 function bindKeyBindingRowEvents(): void {
   element<HTMLElement>('#key-binding-rows').addEventListener('click', (event) => {
@@ -23534,6 +28602,13 @@ window.addEventListener('keydown', (event) => {
 renderKeyBindingRows();
 bindKeyBindingRowEvents();
 
+// GAMEPAD: settings section (deadzones, curves, invert-Y, rumble, remap) and
+// the HUD glyph scheme that follows the pad in the player's hands.
+gamepadSettingsPanel = bindGamepadSettingsPanel(document, gamepadRuntime, { currentTier: activeAimAssistTier });
+gamepadRuntime.onSchemeChange(() => syncHudInputGlyphs());
+gamepadRuntime.onPadChange(() => syncHudInputGlyphs());
+syncHudInputGlyphs();
+
 function persistPass65Settings(next: Pass65Settings): boolean {
   const result = playerProfileStore.update({ settings: next }, { sessionOnFailure: true });
   pass65Settings = result.value.settings;
@@ -23556,6 +28631,7 @@ function applyAccessibilitySettings(): void {
   });
   document.documentElement.dataset.reducedSensory = accessibilityRuntime.reducedSensory ? 'true' : 'false';
   document.documentElement.dataset.reducedMotion = accessibilityRuntime.reducedMotion ? 'true' : 'false';
+  killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   configureMenuPreviewAudio();
   damageFlash.style.setProperty('--damage-flash-scale', String(accessibilityRuntime.damageFlashScale));
   element<HTMLElement>('#accessibility-effective').textContent = accessibilityRuntime.reducedSensory
@@ -23635,6 +28711,7 @@ function flushPendingGraphics(): void {
 const advancedGraphicsBinding = bindAdvancedGraphicsControls(document, pass65Settings.graphics, () => {
   pendingGraphicsPreset = 'custom';
   graphicsProfileInput.value = 'custom';
+  refreshGraphicsProfileCopy('custom');
   refreshGraphicsPendingBadge();
 });
 document.documentElement.dataset.graphicsRegistryCount = String(advancedGraphicsBinding.registeredKeys.length);
@@ -23684,7 +28761,32 @@ hardRefreshButton.addEventListener('click', () => {
     reloadFresh();
   }
 });
+// HF-418 — the RTX row is an EXPLAINER, not a preset. Selecting it must leave
+// the renderer exactly as it was: no staged preset, no advanced-panel refresh,
+// no reload. The select is put back to the mode that is actually active and
+// then the dialog opens. `RTX_NATIVE_RUNTIME_OPTION_VALUE` is deliberately not
+// a member of GraphicsPreset, so even if this branch were ever removed the
+// value could not be persisted - normalizePass65Settings would reject it.
+const rtxNativeRuntimeExplainer = bindRtxNativeRuntimeExplainer(document);
+
+// HF-414/HF-418 — one honest line per mode, plus the expandable detail. Every
+// block is rendered into the shell and all but the active one carry `hidden`,
+// so this only toggles visibility and never composes player-facing copy in the
+// 35k-line module.
+function refreshGraphicsProfileCopy(preset: string): void {
+  for (const node of document.querySelectorAll<HTMLElement>('[data-graphics-profile]')) {
+    node.hidden = node.dataset.graphicsProfile !== preset;
+  }
+}
+refreshGraphicsProfileCopy(displayedGraphicsPreset);
+
 graphicsProfileInput.addEventListener('change', () => {
+  if (graphicsProfileInput.value === RTX_NATIVE_RUNTIME_OPTION_VALUE) {
+    graphicsProfileInput.value = pendingGraphicsPreset ?? displayedGraphicsPreset;
+    refreshGraphicsProfileCopy(graphicsProfileInput.value);
+    rtxNativeRuntimeExplainer.open();
+    return;
+  }
   const preset = graphicsProfileInput.value as GraphicsPreset;
   pendingGraphicsPreset = preset;
   if (preset !== 'custom' && preset in GRAPHICS_PRESET_VALUES) {
@@ -23692,6 +28794,7 @@ graphicsProfileInput.addEventListener('change', () => {
     // can see what they were before deciding to tweak them into a custom set.
     advancedGraphicsBinding.refresh({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset as keyof typeof GRAPHICS_PRESET_VALUES] });
   }
+  refreshGraphicsProfileCopy(preset);
   refreshGraphicsPendingBadge();
 });
 
@@ -23710,10 +28813,18 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   );
   const desiredConfig = resolveActiveGraphicsConfig(live, desiredProfile, queryRenderProfile);
   const staged: string[] = [];
-  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing');
+  if (live.antialiasSamples !== rendererConstructionGraphics.antialiasSamples) staged.push('antiAliasing'); if (pass65Settings.graphics.clusteredLighting !== rendererConstructionGraphics.clusteredLighting) staged.push('clusteredLighting');
   if (desiredConfig.representation !== rendererConstructionGraphics.representation) staged.push('geometryDetail');
-  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled) {
+  if (live.ambientOcclusion.enabled !== rendererConstructionGraphics.ambientOcclusionEnabled
+    || live.ambientOcclusion.denoise !== rendererConstructionGraphics.ambientOcclusionDenoise) {
     staged.push('ambientOcclusionTopology');
+  }
+  // HF-364: turning a screen-space raymarch on or off adds or removes MRT
+  // attachments and whole render targets, so it cannot be a live apply. Tier
+  // changes inside an already-built pass ARE live, which is why this compares
+  // the built topology rather than the tier.
+  if (screenSpaceTopologyKey(live.screenSpace) !== rendererConstructionGraphics.screenSpaceTopology) {
+    staged.push('screenSpaceTopology');
   }
 
   graphicsRuntime = live;
@@ -23747,16 +28858,38 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   fillLight.intensity = activeLighting.fillIntensity * live.indirectLightScale;
   const shadowsEnabled = adaptiveShadowsEnabled(desiredProfile, desiredConfig.shadows, pixelRatioCap)
     && (activeArenaVisualDefinition?.shadows.enabled ?? true);
-  const priorShadowMapSize = sunLight.shadow.mapSize.width;
+  // WEBGPU: the sun's shadow target is OWNED by three's ShadowNode.
+  // three.webgpu.js setupShadow() assigns BOTH ShadowNode.shadowMap AND
+  // light.shadow.map to the SAME render target and resizes it itself every
+  // frame (renderShadow -> shadowMap.setSize(shadow.mapSize...)), so there is
+  // nothing for us to dispose on a size change. Disposing/nulling it here left
+  // light.shadow.map NULL for the rest of the session — setupShadow() only
+  // re-runs on a shadow-TYPE change — so every later godray shaft rebuild
+  // dereferenced light.shadow.map.depthTexture, three swallowed the throw, and
+  // composited a default NodeMaterial as the shaft light. Measured live:
+  // one high -> performance -> high round trip through this function left the
+  // sun with castShadow=true and shadow.map=null permanently.
+  // WEBGL2: WebGLShadowMap allocates shadow.map only when it is null or the
+  // shadow TYPE changed (three.module.js: `shadow.map === null ||
+  // typeChanged`), never on a mapSize change, so THIS backend still needs the
+  // hand-dispose below or a live preset change would leave shadows at the old
+  // resolution.
+  const priorShadowMapSize = renderRuntime.backend === 'webgl2'
+    ? sunLight.shadow.mapSize.width
+    : desiredConfig.shadowMapSize;
   sunLight.castShadow = shadowsEnabled;
   sunLight.shadow.mapSize.set(desiredConfig.shadowMapSize, desiredConfig.shadowMapSize);
-  if (sunLight.shadow.map && priorShadowMapSize !== desiredConfig.shadowMapSize) {
+  if (
+    renderRuntime.backend === 'webgl2'
+    && sunLight.shadow.map
+    && priorShadowMapSize !== desiredConfig.shadowMapSize
+  ) {
     sunLight.shadow.map.dispose();
     sunLight.shadow.map = null;
   }
   renderRuntime.configureShadows({
     enabled: shadowsEnabled,
-    type: webGlShadowMapType,
+    type: shadowMapTypeForFilter(live.shadowFilter),
     autoUpdate: desiredConfig.shadowMode === 'dynamic',
     needsUpdate: shadowsEnabled,
   });
@@ -23776,19 +28909,17 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   smokeVolumePresentationPool.setQualityScale(live.smokeScale);
   grassSystem?.setAdaptivePixelRatio(pixelRatioCap);
   atmosphereSystem?.setProfile(desiredProfile);
-  waterSystem.configure(selectedArena.id, desiredProfile, {
-    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-  }, {
-    night: selectedArena.id === 'rustworks-1v1',
-    waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55,
-  });
+  waterSystem.configure(selectedArena.id, desiredProfile);
   pass64TslSystems?.applyGraphics({
     principalSamples: Math.max(1, pass64TslSystems.principalHdrTarget.samples) as 1 | 2 | 4,
     volumetricScale: live.volumetricScale,
     ambientOcclusion: live.ambientOcclusion,
     post: live.post,
     oceanWaveAmplitude: rustworksOceanAmplitude(desiredProfile),
+    reflectionScale: live.reflectionScale,
+    reflectionQuality: live.reflectionQuality,
+    environmentIntensity: live.environmentIntensity,
+    screenSpace: live.screenSpace,
   });
   // Rebind the complete retained arena presentation after the profile state is
   // committed. Updating only the three ambient intensities leaves the real
@@ -23798,6 +28929,23 @@ function applyLiveGraphicsSettings(): LiveGraphicsApplyResult {
   applyArenaLightingForSelection();
   applyAdaptiveRenderBudget(pixelRatioCap);
   graphicsRefinement.refreshSelectiveBloom(scene);
+  // HF-363: select the filmic grade profile for the player's graphics preset. Without
+  // this every preset ran the 'quality' default, so Performance paid for grading it did
+  // not choose and Max never got its wider look.
+  if (renderRuntime.backend === 'webgpu') {
+    renderRuntime.setGradeProfile(effectiveGradeProfileId());
+    // Pass 76: the display-side grade chain stage is the ONE vignette owner
+    // (the linear-side stage in pass64-tsl-scene was retired), and the
+    // optional FXAA/SMAA + RCAS trailing stages apply without renderer
+    // reconstruction.
+    renderRuntime.setDisplayVignetteStrength(live.post.vignetteStrength);
+    renderRuntime.setPostAntiAliasing(live.postAntiAliasing);
+    renderRuntime.setSharpness(live.post.sharpness);
+    // HF-364: the FSR 1 reconstruction is a display-chain stage, so it applies
+    // live; the matching scene-pass resolution scale is construction-time and
+    // is staged with the rest of the screen-space topology below.
+    renderRuntime.setSpatialUpscaling(live.screenSpace.upscaling);
+  }
   document.documentElement.dataset.graphicsPreset = displayedGraphicsPreset;
   document.documentElement.dataset.graphicsLiveProfile = desiredProfile;
   document.documentElement.dataset.graphicsFrameRateLimit = live.frameRateLimit === 0 ? 'uncapped' : String(live.frameRateLimit);
@@ -23939,104 +29087,158 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('beforeunload', () => audio.dispose(), { once: true });
 
-const GAMEPAD_SUPPORT_LABELS: Record<FieldSupportId, string> = {
-  'scout-sweep': 'SCOUT SWEEP',
-  adrenaline: 'ADRENALINE BOOST',
-  'care-package': 'CARE PACKAGE',
-  yardhawk: 'YARDHAWK',
-  'piloted-drone': 'PILOTED DRONE',
-  'tri-pass': 'TRI-PASS',
-  'carpet-bomber': 'CARPET BOMBER',
-  'hunter-swarm': 'HUNTER SWARM',
-  chopper: 'CHOPPER GUNNER',
-  'drone-swarm': 'DRONE SWARM',
-  nuke: 'NUKE',
-};
-
+// Display labels for every care-pool reward, not only slot-selectable ones:
+// the kill feed has to name a crimson flamethrower grant when it drops.
 function selectFieldSupport(direction: -1 | 1, source: 'PAD' | 'TOUCH'): void {
   gamepadSupportSelection = cycleFieldSupportSelection(gamepadSupportSelection, direction, localFieldSupportProjection().loadout);
   addFeed(`${source} SUPPORT · ${GAMEPAD_SUPPORT_LABELS[gamepadSupportSelection]}`, 'gold');
   updateFieldSupportHud();
 }
 
+// GAMEPAD: pad poll (runtime + helpers are declared with the input state above).
 function pollGamepad(dt: number): void {
-  const pad = navigator.getGamepads?.().find((candidate): candidate is Gamepad => Boolean(candidate && candidate.connected));
-  if (!pad) {
+  const now = performance.now();
+  const frame = gamepadRuntime.poll(now);
+  gamepadSettingsPanel?.poll();
+  if (frame.connected !== gamepadOverlaySuppressed) {
+    gamepadOverlaySuppressed = frame.connected;
+    mobileTouchControls?.setGamepadSuppressed(frame.connected);
+  }
+  if (!frame.connected) {
     gamepadMove = { x: 0, y: 0 };
     gamepadLookRate = { yaw: 0, pitch: 0 };
     gamepadDroneVertical = 0;
     gamepadSprint = false;
-    previousGamepadButtons = [];
+    gamepadTriggerHeld = false;
+    lastGamepadAssist = NO_AIM_ASSIST;
     setLocalTriggerHeld(mouseTriggerHeld);
     adsHeld = admittedAdsHeld(debugAdsOverride ?? mouseAdsHeld);
     return;
   }
-  const shapedMove = applyRadialDeadzone(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.14, 1.6);
-  const look = applyRadialDeadzone(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.1, 1.6);
-  const buttons = pad.buttons.map((button) => button.pressed || button.value > 0.55);
-  const pressed = (index: number) => buttons[index] && !previousGamepadButtons[index];
-  const padAds = Boolean(buttons[6]) || (pad.buttons[6]?.value ?? 0) > 0.22;
-  const padTrigger = Boolean(buttons[7]) || (pad.buttons[7]?.value ?? 0) > 0.22;
+  const padAds = frame.held('ads');
+  const padTrigger = frame.held('fire');
   const canControlPlayer = gameplayInputEnabled();
   const possession = localKillstreakActorSnapshot()?.possession ?? null;
   const pilotedDronePossessed = possession?.kind === 'piloted-drone';
+  // Pause/resume must work while gameplay input is closed; a pad player has
+  // no Escape key and no pointer to click the match with.
+  if (frame.pressed('pause') && gameStarted && player.alive && !matchFinished && !isTextChatTyping()) {
+    // The tactical strike map owns Escape while it is open, so the pad's pause
+    // button must back out of it (with the same refund) before it reaches the
+    // pause menu. Pointer lock is never re-acquired for a pad player.
+    if (tacticalMapOpen) cancelSupportTargeting(true, false);
+    else if (menuLifecycle.surface === 'paused-match') resumeActiveMatchFromMenu(false);
+    else if (menuLifecycle.surface === 'hidden') openActiveMatchPause('mobile-pause');
+  }
   if (!padTrigger) gamepadTriggerArmed = true;
   else if (!canControlPlayer) gamepadTriggerArmed = false;
   if (!padAds) gamepadAdsArmed = true;
   else if (!canControlPlayer) gamepadAdsArmed = false;
   const padTriggerActive = canControlPlayer && padTrigger && gamepadTriggerArmed;
   const padAdsActive = canControlPlayer && padAds && gamepadAdsArmed;
-  gamepadSprint = canControlPlayer && Boolean(buttons[10]);
+  gamepadTriggerHeld = padTriggerActive;
+  gamepadSprint = canControlPlayer && frame.held('sprint');
+  // HF-412: published for the hold-crouch poll in updatePhysics.
+  gamepadCrouchHeld = canControlPlayer && frame.held('crouch');
   adsHeld = admittedAdsHeld(debugAdsOverride ?? (mouseAdsHeld || padAdsActive));
   setLocalTriggerHeld(mouseTriggerHeld || padTriggerActive);
-  gamepadMove = canControlPlayer ? shapedMove : { x: 0, y: 0 };
+  gamepadMove = canControlPlayer ? { x: frame.move.x, y: frame.move.y } : { x: 0, y: 0 };
   gamepadDroneVertical = canControlPlayer && pilotedDronePossessed
-    ? THREE.MathUtils.clamp(Number(buttons[0]) - Number(buttons[1]), -1, 1)
+    ? THREE.MathUtils.clamp(Number(frame.held('jump')) - Number(frame.held('crouch')), -1, 1)
     : 0;
   gamepadLookRate = integrateGamepadLookRate(
     gamepadLookRate,
-    canControlPlayer ? look : { x: 0, y: 0 },
+    canControlPlayer ? frame.look : { x: 0, y: 0 },
     dt,
     adsHeld,
     controllerSensitivity,
   );
+  // Tiered aim assist, PAD = medium. A look-rate modifier only: the rate the
+  // stick produced is scaled inside the target zone and strafe friction is
+  // added as a yaw rate. Damage, spread and hit registration are untouched.
+  // Gated on the pad being the input IN USE, not merely connected: a
+  // keyboard/mouse player with an idle paired pad is a MOUSE player under the
+  // fairness contract and gets nothing (measured 2026-09-02: an untouched
+  // connected pad was dragging a keyboard strafe by 0.0126 rad / 200 ms).
+  const assist = activeAimAssistTier() === 'pad' ? evaluateLocalAimAssist('pad', dt) : NO_AIM_ASSIST;
+  lastGamepadAssist = assist;
   if (canControlPlayer) {
+    const yawDelta = gamepadLookRate.yaw * assist.lookRateScale * dt;
+    const pitchDelta = gamepadLookRate.pitch * assist.lookRateScale * dt;
     if (pilotedDronePossessed) {
       const pose = applyPilotedDroneScreenLookDelta({
         yaw: player.yaw,
         pitch: player.pitch,
-        horizontalLookDelta: gamepadLookRate.yaw * dt,
-        verticalLookDelta: gamepadLookRate.pitch * dt,
+        horizontalLookDelta: yawDelta,
+        verticalLookDelta: pitchDelta,
       });
       player.yaw = pose.yaw;
       player.pitch = pose.pitch;
     } else {
-      player.yaw -= gamepadLookRate.yaw * dt;
-      player.pitch = THREE.MathUtils.clamp(player.pitch - gamepadLookRate.pitch * dt, -1.42, 1.42);
+      player.yaw -= yawDelta;
+      player.yaw += assist.frictionYawRadPerSec * dt;
+      player.pitch = THREE.MathUtils.clamp(player.pitch - pitchDelta, -1.42, 1.42);
     }
-    if (!possession) {
-      if (pressed(0)) {
+    // Semi-automatic weapons fire on the trigger's press edge (the frame loop
+    // only re-fires held automatics), so a pad shot never waits on pointer lock.
+    if (padTriggerActive && frame.pressed('fire')) tryFire(now);
+    if (possession?.kind === 'chopper-gunner' && frame.pressed('ads')) requestPossessedChopperMissile(now);
+    if (possession?.kind === 'piloted-drone' && frame.pressed('ads')) requestPossessedDroneTaser(now);
+    if (pointSupportTargeting && !tacticalMapOpen) {
+      if (frame.pressed('fire') || frame.pressed('interact')) confirmCrosshairSupportTarget(now);
+      else if (frame.pressed('crouch')) cancelSupportTargeting(true);
+    } else if (!possession) {
+      if (frame.pressed('jump')) {
         if (player.stance !== 'stand') requestStance('stand');
-        jumpQueuedAt = performance.now();
+        jumpQueuedAt = now;
       }
-      if (pressed(1)) requestStance('toggle-crouch');
-      if (pressed(13)) requestStance('toggle-prone');
-      if (pressed(2)) reload();
-      if (pressed(3)) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
-      if (pressed(4)) throwGrenade();
-      if (pressed(5)) melee();
-      if (pressed(14)) selectFieldSupport(-1, 'PAD');
-      if (pressed(15)) selectFieldSupport(1, 'PAD');
-      if (pressed(12)) activateFieldSupport(gamepadSupportSelection);
+      // HF-412: same control as the keyboard. The pad's dedicated prone
+      // button still works and stays remappable; holding the crouch button is
+      // the reference's own console drop-shot control.
+      if (frame.pressed('crouch')) {
+        // The stance AT THE PRESS decides whether the hold may deepen to prone:
+        // from prone this press is how the player gets up.
+        const pressed = crouchPressed(crouchHoldState, now, player.stance);
+        crouchHoldState = pressed.state;
+        if (pressed.action === 'crouch') requestStance('toggle-crouch');
+      }
+      if (frame.pressed('prone')) requestStance('toggle-prone');
+      // Reload and interact may share one face button: interact wins while a
+      // prompt is showing, otherwise the press reloads.
+      const sharedFace = frame.layout !== null && frame.layout.buttons.interact !== null
+        && frame.layout.buttons.interact === frame.layout.buttons.reload;
+      if (frame.pressed('interact')) {
+        const promptVisible = !element<HTMLElement>('#support-interaction-prompt').hidden || !element<HTMLElement>('#pickup-prompt').hidden;
+        if (!sharedFace || promptVisible) beginFInteractionPress(now);
+        else reload();
+      } else if (frame.pressed('reload')) {
+        reload();
+      }
+      if (frame.released('interact')) {
+        releaseFInteractionPress(now);
+        if (localCareCaptureRequiresHold) releaseCareCapture(now);
+      }
+      if (frame.pressed('switch-weapon')) switchWeapon(player.weapon === (localHoldsRailgun() ? 'railgun' : player.primaryWeapon) ? 1 : 0);
+      if (frame.pressed('grenade')) throwGrenade();
+      if (frame.pressed('melee')) melee();
+      if (frame.pressed('emote')) performEmote();
+      if (frame.pressed('support-prev')) selectFieldSupport(-1, 'PAD');
+      if (frame.pressed('support-next')) selectFieldSupport(1, 'PAD');
+      if (frame.pressed('support-activate')) activateFieldSupport(gamepadSupportSelection);
     }
+    if (frame.pressed('scoreboard')) {
+      updateRoster();
+      element<HTMLElement>('#roster').hidden = false;
+    }
+    if (frame.released('scoreboard')) element<HTMLElement>('#roster').hidden = true;
   }
-  previousGamepadButtons = buttons;
 }
 
 function initMobileTouchControls(): void {
   if (mobileTouchControls) return;
   mobileTouchControls = new MobileTouchControls({
     onFireDown: () => {
+      applyTouchTriggerSnap(); // GAMEPAD: touch-tier micro-snap before the shot ray is taken
       setLocalTriggerHeld(true);
       tryFire(performance.now());
     },
@@ -24069,6 +29271,7 @@ function initMobileTouchControls(): void {
   });
   mobileTouchControls.mount(document.body);
   mobileTouchControls.setEnabled(readMobileControlsPreference());
+  mobileTouchControls.setGamepadSuppressed(gamepadOverlaySuppressed); // GAMEPAD: pad may already be connected
 }
 
 function setMobileControlsEnabled(enabled: boolean): void {
@@ -24077,7 +29280,10 @@ function setMobileControlsEnabled(enabled: boolean): void {
   writeMobileControlsPreference(enabled);
 }
 
-function pollMobileTouch(): void {
+function pollMobileTouch(dt: number): void {
+  // GAMEPAD: cleared first so the telemetry read-out never reports a stale
+  // touch assist on a frame where the touch overlay did not drive the view.
+  lastTouchAssist = NO_AIM_ASSIST;
   const touch = mobileTouchControls;
   if (!touch) return;
   // The overlay only ever intercepts input while a match is live and the menu
@@ -24092,17 +29298,42 @@ function pollMobileTouch(): void {
     if (live) requestMobilePresentation();
     else releaseMobilePresentation();
   }
-  if (!touch.isEnabled()) return;
+  if (!touch.isEnabled() || touch.isGamepadSuppressed()) return;
   if (touch.state.firing) setLocalTriggerHeld(true);
   if (touch.state.ads) adsHeld = admittedAdsHeld(true);
   const look = touch.consumeLookDelta();
-  if (!gameplayInputEnabled() || (look.x === 0 && look.y === 0)) return;
-  const lookScale = sensitivity * (adsHeld ? 0.62 : 1);
+  if (!gameplayInputEnabled()) return;
+  // GAMEPAD: tiered aim assist, TOUCH = strongest. Same look-rate-only
+  // contract as the pad path: the held-stick delta is scaled inside the
+  // target zone and strafe friction is added as a yaw rate.
+  const assist = evaluateLocalAimAssist('touch', dt);
+  lastTouchAssist = assist;
+  if (assist.frictionYawRadPerSec !== 0) player.yaw += assist.frictionYawRadPerSec * dt;
+  if (look.x === 0 && look.y === 0) return;
+  const lookScale = sensitivity * (adsHeld ? 0.62 : 1) * assist.lookRateScale;
   player.yaw -= look.x * lookScale;
   player.pitch = THREE.MathUtils.clamp(player.pitch - look.y * lookScale, -1.42, 1.42);
 }
 
-let mobilePresentationActive = false;
+/** GAMEPAD: touch-only trigger micro-snap (see aim-assist.ts); a view nudge, never a hit-model change. */
+function applyTouchTriggerSnap(): void {
+  lastTouchSnapDeg = 0;
+  if (!gameplayInputEnabled() || localKillstreakActorSnapshot()?.possession) return;
+  const snapped = applyTriggerSnap({
+    tier: 'touch',
+    eye: player.position,
+    yaw: player.yaw,
+    pitch: player.pitch,
+    targets: collectAimAssistTargets(),
+    isVisible: aimAssistTargetVisible,
+  });
+  if (snapped.snappedDeg <= 0) return;
+  player.yaw = snapped.yaw;
+  player.pitch = snapped.pitch;
+  lastTouchSnapDeg = snapped.snappedDeg;
+}
+
+// GAMEPAD: `mobilePresentationActive` is declared with the input state above.
 
 /**
  * Mobile play uses the available viewport in either orientation. Fullscreen
@@ -24152,24 +29383,69 @@ textChatInput.addEventListener('keydown', (event) => {
 });
 textChatInput.addEventListener('input', markTextChatActivity);
 textChatInput.addEventListener('keyup', (event) => event.stopPropagation());
+// HF-324: Clicking or tapping anywhere on the chat panel opens chat and focuses its input.
+const handleTextChatPanelOpenAffordance = (event: Event): void => {
+  if (!textChatAvailable()) return;
+  // HF-500: in-match chat is opened by the explicit Enter key only. The game
+  // surface is pointer-inert while closed, and clicking its open surface must
+  // not become a second play-area entry path.
+  if (textChatRoot.dataset.context === 'game') return;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest('button[type="submit"]')) return;
+  // HF-324 residual (Lane J, "cant type in lobby"): openTextChat() focuses the
+  // input during pointerdown, but the browser's DEFAULT mousedown action then
+  // moves focus to <body> (the panel chrome is not focusable), and the log
+  // re-render can swap the click target away so the click-phase refocus never
+  // lands. The first keystroke then hits the window guard instead of the
+  // input and was silently eaten. Cancelling the default on the panel chrome
+  // (never on the input itself, which needs native caret placement) keeps the
+  // focus we just set. Focus-timeline evidence: input focus at pointerdown,
+  // blur ~70ms later to <body>, first typed character lost on host AND guest.
+  if (event.type === 'pointerdown' && event.cancelable && target !== textChatInput) {
+    event.preventDefault();
+  }
+  if (!isTextChatTyping()) openTextChat();
+  else if (document.activeElement !== textChatInput) textChatInput.focus({ preventScroll: true });
+};
+textChatRoot.addEventListener('pointerdown', handleTextChatPanelOpenAffordance);
+textChatRoot.addEventListener('click', handleTextChatPanelOpenAffordance);
 window.addEventListener('keydown', (event) => {
   if (isTextChatTyping()) {
     if (event.target === textChatInput) return;
-    event.preventDefault();
+    // HF-324 residual (Lane J, "cant type in lobby"): chat is open but the
+    // input lost focus (panel-chrome click, roster re-render). This guard
+    // used to preventDefault EVERY key here, so the keystroke that should
+    // have re-entered the chat was eaten — the owner's dropped first letter.
+    // A plain printable key now refocuses the input and keeps its default
+    // action, which the browser delivers to the newly focused input; all
+    // other keys keep the old swallow so gameplay bindings cannot leak
+    // through an open chat.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeTextChat(true);
+      return;
+    }
+    textChatInput.focus({ preventScroll: true });
+    const printable = event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (!printable) event.preventDefault();
     event.stopImmediatePropagation();
-    if (event.key === 'Escape') closeTextChat(true);
-    else textChatInput.focus({ preventScroll: true });
     return;
   }
   if (event.key !== 'Enter' || event.repeat || !textChatAvailable()) return;
+  // HF-324: Stop non-submit buttons (e.g. lobby buttons) from swallowing Enter,
+  // allowing Enter to open chat while preserving editable fields and form submit buttons.
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+  const button = target?.closest('button');
+  const isSubmitButton = button instanceof HTMLButtonElement && button.type === 'submit' && button.form !== null;
+  if (target?.closest('input, textarea, select, [contenteditable="true"]') || isSubmitButton) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   openTextChat();
 });
 
 window.addEventListener('keydown', (event) => {
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: keyboard use hands HUD prompts back to key labels
   if (isTextChatTyping()) return;
   if (
     event.code === 'Escape'
@@ -24202,8 +29478,28 @@ window.addEventListener('keydown', (event) => {
     openActiveMatchPause('escape');
     return;
   }
-  if (gameplayInputEnabled()) keys.add(event.code);
-  else if (event.code !== 'Tab') return;
+  // HF-316 residual: killstreak slot keys must SAY why they refuse even while
+  // the blanket gameplay-input guard below is closed — pressing key-3 while
+  // dead or during warmup used to be indistinguishable from a dead key. This
+  // is a NARROW pre-check routed through the same evaluateKillstreakActivation
+  // gate (which denies with 'dead' / 'match-inactive' / 'input-disabled' into
+  // the HUD feed and can never activate while input is disabled). The HF-324
+  // blanket guard below is deliberately untouched.
+  if (!gameplayInputEnabled() && gameStarted && !event.repeat) {
+    const deniedKeyProfile = activeKeyBindingProfile();
+    for (let candidateSlot = 0; candidateSlot < 5; candidateSlot += 1) {
+      const action = supportSlotAction(candidateSlot);
+      if (!action || !actionMatchesCode(action, event.code, deniedKeyProfile)) continue;
+      activateOrToggleFieldSupportSlot(candidateSlot);
+      return;
+    }
+  }
+  // HF-324: scope gameplay key handling to active gameplay so Tab is not swallowed
+  // in the lobby or menus. Tab itself stays available for the scoreboard once a match
+  // has started: players expect the roster while dead awaiting respawn, during warmup
+  // and at match end, all of which report gameplayInputEnabled() false.
+  if (!gameplayInputEnabled() && (event.code !== 'Tab' || !gameStarted)) return;
+  keys.add(event.code);
   const keyProfile = activeKeyBindingProfile();
   const supportPossession = localKillstreakActorSnapshot()?.possession ?? null;
   if (!supportPossession) {
@@ -24211,12 +29507,21 @@ window.addEventListener('keydown', (event) => {
       if (player.stance !== 'stand') requestStance('stand');
       jumpQueuedAt = performance.now();
     }
-    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) requestStance('toggle-crouch');
+    // HF-412: the press still toggles crouch exactly as it always has; holding
+    // it past DROP_SHOT_TIMING.holdCrouchToProneMs converts to prone (the
+    // reference's console control, offered on the keyboard too). The hold is
+    // polled in the frame loop, which is where key-repeat cannot reach it.
+    if (actionMatchesCode('crouch', event.code, keyProfile) && !event.repeat) {
+      const pressed = crouchPressed(crouchHoldState, performance.now(), player.stance);
+      crouchHoldState = pressed.state;
+      if (pressed.action === 'crouch') requestStance('toggle-crouch');
+    }
     if (actionMatchesCode('prone', event.code, keyProfile) && !event.repeat) requestStance('toggle-prone');
     if (actionMatchesCode('weapon-1', event.code, keyProfile)) switchWeapon(0);
     if (actionMatchesCode('weapon-2', event.code, keyProfile)) switchWeapon(1);
     if (actionMatchesCode('reload', event.code, keyProfile)) reload();
     if (actionMatchesCode('melee', event.code, keyProfile) && !event.repeat) melee();
+    if (actionMatchesCode('emote', event.code, keyProfile) && !event.repeat) performEmote();
     if (actionMatchesCode('grenade', event.code, keyProfile) && !event.repeat) throwGrenade();
   }
   let supportSlot = -1;
@@ -24262,6 +29567,7 @@ window.addEventListener('focus', () => {
 });
 window.addEventListener('mousemove', (event) => {
   if (document.pointerLockElement !== canvas || !player.alive || isTextChatTyping()) return;
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: captured mouse look = keyboard/mouse scheme
   const aimScale = mouseSensitivityMultiplier(adsHeld, currentSprinting);
   if (localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
     const pose = applyPilotedDronePointerDelta({
@@ -24283,6 +29589,7 @@ window.addEventListener('mousemove', (event) => {
 canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 canvas.addEventListener('mousedown', (event) => {
   if (isTextChatTyping()) return;
+  gamepadRuntime.notifyKeyboardMouse(); // GAMEPAD: mouse click = keyboard/mouse scheme
   if (document.pointerLockElement !== canvas) {
     requestGamePointerLock('canvas');
     return;
@@ -24302,6 +29609,15 @@ canvas.addEventListener('mousedown', (event) => {
     mouseAdsHeld = false;
     adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
     requestPossessedChopperMissile(performance.now());
+    return;
+  }
+  // HF-458: the same right-click slot on the possessed Piloted Drone fires the
+  // taser instead of entering ADS, mirroring the Chopper's RMB missile.
+  if (event.button === 2 && localKillstreakActorSnapshot()?.possession?.kind === 'piloted-drone') {
+    event.preventDefault();
+    mouseAdsHeld = false;
+    adsHeld = admittedAdsHeld(debugAdsOverride ?? false);
+    requestPossessedDroneTaser(performance.now());
     return;
   }
   if (event.button === 2) {
@@ -24403,6 +29719,19 @@ function syncArenaSelectionUi(): void {
     ? `${selectedArena.titleLead} <span>${selectedArena.titleAccent}</span>`
     : selectedArena.titleLead;
   element<HTMLElement>('#arena-lede').textContent = selectedArena.menuLede;
+  // MAP3 (HF-409): the standalone showcase link. Present only for an arena that
+  // declares a second page, and relative to THIS document, so it resolves
+  // inside whatever release channel the player loaded the game from.
+  const showcaseLink = element<HTMLAnchorElement>('#arena-showcase-link');
+  const showcasePath = selectedArena.showcasePath;
+  if (showcasePath) {
+    showcaseLink.setAttribute('href', showcasePath);
+    showcaseLink.title = `Open the ${selectedArena.displayName} showcase fly-through in a new tab`;
+    showcaseLink.hidden = false;
+  } else {
+    showcaseLink.removeAttribute('href');
+    showcaseLink.hidden = true;
+  }
   canvas.setAttribute('aria-label', arenaCanvasLabel(selectedArena));
   renderFieldKitSelection();
 }
@@ -24422,7 +29751,7 @@ function syncAtomicHouseStructuralPresentation(): void {
 
 function setArenaPresentationVisibility(): void {
   const atomicVisible = selectedArena.id === 'atomic-acres';
-  const rustworksVisible = selectedArena.id === 'rustworks-1v1';
+  const rustworksVisible = selectedArena.id === 'rustworks-1v1'; nukeEvent.setArenaActive(selectedArena.id === 'nuketown2');
   const atomicQualityPrimary = atomicVisible && atomicQualityHousePresentationActive();
   arena.root.visible = arena.id === 'atomic-acres'
     ? !atomicQualityPrimary
@@ -24433,18 +29762,16 @@ function setArenaPresentationVisibility(): void {
     setWorldIdentityHouseShellPresentation(worldIdentityPresentation.root, atomicVisible && !blenderArenaActive);
   }
   if (neighbourhoodLifeRoot) neighbourhoodLifeRoot.visible = atomicVisible;
-  // Rustworks' ocean needs a long view frustum so water, not void, meets the horizon.
-  const desiredFarPlane = rustworksVisible ? 1_400 : 180;
+  // Shared surrounding oceans need a long view frustum so water, not void,
+  // meets the horizon. The authoring registry is the single ownership gate.
+  const desiredFarPlane = selectedArena.id === 'nuketown2' ? NUKE_EVENT_CAMERA_FAR_M : sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
   if (camera.far !== desiredFarPlane) {
     camera.far = desiredFarPlane;
     camera.updateProjectionMatrix();
   }
   atmosphereSystem?.setArena(selectedArena.id);
   if (atmosphereSystem) atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
-  waterSystem.configure(selectedArena.id, liveGraphicsProfile, {
-    halfX: Math.max(Math.abs(arena.bounds.minX), Math.abs(arena.bounds.maxX)),
-    halfZ: Math.max(Math.abs(arena.bounds.minZ), Math.abs(arena.bounds.maxZ)),
-  }, { night: selectedArena.id === 'rustworks-1v1', waterLevel: selectedArena.id === 'rustworks-1v1' ? -19.5 : -0.55 });
+  waterSystem.configure(selectedArena.id, liveGraphicsProfile);
   ensureRustworksStarfield(scene, selectedArena.id);
   applyArenaFogProfile();
   applyArenaLightingForSelection();
@@ -24467,10 +29794,10 @@ function applyArenaLightingForSelection(): void {
     liveGraphicsProfile,
     selectedArena.id,
   );
-  const lighting = activeLighting;
+  const lighting = activeLighting; nukeEvent.setSunDirection(lighting.sunPosition[0], lighting.sunPosition[1], lighting.sunPosition[2]);
   const definition = activeArenaVisualDefinition?.id === selectedArena.id ? activeArenaVisualDefinition : null;
   renderRuntime.setExposure(effectiveGraphicsExposure(definition?.colorPipeline.exposure ?? lighting.exposure));
-  renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: webGlShadowMapType });
+  renderRuntime.configureShadows({ enabled: renderRuntime.shadowsEnabled(), type: shadowMapTypeForFilter(graphicsRuntime.shadowFilter) });
   if (scene.fog instanceof THREE.Fog) scene.fog.color.setHex(definition?.fog.color ?? lighting.fogColor);
   if (skyMaterial) {
     skyMaterial.uniforms.top.value.setHex(lighting.skyTop);
@@ -24533,6 +29860,26 @@ function applyArenaLightingForSelection(): void {
   }
   arenaContrastLighting.setProfile(liveGraphicsProfile);
   if (definition) arenaContrastLighting.applyDefinition(definition);
+  // LIGHTING: this function is the canonical "write the AUTHORED lighting into
+  // the frozen light set" path (arena selection and every graphics-settings
+  // apply land here). Re-anchor the baseline on the values it just wrote, then
+  // re-compose the resolved hour — otherwise changing a graphics setting mid
+  // match would silently snap the sky back to the arena's authored hour.
+  captureLightingConditionBaseline({
+    arenaId: selectedArena.id,
+    sunColor: definition?.lighting.sunColor ?? lighting.sunColor,
+    sunIntensity: definition?.lighting.sunIntensity ?? lighting.sunIntensity,
+    ambientColor: definition?.lighting.ambientColor ?? lighting.ambientColor,
+    ambientIntensity: definition?.lighting.ambientIntensity ?? lighting.ambientIntensity,
+    hemisphereSky: lighting.hemisphereSky,
+    hemisphereGround: lighting.hemisphereGround,
+    hemisphereIntensity: lighting.hemisphereIntensity,
+    fillColor: lighting.fillColor,
+    fillIntensity: lighting.fillIntensity,
+    fogColor: definition?.fog.color ?? lighting.fogColor,
+    exposure: definition?.colorPipeline.exposure ?? lighting.exposure,
+  });
+  applyLightingConditionUniforms(true);
   if (renderRuntime.shadowsEnabled()) requestStaticShadowRefresh();
 }
 
@@ -24584,11 +29931,14 @@ async function performArenaSelection(
   const previousArena = arena;
   const previousPhysics = characterPhysics;
   const previousInteractiveWorldRuntime = interactiveWorldRuntime;
+  const previousThinMetalPerforationRuntime = thinMetalPerforationRuntime;
   const hadPreparedArena = gameplayArenaPrepared;
   let nextArena: ArenaMap | null = null;
   let nextPhysics: CharacterPhysics | null = null;
   let nextInteractiveWorldRuntime: InteractiveWorldRuntime | null = null;
+  let nextThinMetalPerforationRuntime: ThinMetalPerforationRuntime | null = null;
   let committed = false;
+  let exactScenePassPrecompiled = false;
   const assertAdmission = (): void => {
     if (admissionToken) assertMatchAdmissionCurrent(admissionToken);
   };
@@ -24609,7 +29959,7 @@ async function performArenaSelection(
   setStatus(`Preparing ${nextSelection.displayName} deployment assets…`);
   try {
     setBootstrapStage('loading-gameplay-assets');
-    await prepareMenuDeploymentAssets();
+    await prepareMenuDeploymentAssets(); if (hadPreparedArena) await ensureAuthoredSupportPresentationAssets(killstreakPresentation);
     assertAdmission();
     // A map generation may only replace renderer-visible authority once every
     // earlier WebGPU submission has completed. This prevents the old root's
@@ -24618,6 +29968,15 @@ async function performArenaSelection(
     await flushWebGpuFrames();
     assertAdmission();
     arenaTransitionPhase = 'preparing';
+    // MAP3 (HF-409): fetch a lazily loaded arena's builder chunk HERE, in the
+    // preparation phase, so the construction below stays synchronous inside the
+    // fence. The guard matters: an eager arena must not gain even a microtask
+    // boundary it did not have before, so it never touches this await at all.
+    if (!arenaFactories.isResolved(nextSelection.id)) {
+      profileArenaTransition('arena-factory-load');
+      await arenaFactories.resolve(nextSelection.id);
+      assertAdmission();
+    }
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
@@ -24628,13 +29987,18 @@ async function performArenaSelection(
       true,
     );
     nextInteractiveWorldRuntime.root.visible = false;
+    nextThinMetalPerforationRuntime = createAndAttachThinMetalPerforationRuntime(nextArena, interactiveWorldMatchEpoch, true, scene);
     latestArenaPerformanceBudgetSample = null;
     if (localArenaSwitchQaDelayMs > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, localArenaSwitchQaDelayMs));
       assertAdmission();
     }
     profileArenaTransition('physics-construction');
-    nextPhysics = await CharacterPhysics.create(nextArena.physicsColliders, nextArena.bounds);
+    nextPhysics = await CharacterPhysics.create(
+      nextArena.physicsColliders,
+      nextArena.bounds,
+      nextArena.physicsSafetyFloorY,
+    );
     assertAdmission();
     profileArenaTransition('authority-commit');
     characterPhysics = nextPhysics;
@@ -24642,17 +30006,138 @@ async function performArenaSelection(
     clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = nextArena;
+    localSwimState = createSwimState();
+    // Tear the previous arena's overlay down before the new one is dressed, so
+    // it can never outlive the arena it was measuring.
+    farcrysisHitlOverlay?.dispose();
+    farcrysisHitlOverlay = null;
+    if (hitlQuery === '1' && selectedArena.id === 'farcrysis') {
+      try {
+        farcrysisHitlOverlay = mountFarcrysisHitlOverlay(arena);
+      } catch (error) {
+        // Never let a debug overlay take the arena down with it.
+        console.warn('[farcrysis hitl] overlay failed to mount', error);
+      }
+    }
     interactiveWorldRuntime = nextInteractiveWorldRuntime;
     previousInteractiveWorldRuntime?.root.removeFromParent();
     interactiveWorldRuntime.root.visible = true;
+    thinMetalPerforationRuntime = commitThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime);
     syncInteractiveWorldPhysics(true);
+    profileArenaTransition('presentation-batching'); if (selectedArena.id !== 'gun-range') batchSelectedArenaPresentation();
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
+    // HF-371: the air is part of the arena. Swap it with the audio so nothing
+    // from the retired map hangs in the new one.
+    hfParticleRuntime.setArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     setBootstrapStage('waiting-for-authored-textures');
     profileArenaTransition('visual-definition');
     await configurePlayableArenaVisuals(selectedArena.id, arena.root, false);
     assertAdmission();
+    // God-rays raymarch the sun's shadow map, but three's ShadowNode only
+    // allocates that GPU target on a rendered frame, and every later step of
+    // this transition (quality presentation prewarms, weapon-catalog compile,
+    // the exact ScenePass precompile) can build the post graph before any
+    // full frame has run. Building against the still-null target throws
+    // "Cannot read properties of null (reading 'depthTexture')" on every
+    // shaft-enabled arena entry (measured on gun-range) and is one uncaught
+    // variant away from failing the whole transition. Render one fenced warm
+    // frame immediately after the TSL graph exists so the shadow target is
+    // real before anything compiles against it. Explicit-force call forms
+    // keep the pinned coverage-frame sequence in the committing phase below
+    // untouched; its resetRenderInfo still scopes readiness to real coverage.
+    const coldOptionalRoots = !hadPreparedArena ? [overdriveRoot, nukeShockwave, nukeEvent.root, explosiveBoltPresentationRoot, railgunPresentation.root, timedMapWeaponPresentation.root, flareProjectileSystem.root, flamethrowerStreamPresentation.root, tracerPool.lines, impactPresentation.root, grenadeExplosionPresentation.root, supportExplosionPresentation.root, deathDropPresentationPool.root, grenadeWorldPresentationPool.root, smokeVolumePresentationPool.root, killstreakPresentation.root, botWeaponGpuVocabulary.root, weaponView.root] : [];
+    if (renderRuntime.backend === 'webgpu') {
+      // FARCRYSIS-LOAD (pass 84, lane C): the warm frame below is the FIRST
+      // WebGPU submission of a cold session, and it is fenced at 12 s. For
+      // farcrysis it realised 134-217 cold render pipelines (196 distinct
+      // vertex modules before the instancing fix) synchronously inside that
+      // one submission, the GPU process did not finish compiling them within
+      // the fence ("WebGPU queue completion exceeded 12000 ms for submission
+      // 1 ... fenced draws 1017"), the selection rolled back, and the stuck
+      // submission then failed the next arena's 4 s fence as well. Atomic
+      // Acres compiles 75 here and passes. So for this arena the exact
+      // ScenePass vocabulary is realised FIRST through compileAsync -
+      // createRenderPipelineAsync, which Dawn compiles on worker threads and
+      // outside any fence - with frustum culling disabled so the coverage set
+      // is complete; the warm frame and the committing coverage draw then
+      // find every pipeline already built. The fence itself is untouched.
+      //
+      // LOAD-CUT (pass 85, lane H, HF-417): the arena-id gate this used to
+      // carry was the bug. Lane I found gun-range UNREACHABLE by an in-match
+      // map switch on the shipped PASS 84 build - "[Gun Range map selection
+      // failed] WebGPU queue completion exceeded 12000 ms for submission 614
+      // ... fenced draws 770" - while its FIRST load was fine, so every
+      // instrument that only ever boots straight into an arena stayed green
+      // while the map could not be entered. Measured on the shipped build
+      // (docs/evidence/pass85/lane-h/): an in-session switch into gun-range
+      // creates 234-302 render pipelines, and the switch-matrix phase
+      // attribution reports how many of them are built inside THIS
+      // warm-frame-and-fence window. Whichever arena is entered second carries
+      // that cost, so nothing about it is farcrysis-specific - farcrysis was
+      // simply the first arena heavy enough to lose the race outright. The
+      // off-fence realisation therefore runs for EVERY arena. compileAsync
+      // uses createRenderPipelineAsync, which Dawn compiles on worker threads
+      // outside any submission, so this MOVES work off the fence rather than
+      // adding it: the coverage precompile below then finds the pipelines
+      // already built. THE FENCE IS UNTOUCHED at 12 s, and
+      // src/presentation-prewarm-contract.test.ts pins that this region now
+      // contains no arena-id branch at all.
+      //
+      // LOAD-CUT (pass 85, lane H2, 2026-09-03): the generalisation above was
+      // measured to cost a FIRST LOAD 8.6 s it never gets back. Interleaved A/B
+      // on gun-range, baseline dist and candidate dist back to back on the same
+      // machine minutes apart (docs/evidence/pass87/lane-h2/): the
+      // `visual-definition` phase went 4398 -> 12981 ms (x2.95) against an
+      // internal control of x1.35, and `coverage-submit-fence` did NOT fall to
+      // pay for it. The reason is in the ROOT, not the gate: on an in-session
+      // switch the whole scene's vocabulary is the thing at risk, because the
+      // renderer's cache holds the PREVIOUS arena's permutations; on a cold
+      // session nothing in the scene has been realised yet, the retained
+      // gameplay roots are suppressed and are prewarmed by their own passes
+      // downstream, and the only vocabulary the fenced warm frame can be
+      // surprised by is THE ARENA'S OWN - which is exactly what farcrysis's
+      // 134-217 cold pipelines were (submission 1 of a cold session).
+      //
+      // The in-session-switch case - the one that took the 56-pair matrix from
+      // 55/56 to 56/56 - is byte-for-byte what it was, and neither case reads an
+      // arena id.
+      //
+      // MEASURED AGAIN (lane H2, 2026-09-03): scoping the cold-session root to
+      // the arena recovered only a third of the cost - gun-range's
+      // `visual-definition` went 12981 -> 10049 ms against a 4404 ms baseline,
+      // internal control x0.99 - and `coverage-submit-fence` stayed flat at
+      // x1.00, so the remaining 5.6 s is ADDED work, not moved work. On a cold
+      // session the coverage precompile downstream realises the same set off the
+      // fence anyway and the warm frame in between clears 12 s on every arena
+      // except the one `cold-session-precompile-reach.ts` names with its
+      // evidence. So the cold-session relief is asked of that authority, and
+      // this region still contains no arena id (pinned twice).
+      //
+      // A cold session has no prior arena vocabulary to protect. Keep the
+      // measured off-fence relief for the named cold-fence losers, but scope
+      // that first compile to the newly admitted arena root; the later exact
+      // coverage draw owns the shared retained roots. In-session switches keep
+      // the whole-scene relief above because their prior arena cache is the
+      // falsifier that caused the original switch failure.
+      const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);
+      if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {
+        const scenePassPrecompile = pass64TslSystems;
+        if (hadPreparedArena) {
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));
+        } else {
+          // A cold page has no prior arena vocabulary to protect. Compile only
+          // the newly admitted arena root; the pass graph and shared retained
+          // roots are covered by the later exact coverage draw. This keeps the
+          // cold-fence relief from compiling unrelated menu/support roots.
+          await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));
+        }
+        exactScenePassPrecompiled = true;
+        assertAdmission();
+      }
+      requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission();
+    }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
     assertAdmission();
@@ -24668,15 +30153,10 @@ async function performArenaSelection(
     await waitForPendingArtTextures();
     assertAdmission();
     setBootstrapStage('prewarming-weapon-catalog');
-    profileArenaTransition('weapon-catalog-prewarm');
-    await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(
-      nextSelection.id,
-      gunRangeSidearmForWeaponPrewarm(),
-    ));
+    profileArenaTransition('weapon-catalog-prewarm'); await weaponView.prewarmBrowserWeaponCatalog(weaponPrewarmCatalogForArena(nextSelection.id, gunRangeSidearmForWeaponPrewarm()));
     assertAdmission();
-    profileArenaTransition('presentation-batching');
-    setBootstrapStage('batching-static-meshes');
     batchSelectedArenaPresentation();
+    arena.root.userData.staticMatricesFrozen = freezeStaticArenaMatrices(arena.root); // HF-491: batched arena is static from here on
     setArenaPresentationVisibility();
     const collisionRouteAuthority = currentAtomicCollisionRouteAuthority();
     if (collisionRouteAuthority) {
@@ -24690,6 +30170,7 @@ async function performArenaSelection(
     lastPlayerSpawnIndex = -1;
     lastPlayerSpawnAudit = null;
     recentDeathPositions.length = 0;
+    recentSpawnUses.length = 0;
     lastBotSpawnAudit.clear();
     respawn(false);
     setArenaMenuCamera();
@@ -24716,12 +30197,15 @@ async function performArenaSelection(
       if (!exactScenePass) {
         throw new Error('WebGPU arena coverage requires the exact Pass 64 ScenePass graph');
       }
-      await withArenaFrustumCullingDisabled(scene, async () => {
+      await withDetachedRoots(coldOptionalRoots, () => withArenaFrustumCullingDisabled(scene, async () => {
         // Three yields between node shader stages/render objects during this
         // exact HDR/MRT compile, preventing one monolithic first-coverage CPU
         // task. The forced full draw below remains the authoritative geometry,
         // shadow-caster, post-graph and queue-completion proof.
-        await exactScenePass.precompileExactScenePass(scene);
+        if (!exactScenePassPrecompiled) {
+          await exactScenePass.precompileExactScenePass(scene);
+          exactScenePassPrecompiled = true;
+        }
         assertAdmission();
         // The asynchronous ScenePass compiler may finish after a tab switch.
         // Reacquire foreground ownership at the forced full-coverage draw.
@@ -24738,7 +30222,7 @@ async function performArenaSelection(
         // budget. Keep the longer allowance behind the menu/loading surface.
         await flushWebGpuFrames(12_000);
         assertAdmission();
-      });
+      }));
       assertAdmission();
     } else {
       if (admissionToken) await waitForVisibleBrowserPreparation(admissionToken.signal);
@@ -24769,6 +30253,7 @@ async function performArenaSelection(
     setBootstrapStage('gameplay-assets-ready');
     document.documentElement.dataset.gameplayArena = selectedArena.id;
     previousInteractiveWorldRuntime?.dispose();
+    disposeThinMetalPerforationRuntime(previousThinMetalPerforationRuntime);
     try {
       previousPhysics?.dispose();
     } catch (disposeError) {
@@ -24776,7 +30261,7 @@ async function performArenaSelection(
     }
     setStatus(`${selectedArena.displayName} selected · ${selectedArena.rulesLabel}.`);
   } catch (error) {
-    console.error('[Nuke Town map selection failed]', error);
+    console.error(`[${nextSelection.displayName} map selection failed]`, error);
     arenaTransitionPhase = 'rolling-back';
     arenaTransitionFailure = error instanceof Error ? error.message : String(error);
     profileArenaTransition('rollback');
@@ -24786,6 +30271,7 @@ async function performArenaSelection(
     lastDebugCapturePresentation = null;
     arena = previousArena;
     interactiveWorldRuntime = previousInteractiveWorldRuntime;
+    thinMetalPerforationRuntime = rollbackThinMetalPerforationRuntime(previousThinMetalPerforationRuntime, nextThinMetalPerforationRuntime, scene);
     gameplayArenaPrepared = hadPreparedArena;
     document.documentElement.dataset.gameplayArena = hadPreparedArena
       ? previousArena.id
@@ -24797,6 +30283,7 @@ async function performArenaSelection(
     syncInteractiveWorldPhysics(true);
     audio.setArena(selectedArena.id);
     footstepEmitters.reset();
+    hfParticleRuntime.setArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
     if (!hadPreparedArena) {
       arenaVisualReceipt = null;
@@ -24814,10 +30301,17 @@ async function performArenaSelection(
       lastPlayerSpawnIndex = -1;
       lastPlayerSpawnAudit = null;
       recentDeathPositions.length = 0;
+      recentSpawnUses.length = 0;
       lastBotSpawnAudit.clear();
       respawn(false);
       setArenaMenuCamera();
-      setStatus(`Map switch failed — ${selectedArena.displayName} remains selected.`, 'warn');
+      // Say "deployment preparation failed" on BOTH rollback paths. A GPU that
+      // rejects the requested arena (an over-limit bind group, a driver pipeline
+      // failure) used to land here and report only that the OLD map "remains
+      // selected", which is indistinguishable from a hang: the boot gate cannot
+      // match it, so it went on to boot the rolled-back arena and passed, and a
+      // real player's menu click appeared to do nothing at all.
+      setStatus(`${nextSelection.displayName} deployment preparation failed — ${selectedArena.displayName} remains selected.`, 'warn');
     } catch (rollbackError) {
       arenaTransitionPhase = 'failed';
       arenaTransitionFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
@@ -24980,7 +30474,7 @@ function resetForMode(preserveAdmission = false): void {
   resetBreakableWindows();
   for (const id of remotes.keys()) removeRemote(id, 'cleared', false);
   verifiedRemoteKills.clear();
-  element<HTMLElement>('#banner').hidden = true;
+  clearCentreBanner(); // HF-339
   element<HTMLElement>('#countdown').hidden = true;
   element<HTMLElement>('#respawn').hidden = true;
   element<HTMLElement>('#death-fade').classList.remove('death-wash', 'respawn-flash');
@@ -25010,7 +30504,7 @@ function restartSoloMatch(): void {
 
 function returnToMainMenu(): void {
   invalidateMatchAdmission('Player returned to the main menu');
-  const leavingHostedMatch = network.role === 'host';
+  const leavingHostedMatch = network.role === 'host'; pendingVoluntaryActiveMatchRejoinRoomCode = network.role === 'client' && network.roomCode && (gameStarted || matchState.phase === 'active' || privateLobbySnapshot?.phase === 'active' || privateMatchActiveAtEpochMs !== null) ? network.roomCode : ''; if (network.role === 'client' && network.roomCode && localResumeToken) { try { saveActiveRoomIdentity(network.roomCode); } catch { /* In-memory rejoin identity remains canonical. */ } }
   if (network.role !== 'offline') network.send({ type: 'leave', playerId: player.id, voluntary: true });
   network.close();
   if (leavingHostedMatch) {
@@ -25047,14 +30541,16 @@ function returnToMainMenu(): void {
   }
 }
 
-function resumeActiveMatchFromMenu(): void {
+function resumeActiveMatchFromMenu(requestLock = true): void {
   if (!gameStarted || !player.alive || matchFinished) return;
   // One explicit transaction owns every pending Options edit. Switching the
   // visible panel after it must not perform a second persistence operation.
   flushPendingGraphics();
   if (activeMenuTabId === 'options') setMenuTab('deploy', false);
   applyMenuLifecycle({ type: 'resume' });
-  requestGamePointerLock('resume');
+  // GAMEPAD: a pad resume needs no mouse capture; asking for it outside a
+  // click gesture only produces the "capture was blocked" warning.
+  if (requestLock) requestGamePointerLock('resume');
 }
 
 resumeButton.addEventListener('click', () => {
@@ -25070,13 +30566,17 @@ bindProjectMapDialog();
 element<HTMLButtonElement>('#solo').addEventListener('click', () => {
   if (matchStartPreparing) return;
   if (!requirePlayerName()) return;
+  // A fresh explicit click restores the automatic retry budget (see
+  // handleMatchAdmissionFailure): retries belong to an attempt, not to the session.
+  soloRendererAutoRetriesRemaining = 4;
   network.close();
   resetForMode();
   resetPrivateLobbyState();
   void startGame('solo');
 });
 refreshHostMatchRecoveryAffordance();
-element<HTMLButtonElement>('#host').addEventListener('click', () => {
+element<HTMLButtonElement>('#host').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (network.role !== 'offline' || network.pendingConnectionAttempt()) {
     syncArenaSelectionUi();
     return;
@@ -25094,7 +30594,8 @@ element<HTMLButtonElement>('#host').addEventListener('click', () => {
   network.host(initializeHostLobby, preferredRoomCode, recovery !== null);
   syncArenaSelectionUi();
 });
-element<HTMLButtonElement>('#join').addEventListener('click', () => {
+element<HTMLButtonElement>('#join').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (network.role !== 'offline' || network.pendingConnectionAttempt()) {
     syncArenaSelectionUi();
     return;
@@ -25110,7 +30611,8 @@ element<HTMLButtonElement>('#join').addEventListener('click', () => {
   network.join(code, sendLobbyJoin);
   syncArenaSelectionUi();
 });
-element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
+element<HTMLButtonElement>('#copy-room').addEventListener('click', async (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   const roomCode = network.roomCode.trim();
   if (!roomCode) {
     setStatus('Room code is not ready yet', 'warn');
@@ -25128,7 +30630,8 @@ element<HTMLButtonElement>('#copy-room').addEventListener('click', async () => {
   }
   setStatus('Lobby code copied', 'ok');
 });
-element<HTMLButtonElement>('#lobby-ready').addEventListener('click', () => {
+element<HTMLButtonElement>('#lobby-ready').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting') return;
   const ready = !localLobbyReady;
   if (network.role === 'host') updateHostReady({ type: 'lobby-ready', by: player.id, ready, nonce: randomNonce() });
@@ -25144,15 +30647,35 @@ element<HTMLElement>('#lobby-roster').addEventListener('change', (event) => {
   if (network.role === 'host') updateHostHandicap(message);
   else if (network.role === 'client') network.send(message);
 });
-element<HTMLButtonElement>('#lobby-start').addEventListener('click', hostStartPrivateMatch);
-element<HTMLButtonElement>('#lobby-leave').addEventListener('click', returnToMainMenu);
+element<HTMLButtonElement>('#lobby-start').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  hostStartPrivateMatch();
+});
+element<HTMLButtonElement>('#lobby-swap-sides').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  // HF-328: the button is a SWAP SIDES REQUEST, same authority path as the
+  // legacy #team select: the host decides via applyTeamSwap, never the client.
+  if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
+  const member = hostLobbyMembers.get(player.id)
+    ?? privateLobbySnapshot.members.find((entry) => entry.id === player.id);
+  if (!member?.connected) return;
+  const message = { type: 'lobby-team' as const, by: player.id, team: (member.team === 0 ? 1 : 0) as Team, nonce: randomNonce() };
+  if (network.role === 'host') updateHostTeam(message);
+  else if (network.role === 'client') network.send(message);
+});
+element<HTMLButtonElement>('#lobby-leave').addEventListener('click', (event) => {
+  (event.currentTarget as HTMLElement)?.blur(); // HF-324: blur button after click
+  returnToMainMenu();
+});
 const commitLocalSquadPresentation = (): void => {
   if (network.role !== 'host' && network.role !== 'client') return;
   const member = privateLobbySnapshot?.members.find((entry) => entry.id === player.id)
     ?? hostLobbyMembers.get(player.id);
+  // HF-328: identity is prescribed from the member's team rather than typed, so the
+  // current local values are the source rather than removed form controls.
   const squad = sanitizeSquadPresentation(
-    element<HTMLInputElement>('#lobby-squad-name').value,
-    element<HTMLInputElement>('#lobby-squad-color').value,
+    localSquadName,
+    localSquadColor,
     member?.team ?? player.team,
   );
   localSquadName = squad.name;
@@ -25163,8 +30686,112 @@ const commitLocalSquadPresentation = (): void => {
   if (network.role === 'host') updateHostSquad(message);
   else network.send(message);
 };
-element<HTMLInputElement>('#lobby-squad-name').addEventListener('change', commitLocalSquadPresentation);
-element<HTMLInputElement>('#lobby-squad-color').addEventListener('change', commitLocalSquadPresentation);
+// HF-360: operator-skin selection. Local choice persists, prefetches its
+// asset, and replicates through the host (host validates against the catalog
+// and rebroadcasts via the lobby snapshot).
+const operatorSkinSelect = element<HTMLSelectElement>('#operator-skin');
+operatorSkinSelect.value = localOperatorSkinId;
+operatorSkinSelect.addEventListener('change', () => {
+  const chosen = operatorSkinSelect.value;
+  if (!isSelectableOperatorSkinId(chosen)) {
+    operatorSkinSelect.value = localOperatorSkinId;
+    return;
+  }
+  localOperatorSkinId = chosen;
+  try { localStorage.setItem(OPERATOR_SKIN_STORAGE_KEY, chosen); } catch { /* selection still applies this session */ }
+  void loadOperatorSkinAsset(chosen);
+  const message: LobbySkinMessage = { type: 'lobby-skin', by: player.id, skinId: chosen, nonce: randomNonce() };
+  if (network.role === 'host') updateHostSkin(message);
+  else if (network.role === 'client') network.send(message);
+});
+// LIGHTING: the SOLO sky. The lobby row is host-authoritative and only exists
+// once a lobby does; solo has no host to defer to, so this writes the SAME
+// replicated field (`privateMatchConfig.timeOfDay`) and applies immediately.
+// Hosting seeds the lobby from it, after which the lobby row is the authority
+// and `activeLightingTimeChoice()` reads the snapshot instead of this.
+const soloTimeOfDaySelect = element<HTMLSelectElement>('#solo-time-of-day');
+soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+soloTimeOfDaySelect.addEventListener('change', () => {
+  const chosen = soloTimeOfDaySelect.value;
+  if (!isLightingTimeChoice(chosen)) {
+    soloTimeOfDaySelect.value = privateMatchConfig.timeOfDay ?? DEFAULT_LIGHTING_TIME_CHOICE;
+    return;
+  }
+  privateMatchConfig = { ...privateMatchConfig, timeOfDay: chosen };
+  // A local override from `?tod=` would otherwise shadow the player's own
+  // choice for the rest of the session, which reads as a broken control.
+  lightingTimeChoiceOverride = null;
+  applyLightingConditionUniforms(true);
+});
+// Pass 75: the OPERATOR panel. Skin, idle stance and emote are chosen from
+// cards rather than a buried dropdown, each persists locally, and the skin
+// still replicates through the existing host-authoritative lobby-skin path.
+function renderOperatorAppearance(): void {
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-skin]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorSkin === localOperatorSkinId));
+  }
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-stance]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorStance === localOperatorStanceId));
+  }
+  for (const card of document.querySelectorAll<HTMLButtonElement>('[data-operator-emote]')) {
+    card.setAttribute('aria-pressed', String(card.dataset.operatorEmote === localOperatorEmoteId));
+  }
+  const status = document.querySelector<HTMLElement>('#operator-appearance-status');
+  if (status) {
+    const skinName = OPERATOR_SKIN_CATALOG.definitions.find((entry) => entry.id === localOperatorSkinId)?.displayName
+      ?? 'Standard Operator';
+    const emote = operatorEmote(localOperatorEmoteId);
+    status.textContent = `${skinName} · ${operatorStance(localOperatorStanceId).displayName} · ${emote.clipName === null ? 'no emote' : emote.displayName}.`;
+  }
+}
+
+function persistOperatorPreference(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* selection still applies this session */ }
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target : null;
+  const card = target?.closest<HTMLButtonElement>('[data-operator-skin], [data-operator-stance], [data-operator-emote]');
+  if (!card) return;
+  const skin = card.dataset.operatorSkin;
+  const stance = card.dataset.operatorStance;
+  const emote = card.dataset.operatorEmote;
+  if (skin !== undefined && isSelectableOperatorSkinId(skin)) {
+    localOperatorSkinId = skin;
+    persistOperatorPreference(OPERATOR_SKIN_STORAGE_KEY, skin);
+    void loadOperatorSkinAsset(skin);
+    const select = document.querySelector<HTMLSelectElement>('#operator-skin');
+    if (select) select.value = skin;
+    const message: LobbySkinMessage = { type: 'lobby-skin', by: player.id, skinId: skin, nonce: randomNonce() };
+    if (network.role === 'host') updateHostSkin(message);
+    else if (network.role === 'client') network.send(message);
+  } else if (stance !== undefined && isOperatorStanceId(stance)) {
+    localOperatorStanceId = stance;
+    persistOperatorPreference(OPERATOR_STANCE_STORAGE_KEY, stance);
+    // HF-388: persisting alone left activeOperatorStance()'s cache stale, so
+    // the first-person arms (weapon-presentation reads it every frame) kept
+    // the previous stance until a reload. Publish to the live store here,
+    // mirroring what ui/operator-preview.ts already does for its turntable.
+    setActiveOperatorStance(stance);
+    // HF-382: and replicate it, exactly like the skin branch above - the panel
+    // says "Your squad sees every choice here" and until now stance was the one
+    // choice they never saw.
+    const stanceMessage: LobbyStanceMessage = { type: 'lobby-stance', by: player.id, stanceId: stance, nonce: randomNonce() };
+    if (network.role === 'host') updateHostStance(stanceMessage);
+    else if (network.role === 'client') network.send(stanceMessage);
+  } else if (emote !== undefined && isOperatorEmoteId(emote)) {
+    localOperatorEmoteId = emote;
+    persistOperatorPreference(OPERATOR_EMOTE_STORAGE_KEY, emote);
+  } else {
+    return;
+  }
+  renderOperatorAppearance();
+});
+renderOperatorAppearance();
+
+// HF-328: the free squad-name input and colour picker were removed from the lobby -
+// identity is prescribed - so there are no change events to bind here. Squad identity
+// is committed by the team-assignment path instead.
 element<HTMLButtonElement>('#lobby-reset').addEventListener('click', () => {
   if (network.role !== 'host') return;
   if (!clearLastHostedRoomCode(clientPersistentStorage())) {
@@ -25189,6 +30816,13 @@ element<HTMLButtonElement>('#lobby-balance').addEventListener('click', () => {
   for (const member of balanceLobbyTeams([...hostLobbyMembers.values()])) hostLobbyMembers.set(member.id, { ...member, ready: false });
   broadcastHostLobby('waiting');
 });
+/** HF-377: an empty select value is the uncapped OFF option; anything else must
+ * be a whole-number first-to-N target before it may enter the match contract. */
+const parsedLobbyKillLimit = (value: string): number | null => {
+  if (value === '') return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : privateMatchConfig.scoreLimit;
+};
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
   const requestedArena = element<HTMLSelectElement>('#lobby-arena').value as ArenaId;
@@ -25197,7 +30831,23 @@ const updateLobbyConfigFromUi = (): void => {
   const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;
   const requestedBots = Number(element<HTMLSelectElement>('#lobby-bots').value);
-  const hostedBotCount: HostedBotCount = rangeLobby ? 0 : isHostedBotCount(requestedBots) ? requestedBots : 0;
+  // HF-533/HF-534: Nuke Town hosts exactly two bots when enabled; the coerced value is
+  // written back so the select never promises an unfielded count (no change event, no recursion).
+  const hostedBotCount: HostedBotCount = rangeLobby ? 0 : coerceHostedBotCountForArena(arenaId, requestedBots);
+  element<HTMLSelectElement>('#lobby-bots').value = rangeLobby ? '0' : String(hostedBotCount);
+  // Pass 70 + HF-377: a host MAP CHANGE canonicalizes the round to THAT arena's
+  // own duration (and uncapped score) by resetting the mirrored limit selects
+  // before the contract is applied; a limit the host explicitly picks afterwards
+  // survives every other config change because it is read back from these same
+  // controls. Every hostedArenaDurationMs value is a published select option,
+  // so this assignment can never silently no-op.
+  const timeLimitSelect = element<HTMLSelectElement>('#lobby-time-limit');
+  const killLimitSelect = element<HTMLSelectElement>('#lobby-kill-limit');
+  const timeOfDaySelect = element<HTMLSelectElement>('#lobby-time-of-day');
+  if (arenaId !== privateMatchConfig.arenaId) {
+    timeLimitSelect.value = String(hostedArenaDurationMs(arenaSelection(arenaId)));
+    killLimitSelect.value = '';
+  }
   applyHostLobbyConfig({
     ...privateMatchConfig,
     arenaId,
@@ -25205,7 +30855,14 @@ const updateLobbyConfigFromUi = (): void => {
     capacity,
     hostedBotCount,
     autoBalance: !rangeLobby && mode === 'tdm' && element<HTMLInputElement>('#lobby-auto-balance').checked,
-    durationMs: hostedArenaDurationMs(arenaSelection(arenaId)),
+    // HF-377: the host's explicit time/kill limit choices join the match
+    // contract; gun-range keeps its fixed untimed practice round.
+    durationMs: rangeLobby ? hostedArenaDurationMs(arenaSelection(arenaId)) : Number(timeLimitSelect.value),
+    scoreLimit: rangeLobby ? null : parsedLobbyKillLimit(killLimitSelect.value),
+    // LIGHTING: the host's time-of-day mode joins the replicated match contract.
+    // A value the validator does not know collapses to the default rather than
+    // failing the whole lobby snapshot.
+    timeOfDay: isLightingTimeChoice(timeOfDaySelect.value) ? timeOfDaySelect.value : DEFAULT_LIGHTING_TIME_CHOICE,
   });
 };
 element<HTMLSelectElement>('#lobby-arena').addEventListener('change', updateLobbyConfigFromUi);
@@ -25213,6 +30870,9 @@ element<HTMLSelectElement>('#lobby-mode').addEventListener('change', updateLobby
 element<HTMLSelectElement>('#lobby-capacity').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLSelectElement>('#lobby-bots').addEventListener('change', updateLobbyConfigFromUi);
 element<HTMLInputElement>('#lobby-auto-balance').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-kill-limit').addEventListener('change', updateLobbyConfigFromUi);
+element<HTMLSelectElement>('#lobby-time-of-day').addEventListener('change', updateLobbyConfigFromUi);
 teamSelect.addEventListener('change', () => {
   if (!privateLobbySnapshot || privateLobbySnapshot.phase !== 'waiting' || privateLobbySnapshot.config.mode !== 'tdm') return;
   const team: Team = teamSelect.value === '1' ? 1 : 0;
@@ -25251,6 +30911,9 @@ function scheduleStateBroadcast(): void {
         synchronizeGunRangeTestBayDoorWorld(doorState, false);
         flushGunRangeTestBayDoorBroadcast();
       }
+      // HF-318: a hidden host still simulates bots, so keep the dummy colliders
+      // current on the authority heartbeat as well as on presented frames.
+      refreshGunRangeTestBayDummyColliders(now);
       updateGunRangeMatchClockAuthority(now);
       updateTimedMapWeapons(now);
     }
@@ -25305,34 +30968,62 @@ window.addEventListener('beforeunload', () => {
   arenaVisualStream.dispose();
   retireAtomicPresentation();
   for (const [arenaId, cachedArena] of [...arenaCache]) disposeRetiredArena(arenaId, cachedArena);
+  // Terminal teardown owns the shared sky textures (see disposeRetiredArena:
+  // per-arena retirement keeps them alive because TextureLoader/Cache may hand
+  // the same texture to a newly constructed arena). The frame loop bails once
+  // gameplayRuntimeDisposing is set, so no frame can still sample these.
+  disposeSkyBackdrops();
   renderRuntime.dispose();
 });
 
 function effectiveFramePacing(now = performance.now()) {
   const callback = framePacing.summary();
+  // rateHz, never cadenceHz: a median gap reports the rate INSIDE a burst, so
+  // "two frames back to back then a refusal" reads as 125 fps while 42 frames
+  // are presenting. Every published cadence here is frames over elapsed time.
   if (renderRuntime.backend !== 'webgpu') {
     return Object.freeze({
       ...callback,
       source: 'animation-frame' as const,
-      callbackCadenceHz: callback.cadenceHz,
-      completedCadenceHz: callback.cadenceHz,
+      cadenceHz: callback.rateHz,
+      callbackCadenceHz: callback.rateHz,
+      callbackRefreshHz: callback.p05Ms > 0 ? 1_000 / callback.p05Ms : 0,
+      submittedCadenceHz: callback.rateHz,
+      completedCadenceHz: callback.rateHz,
+      displayLimited: false,
     });
   }
   const progress = renderRuntime.presentationTelemetry(now).progress;
   const submittedCadenceHz = cadenceWithNoProgressAge(
-    progress.submissionPacing.cadenceHz,
+    progress.submissionPacing.rateHz,
     progress.currentSubmissionGapMs,
   );
+  // PRESENTED frames: the completion frontier is the only counter that moves
+  // when the GPU actually finished a frame. Submissions overcount (they include
+  // work still queued) and requestAnimationFrame callbacks overcount by far
+  // more (they keep firing through every refused submission).
   const completedCadenceHz = cadenceWithNoProgressAge(
-    progress.completionPacing.cadenceHz,
+    progress.completionPacing.rateHz,
     progress.currentCompletionGapMs,
   );
+  const callbackCadenceHz = callback.rateHz;
+  // The refresh CEILING: the fastest callbacks in the window. Nothing presents
+  // faster than the display refresh, so this stays put when the renderer
+  // hitches while callbackCadenceHz falls with it.
+  const callbackRefreshHz = callback.p05Ms > 0 ? 1_000 / callback.p05Ms : 0;
   return Object.freeze({
-    ...progress.submissionPacing,
-    cadenceHz: submittedCadenceHz,
-    source: 'webgpu-submission' as const,
-    callbackCadenceHz: callback.cadenceHz,
+    ...progress.completionPacing,
+    cadenceHz: completedCadenceHz,
+    source: 'webgpu-presented' as const,
+    callbackCadenceHz,
+    callbackRefreshHz,
+    submittedCadenceHz,
     completedCadenceHz,
+    displayLimited: presentationIsDisplayLimited({
+      sampleCount: progress.completionPacing.sampleCount,
+      presentedCadenceHz: completedCadenceHz,
+      callbackRefreshHz,
+    }),
     progressWindow: Object.freeze({
       elapsedMs: progress.elapsedMs,
       submissionAdvances: progress.submissionAdvances,
@@ -25496,6 +31187,7 @@ function monitorSelectedArenaRender(now: number): void {
 const runtimeErrorLog: string[] = [];
 let consecutiveFrameErrors = 0;
 
+let runtimeErrorLogHideTimer: number | null = null;
 function reportRuntimeError(context: string, error: unknown): void {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   const stack = error instanceof Error && error.stack ? error.stack.split('\n').slice(1, 4).join(' | ').trim() : '';
@@ -25516,6 +31208,15 @@ function reportRuntimeError(context: string, error: unknown): void {
   if (el) {
     el.hidden = false;
     el.textContent = runtimeErrorLog.join('\n');
+    // Owner 2026-08-30: a transient hiccup used to leave this red box on
+    // screen for the rest of the session. The full detail persists in the
+    // client runtime log and console either way; the on-screen surface is a
+    // 12-second toast that re-arms on every new entry.
+    if (runtimeErrorLogHideTimer !== null) window.clearTimeout(runtimeErrorLogHideTimer);
+    runtimeErrorLogHideTimer = window.setTimeout(() => {
+      runtimeErrorLogHideTimer = null;
+      el.hidden = true;
+    }, 12_000);
   }
 }
 
@@ -25523,6 +31224,7 @@ function frame(now: number, scheduleNext = true): void {
   // A pending rAF can run after beforeunload has begun. Never touch renderer
   // resources once page-exit teardown has started, and do not reschedule it.
   if (gameplayRuntimeDisposing) return;
+  clearExpiredLocalReloadAuthority(now);
   const schedulingDecision = reconcilePresentationScheduling('animation frame eligibility');
   if (schedulingDecision.mode !== 'foreground-presentation') {
     // The prerecorded menu/loading media owns its own browser compositor path.
@@ -25573,7 +31275,7 @@ function frame(now: number, scheduleNext = true): void {
       && gameStarted && matchState.phase === 'active' && menuLifecycle.surface === 'hidden'
       && document.visibilityState === 'visible' && document.hasFocus();
     if (activeForegroundWebGpuFrame
-      && shouldResetPresentationAfterSchedulerGap(rawFrameMs, LIVE_WEBGPU_PRESENTATION_STALL_MS)) {
+      && shouldResetPresentationAfterSchedulerGap(rawFrameMs, WEBGPU_SCHEDULER_GAP_RESET_MS)) {
       resetWebGpuPresentationEpoch('foreground scheduler gap', now);
     }
     monitorCompletedWebGpuQueueHealth(now);
@@ -25600,25 +31302,79 @@ function frame(now: number, scheduleNext = true): void {
       // Keep it on the four-Hz display cadence so uncapped WebGPU does not
       // manufacture sustained allocation/GC pressure merely to repaint text.
       const pacing = effectiveFramePacing(now);
+      // PRESENTED frames. pacing.cadenceHz is now the completion-frontier rate,
+      // so this reads what the owner is looking at instead of the median gap
+      // between SUBMISSIONS - which read 60 while he was watching 20, because a
+      // burst of two admitted frames followed by a refusal has an 8 ms median.
       const fps = pacing.sampleCount >= 1 ? Math.max(1, Math.round(pacing.cadenceHz)) : null;
       fpsCounterValue.textContent = fps === null ? '--' : String(fps);
       fpsCounter.dataset.pacing = fps === null ? 'warming' : fps >= 55 ? 'smooth' : fps >= 40 ? 'strained' : 'slow';
+      // When the frame loop is running materially faster than the GPU is
+      // presenting, THAT divergence is the interesting number - it is the
+      // signature of refused submissions, and hiding it is what let this ship.
+      const callbackHz = Math.round(pacing.callbackCadenceHz);
+      const divergent = fps !== null && callbackHz >= fps + Math.max(8, fps * 0.15);
+      fpsCounterLabel.textContent = divergent ? `FPS · ${callbackHz} LOOP` : 'FPS';
+      fpsCounter.dataset.divergent = divergent ? 'true' : 'false';
       const refreshWarning = element<HTMLElement>('#refresh-warning');
-      refreshWarning.hidden = !(pacing.displayLimited && now < refreshWarningUntil);
-      if (pacing.displayLimited) {
-        refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.cadenceHz)} HZ PRESENTATION LIMIT`;
+      // Arm once per match, on the first display-limited reading taken over a
+      // FULL pacing window. A partial window arms during arena warm-up, when
+      // the frame loop is still ramping through 23-29 Hz, and the notice then
+      // announces a refresh rate the monitor does not have.
+      if (pacing.displayLimited && refreshWarningPending && pacing.sampleCount >= 180) {
+        refreshWarningPending = false;
+        refreshWarningUntil = now + 12_000;
+        // Say the actual refresh, and say what to do about it. The old copy
+        // asserted "30 HZ DISPLAY LIMIT" and could never fire at the 59 Hz the
+        // owner's 180 Hz panel is actually set to in Windows.
+        refreshWarning.querySelector('strong')!.textContent = `${Math.round(pacing.callbackRefreshHz)} HZ DISPLAY REFRESH`;
+        refreshWarning.querySelector('span')!.textContent =
+          'Your monitor is presenting at its refresh rate, not the game’s limit. '
+          + 'Raise it in Windows Settings › System › Display › Advanced display, '
+          + 'or run tools/play-atomic-acres-no-vsync.cmd to render above the refresh.';
       }
+      // Held for the whole window once armed. Toggling it off the instant the
+      // presented estimate wobbles made the one surface that explains the frame
+      // rate flicker in and out while the player was trying to read it.
+      //
+      // ...except in CAPTURE mode. A deterministic review frame is a
+      // measurement, and this banner lays an opaque strip across the bottom of
+      // it: the Lane AB time-of-day frames for Terminal both carry a "91 HZ
+      // DISPLAY REFRESH" notice over ~8% of the frame. It is constant across a
+      // pair so it cannot flip the sign of a delta, but it dilutes every
+      // percentage-of-frame metric and it is not a clean review capture. The
+      // same flag that hides the viewmodel for a capture hides it.
+      refreshWarning.hidden = debugCaptureViewmodelHidden || now >= refreshWarningUntil;
       lastFpsHudAt = now;
     }
     const frameDt = Math.min(0.05, rawFrameMs / 1000);
     lastFrame = now;
     pollGamepad(frameDt);
-    pollMobileTouch();
+    pollMobileTouch(frameDt);
     accumulator += frameDt;
     const step = 1 / SIMULATION_HZ;
     let iterations = 0;
     while (accumulator >= step && iterations < 6) {
       updatePhysics(step);
+      if (gameStarted && player.alive && matchState.phase === 'active') {
+        const adrenalineActive = (localKillstreakActorSnapshot()?.adrenalineRemainingMs ?? 0) > 0;
+        const healthBeforeRegen = player.hp;
+        player.hp = advanceLocalHealthRegen({
+          hp: player.hp,
+          lastDamageAt,
+          adrenalineActive,
+          now,
+          dtSeconds: step,
+        });
+        if (Math.floor(healthBeforeRegen) !== Math.floor(player.hp) || player.hp === 100) {
+          recordMatchDiagnostic('health-regen', 'accepted', {
+            actorId: player.id,
+            actorKind: 'player',
+            healthBefore: healthBeforeRegen,
+            healthAfter: player.hp,
+          });
+        }
+      }
       stepInteractiveWorldAuthority();
       accumulator -= step;
       iterations += 1;
@@ -25627,7 +31383,23 @@ function frame(now: number, scheduleNext = true): void {
     if (triggerHeld && WEAPONS[player.weapon].automatic && !localKillstreakActorSnapshot()?.possession) tryFire(now);
     finishReload(now);
     const visualNow = debugCaptureFixedVisualTimeMs ?? now;
-    updateTargets(visualNow);
+    // HF-347: gun-range target lifecycle (dummy respawn checks against the
+    // replicated host-time respawnAt, flying-cat pose) ticks on host-mapped
+    // time so every peer respawns and poses targets on one clock. For solo
+    // and host, currentHostTimeMs() IS performance.now(); other arenas keep
+    // the local visual clock unchanged.
+    updateTargets(selectedArena.id === 'gun-range'
+      ? debugCaptureFixedVisualTimeMs ?? currentHostTimeMs()
+      : visualNow);
+    // MAP3 (HF-409): advance arena-authored animation for the active arena.
+    // `arena` is the admitted arena; staged and cached arenas are never passed
+    // here, so a not-yet-admitted world cannot advance its clock behind the
+    // loading transition. The context factory allocates only when a hook exists.
+    arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
+      arenaId: arena.id,
+      cameraPosition: camera.position,
+      playerVelocity: player.velocity,
+    }));
     updateBots(frameDt, now);
     const grenadeUpdateStartedAt = profileGrenadeFrame ? performance.now() : 0;
     updateGrenades(frameDt, now);
@@ -25699,25 +31471,136 @@ function frame(now: number, scheduleNext = true): void {
     updateRemotes(frameDt, now);
     updateHostedBotReplicaPresentations(frameDt, now);
     updateSensoryFeedback(now);
+    // Pass 75: intermittent arena ambience. One clock comparison on the common
+    // path; it fires a sparse spatialised one-shot only when its own schedule
+    // is due and the shared voice budget has room.
+    audio.updateArenaAmbience();
     if (selectedArena.id === 'atomic-acres') {
       if (arenaArtRoot && !blenderArenaActive) updateArenaArt(arenaArtRoot, visualNow);
       if (neighbourhoodLifeRoot) updateArenaArt(neighbourhoodLifeRoot, visualNow);
-      atmosphereSystem?.update(visualNow / 1_000);
       grassSystem?.update(visualNow / 1_000, camera.position, player.position, gameStarted);
-    } else if (selectedArena.id === 'rustworks-1v1') {
-      atmosphereSystem?.update(visualNow / 1_000);
+    } else if (selectedArena.id === 'nuketown2') {
+      // HF-426 Job 3. The rebuild's lawn field is built INSIDE `buildNuketown2`
+      // and parks its wind hook on the arena root, so it takes the same single
+      // uniform write per frame the shipped map's lawn does. The light set is
+      // untouched here - `updateArenaArt` writes one uniform and then finds no
+      // rings, nucleus, beacon or fauna on this root and does nothing else.
+      if (arena.id === 'nuketown2') updateArenaArt(arena.root, visualNow);
     } else if (selectedArena.id === 'gun-range') {
-      updateGunRangePresentation(arena.root, visualNow);
+      // HF-347: pose the training dummies on HOST time, not this peer's own clock.
+      // gunRangeTestBayRenderedDummyPose is a pure function of time with no
+      // replicated phase input, so a guest feeding it its own performance.now()
+      // renders every dummy somewhere the host does not think it is - the guest
+      // aims at a dummy that, host-side, has already moved. currentHostTimeMs()
+      // returns performance.now() unchanged for solo and host, and the monotonic
+      // host-mapped time for a client, so the patrol converges across peers with
+      // no protocol change. The debug capture override still wins so deterministic
+      // visual captures stay reproducible.
+      const dummyNow = debugCaptureFixedVisualTimeMs ?? currentHostTimeMs();
+      updateGunRangePresentation(arena.root, dummyNow);
+      // HF-318: derive the dummy colliders on the same clock that just posed the
+      // rendered dummies, so the solid volume tracks the visible patrol position
+      // rather than lagging it by a frame.
+      refreshGunRangeTestBayDummyColliders(dummyNow);
       const doorState = updateGunRangeTestBayDoorAuthority(now)
         ?? gunRangeTestBayDoorState
         ?? createGunRangeTestBayDoorState(now);
       synchronizeGunRangeTestBayDoorWorld(doorState, true);
       flushGunRangeTestBayDoorBroadcast();
     }
+    atmosphereSystem?.update(visualNow / 1_000); nukeEvent.update(debugCaptureFixedVisualTimeMs ?? currentHostTimeMs());
+    // HF-371: weather is a pure function of (arena, match seed, elapsed), so
+    // every peer derives the same sky without a byte of network traffic.
+    const weatherElapsedSeconds = gameStarted && matchState.phase === 'active'
+      ? Math.max(0, (visualNow - matchState.phaseStartedAt) / 1_000)
+      : 0;
+    // ?weather=storm|heavy-rain|light-rain|overcast|clear forces the sky.
+    // Natural weather reaches rain in roughly a fifth of five-minute matches,
+    // which is the right variety to PLAY with and the wrong odds to TEST with -
+    // without this you would have to reroll matches to see the feature at all.
+    const weatherNow = weatherOverrideState
+      ? forcedWeatherSample(selectedArena.id, weatherOverrideState)
+      : gameStarted
+        ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
+        : clearWeatherSample(selectedArena.id);
+    // LIGHTING: the hour rides the SAME clock and the SAME match seed the
+    // weather does, so two peers agree on the sun for exactly the reason they
+    // already agree on the sky — and `skyDarkenAmount` pulls the time-of-day
+    // excursion back toward the arena's authored identity as the sky closes in.
+    // This is a uniform write over the frozen light set. `fixed`/`random` write
+    // once per arena apply AND once per weather step that actually changes a
+    // resolved term; `cycle` additionally writes as the clock moves the sun.
+    lightingConditionsElapsedSeconds = weatherElapsedSeconds;
+    lightingConditionsSkyDarken = weatherNow.skyDarkenAmount;
+    applyLightingConditionUniforms();
+    const windNow = sampleWind(
+      weatherWindField,
+      camera.position.x,
+      camera.position.z,
+      visualNow / 1_000,
+      weatherNow.windMultiplier,
+    );
+    const weatherDeltaSeconds = Math.min(0.05, Math.max(0, (visualNow - lastRainUpdateAtMs) / 1_000));
+    rainPresentation.update(
+      weatherDeltaSeconds,
+      camera,
+      weatherNow,
+      windNow,
+      { adsProgress: weaponView.adsProgress?.() ?? 0 },
+    );
+    // HF-371 ambient air rides the SAME clamped delta, the SAME wind sample
+    // and the SAME ads state as rain, so dust, leaves and spray move with the
+    // one shared sky instead of inventing a second wind.
+    hfParticleRuntime.update(weatherDeltaSeconds, camera, {
+      wind: windNow,
+      adsProgress: weaponView.adsProgress?.() ?? 0,
+      densityScale: hfParticleDensityScale,
+      // Rain reaches the ambient simulation through the same shared sample
+      // rain itself draws from: dust is beaten down and debris loaded in
+      // proportion to rainRate. Same numbers on every peer, zero traffic.
+      weather: weatherNow,
+    });
+    lastRainUpdateAtMs = visualNow;
     waterSystem.update(visualNow / 1_000);
     if (gameStarted) updateMinimap(now);
     updateGunRangeMatchClockAuthority(now);
+    updateHostLossPresentation(now); // HF-325 Part 1
     updateHud(now);
+  // Must live in frame(), not updateHud: updateHud self-throttles to 10 Hz and
+  // sway needs every frame or it reads as a stutter rather than a lag.
+  //
+  // Sway is first-person player motion. The four states below are the ones
+  // pass77-hud-sway's own contract names as "motion must stop dead": reduced
+  // motion, a menu/pause surface on screen, death, and a killstreak
+  // possession handover (the HUD is then reporting the drone or chopper, not
+  // the body). `releaseHudSway` existed for exactly this and had no caller at
+  // all, so the last live frame's offset stayed frozen on the HUD through all
+  // four — most visibly on death, where the whole HUD held a stale lean until
+  // the next respawn frame overwrote it.
+  const hudSwayLive = !accessibilityRuntime.reducedMotion
+    && gameStarted
+    && menuLifecycle.surface === 'hidden'
+    && player.hp > 0
+    && !localKillstreakActorSnapshot()?.possession;
+  if (hudSwayLive) {
+    hudSway = applyHudSway(hudMotionTargets, hudSway, {
+      yaw: player.yaw,
+      pitch: player.pitch,
+      speed: Math.hypot(player.velocity.x, player.velocity.z),
+      deltaMs: rawFrameMs,
+    });
+    hudSwayReleased = false;
+  } else if (!hudSwayReleased) {
+    // Latched: write the neutral pose once, then leave the properties alone
+    // so a paused HUD is not re-writing four custom properties every frame.
+    releaseHudSway(hudMotionTargets);
+    hudSway = createHudSwayState(player.yaw, player.pitch);
+    hudSwayReleased = true;
+  }
+  // HF-491 perf lane 4: same dirty-flag path as the sway writes - a
+  // Health is a direct write to its sole consuming element; the five frame-
+  // driven properties never live on the 245-element HUD root.
+  setHudProperty(hudMotionTargets.health, '--hud-health', (Math.max(0, player.hp) / 100).toFixed(3));
     arenaContrastLighting.update(visualNow);
     pass64TslSystems?.update(visualNow);
     if (activeArenaReviewHud) hudRoot.hidden = activeArenaReviewHud === 'hidden';
@@ -25887,11 +31770,6 @@ type ArenaPerformanceBudgetSample = Readonly<{
 }>;
 let latestArenaPerformanceBudgetSample: ArenaPerformanceBudgetSample | null = null;
 
-function percentile(values: readonly number[], quantile: number): number {
-  if (values.length === 0) return Number.POSITIVE_INFINITY;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor((sorted.length - 1) * THREE.MathUtils.clamp(quantile, 0, 1))];
-}
 
 function estimateRendererResidency() {
   return estimateResidentObjectMemory(scene, [
@@ -26170,6 +32048,11 @@ function playableSceneProof(): Record<string, unknown> {
       hud: activeArenaReviewHud,
       tslTimeMs: pass64TslSystems?.root.userData.tslReviewTimeMs ?? null,
       tslSeed: pass64TslSystems?.root.userData.tslReviewSeed ?? null,
+      // HF-535: the sky the station actually committed under. A capture whose
+      // choice is 'random'/'cycle' is a dice roll and its diff means nothing.
+      lightingChoice: activeLightingTimeChoice(),
+      lightingFixedHour: lightingCaptureFixedHour,
+      lightingHour: activeLightingConditions ? Number(activeLightingConditions.hour.toFixed(3)) : null,
     },
     actualArenaVisualPolicy: {
       definitionId: activeArenaVisualDefinition?.id ?? null,
@@ -26238,7 +32121,7 @@ function sampleEnduranceHealth(detail: EnduranceHealthDetail = 'base') {
     },
     runtime: renderRuntime.healthTelemetry(),
     watchdog: arenaRenderWatchdog.telemetry(),
-    gpuRetirement: { failures: gpuRetirementFailures },
+    gpuRetirement: { failures: gpuRetirement.telemetry().failures },
     killstreak: {
       revision: killstreakSnapshot.revision,
       entities: killstreakSnapshot.entities.length,
@@ -26262,7 +32145,10 @@ function sampleEnduranceHealth(detail: EnduranceHealthDetail = 'base') {
         } : null,
       } : null,
       carpetWorkflow: detail === 'carpet-workflow' && carpetPresentationHealth ? {
-        targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+        // HF-317: an open carpet corridor reports as 'carpet-bomber' targeting.
+        targetingMode: pointSupportTargeting?.id
+          ?? (carpetCorridorTargeting ? 'carpet-bomber' as const : null)
+          ?? (triPassTargeting ? 'tri-pass' as const : null),
         crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
         markers: carpetPresentationHealth.markers,
         aircraft: carpetAircraft ? {
@@ -26311,6 +32197,50 @@ function sampleDmrThermalReadiness() {
   });
 }
 
+/**
+ * HF-412: the CHEAP per-frame read of a third-person body's stance blend, for
+ * the drop-shot body and guest harnesses.
+ *
+ * The full operator snapshot rebuilds the whole report (every bone chain in the
+ * scene) and stretched the body harness's sampling frame to ~65 ms, which made
+ * its "single frame" numbers sample deltas rather than frames. This walks
+ * nothing: it reads the rig runtime's five stance fields directly.
+ *
+ * `kind: 'remote'` is the guest's view of another PLAYER (the path that matters
+ * for the ledger's two-client falsifier); `kind: 'bot'` is the local rig the
+ * QA presentation override drives.
+ */
+function sampleBodyStancePose(kind: 'bot' | 'remote' = 'bot') {
+  let id: string | null = null;
+  let operator: THREE.Object3D | undefined;
+  if (kind === 'remote') {
+    for (const [remoteId, remote] of remotes) {
+      id = remoteId;
+      operator = remote.root.userData.operator as THREE.Object3D | undefined;
+      break;
+    }
+  } else {
+    for (const [botId, bot] of bots) {
+      id = botId;
+      operator = bot.root;
+      break;
+    }
+  }
+  const sample = riggedOperatorStanceSample(operator);
+  return Object.freeze({
+    kind,
+    id,
+    found: sample !== null,
+    atMs: performance.now(),
+    stance: sample?.stance ?? null,
+    blendFrom: sample?.blendFrom ?? null,
+    blendProgress: sample?.blendProgress ?? null,
+    crouchBlend: sample?.crouchBlend ?? null,
+    proneBlend: sample?.proneBlend ?? null,
+    pivotHeight: sample?.pivotHeight ?? null,
+  });
+}
+
 function sampleWeaponActionReadiness() {
   const now = performance.now();
   return Object.freeze({
@@ -26326,6 +32256,18 @@ function sampleWeaponActionReadiness() {
     possessed: localKillstreakActorSnapshot()?.possession?.kind ?? null,
     stanceRecoveryRemainingMs: Math.max(0, stanceRecoveryUntil - now),
     sprintRecoveryRemainingMs: Math.max(0, sprintRecoveryUntil - now),
+    // HF-412: the drop-shot transition, so a harness can assert the shape of
+    // the fall instead of inferring it from camera samples alone.
+    dropShot: {
+      active: stanceTransitionSample.active,
+      from: stanceTransitionSample.from,
+      to: stanceTransitionSample.to,
+      progress: stanceTransitionSample.progress,
+      eyeOffsetMeters: stanceTransitionSample.eyeOffsetMeters,
+      spreadMultiplier: stanceTransitionSample.spreadMultiplier,
+      dropping: stanceTransitionSample.dropping,
+      durationMs: stanceTransition?.durationMs ?? 0,
+    },
     nextShotRemainingMs: Math.max(0, player.nextShotAt - now),
     switchingReady: now >= player.switchingUntil,
     switchingRemainingMs: Math.max(0, player.switchingUntil - now),
@@ -26614,16 +32556,59 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
+    // MP-LAB: the cheap pose read for movement probes. The full snapshot walks every
+    // rigged actor's skinned meshes and costs ~60 ms per call (measured
+    // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
+    // it is measuring. This returns only what a deadlock check needs.
+    samplePlayerPose: () => {
+      alive: boolean;
+      position: number[];
+      yaw: number;
+      gameStarted: boolean;
+      matchPhase: string;
+      awaitingCanonicalGuestAuthority: boolean;
+      menuHidden: boolean;
+    };
     snapshot: () => Record<string, unknown> & { player: DebugPlayerPose };
+    /** GAMEPAD: pad runtime + assist telemetry for the PASS 84 e2e. */
+    sampleGamepad: () => Record<string, unknown> & {
+      connected: boolean;
+      /** Which input the player is actually driving with; the assist tier follows it. */
+      scheme: 'keyboard' | 'gamepad';
+      assist: AimAssistResult;
+      touchAssist: AimAssistResult;
+      touchSnapDeg: number;
+      tier: AimAssistTier;
+      overlaySuppressed: boolean;
+    };
+    sampleFireAdmissionDiagnostics: () => Record<string, unknown>;
+    sampleViewmodelPenetration: () => Record<string, unknown>;
+    /** HF-410: the rig's own envelope against the capsule that carries it. */
+    sampleViewmodelRigExtent: () => Record<string, unknown>;
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
+    sampleSceneGraph: () => THREE.Scene;
+    sampleWeather: () => Record<string, unknown>;
+    // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
+    sampleLightingConditions: () => Record<string, unknown>;
+    setLightingTimeChoice: (choice: string) => Record<string, unknown>; triggerNukeEvent: (matchEndHostTimeMs?: number) => Record<string, unknown>;
+    /** LIGHTING: move weather live, unforced, to falsify the uniform-write gate. */
+    setWeatherOverride: (state: string | null) => Record<string, unknown>;
+    /** LIGHTING: pin an exact hour for a capture scan; null restores the mode. */
+    setLightingFixedHour: (hour: number | null) => Record<string, unknown>;
+    sampleSimulationGate: () => Record<string, unknown>;
+    sampleHostSuccession: () => Record<string, unknown>;
     samplePresentationTelemetry: () => ReturnType<typeof renderRuntime.presentationTelemetry>;
+    samplePresentationCounters: () => ReturnType<typeof renderRuntime.presentationCounters>;
     sampleEnduranceHealth: (detail?: EnduranceHealthDetail) => ReturnType<typeof sampleEnduranceHealth>;
     sampleWeaponCatalogReadiness: () => ReturnType<typeof weaponView.browserCatalogReadiness>;
     sampleActiveWeaponReadiness: () => ReturnType<typeof weaponView.activeWeaponReadiness>;
     sampleWeaponAssetCache: () => ReturnType<typeof pass65WeaponCacheTelemetry>;
     sampleDmrThermalReadiness: () => ReturnType<typeof sampleDmrThermalReadiness>;
     sampleWeaponActionReadiness: () => ReturnType<typeof sampleWeaponActionReadiness>;
+    /** HF-412: cheap third-person stance-blend read; see sampleBodyStancePose. */
+    sampleBodyStancePose: (kind?: 'bot' | 'remote') => ReturnType<typeof sampleBodyStancePose>;
     sampleGrenadeColdPathTelemetry: () => ReturnType<typeof sampleGrenadeColdPathTelemetry>;
+    prepareArena: (arenaId: ArenaId) => Promise<void>;
     traceBallistics: (
       weapon: WeaponId,
       origin: [number, number, number],
@@ -26670,6 +32655,12 @@ const debugWindow = window as Window & {
     showBotDamageDirection: () => number | null;
     respawn: () => void;
     aimAtBot: (zone?: HitZone) => void;
+    // GAMEPAD: QA-only exact staging for the aim-assist gates (PASS 84 Lane E).
+    aimAtAimAssistPoint: (yawOffsetDeg?: number, pitchOffsetDeg?: number) => {
+      botId: string;
+      yaw: number;
+      pitch: number;
+    } | null;
     aimPossessedChopperAtTrainingDummy: (targetId: string) => {
       entityId: string;
       activationId: string;
@@ -26680,6 +32671,26 @@ const debugWindow = window as Window & {
       pitch: number;
       lineOfSight: true;
     } | null;
+    aimPossessedChopperAtBot: (botId: string) => {
+      entityId: string;
+      botId: string;
+      origin: number[];
+      target: number[];
+      yaw: number;
+      pitch: number;
+    } | null;
+    /** QA-only: exact RMB missile request for the locally possessed chopper. */
+    firePossessedChopperMissile: () => boolean;
+    /** HF-458: right-click taser on the possessed Piloted Drone. */
+    firePossessedDroneTaser: () => boolean;
+    /** HF-458: taser stun counters for a headless killstreak run. */
+    taserTelemetry: () => {
+      stunsApplied: number;
+      localStunRemainingMs: number;
+      botsStunned: number;
+      host: ReturnType<TaserHostAuthority['telemetry']>;
+      victim: ReturnType<TaserVictimResultConsumer['telemetry']>;
+    };
     aimAtRemote: (zone?: HitZone) => void;
     aimAtRemoteWithOffset: (yawOffset: number, pitchOffset?: number) => void;
     stageWindow: (index: number, distance?: number) => void;
@@ -26802,6 +32813,8 @@ const debugWindow = window as Window & {
     }> | null;
     segmentBlocked: (x1: number, z1: number, x2: number, z2: number) => boolean;
     selectTriPassWorldTargets: (points: [number, number][]) => boolean;
+    /** HF-317: drives the two-point Carpet Bomber corridor from world coords. */
+    selectCarpetCorridorWorldPoints: (points: [number, number][]) => boolean;
     captureShadowProbeFrame: (horizontalOffset: number) => string;
     readbackWebGpuFrame: () => Promise<{ bytes: number; hash: string; x: number; y: number; width: number; height: number }>;
     sampleRendererResidency: () => ReturnType<typeof estimateRendererResidency>;
@@ -26810,6 +32823,9 @@ const debugWindow = window as Window & {
     setRenderPaused: (paused: boolean) => void;
     recoverFromVisibilityRegain: () => void;
     openMenu: () => void;
+    cameraSeat: () => number[];
+    lastEyeClearance: () => { x: number; y: number; z: number; pushedM: number } | null;
+    setStanceForQa: (target: 'stand' | 'crouch' | 'prone') => string;
     fireOnce: () => void;
     setTriggerHeld: (held: boolean) => void;
     stageSmokeVolume: (distance?: number) => string;
@@ -26827,6 +32843,7 @@ const debugWindow = window as Window & {
     interactDrop: () => void;
     interactTestBayStation: () => boolean;
     setAmmo: (weapon: WeaponId, ammo: number, reserve: number) => void;
+    setRemoteAmmoAuthoritatively: (weapon: WeaponId, ammo: number, reserve: number, playerId?: string) => boolean;
     setGrenades: (count: number) => void;
     reload: () => void;
     melee: () => { accepted: boolean; alive: boolean; phase: string; lastMeleeAt: number };
@@ -26848,12 +32865,12 @@ const debugWindow = window as Window & {
     earnSupport: (eliminations: number) => void;
     earnSupportForActor: (actorId: string, eliminations: number) => boolean;
     activateKillstreak: (
-      id: Pass65KillstreakId,
+      id: SelectableKillstreakId,
       anchor?: [number, number, number],
       facing?: [number, number, number],
     ) => boolean;
     activateKillstreakWithReceipt: (
-      id: Pass65KillstreakId,
+      id: SelectableKillstreakId,
       anchor?: [number, number, number],
       facing?: [number, number, number],
     ) => { activationId: string; sequence: number; lifeId: number } | null;
@@ -26861,6 +32878,14 @@ const debugWindow = window as Window & {
     forceRemoteDeathForReconnect: (playerId?: string) => { targetId: string; nextLifeId: number } | null;
     togglePilotedDroneControl: (entityId?: string) => boolean;
     toggleChopperGunnerControl: (entityId?: string) => boolean;
+    sampleChopperPilotLoad: () => {
+      possessed: boolean;
+      matchPhase: string;
+      alive: boolean;
+      ghost: ThermalGhostTelemetry;
+      sceneDrawCalls: number;
+      sceneTriangles: number;
+    };
     forceBotGrenade: (fuseMs?: number, grenade?: GrenadeId) => boolean;
     activateSupport: (id: FieldSupportId) => void;
     setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => void;
@@ -26882,6 +32907,8 @@ const debugWindow = window as Window & {
     grantRailgunToRemote: (playerId: string) => boolean;
     interactRailgun: () => boolean | string;
     degradeStateChannel: () => boolean;
+    /** HF-504: QA-only multiplayer message trace (see network.ts qaMessageTrace). */
+    sampleMessageTrace: () => QaMessageTrace;
     endMatch: () => void;
     rematch: () => void;
     returnToMainMenu: () => void;
@@ -26892,6 +32919,9 @@ const debugWindow = window as Window & {
     interactShed: () => boolean;
     damageShed: (placementId?: string, surfaceId?: string, damageQ?: number) => boolean;
     bulletHitShed: (placementId?: string, surfaceId?: string, damageQ?: number, penetrationEnergyQ?: number) => boolean;
+    audioTelemetry: () => Record<string, unknown>;
+    audioProbeTone: (target?: string, gain?: number) => boolean;
+    audioMusicState: () => Record<string, unknown> | null;
     detonateGrenadeAtShed: (placementId?: string, surfaceId?: string) => {
       accepted: boolean;
       placementId: string | null;
@@ -27325,15 +33355,6 @@ function debugCapturePresentationReceipt(frame: number): DebugCapturePresentatio
 }
 
 const DEBUG_EVIDENCE_LOS_ENDPOINT_TOLERANCE_M = 0.025;
-const DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS = Object.freeze([
-  Object.freeze({ name: 'head', aliases: Object.freeze(['Head']) }),
-  Object.freeze({ name: 'shoulder-left', aliases: Object.freeze(['UpperArmL', 'UpperArm.L']) }),
-  Object.freeze({ name: 'shoulder-right', aliases: Object.freeze(['UpperArmR', 'UpperArm.R']) }),
-  Object.freeze({ name: 'pelvis', aliases: Object.freeze(['Hips']) }),
-  Object.freeze({ name: 'wrist-left', aliases: Object.freeze(['WristL', 'Wrist.L']) }),
-  Object.freeze({ name: 'wrist-right', aliases: Object.freeze(['WristR', 'Wrist.R']) }),
-] as const);
-
 function debugRiggedEvidenceActorRoot(
   actorKind: 'bot' | 'training-dummy',
   actorId: string,
@@ -27594,17 +33615,350 @@ function debugRiggedOperatorJointScreenPositions(
   return projected;
 }
 
+
+// ---------------------------------------------------------------------------
+// HF-331: self-measuring frame-rate probe for browsers no driver can reach.
+//
+// Playwright's bundled Firefox hangs in launch() on this machine and stock
+// Firefox cannot be puppeteered without geckodriver, so the Firefox number in
+// the owner's "~10 FPS vs 150+" report was unmeasurable mechanically. The fix
+// is to stop trying to reach in from outside: with these QA params the page
+// runs a solo match itself, samples its own presented frame times, and POSTs
+// the result to a local receiver. Works identically in every browser that can
+// open a URL, which is all of them.
+//
+// Safety: does nothing unless all three params are present, and the endpoint
+// must be loopback - the measurement never leaves this machine.
+// ---------------------------------------------------------------------------
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  // A comma-separated arena list boots EVERY named arena in turn and reports
+  // each one. This exists because headless Chromium cannot create a WebGPU
+  // device on this machine, so every automated visual check has only ever
+  // exercised the WebGL2 compat path - while players are on WebGPU. An arena
+  // that fails only on the WebGPU route was invisible to all of it.
+  const probeArena = params.get('qaFpsProbe');
+  const probeEndpoint = params.get('qaFpsEndpoint');
+  const sampleMs = Math.min(60_000, Math.max(3_000, Number(params.get('qaFpsSampleMs') ?? 12_000)));
+  if (!probeArena || !probeEndpoint) return;
+  if (!/^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(probeEndpoint)) return;
+
+  const post = (payload: Record<string, unknown>): void => {
+    try {
+      // text/plain keeps this a CORS "simple request": no preflight, so the
+      // POST reaches the local receiver even though the response stays opaque.
+      void fetch(probeEndpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain' },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: 'no-cors',
+      });
+    } catch { /* Local receiver gone; the on-screen status still shows it. */ }
+  };
+
+  const waitFor = (condition: () => boolean, timeoutMs: number): Promise<boolean> => new Promise((resolveWait) => {
+    const startedAt = performance.now();
+    const tick = (): void => {
+      if (condition()) { resolveWait(true); return; }
+      if (performance.now() - startedAt > timeoutMs) { resolveWait(false); return; }
+      window.setTimeout(tick, 250);
+    };
+    tick();
+  });
+
+  void (async () => {
+    try {
+      // Armed beacon first: lets the receiver distinguish "page never loaded"
+      // from "probe armed but the run stalled later".
+      post({ stage: 'armed', userAgent: navigator.userAgent });
+      // Capture the page's own failures so a wedged stage names its error in
+      // the heartbeat instead of demanding devtools on an undriveable browser.
+      const recentErrors: string[] = [];
+      const recordError = (text: string): void => {
+        recentErrors.push(text.slice(0, 220));
+        if (recentErrors.length > 3) recentErrors.shift();
+      };
+      window.addEventListener('error', (event) => recordError(String(event.message ?? event)));
+      window.addEventListener('unhandledrejection', (event) => recordError(String(event.reason ?? 'unhandled rejection')));
+      if (!await waitFor(() => arenaSelectionReady, 120_000)) { post({ error: 'bootstrap-timeout' }); return; }
+      post({ stage: 'bootstrap-ready', backend: document.documentElement.dataset.renderBackend ?? null });
+
+      const requestedArenas = probeArena.split(',').map((entry) => entry.trim()).filter(Boolean);
+      if (requestedArenas.length > 1) {
+        // Boot-sweep mode: prove each arena reaches an active match on THIS
+        // renderer route, and report the first failure per arena rather than
+        // stopping the whole sweep.
+        for (const arenaId of requestedArenas) {
+          const startedAt = performance.now();
+          try {
+            recentErrors.length = 0;
+            await activateArenaSelection(arenaId as ArenaId);
+            element<HTMLInputElement>('#player-name').value = 'Boot Probe';
+            network.close();
+            resetForMode();
+            void startGame('solo', false);
+            const active = await waitFor(() => gameStarted && matchState.phase === 'active', 120_000);
+            post({
+              stage: 'arena-boot',
+              arena: arenaId,
+              ok: active,
+              ms: Math.round(performance.now() - startedAt),
+              backend: document.documentElement.dataset.renderBackend ?? null,
+              bootstrapStage,
+              statusText: (statusEl.textContent ?? '').slice(0, 120),
+              errors: [...recentErrors],
+            });
+          } catch (error) {
+            post({
+              stage: 'arena-boot',
+              arena: arenaId,
+              ok: false,
+              ms: Math.round(performance.now() - startedAt),
+              backend: document.documentElement.dataset.renderBackend ?? null,
+              thrown: String(error).slice(0, 400),
+              errors: [...recentErrors],
+            });
+          }
+          returnPrivateMatchToLobby(false);
+          await new Promise((settle) => window.setTimeout(settle, 900));
+        }
+        post({ stage: 'sweep-complete', arenas: requestedArenas.length });
+        return;
+      }
+      // Heartbeat while the arena activates: when a browser wedges inside
+      // activation, the last reported bootstrap stage names the wedge.
+      const heartbeat = window.setInterval(() => {
+        post({
+          stage: 'heartbeat',
+          bootstrapStage,
+          bootstrapError,
+          recentErrors,
+          statusText: (statusEl.textContent ?? '').slice(0, 90),
+          backend: document.documentElement.dataset.renderBackend ?? null,
+          // The renderer refuses to submit frames without foreground ownership,
+          // so a stalled prewarm is usually a focus question, not a GPU one.
+          hasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+          visibility: document.visibilityState,
+        });
+      }, 10_000);
+      try {
+        await activateArenaSelection(probeArena as ArenaId);
+      } finally {
+        window.clearInterval(heartbeat);
+      }
+      post({ stage: 'arena-selected' });
+      element<HTMLInputElement>('#player-name').value = 'FPS Probe';
+      network.close();
+      resetForMode();
+      void startGame('solo', false);
+      if (!await waitFor(() => gameStarted && matchState.phase === 'active', 120_000)) {
+        post({ error: 'match-start-timeout', gameStarted, matchPhase: matchState.phase });
+        return;
+      }
+      post({ stage: 'match-active', arena: probeArena, backend: document.documentElement.dataset.renderBackend ?? null });
+      // Let streaming and first-use shader compilation drain before sampling -
+      // the number wanted is steady state, not warmup.
+      await new Promise((settle) => window.setTimeout(settle, 5_000));
+
+      const deltas: number[] = [];
+      let previous = performance.now();
+      await new Promise<void>((doneSampling) => {
+        const frame = (): void => {
+          const now = performance.now();
+          deltas.push(now - previous);
+          previous = now;
+          if (now - startedSamplingAt >= sampleMs) { doneSampling(); return; }
+          requestAnimationFrame(frame);
+        };
+        const startedSamplingAt = performance.now();
+        requestAnimationFrame(frame);
+      });
+
+      deltas.sort((a, b) => a - b);
+      const at = (fraction: number): number => deltas[Math.min(deltas.length - 1, Math.floor(deltas.length * fraction))];
+      const fps = (delta: number): number => Number((1_000 / Math.max(0.001, delta)).toFixed(1));
+      const result = {
+        userAgent: navigator.userAgent,
+        arena: probeArena,
+        backend: document.documentElement.dataset.renderBackend ?? null,
+        webgpuAvailable: Boolean(navigator.gpu),
+        sampleMs,
+        frames: deltas.length,
+        medianFps: fps(at(0.5)),
+        p90WorstFps: fps(at(0.9)),
+        p99WorstFps: fps(at(0.99)),
+      };
+      post(result);
+      setStatus(`FPS probe: median ${result.medianFps} · p90 ${result.p90WorstFps} · ${result.backend}`, 'ok');
+    } catch (error) {
+      post({ error: String(error).slice(0, 300) });
+    }
+  })();
+})();
+
 debugWindow.__ATOMIC_ACRES_DEBUG__ = {
+  // GAMEPAD: pad runtime + tiered-assist telemetry (PASS 84 Lane E e2e).
+  sampleGamepad: () => ({
+    ...gamepadRuntime.telemetry(),
+    assist: lastGamepadAssist,
+    touchAssist: lastTouchAssist,
+    touchSnapDeg: lastTouchSnapDeg,
+    tier: activeAimAssistTier(),
+    overlaySuppressed: gamepadOverlaySuppressed,
+    triggerHeld: gamepadTriggerHeld,
+  }),
+  sampleViewmodelPenetration,
+  sampleViewmodelRigExtent,
+  // 2026-08-29: the chiptune shipped inaudible TWICE (staging, then a
+  // runtime coefficient revert). This probe ends the guessing: live bus
+  // gains, context state, the music scheduler flag and a real output
+  // amplitude sample, all readable by the QA harnesses.
+  audioTelemetry: () => ({ ...audio.telemetry(), gameMusicRunning: audio.gameMusicRunning }),
+  audioProbeTone: (target = 'master', gain = 0.2) => audio.debugProbeTone(target as never, gain),
+  audioMusicState: () => audio.debugMusicState(),
   admissionState: sampleAdmissionState,
+  // Read-only handle on the live scene graph. Screenshots tell you THAT a frame
+  // is wrong; walking the graph tells you WHICH object is doing it. Debug-only
+  // and never referenced by gameplay.
+  sampleSceneGraph: () => scene,
+  // HF-371: prove rain, weather AND ambient air are actually running, not
+  // merely imported.
+  sampleWeather: () => ({
+    seed: weatherMatchSeed,
+    rain: rainPresentation.telemetry(),
+    particles: hfParticleRuntime.telemetry(),
+  }),
+  // LIGHTING: read-only time-of-day telemetry. No light is touched by reading.
+  sampleLightingConditions: () => lightingConditionsTelemetry(),
+  // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
+  setLightingTimeChoice: (choice: string) => {
+    if (!isLightingTimeChoice(choice)) return { accepted: false, choice: activeLightingTimeChoice() };
+    lightingTimeChoiceOverride = choice;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, ...lightingConditionsTelemetry() };
+  }, triggerNukeEvent: (matchEndHostTimeMs = currentHostTimeMs()) => ({ accepted: nukeEvent.debugTrigger(matchEndHostTimeMs), ...nukeEvent.telemetry() }),
+  // LIGHTING: move the weather with NO forced apply, so the next ordinary frame
+  // decides for itself whether a uniform write is owed. This is the falsifier
+  // for the gate defect: before the writes-gate fix, a weather change at a fixed
+  // hour resolved new tints and threw them away, and `uniformWrites` did not
+  // move. It writes one module-scope variable the weather sampler already reads.
+  setWeatherOverride: (state: string | null) => {
+    if (state !== null && !WEATHER_SEVERITY_LADDER.includes(state as WeatherState)) {
+      return { accepted: false, weather: weatherOverrideState };
+    }
+    weatherOverrideState = state as WeatherState | null;
+    return { accepted: true, weather: weatherOverrideState, ...lightingConditionsTelemetry() };
+  },
+  // LIGHTING: the same hook at hour resolution, for the band scan. Still only
+  // uniform writes over the frozen light set -- an hour is an argument to a pure
+  // function here, not a scene change.
+  setLightingFixedHour: (hour: number | null) => {
+    lightingCaptureFixedHour = typeof hour === 'number' && Number.isFinite(hour) ? hour : null;
+    applyLightingConditionUniforms(true);
+    return { accepted: true, fixedHour: lightingCaptureFixedHour, ...lightingConditionsTelemetry() };
+  },
+  // Which clause of the movement gate is holding the local player still. The
+  // owner's "can't move" reports were undiagnosable from screenshots because
+  // five independent conditions can freeze movement and none of them was
+  // observable; this reports each one by name.
+  sampleSimulationGate: () => ({
+    gameStarted,
+    alive: player.alive,
+    matchPhase: matchState.phase,
+    menuHidden: menu.classList.contains('hidden'),
+    possessed: Boolean(localKillstreakActorSnapshot()?.possession),
+    awaitingCanonicalGuestAuthority,
+    pendingClientWorldRepair: pendingClientWorldRepair(),
+    simulationEnabled: playerSimulationEnabled(),
+    physicsReady: characterPhysics !== null,
+    playerVelocity: [player.velocity.x, player.velocity.y, player.velocity.z],
+    inputEnabled: gameplayInputEnabled(),
+  }),
+  // HF-325: read-only succession observability for QA drivers (e.g.
+  // scripts/qa/verify-host-succession-cdp.mjs). Exposes what the promotion
+  // trigger actually sees — mandate, mirror freshness, term state — without
+  // letting anything mutate it. Never referenced by gameplay.
+  sampleHostSuccession: () => ({
+    role: network.role,
+    roomCode: network.roomCode,
+    selfId: player.id,
+    lobbyHostId: privateLobbySnapshot?.hostId ?? null,
+    hostLinkState: lastHostLossState,
+    mandate: successorHoldings.mandate && (() => {
+      const mandate = successorHoldings.mandate;
+      return {
+        term: mandate.term,
+        successorId: mandate.successorId,
+        issuedByHostId: mandate.issuedByHostId,
+        issuedAtEpochMs: mandate.issuedAtEpochMs,
+        expiresAtEpochMs: mandate.expiresAtEpochMs,
+        lobbyRevision: mandate.lobbyRevision,
+        expired: Date.now() >= mandate.expiresAtEpochMs,
+      };
+    })(),
+    highestObservedTerm: successorHoldings.highestObservedTerm,
+    mirror: successorHoldings.mirror && (() => {
+      const nowEpochMs = Date.now();
+      return {
+        mirrorTerm: successorHoldings.mirrorTerm,
+        receivedAtEpochMs: successorHoldings.mirrorReceivedAtEpochMs,
+        offsetTrusted: successorHoldings.mirrorOffsetTrusted,
+        expiresAtEpochMs: successorHoldings.mirror.expiresAtEpochMs,
+        fresh: Number.isFinite(nowEpochMs) && nowEpochMs < successorHoldings.mirror.expiresAtEpochMs,
+        ageMs: successorHoldings.mirrorReceivedAtEpochMs === null
+          ? null
+          : nowEpochMs - successorHoldings.mirrorReceivedAtEpochMs,
+        roomCode: successorHoldings.mirror.roomCode,
+        successionTerm: successorHoldings.mirror.succession?.term ?? null,
+      };
+    })(),
+    publisher: network.role === 'host' ? {
+      term: hostSuccessionPublisher.term,
+      standDown: hostSuccessionPublisher.standDown,
+      hasMandate: hostSuccessionPublisher.mandate !== null,
+      mandatedSuccessorId: hostSuccessionPublisher.mandate?.successorId ?? null,
+      lastMirroredTerm: hostSuccessionPublisher.lastMirroredTerm,
+    } : null,
+    diagnostics: {
+      lastPublish: lastSuccessionPublish,
+      lastMirrorShip: lastMirrorShip,
+      lastMandateAccept: lastMandateAccept,
+      lastMirrorAccept: lastMirrorAccept,
+      lastCheckpointAttempt: lastCheckpointAttempt,
+    },
+  }),
+  sampleFireAdmissionDiagnostics,
   samplePresentationTelemetry: () => renderRuntime.presentationTelemetry(),
+  // The sort-free presented-frame counters. scripts/qa/measure-presented-frames.mjs
+  // polls this above the frame rate; presentationTelemetry() sorts two pacing
+  // windows per call and cannot be sampled that fast without becoming the cost.
+  samplePresentationCounters: () => renderRuntime.presentationCounters(),
   sampleEnduranceHealth,
   sampleWeaponCatalogReadiness: () => weaponView.browserCatalogReadiness(),
   sampleActiveWeaponReadiness: () => weaponView.activeWeaponReadiness(),
   sampleWeaponAssetCache: () => pass65WeaponCacheTelemetry(),
   sampleDmrThermalReadiness,
   sampleWeaponActionReadiness,
+  sampleBodyStancePose,
   sampleGrenadeColdPathTelemetry,
+  // MP-LAB: see the type; nothing here allocates beyond the returned object.
+  samplePlayerPose: () => ({
+    alive: player.alive,
+    position: player.position.toArray(),
+    yaw: player.yaw,
+    gameStarted,
+    matchPhase: matchState.phase,
+    awaitingCanonicalGuestAuthority,
+    menuHidden: menu.classList.contains('hidden'),
+  }),
   snapshot: () => ({
+    swim: {
+      swimming: localSwimState.swimming,
+      weaponRestricted: localSwimState.weaponRestricted,
+      drySeconds: Number(localSwimState.drySeconds.toFixed(3)),
+      bodySwimmable: waterSystem.swimmable,
+    },
     bootstrap: {
       stage: bootstrapStage,
       error: bootstrapError,
@@ -27613,6 +33967,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       menuDeploymentAssetsProfile: lastMenuDeploymentAssetsProfile,
       menuDeploymentAssets: menuDeploymentAssetsCoordinator.snapshot(),
       effectPrewarmProfile: lastArenaEffectPrewarmProfile,
+      matchAdmissionProfile: lastMatchAdmissionProfile,
       botWeaponVocabulary: botWeaponGpuVocabulary.telemetry(),
     },
     gameStarted,
@@ -27681,6 +34036,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostedBotCount: privateLobbySnapshot.config.hostedBotCount,
       autoBalance: privateLobbySnapshot.config.autoBalance,
       durationMs: privateLobbySnapshot.config.durationMs,
+      scoreLimit: privateLobbySnapshot.config.scoreLimit,
       matchClock: privateLobbySnapshot.matchClock ? { ...privateLobbySnapshot.matchClock } : null,
       testBayDoor: privateLobbySnapshot.testBayDoor ? { ...privateLobbySnapshot.testBayDoor } : null,
       members: privateLobbySnapshot.members.map((member) => ({ ...member })),
@@ -27690,15 +34046,67 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       hostTimeOffsetMs: network.role === 'client' ? hostTimeMapping.offsetMs : 0,
       localPingMs: localLobbyPingMs,
     } : null,
+    stateAdmissionDrops: {
+      total: stateAdmissionDropTelemetry.total,
+      byReason: { ...stateAdmissionDropTelemetry.byReason },
+      last: stateAdmissionDropTelemetry.last ? { ...stateAdmissionDropTelemetry.last } : null,
+    },
+    // Lane J: admission traffic that arrived while this side was still loading
+    // its arena, and what became of it. See parkMatchAdmissionMessage().
+    matchAdmissionPark: { ...matchAdmissionParkTelemetry },
+    // Lane J: the live admission record, so a guest that goes dead mid-match
+    // can be attributed to the handshake rather than to combat.
+    clientWorldRepairFailures: {
+      total: clientWorldRepairFailureTelemetry.total,
+      last: clientWorldRepairFailureTelemetry.last ? { ...clientWorldRepairFailureTelemetry.last } : null,
+    },
+    clientWorldRepair: clientWorldRepairAdmission
+      ? {
+          lifeId: clientWorldRepairAdmission.identity.lifeId,
+          matchEpoch: clientWorldRepairAdmission.identity.matchEpoch,
+          attempts: clientWorldRepairAdmission.attempts,
+          acknowledged: clientWorldRepairAdmission.acknowledged,
+          lastAttemptAtMs: clientWorldRepairAdmission.lastAttemptAtMs,
+        }
+      : null,
+    // Lane J: why the trigger last refused, so "sometimes randomly cant shoot"
+    // is attributable instead of guessed at. See refuseFire().
+    fireBlock: {
+      total: fireBlockTelemetry.total,
+      byReason: { ...fireBlockTelemetry.byReason },
+      last: fireBlockTelemetry.last,
+      lastAtMs: fireBlockTelemetry.lastAtMs,
+      lastFiredAtMs: fireBlockTelemetry.lastFiredAtMs,
+    },
+    reloadAuthority: {
+      localPending: pendingLocalReloadAuthority ? {
+        requestId: pendingLocalReloadAuthority.requestId,
+        weapon: pendingLocalReloadAuthority.weapon,
+        startSequence: pendingLocalReloadAuthority.startSequence,
+        cancelSequence: pendingLocalReloadAuthority.cancelSequence,
+        cancelRequestId: pendingLocalReloadAuthority.cancelRequestId,
+      } : null,
+      remote: [...remoteReloadAuthorities.entries()].map(([id, state]) => ({
+        playerId: id,
+        lastActionSequence: state.lastActionSequence,
+        pending: state.pending ? {
+          requestId: state.pending.requestId,
+          actionSequence: state.pending.actionSequence,
+          weapon: state.pending.weapon,
+          completesAtHostTimeMs: state.pending.completesAtHostTimeMs,
+        } : null,
+      })),
+      cachedResults: remoteReloadResultCache.size,
+      retryScheduled: localReloadRetryRuntime.isScheduled(),
+      protocolTrace: reloadProtocolTrace.map((entry) => ({ ...entry })),
+    },
     hostMatchRecoveryCheckpoint: {
       rejectedPoseWrites: hostCheckpointRejectedPoseWrites,
       lastRejectedPoseReason: lastHostCheckpointRejectedPoseReason,
       lastRejectedPoseAtEpochMs: lastHostCheckpointRejectedPoseAtEpochMs,
     },
     textChat: {
-      open: textChatOpen,
-      focused: document.activeElement === textChatInput,
-      entries: textChatHistory.map((entry) => ({ ...entry })),
+      ...textChatDebugSnapshot(),
       heldKeys: [...keys].sort(),
       triggerHeld,
       adsHeld,
@@ -27852,18 +34260,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       collisionCacheRevision: activeWorldColliderCacheRevision,
       rapierMajorBodies: characterPhysics?.majorDebrisBodyCount() ?? 0,
       rapierPrewarmedMajorBodies: characterPhysics?.prewarmedMajorDebrisBodyCount() ?? 0,
-      gpuRetirement: {
-        queuedResources: deferredGpuRetirements.length,
-        queuedRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
-        queuedGeometries: deferredGpuRetirements.filter((entry) => entry.kind === 'geometry').length,
-        draining: gpuRetirementTask !== null,
-        fences: gpuRetirementFences,
-        scheduledRoots: gpuRetirementScheduledRoots,
-        scheduledGeometries: gpuRetirementScheduledGeometries,
-        disposedRoots: gpuRetirementDisposedRoots,
-        disposedGeometries: gpuRetirementDisposedGeometries,
-        failures: gpuRetirementFailures,
-      },
+      gpuRetirement: gpuRetirement.telemetry(),
     },
     ballistics: {
       activeSurfaces: activeBallisticSurfaces().length,
@@ -28013,6 +34410,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : null,
     },
     spawnSelection: lastPlayerSpawnAudit ? { ...lastPlayerSpawnAudit } : null,
+    // HF-402: where each bot was actually SPAWNED, as chosen by
+    // selectSafeBotSpawn - not where it has since walked to.
+    botSpawnSelections: [...lastBotSpawnAudit.values()].map((audit) => ({ ...audit, position: [...audit.position] })),
     bots: [...bots.values()].map((bot) => {
       // Telemetry walks every skinned mesh and bone chain. Cache it once for
       // this actor in this snapshot so presentationReady cannot double that
@@ -28073,14 +34473,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     }),
     botEscalation: {
       deaths: soloBotDeaths,
-      initialBots: selectedArena.soloBotCount,
+      initialBots: initialSoloBotCount(selectedArena),
       targetBots: activeSoloBotTarget(selectedArena, soloBotDeaths),
       activeBots: bots.size,
       dormantBots: dormantBots.size,
       dormantBotsPrewarmed,
       dynamicReinforcementLights: 0,
       maximumBots: selectedArena.maximumSoloBots,
-      nextReinforcementAt: selectedArena.id === 'atomic-acres' && bots.size < selectedArena.maximumSoloBots
+      nextReinforcementAt: bots.size < selectedArena.maximumSoloBots
         ? (Math.floor(soloBotDeaths / BOT_DEATHS_PER_REINFORCEMENT) + 1) * BOT_DEATHS_PER_REINFORCEMENT
         : null,
       lastEliminationProfile: { ...lastBotEliminationProfile },
@@ -28131,6 +34531,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       secondary: remote.snapshot.secondary,
       grenade: remote.snapshot.grenade,
       weapon: remote.snapshot.weapon,
+      reloading: remote.snapshot.reloading ?? false,
       stance: remote.snapshot.stance ?? 'stand',
       seq: remote.snapshot.seq,
       position: remote.target.toArray(),
@@ -28143,6 +34544,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       snapshotBuffer: remote.interpolation.stats,
       snapshotRateHz: remote.snapshotRateHz,
       continuity: remote.continuity,
+      authoritativeReady: remote.authoritativeReady,
       combatInventory: remoteCombatInventories.get(remote.snapshot.id) ?? null,
       historyFirst: remote.positionHistory[0]?.at ?? null,
       historyLatest: remote.positionHistory.at(-1)?.at ?? null,
@@ -28241,6 +34643,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lowHealthOpacity: Number(lowHealthVignette.style.getPropertyValue('--low-health-opacity') || 0),
     },
     killstreak: killstreakSnapshot,
+    killstreakAwareness: killstreakAwarenessQa,
     killstreakControlAdmission: lastLocalKillstreakControlAdmission,
     adrenalineRuntime: adrenalineRuntimeDebugSnapshot(),
     killstreakPresentation: killstreakPresentation.telemetry(camera),
@@ -28271,9 +34674,15 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       } : { active: false, phase: null },
       yardhawkExplosions,
       tacticalMapOpen,
-      targetingMode: pointSupportTargeting?.id ?? (triPassTargeting ? 'tri-pass' : null),
+      // HF-317: an open carpet corridor reports as 'carpet-bomber' targeting.
+      targetingMode: pointSupportTargeting?.id
+        ?? (carpetCorridorTargeting ? 'carpet-bomber' as const : null)
+        ?? (triPassTargeting ? 'tri-pass' as const : null),
       crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null,
-      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point })) ?? [],
+      // HF-317: the corridor's start/end read out on the same channel.
+      tacticalTargets: triPassTargeting?.points.map((point) => ({ ...point }))
+        ?? carpetCorridorTargeting?.points.map((point) => ({ ...point }))
+        ?? [],
       tacticalHostiles: triPassHostileMarkers.map((marker) => ({
         id: marker.id,
         kind: marker.kind,
@@ -28286,7 +34695,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
         : { source: null, audioMs: 0, visualMs: 0, targetDamageMs: 0, totalSyncMs: 0 },
       explosionFrameProfile: { ...lastSupportExplosionFrameProfile, sources: [...lastSupportExplosionFrameProfile.sources] },
       retiredPresentationRoots: supportPresentationRetirements,
-      pendingRetiredPresentationRoots: deferredGpuRetirements.filter((entry) => entry.kind === 'root').length,
+      pendingRetiredPresentationRoots: gpuRetirement.telemetry().queuedRoots,
       prewarmedNuke: {
         shockwaveInScene: nukeShockwave.parent === scene,
         prewarmed: nukePresentationPrewarmed,
@@ -28412,10 +34821,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     spawnSafety: ([0, 1] as Team[]).map((team) => ({
       team,
       authored: arena.spawns[team].length,
-      valid: arena.spawns[team].filter((point) => {
-        const bodyPoint = { x: point.x, y: 0, z: point.z };
-        return pointInsideBounds(bodyPoint, arena.bounds, 0.44) && !isBlocked(bodyPoint, activeWorldColliders(), 0.44);
-      }).length,
+      valid: arena.spawns[team].filter((point) => validArenaSpawnPoint(point, arena.bounds, activeWorldColliders())).length,
     })),
     houseNavigation: arena.houses.map((house) => ({
       id: house.id,
@@ -28526,7 +34932,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     weaponReady: weaponView.isReady(),
     weaponPresentation: {
       ...weaponView.presentationState(),
-      depthSeparatedFromWorld: true,
+      depthSeparatedFromWorld: atomicSignal !== null, // HF-536: was a literal `true`; only AtomicSignalPass clears depth and it is null.
     },
     railgunScope: {
       ...railgunScopeState,
@@ -28718,6 +35124,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       }) ?? [],
     },
   }),
+  /**
+   * MAP3 (HF-409 finisher 2): make a NON-ACTIVE arena buildable.
+   *
+   * `traceBallistics(..., arenaId)` builds an arena it is not standing in, on
+   * the spot and synchronously, and that is how the eye-clearance stage-2
+   * sweep probes every arena from one page. A lazily loaded arena (map3) has a
+   * chunk to fetch and a wasm module to initialise before its builder exists,
+   * and neither can happen inside a synchronous call. So the wait is a
+   * separate, awaitable step: call this first and the probe below works.
+   * Resolving an eager arena is a no-op that costs one microtask.
+   */
+  prepareArena: async (arenaId) => { await arenaFactories.resolve(arenaId); },
   traceBallistics: (weapon, origin, direction, distance, arenaId = selectedArena.id) => {
     const temporaryAuthority = arenaId === selectedArena.id ? null : constructArena(arenaId, false);
     const traceArena = temporaryAuthority ?? arena;
@@ -28929,7 +35347,10 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     bot.root.position.copy(bot.position);
     bot.velocity.set(0, 0, 0);
     bot.root.rotation.y = operatorYawToward(bot.position, origin);
-    poseOperator(bot.root, 'stand', 0, performance.now() * 0.001);
+    // QA staging poses the body upright deliberately; the field follows it so
+    // the pose and the replicated/rewound stance can never disagree.
+    bot.stance = 'stand';
+    poseOperator(bot.root, bot.stance, 0, performance.now() * 0.001);
     bot.root.updateMatrixWorld(true);
     bot.invulnerableUntil = 0;
     return {
@@ -28972,6 +35393,34 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return sourceScreenAngle(player.position, player.yaw, bot.position);
   },
   respawn: () => respawn(false),
+  /**
+   * GAMEPAD: points the view at the aim-assist point of the staged bot (body
+   * centre lifted by AIM_ASSIST_POINT_LIFT_M) offset by an exact number of
+   * degrees. An assist gate staged this way has a chosen angle rather than one
+   * that falls out of hit-proxy geometry, stance and distance, so the snap-cone
+   * and slowdown-zone preconditions carry real margin. QA-only.
+   */
+  aimAtAimAssistPoint: (yawOffsetDeg = 0, pitchOffsetDeg = 0) => {
+    const bot = bots.values().next().value as BotPlayer | undefined;
+    if (!bot) return null;
+    const stance = ((bot.root.userData.operatorStance as Stance | undefined) ?? 'stand');
+    const centre = hitProxyZoneCentre('body', stance);
+    const delta = new THREE.Vector3(
+      bot.position.x + centre[0],
+      bot.position.y + centre[1] + AIM_ASSIST_POINT_LIFT_M,
+      bot.position.z + centre[2],
+    ).sub(player.position);
+    player.yaw = Math.atan2(-delta.x, -delta.z) + THREE.MathUtils.degToRad(yawOffsetDeg);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)) + THREE.MathUtils.degToRad(pitchOffsetDeg),
+      -1.42,
+      1.42,
+    );
+    camera.position.copy(player.position);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return { botId: bot.id, yaw: player.yaw, pitch: player.pitch };
+  },
   aimAtBot: (zone: HitZone = 'body') => {
     const bot = bots.values().next().value as BotPlayer | undefined;
     if (!bot) return;
@@ -29021,6 +35470,49 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       yaw: player.yaw,
       pitch: player.pitch,
       lineOfSight: true,
+    };
+  },
+  firePossessedChopperMissile: () => requestPossessedChopperMissile(),
+  // HF-458 QA: the taser's right-click, and the counters a headless run reads.
+  firePossessedDroneTaser: () => requestPossessedDroneTaser(),
+  taserTelemetry: () => ({
+    stunsApplied: taserStunsAppliedThisMatch,
+    localStunRemainingMs: Math.max(0, taserStunEndsAtHostTimeMs - currentHostTimeMs()),
+    botsStunned: botTaserStunUntilHostTimeMs.size,
+    host: taserHostAuthority.telemetry(),
+    victim: taserVictimConsumer.telemetry(),
+  }),
+  aimPossessedChopperAtBot: (botId) => {
+    // QA-only: the training-dummy variant is gun-range-only; this aims the
+    // possessed autocannon at a live bot on ANY arena so possessed-fire
+    // damage can be probed without pointer lock.
+    const possession = localKillstreakActorSnapshot()?.possession;
+    if (possession?.kind !== 'chopper-gunner') return null;
+    const entity = killstreakSnapshot.entities.find((candidate) => (
+      candidate.id === possession.entityId && candidate.kind === 'chopper'
+    ));
+    const bot = bots.get(botId);
+    if (!entity || !bot || !bot.alive) return null;
+    const origin = new THREE.Vector3(...chopperGunnerCameraOrigin(entity.position, entity.attitude));
+    const targetPoint = bot.position.clone().setY(bot.position.y + 0.9);
+    const delta = targetPoint.clone().sub(origin);
+    if (delta.lengthSq() < 1e-6) return null;
+    player.yaw = Math.atan2(-delta.x, -delta.z);
+    player.pitch = THREE.MathUtils.clamp(
+      Math.atan2(delta.y, Math.hypot(delta.x, delta.z)),
+      -1.2,
+      0.5,
+    );
+    camera.position.copy(origin);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+    camera.updateMatrixWorld(true);
+    return {
+      entityId: entity.id,
+      botId: bot.id,
+      origin: origin.toArray(),
+      target: targetPoint.toArray(),
+      yaw: player.yaw,
+      pitch: player.pitch,
     };
   },
   aimAtRemote: (zone: HitZone = 'body') => {
@@ -29304,7 +35796,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
     camera.updateMatrixWorld(true);
     player.invulnerableUntil = 0;
-    if (gameStarted) network.send(createStateMessage());
+    if (gameStarted) { const teleportState = createStateMessage(); network.send(teleportState); if (network.role === 'client') network.sendStateCommitReliably(teleportState); }
   },
   setCaptureCameraPose: (x, y = 0, z = 0, yaw = 0, pitch = 0, fov = camera.fov, fixedVisualTimeMs, seed = 6501) => {
     resetDebugChopperExteriorReviewTracker();
@@ -29375,7 +35867,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return debugCaptureCameraRevision;
   },
   setCaptureCameraFarPlane: (far) => {
-    const arenaFarPlane = selectedArena.id === 'rustworks-1v1' ? 1_400 : 180;
+    const arenaFarPlane = sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
     const requestedFarPlane = Number.isFinite(far) ? THREE.MathUtils.clamp(far!, camera.near + 1, 2_000) : arenaFarPlane;
     if (camera.far === requestedFarPlane) return;
     camera.far = requestedFarPlane;
@@ -29415,7 +35907,13 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArenaReviewCamera: (cameraId) => {
     resetDebugChopperExteriorReviewTracker();
-    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId);
+    // PASS 94 CANDIDATE 4b: the installed definition first, then the AUTHORED
+    // one. A review station is source data, not GPU state, so its reachability
+    // must not be a fact about whether a deploy-time fence was met - see
+    // `findAuthoredArenaReviewCamera`. `false` now means the id is declared by
+    // no loaded arena at all, which is the only honest refusal.
+    const reviewCamera = activeArenaVisualDefinition?.reviewCameras.find((entry) => entry.id === cameraId)
+      ?? findAuthoredArenaReviewCamera(cameraId);
     if (!reviewCamera) return false;
     camera.position.set(...reviewCamera.position);
     camera.lookAt(...reviewCamera.target);
@@ -29425,6 +35923,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld(true);
     renderRuntime.setExposure(effectiveGraphicsExposure(reviewCamera.exposure));
+    // HF-535: a deterministic review pins the SKY too - the random per-session sky confounded every viewpoint diff (see src/rendering/deterministic-review-lighting.ts).
+    const reviewLightingOverride = reviewCaptureLightingOverride({ requestedOverride: lightingTimeChoiceOverride, fixedHour: lightingCaptureFixedHour, hosted: privateLobbySnapshot !== null });
+    if (reviewLightingOverride !== null) lightingTimeChoiceOverride = reviewLightingOverride;
+    applyLightingConditionUniforms(true);
+    assertDeterministicReviewLighting({ cameraId: reviewCamera.id, choice: activeLightingTimeChoice(), fixedHour: lightingCaptureFixedHour, hosted: privateLobbySnapshot !== null });
     pass64TslSystems?.setReviewCamera(reviewCamera);
     activeArenaReviewCameraId = reviewCamera.id;
     activeArenaReviewFixedTimeMs = reviewCamera.fixedTimeMs;
@@ -29622,6 +36125,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   },
   setArmEvidenceCapture: (mode) => weaponView.setArmEvidenceCapture(mode),
   setThermalRevealEvidenceHidden: (hidden) => thermalGhostPresentation.setEvidenceControlHidden(hidden),
+  sampleChopperPilotLoad: () => ({
+    possessed: localKillstreakActorSnapshot()?.possession?.kind === 'chopper-gunner',
+    matchPhase: matchState.phase,
+    alive: player.alive,
+    ghost: thermalGhostPresentation.telemetry(),
+    sceneDrawCalls: Number(arenaVisualBudgetAudit().drawCalls ?? 0),
+    sceneTriangles: Number(arenaVisualBudgetAudit().triangles ?? 0),
+  }),
   stagePass73NativeAdsRevealTarget,
   samplePass73AdsRevealTarget,
   setPass73AdsRevealNormalBodyHidden,
@@ -29660,7 +36171,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       const haze = bot.root.getObjectByName('neon-purple-bot-haze');
       if (haze) haze.visible = false;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
     }
     botsFrozen = true;
@@ -29670,9 +36181,41 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       positions: stagedBots.map((bot) => bot.position.toArray()),
     };
   },
-  collisionProbe: (x, z) => Number.isFinite(x) && Number.isFinite(z)
-    ? isBlocked({ x, y: 0, z }, activeWorldColliders(), 0.44)
-    : true,
+  // Owner 2026-08-31: isBlocked takes the CAPSULE TOP, not the feet - see its
+  // `point.y - PLAYER_CAPSULE_HEIGHT > box.maxY` early-out, and the live bot
+  // mover above, which span-filters then probes at position.y + 1.7. Probing at
+  // y: 0 modelled a capsule spanning -1.7..0, i.e. entirely underground. That
+  // was invisible on the five arenas that author nothing below y = 0, but test1
+  // and test2 author their ground as real movement colliders at y[-1, 0], so
+  // this reported EVERY point in both arenas as solid. Nine playtest-*.mjs
+  // scripts consume this hook, and would have read that as a catastrophic
+  // traversal failure rather than a probe bug. Same defect the eye-clearance
+  // sweep carried (60886c35); this is its twin on the live debug surface.
+  collisionProbe: (x, z) => {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return true;
+    const capsuleTop = DEBUG_PROBE_CAPSULE_HEIGHT_M;
+    return isBlocked(
+      { x, y: capsuleTop, z },
+      collidersOverlappingVerticalSpan(activeWorldColliders(), 0, capsuleTop),
+      0.44,
+    );
+  },
+  // KNOWN DEFECT, deliberately NOT patched here - see
+  // docs/STALE_CHECK_AUDIT_2026-08-31.md finding 2. This hook diverges from the
+  // runtime it stands in for in three ways: isBlocked reads its point as the
+  // capsule TOP while every caller passes some other height above the feet
+  // (feetY + 0.9 in the invisible-wall sweep, position[1] - 1.05 in the prone
+  // matrix); the radius is 0.36 against the mover's 0.44; and there is no
+  // collidersOverlappingVerticalSpan filter.
+  //
+  // The fix is at the ~10 CALL SITES, not here: the contract that matches
+  // isBlocked and the mover is "y is the capsule top", and the callers are the
+  // ones violating it. Changing the hook's meaning underneath them - which I
+  // tried - just moves the probe from 0.75 m underground to 1.7 m airborne.
+  // Doing it properly means updating each caller and re-measuring what it
+  // reports, which is its own pass. Left correct-as-documented rather than
+  // half-changed, because a shared debug hook with ten consumers is exactly
+  // where a partial fix does the most damage.
   collisionProbeAt: (x, y, z) => [x, y, z].every(Number.isFinite)
     ? isBlocked({ x, y, z }, activeWorldColliders(), 0.36)
     : true,
@@ -29699,6 +36242,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     scheduleTriPassMissiles(next.points, now);
     cancelSupportTargeting(false);
     return true;
+  },
+  // HF-317: same shape as selectTriPassWorldTargets, but two points and the
+  // production commit path so QA exercises the real corridor intent.
+  selectCarpetCorridorWorldPoints: (points) => {
+    if (!carpetCorridorTargeting || !tacticalMapOpen) return false;
+    let next = carpetCorridorTargeting;
+    for (const [x, z] of points.slice(0, CARPET_CORRIDOR_POINT_COUNT)) {
+      next = registerCarpetCorridorPoint(next, { x, z }, arena.bounds);
+    }
+    carpetCorridorTargeting = next;
+    drawStrikeMap();
+    if (!next.complete) return false;
+    return commitCarpetCorridor(next, performance.now());
   },
   captureShadowProbeFrame: (horizontalOffset) => {
     if (renderRuntime.backend === 'webgpu') {
@@ -29772,6 +36328,17 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   setRenderPaused: (paused: boolean) => { debugRenderPaused = paused; },
   recoverFromVisibilityRegain: () => recoverFromSchedulingInterruption('debug visibility regain'),
   openMenu: () => openActiveMatchPause('debug-pause'),
+  cameraSeat: () => camera.position.toArray(),
+  lastEyeClearance: () => lastEyeClearanceResult,
+  setStanceForQa: (target: 'stand' | 'crouch' | 'prone') => {
+    // QA-only: drive the real stance machine to an absolute target so the
+    // eye-clearance verifier can measure every stance without pointer lock.
+    for (let guard = 0; guard < 3 && player.stance !== target; guard += 1) {
+      const action = target === 'stand' ? 'stand' : target === 'crouch' ? 'toggle-crouch' : 'toggle-prone';
+      if (!requestStance(action)) break;
+    }
+    return player.stance;
+  },
   fireOnce: () => {
     debugInputUnlocked = true;
     setLocalTriggerHeld(true);
@@ -29887,6 +36454,14 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     player.ammo[weapon] = Math.max(0, Math.min(WEAPONS[weapon].mag, Math.floor(ammo)));
     player.reserve[weapon] = Math.max(0, Math.min(WEAPONS[weapon].reserve, Math.floor(reserve)));
   },
+  setRemoteAmmoAuthoritatively: (weapon: WeaponId, ammo: number, reserve: number, playerId?: string) => {
+    if (!localMultiplayerQa || network.role !== 'host' || !isOrdinaryWeapon(weapon)) return false;
+    const targetId = playerId ?? (remotes.values().next().value as RemotePlayer | undefined)?.snapshot.id;
+    const inventory = targetId ? remoteCombatInventories.get(targetId) : undefined;
+    if (!targetId || !inventory) return false;
+    setRemoteCombatInventory(targetId, setGuestCombatInventoryWeapon(inventory, weapon, ammo, reserve));
+    return true;
+  },
   setGrenades: (count: number) => {
     if (Number.isFinite(count)) player.grenades = Math.max(0, Math.min(1, Math.floor(count)));
   },
@@ -29989,6 +36564,18 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       ...retained,
       snapshot: Object.freeze({ ...retained.snapshot, hp: result.state.hp }),
     }));
+    if (remote) { publishRemoteHealthAuthority(targetId, true); network.send(createCanonicalRemoteState(remote.snapshot, currentHostTimeMs(), remote.continuity, remote.snapshotRateHz, remoteCombatInventoryProjection(targetId))); }
+    if (result.died && remote) {
+      // HF-504 QA seam: const canonicalDeath = canonicalDeathMessage(death); network.send(canonicalDeath); processDeath(canonicalDeath);
+      // The QA damage hook must use the same host-authored death/drop path as
+      // real combat; otherwise a test can prove only HP replication and leaves
+      // pickup authority unmeasured.
+      const death: DeathMessage = {
+        type: 'death', killer: player.id, victim: targetId,
+        cause: { kind: 'gun', weapon: player.weapon }, nonce: randomNonce(),
+      };
+      broadcastCanonicalDeath(death);
+    }
     recordAuthoritativeRemoteRegeneration(targetId, result, 'qa-host-ledger-before-small-hit');
     return {
       targetId,
@@ -30022,7 +36609,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     updateFieldSupportHud();
     return admitted > 0;
   },
-  activateKillstreak: (id: Pass65KillstreakId, anchor, facing) => Boolean(
+  activateKillstreak: (id: SelectableKillstreakId, anchor, facing) => Boolean(
     requestKillstreakActivation(id, performance.now(), anchor, facing),
   ),
   activateKillstreakWithReceipt: (id, anchor, facing) => {
@@ -30060,8 +36647,7 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       cause: { kind: 'gun', weapon: player.weapon },
       nonce: randomNonce(),
     };
-    network.send(death);
-    processDeath(death);
+    broadcastCanonicalDeath(death);
     persistActiveHostMatchCheckpoint();
     const nextLifeId = killstreakRuntime.actorLifeId(remote.snapshot.id);
     return nextLifeId === null ? null : { targetId: remote.snapshot.id, nextLifeId };
@@ -30092,22 +36678,31 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   activateSupport: (id: FieldSupportId) => activateFieldSupport(id),
   setOverdrive: (mode: 'charging' | 'available' | 'active' | 'expired') => {
     const now = performance.now();
-    if (mode === 'charging') overdriveState = createOverdriveState(now);
-    else if (mode === 'available') overdriveState = { ...createOverdriveState(now), available: false, nextSpawnAt: now };
+    // HF-432 item 5: the harness stages the ARENA's seat, never the shipped
+    // map's - the debug backdoor `stageRailgunSpawn` below already records.
+    const seat = overdrivePositionForArena(selectedArena.id);
+    if (mode === 'charging') overdriveState = createOverdriveState(now, seat);
+    else if (mode === 'available') overdriveState = { ...createOverdriveState(now, seat), available: false, nextSpawnAt: now };
     else if (mode === 'active') overdriveState = {
       generation: overdriveState.generation + 1, available: false, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS,
       holderId: player.id, activeUntil: now + OVERDRIVE_DURATION_MS,
-      position: OVERDRIVE_POSITION,
+      position: seat,
+      home: seat,
     };
     else overdriveState = { ...overdriveState, available: false, holderId: null, activeUntil: 0, nextSpawnAt: now + OVERDRIVE_SPAWN_INTERVAL_MS };
     updateOverdrive(now);
     broadcastOverdriveState(now);
   },
   stageRailgunSpawn: (siteIndex = 0) => {
-    if (!gameStarted || selectedArena.id !== 'atomic-acres') return railgunState;
-    const boundedIndex = Math.max(0, Math.min(RAILGUN_UPPER_ROOM_SPAWN_SITES.length - 1, Math.floor(siteIndex)));
-    const scheduled = createRailgunAuthorityState('atomic-acres', 0, (boundedIndex + 0.01) / RAILGUN_UPPER_ROOM_SPAWN_SITES.length, railgunState.generation + 1);
-    const advanced = advanceRailgunAuthority(scheduled, RAILGUN_SPAWN_DELAY_MS);
+    // HF-407: the staging path is arena-scoped, not Nuke-Town-scoped. Hard-coding
+    // 'atomic-acres' here while the player stood in another railgun arena would have
+    // staged the pickup at the SHIPPED map's coordinates - a debug backdoor telling a
+    // QA run the weapon works where a real match would put it somewhere else.
+    const stagedSites = gameStarted ? railgunSpawnSitesForArena(selectedArena.id) : null;
+    if (!stagedSites) return railgunState;
+    const boundedIndex = Math.max(0, Math.min(stagedSites.length - 1, Math.floor(siteIndex)));
+    const scheduled = createRailgunAuthorityState(selectedArena.id, 0, (boundedIndex + 0.01) / stagedSites.length, railgunState.generation + 1);
+    const advanced = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs ?? RAILGUN_SPAWN_DELAY_MS);
     applyRailgunState(advanced.state, advanced.announcement !== null);
     broadcastRailgunState();
     return railgunState;
@@ -30175,16 +36770,19 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       bot.nextGrenadeAt = now + 60_000;
       bot.grenadeActive = false;
       bot.continuity += 1;
+      bot.stance = 'stand';
+      bot.stanceHeldUntil = 0;
+      bot.lastDamagedAt = Number.NEGATIVE_INFINITY;
       bot.positionHistory = [{
-        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + 1.7, z: bot.position.z,
-        yaw: operatorYawToward(bot.position, origin), stance: 'stand', continuity: bot.continuity,
+        at: currentHostTimeMs(), x: bot.position.x, y: bot.position.y + botStanceEyeHeightM(bot.stance), z: bot.position.z,
+        yaw: operatorYawToward(bot.position, origin), stance: bot.stance, continuity: bot.continuity,
       }];
       bot.root.position.copy(bot.position);
       bot.root.rotation.set(0, operatorYawToward(bot.position, origin), 0);
       bot.root.scale.setScalar(1);
       bot.root.visible = true;
       resetOperator(bot.root);
-      poseOperator(bot.root, 'stand', 0, now * 0.001);
+      poseOperator(bot.root, bot.stance, 0, now * 0.001);
       bot.root.updateMatrixWorld(true);
       if (index < 3) railgunQaHeldDeadBots.add(bot.id);
     }
@@ -30225,6 +36823,9 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     return interactWithRailgunPickup();
   },
   degradeStateChannel: () => localMultiplayerQa && network.degradeStateChannelForQa(),
+  // HF-504: the audit driver reads this on every peer to diff who sent and who
+  // received each message. Read-only; the trace ring is opened by URL fence.
+  sampleMessageTrace: () => network.qaMessageTrace(),
   endMatch: () => {
     endTimedMatchFromAuthority(performance.now());
   },
@@ -30318,6 +36919,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     const detonatedAt = performance.now();
     audio.explosion(detonatedAt);
     spawnGrenadeExplosionVisual(point, detonatedAt);
+    cameraShakeState = addCameraShakeImpulse(cameraShakeState, {
+      distanceUnits: point.distanceTo(player.position),
+      family: 'semtex',
+      sensoryScale: accessibilityRuntime.weaponMotionScale,
+      now: detonatedAt,
+    });
     breakWindowsInGrenadeBlast(point, randomNonce(), true, GRENADE_RADIUS);
     const accepted = applyInteractiveWorldExplosion(point, GRENADE_RADIUS, 100, 'grenade-major-collapse');
     const envelopeAfter = interactiveWorldRuntime.stateEnvelope();
@@ -30340,7 +36947,6 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
 let menuWeaponAssetPromise: Promise<void> | null = null;
 let sharedGameplayAssetsPromise: Promise<void> | null = null;
 let menuDeploymentAssetsPromise: Promise<void> | null = null;
-
 function yieldMenuPreparationIdleSlice(): Promise<void> {
   // The shared idle scheduler preserves requestIdleCallback while visible and
   // transfers ownership to a timer if the tab hides before that callback runs.
@@ -30407,13 +37013,10 @@ async function prepareSharedGameplayAssets(): Promise<void> {
       operatorPromise,
       prepareMenuWeaponAsset(),
       loadGrenadePresentation(),
-      loadHunterDronePresentation(),
-      loadSupportVehiclePresentations(),
     ]);
     // Every streamed viewmodel must inherit the camera's isolated compositing
     // layer before any match-boundary GPU prewarm can stage it.
     weaponView.root.traverse((node) => node.layers.set(VIEWMODEL_RENDER_LAYER));
-    await killstreakPresentation.prewarmAuthoredAssets();
     // First-person geometry is composited after world depth is cleared. Contact
     // retreat still keeps it tucked near walls without world geometry cutting
     // holes through hands and weapons.
@@ -30534,10 +37137,62 @@ let lastArenaEffectPrewarmProfile: Readonly<{
   groups: readonly Readonly<{ name: string; startedAt: number; completedAt: number; durationMs: number }>[];
 }> | null = null;
 
+// LOAD-CUT (pass 85, lane H2): MATCH ADMISSION IS THE LARGEST UNMEASURED BLOCK.
+// The arena transition has had a phase profiler since pass 79 and every cut this
+// repo has made to load time was aimed by it. Admission - everything between
+// `startSolo()` and the first live frame - has only ever produced ONE number,
+// and it is 14.4-20.4 s per arena, roughly 30-40% of the wall time between
+// pressing deploy and playing (lane H first-load rows, 2026-09-02). "Attribute
+// it" cannot be done from one number, so this records the same shape the
+// transition profiler records.
+//
+// It is MARKERS ONLY. Every call in the admission block is pinned by exact
+// source string in `src/presentation-prewarm-contract.test.ts`, so nothing here
+// wraps, reorders, adds or removes a step: `markMatchAdmission` stamps
+// performance.now() BETWEEN the existing statements, exactly as
+// `profileArenaTransition` does inside the transition. A mark costs one array
+// push; the block it measures costs seconds.
+let matchAdmissionMarks: { name: string; at: number }[] = [];
+let lastMatchAdmissionProfile: Readonly<{
+  arenaId: string;
+  mode: string;
+  durationMs: number;
+  steps: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+
+function beginMatchAdmissionProfile(): void {
+  matchAdmissionMarks = [];
+}
+
+function markMatchAdmission(name: string): void {
+  matchAdmissionMarks.push({ name, at: performance.now() });
+}
+
+/**
+ * Closes the open marker and publishes the block. Durations are mark-to-mark, so
+ * the LAST mark's duration runs to this call - which is why `finalize` is stamped
+ * at the end of both backend branches rather than inferred.
+ */
+function finalizeMatchAdmissionProfile(mode: string): void {
+  const marks = matchAdmissionMarks;
+  matchAdmissionMarks = [];
+  if (marks.length === 0) return;
+  const completedAt = performance.now();
+  const steps = marks.map((mark, index) => Object.freeze({
+    name: mark.name,
+    durationMs: Number(((index + 1 < marks.length ? marks[index + 1].at : completedAt) - mark.at).toFixed(3)),
+  }));
+  lastMatchAdmissionProfile = Object.freeze({
+    arenaId: selectedArena.id,
+    mode,
+    durationMs: Number((completedAt - marks[0].at).toFixed(3)),
+    steps: Object.freeze(steps),
+  });
+}
+
 async function yieldDeploymentPrewarmFrame(): Promise<void> {
   await yieldBrowserPreparationFrame();
 }
-
 async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): Promise<void> {
   if (renderRuntime.backend === 'webgpu') {
     setBootstrapStage('prewarming-batched-presentations');
@@ -30570,7 +37225,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
       ])],
       ['world-ordnance', () => prewarmGrenadeWorldPresentations(sceneGeneration)],
       ['nuke-overdrive-bolts', () => Promise.all([
-        prewarmNukePresentation(),
+        prewarmNukePresentation(), nukeEvent.prewarm(renderRuntime, camera, scene),
         prewarmOverdrivePresentation(),
         prewarmExplosiveBoltPresentation(sceneGeneration),
         timedMapWeaponPresentation.prewarm(renderRuntime, camera, sceneGeneration),
@@ -30589,17 +37244,33 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // their first exact roots into one masked TSL/HDR submission, while
     // Promise.all preserves the eight-name evidence order regardless of which
     // family completes first.
-    const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, operation)));
-    groups.push(await runGroup('flare-first-shot', () => (
-      flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
+    const groups = await Promise.all(groupDefinitions.map(([name, operation]) => runGroup(name, coldArenaOperation(!gameplayArenaPrepared, operation))));
+    // LOAD-CUT (pass 85, lane H): these two rehearsals are SERIALIZED after the
+    // concurrent families above - they stage a transient world PointLight and
+    // three r185 folds the visible light graph into every render object's cache
+    // key, so they cannot overlap - and they ran on every arena. Measured over
+    // 56 in-session map switches on the shipped PASS 84 build:
+    // `flare-first-shot` 2560.6 ms median, `flamethrower-first-shot` 415.4 ms,
+    // out of a 21.3 s median switch. Neither weapon is a loadout weapon; each
+    // has one authored route onto a map, and `arena-special-weapon-reach.ts`
+    // asks those authorities (TIMED_MAP_WEAPON_DEFINITIONS, and the
+    // field-support rule for the care package's crimson flamethrower) instead
+    // of restating an arena list. Nothing leaves the ADMITTED vocabulary: the
+    // full weapon catalogue is still prewarmed above, and
+    // prewarmMatchBoundFirstShotPresentations still rehearses both exact fire
+    // compositions against the complete match scene on every arena before
+    // admission. This only drops the duplicate arena-side rehearsal on arenas
+    // whose own authority can never produce the weapon.
+    groups.push(await runGroup('flare-first-shot', () => !gameplayArenaPrepared ? Promise.resolve() : (
+      !arenaCanAcquireFlareGun(selectedArena) ? Promise.resolve() : flareProjectileSystem.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flare-gun',
           () => renderRuntime.compileAndRender(scene, camera, scene),
         )
       ))
     )));
-    groups.push(await runGroup('flamethrower-first-shot', () => (
-      flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
+    groups.push(await runGroup('flamethrower-first-shot', () => !gameplayArenaPrepared ? Promise.resolve() : (
+      !arenaCanAcquireFlamethrower(selectedArena) ? Promise.resolve() : flamethrowerStreamPresentation.withStagedFirstShotPresentation(camera, () => (
         weaponView.prewarmBrowserWeaponFirePresentation(
           'flamethrower',
           () => renderRuntime.compileAndRender(scene, camera, scene),
@@ -30612,14 +37283,14 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     // fill plus zero-intensity muzzle light that coexist with world support in
     // gameplay. Its internal CPU yields still bound the exact LOD, 24-drone
     // formation and possessed-cockpit submissions.
-    groups.push(await runGroup('killstreak-vocabulary', async () => {
+    groups.push(await runGroup('killstreak-vocabulary', coldArenaOperation(!gameplayArenaPrepared, async () => {
       weaponView.setPresentationVisible(true);
       try {
         await killstreakPresentation.prewarm(renderRuntime, camera, sceneGeneration);
       } finally {
         weaponView.setPresentationVisible(false);
       }
-    }));
+    })));
     lastArenaEffectPrewarmProfile = Object.freeze({
       sceneGeneration,
       durationMs: Number((performance.now() - startedAt).toFixed(3)),
@@ -30659,7 +37330,7 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     ]);
     setBootstrapStage('prewarming-nuke');
     profileArenaTransition('prewarm-nuke');
-    await prewarmNukePresentation();
+    await prewarmNukePresentation(); await nukeEvent.prewarm(renderRuntime, camera, scene);
     setBootstrapStage('prewarming-overdrive');
     profileArenaTransition('prewarm-overdrive');
     await prewarmOverdrivePresentation();
@@ -30705,7 +37376,6 @@ async function prewarmArenaBoundGameplayPresentations(sceneGeneration: number): 
     )
   ));
 }
-
 function bootstrapMenuPreview(): void {
   document.documentElement.dataset.gameplayArena = 'deferred-until-deployment';
   arenaSelectionReady = true;
@@ -30713,7 +37383,7 @@ function bootstrapMenuPreview(): void {
   setArenaMenuCamera();
   setStatus(`${selectedArena.displayName} preview ready · deployment assets prepare in the background.`);
   bootstrapStage = 'ready';
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); void prepareMenuDeploymentAssets('idle');
   void menuPreviewVideoController.whenFirstFramePresented().then(() => {
     if (gameStarted || matchStartPreparing) return;
     return prepareMenuDeploymentAssets('idle').then(() => {

@@ -290,3 +290,69 @@ describe('attached weapon draw-call batching', () => {
     expect(weapon.getObjectByName('bolt-or-slide')?.visible).toBe(true);
   });
 });
+
+describe('static batching preserves authored draw order', () => {
+  /**
+   * REGRESSION GUARD.
+   *
+   * The batcher grouped meshes by material alone and built each batch with a
+   * default renderOrder of 0. Every arena that authored a transparent draw
+   * order therefore lost it the moment its meshes were batched: in Farcrysis
+   * the renderOrder -1 sky dome, the renderOrder 2 horizon glows and the
+   * renderOrder 3 sun-glitter path all collapsed to 0 and composited in
+   * arbitrary order, which is what produced the overlapping white planes over
+   * the sky.
+   *
+   * Draw order is part of a mesh's identity: meshes drawn in different passes
+   * must not share a batch, and a batch must carry the order it was authored
+   * with.
+   */
+  const buildSource = () => {
+    const root = new THREE.Group();
+    root.name = 'order-fixture';
+    // Same material, three different authored passes.
+    const shared = () => new THREE.MeshBasicMaterial({ color: 0x8899aa });
+    for (const [name, order] of [['sky', -1], ['glow', 2], ['glitter', 3]] as const) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), shared());
+      mesh.name = name;
+      mesh.renderOrder = order;
+      root.add(mesh);
+    }
+    return root;
+  };
+
+  it('never merges meshes that are drawn in different passes', () => {
+    const root = buildSource();
+    const destination = new THREE.Group();
+    batchStaticMeshes(root, destination);
+
+    const batches = destination.children[0];
+    expect(batches).toBeDefined();
+
+    const orders = (batches as THREE.Group).children.map((child) => child.renderOrder).sort((a, b) => a - b);
+    // Three authored orders in, three batches out - not one merged batch.
+    expect(orders).toEqual([-1, 2, 3]);
+  });
+
+  it('carries every authored render order onto the batch that replaces it', () => {
+    const root = buildSource();
+    const authored = new Map<string, number>();
+    root.traverse((node) => {
+      if (node instanceof THREE.Mesh) authored.set(node.name, node.renderOrder);
+    });
+
+    const destination = new THREE.Group();
+    batchStaticMeshes(root, destination);
+
+    const batched = (destination.children[0] as THREE.Group).children;
+    const batchedOrders = new Set(batched.map((child) => child.renderOrder));
+    for (const order of authored.values()) {
+      expect(batchedOrders.has(order), `no batch renders at authored order ${order}`).toBe(true);
+    }
+
+    // And the sources it replaced are the ones that were hidden.
+    root.traverse((node) => {
+      if (node instanceof THREE.Mesh) expect(node.visible).toBe(false);
+    });
+  });
+});

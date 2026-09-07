@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { FLAMETHROWER_EFFECT } from './special-weapon-effects';
+import { WEAPON_CATALOG } from './combat/weapon-catalog';
+import { WEAPON_IDS } from './protocol';
 import {
   FLAMETHROWER_GROUND_FIRE_DAMAGE_PER_PULSE,
   FLAMETHROWER_GROUND_FIRE_DURATION_MS,
   FLAMETHROWER_GROUND_FIRE_PULSE_INTERVAL_MS,
+  FLAMETHROWER_STREAM_WEAPON_IDS,
   FlamethrowerGroundFirePool,
   FlamethrowerStreamSystem,
   flamethrowerPulseImpactPresentationEnabled,
+  isFlamethrowerStreamWeapon,
   type FlamethrowerGroundFire,
 } from './flamethrower-stream-system';
 
@@ -235,5 +239,49 @@ describe('flamethrower stream presentation', () => {
       pulseIndex: 0, pulseAtMs: 1_000,
     });
     expect(receipts.at(-1)?.pulseAtMs).toBe(5_500);
+  });
+});
+
+describe('flamethrower stream weapon identity (owner 2026-08-25)', () => {
+  it('derives stream membership from the canonical catalog - both flamethrowers, nothing else', () => {
+    expect([...FLAMETHROWER_STREAM_WEAPON_IDS].sort())
+      .toEqual(['crimson-flamethrower', 'flamethrower']);
+    // The export must stay a projection of the catalog rows, never a second
+    // hand-maintained eligibility list.
+    expect([...FLAMETHROWER_STREAM_WEAPON_IDS]).toEqual(
+      WEAPON_CATALOG
+        .filter((weapon) => weapon.fireKind === 'hitscan'
+          && weapon.penetration.calibreLabel === 'ignited fuel stream')
+        .map((weapon) => weapon.id),
+    );
+    for (const id of WEAPON_IDS) {
+      expect(isFlamethrowerStreamWeapon(id)).toBe(id === 'flamethrower' || id === 'crimson-flamethrower');
+    }
+  });
+
+  it('keeps every stream weapon on ONE fire style - only direct damage may differ', () => {
+    const byId = (id: string) => WEAPON_CATALOG.find((weapon) => weapon.id === id)!;
+    const map = byId('flamethrower');
+    const crimson = byId('crimson-flamethrower');
+    // Stream mechanics and geometry: identical.
+    expect(crimson.fireKind).toBe(map.fireKind);
+    expect(crimson.rpm).toBe(map.rpm);
+    expect(crimson.spinUpMs).toBe(map.spinUpMs);
+    expect(crimson.pellets).toBe(map.pellets);
+    expect(crimson.spread).toEqual(map.spread);
+    expect(crimson.recoil).toEqual({ ...map.recoil, deterministicPatternId: crimson.recoil.deterministicPatternId });
+    expect(crimson.effects.muzzleFlashScale).toBe(map.effects.muzzleFlashScale);
+    expect(crimson.effects.reportGain).toBe(map.effects.reportGain);
+    expect(crimson.penetration.calibreLabel).toBe(map.penetration.calibreLabel);
+    expect(crimson.penetration.energyFalloffStartM).toBe(map.penetration.energyFalloffStartM);
+    expect(crimson.penetration.energyFalloffEndM).toBe(map.penetration.energyFalloffEndM);
+    // Reach contract: both falloffs end exactly at the shared stream range.
+    expect(map.damage.falloffEndM).toBe(FLAMETHROWER_EFFECT.rangeM);
+    expect(crimson.damage.falloffEndM).toBe(FLAMETHROWER_EFFECT.rangeM);
+    // The ONLY permitted divergence is direct damage (owner: "30% less") plus livery.
+    expect(crimson.damage.base).toBeCloseTo(map.damage.base * 0.7, 10);
+    expect(crimson.damage.minimum).toBe(map.damage.minimum);
+    expect(crimson.damage.headMultiplier).toBe(map.damage.headMultiplier);
+    expect(crimson.damage.limbMultiplier).toBe(map.damage.limbMultiplier);
   });
 });

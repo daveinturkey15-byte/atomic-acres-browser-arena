@@ -26,6 +26,7 @@ import {
   validateHardwareWebGl2BuildManifest,
   validateHardwareWebGl2DetailedReceipt,
 } from './pass65-hardware-webgl2-receipt-contract.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const ARTIFACT_ROOT = 'artifacts/pass65/hardware-webgl2-admission';
 const OWNER_ARTIFACT_ROOT = 'artifacts/pass65-owner-feedback';
@@ -887,7 +888,8 @@ async function runTrial(trial: number): Promise<TrialReceipt> {
       viewport: VIEWPORT,
       deviceScaleFactor: 1,
       args: [
-        '--disable-background-timer-throttling',
+    ...OFFSCREEN_ARGS,
+    '--disable-background-timer-throttling',
         '--disable-renderer-backgrounding',
         '--disable-backgrounding-occluded-windows',
         '--force-device-scale-factor=1',

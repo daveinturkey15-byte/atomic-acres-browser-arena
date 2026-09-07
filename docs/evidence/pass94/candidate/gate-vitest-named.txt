@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-hitl
+
+
+ Test Files  19 passed (19)
+      Tests  400 passed (400)
+   Start at  13:39:55
+   Duration  24.56s (transform 44.17s, setup 0ms, import 61.10s, tests 57.89s, environment 2ms)
+

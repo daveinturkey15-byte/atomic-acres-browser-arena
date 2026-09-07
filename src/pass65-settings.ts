@@ -4,14 +4,50 @@ import {
   GRAPHICS_PRESET_VALUES,
   normalizeAdvancedGraphicsValues,
   type AdvancedGraphicsValues,
+  type FilmicProfileChoice,
+  type ReflectionQualityTier,
+  type ShadowFilterMode,
   type ToneMappingMode,
 } from './graphics-settings-registry';
+import {
+  resolveScreenSpacePostRuntime,
+  SCREEN_SPACE_POST_DISABLED,
+  type ScreenSpacePostRuntime,
+} from './rendering/screen-space-post-profile';
+import {
+  publishWeatherPresentation,
+  resolveWeatherPresentation,
+  type WeatherPresentationRuntime,
+} from './weather/weather-settings';
+import {
+  publishAmbientLife,
+  resolveAmbientLife,
+  type AmbientLifeRuntime,
+} from './particles/ambient-life-settings';
 
 export { AUDIO_BUS_IDS };
 export type { AudioBusId };
 
 export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
-export type GraphicsPreset = 'performance' | 'high' | 'max' | 'custom';
+/**
+ * The preset ladder, in the order a player climbs it.
+ *
+ * `balanced` is HF-418 (owner, 2026-09-02 19:10: "maybe make a new balanced
+ * profile that doesnt look shit like performance but will run nice and look
+ * good?"). It sits between `performance` and `high`; its control set and the
+ * reason for every entry in it are in graphics-settings-registry.ts, derived
+ * from the HF-414 cost audit.
+ *
+ * `raytraced` WAS HF-398 and is RETIRED by HF-438 (owner, 2026-09-03:
+ * "I don't think we should have a ray tracing AND an RTX mode"). It is no
+ * longer a member of this union; a stored `raytraced` preference migrates to
+ * `high`, which now carries the trace at its light tier. The word RTX still
+ * appears in exactly one place in the player-facing build, and it is not a
+ * preset: it is the native-runtime EXPLAINER
+ * (src/ui/rtx-native-runtime-explainer.ts), which changes no renderer setting
+ * at all.
+ */
+export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';
 
 export type GraphicsSettings = Readonly<AdvancedGraphicsValues & {
@@ -23,6 +59,13 @@ export type AudioSettings = Readonly<{
   schemaVersion: 1;
   gains: Readonly<Record<AudioBusId, number>>;
   mutes: Readonly<Record<AudioBusId, boolean>>;
+  /** One-time migration marker: the 2026-08-29 owner retune moved the
+   * game-music default 100 -> 50. Stored settings from before the retune
+   * carry the OLD default and would override the new one forever; when this
+   * marker is absent and the stored gain still equals that old default, the
+   * gain migrates to 50. Once the marker is written, a user deliberately
+   * choosing 100 again is respected. */
+  gameMusicRetuned: true;
 }>;
 
 export type AccessibilitySettings = Readonly<{
@@ -56,9 +99,12 @@ export type GraphicsRuntime = Readonly<{
   targetFps: GraphicsSettings['targetFps'];
   frameRateLimit: number;
   antialiasSamples: 0 | 2 | 4;
+  /** WebGPU display-side post anti-aliasing stage; 'off' whenever MSAA owns AA. */
+  postAntiAliasing: 'off' | 'fxaa' | 'smaa';
   shadows: boolean;
   shadowMapSize: 1024 | 2048;
   shadowUpdateMode: GraphicsSettings['shadowUpdateMode'];
+  shadowFilter: ShadowFilterMode;
   indirectLightScale: number;
   ambientOcclusion: Readonly<{
     quality: GraphicsSettings['ambientOcclusion'];
@@ -67,8 +113,20 @@ export type GraphicsRuntime = Readonly<{
     samples: number;
     radius: number;
     strength: number;
+    /** High/Ultra tiers run the depth/normal-aware denoise pass over the raw GTAO target. */
+    denoise: boolean;
   }>;
   reflectionScale: number;
+  reflectionQuality: ReflectionQualityTier;
+  environmentIntensity: number;
+  /**
+   * HF-364 — the resolved screen-space raymarched stack (volumetric shafts,
+   * SSR, SSGI, depth of field, motion blur) plus the FSR 1 upscaler. The tier
+   * tables and the combat-safety ceilings live in
+   * `rendering/screen-space-post-profile.ts`, which is also where the numbers
+   * are proven; this field is only the resolved result.
+   */
+  screenSpace: ScreenSpacePostRuntime;
   volumetricScale: number;
   maximumAnisotropy: GraphicsSettings['anisotropy'];
   particleScale: number;
@@ -80,7 +138,26 @@ export type GraphicsRuntime = Readonly<{
     toneMapping: ToneMappingMode;
     filmGrainScale: number;
     vignetteStrength: number;
+    /** 0 disables the display-side RCAS stage entirely. */
+    sharpness: number;
   }>;
+  /** 'arena-default' keeps the preset-matched filmic grade profile mapping. */
+  gradeProfile: FilmicProfileChoice;
+  /**
+   * Pass 78 — the player's weather ceiling, rain density, wind strength and
+   * lightning switch, resolved. The weather MODEL is untouched by this: it
+   * stays a pure function of (arena, match seed, elapsed) that every peer
+   * agrees on, and this only decides how much of it the local screen draws.
+   */
+  weather: WeatherPresentationRuntime;
+  /**
+   * Pass 79 — how much of the authored ambient population the player asked to
+   * see. Same latch argument as `weather` above: the ambient particle runtime
+   * is constructed at module scope in legacy-main and is never handed settings,
+   * so without publishing this the AIRBORNE DETAIL row would be a switch wired
+   * to nothing.
+   */
+  ambientLife: AmbientLifeRuntime;
   reason: string | null;
 }>;
 
@@ -97,7 +174,8 @@ export type CapabilityHints = Readonly<{
 
 export const MIN_GRAPHICS_TARGET_FPS = 30;
 export const MAX_GRAPHICS_TARGET_FPS = 360;
-const PRESETS = new Set<GraphicsPreset>(['performance', 'high', 'max', 'custom']);
+/** Static membership table for the stored-preset gate (HF-438: no 'raytraced'). */
+const PRESETS: Readonly<Record<string, true>> = Object.freeze({ performance: true, balanced: true, high: true, max: true, custom: true });
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -110,6 +188,36 @@ function clamp(value: number, minimum: number, maximum: number): number {
 function bool(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
+
+/**
+ * HF-536 night-lighting — GTAO gather radius per tier, IN METRES.
+ *
+ * `GTAONode` multiplies its sample direction by `radius` in VIEW space
+ * (`node_modules/three/examples/jsm/tsl/display/GTAONode.js`, the
+ * `sampleViewOffset` line), so this number is a real world length, not a
+ * screen fraction. The shipped tiers were 0.18 / 0.22 / 0.25 m — an interior
+ * prop radius. In a 36 x 84 m exterior arena the contacts a player reads are
+ * a kerb against asphalt, a house base against a lawn, a porch soffit, a
+ * hedge against a wall and a vehicle against the road; those separations are
+ * 0.4-0.9 m, so a 0.22 m gather darkened a band roughly 3 px wide at 1280x720
+ * from ten metres and every box in the frame read as floating (owner,
+ * 2026-09-06: "looks like Roblox").
+ *
+ * Cost is unchanged by construction: GTAO's per-pixel cost is
+ * `samples x resolutionScale`, and neither moves here. A wider radius changes
+ * only where the same twelve taps land (measured fps delta reported in the
+ * lane report).
+ *
+ * The strengths are deliberately NOT raised alongside: strength is the mix
+ * weight of the occlusion term, and moving both at once would make the pass
+ * unattributable. Widening the gather is the correction; darkening it further
+ * would be a second, separate claim.
+ */
+export const GTAO_RADIUS_METRES = Object.freeze({
+  low: 0.42,
+  high: 0.6,
+  ultra: 0.8,
+});
 
 function presetGraphics(preset: Exclude<GraphicsPreset, 'custom'>): GraphicsSettings {
   return Object.freeze({ schemaVersion: 1, preset, ...GRAPHICS_PRESET_VALUES[preset] });
@@ -127,12 +235,12 @@ export function createDefaultPass65Settings(capabilities: CapabilityHints = {}):
   const gains = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [id, 100])) as Record<AudioBusId, number>;
   const mutes = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [id, false])) as Record<AudioBusId, boolean>;
   gains['menu-music'] = 72;
-  gains['game-music'] = 68;
+  gains['game-music'] = 50; // owner-tuned 2026-08-29 with the 0.214 bus
   gains.ambience = 82;
   return Object.freeze({
     version: 1,
     graphics: presetGraphics(preset),
-    audio: Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes) }),
+    audio: Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes), gameMusicRetuned: true as const }),
     accessibility: Object.freeze({
       schemaVersion: 1,
       reducedMotion: false,
@@ -153,7 +261,17 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   if (!value || typeof value !== 'object') return defaults;
   const raw = value as Partial<Pass65Settings>;
   const rawGraphics = raw.graphics && typeof raw.graphics === 'object' ? raw.graphics as Partial<GraphicsSettings> : {};
-  const preset = PRESETS.has(rawGraphics.preset as GraphicsPreset) ? rawGraphics.preset as GraphicsPreset : defaults.graphics.preset;
+  // HF-438 migration: a stored `raytraced` preference (HF-398, retired) maps
+  // to QUALITY on load — the rung that now carries the trace — regardless of
+  // what this machine's automatic default would have been.
+  const LEGACY_PRESET_ALIASES: Readonly<Record<string, Exclude<GraphicsPreset, 'custom'>>> = Object.freeze({ raytraced: 'high' });
+  const storedPreset = typeof rawGraphics.preset === 'string' ? rawGraphics.preset : null;
+  const requestedPreset = storedPreset !== null && storedPreset in LEGACY_PRESET_ALIASES
+    ? LEGACY_PRESET_ALIASES[storedPreset]
+    : storedPreset;
+  const preset = requestedPreset !== null && requestedPreset in PRESETS
+    ? requestedPreset as GraphicsPreset
+    : defaults.graphics.preset;
   // A named profile is an atomic, canonical choice. Persisted advanced values
   // can only belong to Custom; allowing them to leak into a named profile
   // makes the label lie about the runtime configuration after migrations.
@@ -173,7 +291,12 @@ export function normalizePass65Settings(value: unknown, capabilities: Capability
   const mutes = Object.fromEntries(AUDIO_BUS_IDS.map((id) => [
     id, bool(rawMutes[id], defaults.audio.mutes[id]),
   ])) as Record<AudioBusId, boolean>;
-  const audio: AudioSettings = Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes) });
+  // 2026-08-29 owner retune migration: pre-retune stored settings hold the
+  // old game-music default (100) and would drown the new 50 default forever.
+  if (rawAudio.gameMusicRetuned !== true && gains['game-music'] === 100) {
+    gains['game-music'] = defaults.audio.gains['game-music'];
+  }
+  const audio: AudioSettings = Object.freeze({ schemaVersion: 1, gains: Object.freeze(gains), mutes: Object.freeze(mutes), gameMusicRetuned: true as const });
   const rawAccessibility = raw.accessibility && typeof raw.accessibility === 'object'
     ? raw.accessibility as Partial<AccessibilitySettings>
     : {};
@@ -240,21 +363,94 @@ export function writePass65Settings(
   return false;
 }
 
-export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatibility = false): GraphicsRuntime {
+/**
+ * What the RENDERER ROUTE can actually do. Only the caller that owns the
+ * renderer knows this, so it is passed in rather than sniffed: `navigator.gpu`
+ * existing is not the same statement as "this session adopted the WebGPU
+ * backend", and the fallback to WebGL2 happens after adapter request.
+ */
+export type GraphicsRouteCapability = Readonly<{
+  /**
+   * True when the classic ray tracer can be built at all. The tracer composites
+   * inside the TSL/HDR graph, and `legacy-main` constructs that graph only when
+   * `renderRuntime.backend === 'webgpu'`, so on every other route the trace is
+   * structurally absent rather than merely expensive.
+   *
+   * Defaults to TRUE. Every existing caller resolves settings without a
+   * renderer in hand (storage round-trips, the feature inventory, the whole
+   * unit suite) and must keep the behaviour it had; the one caller that owns a
+   * renderer passes the real backend.
+   */
+  rayTracingCapable?: boolean;
+}>;
+
+/**
+ * Why the ray-traced controls were switched off. Printed by the EFFECTIVE
+ * badge next to the preset the player kept, in the same slot the
+ * compatibility route uses.
+ */
+export const RAY_TRACED_REQUIRES_WEBGPU_REASON =
+  'Ray tracing needs the WebGPU renderer; this device fell back to WebGL2.';
+
+/**
+ * Resolves the runtime AND publishes the weather half of it.
+ *
+ * THE ONE SIDE EFFECT IN THIS FILE, AND WHY IT IS HERE. The weather systems are
+ * constructed at module scope in legacy-main, before any settings object
+ * exists, and the frame loop never hands them settings afterwards — it passes a
+ * camera, a weather sample and a wind sample and nothing else. Without a latch,
+ * every weather row in Options would be a switch wired to nothing, which is the
+ * exact defect this lane was opened to fix.
+ *
+ * It is safe to sit in a resolver because the published value is a pure
+ * function of `settings`: resolving twice with the same settings publishes the
+ * same frozen numbers, and order between callers cannot matter. Consumers take
+ * it as a DEFAULT ARGUMENT, so any caller that wants purity passes its own and
+ * never reads the latch (`resetWeatherPresentation` exists for suites that do
+ * exercise this path).
+ *
+ * This runs at boot and again on every Options apply — exactly the cadence a
+ * presentation clamp needs.
+ */
+export function resolveGraphicsRuntime(
+  requestedGraphics: GraphicsSettings,
+  forceCompatibility = false,
+  capability: GraphicsRouteCapability = {},
+): GraphicsRuntime {
+  // PASS 81 — the capability gate for the classic ray tracer. Since HF-438 the
+  // trace ships inside QUALITY and MAX, so a renderer that cannot trace simply
+  // has that one control switched off, with a reason: the player keeps the
+  // rung they chose and every other value they asked for.
+  const traceUnavailable = capability.rayTracingCapable === false && requestedGraphics.rayTracing !== 'off';
+  const settings: GraphicsSettings = traceUnavailable
+    ? Object.freeze({ ...requestedGraphics, rayTracing: 'off' as const })
+    : requestedGraphics;
+  const weather = resolveWeatherPresentation(settings);
+  publishWeatherPresentation(weather);
+  // Second latch, same contract, same cadence: a pure function of `settings`,
+  // published here because the ambient particle runtime has no other route to
+  // the player's choice.
+  const ambientLife = resolveAmbientLife(settings);
+  publishAmbientLife(ambientLife);
   const qualityScale = (tier: GraphicsSettings['particleQuality']): number => tier === 'low' ? 0.5 : tier === 'high' ? 0.8 : 1;
   const lightingScale = (tier: GraphicsSettings['indirectLighting']): number => tier === 'off' ? 0 : tier === 'low' ? 0.62 : 1;
   const bloomStrength = settings.bloomQuality === 'off' ? 0 : settings.bloomQuality === 'subtle' ? 0.065 : 0.14;
   const antialiasSamples = settings.antiAliasing === 'msaa-4x' ? 4 : settings.antiAliasing === 'msaa-2x' ? 2 : 0;
+  const postAntiAliasing = settings.antiAliasing === 'fxaa' || settings.antiAliasing === 'smaa'
+    ? settings.antiAliasing
+    : 'off' as const;
+  // Low keeps the raw single-pass GTAO as the cheap tier; High and Ultra add
+  // the depth/normal-aware spatial denoise over the same bounded target.
   const ambientOcclusion = settings.ambientOcclusion === 'off'
-    ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 })
+    ? Object.freeze({ quality: 'off' as const, enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false })
     : settings.ambientOcclusion === 'low'
-      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42 })
+      ? Object.freeze({ quality: 'low' as const, enabled: true, resolutionScale: 0.35, samples: 8, radius: GTAO_RADIUS_METRES.low, strength: 0.42, denoise: false })
       : settings.ambientOcclusion === 'high'
-        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52 })
-        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62 });
+        ? Object.freeze({ quality: 'high' as const, enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52, denoise: true })
+        : Object.freeze({ quality: 'ultra' as const, enabled: true, resolutionScale: 0.75, samples: 16, radius: GTAO_RADIUS_METRES.ultra, strength: 0.62, denoise: true });
   if (forceCompatibility) {
     return Object.freeze({
-      requestedPreset: settings.preset,
+      requestedPreset: requestedGraphics.preset,
       effectivePreset: 'performance',
       renderProfile: 'compat',
       renderScale: 0.2,
@@ -262,23 +458,42 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       targetFps: settings.targetFps,
       frameRateLimit: settings.frameRateLimit,
       antialiasSamples: 0,
+      postAntiAliasing: 'off',
       shadows: false,
       shadowMapSize: 1024,
       shadowUpdateMode: 'static',
+      shadowFilter: 'auto',
       indirectLightScale: 0.45,
-      ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 }),
+      ambientOcclusion: Object.freeze({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false }),
       reflectionScale: 0,
+      reflectionQuality: 'off',
+      environmentIntensity: 0,
+      // The compatibility route has no RenderPipeline and therefore no linear
+      // post graph at all; every screen-space effect is structurally absent
+      // rather than merely turned down.
+      screenSpace: SCREEN_SPACE_POST_DISABLED,
       volumetricScale: 0.4,
       maximumAnisotropy: 1,
       particleScale: 0.4,
       decalScale: 0.4,
       smokeScale: 0.55,
-      post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0 }),
+      post: Object.freeze({ bloomStrength: 0, exposureScale: settings.exposure, toneMapping: settings.toneMapping, filmGrainScale: 0, vignetteStrength: 0, sharpness: 0 }),
+      gradeProfile: 'arena-default',
+      // The compatibility route draws no rain at all (rainBypassReason ->
+      // 'compat-profile'), but the player's settings are still resolved and
+      // published: wind strength reaches particle drift and foliage on this
+      // route, and a control that silently stops existing on one renderer is
+      // worse than one that is honestly bounded.
+      weather,
+      // The compatibility route runs the ambient families at the LOW tier
+      // rather than bypassing them (particles/index.ts says why), so the
+      // player's row reaches this renderer too.
+      ambientLife,
       reason: 'Compatibility renderer is active.',
     });
   }
   return Object.freeze({
-    requestedPreset: settings.preset,
+    requestedPreset: requestedGraphics.preset,
     effectivePreset: settings.preset,
     renderProfile: settings.geometryDetail === 'reduced' ? 'performance' : 'blender',
     renderScale: Math.min(1.25, settings.renderScale),
@@ -286,12 +501,43 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
     targetFps: settings.targetFps,
     frameRateLimit: settings.frameRateLimit,
     antialiasSamples,
+    postAntiAliasing,
     shadows: settings.shadows === 'high',
     shadowMapSize: settings.shadowResolution === 'high' ? 2048 : 1024,
     shadowUpdateMode: settings.shadowUpdateMode,
+    shadowFilter: settings.shadowFilter,
     indirectLightScale: lightingScale(settings.indirectLighting),
     ambientOcclusion,
-    reflectionScale: lightingScale(settings.reflectionQuality),
+    // Ultra shares High's unit reflection gain; the extra tier buys PMREM
+    // resolution (512) in arena-environment-ibl, not a hotter multiplier.
+    reflectionScale: settings.reflectionQuality === 'off' ? 0 : settings.reflectionQuality === 'low' ? 0.62 : 1,
+    reflectionQuality: settings.reflectionQuality,
+    environmentIntensity: lightingScale(settings.indirectLighting) * settings.environmentIntensity,
+    // Volumetric shafts raymarch the sun shadow map, so the shadow setting is a
+    // hard capability input here rather than a taste preference: with shadows
+    // off there is nothing to occlude the volume and the resolver reports why.
+    screenSpace: resolveScreenSpacePostRuntime({
+      // HF-418 / Lane AL. Baked indirect is resolved with the screen-space
+      // family because it composites into the same additive bounce term, but
+      // it is the one member whose cost is paid offline: both tiers are three
+      // texture fetches per pixel and differ only in bake time.
+      bakedIndirect: settings.bakedIndirect,
+      volumetricLightShafts: settings.volumetricLightShafts,
+      // HF-481. Aerial perspective rides the atmosphere setting that already
+      // exists rather than a new control; this is its only runtime wiring.
+      volumetricQuality: settings.volumetricQuality,
+      screenSpaceReflections: settings.screenSpaceReflections,
+      screenSpaceGi: settings.screenSpaceGi,
+      depthOfField: settings.depthOfField,
+      depthOfFieldStrength: settings.depthOfFieldStrength,
+      motionBlur: settings.motionBlur,
+      spatialUpscaling: settings.spatialUpscaling,
+      // HF-398. The trace shares the shafts' one hard capability dependency: a
+      // shadow-casting sun. Without one there is nothing for a shadow ray to
+      // resolve against, and the resolver reports that rather than silently
+      // drawing a reflection with no shadows in it.
+      rayTracing: settings.rayTracing,
+    }, { shadowsEnabled: settings.shadows === 'high' }),
     volumetricScale: qualityScale(settings.volumetricQuality),
     maximumAnisotropy: settings.anisotropy,
     particleScale: qualityScale(settings.particleQuality),
@@ -303,8 +549,12 @@ export function resolveGraphicsRuntime(settings: GraphicsSettings, forceCompatib
       toneMapping: settings.toneMapping,
       filmGrainScale: settings.filmGrain,
       vignetteStrength: settings.vignette,
+      sharpness: settings.sharpness,
     }),
-    reason: null,
+    gradeProfile: settings.filmicProfile,
+    weather,
+    ambientLife,
+    reason: traceUnavailable ? RAY_TRACED_REQUIRES_WEBGPU_REASON : null,
   });
 }
 
@@ -339,7 +589,18 @@ export function resolveActiveGraphicsConfig(
   });
 }
 
-/** Public preset label after an explicit renderer review route is applied. */
+/**
+ * Public preset label after an explicit renderer review route is applied.
+ *
+ * An explicit review route is a stronger statement than any preset:
+ * `?render=performance` already forced the whole budget down, and reporting a
+ * preset the route does not run would be the same lie from the other
+ * direction. It mirrors `resolveGraphicsRuntime`'s `effectivePreset`; the
+ * trace's capability gate lives THERE — since HF-438 it switches the one
+ * control off and keeps the rung — and its reason string is
+ * `RAY_TRACED_REQUIRES_WEBGPU_REASON`, published through
+ * `GraphicsRuntime.reason`.
+ */
 export function resolveDisplayedGraphicsPreset(
   requestedPreset: GraphicsPreset,
   queryRenderProfile: RenderProfile | null = null,

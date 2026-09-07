@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 73",
-    "description": "Pass 73: first-person, combat, collision, live-graphics and cross-browser corrections with preserved release channels."
+    "label": "PASS 94",
+    "description": "Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish."
   },
   "experimental": {
-    "label": "PASS 73",
-    "description": "Pass 73 first-person, gameplay, world-integrity and renderer-correction build.",
-    "pass": "PASS 73",
-    "path": "channels/the-big-one"
+    "pass": "PASS 94",
+    "label": "PASS 94",
+    "description": "Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish.",
+    "path": "channels/pass94"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -66,5 +66,11 @@
     "runtimeTreeSha256": "b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce",
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
+  },
+  "pass93Backup": {
+    "label": "PASS 93 · SAFE BACKUP",
+    "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
+    "pass": "PASS 93",
+    "path": "channels/pass93"
   }
 }

@@ -1,0 +1,1325 @@
+{
+  "contract": "arena-viewpoint-regression-diff-v1",
+  "verdict": "FAIL",
+  "thresholds": {
+    "meanQuiet": 0.5,
+    "regionMin": 0.0025,
+    "regionGlobal": 0.15,
+    "deltaHard": 32,
+    "deltaSoft": 8,
+    "newlyBlackFloor": 6,
+    "newlyBlackFraction": 0.005
+  },
+  "analysis": {
+    "width": 640,
+    "height": 360
+  },
+  "base": {
+    "dir": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\served-b5b06e0f",
+    "sha": "b639b751",
+    "bundleAtStart": "/legacy-main-D1KZmZ-u.js",
+    "capturedAt": "2026-09-06T06:24:59.535Z"
+  },
+  "persistence": {
+    "rule": "pixel-wise min |base-candidate| across ALL base x candidate sample pairs",
+    "baseSamples": 1,
+    "candidateSamples": 2
+  },
+  "candidate": {
+    "dir": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\final-3",
+    "sha": "bc649bb5",
+    "bundleAtStart": "/legacy-main-B_HlzZdZ.js",
+    "capturedAt": "2026-09-06T09:57:37.432Z"
+  },
+  "counts": {
+    "MISSING": 62,
+    "GLOBAL_CHANGED": 11,
+    "NEWLY_BLACK": 12,
+    "REGION_CHANGED": 3,
+    "DYNAMIC_ONLY": 3
+  },
+  "comparisons": [
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-plan",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-street-axis",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-west-garden",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-aqua-upper-roof",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-aqua-wall-closed",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "atomic-acres",
+      "cameraId": "nuke-town-aqua-door-open",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-beach-golden",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-jungle-dapple",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-core-interior",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-seaplane-throwback",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-island-topdown",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "farcrysis",
+      "cameraId": "farcrysis-west-shoreline",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-armory-support",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-lane-wall",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-neon-lanes",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-lateral-targets",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-test-bay-corridor",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-test-bay-door-approach",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-test-bay-door-relief",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-test-bay-door-bay-face",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "gun-range",
+      "cameraId": "gun-range-test-bay-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "map3",
+      "cameraId": "map3-hub-vista",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "map3",
+      "cameraId": "map3-bay-nature",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "map3",
+      "cameraId": "map3-volume-hall",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "map3",
+      "cameraId": "map3-into-sun-hub",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "high-seas",
+      "cameraId": "high-seas-starboard-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "high-seas",
+      "cameraId": "high-seas-stern-main-deck",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "high-seas",
+      "cameraId": "high-seas-upper-deck-occlusion",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "high-seas",
+      "cameraId": "high-seas-bow-lane",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-tower-support",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-container-wall",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-container-dynamic-northwest",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-container-dynamic-southeast",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-mounted-work-lights",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "rustworks-1v1",
+      "cameraId": "rustrig-deck-surface",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-cabin-ceiling",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-concourse-wall-closed",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-boarding-open",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-port-wing-authority",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "skyline-terminal",
+      "cameraId": "terminal-starboard-wing-authority",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test1",
+      "cameraId": "test1-tower-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test1",
+      "cameraId": "test1-firing-line",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test1",
+      "cameraId": "test1-container-occlusion",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test1",
+      "cameraId": "test1-into-sun-hardpan",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test2",
+      "cameraId": "test2-estate-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test2",
+      "cameraId": "test2-pool-lane",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test2",
+      "cameraId": "test2-garden-occlusion",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "test2",
+      "cameraId": "test2-into-sun-terrace",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-overhead",
+      "metrics": {
+        "newlyBlackFraction": 0,
+        "newlyBlackPixels": 1,
+        "newlyBlackBox": {
+          "x": 222,
+          "y": 251,
+          "w": 1,
+          "h": 1
+        },
+        "healedFraction": 0.02881,
+        "healedPixels": 6637,
+        "meanAbsDelta": 9.182,
+        "ratioOver8": 0.36474,
+        "ratioOver32": 0.0474,
+        "largestRegionFraction": 0.01263,
+        "largestRegionBox": {
+          "x": 274,
+          "y": 251,
+          "w": 73,
+          "h": 109
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-overhead.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-north-yard",
+      "metrics": {
+        "newlyBlackFraction": 0.00391,
+        "newlyBlackPixels": 901,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 68,
+          "w": 632,
+          "h": 249
+        },
+        "healedFraction": 0.00024,
+        "healedPixels": 55,
+        "meanAbsDelta": 28.312,
+        "ratioOver8": 0.37045,
+        "ratioOver32": 0.28144,
+        "largestRegionFraction": 0.24974,
+        "largestRegionBox": {
+          "x": 5,
+          "y": 200,
+          "w": 635,
+          "h": 160
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-north-yard.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-south-yard",
+      "metrics": {
+        "newlyBlackFraction": 0.00045,
+        "newlyBlackPixels": 103,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 63,
+          "w": 633,
+          "h": 263
+        },
+        "healedFraction": 0.00034,
+        "healedPixels": 79,
+        "meanAbsDelta": 18.401,
+        "ratioOver8": 0.47421,
+        "ratioOver32": 0.27452,
+        "largestRegionFraction": 0.25428,
+        "largestRegionBox": {
+          "x": 0,
+          "y": 198,
+          "w": 640,
+          "h": 162
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-south-yard.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-street-centre",
+      "metrics": {
+        "newlyBlackFraction": 0.0973,
+        "newlyBlackPixels": 22418,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 105,
+          "w": 467,
+          "h": 255
+        },
+        "healedFraction": 0.00176,
+        "healedPixels": 405,
+        "meanAbsDelta": 13.248,
+        "ratioOver8": 0.29227,
+        "ratioOver32": 0.11526,
+        "largestRegionFraction": 0.05966,
+        "largestRegionBox": {
+          "x": 7,
+          "y": 233,
+          "w": 363,
+          "h": 127
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-street-centre.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-north-upper-window",
+      "metrics": {
+        "newlyBlackFraction": 0.00036,
+        "newlyBlackPixels": 84,
+        "newlyBlackBox": {
+          "x": 107,
+          "y": 168,
+          "w": 44,
+          "h": 17
+        },
+        "healedFraction": 0.00005,
+        "healedPixels": 12,
+        "meanAbsDelta": 3.889,
+        "ratioOver8": 0.09227,
+        "ratioOver32": 0.03151,
+        "largestRegionFraction": 0.01533,
+        "largestRegionBox": {
+          "x": 325,
+          "y": 315,
+          "w": 100,
+          "h": 45
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "REGION_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-north-upper-window.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-south-upper-window",
+      "metrics": {
+        "newlyBlackFraction": 0.00054,
+        "newlyBlackPixels": 124,
+        "newlyBlackBox": {
+          "x": 77,
+          "y": 166,
+          "w": 319,
+          "h": 21
+        },
+        "healedFraction": 0.00001,
+        "healedPixels": 3,
+        "meanAbsDelta": 2.275,
+        "ratioOver8": 0.03318,
+        "ratioOver32": 0.00427,
+        "largestRegionFraction": 0.00054,
+        "largestRegionBox": {
+          "x": 144,
+          "y": 139,
+          "w": 16,
+          "h": 17
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "DYNAMIC_ONLY"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-into-sun-street",
+      "metrics": {
+        "newlyBlackFraction": 0.04895,
+        "newlyBlackPixels": 11277,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 99,
+          "w": 504,
+          "h": 261
+        },
+        "healedFraction": 0.00099,
+        "healedPixels": 229,
+        "meanAbsDelta": 12.427,
+        "ratioOver8": 0.24239,
+        "ratioOver32": 0.1236,
+        "largestRegionFraction": 0.04775,
+        "largestRegionBox": {
+          "x": 0,
+          "y": 253,
+          "w": 201,
+          "h": 107
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-into-sun-street.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-north-interior",
+      "metrics": {
+        "newlyBlackFraction": 0,
+        "newlyBlackPixels": 0,
+        "newlyBlackBox": null,
+        "healedFraction": 0,
+        "healedPixels": 0,
+        "meanAbsDelta": 2.126,
+        "ratioOver8": 0.00164,
+        "ratioOver32": 0.0005,
+        "largestRegionFraction": 0.00029,
+        "largestRegionBox": {
+          "x": 255,
+          "y": 225,
+          "w": 15,
+          "h": 8
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "DYNAMIC_ONLY"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-south-interior",
+      "metrics": {
+        "newlyBlackFraction": 0,
+        "newlyBlackPixels": 0,
+        "newlyBlackBox": null,
+        "healedFraction": 0,
+        "healedPixels": 0,
+        "meanAbsDelta": 2.231,
+        "ratioOver8": 0.00085,
+        "ratioOver32": 0.00009,
+        "largestRegionFraction": 0.00004,
+        "largestRegionBox": {
+          "x": 239,
+          "y": 175,
+          "w": 6,
+          "h": 2
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "DYNAMIC_ONLY"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-garage",
+      "metrics": {
+        "newlyBlackFraction": 0,
+        "newlyBlackPixels": 0,
+        "newlyBlackBox": null,
+        "healedFraction": 0,
+        "healedPixels": 1,
+        "meanAbsDelta": 1.948,
+        "ratioOver8": 0.0175,
+        "ratioOver32": 0.00374,
+        "largestRegionFraction": 0.00329,
+        "largestRegionBox": {
+          "x": 143,
+          "y": 157,
+          "w": 32,
+          "h": 51
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "REGION_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-garage.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-north-balcony",
+      "metrics": {
+        "newlyBlackFraction": 0.00084,
+        "newlyBlackPixels": 193,
+        "newlyBlackBox": {
+          "x": 256,
+          "y": 34,
+          "w": 350,
+          "h": 215
+        },
+        "healedFraction": 0.00003,
+        "healedPixels": 7,
+        "meanAbsDelta": 4.623,
+        "ratioOver8": 0.09296,
+        "ratioOver32": 0.0349,
+        "largestRegionFraction": 0.01375,
+        "largestRegionBox": {
+          "x": 439,
+          "y": 281,
+          "w": 174,
+          "h": 71
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "REGION_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-north-balcony.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-front-porch",
+      "metrics": {
+        "newlyBlackFraction": 0.0274,
+        "newlyBlackPixels": 6314,
+        "newlyBlackBox": {
+          "x": 22,
+          "y": 58,
+          "w": 353,
+          "h": 302
+        },
+        "healedFraction": 0.00024,
+        "healedPixels": 55,
+        "meanAbsDelta": 8.982,
+        "ratioOver8": 0.20534,
+        "ratioOver32": 0.08191,
+        "largestRegionFraction": 0.03065,
+        "largestRegionBox": {
+          "x": 130,
+          "y": 312,
+          "w": 334,
+          "h": 48
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-front-porch.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-vehicle-near",
+      "metrics": {
+        "newlyBlackFraction": 0.02105,
+        "newlyBlackPixels": 4849,
+        "newlyBlackBox": {
+          "x": 9,
+          "y": 18,
+          "w": 631,
+          "h": 342
+        },
+        "healedFraction": 0.00845,
+        "healedPixels": 1947,
+        "meanAbsDelta": 14.761,
+        "ratioOver8": 0.47072,
+        "ratioOver32": 0.16438,
+        "largestRegionFraction": 0.12952,
+        "largestRegionBox": {
+          "x": 158,
+          "y": 200,
+          "w": 381,
+          "h": 160
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-vehicle-near.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-vehicle-mid",
+      "metrics": {
+        "newlyBlackFraction": 0.02071,
+        "newlyBlackPixels": 4772,
+        "newlyBlackBox": {
+          "x": 24,
+          "y": 132,
+          "w": 569,
+          "h": 191
+        },
+        "healedFraction": 0.00045,
+        "healedPixels": 104,
+        "meanAbsDelta": 8.979,
+        "ratioOver8": 0.26395,
+        "ratioOver32": 0.12049,
+        "largestRegionFraction": 0.05633,
+        "largestRegionBox": {
+          "x": 407,
+          "y": 250,
+          "w": 233,
+          "h": 110
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-vehicle-mid.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-vehicle-far",
+      "metrics": {
+        "newlyBlackFraction": 0.0789,
+        "newlyBlackPixels": 18178,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 103,
+          "w": 509,
+          "h": 257
+        },
+        "healedFraction": 0.00218,
+        "healedPixels": 503,
+        "meanAbsDelta": 14.885,
+        "ratioOver8": 0.31539,
+        "ratioOver32": 0.12412,
+        "largestRegionFraction": 0.09574,
+        "largestRegionBox": {
+          "x": 0,
+          "y": 212,
+          "w": 488,
+          "h": 148
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-vehicle-far.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-coach-elevation",
+      "metrics": {
+        "newlyBlackFraction": 0.21173,
+        "newlyBlackPixels": 48782,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 117,
+          "w": 640,
+          "h": 243
+        },
+        "healedFraction": 0.00018,
+        "healedPixels": 41,
+        "meanAbsDelta": 19.648,
+        "ratioOver8": 0.32836,
+        "ratioOver32": 0.26514,
+        "largestRegionFraction": 0.24549,
+        "largestRegionBox": {
+          "x": 81,
+          "y": 228,
+          "w": 559,
+          "h": 132
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-coach-elevation.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-truck-cab-near",
+      "metrics": {
+        "newlyBlackFraction": 0.05604,
+        "newlyBlackPixels": 12912,
+        "newlyBlackBox": {
+          "x": 19,
+          "y": 142,
+          "w": 621,
+          "h": 218
+        },
+        "healedFraction": 0.00417,
+        "healedPixels": 960,
+        "meanAbsDelta": 15.977,
+        "ratioOver8": 0.49457,
+        "ratioOver32": 0.15879,
+        "largestRegionFraction": 0.12027,
+        "largestRegionBox": {
+          "x": 170,
+          "y": 222,
+          "w": 470,
+          "h": 138
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-truck-cab-near.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-appliance-bank-north-close",
+      "metrics": {
+        "newlyBlackFraction": 0.09009,
+        "newlyBlackPixels": 20757,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 67,
+          "w": 639,
+          "h": 293
+        },
+        "healedFraction": 0.0025,
+        "healedPixels": 577,
+        "meanAbsDelta": 21.725,
+        "ratioOver8": 0.50879,
+        "ratioOver32": 0.29759,
+        "largestRegionFraction": 0.15225,
+        "largestRegionBox": {
+          "x": 338,
+          "y": 142,
+          "w": 302,
+          "h": 218
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-appliance-bank-north-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-appliance-bank-south-close",
+      "metrics": {
+        "newlyBlackFraction": 0.01799,
+        "newlyBlackPixels": 4144,
+        "newlyBlackBox": {
+          "x": 3,
+          "y": 69,
+          "w": 637,
+          "h": 291
+        },
+        "healedFraction": 0.0001,
+        "healedPixels": 22,
+        "meanAbsDelta": 23.349,
+        "ratioOver8": 0.65082,
+        "ratioOver32": 0.26424,
+        "largestRegionFraction": 0.18388,
+        "largestRegionBox": {
+          "x": 309,
+          "y": 139,
+          "w": 331,
+          "h": 221
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-appliance-bank-south-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-glasshouse-north-close",
+      "metrics": {
+        "newlyBlackFraction": 0.00175,
+        "newlyBlackPixels": 404,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 82,
+          "w": 347,
+          "h": 93
+        },
+        "healedFraction": 0,
+        "healedPixels": 0,
+        "meanAbsDelta": 24.897,
+        "ratioOver8": 0.64659,
+        "ratioOver32": 0.37092,
+        "largestRegionFraction": 0.27132,
+        "largestRegionBox": {
+          "x": 79,
+          "y": 189,
+          "w": 561,
+          "h": 171
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-glasshouse-north-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-garden-pod-north-close",
+      "metrics": {
+        "newlyBlackFraction": 0.00009,
+        "newlyBlackPixels": 21,
+        "newlyBlackBox": {
+          "x": 53,
+          "y": 1,
+          "w": 577,
+          "h": 167
+        },
+        "healedFraction": 0.00014,
+        "healedPixels": 32,
+        "meanAbsDelta": 20.118,
+        "ratioOver8": 0.5643,
+        "ratioOver32": 0.34459,
+        "largestRegionFraction": 0.18018,
+        "largestRegionBox": {
+          "x": 160,
+          "y": 196,
+          "w": 480,
+          "h": 164
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-garden-pod-north-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-sand-pit-north-close",
+      "metrics": {
+        "newlyBlackFraction": 0.0013,
+        "newlyBlackPixels": 300,
+        "newlyBlackBox": {
+          "x": 31,
+          "y": 6,
+          "w": 526,
+          "h": 350
+        },
+        "healedFraction": 0.00003,
+        "healedPixels": 8,
+        "meanAbsDelta": 23.91,
+        "ratioOver8": 0.67897,
+        "ratioOver32": 0.44482,
+        "largestRegionFraction": 0.2848,
+        "largestRegionBox": {
+          "x": 40,
+          "y": 149,
+          "w": 489,
+          "h": 211
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-sand-pit-north-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-driveway-apron-close",
+      "metrics": {
+        "newlyBlackFraction": 0.00053,
+        "newlyBlackPixels": 122,
+        "newlyBlackBox": {
+          "x": 29,
+          "y": 23,
+          "w": 593,
+          "h": 218
+        },
+        "healedFraction": 0.00053,
+        "healedPixels": 122,
+        "meanAbsDelta": 22.026,
+        "ratioOver8": 0.71098,
+        "ratioOver32": 0.22645,
+        "largestRegionFraction": 0.12542,
+        "largestRegionBox": {
+          "x": 38,
+          "y": 167,
+          "w": 602,
+          "h": 188
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-driveway-apron-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-border-path-close",
+      "metrics": {
+        "newlyBlackFraction": 0.0008,
+        "newlyBlackPixels": 185,
+        "newlyBlackBox": {
+          "x": 183,
+          "y": 0,
+          "w": 230,
+          "h": 123
+        },
+        "healedFraction": 0.00001,
+        "healedPixels": 2,
+        "meanAbsDelta": 18.336,
+        "ratioOver8": 0.3835,
+        "ratioOver32": 0.2242,
+        "largestRegionFraction": 0.10651,
+        "largestRegionBox": {
+          "x": 160,
+          "y": 167,
+          "w": 365,
+          "h": 193
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-border-path-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-perimeter-wall-long-close",
+      "metrics": {
+        "newlyBlackFraction": 0.0006,
+        "newlyBlackPixels": 138,
+        "newlyBlackBox": {
+          "x": 23,
+          "y": 130,
+          "w": 205,
+          "h": 32
+        },
+        "healedFraction": 0.00041,
+        "healedPixels": 95,
+        "meanAbsDelta": 15.652,
+        "ratioOver8": 0.43978,
+        "ratioOver32": 0.11583,
+        "largestRegionFraction": 0.06798,
+        "largestRegionBox": {
+          "x": 306,
+          "y": 214,
+          "w": 170,
+          "h": 146
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-perimeter-wall-long-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-perimeter-wall-end-close",
+      "metrics": {
+        "newlyBlackFraction": 0.00325,
+        "newlyBlackPixels": 749,
+        "newlyBlackBox": {
+          "x": 256,
+          "y": 0,
+          "w": 384,
+          "h": 360
+        },
+        "healedFraction": 0.00026,
+        "healedPixels": 59,
+        "meanAbsDelta": 12.666,
+        "ratioOver8": 0.16464,
+        "ratioOver32": 0.14955,
+        "largestRegionFraction": 0.14431,
+        "largestRegionBox": {
+          "x": 257,
+          "y": 147,
+          "w": 383,
+          "h": 213
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-perimeter-wall-end-close.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-nuke-street",
+      "metrics": {
+        "newlyBlackFraction": 0.01664,
+        "newlyBlackPixels": 3833,
+        "newlyBlackBox": {
+          "x": 152,
+          "y": 207,
+          "w": 486,
+          "h": 153
+        },
+        "healedFraction": 0.00129,
+        "healedPixels": 298,
+        "meanAbsDelta": 7.511,
+        "ratioOver8": 0.23142,
+        "ratioOver32": 0.05505,
+        "largestRegionFraction": 0.00957,
+        "largestRegionBox": {
+          "x": 555,
+          "y": 320,
+          "w": 85,
+          "h": 40
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-nuke-street.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-nuke-north-balcony",
+      "metrics": {
+        "newlyBlackFraction": 0.09749,
+        "newlyBlackPixels": 22462,
+        "newlyBlackBox": {
+          "x": 0,
+          "y": 39,
+          "w": 427,
+          "h": 321
+        },
+        "healedFraction": 0.00372,
+        "healedPixels": 858,
+        "meanAbsDelta": 11.542,
+        "ratioOver8": 0.16256,
+        "ratioOver32": 0.10757,
+        "largestRegionFraction": 0.07034,
+        "largestRegionBox": {
+          "x": 133,
+          "y": 217,
+          "w": 234,
+          "h": 143
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "NEWLY_BLACK",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-nuke-north-balcony.png"
+    },
+    {
+      "arena": "nuketown2",
+      "cameraId": "nuketown2-nuke-south-balcony",
+      "metrics": {
+        "newlyBlackFraction": 0.00007,
+        "newlyBlackPixels": 16,
+        "newlyBlackBox": {
+          "x": 290,
+          "y": 137,
+          "w": 345,
+          "h": 76
+        },
+        "healedFraction": 0.00004,
+        "healedPixels": 9,
+        "meanAbsDelta": 10.764,
+        "ratioOver8": 0.20801,
+        "ratioOver32": 0.1345,
+        "largestRegionFraction": 0.07239,
+        "largestRegionBox": {
+          "x": 215,
+          "y": 263,
+          "w": 381,
+          "h": 97
+        }
+      },
+      "samplesUsed": {
+        "base": 1,
+        "candidate": 2
+      },
+      "verdict": "GLOBAL_CHANGED",
+      "composite": "C:\\Users\\david\\projects\\aa-astra-pass95-hitl\\artifacts\\viewpoint-regression\\diff-served-b5b06e0f-final-3\\nuketown2__nuketown2-nuke-south-balcony.png"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-estate-overview",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-west-apron",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-garage-fan",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-defining-lane",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-pool-deck-return",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-courtyard",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-house-spine",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-upper-bedroom",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-drive-balcony",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    },
+    {
+      "arena": "raid2",
+      "cameraId": "raid2-drive-approach",
+      "verdict": "MISSING",
+      "missingSide": "base"
+    }
+  ]
+}

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 const deathDropSource = readFileSync(new URL('./death-drops.ts', import.meta.url), 'utf8');
+/** New home of the support airspace, lifted out of legacy-main on 2026-08-31. */
+const flightWorld = readFileSync(new URL('./systems/support-flight-world.ts', import.meta.url), 'utf8');
 
 describe('Pass 65 playable killstreak integration', () => {
   it('freezes the persisted five-slot selection and routes keys 3-7 through activation or possession', () => {
@@ -114,7 +116,9 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(updateBlock).toContain('killstreakRuntime.advance(now, killstreakWorldState())');
     expect(updateBlock).toContain('refreshLocalKillstreakSnapshot(now,');
     expect(updateBlock).toContain('result.damageEvents.length > 0 || result.shotEvents.length > 0 || result.impactEvents.length > 0 || result.expiredEntityIds.length > 0');
-    expect(updateBlock).toContain('presentSupportShotAudio(');
+    // HF-337: support shot audio is now positional - it plays at the firing chopper's
+    // world position rather than flat, so teammates and enemies can locate it.
+    expect(updateBlock).toContain('presentSupportShotAudioPositional(');
     expect(updateBlock).toContain('shots: result.shotEvents');
     expect(updateBlock.indexOf('killstreakRuntime.advance(now, killstreakWorldState())'))
       .toBeLessThan(updateBlock.indexOf('refreshLocalKillstreakSnapshot(now,'));
@@ -153,7 +157,13 @@ describe('Pass 65 playable killstreak integration', () => {
     const clearBlock = source.slice(clearStart, clearEnd);
     expect(clearBlock).toContain('killstreakPresentation.setFirstPersonEntity(null);');
     expect(clearBlock).toContain("document.documentElement.dataset.killstreakPossession = 'none';");
-    expect(clearBlock).toContain('camera.near = 0.08;');
+    // RE-PINNED FOR HF-410. The contract is "the on-foot near plane is restored
+    // on every exit path", not "the literal 0.08 appears here". The plane moved
+    // to 0.02 m because the first-person rig now sits inside the player's
+    // collision capsule and is drawn with this camera, and it moved into one
+    // named constant so the three restore sites cannot drift apart. Pinning the
+    // constant is what the old line was trying to say.
+    expect(clearBlock).toContain('camera.near = FIRST_PERSON_CAMERA_NEAR_METERS;');
     expect(clearBlock).toContain('weaponView.setPresentationVisible(player.alive);');
   });
 
@@ -261,40 +271,137 @@ describe('Pass 65 playable killstreak integration', () => {
     expect(clientBlock).toContain('killstreakPresentation.presentChopperImpactAction(presented.id)');
   });
 
-  it('uses a world-space crosshair for Care/Carpet placement and host-owned surface height', () => {
+  it('uses a world-space crosshair for Care Package placement and host-owned surface height', () => {
     expect(source).toContain("beginPointSupportTargeting('care-package')");
-    expect(source).toContain("beginPointSupportTargeting('carpet-bomber')");
     const targetingStart = source.indexOf('function beginPointSupportTargeting(');
     const targetingEnd = source.indexOf('\nfunction cancelSupportTargeting(', targetingStart);
     const targetingBlock = source.slice(targetingStart, targetingEnd);
     expect(targetingBlock).toContain('tacticalMapOpen = false;');
-    expect(targetingBlock).toContain("if (id === 'care-package' || id === 'carpet-bomber') {");
     expect(source).toContain('function updateCrosshairSupportPreview()');
     expect(source).toContain('function confirmCrosshairSupportTarget(');
-    expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*targeting\.id === 'carpet-bomber' \? crosshairPreviewFacing \?\? undefined : undefined,\s*\)/);
-    expect(source).toContain("targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined");
+    expect(source).toMatch(/requestKillstreakActivation\(\s*targeting\.id,\s*confirmedAt,\s*\[point\.x, point\.y, point\.z\],\s*\)/);
     expect(source).toContain("label.textContent = 'LEFT CLICK or [F] to confirm target  [RMB] to cancel'");
     expect(source).toContain("? 'CLICK ONE LOCATION TO CONFIRM · <kbd>RMB</kbd> CANCELS AND REFUNDS'");
     expect(source).not.toContain("LEFT CLICK or [F] to confirm target  [ESC] to cancel");
     expect(source).toContain('cancelSupportTargeting(true)');
-    expect(source).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
-    expect(source).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
-    expect(source).toContain('colliders: flightSolids');
+    // Re-pinned 2026-08-31: the lazy placement-ground sampler moved out of
+    // legacy-main into src/systems/support-flight-world.ts. The invariant is
+    // unchanged - host-owned surface height, built at most once per world, off
+    // the SAME collider snapshot support flight uses - so the pins follow it.
+    // legacy-main keeps the half that genuinely belongs to it: the scene walk.
+    expect(flightWorld).toContain('let groundSampler: SupportPlacementGroundSampler | null = null;');
+    expect(flightWorld).toContain('groundSampler ??= new SupportPlacementGroundSampler({');
+    expect(flightWorld).toContain('colliders: input.solids,');
     expect(source).toContain('arena.root.updateWorldMatrix(true, true);');
-    expect(source).toContain('groundHeightAt,');
+    expect(source).toContain('prepareRaycastMeshes: () => {');
+    expect(flightWorld).toContain('groundHeightAt: (x, z) => {');
+    // Strengthened: legacy-main must not grow a second sampler where the first
+    // one lived, and must not go back to assembling the airspace inline.
+    expect(source).not.toContain('new SupportPlacementGroundSampler(');
+    expect(source.split('createSupportFlightWorld(')).toHaveLength(2);
     expect(source).toContain('crosshairTarget: crosshairPreviewLastPoint?.toArray() ?? null');
     expect(source).toContain('CARE PACKAGE · TARGET CONFIRMED · DELIVERY INBOUND');
     expect(source).not.toContain('CARE PACKAGE · TARGET CONFIRMED · PRESS F TO SECURE');
     expect(source).not.toContain('nearestSupportTarget()?.point ?? player.position.clone().addScaledVector');
   });
 
+  // HF-317 (owner, third ask): "carpet bomb is still like carepackage not tri
+  // pass as requested? fix it" — Carpet Bomber must author a two-point bombing
+  // RUN on the tactical map, never a single Care-Package-style point drop.
+  it('authors the Carpet Bomber run as a two-point tactical-map corridor, not a point drop', () => {
+    // The Care Package point path must no longer accept carpet at all.
+    expect(source).toContain("type PointSupportTargeting = Readonly<{ id: 'care-package' }>;");
+    expect(source).not.toContain("beginPointSupportTargeting('carpet-bomber')");
+    expect(source).not.toContain("targeting.id === 'carpet-bomber' ? crosshairPreviewFacing ?? undefined : undefined");
+    expect(source).toContain("beginCarpetCorridorTargeting();");
+
+    // The corridor opens the same tactical map overlay Tri-Pass uses.
+    const beginStart = source.indexOf('function beginCarpetCorridorTargeting(');
+    const beginBlock = source.slice(beginStart, source.indexOf('\nfunction beginPointSupportTargeting(', beginStart));
+    expect(beginStart).toBeGreaterThan(-1);
+    expect(beginBlock).toContain('carpetCorridorTargeting = createCarpetCorridorTargeting();');
+    expect(beginBlock).toContain('tacticalMapOpen = true;');
+    expect(beginBlock).toContain("element<HTMLElement>('#strike-map-overlay').hidden = false;");
+    expect(beginBlock).toContain('pointSupportTargeting = null;');
+    expect(beginBlock).toContain('triPassTargeting = null;');
+
+    // Two clicks, registered through the tested pure module.
+    const clickStart = source.indexOf('function registerCarpetCorridorClick(');
+    const clickBlock = source.slice(clickStart, source.indexOf("\nstrikeMapCanvas.addEventListener('click'", clickStart));
+    expect(clickStart).toBeGreaterThan(-1);
+    expect(clickBlock).toContain('if (!tacticalMapOpen || !targeting || targeting.complete) return false;');
+    expect(clickBlock).toContain('registerCarpetCorridorPoint(targeting, point, arena.bounds)');
+    expect(clickBlock).toContain('if (!next.complete) return true;');
+    expect(clickBlock).toContain('return commitCarpetCorridor(next, confirmedAt);');
+    expect(source).toContain('if (registerCarpetCorridorClick(event.clientX, event.clientY)) return;');
+
+    // The commit proposes an anchor + UNNORMALIZED facing; the host admits it.
+    const commitStart = source.indexOf('function commitCarpetCorridor(');
+    const commitBlock = source.slice(commitStart, source.indexOf('\nfunction registerCarpetCorridorClick(', commitStart));
+    expect(commitStart).toBeGreaterThan(-1);
+    expect(commitBlock).toContain('const intent = carpetCorridorIntent(state);');
+    expect(commitBlock).toMatch(/requestKillstreakActivation\(\s*'carpet-bomber',\s*confirmedAt,\s*\[intent\.anchor\[0\], intent\.anchor\[1\], intent\.anchor\[2\]\],\s*\[intent\.facing\[0\], intent\.facing\[1\], intent\.facing\[2\]\],\s*\)/);
+    expect(commitBlock).toContain('AUTHORITY REJECTED · REWARD RETAINED');
+    expect(commitBlock).toContain('cancelSupportTargeting(false);');
+    // Carpet stays host-driven so its events keep attributing to the map, not
+    // to the caller — the corridor commit must not self-authorize locally.
+    expect(commitBlock).not.toContain('authorizeLocalOffensiveSupport');
+
+    // Cancel/refund mirrors the other targeting modes.
+    const cancelStart = source.indexOf('function cancelSupportTargeting(');
+    const cancelBlock = source.slice(cancelStart, source.indexOf('\nfunction updateCrosshairSupportPreview(', cancelStart));
+    expect(cancelBlock).toContain("?? (carpetCorridorTargeting !== null && !carpetCorridorTargeting.complete ? 'carpet-bomber' : null)");
+    expect(cancelBlock).toContain('carpetCorridorTargeting = null;');
+
+    // Overlay copy names the run and counts to two. RE-PINNED 2026-09-06 (HF-369,
+    // HF-536 S1 salvage): the two captions this used to pin were static literals
+    // that said 'SELECT RUN START AND END' and 'CLICK RUN START THEN RUN END' for
+    // BOTH clicks - the owner complaint itself. They are now derived from
+    // carpetCorridorStage by src/ui/carpet-corridor-map-overlay.ts, so the caption
+    // cannot name the wrong click. Nothing is relaxed: the positive assertions are
+    // replaced one-for-one and the retired literals are asserted GONE.
+    expect(source).toContain("? 'CARPET BOMBER'");
+    expect(source).toContain('const corridorPrompt = carpetCorridorTargeting ? carpetCorridorPrompt(carpetCorridorTargeting) : null;');
+    expect(source).toContain('? corridorPrompt.instruction');
+    expect(source).toContain('? corridorPrompt.help');
+    expect(source).not.toContain("'SELECT RUN START AND END'");
+    expect(source).not.toContain('CLICK RUN START THEN RUN END');
+    expect(source).toContain('const targetCount = carpetCorridorActive ? CARPET_CORRIDOR_POINT_COUNT : pointSupportTargeting ? 1 : 3;');
+    expect(source).toContain('`${selectedCount} / ${targetCount}`');
+
+    // The corridor draws as a banded run with a heading arrow, not Tri-Pass dots.
+    // RE-PINNED 2026-09-06 (HF-369): the draw moved into the overlay module, which
+    // also labels the pins DROP / DIRECTION and clamps the drawn run to the one the
+    // host will fly. Full coverage in src/carpet-corridor-main-integration.test.ts.
+    expect(source).toContain('const corridorPoints = carpetCorridorTargeting?.points ?? [];');
+    expect(source).toContain('drawCarpetCorridorOverlay(context, carpetCorridorOverlayPlan({');
+    expect(source).not.toContain("index === 0 ? 'START' : 'END'");
+  });
+
+  // Re-pinned 2026-08-31: the airspace (portal/no-fly navigation, centre-spawn
+  // volume, flight predicates and the placement ground surface) moved into
+  // src/systems/support-flight-world.ts. It is one arena-derived unit and it now
+  // has one home, which is the point: HF-131 ("always spawn in the center of the
+  // map") could previously only be observed by flying a killstreak, so the
+  // drone-deployment suite tested a hand-copied duplicate of this arithmetic.
+  // Same feed, same predicates - nothing relaxed, and the negative assertions
+  // below stop legacy-main assembling a second airspace where the first one was.
   it('feeds arena-owned portal/no-fly data and current static plus dynamic solids into support flight', () => {
-    expect(source).toContain('PASS65_FLIGHT_NAVIGATION[selectedArena.id]');
+    expect(flightWorld).toContain('PASS65_FLIGHT_NAVIGATION[input.arenaId]');
     expect(source).toContain('const flightSolids = activeWorldColliders();');
-    expect(source).toContain('resolveFlightPosition: (from, desired, radius)');
-    expect(source).toContain('resolveSupportFlightStep({');
-    expect(source).toContain('solids: flightSolids');
-    expect(source).toContain('!flightSolids.some((solid) => sphereIntersectsBox(point, 0.35, solid))');
+    expect(source).toContain('solids: flightSolids,');
+    expect(flightWorld).toContain('resolveFlightPosition: (from, desired, radius)');
+    expect(flightWorld).toContain('resolveSupportFlightStep({');
+    expect(flightWorld).toContain('solids: input.solids,');
+    expect(flightWorld).toContain('!input.solids.some((solid) => sphereIntersectsBox(point, FLIGHT_POSITION_CLEARANCE_M, solid))');
+    expect(flightWorld).toContain('const FLIGHT_POSITION_CLEARANCE_M = 0.35;');
+    // The moved half must not reach back into the module it came from.
+    expect(flightWorld).not.toMatch(/from\s+'\.\.\/legacy-main'/u);
+    expect(flightWorld).not.toContain('document.');
+    // ...and legacy-main must not regrow it.
+    expect(source).not.toContain('resolveSupportFlightStep(');
+    expect(source).not.toContain('resolveSupportAircraftEnvelopeStep(');
+    expect(source).not.toContain('supportFlightCentreVolume:');
   });
 
   it('routes one pinned F press only through exact world interactions', () => {

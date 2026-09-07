@@ -1,0 +1,84 @@
+{
+  "renderAuditDraws": 148,
+  "renderAuditTriangles": 87647,
+  "visibleSceneDraws": 148,
+  "visibleSceneTriangles": 537455,
+  "byName": [
+    {
+      "name": "BLD_BATCH_MAT_foliage_military",
+      "triangles": 1008
+    },
+    {
+      "name": "forest-broadleaf-canopies",
+      "triangles": 160
+    },
+    {
+      "name": "forest-broadleaf-trunks",
+      "triangles": 28
+    },
+    {
+      "name": "forest-conifers",
+      "triangles": 60
+    },
+    {
+      "name": "forest-contact-skirts",
+      "triangles": 9
+    },
+    {
+      "name": "forest-understory",
+      "triangles": 20
+    },
+    {
+      "name": "nuketown-backdrop-ground-skirt",
+      "triangles": 2304
+    },
+    {
+      "name": "nuketown-lawn-region-0",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-1",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-2",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-lawn-region-3",
+      "triangles": 15
+    },
+    {
+      "name": "nuketown-mountain-far-range",
+      "triangles": 960
+    },
+    {
+      "name": "nuketown-mountain-foothills",
+      "triangles": 864
+    },
+    {
+      "name": "nuketown-mountain-ridge",
+      "triangles": 1152
+    },
+    {
+      "name": "yard-tree-boles",
+      "triangles": 1376
+    },
+    {
+      "name": "yard-tree-branches",
+      "triangles": 120
+    },
+    {
+      "name": "yard-tree-canopy-lower",
+      "triangles": 280
+    },
+    {
+      "name": "yard-tree-canopy-upper",
+      "triangles": 140
+    },
+    {
+      "name": "yard-tree-litter",
+      "triangles": 10
+    }
+  ]
+}

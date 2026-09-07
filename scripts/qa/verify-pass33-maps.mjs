@@ -1,8 +1,16 @@
 import { chromium } from 'playwright';
+import { defaultSelectableRoster } from './arena-roster.mjs';
 
 const base = process.env.BASE_URL ?? 'http://127.0.0.1:4173';
-const maps = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'];
-const browser = await chromium.launch({ headless: true });
+// PASS 85 Lane N repair: a hardcoded four-map literal from Pass 33, so this
+// render-metric sweep never opened High Seas, Test1, Test2 or Map 3. Derived
+// from the registry now. The SELECTABLE roster, not the boot roster: farcrysis
+// is `selectable: false` precisely because its cold load runs to minutes
+// (HF-406) and would blow the 60 s per-map budget below. QA_PASS33_ARENAS
+// overrides the default for a targeted run.
+const maps = (process.env.QA_PASS33_ARENAS ?? defaultSelectableRoster())
+  .split(',').map((entry) => entry.trim()).filter(Boolean);
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const results = [];
 try {
   for (const map of maps) {

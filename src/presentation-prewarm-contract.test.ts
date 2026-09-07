@@ -7,6 +7,8 @@ const presentationSources = [
   './grenade-explosion-presentation.ts',
   './support-explosion-presentation.ts',
   './death-drop-presentation.ts',
+  './destructible-shed-presentation.ts',
+  './house-destruction-presentation.ts',
 ] as const;
 
 describe('presentation prewarm startup contract', () => {
@@ -29,20 +31,57 @@ describe('presentation prewarm startup contract', () => {
 
   it('keeps WebKit on real basic-depth shadows instead of invalid PCF comparison samplers', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
-    expect(source).toContain("const shadowSamplerMode = webGlShadowSamplerMode(navigator.userAgent);");
-    expect(source).toContain("shadowSamplerMode === 'basic-depth' ? THREE.BasicShadowMap : THREE.PCFShadowMap");
+    // The WebKit floor is the guarantee here, not the exact call text: Pass 74
+    // added a quality-profile soft tier, so the selector now takes the profile
+    // as a second argument. What must never change is that the sampler comes
+    // from webGlShadowSamplerMode and that 'basic-depth' still maps to a real
+    // BasicShadowMap rather than a PCF comparison sampler.
+    expect(source).toMatch(/const shadowSamplerMode = webGlShadowSamplerMode\(navigator\.userAgent[^)]*\);/);
+    // Pass 76 moved the ShadowMapType mapping into shadowMapTypeForFilter so a
+    // player-facing filter override exists, but the selection still flows
+    // through resolveWebGlShadowSamplerMode, whose WebKit basic-depth floor no
+    // override can bypass (proven in webgl-shadow-compatibility.test.ts).
+    expect(source).toContain('resolveWebGlShadowSamplerMode(navigator.userAgent, renderProfile, filter)');
+    expect(source).toContain("mode === 'basic-depth'");
+    expect(source).toContain('? THREE.BasicShadowMap');
+    // The soft tier is opt-in/quality-only and must never capture the WebKit branch.
+    expect(source).toContain("mode === 'pcf-soft' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap");
     // Renderer construction, exact-composition prewarm, and the live graphics
     // transaction must all retain the browser-safe sampler selection.
-    expect(source.match(/type: webGlShadowMapType/g)).toHaveLength(3);
+    expect(source.match(/type: shadowMapTypeForFilter\(/g)).toHaveLength(3);
     expect(source).not.toContain('type: THREE.PCFShadowMap');
   });
 
-  it('keeps cold work one-deep and bounds warmed live work to a two-frame completion frontier', () => {
+  it('keeps cold work one-deep and bounds warmed live work to a NAMED, SMALL completion frontier', () => {
     const source = readFileSync(new URL('./rendering/render-runtime.ts', import.meta.url), 'utf8');
-    expect(source).toContain("mode === 'warmed-live' ? 2 : 1");
+    // Re-pinned 2026-08-31. This asserted the literal "mode === 'warmed-live' ? 2 : 1".
+    // That 2-deep frontier turned out to BE the owner's frame-rate problem: with a
+    // 20-45 ms completion fence, a 2-deep cap bounds PRESENTED frames at roughly
+    // 20-54 fps no matter how cheap the frame is - measured 54.3 presented/s while
+    // the RTX 5080 sat at 14% utilisation. So the number moved deliberately, and
+    // pinning the number again would just re-break the same way next time it is tuned.
+    //
+    // What must NOT change is the SHAPE: cold work stays one-deep, warmed-live is
+    // bounded rather than unbounded, and the bound is a named constant somebody can
+    // find. So this now pins the invariant and a sane ceiling instead of a magic value.
+    expect(source).toContain("mode === 'warmed-live' ? WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS : 1");
+    const declared = /export const WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS = (\d+);/u.exec(source);
+    expect(declared, 'the warmed-live frontier must be a findable named constant').not.toBeNull();
+    const frontier = Number(declared![1]);
+    expect(frontier, 'warmed-live must stay bounded, not unbounded').toBeGreaterThanOrEqual(2);
+    expect(frontier, 'an unbounded-in-practice frontier defeats the backpressure this exists for').toBeLessThanOrEqual(4);
     expect(source).toContain('Forced WebGPU submission requires an idle completion frontier');
     expect(source).toContain('await this.waitForSubmittedWork(12_000);');
-    expect(source).toContain('completionProbeTargetSequence: this.completionProbeTargetSequence');
+    // Re-pinned 2026-08-31. Was a single shared probe with
+    // "if (this.completionProbe) return this.completionProbe;", so the completion
+    // frontier could only advance ONE sequence per resolved promise - the second
+    // half of the presented-frame ceiling. It is now a probe PER SUBMISSION.
+    // Pin the shape that matters (per-sequence, and the telemetry reports the
+    // oldest outstanding one) rather than the old field name.
+    expect(source).toContain('private readonly completionProbes = new Map<number, Promise<void>>();');
+    expect(source).toContain('completionProbeTargetSequence: this.oldestOutstandingProbeSequence()');
+    expect(source, 'the single-probe early return is what bounded the frontier; it must not come back')
+      .not.toContain('if (this.completionProbe) return this.completionProbe;');
     expect(source).toContain('submissionPacing: this.submissionPacing.summary()');
     expect(source).toContain('completionPacing: this.completionPacing.summary()');
     expect(source).toContain('maximumPendingForMs: Math.max(this.progressMaximumPendingForMs, pendingForMs)');
@@ -230,7 +269,12 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(arenaVisualConfiguration.match(/invalidateBrowserWeaponGpuReadinessForPipelineChange\(\)/g)).toHaveLength(1);
     expect(arenaVisualConfiguration.indexOf('invalidateBrowserWeaponGpuReadinessForPipelineChange()'))
-      .toBeLessThan(arenaVisualConfiguration.indexOf('if (pass64TslSystems) pass64TslSystems.applyDefinition'));
+      // Re-pinned 2026-08-31: the branch this named is the one that CAUSED the
+      // first-arena environment bug - applyDefinition was called unawaited, and
+      // the else path that constructs the systems had no IBL wiring at all, so
+      // map 1 of every session rendered with scene.environment null. It is now
+      // awaited. Pin the ordering against the awaited form.
+      .toBeLessThan(arenaVisualConfiguration.indexOf('if (pass64TslSystems) await pass64TslSystems.applyDefinition'));
     expect(arenaDeployment.indexOf('respawn(false);'))
       .toBeLessThan(arenaDeployment.indexOf('await prewarmArenaBoundGameplayPresentations(arenaTransitionGeneration);'));
     expect(source).toContain("setBootstrapStage('prewarming-overdrive')");
@@ -423,7 +467,17 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(matchDeployment.indexOf('player.invulnerableUntil = matchStartedAt'));
     expect(matchDeployment).toContain('await weaponView.prepareBrowserWeapon(matchStartWeapon);');
     expect(matchDeployment).toContain('await prewarmExactWebGlMatchComposition();');
-    expect(matchDeployment).not.toContain('await renderRuntime.compileAndRender(scene, camera, scene);');
+    // Pass 79 MAX admission: exactly ONE unsuppressed full-scene compile is
+    // allowed inside match deployment - the cold-generation-fenced prewarm
+    // submitted BEFORE the first guarded MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS
+    // flush (the weapon-switch exercise). Every earlier prewarm renders one-deep,
+    // so without it the complete composition's first draw carries cold pipeline
+    // creation into a 4s-bounded flush and bounces MAX deployments to the menu.
+    // More than one whole-scene compile in startGame remains forbidden.
+    const fullSceneCompiles = matchDeployment.match(/await renderRuntime\.compileAndRender\(scene, camera, scene\);/g) ?? [];
+    expect(fullSceneCompiles).toHaveLength(1);
+    expect(matchDeployment.indexOf('await renderRuntime.compileAndRender(scene, camera, scene);'))
+      .toBeLessThan(matchDeployment.indexOf('await exercisePreparedWebGpuWeaponSwitches();'));
     const webGlMatchPrewarm = source.slice(
       source.indexOf('async function prewarmExactWebGlMatchComposition('),
       source.indexOf('function disposeCorpsePresentation('),
@@ -446,6 +500,25 @@ describe('presentation prewarm startup contract', () => {
     expect(finalWebGlPresentationSync).toContain('weaponView.snapToMatchStartRestPose(currentViewmodelSurfaceRetreat());');
     expect(finalWebGlPresentationSync).toContain('camera.updateMatrixWorld(true);');
     expect(finalWebGlPresentationSync).not.toContain('updatePhysics(');
+    // Pass 79 farcrysis MAX: the frozen final WebGPU prime is the first frame
+    // with the spawn camera, restored corpse pool and rest-pose viewmodel
+    // together, so its 4000ms-bounded flush still carried cold pipeline
+    // creation for arena materials outside every earlier prewarm's frustum
+    // (measured bounce: "WebGPU queue completion exceeded 4000 ms for
+    // submission 141"). The prime must therefore compile that EXACT
+    // composition once - frustum culling disabled - behind the runtime's own
+    // 12s cold-generation fence, BEFORE any bounded sample flush runs. The
+    // MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS guard itself is untouched.
+    const finalWebGpuPrime = source.slice(
+      source.indexOf('async function primeFinalWebGpuMatchPresentation('),
+      source.indexOf('function buildSky()'),
+    );
+    expect(finalWebGpuPrime).toContain('synchronizeFrozenMatchPrimePresentation();');
+    expect(finalWebGpuPrime.indexOf('await withArenaFrustumCullingDisabled(scene,'))
+      .toBeGreaterThan(-1);
+    expect(finalWebGpuPrime.indexOf('await withArenaFrustumCullingDisabled(scene,'))
+      .toBeLessThan(finalWebGpuPrime.indexOf('for (let sample = 0; sample < 2; sample += 1) {'));
+    expect(finalWebGpuPrime).toContain('renderRuntime.compileAndRender(scene, camera, scene)');
     expect(finalWebGlPresentationSync).not.toContain('weaponView.update(');
     expect(finalWebGlPrime).toContain("renderRuntime.backend === 'webgpu'");
     expect(finalWebGlPrime).toContain('synchronizeFrozenMatchPrimePresentation();');
@@ -540,7 +613,7 @@ describe('presentation prewarm startup contract', () => {
     expect(source).toContain('if (submitWebGpuFrame(performance.now(), force, submissionMode)) return;');
     expect(matchDeployment.indexOf("await settleWebGpuPresentation('Initial match');"))
       .toBeLessThan(matchDeployment.indexOf('await waitForStableMatchAdmissionCadence();'));
-    expect(arenaDeployment).toContain('await withArenaFrustumCullingDisabled(scene, async () => {');
+    expect(arenaDeployment).toContain('withArenaFrustumCullingDisabled(scene, async () => {');
     expect(arenaDeployment).toContain('const exactScenePass = pass64TslSystems;');
     expect(arenaDeployment).toContain('await waitForVisibleBrowserPreparation();');
     expect(arenaDeployment).toContain('await exactScenePass.precompileExactScenePass(scene);');
@@ -552,11 +625,78 @@ describe('presentation prewarm startup contract', () => {
       .toBeLessThan(arenaDeployment.indexOf('await submitForegroundWebGpuFrame();'));
     expect(arenaDeployment.indexOf('withArenaFrustumCullingDisabled(scene'))
       .toBeLessThan(arenaDeployment.indexOf('auditArenaRenderLiveness('));
+    // PASS 84 lane C: the cold WebGPU warm frame is the FIRST submission of a
+    // cold session and it is fenced at 12 s. farcrysis realised 134-217 cold
+    // pipelines inside that one submission, missed the fence, rolled back and
+    // left the queue stuck for the next arena's 4 s fence too. The fix realises
+    // the exact ScenePass vocabulary through compileAsync first, which Dawn
+    // compiles off-fence.
+    //
+    // PASS 85 lane H (HF-417) re-pinned this STRICTER, not looser. Lane C
+    // gated the relief on `selectedArena.id === 'farcrysis'` and this test
+    // pinned that gate while warning that an arena-id branch in a shared
+    // engine path is this repo's documented drift shape. The warning was
+    // right: on the shipped PASS 84 build gun-range was UNREACHABLE by an
+    // in-match map switch — "[Gun Range map selection failed] WebGPU queue
+    // completion exceeded 12000 ms for submission 614 ... fenced draws 770" —
+    // because it took the un-relieved sequence and compiled its vocabulary
+    // inside this fence. The relief is now unconditional, so the pin is
+    // inverted: this region must contain NO arena-id branch at all (0, where
+    // it used to allow exactly 1), the precompile must still run strictly
+    // before the shadow refresh and the fenced warm frame, and the fence
+    // itself must still be 12 s. Re-introducing any per-arena special case
+    // here fails this test.
+    const coldWebGpuWarmFrame = arenaDeployment.slice(
+      arenaDeployment.indexOf("if (renderRuntime.backend === 'webgpu') {"),
+      arenaDeployment.indexOf("profileArenaTransition('quality-presentation');"),
+    );
+    expect(coldWebGpuWarmFrame).not.toHaveLength(0);
+    // LANE H2: the guard now also asks whether a COLD session needs the relief.
+    // The switch case (`hadPreparedArena`) is unconditional and unchanged; the
+    // cold-session case is answered by an evidenced authority module, never by
+    // an id in this region - which the zero-arena-id assertion below still pins.
+    expect(coldWebGpuWarmFrame)
+      .toContain('if (pass64TslSystems && (hadPreparedArena || coldSessionNeedsPrecompile)) {');
+    expect(coldWebGpuWarmFrame)
+      .toContain('const coldSessionNeedsPrecompile = arenaNeedsColdSessionPrecompile(selectedArena);');
+    expect(coldWebGpuWarmFrame)
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(scene));');
+    expect(coldWebGpuWarmFrame.match(/selectedArena\.id === '/g) ?? []).toHaveLength(0);
+    // LANE H2. The relief stays unconditional - every arena, both paths - but
+    // its ROOT is now chosen, because measuring it showed a cold session paying
+    // 8.6 s to realise a scene whose non-arena content the fenced warm frame
+    // cannot be surprised by. Pinned strictly tighter than before, not looser:
+    //  * unconditionally on an in-session switch (`hadPreparedArena`), which is
+    //    byte-for-byte the sequence that took the 56-pair switch matrix to 56/56,
+    //  * on a cold session only where a cold session has been MEASURED to lose
+    //    the 12 s fence, answered by cold-session-precompile-reach.ts.
+    // In-session switches retain the whole-scene relief; a cold session has no
+    // prior arena vocabulary, so its first compile is scoped to the admitted
+    // arena root and the later coverage draw owns the shared roots. A future
+    // edit that drops the guard, inverts it, or widens the cold root fails here.
+    expect(coldWebGpuWarmFrame.match(/precompileExactScenePass\(/g) ?? []).toHaveLength(2);
+    expect(coldWebGpuWarmFrame)
+      .toContain('await withArenaFrustumCullingDisabled(scene, () => scenePassPrecompile.precompileExactScenePass(arena.root));');
+    for (const fencedStep of [
+      'requestStaticShadowRefresh(true);',
+      'await submitForegroundWebGpuFrame(true);',
+      'await flushWebGpuFrames(12_000);',
+    ]) {
+      expect(coldWebGpuWarmFrame).toContain(fencedStep);
+      expect(
+        coldWebGpuWarmFrame.indexOf('scenePassPrecompile.precompileExactScenePass(scene)'),
+        `the ScenePass precompile must precede ${fencedStep}, otherwise it compiles inside the fence it exists to relieve`,
+      ).toBeLessThan(coldWebGpuWarmFrame.indexOf(fencedStep));
+    }
+    // The relief must never become a fence change: the arena still has to pass
+    // the same 12 s bound every other arena passes.
+    expect(coldWebGpuWarmFrame).not.toMatch(/flushWebGpuFrames\((?!12_000)/);
     expect(source).toContain('await flushWebGpuFrames(12_000)');
     expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
     expect(source).toContain('MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000');
     expect(source).toContain('assertWebGpuAdmissionCompletionLatency(');
-    expect(source).toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
+    expect(readFileSync(new URL('./gpu-retirement-scheduler.ts', import.meta.url), 'utf8'))
+      .toContain('if (!isSharedMeshGeometry(geometry)) geometry.dispose();');
     expect(source).toContain("presentation.status === 'stalled'");
     expect(source).not.toContain('consecutiveMinimumTierSlowSamples');
     expect(source).not.toContain('Live WebGPU queue latency');
@@ -570,9 +710,19 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(presentationEpochReset).toContain('lastObservedWebGpuCompletionSequence = renderRuntime.presentationTelemetry(now).completedSequence;');
     expect(presentationEpochReset).toContain('deferredWebGpuAdaptivePixelRatio.clear();');
-    expect(source).toContain("source: 'webgpu-submission' as const");
+    // Re-pinned 2026-08-31: 'webgpu-submission' -> 'webgpu-presented'. The HUD was
+    // reporting a median of SUBMISSION gaps, so it read 60 while the owner was
+    // actually seeing ~50, and 60 while he was seeing ~20 - submitWebGpuFrame
+    // returns false when the in-flight cap is hit but the frame counter still
+    // increments, so roughly half the rAF ticks put no new image on screen. The
+    // readout now counts frames actually submitted AND completed.
+    expect(source).toContain("source: 'webgpu-presented' as const");
     expect(source).toContain('document.documentElement.dataset.graphicsLiveProfile = liveGraphicsProfile;');
-    expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 1_000');
+    // 2026-08-30 re-pin: 1s tripped the on-screen error box on transient
+    // compositor hitches; 3s is a real stall. The eager scheduler-gap reset
+    // keeps its own 1s constant.
+    expect(source).toContain('LIVE_WEBGPU_PRESENTATION_STALL_MS = 3_000');
+    expect(source).toContain('WEBGPU_SCHEDULER_GAP_RESET_MS = 1_000');
     expect(source).toContain('detectLivePresentationStall({');
     expect(source).toContain('documentFocused: document.hasFocus()');
     expect(source).toContain("resetWebGpuPresentationEpoch('foreground scheduler gap', now);");
@@ -590,7 +740,12 @@ describe('presentation prewarm startup contract', () => {
     );
     expect(fpsHudCadence).toContain('const pacing = effectiveFramePacing(now);');
     expect(fpsHudCadence).toContain("element<HTMLElement>('#refresh-warning')");
-    expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple')");
+    // Bots must be built WITH a skin id. Without the final argument every bot in
+    // the game draws the catalog default, in appearance and in animation, because
+    // the director keys posture and aim response off the archetype. Pinning the
+    // full call keeps that argument from being dropped again.
+    expect(source).toContain("buildOperator(botTeam, 'bot-operator', renderProfile !== 'blender', weapon, 'neon-purple', botSkinId)");
+    expect(source).toContain("botSkinCycle = createShuffleBag(BOT_OPERATOR_SKIN_POOL, gameplayRandom)");
     expect(source).toContain('const streamedWeaponGpuPrewarmer: WeaponViewmodelGpuPrewarmer | undefined');
     expect(source).toContain('streamedWeaponGpuPrewarmQueue.run(() => runStreamedWeaponGpuPrewarm(model, context))');
     expect(source).toContain('const streamedWeaponCatalogGpuPrewarmer: WeaponViewmodelCatalogGpuPrewarmer | undefined');
@@ -651,9 +806,10 @@ describe('presentation prewarm startup contract', () => {
       operatorPrewarm.indexOf("if (renderRuntime.backend === 'webgpu')"),
       operatorPrewarm.indexOf('} else {'),
     );
-    const retirementDrain = runtimeSource.slice(
-      runtimeSource.indexOf('async function drainDeferredGpuRetirements()'),
-      runtimeSource.indexOf('function scheduleDeferredGpuRetirement('),
+    const retirementSource = readFileSync(new URL('./gpu-retirement-scheduler.ts', import.meta.url), 'utf8');
+    const retirementDrain = retirementSource.slice(
+      retirementSource.indexOf('async function drainDeferredGpuRetirements()'),
+      retirementSource.indexOf('function scheduleDeferredGpuRetirement('),
     );
 
     expect(grenadeSource).toContain('GRENADE_WORLD_PRESENTATION_BUILD_BATCH_SIZE = 2');
@@ -679,6 +835,9 @@ describe('presentation prewarm startup contract', () => {
     expect(runtimeSource.match(/await yieldBrowserPreparationFrame\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(retirementDrain).toContain('for (const [retirementIndex, retirement] of batch.entries())');
     expect(retirementDrain).toContain('await yieldDeferredGpuRetirementTask();');
+    // Pass 79 extraction: legacy-main must wire the real backend and the
+    // flushWebGpuFrames fence into the scheduler, never a stub.
+    expect(runtimeSource).toContain("const gpuRetirement = createGpuRetirementScheduler({\n  backend: () => renderRuntime.backend,\n  flushSubmittedFrames: (timeoutMs?: number) => flushWebGpuFrames(timeoutMs),\n});");
   });
 
   it('runs the shed reset probe only across the final two RustRig visits and gates continuous GPU progress', () => {
@@ -1091,7 +1250,7 @@ describe('presentation prewarm startup contract', () => {
   it('returns active-match Options Escape directly to play through one settings flush', () => {
     const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
     const resume = source.slice(
-      source.indexOf('function resumeActiveMatchFromMenu()'),
+      source.indexOf('function resumeActiveMatchFromMenu('), // GAMEPAD: optional requestLock param
       source.indexOf("resumeButton.addEventListener('click'"),
     );
     expect(resume.match(/flushPendingGraphics\(\)/g)).toHaveLength(1);

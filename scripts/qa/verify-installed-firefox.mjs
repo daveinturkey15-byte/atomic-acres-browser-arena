@@ -1,3 +1,12 @@
+// NOTE (Lane Q, 2026-08-23): this drives Firefox through geckodriver, which
+// launches it with a temporary profile. An explicit `-profile <dir>` is exactly
+// what stops Firefox handing the content document focus on this machine -
+// document.hasFocus() stays false for the whole session - and the product pauses
+// its frame loop on that predicate. So any FRAME-RATE number taken through this
+// path is measuring a paused game, which is what HF-331's "Firefox ~10 FPS"
+// actually was. The audio/console evidence this file exists for is unaffected.
+// For frame rate use scripts/qa/verify-cross-browser-matrix.mjs, and see
+// docs/LANE_Q_CROSS_BROWSER_AND_MOBILE_AUDIT_2026-08-23.md.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -9,6 +18,7 @@ import {
   hardwareAdapterVendor,
   nextOuterRectForContentViewport,
 } from './pass66-owned-browser-verifier-contract.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const root = path.resolve(process.cwd());
 const baseUrl = process.env.QA_BASE_URL ?? process.env.BASE_URL ?? '';
@@ -521,7 +531,8 @@ async function runChromeParityCycles(seed) {
   const browser = await chromium.launch({
     executablePath: chromeExecutable,
     headless: parityHeadless,
-    args: ['--enable-unsafe-webgpu'],
+    args: [...OFFSCREEN_ARGS,
+    '--enable-unsafe-webgpu'],
   });
   try {
     const context = await browser.newContext({

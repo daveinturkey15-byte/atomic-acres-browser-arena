@@ -1,17 +1,22 @@
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import {
   HUNTER_DRONE_ASSET,
   SUPPORT_VEHICLE_ASSETS,
   SUPPORT_VEHICLE_LOD_DISTANCES,
   SUPPORT_VEHICLE_PREWARM_DISTANCES,
+  SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL,
   SUPPORT_VEHICLE_TEXTURE_MEMORY_EXPECTATION,
   KillstreakPresentation,
   SupportVehicleTextureCanonicalizer,
   applyAuthoredChopperReadability,
+  authoredSupportShadowSilhouetteLevel,
   authoredSupportStaticGeometryCanBatch,
   authoredSupportMaterialCastsShadow,
+  mergeAuthoredSupportShadowSilhouette,
   cloneAuthoredSupportStaticGeometryForTransform,
   deriveSupportVehiclePrewarmDistances,
   hunterDronePresentationTelemetry,
@@ -19,6 +24,9 @@ import {
   supportAircraftWingVisibility,
   supportVehiclePresentationTelemetry,
   supportVehicleStableAirframeBounds,
+  FIRST_PERSON_COCKPIT_VIEW_LIFT_M,
+  FIRST_PERSON_COCKPIT_VIEW_PULL_M,
+  POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG,
 } from './killstreak-presentation';
 import type { KillstreakImpactEvent, KillstreakRecipientSnapshot } from './killstreak-runtime';
 import { DRONE_SWARM_GUN_PROFILE_ID, PILOTED_DRONE_GUN_PROFILE_ID } from './killstreak-support-catalog';
@@ -35,11 +43,151 @@ describe('authored support shadow budget', () => {
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_HunterDrone_IdentityLight')).toBe(false);
     expect(authoredSupportMaterialCastsShadow('drone', 'MAT_FutureDrone_Gunmetal')).toBe(false);
   });
+
+  // HF-336: the possessing player hides the chopper exterior outright, so every
+  // other player is the only one paying for its shadow casters. One merged
+  // low-detail silhouette replaces the authored mesh set in the shadow map.
+  it('bakes the coarsest authored level into one shared caster silhouette', () => {
+    expect(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL).toBe(2);
+    expect(authoredSupportShadowSilhouetteLevel(3)).toBe(2);
+    expect(authoredSupportShadowSilhouetteLevel(2)).toBe(1);
+    expect(authoredSupportShadowSilhouetteLevel(1)).toBe(0);
+    expect(authoredSupportShadowSilhouetteLevel(0)).toBe(-1);
+
+    const source = new THREE.Group();
+    source.name = 'pass65-chopper-gunner-authored-lod2';
+    source.scale.setScalar(2);
+    const hull = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Armor_PBR' }),
+    );
+    hull.name = 'chopper-fuselage';
+    hull.position.set(1, 0, 0);
+    const glass = new THREE.Mesh(
+      new THREE.BoxGeometry(40, 40, 40),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_CanopyGlass' }),
+    );
+    glass.name = 'chopper-sleek-cockpit-canopy';
+    const rotor = new THREE.Group();
+    rotor.name = 'chopper-main-rotor';
+    const blade = new THREE.Mesh(
+      new THREE.BoxGeometry(60, 0.1, 0.4),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_RotorBlade' }),
+    );
+    rotor.add(blade);
+    const cockpit = new THREE.Group();
+    cockpit.name = 'chopper-first-person-cockpit';
+    cockpit.userData.firstPersonOnly = true;
+    const cockpitMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(30, 30, 30),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Gunmetal' }),
+    );
+    cockpit.add(cockpitMesh);
+    source.add(hull, glass, rotor, cockpit);
+
+    const merged = mergeAuthoredSupportShadowSilhouette(source, 'chopper');
+    expect(merged).not.toBeNull();
+    // Exactly the hull: glass is not an admitted caster material, the rotor is
+    // animated and the cockpit is first-person only. One non-indexed,
+    // position-only triangle soup, with the authored level scale baked in.
+    expect(Object.keys(merged!.attributes)).toEqual(['position']);
+    expect(merged!.getIndex()).toBeNull();
+    expect(merged!.getAttribute('position').count).toBe(36);
+    expect(merged!.boundingBox!.min.toArray()).toEqual([0, -1, -1]);
+    expect(merged!.boundingBox!.max.toArray()).toEqual([4, 1, 1]);
+    // Shared across every presented instance, so pooled retirement must not
+    // dispose it out from under a live root.
+    expect(typeof merged!.userData[GPU_SHARED_GEOMETRY_KEY]).toBe('string');
+
+    const rotorsOnly = new THREE.Group();
+    const orphanRotor = new THREE.Group();
+    orphanRotor.name = 'chopper-tail-rotor';
+    orphanRotor.add(new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_RotorBlade' }),
+    ));
+    rotorsOnly.add(orphanRotor);
+    expect(mergeAuthoredSupportShadowSilhouette(rotorsOnly, 'chopper')).toBeNull();
+
+    merged!.dispose();
+  });
+
+  // HF-336: the baked shadow soup is decimated toward an 800-1500 triangle
+  // outline budget - a 2048x2048 shadow map reads the silhouette, not airframe
+  // detail. The budget constant itself is pinned, and a dense synthetic
+  // airframe-sized source must come out inside the pinned band while small
+  // fixtures stay untouched.
+  it('HF-336: decimates the baked shadow silhouette into the pinned outline budget', () => {
+    const presentation = readFileSync(resolve(__dirname, 'killstreak-presentation.ts'), 'utf8');
+    expect(presentation).toContain('const SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET = 1_200;');
+    // The decimation must run at bake time, before caching, so the cached
+    // geometry is already the reduced one and no per-frame work exists.
+    const mergeStart = presentation.indexOf('export function mergeAuthoredSupportShadowSilhouette(');
+    const cacheStart = presentation.indexOf('const supportShadowSilhouetteGeometries =');
+    const mergeBody = presentation.slice(mergeStart, cacheStart);
+    expect(mergeBody).toContain('decimateSupportShadowSilhouetteTriangles(positions)');
+    expect(presentation.indexOf('decimateSupportShadowSilhouetteTriangles')).toBeGreaterThan(-1);
+
+    // Dense source: ~2,000 distinct triangles of hull plating spread across a
+    // chopper-scale (~8m) extent. Must decimate into the pinned band.
+    const dense = new THREE.Group();
+    const plating = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Armor_PBR' }),
+    );
+    dense.add(plating);
+    let densePositions: number[] = [];
+    {
+      const source = plating.geometry.getAttribute('position');
+      const index = plating.geometry.getIndex()!;
+      const baseTriangles = index.count / 3;
+      const copies = Math.ceil(2000 / baseTriangles);
+      // Spread each copy across the plate on a 0.05 grid - dense enough to
+      // exercise welding, sparse enough that ~2,000 distinct triangles land
+      // in distinct cells at the finest cluster ratio.
+      for (let copy = 0; copy < copies; copy += 1) {
+        const ox = ((copy % 45) - 22) * 0.05;
+        const oy = Math.floor(copy / 45) * 0.05;
+        for (let cursor = 0; cursor < index.count; cursor += 1) {
+          const vi = index.getX(cursor);
+          densePositions.push(
+            source.getX(vi) + ox,
+            source.getY(vi) + oy,
+            source.getZ(vi),
+          );
+        }
+      }
+    }
+    const denseGeometry = new THREE.BufferGeometry();
+    denseGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(densePositions), 3));
+    plating.geometry.dispose();
+    // Swap in the dense position-only soup; cast through unknown because
+    // mergeAuthoredSupportShadowSilhouette only reads the position attribute.
+    (plating as unknown as { geometry: THREE.BufferGeometry }).geometry = denseGeometry;
+    const decimated = mergeAuthoredSupportShadowSilhouette(dense, 'chopper')!;
+    const decimatedTriangles = decimated.getAttribute('position').count / 3;
+    expect(decimatedTriangles).toBeGreaterThanOrEqual(800);
+    expect(decimatedTriangles).toBeLessThanOrEqual(1500);
+    decimated.dispose();
+
+    // Small fixtures are already inside the budget: pass-through unchanged.
+    const tiny = new THREE.Group();
+    const plate = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ name: 'MAT_Pass65Chopper_Armor_PBR' }),
+    );
+    tiny.add(plate);
+    const passthrough = mergeAuthoredSupportShadowSilhouette(tiny, 'chopper')!;
+    expect(passthrough.getAttribute('position').count).toBe(36);
+    passthrough.dispose();
+  });
 });
 
 describe('authored support LOD prewarm bands', () => {
   it('pins the current thresholds and derives one production-scale rehearsal inside every band', () => {
-    expect(SUPPORT_VEHICLE_LOD_DISTANCES).toEqual([0, 95, 190]);
+    // HF-336: re-tuned from [0, 95, 190] so LOD1/LOD2 engage at the chopper's
+    // 25-35m operating altitude instead of forcing LOD0 at every range.
+    expect(SUPPORT_VEHICLE_LOD_DISTANCES).toEqual([0, 36, 75]);
     expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeCloseTo(8.4 * 1.2);
     expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeGreaterThan(SUPPORT_VEHICLE_LOD_DISTANCES[0]);
     expect(SUPPORT_VEHICLE_PREWARM_DISTANCES[0]).toBeLessThan(SUPPORT_VEHICLE_LOD_DISTANCES[1]);
@@ -415,6 +563,7 @@ const snapshot = (
     gunController: index === 0 ? 'ai' : null,
     missileAmmo: index === 0 ? 6 : null,
     missileCooldownMs: index === 0 ? 0 : null,
+    taserCharges: null,
     captureActorId: null,
     captureProgress: null,
     revealedReward: null,
@@ -953,7 +1102,46 @@ describe('killstreak presentation', () => {
     const cockpitWorldQuaternion = chopper.getObjectByName('chopper-first-person-cockpit')!
       .getWorldQuaternion(new THREE.Quaternion());
     expect(cockpitWorldQuaternion.angleTo(cameraQuaternion)).toBeLessThan(1e-6);
-    expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(cameraPosition)).toBeLessThan(1e-6);
+    // Owner 2026-08-29: the cockpit viewmodel rides LIFTED in camera space so
+    // the canopy glass frame sits high on the screen (regression guard for
+    // the mid-screen glass issue). The pivot must land exactly on the lifted
+    // target - neither at the raw camera (no lift = regression) nor anywhere
+    // else (misalignment).
+    const liftedTarget = cameraPosition.clone()
+      .addScaledVector(
+        new THREE.Vector3(0, 1, 0).applyQuaternion(cameraQuaternion),
+        FIRST_PERSON_COCKPIT_VIEW_LIFT_M,
+      )
+      .addScaledVector(
+        new THREE.Vector3(0, 0, -1).applyQuaternion(cameraQuaternion),
+        -FIRST_PERSON_COCKPIT_VIEW_PULL_M,
+      );
+    expect(FIRST_PERSON_COCKPIT_VIEW_LIFT_M).toBeGreaterThan(0.05);
+    expect(FIRST_PERSON_COCKPIT_VIEW_PULL_M).toBeGreaterThan(0.05);
+    expect(cockpit.localToWorld(authoredCameraPivot).distanceTo(liftedTarget)).toBeLessThan(1e-6);
+    // Owner 2026-08-31: "the cockpit not stopping midscreen". Canopy framing
+    // that ENDS inside the viewport is not drawn at all. The rails top out far
+    // below the vertical half-FOV, so they are withheld, they are named in the
+    // telemetry, and nothing is left crossing the sight picture: no cockpit
+    // structure reaches the sight line, and the centre column above the eye is
+    // clear. The vertical half-FOV does not move with the aspect ratio, so
+    // this holds at 16:9, at 21:9, and everywhere between.
+    const railLeft = chopper.getObjectByName('chopper-cockpit-rail-left') as THREE.Mesh;
+    const railRight = chopper.getObjectByName('chopper-cockpit-rail-right') as THREE.Mesh;
+    expect(railLeft.userData.chopperCanopyFrameMember).toBe(true);
+    expect(railLeft.visible).toBe(false);
+    expect(railRight.visible).toBe(false);
+    const possessedAlignment = presentation.telemetry().firstPersonSightline!.alignment!;
+    expect(possessedAlignment.framingSuppressedMembers)
+      .toEqual(['chopper-cockpit-rail-left', 'chopper-cockpit-rail-right']);
+    expect(possessedAlignment.framing!.topEdgeDeg!)
+      .toBeLessThan(POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG);
+    // The tallest surviving corner grazes the sight line (a fraction of a
+    // degree of dashboard edge); the ray ladder confirms nothing actually
+    // draws above it, which is the property that matters.
+    expect(possessedAlignment.framing!.topEdgeDeg!).toBeLessThan(1);
+    expect(possessedAlignment.framing!.apertureTopDeg).toBeNull();
+    expect(possessedAlignment.framing!.structureClearsAboveDeg).toBeNull();
     presentation.setFirstPersonEntity(null);
     expect(chopper.visible).toBe(true);
     expect((chopper.getObjectByName('chopper-fuselage') as THREE.Mesh).visible).toBe(true);
@@ -963,6 +1151,10 @@ describe('killstreak presentation', () => {
     expect((chopper.getObjectByName('chopper-gunner-view-receiver') as THREE.Mesh).visible).toBe(false);
     expect(cockpitHud.layers.mask).toBe(cockpitHudBaseLayerMask);
     expect(hudMaterial.depthWrite).toBe(hudBaseDepthWrite);
+    // Leaving possession clears the framing decision so the next one derives
+    // it again rather than inheriting a stale suppression.
+    expect(railLeft.userData.cockpitFramingSuppressed).toBe(false);
+    expect(railRight.userData.cockpitFramingSuppressed).toBe(false);
     const carePackage = presentation.root.getObjectByName('pass65-care-package') as THREE.Group;
     expect(carePackage.userData).toMatchObject({ interactable: true, interactionPrompt: 'F TO COLLECT KILLSTREAK' });
     expect(carePackage.getObjectByName('care-package-crate')!.userData)

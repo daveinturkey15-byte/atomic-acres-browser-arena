@@ -6,12 +6,10 @@ import { buildArena } from './map';
 import { CharacterPhysics } from './physics';
 
 describe('Atomic Acres Pass 59 collision audit', () => {
-  it('binds visible terrain mounds and the large irrigation cylinder to mechanical authority', () => {
+  it('binds visible terrain mounds and the substantial props to mechanical authority', () => {
     const map = buildArena(new THREE.Scene());
     const audit = map.root.userData.atomicCollisionAudit as {
       terrainMounds: Array<{ id: string; collider: string; bottomY: number }>;
-      qualityEarthBanks: Array<{ id: string; colliders: string[] }>;
-      largeCylinder: { id: string; collider: string; bottomY: number };
       substantialProps: string[];
     };
     expect(audit.terrainMounds).toHaveLength(2);
@@ -23,23 +21,11 @@ describe('Atomic Acres Pass 59 collision audit', () => {
       expect(isBlocked({ x: visual.position.x, y: 0.55, z: visual.position.z }, map.colliders, 0.44)).toBe(true);
       expect(entry.bottomY).toBeLessThanOrEqual(0);
     }
-    const vessel = map.root.getObjectByName(audit.largeCylinder.id)!;
-    expect(vessel.userData.collisionAuthority).toBe(audit.largeCylinder.collider);
-    expect(isBlocked({ x: vessel.position.x, y: 1.65, z: vessel.position.z }, map.colliders, 0.44)).toBe(true);
-    expect(audit.largeCylinder.bottomY).toBe(0);
-    expect(audit.qualityEarthBanks).toHaveLength(4);
-    expect(audit.qualityEarthBanks.flatMap((bank) => bank.colliders)).toHaveLength(11);
-    for (const bank of audit.qualityEarthBanks) {
-      const visual = map.root.getObjectByName(`quality-earth-bank-${bank.id}`)!;
-      expect(visual.userData.collisionAuthorities).toEqual(bank.colliders);
-      for (const colliderName of bank.colliders) {
-        const authority = map.root.getObjectByName(colliderName)!;
-        expect(authority.visible).toBe(false);
-        expect(authority.userData.collisionAuthorityFor).toBe(visual.name);
-        expect(isBlocked(authority.position, map.colliders, 0.1)).toBe(true);
-      }
-    }
-    expect(audit.substantialProps).toHaveLength(40);
+    // DECLUTTER 2026-08-29: the irrigation vessel and the four corner earth
+    // banks are deleted (owner-called clutter), so the audit carries mounds +
+    // substantial props only. Substantial props: -4 terminals, -3 hydro beds,
+    // -1 reclamation tank, +2 spawn-garden trees, +2 honest planters = 36.
+    expect(audit.substantialProps).toHaveLength(36);
     for (const colliderName of audit.substantialProps) {
       const authority = map.root.getObjectByName(colliderName)!;
       expect(authority.visible).toBe(false);
@@ -48,19 +34,25 @@ describe('Atomic Acres Pass 59 collision audit', () => {
     }
   });
 
-  it('prevents Rapier penetration through a terrain mound and the irrigation vessel', async () => {
+  it('prevents Rapier penetration through a terrain mound, a planter and the boundary fence', async () => {
     const map = buildArena(new THREE.Scene());
     const physics = await CharacterPhysics.create(map.physicsColliders, map.bounds);
     try {
-      physics.teleportEye({ x: -28, y: 1.7, z: 5 });
+      // Walk into the west terrain mound from its open side.
+      physics.teleportEye({ x: -24, y: 1.7, z: -33 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0, y: -0.002, z: 0.03 }, 1 / 120);
-      expect(physics.eyePosition().z).toBeLessThan(8.0);
-      physics.teleportEye({ x: 27, y: 1.7, z: 23 });
+      expect(physics.eyePosition().z).toBeLessThan(-29.3);
+      // DECLUTTER 2026-08-29: the vessel and earth banks are gone. Their
+      // penetration duties re-pin onto surviving authority: the rear-yard
+      // planter, and the boundary fence that owns containment now the banks
+      // no longer wall the outside corners.
+      physics.teleportEye({ x: 16, y: 1.7, z: 25.5 });
       for (let step = 0; step < 500; step += 1) physics.move({ x: 0, y: -0.002, z: 0.03 }, 1 / 120);
-      expect(physics.eyePosition().z).toBeLessThan(25.8);
-      physics.teleportEye({ x: -23, y: 1.7, z: -34 });
-      for (let step = 0; step < 500; step += 1) physics.move({ x: -0.03, y: -0.002, z: 0 }, 1 / 120);
-      expect(physics.eyePosition().x).toBeGreaterThan(-25.9);
+      expect(physics.eyePosition().z).toBeLessThan(28.4);
+      // Walk outward from inside the arena into the east boundary fence.
+      physics.teleportEye({ x: 31, y: 1.7, z: -22 });
+      for (let step = 0; step < 500; step += 1) physics.move({ x: 0.03, y: -0.002, z: 0 }, 1 / 120);
+      expect(physics.eyePosition().x).toBeLessThan(37.2); // v3 bounds: fence face at 37
     } finally {
       physics.dispose();
     }
@@ -68,8 +60,10 @@ describe('Atomic Acres Pass 59 collision audit', () => {
   it('keeps every intended house window breakable and uniquely bound', () => {
     const map = buildArena(new THREE.Scene());
     expect(map.houseTelemetry.windows).toBe(6);
-    expect(map.breakableWindows).toHaveLength(6);
-    expect(new Set(map.breakableWindows.map((window) => window.id)).size).toBe(6);
+    // Owner 2026-08-30 (bus v6): the six house windows are joined by ten
+    // breakable bus panes - all uniquely bound below.
+    expect(map.breakableWindows).toHaveLength(16);
+    expect(new Set(map.breakableWindows.map((window) => window.id)).size).toBe(16);
     for (const window of map.breakableWindows) {
       expect(window.mesh.userData.breakableWindowId).toBe(window.id);
       expect(window.mesh.userData.dynamic).toBe(true);

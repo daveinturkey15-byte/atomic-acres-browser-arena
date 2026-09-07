@@ -1,3 +1,4 @@
+import { resolveRoomClaimOutcome, type HostLinkSample } from './host-migration'; // HF-325
 import { DataConnection, Peer } from 'peerjs';
 import {
   type GameMessage,
@@ -6,11 +7,20 @@ import {
   isStateTrafficMessage,
   messageBelongsToPlayer,
   type LeaveMessage,
+  type LobbyClosedMessage,
+  type LobbyClosedReason,
   type Team,
 } from './protocol';
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 import { clientRuntimeLogEntryFromError, type ClientRuntimeLogEntry } from './client-runtime-log';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
+
+// PASS 95 netcode diagnostics: the outbound half of the per-peer overlay.
+// Three call sites, all of them one line after an existing `transmit`, because
+// this is where the send actually happened rather than where it was requested.
+// `observeOutbound*` is a no-op beyond one boolean read unless the evidence
+// recorder is running; see src/netcode-diagnostics-runtime.ts.
+import { observeOutbound, observeOutboundToHost } from './netcode-diagnostics-runtime';
 
 export type NetworkRole = 'offline' | 'host' | 'client';
 
@@ -68,9 +78,37 @@ type NetworkDiagnostics = Record<string, unknown> & {
   clientHostLivenessRecoveries: number;
   stateFallbackActive: boolean;
   stateFallbackMessages: number;
+  lobbyClosedFarewells: number;
   qaEventDelayMs: number;
   qaEventJitterMs: number;
+  qaNetworkRttMs: number;
+  qaNetworkLossPct: number;
+  qaNetworkSeed: string | null;
 };
+
+export type QaTracedMessage = Readonly<{
+  /** performance.now() on the peer that recorded the row. */
+  atMs: number;
+  direction: 'out' | 'in';
+  type: string;
+  /** Serialized payload size; the wire uses binarypack, so this is an upper bound. */
+  bytes: number;
+  channel: ChannelKind;
+  /** The message's own playerId when it carries one -- the credit/ownership subject. */
+  subjectId: string | null;
+}>;
+
+export type QaMessageTrace = Readonly<{
+  enabled: boolean;
+  entries: readonly QaTracedMessage[];
+  recorded: number;
+  dropped: number;
+  impairedSends: number;
+  impairedDrops: number;
+  impairment: Readonly<{ rttMs: number; lossPct: number; seed: string | null }>;
+}>;
+
+const QA_TRACE_CAPACITY = 6_000;
 
 const STATE_LABEL = 'atomic-acres-state-v1';
 const EVENT_LABEL = 'atomic-acres-events-v1';
@@ -78,6 +116,10 @@ const RECONNECT_WINDOW_MS = 90_000;
 const RECONNECT_DELAYS_MS = [500, 1_500, 3_000, 5_000] as const;
 const HOST_ROOM_RECLAIM_DELAYS_MS = [350, 750, 1_500, 2_500, 4_000] as const;
 export const HOST_ROOM_RECLAIM_WINDOW_MS = 60_000;
+/** HF-326: upper bound on how long the lobby-closed farewell may delay an
+ * intentional reset. Long enough for the tiny farewell to leave the SCTP
+ * buffers, far below anything a host would perceive as an unresponsive reset. */
+export const LOBBY_CLOSED_FAREWELL_FLUSH_MS = 250;
 export const CLIENT_HOST_SILENCE_TIMEOUT_MS = 15_000;
 const CLIENT_HOST_LIVENESS_POLL_MS = 1_000;
 export const CLIENT_HOST_LIVENESS_MAX_SCHEDULING_GAP_MS = CLIENT_HOST_LIVENESS_POLL_MS * 3;
@@ -203,13 +245,47 @@ function createArenaPeer(preferredId?: string): Peer {
   return preferredId ? new Peer(preferredId) : new Peer();
 }
 
-function qaEventImpairment(): Readonly<{ delayMs: number; jitterMs: number }> {
+function qaNetworkImpairment(): Readonly<{ delayMs: number; jitterMs: number; rttMs: number; lossPct: number; seed: string | null }> {
   const params = new URLSearchParams(window.location.search);
   const localQa = params.get('multiplayerQa') === '1' && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
-  if (!localQa) return { delayMs: 0, jitterMs: 0 };
+  if (!localQa) return { delayMs: 0, jitterMs: 0, rttMs: 0, lossPct: 0, seed: null };
+  const rttMs = Math.max(0, Math.min(500, Number(params.get('qaRttMs')) || 0));
   const delayMs = Math.max(0, Math.min(250, Number(params.get('eventDelayQaMs')) || 0));
   const jitterMs = Math.max(0, Math.min(100, Number(params.get('eventJitterQaMs')) || 0));
-  return { delayMs, jitterMs };
+  const lossPct = Math.max(0, Math.min(100, Number(params.get('qaLossPct')) || 0));
+  const seed = params.get('qaSeed')?.slice(0, 120) || null;
+  return { delayMs: rttMs > 0 ? rttMs / 2 : delayMs, jitterMs: rttMs > 0 ? 0 : jitterMs, rttMs, lossPct, seed };
+}
+
+function qaLossSample(seed: string, sequence: number): number {
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < seed.length; index += 1) hash = Math.imul(hash ^ seed.charCodeAt(index), 16777619) >>> 0;
+  let value = (hash + Math.imul(sequence + 1, 0x9e3779b9)) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x85ebca6b) >>> 0;
+  value ^= value >>> 13;
+  return (value >>> 0) / 0x1_0000_0000;
+}
+
+/**
+ * HF-504 (mp audit): a QA-only message trace. Every multiplayer defect the
+ * owner has reported for months ("cannot reload", "cannot pick up guns",
+ * "desync") is a question about WHICH message did or did not cross the wire,
+ * and nothing in the build could answer it -- `diagnostics()` counts state
+ * messages but never records a type. This records one row per message on both
+ * the send and receive side so `scripts/qa/mp-audit.mjs` can diff the two
+ * peers' views of the same exchange.
+ *
+ * Fenced to the local QA harness (`multiplayerQa=1` + `qaTrace=1` on
+ * loopback). Production builds never allocate the ring and never pay the
+ * `JSON.stringify` byte measurement.
+ */
+function qaMessageTraceEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('multiplayerQa') === '1'
+    && params.get('qaTrace') === '1'
+    && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 }
 
 function channelKind(connection: DataConnection): ChannelKind {
@@ -383,6 +459,8 @@ export class ArenaNetwork {
   private pendingStateConnections = new Map<string, DataConnection>();
   private joinDeadline: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingLobbyResetTimer: number | null = null;
+  private lobbyClosedFarewells = 0;
   private onMessage: MessageHandler;
   private onStatus: StatusHandler;
   private onDiagnostic: DiagnosticHandler;
@@ -401,7 +479,18 @@ export class ArenaNetwork {
   private selfStateEchoesSuppressed = 0;
   private stateFallbackMessages = 0;
   private clientReadyNotified = false;
+  /** HF-325: set once a host farewell arrives; a deliberate reset is not a crash to retry. */
+  private lobbyClosedByHost = false;
+  /** HF-325: true while a promoted guest is claiming the room id. An
+   * `unavailable-id` during this claim aborts PERMANENTLY (someone else owns
+   * the room), never the crashed-host reclaim ramp and never a fresh room. */
+  private promotionClaim = false;
   private lastClientHostLivenessCheckMonoMs: number | null = null;
+  private readonly qaTrace: QaTracedMessage[] | null = qaMessageTraceEnabled() ? [] : null;
+  private qaTraceRecorded = 0;
+  private qaTraceDropped = 0;
+  private qaImpairedSends = 0;
+  private qaImpairedDrops = 0;
   private qaEventSendSequence = 0;
   private qaEventLastDue = new WeakMap<DataConnection, number>();
   private connectionAttemptSequence = 0;
@@ -419,7 +508,14 @@ export class ArenaNetwork {
     onDiagnostic: DiagnosticHandler = () => undefined,
     peerFactory: ArenaPeerFactory = createArenaPeer,
   ) {
-    this.onMessage = onMessage;
+    this.onMessage = this.qaTrace === null
+      ? onMessage
+      : (message: GameMessage) => {
+        // Recorded BEFORE the handler runs, so a row exists even when the
+        // handler throws or the message is dropped by an admission gate.
+        this.recordQaTrace('in', message, 'events');
+        onMessage(message);
+      };
     this.onStatus = onStatus;
     this.onDiagnostic = onDiagnostic;
     this.peerFactory = peerFactory;
@@ -532,6 +628,23 @@ export class ArenaNetwork {
     return attempt?.phase === 'pending' ? { kind: attempt.kind, key: attempt.key } : null;
   }
 
+  /**
+   * HF-325: raw inputs for host-migration.ts evaluateHostLoss(). Read-only - this
+   * exposes what the transport already knows so the guest can tell a deliberate host
+   * reset apart from a crash, instead of retrying a room that will never exist again.
+   */
+  hostLinkSample(nowMonoMs = performance.now()): HostLinkSample {
+    return {
+      role: this.role,
+      eventChannelOpen: this.hostEventConnection?.open ?? false,
+      reconnectPending: this.reconnectTimer !== null,
+      lastValidHostMessageMonoMs: this.lastValidHostMessageMonoMs,
+      reconnectDeadlineMonoMs: this.reconnectDeadlineMonoMs,
+      lobbyClosedByHost: this.lobbyClosedByHost,
+      nowMonoMs,
+    };
+  }
+
   host(onReady: () => void, preferredRoomCode?: string, recoveryRequired = false): void {
     const preferred = preferredRoomCode?.trim() ?? '';
     const attempt = this.beginExplicitConnectionAttempt('host', hostConnectionAttemptKey(preferred, recoveryRequired));
@@ -547,16 +660,78 @@ export class ArenaNetwork {
   }
 
   /**
+   * HF-325: adopt the host role for a room this peer joined as a client.
+   * Callers MUST hold an `evaluateSelfPromotion(...).promote === true`.
+   *
+   * Claiming the room-code peer id is the mutual-exclusion lock (G3): if any
+   * other peer — including a still-live original host — holds the id, the
+   * claim fails `unavailable-id` and this peer aborts PERMANENTLY, going
+   * offline with the host-lost presentation. It never retries (that would race
+   * a possibly-live host) and never falls back to a fresh room code (its
+   * followers are pointed at THIS room).
+   */
+  promoteToHost(roomCode: string, onReady: () => void): void {
+    const preferred = roomCode.trim();
+    if (this.role !== 'client' || !preferred || preferred !== this.roomCode) return;
+    const attempt = this.beginExplicitConnectionAttempt('host', hostConnectionAttemptKey(preferred, false));
+    if (!attempt) return;
+    this.manualClose = false;
+    this.role = 'host';
+    this.onReady = onReady;
+    this.promotionClaim = true;
+    this.onStatus('Host lost — promoting this peer to host of the same room…', 'warn');
+    this.startHostPeer(attempt, onReady, preferred, false, 0);
+  }
+
+  /**
    * Intentionally invalidate the current host room and start a fresh one.
    * This is deliberately separate from crash recovery: recovery preserves the
    * room code and retained authority, while a reset closes every old channel
    * and admits nobody from the invalidated room.
+   *
+   * HF-326 residual polish: connected guests first receive a best-effort
+   * 'lobby-closed' farewell so they stop the 90-second rejoin loop against a
+   * room id that no longer exists. The farewell is fail-open and never delays
+   * the reset by more than LOBBY_CLOSED_FAREWELL_FLUSH_MS.
    */
   resetLobby(onReady: () => void): boolean {
     if (this.role !== 'host' || this.manualClose) return false;
-    this.close();
-    this.host(onReady);
+    if (this.pendingLobbyResetTimer !== null) return true;
+    const notified = this.announceLobbyClosed('host-reset');
+    const finishReset = (): void => {
+      this.pendingLobbyResetTimer = null;
+      if (this.role !== 'host' || this.manualClose) return;
+      this.close();
+      this.host(onReady);
+    };
+    if (notified === 0) {
+      finishReset();
+      return true;
+    }
+    this.pendingLobbyResetTimer = window.setTimeout(finishReset, LOBBY_CLOSED_FAREWELL_FLUSH_MS);
     return true;
+  }
+
+  /**
+   * Best-effort HF-326 farewell to every admitted guest before an intentional
+   * reset closes their channels. Fail-open: a transmission problem simply
+   * means that guest misses the courtesy notice; it never blocks the reset.
+   */
+  announceLobbyClosed(reason: LobbyClosedReason = 'host-reset'): number {
+    if (this.role !== 'host') return 0;
+    let notified = 0;
+    const farewell: LobbyClosedMessage = { type: 'lobby-closed', reason, nonce: Date.now() };
+    for (const bundle of this.guestBundles.values()) {
+      if (!bundle.admitted || !bundle.events.open) continue;
+      try {
+        this.transmit(bundle.events, farewell, false);
+        notified += 1;
+      } catch {
+        // Fail-open: never let one broken channel stall the lobby reset.
+      }
+    }
+    this.lobbyClosedFarewells += notified;
+    return notified;
   }
 
   private startHostPeer(
@@ -579,6 +754,7 @@ export class ArenaNetwork {
     this.peer = peer;
     peer.on('open', (id) => {
       if (this.peer !== peer || !this.isCurrentConnectionAttempt(attempt) || this.role !== 'host' || this.manualClose) return;
+      this.promotionClaim = false; // HF-325: the room-id claim succeeded
       const signallingRestored = this.roomCode.length > 0;
       this.roomCode = id;
       this.markConnectionAttemptActive(attempt);
@@ -592,6 +768,28 @@ export class ArenaNetwork {
     peer.on('error', (error) => {
       if (this.peer !== peer || !this.isCurrentConnectionAttempt(attempt) || this.role !== 'host' || this.manualClose) return;
       this.reportNetworkIssue('peerjs:host-signalling', error, 'Host signalling failed');
+      if ((error as { type?: string }).type === 'unavailable-id' && this.promotionClaim) {
+        // HF-325 G3: someone else holds the room id — possibly the original
+        // host, alive after all. resolveRoomClaimOutcome maps this to a
+        // PERMANENT abort: no retry ramp (that races a live host), no fresh
+        // room (followers are pointed at this one). Offline + host-lost UI.
+        this.promotionClaim = false;
+        if (resolveRoomClaimOutcome('unavailable-id') === 'abort') {
+          this.onStatus('Another peer already owns this room — promotion abandoned.', 'error');
+          this.close();
+          return;
+        }
+      }
+      if ((error as { type?: string }).type === 'unavailable-id' && !preferred && this.roomCode) {
+        // HF-325 stand-down: an ESTABLISHED host whose signalling dropped and
+        // whose released id has since been claimed — a successor was promoted
+        // while this host was away. Surrender: farewell the guests still
+        // attached, stop admitting, and go offline. Never fight for the id.
+        this.onStatus('This room now belongs to a newer host — standing down.', 'error');
+        this.announceLobbyClosed('host-superseded');
+        this.close();
+        return;
+      }
       if (preferred && (error as { type?: string }).type === 'unavailable-id') {
         const reclaim = hostRoomReclaimAction(recoveryRequired, reclaimAttempt);
         if (reclaim.action === 'retry') {
@@ -657,6 +855,7 @@ export class ArenaNetwork {
         : this.hostEventConnection;
       if (connection?.open) {
         this.transmit(connection, message, isStateTrafficMessage(message));
+        observeOutboundToHost(message, performance.now());
         if (isStateTrafficMessage(message)) this.stateMessagesSent += 1;
         if (stateFallback) this.stateFallbackMessages += 1;
       }
@@ -698,6 +897,7 @@ export class ArenaNetwork {
       : bundle?.events;
     if (!connection?.open) return false;
     this.transmit(connection, message, isStateTrafficMessage(message));
+    observeOutbound(message, playerId, performance.now());
     if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
     if (stateFallback) this.stateFallbackMessages += 1;
     return true;
@@ -752,8 +952,47 @@ export class ArenaNetwork {
     return true;
   }
 
+  private recordQaTrace(direction: 'out' | 'in', message: GameMessage, channel: ChannelKind): void {
+    const trace = this.qaTrace;
+    if (!trace) return;
+    this.qaTraceRecorded += 1;
+    if (trace.length >= QA_TRACE_CAPACITY) {
+      trace.shift();
+      this.qaTraceDropped += 1;
+    }
+    let bytes = 0;
+    try { bytes = JSON.stringify(message)?.length ?? 0; } catch { bytes = -1; }
+    const carried = message as unknown as Record<string, unknown>;
+    // Most of the protocol names its author `by` (lobby-ready, reload-intent,
+    // pickup, shot); a few carry the subject as `playerId`/`victim`/`target`.
+    const subject = carried.by ?? carried.playerId ?? carried.victim ?? carried.targetId ?? carried.id ?? null;
+    trace.push({
+      atMs: performance.now(),
+      direction,
+      type: String(message.type),
+      bytes,
+      channel,
+      subjectId: typeof subject === 'string' ? subject : null,
+    });
+  }
+
+  /** HF-504: read-only trace for `scripts/qa/mp-audit.mjs`. Empty unless the
+   * QA trace fence is open. */
+  qaMessageTrace(): QaMessageTrace {
+    const impairment = qaNetworkImpairment();
+    return {
+      enabled: this.qaTrace !== null,
+      entries: this.qaTrace ? [...this.qaTrace] : [],
+      recorded: this.qaTraceRecorded,
+      dropped: this.qaTraceDropped,
+      impairedSends: this.qaImpairedSends,
+      impairedDrops: this.qaImpairedDrops,
+      impairment: { rttMs: impairment.rttMs, lossPct: impairment.lossPct, seed: impairment.seed },
+    };
+  }
+
   diagnostics(): NetworkDiagnostics {
-    const qaImpairment = qaEventImpairment();
+    const qaImpairment = qaNetworkImpairment();
     const eventChannels = this.role === 'host'
       ? [...this.guestBundles.values()].filter((bundle) => bundle.events.open).length
       : Number(this.hostEventConnection?.open ?? false);
@@ -809,8 +1048,13 @@ export class ArenaNetwork {
         ? stateTrafficUsesFallback(Boolean(this.hostStateConnection?.open), Boolean(this.hostEventConnection?.open))
         : [...this.guestBundles.values()].some((bundle) => stateTrafficUsesFallback(Boolean(bundle.state?.open), bundle.events.open)),
       stateFallbackMessages: this.stateFallbackMessages,
+      lobbyClosedFarewells: this.lobbyClosedFarewells,
+      pendingLobbyReset: this.pendingLobbyResetTimer !== null,
       qaEventDelayMs: qaImpairment.delayMs,
       qaEventJitterMs: qaImpairment.jitterMs,
+      qaNetworkRttMs: qaImpairment.rttMs,
+      qaNetworkLossPct: qaImpairment.lossPct,
+      qaNetworkSeed: qaImpairment.seed,
     };
   }
 
@@ -819,6 +1063,10 @@ export class ArenaNetwork {
     this.liveConnectionAttempt = null;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    // A close during the farewell flush window cancels the deferred reset so a
+    // stale timer can never tear down a session started after this close.
+    if (this.pendingLobbyResetTimer !== null) clearTimeout(this.pendingLobbyResetTimer);
+    this.pendingLobbyResetTimer = null;
     this.stopClientHostLivenessWatchdog();
     this.clearJoinDeadline();
     try { this.hostEventConnection?.close(); } catch { /* no-op */ }
@@ -850,6 +1098,8 @@ export class ArenaNetwork {
     this.role = 'offline';
     this.onReady = null;
     this.reconnectDeadlineMonoMs = null;
+    this.lobbyClosedByHost = false; // HF-325
+    this.promotionClaim = false; // HF-325
   }
 
   private connectClient(reconnecting: boolean): void {
@@ -1057,6 +1307,7 @@ export class ArenaNetwork {
         try { connection.close(); } catch { /* no-op */ }
         return;
       }
+      // Host-authoritative claims must reach validation before the generic relay below.
       if (payload.type === 'overdrive-claim' || payload.type === 'hit' || payload.type === 'window-break'
         || payload.type === 'join' || payload.type === 'shot' || payload.type === 'shot-request' || payload.type === 'trigger-state' || payload.type === 'state-feedback' || payload.type === 'melee'
         || payload.type === 'support-activate' || payload.type === 'grenade-throw'
@@ -1065,7 +1316,7 @@ export class ArenaNetwork {
         || payload.type === 'railgun-claim-request' || payload.type === 'railgun-shot-request'
         || payload.type === 'timed-map-weapon-claim-request'
         || payload.type === 'guest-resume-ack' || payload.type === 'guest-resume-nack'
-        || payload.type === 'reload-intent'
+        || payload.type === 'reload-intent' || payload.type === 'pickup'
         || payload.type === 'chat-submit') {
         this.onMessage(payload);
         return;
@@ -1154,7 +1405,16 @@ export class ArenaNetwork {
     connection.on('data', (payload) => {
       if (!current() || !isGameMessage(payload)) return;
       if (kind === 'state' && !isStateTrafficMessage(payload)) return;
-      this.noteValidHostMessage();
+      this.noteValidHostMessage(payload);
+      if (payload.type === 'lobby-closed') {
+        // HF-326: the host intentionally invalidated this room. Surface the
+        // farewell to the app, then end the session immediately instead of
+        // retrying a dead room id for the 90-second rejoin window.
+        this.onMessage(payload);
+        this.close();
+        this.onStatus('Host opened a fresh room — ask for the new invite code.', 'warn');
+        return;
+      }
       this.onMessage(payload);
     });
     connection.on('close', () => {
@@ -1179,6 +1439,7 @@ export class ArenaNetwork {
     this.clearJoinDeadline();
     this.reconnectAttempts = 0;
     this.reconnectDeadlineMonoMs = null;
+    this.lobbyClosedByHost = false; // HF-325
     if (this.liveConnectionAttempt?.kind === 'join') this.markConnectionAttemptActive(this.liveConnectionAttempt);
     this.onStatus('Connected to host', 'ok');
     this.onReady?.();
@@ -1267,8 +1528,14 @@ export class ArenaNetwork {
     if (this.isCurrentConnectionAttempt(attempt)) this.close();
   }
 
-  private noteValidHostMessage(): void {
-    if (this.role === 'client') this.lastValidHostMessageMonoMs = performance.now();
+  private noteValidHostMessage(payload?: { type?: string }): void {
+    if (this.role !== 'client') return;
+    this.lastValidHostMessageMonoMs = performance.now();
+    // HF-325: a host farewell is a DELIBERATE room closure, not a crash. Recording it
+    // lets the guest stop retrying a room id that will never exist again - previously
+    // 'lobby-closed' was defined in the protocol, sent by the host, and handled nowhere,
+    // so a reset room left every guest grinding the full 90s reconnect window.
+    if (payload?.type === 'lobby-closed') this.lobbyClosedByHost = true;
   }
 
   private startClientHostLivenessWatchdog(): void {
@@ -1383,6 +1650,7 @@ export class ArenaNetwork {
         : bundle.events;
       if (!connection?.open) continue;
       this.transmit(connection, message, isStateTrafficMessage(message));
+      observeOutbound(message, bundle.playerId, performance.now());
       if (isStateTrafficMessage(message)) this.stateMessagesRelayed += 1;
       if (stateFallback) this.stateFallbackMessages += 1;
     }
@@ -1394,19 +1662,29 @@ export class ArenaNetwork {
   }
 
   private transmit(connection: DataConnection, message: GameMessage, stateTraffic: boolean): void {
-    const impairment = qaEventImpairment();
-    if (stateTraffic || impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
-      connection.send(message);
+    this.recordQaTrace('out', message, stateTraffic ? 'state' : 'events');
+    const impairment = qaNetworkImpairment();
+    const sequence = this.qaEventSendSequence;
+    this.qaEventSendSequence += 1;
+    const shouldDrop = impairment.lossPct > 0 && impairment.seed !== null
+      && qaLossSample(impairment.seed, sequence) < impairment.lossPct / 100;
+    if (impairment.lossPct > 0 || impairment.delayMs > 0 || impairment.jitterMs > 0) this.qaImpairedSends += 1;
+    const send = () => {
+      if (shouldDrop) {
+        this.qaImpairedDrops += 1;
+        return;
+      }
+      if (connection.open) connection.send(message);
+    };
+    if (impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
+      send();
       return;
     }
     const phase = (this.qaEventSendSequence % 5) - 2;
-    this.qaEventSendSequence += 1;
     const requestedDue = performance.now() + impairment.delayMs + phase * impairment.jitterMs / 2;
     const due = Math.max(requestedDue, (this.qaEventLastDue.get(connection) ?? 0) + 0.1);
     this.qaEventLastDue.set(connection, due);
-    window.setTimeout(() => {
-      if (connection.open) connection.send(message);
-    }, Math.max(0, due - performance.now()));
+    window.setTimeout(send, Math.max(0, due - performance.now()));
   }
 
   private reportNetworkIssue(source: string, error: unknown, fallbackMessage: string): void {

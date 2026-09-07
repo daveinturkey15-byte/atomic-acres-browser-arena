@@ -174,10 +174,12 @@ if (!supportedEngines.includes(configuredCrossGuest as EngineKind)) {
 const crossGuestEngine = configuredCrossGuest as EngineKind;
 
 async function openEngineBrowser(kind: EngineKind): Promise<Browser> {
-  if (kind === 'chromium') return chromium.launch({ headless: true });
+  if (kind === 'chromium') return chromium.launch({ headless: true, args: ['--mute-audio'] });
   if (kind === 'firefox') {
     const executablePath = process.env.PASS70_FIREFOX_EXECUTABLE_PATH;
-    return firefox.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+    // Firefox has no --mute-audio; media.volume_scale is the equivalent (owner 2026-08-30:
+    // every browser we launch stays silent while he is at this PC).
+    return firefox.launch({ headless: true, firefoxUserPrefs: { 'media.volume_scale': '0.0' }, ...(executablePath ? { executablePath } : {}) });
   }
   if (kind === 'webkit') return webkit.launch({ headless: true });
   if (kind === 'opera') {
@@ -707,6 +709,7 @@ test(`Chromium host and ${crossGuestEngine} guest survive ADS combat, guest rejo
   const chromiumBrowser = await chromium.launch({
     headless: true,
     args: [
+      '--mute-audio',
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--disable-backgrounding-occluded-windows',

@@ -1,0 +1,85 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:playwright-topology
+> node scripts/qa/run-playwright-with-topology.mjs tests/e2e/release-channel-chooser.spec.ts --project=chromium --workers=1 --retries=0
+
+vite v8.1.3 building client environment for production...
+[2Ktransforming...✓ 498 modules transformed.
+rendering chunks...
+computing gzip size...
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/index.html                                          1.20 kB │ gzip:   0.62 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/map3.html                                           1.84 kB │ gzip:   0.88 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/legacy-main-BY5wB9kX.css                    16.27 kB │ gzip:   3.89 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/style-DnVwtB4j.css                         165.27 kB │ gzip:  33.92 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/index-DyAt29Qn.css                         204.05 kB │ gzip:  38.54 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/map3-arena-DI78zBri.js                       0.25 kB │ gzip:   0.19 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/retry-load-DIpB1FEH.js                       0.25 kB │ gzip:   0.21 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/webgpu-adapter-diagnostics-BNE2ATWW.js       0.34 kB │ gzip:   0.21 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/release-identity-CxLcFW5B.js                 0.51 kB │ gzip:   0.36 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/rolldown-runtime-QTnfLwEv.js                 0.69 kB │ gzip:   0.42 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/modulepreload-polyfill-Dezn_h7o.js           0.69 kB │ gzip:   0.39 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js         0.75 kB │ gzip:   0.40 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/deterministic-rng-Cz65iEo8.js                0.75 kB │ gzip:   0.41 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/map3-DY7xm8CP.js                             1.18 kB │ gzip:   0.72 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/test1-CeDDV6-n.js                            1.20 kB │ gzip:   0.73 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/preload-helper-DYl5dUZ5.js                   1.27 kB │ gzip:   0.70 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/test2-195eArEr.js                            1.30 kB │ gzip:   0.77 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/nuketown2-CUJ9H2lW.js                        1.48 kB │ gzip:   0.80 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/main-AureOG3P.js                             1.49 kB │ gzip:   0.92 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/farcrysis-C1M0rPEY.js                        1.68 kB │ gzip:   0.86 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/atomic-acres-p2vYQi0v.js                     1.70 kB │ gzip:   0.93 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/skyline-terminal-Ci_Wk95k.js                 1.74 kB │ gzip:   0.90 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/high-seas-CdBu-F2K.js                        2.42 kB │ gzip:   1.20 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/rustworks-1v1-0suRQHx-.js                    2.83 kB │ gzip:   1.20 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/webgpu-diagnostics-screen-BO3QB7N0.js        3.45 kB │ gzip:   1.54 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/gun-range-rack-presentation-BWQ3g6zI.js      3.57 kB │ gzip:   1.49 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/index-38R-KHq7.js                            4.24 kB │ gzip:   1.85 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/map3-arena-Crgk5QjJ.js                       4.31 kB │ gzip:   2.14 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/gun-range-DW9tYhBG.js                        5.04 kB │ gzip:   1.74 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/shared-DeCo1P3N.js                           6.45 kB │ gzip:   2.40 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/webgpu-adapter-diagnostics-BK_qrMAJ.js       7.75 kB │ gzip:   3.19 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/combat-feedback-1xrJRg1x.js                  9.42 kB │ gzip:   3.70 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/nuketown2-arena-Hzu3Wfbn.js                  9.47 kB │ gzip:   3.90 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/sky-backdrop-5XoGW9vY.js                     9.52 kB │ gzip:   3.55 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/map3-Clpxy4CG.js                            16.45 kB │ gzip:   7.39 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/three.webgpu-oc72ejhZ.js                    19.22 kB │ gzip:   7.48 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/vendor-three-loaders-BOatHMLM.js            42.89 kB │ gzip:  12.76 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/changelog-CGDI__K3.js                       43.07 kB │ gzip:  16.01 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/map-BGgf3wD-.js                             43.75 kB │ gzip:  15.26 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/high-seas-xUUuNxAw.js                       45.42 kB │ gzip:  14.34 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/test-maps-B2LolRBs.js                       53.00 kB │ gzip:  19.32 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/corridor-colosseum-Dtg35OUO.js              85.14 kB │ gzip:  31.83 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/vendor-peer-DW-fpQKQ.js                     86.87 kB │ gzip:  23.17 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/additional-maps-DO4VNTEL.js                110.65 kB │ gzip:  33.30 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/farcrysis-DHOCdPyF.js                      145.64 kB │ gzip:  47.22 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/gameplay-P-UGGvcf.js                       505.33 kB │ gzip: 136.99 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/vendor-three-CwPXx5A7.js                 1,567.51 kB │ gzip: 444.33 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/legacy-main-BOIBEQDQ.js                  1,859.12 kB │ gzip: 571.67 kB
+../../AppData/Local/Temp/atomic-acres-playwright-meLtMI/dist/assets/rapier-USIc5Cek.js                       2,236.65 kB │ gzip: 842.25 kB
+
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vite:css-post (58%)
+  - vite:prepare-out-dir (15%)
+  - vite:build-import-analysis (8%)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 4.62s
+{"releaseTopology":"ok","sourceSha":"dae229f2837a52d05457aaab34081ca057441f31","channels":{"experimental":{"pass":"PASS 86","sourceSha":"dae229f2837a52d05457aaab34081ca057441f31","digest":"123563edba9843bc2fb88f3a4b2cddcf79ec4d00fe3f9646473b60ad34f1bf78"},"previous":{"pass":"PASS 72","pagesSha":"d5b77dc3b9e46608264c52eb0737b50590d70eb5","digest":"594ed5be34d78ea1f93a28f7b457c91cababbac8ea737bb6dd06701fee25b22d"},"retained":{"pass":"PASS 70","pagesSha":"3b5e675c54eaea2a2dd721eca6f247c933361587","digest":"59ca7375a99d79ee644857df7c219b1beee2803ce3d077ba054ec44abd9adfa6"},"historical":{"pass":"PASS 69","pagesSha":"71ec5616504d8e24241450742d01b25c1d6ff4e4","digest":"04e3fcf121db14038a1cd27661ec9ac5fdf62939af470c070fa92cfbb45388ec"},"stable":{"pass":"PASS 67.1","pagesSha":"271cea28299570af8def30e879701ddbd3c4bc12","digest":"10e408e5663dda8fef820aae89bbcda174699bd2661b9d94387d060fdb55914a"},"rollback":{"pass":"PASS 63","sourceSha":"ac85e9b8b46cc2370aee903d564ecf3c4682b24c","digest":"43e97691b33240be8992f1f1238f5d3effb292e3765e7528b27756c04695f579"}}}
+Atomic Acres owned Playwright preview listening at http://127.0.0.1:4174/
+
+Running 5 tests using 1 worker
+
+(node:60408) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › tests\e2e\release-channel-chooser.spec.ts:84:5 › offers exactly the channels the deploy staged, stamped with the current pass (2.7s)
+  ok 2 [chromium] › tests\e2e\release-channel-chooser.spec.ts:189:5 › front-page hard reset clears CacheStorage and reloads the chooser (390ms)
+  ok 3 [chromium] › tests\e2e\release-channel-chooser.spec.ts:198:5 › routes removed stable and rollback aliases to the exact previous-live channel (1.1s)
+  ok 4 [chromium] › tests\e2e\release-channel-chooser.spec.ts:206:5 › routes each retained choice to its own configured channel (1.6s)
+  ok 5 [chromium] › tests\e2e\release-channel-chooser.spec.ts:216:5 › keeps legacy latest, normal and room entries on the stamped current pass (2.0s)
+
+  5 passed (9.0s)
+EXIT 0

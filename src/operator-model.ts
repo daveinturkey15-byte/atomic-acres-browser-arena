@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { proneStanceAdjustment, type ProneBodyClearance } from './prone-clearance';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
@@ -6,7 +7,49 @@ import { markMeshGeometriesShared } from './gpu-resource-ownership';
 import type { Team } from './protocol';
 import { objectLocalGeometryBounds } from './character-presentation-contract';
 import { solveTwoBoneElbow } from './ik';
+import { // HF-509
+  clampFootDistanceM,
+  crouchPlantAuthority,
+  legSettleWeight,
+  separateLegLateralTargets,
+} from './operator-leg-pose';
+import { stanceTransitionDurationMs } from './prone-transition'; // HF-412
 import { yieldBrowserCpuTask } from './browser-preparation-scheduler';
+import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
+import {
+  advanceOperatorAnimation,
+  createOperatorAnimationDirector,
+  pushOperatorHitImpulse,
+  pushOperatorOneShot,
+  type OperatorOneShotKind,
+  type OperatorAnimationDirector,
+  type OperatorAnimationOutput,
+} from './rigged-operator-animation-director';
+import {
+  applyOperatorAnimationPose,
+  applyOperatorMixerPlan,
+  directedGroundVelocity,
+  localGroundVelocity,
+  planOperatorMixer,
+} from './rigged-operator-animation-runtime';
+import { wrapAngleRadians } from './animation-additive-pose';
+import type { HitReactionZone } from './animation-hit-reaction';
+import {
+  isOperatorStanceId,
+  stanceIdleClip,
+  type OperatorStanceId,
+} from './operator-appearance-catalog'; // HF-382
+import {
+  advanceOperatorPosture,
+  createOperatorPostureLayer,
+  type OperatorPostureLayerState,
+  type OperatorPostureOutput,
+} from './operator-posture-layer'; // PASS 94
+import { resolveOperatorLook } from './operator-skin-look-registry'; // PASS 94
+import {
+  operatorLookMaterialForAuthored,
+  operatorLookMaterialsEnabled,
+} from './operator-skin-tsl-materials'; // PASS 94
 
 export const BOT_EMISSIVE_BRIGHTNESS_SCALE = 0.5;
 
@@ -20,6 +63,11 @@ export function applyBotEmissiveBrightness(root: THREE.Object3D): number {
   });
   let adjusted = 0;
   for (const material of materials) {
+    // MUSE F5 (PASS 94 animation+skins review): TSL node materials fail every
+    // instanceof below and are skipped on purpose - the procedural operator skins
+    // carry no emissive fill to scale (see animation-skins REPORT 5.2). A future
+    // brightness tune that expects to reach WebGPU operators must add a node path
+    // here rather than assume this loop covered them.
     if (!(material instanceof THREE.MeshStandardMaterial)
       && !(material instanceof THREE.MeshLambertMaterial)
       && !(material instanceof THREE.MeshPhongMaterial)) continue;
@@ -56,15 +104,33 @@ type FirstPersonArmsRuntime = {
   mixer: THREE.AnimationMixer;
   actions: Map<string, THREE.AnimationAction>;
   activeAction: string | null;
+  /**
+   * HF-365 ("badly animated"): the authored delivery ships 13 runtime clips but
+   * only fire/reload/melee were ever played, and each stopped every other
+   * action, so a standing or walking player's arms were frozen. The base action
+   * is the looping locomotion clip underneath those one-shots.
+   */
+  baseAction: string | null;
 };
 
-const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR](?:\.|$)/;
+/**
+ * ROTATION only, and deliberately so. The authored clips carry translation and
+ * scale channels for every digit alongside the rotation, and the old
+ * `(?:\.|$)` suffix admitted all three. A digit is a hinge: animating its
+ * translation and scale stretched the finger bones into needles that shot out
+ * past the weapon. It stayed hidden while the only clips ever played were brief
+ * one-shots and the per-frame finger reset restored quaternions (and nothing
+ * else), which is exactly the drift this pattern leaves behind. Admitting the
+ * hinge channel only is strictly narrower than before.
+ */
+const FIRST_PERSON_RUNTIME_FINGER_TRACK = /(?:Index|Middle|Ring|Pinky|Thumb)[123][LR]\.quaternion$/;
 
 /**
  * The authored Blender clips retain complete arm-chain motion for offline
- * contact review. In the live viewmodel only digit tracks are admitted: the
- * shoulder, elbow and wrist are solved after animation by weapon socket IK (or
- * the dedicated melee solve), so a clip can never pull a hand off its socket.
+ * contact review. In the live viewmodel only digit rotation tracks are
+ * admitted: the shoulder, elbow and wrist are solved after animation by weapon
+ * socket IK (or the dedicated melee solve), so a clip can never pull a hand off
+ * its socket, and no digit can be translated or scaled off its knuckle.
  */
 export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.AnimationClip {
   return new THREE.AnimationClip(
@@ -75,6 +141,216 @@ export function firstPersonArmRuntimeClip(clip: THREE.AnimationClip): THREE.Anim
   );
 }
 
+/**
+ * HF-388 architectural fix — the authored pose layer.
+ *
+ * MEASURED 2026-08-25 by decoding `pass65-first-person-arms-lod0.glb` directly
+ * (normalized-int16 quaternion accessors): every one of the 13 clips carries
+ * exactly two identical keyframes per track — a static held pose, no motion
+ * (max inter-key span ≈ 0° except a small left-thumb wiggle). The authoring
+ * script (`build-pass65-djmaesen-first-person-arms.py`, `action_corpus`)
+ * confirms the intent: one pose dictionary inserted at every keyframe.
+ *
+ * Consequence: admitting the arm-chain tracks into the live mixer (or
+ * reordering restoreRiggedArmBindPose) would surface exactly nothing. Instead,
+ * each clip's arm-chain quaternion deltas vs bind are decomposed ONCE at load
+ * into the three parameters the authoritative socket IK can actually accept
+ * without breaking palm contact: an elbow-pole rotation about the
+ * shoulder→wrist axis, a wrist roll about the forearm axis, and a bounded
+ * shoulder-carriage offset. The viewmodel layer sums these with its procedural
+ * motion and clamps to the same caps, so the authored poses finally reach the
+ * screen as visible arm carriage while every contact gate stays intact.
+ */
+export type FirstPersonArmAuthoredChannel = Readonly<{
+  poleRadians: number;
+  wristRollRadians: number;
+  /** Authored wrist displacement vs bind, arms-visual local metres. */
+  carriageOffset: readonly [number, number, number];
+}>;
+export type FirstPersonArmAuthoredClipPose = Readonly<{
+  left: FirstPersonArmAuthoredChannel;
+  right: FirstPersonArmAuthoredChannel;
+}>;
+export type FirstPersonArmAuthoredPoseLayer = ReadonlyMap<string, FirstPersonArmAuthoredClipPose>;
+
+/** Identical numeric bound to weapon-presentation's procedural pole cap. */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS = 0.24;
+/** Identical numeric bound to weapon-presentation's procedural wrist-roll cap. */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS = 0.03;
+/**
+ * Carriage is a translation of the whole shoulder entry, so it competes with
+ * reach and near-plane framing; it is bounded far below the pole cap.
+ */
+export const FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS = 0.05;
+
+const FIRST_PERSON_ARM_AUTHORED_ZERO_CHANNEL: FirstPersonArmAuthoredChannel = Object.freeze({
+  poleRadians: 0,
+  wristRollRadians: 0,
+  carriageOffset: Object.freeze([0, 0, 0] as const),
+});
+
+export type FirstPersonArmChainJoints = Readonly<{
+  side: 'left' | 'right';
+  shoulder: THREE.Bone;
+  elbow: THREE.Bone;
+  wrist: THREE.Bone;
+}>;
+
+/**
+ * Evaluates a clip's rotation track at its last key into `target`. Missing or
+ * non-rotation tracks leave `target` untouched and return false, which the
+ * builder treats as "this clip holds bind on that joint".
+ */
+function clipQuatAt(
+  clip: THREE.AnimationClip,
+  trackName: string,
+  target: THREE.Quaternion,
+): boolean {
+  const track = clip.tracks.find((candidate) => candidate.name === trackName);
+  if (!(track instanceof THREE.QuaternionKeyframeTrack) || track.times.length === 0) return false;
+  // The sample is taken AT the last keyframe, where interpolation is the identity - so
+  // read the final quaternion straight out of the buffer. createInterpolant() is not on
+  // the QuaternionKeyframeTrack type in r185 and is not needed for an on-key sample.
+  const base = (track.times.length - 1) * 4;
+  if (track.values.length < base + 4) return false;
+  target.set(track.values[base], track.values[base + 1],
+             track.values[base + 2], track.values[base + 3]).normalize();
+  return true;
+}
+
+/**
+ * Decomposes one clip's arm-chain hold pose into IK-layer channels for both
+ * sides. Pure FK math on local transforms — no bone in the scene is read or
+ * written beyond the bind reference supplied by `joints`, whose bones must be
+ * resting at their loaded bind pose when this runs (true inside
+ * createFirstPersonRiggedArms before any mixer action has played).
+ */
+export function buildFirstPersonArmAuthoredPoseLayer(
+  clips: readonly THREE.AnimationClip[],
+  joints: readonly FirstPersonArmChainJoints[],
+): FirstPersonArmAuthoredPoseLayer {
+  const references = joints.map((joint) => ({
+    side: joint.side,
+    suffix: joint.side === 'left' ? 'L' : 'R',
+    shoulderToElbow: joint.elbow.position.clone(),
+    elbowToWrist: joint.wrist.position.clone(),
+    bindShoulder: joint.shoulder.quaternion.clone(),
+    bindElbow: joint.elbow.quaternion.clone(),
+    bindWrist: joint.wrist.quaternion.clone(),
+  }));
+  const clipQuat = new THREE.Quaternion();
+  const swing = new THREE.Quaternion();
+  const elbowWorld = new THREE.Vector3();
+  const wristWorld = new THREE.Vector3();
+  const bindElbowWorld = new THREE.Vector3();
+  const bindWristWorld = new THREE.Vector3();
+  const axis = new THREE.Vector3();
+  const bindElbowDir = new THREE.Vector3();
+  const clipElbowDir = new THREE.Vector3();
+  const cross = new THREE.Vector3();
+  const forearmAxis = new THREE.Vector3();
+  const carriage = new THREE.Vector3();
+  const layer = new Map<string, FirstPersonArmAuthoredClipPose>();
+  for (const clip of clips) {
+    const sides = {} as Record<'left' | 'right', FirstPersonArmAuthoredChannel>;
+    for (const reference of references) {
+      // Forward-kinematics the chain with the clip's local rotations. Bind
+      // positions are shared; only rotations differ between the two poses.
+      const posedShoulder = clipQuatAt(clip, `UpperArm${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindShoulder.clone();
+      const posedElbow = clipQuatAt(clip, `LowerArm${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindElbow.clone();
+      const posedWrist = clipQuatAt(clip, `Wrist${reference.suffix}.quaternion`, clipQuat)
+        ? clipQuat.clone() : reference.bindWrist.clone();
+      elbowWorld.copy(reference.shoulderToElbow).applyQuaternion(posedShoulder);
+      wristWorld.copy(reference.elbowToWrist).applyQuaternion(swing.copy(posedShoulder).multiply(posedElbow)).add(elbowWorld);
+      bindElbowWorld.copy(reference.shoulderToElbow).applyQuaternion(reference.bindShoulder);
+      bindWristWorld.copy(reference.elbowToWrist)
+        .applyQuaternion(swing.copy(reference.bindShoulder).multiply(reference.bindElbow))
+        .add(bindElbowWorld);
+      axis.copy(wristWorld).normalize();
+      bindElbowDir.copy(bindElbowWorld).addScaledVector(axis, -bindElbowWorld.dot(axis));
+      clipElbowDir.copy(elbowWorld).addScaledVector(axis, -elbowWorld.dot(axis));
+      let poleRadians = 0;
+      if (bindElbowDir.lengthSq() > 1e-10 && clipElbowDir.lengthSq() > 1e-10) {
+        cross.crossVectors(bindElbowDir.normalize(), clipElbowDir.normalize());
+        poleRadians = Math.atan2(cross.dot(axis), bindElbowDir.dot(clipElbowDir));
+      }
+      forearmAxis.copy(wristWorld).sub(elbowWorld);
+      let wristRollRadians = 0;
+      if (forearmAxis.lengthSq() > 1e-10) {
+        // Twist component of (posedWrist ∘ bindWrist⁻¹) about the UNIT forearm
+        // axis; atan2's first argument is only a signed sine on a unit axis.
+        forearmAxis.normalize();
+        swing.copy(posedWrist).multiply(reference.bindWrist.clone().invert());
+        wristRollRadians = 2 * Math.atan2(
+          swing.x * forearmAxis.x + swing.y * forearmAxis.y + swing.z * forearmAxis.z,
+          swing.w,
+        );
+      }
+      carriage.copy(wristWorld).sub(bindWristWorld);
+      sides[reference.side] = Object.freeze({
+        poleRadians,
+        wristRollRadians,
+        carriageOffset: Object.freeze([carriage.x, carriage.y, carriage.z] as const),
+      });
+    }
+    layer.set(clip.name, Object.freeze({ left: sides.left, right: sides.right }));
+  }
+  return layer;
+}
+
+function clampFirstPersonArmAuthoredChannel(
+  channel: FirstPersonArmAuthoredChannel | undefined,
+): FirstPersonArmAuthoredChannel {
+  if (!channel) return FIRST_PERSON_ARM_AUTHORED_ZERO_CHANNEL;
+  const [x, y, z] = channel.carriageOffset;
+  const magnitude = Math.hypot(x, y, z);
+  const scale = magnitude > FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS
+    ? FIRST_PERSON_ARM_AUTHORED_MAX_CARRIAGE_METERS / magnitude
+    : 1;
+  return Object.freeze({
+    poleRadians: THREE.MathUtils.clamp(
+      channel.poleRadians,
+      -FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS,
+      FIRST_PERSON_ARM_AUTHORED_MAX_POLE_RADIANS,
+    ),
+    wristRollRadians: THREE.MathUtils.clamp(
+      channel.wristRollRadians,
+      -FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
+      FIRST_PERSON_ARM_AUTHORED_MAX_WRIST_ROLL_RADIANS,
+    ),
+    carriageOffset: Object.freeze([x * scale, y * scale, z * scale] as const),
+  });
+}
+
+/**
+ * Combines the looping base pose with the active one-shot pose. The runtime
+ * mixer already collapses weight (updateFirstPersonArmAnimations holds the
+ * base at zero while a one-shot runs), so the one-shot simply overrides here;
+ * the consumer's exponential smoothing provides the crossfade in time.
+ */
+export function firstPersonArmAuthoredLayerSample(
+  layer: FirstPersonArmAuthoredPoseLayer | null | undefined,
+  baseAction: string | null,
+  oneShotAction: string | null,
+): { left: FirstPersonArmAuthoredChannel; right: FirstPersonArmAuthoredChannel } {
+  // Ternaries, not `&&`: `'' && x` evaluates to '' rather than undefined, and ?? only
+  // falls through on null/undefined - so an empty action name (an idle slot) survived into
+  // `selected` as a string and the .left/.right reads below failed to typecheck.
+  const selected = (oneShotAction ? layer?.get(oneShotAction) : undefined)
+    ?? (baseAction ? layer?.get(baseAction) : undefined)
+    ?? null;
+  return {
+    left: clampFirstPersonArmAuthoredChannel(selected?.left),
+    right: clampFirstPersonArmAuthoredChannel(selected?.right),
+  };
+}
+
+export function getFirstPersonArmAuthoredLayer(root: THREE.Object3D): FirstPersonArmAuthoredPoseLayer | null {
+  return (root.userData.firstPersonArmAuthoredLayer as FirstPersonArmAuthoredPoseLayer | undefined) ?? null;
+}
+
 type RiggedOperatorRuntime = {
   mixer: THREE.AnimationMixer;
   clips: Map<string, THREE.AnimationClip>;
@@ -82,18 +358,66 @@ type RiggedOperatorRuntime = {
   currentBase: string;
   lastUpdatedAt: number;
   stancePivot: THREE.Group;
+  /**
+   * Room the prone presentation actually has, supplied by the runtime each
+   * frame. Null when the caller has not measured it, in which case the pose is
+   * used exactly as authored.
+   */
+  proneClearance: ProneBodyClearance | null;
   visual: THREE.Group;
   weaponSocket: THREE.Group;
   canonicalEvidence: RiggedOperatorCanonicalEvidence;
   stance: 'stand' | 'crouch' | 'prone';
+  /**
+   * HF-412: the stance the body is transitioning OUT of, and how far along that
+   * transition it is (0..1). Together they turn what used to be a frame-rate
+   * coupled exponential settle into the same FIXED window the local player's
+   * camera drop uses, so a guest watching a host drop-shot sees the body fall
+   * over the reference's duration rather than ease in asymptotically.
+   */
+  stanceBlendFrom: 'stand' | 'crouch' | 'prone';
+  stanceBlendProgress: number;
   crouchBlend: number;
   proneBlend: number;
   speed: number;
+  /** Pass 77: the composed animation director this operator is driven by. */
+  director: OperatorAnimationDirector;
+  /**
+   * PASS 94: the posture layer. It turns the gameplay stance and ground speed
+   * into the cadence correction, capped clip-selection speed and sprint
+   * envelope the director solves against, so a crouch-walk stops skating on a
+   * standing stride and a sprint reads as one. Presentation only.
+   */
+  posture: OperatorPostureLayerState;
+  /** PASS 94: last posture solve, read by the stance pose for the sprint lean. */
+  lastPosture: OperatorPostureOutput | null;
+  /** Terminal: once dead, the corpse clip owns the mixer until a reset. */
+  dead: boolean;
+  /** Clips the mixer had non-zero weight on last frame, so they can be released. */
+  activeAnimationClips: readonly string[];
+  /** Presentation yaw, rate limited toward the authoritative root yaw. */
+  visualYawRadians: number;
+  /** Previous root ground position, for measuring the real movement direction. */
+  lastGroundX: number;
+  lastGroundZ: number;
+  lastAnimation: OperatorAnimationOutput | null;
+  /**
+   * HF-382: the selected IDLE STANCE's authored clip plus its cross-fade state.
+   * `clipName` is what the operator fades TOWARD; `fadeFrom` is the outgoing
+   * idle still carrying weight. Both stay null until a stance is published.
+   */
+  stanceIdleFade: {
+    clipName: string | null;
+    fadeFrom: string | null;
+    fadeSeconds: number;
+  };
+  lazilyBoundDirectionalClips: number;
   poseBones: {
     hips?: THREE.Bone;
     abdomen?: THREE.Bone;
     torso?: THREE.Bone;
     chest?: THREE.Bone;
+    neck?: THREE.Bone;
     head?: THREE.Bone;
     upperLegLeft?: THREE.Bone;
     upperLegRight?: THREE.Bone;
@@ -132,6 +456,15 @@ type RiggedOperatorRuntime = {
     position: THREE.Vector3;
     quaternion: THREE.Quaternion;
   }>;
+  /**
+   * HF-509. The six leg bones' AUTHORED local rotations, captured once before
+   * the mixer has ever run. `legSettleWeight` slerps toward these while the body
+   * is prone or moving between crouch and prone. Optional because several call
+   * sites (the Gun Range training dummy among them) hand-build a runtime object,
+   * and a runtime authored before this field existed must degrade to "no settle"
+   * rather than to a crash.
+   */
+  legBindPose?: Array<{ bone: THREE.Bone; quaternion: THREE.Quaternion }>;
 };
 
 export type RiggedOperatorCanonicalBoneIdentity = Readonly<{
@@ -263,9 +596,34 @@ export const RIGGED_OPERATOR_RUNTIME_ACTION_NAMES = Object.freeze([
   'Death',
   'Punch_Right',
   'Kick_Right',
+  // Pass 75: the only clip the selectable-emote catalog adds to the bound set.
+  // One extra clip against a deliberate binding budget, so the emote menu can
+  // never request something the mixer does not carry.
+  'Wave',
 ] as const);
 
 export const RIGGED_OPERATOR_CORPSE_ACTION_NAMES = Object.freeze(['Death'] as const);
+
+/**
+ * Pass 77 / HF-375. The three authored directional runs, which the corpus has
+ * carried since Pass 65 and the runtime has never used. Without them a bot
+ * retreating at 4.65 m/s or strafing at 4.05 m/s plays a FORWARD run - it
+ * moonwalks - because clip choice was made from a scalar speed.
+ *
+ * They are deliberately NOT in `RIGGED_OPERATOR_RUNTIME_ACTION_NAMES`. That list
+ * is the SPAWN-TIME prewarm budget, capped at 14 by
+ * `operator-appearance-catalog.test.ts` for a measured main-thread cost, and
+ * raising that cap without re-measuring would be weakening a gate to get green.
+ * These are made available to the mixer and bound lazily by `actionFor` on the
+ * first frame an operator actually moves sideways or backwards - one clip, once
+ * per operator lifetime, at the moment it is needed. Spawn cost is unchanged;
+ * `lazilyBoundDirectionalClips` reports what the lazy path actually cost.
+ */
+export const RIGGED_OPERATOR_DIRECTIONAL_ACTION_NAMES = Object.freeze([
+  'Run_Back',
+  'Run_Left',
+  'Run_Right',
+] as const);
 
 export function riggedOperatorRuntimeClips(clips: readonly THREE.AnimationClip[]): THREE.AnimationClip[] {
   const clipsByName = new Map(clips.map((clip) => [clip.name, clip]));
@@ -275,17 +633,94 @@ export function riggedOperatorRuntimeClips(clips: readonly THREE.AnimationClip[]
   });
 }
 
+/**
+ * Every clip the live mixer may reach: the prewarmed controller set plus the
+ * lazily bound directional runs. Availability is not binding - a clip only costs
+ * anything once `actionFor` is asked for it.
+ */
+export function riggedOperatorAvailableClips(clips: readonly THREE.AnimationClip[]): THREE.AnimationClip[] {
+  const clipsByName = new Map(clips.map((clip) => [clip.name, clip]));
+  const bound = riggedOperatorRuntimeClips(clips);
+  return [
+    ...bound,
+    ...RIGGED_OPERATOR_DIRECTIONAL_ACTION_NAMES.flatMap((name) => {
+      const clip = clipsByName.get(name);
+      return clip ? [clip] : [];
+    }),
+  ];
+}
+
 export type RiggedOperatorInstance = {
   root: THREE.Group;
   weaponSocket: THREE.Group;
 };
 
-export type OperatorAppearance = 'team' | 'neon-purple';
+/**
+ * `showcase` is the menu's appearance: the skin's own colours with no team
+ * wash, for the OPERATOR panel's live turntable. Gameplay never uses it.
+ */
+export type OperatorAppearance = 'team' | 'neon-purple' | 'showcase';
 
 const operatorAssets: Partial<Record<'quality' | 'performance', RiggedOperatorAsset>> = {};
 let firstPersonArmsAsset: FirstPersonArmsAsset | null = null;
 let operatorAssetPromise: Promise<void> | null = null;
 let firstPersonArmsAssetPromise: Promise<void> | null = null;
+
+/**
+ * HF-360: per-skin third-person operator deliveries. Every archetype GLB was
+ * authored on the SAME canonical rig (62 joints, 24 clips —
+ * pass65-third-person-operator-family-v1, verified from the binaries), so a
+ * skin swap is a model swap with identical animation, sockets and hit proxies.
+ * Assets load lazily per selected skin; nobody pays for skins nobody picked.
+ * The 'default' id maps to the retained pass65 operator via operatorAssets.
+ */
+export const OPERATOR_SKIN_MODEL_URLS: Readonly<Record<string, Readonly<{ quality: string; performance: string }>>> = Object.freeze({
+  explorer: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb',
+  }),
+  symbiote: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb',
+  }),
+  navalops: Object.freeze({
+    quality: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb',
+    performance: './assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb',
+  }),
+});
+
+const operatorSkinAssets = new Map<string, Partial<Record<'quality' | 'performance', RiggedOperatorAsset>>>();
+const operatorSkinAssetPromises = new Map<string, Promise<void>>();
+
+/** Lazily loads both LODs for a non-default skin. Unknown ids resolve without
+ * loading anything, so a stale peer selection can never wedge deployment. */
+export function loadOperatorSkinAsset(skinId: string): Promise<void> {
+  if (skinId === 'default') return loadRiggedOperatorAsset();
+  const urls = OPERATOR_SKIN_MODEL_URLS[skinId];
+  if (!urls) return Promise.resolve();
+  const existing = operatorSkinAssetPromises.get(skinId);
+  if (existing) return existing;
+  const promise = Promise.all([
+    loadRiggedGltf(urls.quality).then((operator) => {
+      const store = operatorSkinAssets.get(skinId) ?? {};
+      store.quality = describeOperatorAsset(operator, 0, urls.quality);
+      operatorSkinAssets.set(skinId, store);
+    }),
+    loadRiggedGltf(urls.performance).then((operator) => {
+      const store = operatorSkinAssets.get(skinId) ?? {};
+      store.performance = describeOperatorAsset(operator, 1, urls.performance);
+      operatorSkinAssets.set(skinId, store);
+    }),
+  ]).then(() => undefined);
+  operatorSkinAssetPromises.set(skinId, promise);
+  return promise;
+}
+
+export function operatorSkinAssetReady(skinId: string): boolean {
+  if (skinId === 'default') return operatorAssets.quality !== undefined && operatorAssets.performance !== undefined;
+  const store = operatorSkinAssets.get(skinId);
+  return store?.quality !== undefined && store?.performance !== undefined;
+}
 
 const STANCE_PIVOT_HEIGHT = 0.84;
 const EMBEDDED_WEAPON_NAME = /(^|[\s_.-])(pistol|rifle|shotgun|smg|gun|weapon)([\s_.-]|$)/i;
@@ -359,35 +794,129 @@ function plantCrouchLeg(
   const upperLength = hip.distanceTo(knee);
   const lowerLength = knee.distanceTo(ankle);
   const footWorldRotation = foot.getWorldQuaternion(new THREE.Quaternion());
-  const kneeTarget = solveTwoBoneElbow(hip, footTarget, upperLength, lowerLength, bendHint);
+  // HF-509 mechanism 2: the knee had no limit. `solveTwoBoneElbow` clamps a
+  // target onto the reachable sphere at |upper - lower|, which for two equal
+  // segments is ZERO - a leg folded flat against itself. Pull the target out to
+  // the closest distance a 140-degree knee can reach before solving, so the
+  // orientation this writes can never describe a collapsed or inverted joint.
+  const toTarget = footTarget.clone().sub(hip);
+  const rawDistance = toTarget.length();
+  const constrainedTarget = rawDistance > 1e-6
+    ? hip.clone().addScaledVector(
+      toTarget.multiplyScalar(1 / rawDistance),
+      clampFootDistanceM(rawDistance, upperLength, lowerLength),
+    )
+    : footTarget.clone();
+  const kneeTarget = solveTwoBoneElbow(hip, constrainedTarget, upperLength, lowerLength, bendHint);
   orientBoneTowardWorld(upper, lower, kneeTarget);
-  orientBoneTowardWorld(lower, foot, footTarget);
+  orientBoneTowardWorld(lower, foot, constrainedTarget);
   const parentWorld = foot.parent?.getWorldQuaternion(new THREE.Quaternion()) ?? new THREE.Quaternion();
   foot.quaternion.copy(parentWorld.invert().multiply(footWorldRotation));
   foot.updateWorldMatrix(false, true);
 }
 
+/**
+ * HF-412. Smoothstep, and the incremental step that FOLLOWS a smoothstep from
+ * wherever the pose currently sits.
+ *
+ * `applyStancePose` lerps a dozen values toward their targets each frame and
+ * keeps no copy of where each one started, so a normalized `lerp(start, end, s)`
+ * would need a snapshot of all of them. Advancing by the fraction of the
+ * REMAINING distance that this frame's smoothstep step covers reproduces the
+ * same curve exactly, needs no snapshot, and lands on the target at progress 1
+ * instead of approaching it forever.
+ */
+function stanceSmoothstep(t: number): number {
+  const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void {
   const target = riggedStanceTarget(runtimeState.stance);
-  const alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
+  // HF-412: one fixed window, shared with the player's own drop-shot
+  // transition, for the PRONE pairs only.
+  //
+  // `riggedOperatorRuntime` is stamped onto userData by several call sites
+  // (including the Gun Range training dummy, which hand-builds one), so a
+  // runtime object authored before these two fields existed must read as
+  // SETTLED rather than as NaN. Without this the whole pose chain silently
+  // becomes non-finite - which is exactly what it did the first time.
+  const blendFrom = runtimeState.stanceBlendFrom ?? runtimeState.stance;
+  // A plain stand<->crouch step keeps the shipped `1 - exp(-dt * 12)` settle
+  // exactly as it was. HF-412 is a prone-transition row, and this file is Lane
+  // Z's (rig and clips) - changing how every operator in the game crouches, in
+  // both directions, on every arena, is not in scope for a drop shot and was
+  // never measured. Only the pairs the drop shot actually uses move onto the
+  // fixed window.
+  const proneInvolved = blendFrom === 'prone' || runtimeState.stance === 'prone';
+  let alpha: number;
+  if (!proneInvolved) {
+    runtimeState.stanceBlendProgress = 1;
+    alpha = 1 - Math.exp(-Math.max(0, dt) * 12);
+  } else {
+    const durationSeconds = Math.max(
+      0.001,
+      stanceTransitionDurationMs(blendFrom, runtimeState.stance) / 1_000,
+    );
+    const previousProgress = Number.isFinite(runtimeState.stanceBlendProgress)
+      ? runtimeState.stanceBlendProgress
+      : 1;
+    runtimeState.stanceBlendProgress = Math.min(1, previousProgress + Math.max(0, dt) / durationSeconds);
+    const easedBefore = stanceSmoothstep(previousProgress);
+    const easedNow = stanceSmoothstep(runtimeState.stanceBlendProgress);
+    alpha = runtimeState.stanceBlendProgress >= 1
+      ? 1
+      : Math.min(1, Math.max(0, (easedNow - easedBefore) / Math.max(1e-6, 1 - easedBefore)));
+  }
   runtimeState.crouchBlend = THREE.MathUtils.lerp(runtimeState.crouchBlend, target.crouch, alpha);
   runtimeState.proneBlend = THREE.MathUtils.lerp(runtimeState.proneBlend, target.prone, alpha);
+  // HF-345. The prone pose lays the whole rig down about the pelvis pivot, so
+  // the visible body reaches ~0.82 m forward and ~0.88 m back while the
+  // authority capsule stays tiny. Against a wall that surplus went straight
+  // through the geometry. proneBodyClearance has measured the available room
+  // since HF-345 landed, but nothing consumed it; this is that consumer.
+  //
+  // Presentation only - the capsule, the hit proxies and every authority
+  // decision are untouched, exactly as the clearance module intended.
+  const proneAdjustment = runtimeState.stance === 'prone' && runtimeState.proneClearance
+    ? proneStanceAdjustment(runtimeState.proneClearance)
+    : null;
+
   runtimeState.stancePivot.position.y = THREE.MathUtils.lerp(
     runtimeState.stancePivot.position.y,
     target.pivotHeight,
     alpha,
   );
+  // Sliding along local Z seats the body in the room it has without changing
+  // the pose; propping only happens when sliding cannot recover the deficit.
+  runtimeState.stancePivot.position.z = THREE.MathUtils.lerp(
+    runtimeState.stancePivot.position.z,
+    proneAdjustment ? proneAdjustment.slideM : 0,
+    alpha,
+  );
+  // PASS 94: the sprint lean. The posture layer only produces a non-zero lean
+  // while STANDING, where `pivotPitch` is 0, so this cannot fight the prone
+  // pivot. Negative pitches the body forward, the same sign convention the
+  // prone pose uses.
+  const sprintLean = -(runtimeState.lastPosture?.leanRadians ?? 0);
   runtimeState.stancePivot.rotation.x = THREE.MathUtils.lerp(
     runtimeState.stancePivot.rotation.x,
-    target.pivotPitch,
+    (proneAdjustment ? target.pivotPitch * proneAdjustment.pitchScale : target.pivotPitch) + sprintLean,
     alpha,
   );
 
   // The visible loadout lives in body space rather than under an animated
   // wrist. That keeps its muzzle authoritative while both arms are solved onto
   // the weapon after the animation mixer has written the current pose.
+  // MUSE F3 (PASS 94 animation+skins review): one body, one sprint. The posture
+  // layer's latched sprint (5.2/4.4 m/s with a ramp) drives lean and aim, so the
+  // weapon socket reads from it too; without that the socket finished dropping at
+  // ~6.8 m/s while the lean had barely started and sprint read as two systems.
+  // The stateless smoothstep stays as the fallback for callers that pose an
+  // operator without running the posture layer.
   const sprint = runtimeState.stance === 'stand'
-    ? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8)
+    ? (runtimeState.lastPosture?.sprint
+      ?? THREE.MathUtils.smoothstep(runtimeState.speed, 3.2, 6.8))
     : 0;
   const weaponId = String(runtimeState.weaponSocket.children[0]?.userData.weaponId ?? 'carbine');
   const proneMount = PRONE_WEAPON_MOUNT[weaponId] ?? PRONE_WEAPON_MOUNT.carbine;
@@ -406,18 +935,36 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   const crouch = runtimeState.crouchBlend;
   const prone = runtimeState.proneBlend;
   const bones = runtimeState.poseBones;
-  const leftFootTarget = crouch > 0.001 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
-  const rightFootTarget = crouch > 0.001 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  // HF-509 mechanism 3. The plant is withdrawn for every frame carrying ANY
+  // prone weight, because its targets are WORLD positions snapshotted before the
+  // pelvis pivot rotates up to 1.42 rad: through a crouch<->prone transition it
+  // was dragging both ankles onto positions the body had already left.
+  // `legSettleWeight` below covers exactly the region this withdraws from.
+  const plantAuthority = crouchPlantAuthority(crouch, prone);
+  const leftFootTarget = plantAuthority > 0 ? bones.footLeft?.getWorldPosition(new THREE.Vector3()) ?? null : null;
+  const rightFootTarget = plantAuthority > 0 ? bones.footRight?.getWorldPosition(new THREE.Vector3()) ?? null : null;
   if (bones.hips) bones.hips.position.y -= 0.44 * crouch;
   addLocalPose(bones.hips, 0.05, 0, 0, crouch);
   addLocalPose(bones.abdomen, 0.08, 0, 0, crouch);
   addLocalPose(bones.torso, 0.12, 0, 0, crouch);
   addLocalPose(bones.chest, -0.05, 0, 0, crouch);
-  if (crouch > 0.001) {
+  if (plantAuthority > 0 && leftFootTarget && rightFootTarget) {
     runtimeState.visual.updateWorldMatrix(true, true);
     const bodyRotation = runtimeState.stancePivot.getWorldQuaternion(new THREE.Quaternion());
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bodyRotation);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(bodyRotation);
+    // HF-509 mechanism 1. `Run_Left` and `Run_Right` hand over mid-cycle ankles
+    // that have CROSSED the body midline; planting a crossed pair on a leg
+    // shortened by 0.44 m swaps the two shins. Correct the pair on the body's
+    // own lateral axis, about the body's own origin, BEFORE solving. The mean is
+    // preserved, so a stride genuinely shifted to one side stays shifted and
+    // only the crossing is removed.
+    const bodyOrigin = runtimeState.stancePivot.getWorldPosition(new THREE.Vector3());
+    const leftLateral = leftFootTarget.clone().sub(bodyOrigin).dot(right);
+    const rightLateral = rightFootTarget.clone().sub(bodyOrigin).dot(right);
+    const separated = separateLegLateralTargets(leftLateral, rightLateral);
+    leftFootTarget.addScaledVector(right, separated.left - leftLateral);
+    rightFootTarget.addScaledVector(right, separated.right - rightLateral);
     plantCrouchLeg(
       bones.upperLegLeft, bones.lowerLegLeft, bones.footLeft, leftFootTarget,
       forward.clone().addScaledVector(right, -0.18),
@@ -428,10 +975,64 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
     );
   }
 
-  // The whole-pelvis pivot supplies the prone silhouette. Keep the authored
-  // idle legs intact: layering walk-knee offsets here produced a raised foot
-  // and twisted hip that read as a broken ragdoll.
+  // HF-509 mechanism 4. The whole-pelvis pivot supplies the prone silhouette,
+  // but the legs kept playing a STANDING walk or run underneath it - at up to
+  // 3.3x cadence, because PASS 94's posture layer correctly speeds a crawl's
+  // cycle up. A scissoring standing stride rotated 81 degrees is a pair of legs
+  // swinging through each other, and it is also what the withdrawn plant above
+  // stops covering. Settling the leg chain toward its BIND pose fixes both: the
+  // bind legs are straight and parallel at the rig's own 0.36 m hip width, so
+  // the blend cannot cross, and the quarter of the clip left behind is the drag
+  // the crawl reads by. Layering walk-KNEE offsets here is what produced the
+  // raised foot and twisted hip previously reported; this is a settle toward a
+  // captured pose, not an offset on top of one.
+  const settle = legSettleWeight(crouch, prone);
+  if (settle > 0) {
+    for (const entry of runtimeState.legBindPose ?? []) entry.bone.quaternion.slerp(entry.quaternion, settle);
+  }
   addLocalPose(bones.chest, -0.025, 0, 0, prone);
+}
+
+/**
+ * HF-366: the operator body carries the SELECTED SKIN, not one fixed team paint.
+ *
+ * Measured at HEAD before this change, from the running build: all four skin
+ * GLBs load correctly and then arrive here sharing the canonical material names
+ * (`Swat`, `Swat_Black`, `Visor`, `Skin`), so the old exact-name branches below
+ * stamped identical colours on every one of them - `Swat` came out #2d7882 for
+ * default, explorer, symbiote AND navalops. Four different multi-megabyte
+ * deliveries, one colour. "They all looked greyed out" was the correct report.
+ *
+ * The team is still applied, as a bounded wash over the skin's own colour
+ * (`operatorBodyColour`), so aqua and coral stay separable at range. The
+ * `lift` term exists because two of the four skins ship a garment atlas whose
+ * mean is ~40/255: no multiply tint, not even white, can make those read as a
+ * colour, so a small flat palette-hued fill does the part multiply cannot.
+ *
+ * `showcase` is the menu's appearance: no team wash at all, because a player
+ * looking at their own operator in the OPERATOR panel is not on a team yet and
+ * should see the skin they are actually buying into.
+ */
+function skinPaintedBodyMaterial(
+  result: THREE.MeshStandardMaterial,
+  role: 'swat' | 'swatBlack' | 'grey',
+  team: Team,
+  appearance: OperatorAppearance,
+  skinId: string,
+  flattenMaterials: boolean,
+): void {
+  const body = operatorSkinPalette(skinId).body;
+  const colour = appearance === 'showcase'
+    ? body[role]
+    : operatorBodyColour(skinId, team === 0 ? 0 : 1, role);
+  result.color.setHex(colour);
+  // The fill is the same hue as the garment, so a dark authored atlas gains
+  // readable colour rather than gaining grey.
+  result.emissive.setHex(colour);
+  const lift = role === 'grey' ? body.lift * 0.6 : body.lift;
+  result.emissiveIntensity = flattenMaterials ? lift * 1.35 : lift;
+  if (role === 'swat') result.roughness = body.swatRoughness;
+  else if (role === 'swatBlack') result.roughness = body.swatBlackRoughness;
 }
 
 function materialForTeam(
@@ -439,8 +1040,23 @@ function materialForTeam(
   team: Team,
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
+  skinId = 'default',
 ): THREE.Material {
   if (!(material instanceof THREE.MeshStandardMaterial)) return material.clone();
+  // PASS 94. In-match team appearance takes the procedural TSL look instead of
+  // a multiply tint over a ~40/255 atlas plus an emissive fill. Gated on the
+  // node-capable backend and on the material being one of the three authored
+  // garment roles; anything else - Skin, Visor, the menu showcase, the
+  // neon-purple test dummies, and the whole WebGL2 compatibility route - falls
+  // through to the shipped path below unchanged.
+  if (appearance === 'team' && operatorLookMaterialsEnabled()) {
+    const look = resolveOperatorLook(skinId, team === 0 ? 0 : 1);
+    const procedural = operatorLookMaterialForAuthored(material.name, look.id, {
+      flattenMaterials,
+      authored: material,
+    });
+    if (procedural) return procedural;
+  }
   const result = material.clone();
   const name = material.name.toLowerCase();
   if (appearance === 'neon-purple' && name === 'swat') {
@@ -462,18 +1078,31 @@ function materialForTeam(
     result.roughness = 0.54;
     result.metalness = 0.04;
   } else if (name === 'swat') {
-    result.color.setHex(team === 0 ? 0x2d7882 : 0xb34d3f);
-    result.emissive.setHex(team === 0 ? 0x061a1d : 0x240906);
-    result.emissiveIntensity = flattenMaterials ? 0.34 : 0.14;
+    skinPaintedBodyMaterial(result, 'swat', team, appearance, skinId, flattenMaterials);
   } else if (name.includes('swat_black')) {
-    result.color.setHex(team === 0 ? 0x1d292d : 0x302326);
-    result.emissive.setHex(team === 0 ? 0x061113 : 0x130708);
-    result.emissiveIntensity = flattenMaterials ? 0.22 : 0.08;
+    skinPaintedBodyMaterial(result, 'swatBlack', team, appearance, skinId, flattenMaterials);
   } else if (name.includes('grey')) {
-    result.color.setHex(team === 0 ? 0x6d9b9e : 0xb98276);
+    skinPaintedBodyMaterial(result, 'grey', team, appearance, skinId, flattenMaterials);
+  } else if (name === 'visor') {
+    // The visor is the head's only bright element and the fastest way to tell
+    // two operators apart across an arena, so it takes the skin at full
+    // strength and never a team wash.
+    // HF-380: each skin's lens atlas is baked in its OWN tint (the symbiote's
+    // is teal), and colour MULTIPLIES the map - white over teal is still teal,
+    // so the palette's lens colour could never reach the mesh. Drop the map
+    // (retained for recovery, same contract as the arm crushed-albedo roles)
+    // so the lens IS the palette colour on every skin.
+    if (result.map) {
+      result.userData.authoredVisorBaseColorMap = result.map;
+      result.map = null;
+    }
+    result.color.setHex(operatorSkinPalette(skinId).body.visor);
   }
   if (flattenMaterials && appearance !== 'neon-purple') {
-    result.roughness = 1;
+    // Bots and distant operators drop to a flat response, but NOT to a flat
+    // roughness of 1 on the garment: that erased the one cue separating wet
+    // neoprene from canvas even when the colour survived.
+    if (name !== 'swat' && !name.includes('swat_black')) result.roughness = 1;
     result.metalness = 0;
   }
   return result;
@@ -490,12 +1119,13 @@ export function createOperatorInstanceMaterialResolver(
   team: Team,
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
+  skinId = 'default',
 ): (material: THREE.Material) => THREE.Material {
   const instanceMaterials = new Map<THREE.Material, THREE.Material>();
   return (material: THREE.Material): THREE.Material => {
     const existing = instanceMaterials.get(material);
     if (existing) return existing;
-    const result = materialForTeam(material, team, flattenMaterials, appearance);
+    const result = materialForTeam(material, team, flattenMaterials, appearance, skinId);
     result.transparent = false;
     result.opacity = 1;
     result.depthWrite = true;
@@ -525,7 +1155,282 @@ export function firstPersonArmMaterialReadabilityProfile(materialName: string): 
   return null;
 }
 
-function materialForFirstPerson(material: THREE.Material, flattenMaterials: boolean): THREE.Material {
+export type FirstPersonArmMaterialRole = 'sleeve' | 'glove' | 'finger-glove' | 'accent' | 'skin';
+
+/**
+ * Classifies one authored arm material into the role the skin palette paints.
+ * Exported because the skin -> arm resolution is the testable half of HF-366:
+ * a renamed or newly added arm material that falls through to null would be
+ * left untinted and would visibly disagree with the menu portrait.
+ */
+export function firstPersonArmMaterialRole(materialName: string): FirstPersonArmMaterialRole | null {
+  const normalized = materialName.toLowerCase();
+  if (normalized === 'skin') return 'skin';
+  if (normalized.includes('arms_fingerglove')) return 'finger-glove';
+  if (normalized.includes('arms_glove')) return 'glove';
+  if (normalized.includes('arms_sleeve')) return 'sleeve';
+  if (normalized.includes('arms_wristaccent') || normalized.includes('arms_armorpad')) return 'accent';
+  return null;
+}
+
+export const FIRST_PERSON_ARM_SKIN_CONTRACT = 'measured-albedo-aware-arm-skin-v2';
+
+/**
+ * HF-365 / HF-366: what the authored first-person arm atlas actually contains,
+ * measured on 2026-08-23 by sampling the shipped 1024x1024 base-colour PNG
+ * through each mesh's own UVs. Mean RGB, per material role:
+ *
+ *   sleeve       ( 30,  30,  32)   <- crushed; no usable albedo signal
+ *   glove        ( 14,  17,  20)   <- crushed; no usable albedo signal
+ *   finger-glove ( 98,  92,  96)   <- the bare-hand island, correctly exposed
+ *   accent       (105,  99, 102)   <- correctly exposed
+ *
+ * This is the fact the previous attempt at this row did not have, and the
+ * reason its fix could not reach the owner. A `color` multiply is bounded above
+ * by white, so tinting a 14/255 glove with the brightest possible tint still
+ * yields 14/255: the arms were mathematically incapable of showing ANY skin,
+ * and were guaranteed to render as one flat black wedge - which is exactly what
+ * "the arms are thin" describes, because a silhouette with no interior shading
+ * has no readable thickness.
+ *
+ * So the two crushed roles stop multiplying a black map and take the palette
+ * colour as their albedo directly. The normal map (1.0 MB) and roughness map
+ * (0.5 MB) are kept, and they are where the weave, wrinkles and seams actually
+ * live - so the arm gains form and colour and loses nothing that was visible.
+ * The two correctly-exposed roles keep their map and are tinted as before.
+ */
+export const FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES: readonly FirstPersonArmMaterialRole[] =
+  Object.freeze(['sleeve', 'glove']);
+
+/**
+ * The hand island is bare skin. Tinting it to the palette's glove colour at
+ * full strength turned the player's own hands grey-blue; a partial wash keeps
+ * flesh reading as flesh while still shifting with the skin.
+ */
+export const FIRST_PERSON_ARM_HAND_TINT_BLEND = 0.42;
+
+/**
+ * HF-388. The correction the crushed-albedo fix above needed and did not have.
+ *
+ * Dropping the 14/255 map was right - a multiply cannot lighten - but it left
+ * the palette colour standing as the arm's ENTIRE albedo, and the palette is
+ * authored for a body seen across an arena under arena lighting. The
+ * first-person arms are a different lighting problem: they sit inside
+ * `first-person-viewmodel-fill`, a point light which at the time of this pass
+ * ran at intensity 17.5 with decay 2, MEASURED live at 0.61 m from the arm -
+ * an order of magnitude more illuminance than the same surface receives in
+ * third person. Measured on the running build 2026-08-25, the shipped default
+ * sleeve arrives at sRGB #9fc6cc - luminance 0.75, brighter than printer paper
+ * - and the rendered arm is a value-flat white shape with 12% of its pixels
+ * within a hair of clipping.
+ *
+ * SUPERSEDED IN PART, same day: correcting the albedo was necessary and is
+ * kept, but it was not sufficient and the diagnosis above under-attributed the
+ * fill. Forcing the arm's albedo to BLACK still rendered mean 100.5 against a
+ * shipped 140.5, so most of the brightness was never albedo at all - it was
+ * the fill's white specular sheen. The fill now runs at 4.5; see
+ * FIRST_PERSON_VIEWMODEL_FILL_INTENSITY in weapon-presentation.ts.
+ * The owner's "still need some work" is the far side of the same coin the
+ * black wedge was on: one had no albedo, this has too much.
+ *
+ * So the palette keeps deciding WHICH COLOUR the arm is, and this decides how
+ * much light it may return. Two properties matter and both are asserted:
+ *
+ *   1. The target luminance sits far above `READABLE_ALBEDO_FLOOR` (0.16), so
+ *      this cannot walk back toward the silhouette failure it is fixing.
+ *   2. Chroma is preserved as an sRGB offset from each palette's own grey, not
+ *      scaled with it, and then GAINED - because removing value from a colour
+ *      removes the channel separation that made two skins tellable apart, and
+ *      the four-skin separability gate must not be paid for with this fix.
+ */
+export const FIRST_PERSON_ARM_ALBEDO_CONTRACT = 'first-person-exposure-corrected-arm-albedo-v1';
+/** sRGB luminance the arm's two largest regions are re-based onto. */
+export const FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE: Readonly<Record<'sleeve' | 'glove', number>> = Object.freeze({
+  // A deliberate value break between sleeve and glove: an arm with one flat
+  // value has no readable interior, which is the other half of what "thin"
+  // described. Gloves are darker than sleeves in every issued kit.
+  sleeve: 0.35,
+  glove: 0.28,
+});
+/**
+ * Chroma restoration applied while re-basing onto the luminance target.
+ * 1.4 left the tightest produced pair (default vs navalops sleeve) at
+ * 40/255 sRGB separation - below the four-skin separability contract's
+ * 0.16 floor (operator-model.test.ts). 1.45 puts that pair at 44/255
+ * (0.1725) with no channel clamped on any skin or role, so the exact
+ * luminance landing is preserved.
+ */
+export const FIRST_PERSON_ARM_CHROMA_GAIN = 1.45;
+
+/**
+ * HF-388 follow-up: why the arm had no weave, wrinkle or material character
+ * even after its albedo was corrected.
+ *
+ * The crushed-albedo fix above drops the base-colour map for sleeve and glove
+ * and keeps the normal (1.0 MB) and roughness (0.5 MB) maps, on the stated
+ * grounds that they are "where the weave, wrinkles and seams actually live".
+ * They are - but MEASURED live on the shipped GLB 2026-08-25, the authored
+ * materials arrive with `normalScale` 0.68-0.72, i.e. the asset itself
+ * attenuates that detail to about seven tenths before it is ever shaded. With
+ * the base-colour map deliberately removed, the normal map is now the ONLY
+ * spatial signal the sleeve has, and it was being delivered at a discount.
+ *
+ * That is the second half of "a bright, nearly featureless pale shape": the
+ * first half was the viewmodel fill's white specular veil
+ * (FIRST_PERSON_VIEWMODEL_FILL_INTENSITY), and with the veil reduced the
+ * detail underneath still has to be strong enough to read at arm's length.
+ *
+ * Verified by sweep on real WebGPU at Nuke Town sunset, over arm pixels only,
+ * measuring mean absolute one-pixel luminance step BETWEEN neighbouring arm
+ * pixels - a silhouette-free local-detail term, because a limb under a broad
+ * gradient keeps a healthy stdDev while being locally flat:
+ *     authored 0.72 -> 8.42     2.4 -> 9.24     3.2 -> 9.85     4.0 -> 9.69
+ * Frames were read, not just the numbers: at the authored value the sleeve is
+ * a smooth latex tube, at 2.4 it carries fabric folds and creases, and by 4.0
+ * it starts to look ropey and synthetic. 2.4 is the value that reads as cloth.
+ *
+ * The geometry supports this honestly - the arm meshes ship `tangent` and
+ * `uv1` attributes, so this is a real tangent-space normal map being turned up
+ * to full strength, not a flat surface being faked.
+ */
+export const FIRST_PERSON_ARM_NORMAL_SCALE = 2.4;
+
+function srgbChannels(hex: number): [number, number, number] {
+  return [((hex >> 16) & 0xff) / 255, ((hex >> 8) & 0xff) / 255, (hex & 0xff) / 255];
+}
+
+function srgbLuminance(channels: readonly [number, number, number]): number {
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+/**
+ * Re-bases one palette arm colour onto the first-person luminance target,
+ * preserving (and gaining) its chroma. Returns an sRGB hex, because that is
+ * the space the palette is authored in and the space the separability gate
+ * judges; `THREE.Color.setHex` converts to linear on the way in.
+ *
+ * The chroma offsets sum to zero luminance by construction, so the result
+ * lands on the target EXACTLY - as long as no channel is clamped. A clamp
+ * would silently push the surface back up in value, which is the failure being
+ * fixed, so the gain is capped per colour at whatever that colour can take
+ * instead. Only the explorer sleeve is anywhere near that cap; every other
+ * arm colour takes the full gain.
+ */
+export function firstPersonArmSkinAlbedo(paletteHex: number, role: 'sleeve' | 'glove'): number {
+  const channels = srgbChannels(paletteHex);
+  const grey = srgbLuminance(channels);
+  const target = FIRST_PERSON_ARM_TARGET_SRGB_LUMINANCE[role];
+  const offsets = channels.map((channel) => channel - grey);
+  const admissibleGain = offsets.reduce((limit, offset) => {
+    if (Math.abs(offset) < 1e-6) return limit;
+    const headroom = offset < 0 ? target : 1 - target;
+    return Math.min(limit, headroom / Math.abs(offset));
+  }, FIRST_PERSON_ARM_CHROMA_GAIN);
+  const gain = Math.max(1, Math.min(FIRST_PERSON_ARM_CHROMA_GAIN, admissibleGain));
+  return offsets.reduce(
+    (hex, offset) => (hex << 8) | Math.round(Math.max(0, Math.min(1, target + offset * gain)) * 255),
+    0,
+  );
+}
+
+const armHandTintScratch = new THREE.Color();
+
+/**
+ * HF-366: paints one already-cloned arm material with the selected skin.
+ *
+ * The tint MULTIPLIES the authored base-colour map, so the licensed albedo,
+ * normal and ORM detail survives and only the hue/response changes. This is
+ * the honest limit of what the shipped assets allow: the arms GLB has no
+ * per-skin variant and each skin's own atlas is UV-mapped for the full body,
+ * so sampling it through arm UVs would land on legs and webbing.
+ */
+export function applyFirstPersonArmSkinMaterial(
+  material: THREE.Material,
+  materialName: string,
+  skinId: string,
+): boolean {
+  if (!(material instanceof THREE.MeshStandardMaterial)) return false;
+  const role = firstPersonArmMaterialRole(materialName);
+  if (role === null || role === 'skin') return false;
+  const palette = operatorSkinPalette(skinId).arm;
+  // HF-388 follow-up: drive the authored normal map at full strength. This
+  // lives here rather than in the material clone path for two reasons: every
+  // arm role this function paints has the same attenuated authored scale, and
+  // a later skin change re-enters HERE - so a repaint cannot silently drop the
+  // surface detail and leave the arm smooth again for one player.
+  if (material.normalMap !== null) {
+    material.normalScale.set(FIRST_PERSON_ARM_NORMAL_SCALE, FIRST_PERSON_ARM_NORMAL_SCALE);
+  }
+  if (role === 'sleeve' || role === 'glove') {
+    material.color.setHex(firstPersonArmSkinAlbedo(role === 'sleeve' ? palette.sleeve : palette.glove, role));
+    material.roughness = role === 'sleeve' ? palette.sleeveRoughness : palette.gloveRoughness;
+    // HF-388. Measured live on the shipped GLB 2026-08-25: both of these
+    // materials arrive with `metalness` 0.82. Woven sleeve and rubber-palmed
+    // glove are dielectrics - a metal has no diffuse response at all and tints
+    // its specular with its base colour, which is exactly the wet-plastic read
+    // the owner is looking at. `finger-glove` is the ONLY arm role that
+    // already forced this to 0, and it is the only one that does not look like
+    // latex. The authored metalnessMap is deliberately left attached, so an
+    // asset that really does carry metal detail loses nothing it had: THREE
+    // multiplies the two, and this only removes the scalar that could not be
+    // right for cloth.
+    material.metalness = 0;
+    // The crushed base-colour map is dropped, not multiplied: see
+    // FIRST_PERSON_ARM_CRUSHED_ALBEDO_ROLES. Everything that carries the
+    // surface's form - normalMap, roughnessMap, metalnessMap, aoMap - stays.
+    if (material.map !== null) {
+      material.userData.authoredArmBaseColorMap = material.map;
+      material.map = null;
+      material.needsUpdate = true;
+    }
+  } else if (role === 'finger-glove') {
+    // Bare hands: wash toward the palette rather than replacing flesh with it.
+    armHandTintScratch.setHex(palette.fingerGlove);
+    material.color.setRGB(
+      1 + (armHandTintScratch.r - 1) * FIRST_PERSON_ARM_HAND_TINT_BLEND,
+      1 + (armHandTintScratch.g - 1) * FIRST_PERSON_ARM_HAND_TINT_BLEND,
+      1 + (armHandTintScratch.b - 1) * FIRST_PERSON_ARM_HAND_TINT_BLEND,
+    );
+    material.roughness = 0.86;
+    material.metalness = 0;
+  } else {
+    material.color.setHex(palette.accent);
+    material.metalness = palette.accentMetalness;
+    material.emissive.setHex(palette.accentEmissive);
+    material.emissiveIntensity = Math.min(0.16, FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+  }
+  return true;
+}
+
+/**
+ * Repaints a live first-person arms root for a new skin selection. Materials
+ * are per-instance clones (materialForFirstPerson clones every source), so this
+ * mutates only the caller's own arms and never the shared authored asset.
+ */
+export function applyFirstPersonArmSkin(root: THREE.Object3D, skinId: string): number {
+  let painted = 0;
+  const seen = new Set<THREE.Material>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    for (const material of materials) {
+      if (seen.has(material)) continue;
+      seen.add(material);
+      const sourceName = String(material.userData.authoredArmMaterialName ?? material.name);
+      if (applyFirstPersonArmSkinMaterial(material, sourceName, skinId)) painted += 1;
+    }
+  });
+  root.userData.firstPersonArmSkinId = skinId;
+  root.userData.firstPersonArmSkinContract = FIRST_PERSON_ARM_SKIN_CONTRACT;
+  root.userData.firstPersonArmSkinPaintedMaterials = painted;
+  return painted;
+}
+
+function materialForFirstPerson(
+  material: THREE.Material,
+  flattenMaterials: boolean,
+  skinId: string,
+): THREE.Material {
   const result = materialForTeam(material, 0, flattenMaterials);
   const profile = firstPersonArmMaterialReadabilityProfile(material.name);
   if (result instanceof THREE.MeshStandardMaterial && profile) {
@@ -541,6 +1446,10 @@ function materialForFirstPerson(material: THREE.Material, flattenMaterials: bool
     result.roughness = 0.92;
     result.metalness = 0;
   }
+  // Keep the authored name on the clone so a later skin change can re-classify
+  // it; materialForTeam clones may be renamed by downstream passes.
+  result.userData.authoredArmMaterialName = material.name;
+  applyFirstPersonArmSkinMaterial(result, material.name, skinId);
   return result;
 }
 
@@ -574,9 +1483,96 @@ function describeOperatorAsset(
   };
 }
 
+export const FIRST_PERSON_ARM_GIRTH_CONTRACT = 'authored-normal-shell-limb-girth-v1';
+
+/**
+ * HF-365 ("the arms are thin"): metres of radius added along the authored
+ * vertex normals, per material role, in the arms GLB's own local units.
+ *
+ * A normal-offset shell is the one girth operation that leaves EVERYTHING else
+ * the release gates depend on untouched: no bone is scaled (the reviewed
+ * "no skinned bone receives scale or length mutation" contract holds), no
+ * segment length changes, no socket, palm contact or knife mount moves, and
+ * the skin weights are the authored ones because only positions move. Fingers
+ * take a much smaller shell than the sleeve so digits thicken without fusing.
+ *
+ * HF-354 previously recorded arm thickness as correct. The owner played the
+ * Pass 76 candidate and said the opposite, so that status is superseded here.
+ */
+export const FIRST_PERSON_ARM_GIRTH_METRES: Readonly<Record<FirstPersonArmMaterialRole, number>> = Object.freeze({
+  // Raised for the HF-365 second pass. The shell was already applied at HEAD
+  // (verified on the live geometry: sleeve carried 0.0105 m), so thickness was
+  // not the whole of "the arms are thin" - a black silhouette reads thin at any
+  // girth. Colour is fixed above; this adds the mass that was genuinely
+  // missing, still without scaling one bone or moving one socket.
+  sleeve: 0.0172,
+  accent: 0.0148,
+  glove: 0.0112,
+  // Digits keep the small shell: a larger one fuses adjacent fingers into a
+  // mitten, and the grip read depends on separated fingers.
+  'finger-glove': 0.0031,
+  skin: 0.0031,
+});
+
+const ARM_GIRTH_APPLIED_KEY = 'firstPersonArmGirthMetres';
+
+/**
+ * Thickens the shared authored arm geometry exactly once. SkeletonUtils.clone
+ * SHARES geometry between every arms instance, so inflating per instance would
+ * compound the shell on every viewmodel build; the applied amount is stamped on
+ * the geometry and re-entry is a no-op.
+ */
+export function inflateFirstPersonArmGirth(root: THREE.Object3D): number {
+  let inflated = 0;
+  const done = new Set<THREE.BufferGeometry>();
+  root.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const geometry = node.geometry;
+    if (done.has(geometry)) return;
+    done.add(geometry);
+    if (typeof geometry.userData[ARM_GIRTH_APPLIED_KEY] === 'number') return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    const roles = materials
+      .map((material) => firstPersonArmMaterialRole(material.name))
+      .filter((role): role is FirstPersonArmMaterialRole => role !== null);
+    if (roles.length !== 1) return;
+    const girth = FIRST_PERSON_ARM_GIRTH_METRES[roles[0]!];
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    if (!position || !normal || position.count !== normal.count) return;
+    // The delivery is meshopt-compressed: positions arrive as a NORMALIZED
+    // Int16 interleaved attribute, so the encodable range is exactly [-1, 1]
+    // and setXYZ re-quantizes on write. Writing an inflated extreme vertex
+    // (fingertips and sleeve ends sit ON the quantization bounds by
+    // construction) overflows Int16 and WRAPS to the opposite extreme, which
+    // renders as a metre-long black spike through the viewmodel. Rebuild the
+    // attribute as float first; four small viewmodel meshes can afford it, and
+    // no other attribute is touched.
+    const shelled = new Float32Array(position.count * 3);
+    for (let index = 0; index < position.count; index += 1) {
+      shelled[index * 3] = position.getX(index) + normal.getX(index) * girth;
+      shelled[index * 3 + 1] = position.getY(index) + normal.getY(index) * girth;
+      shelled[index * 3 + 2] = position.getZ(index) + normal.getZ(index) * girth;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(shelled, 3));
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    geometry.userData[ARM_GIRTH_APPLIED_KEY] = girth;
+    geometry.userData.firstPersonArmGirthContract = FIRST_PERSON_ARM_GIRTH_CONTRACT;
+    inflated += 1;
+  });
+  return inflated;
+}
+
 export function loadFirstPersonArmsAsset(): Promise<void> {
   if (firstPersonArmsAsset) return Promise.resolve();
-  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).then((arms) => {
+  firstPersonArmsAssetPromise ??= loadRiggedGltf(FIRST_PERSON_ARMS_URL).catch((error: unknown) => {
+    // Same anti-poisoning rule as the operator memo below: a transient fetch
+    // failure must be retryable, not cached for the session.
+    firstPersonArmsAssetPromise = null;
+    throw error;
+  }).then((arms) => {
+    inflateFirstPersonArmGirth(arms.scene);
     firstPersonArmsAsset = { scene: arms.scene, clips: arms.animations };
   });
   return firstPersonArmsAssetPromise;
@@ -593,7 +1589,17 @@ export function loadRiggedOperatorAsset(): Promise<void> {
       operatorAssets.performance = describeOperatorAsset(operator, 1, OPERATOR_PERFORMANCE_URL);
     }),
     loadFirstPersonArmsAsset(),
-  ]).then(() => undefined);
+  ]).then(() => undefined)
+    .catch((error: unknown) => {
+      // A rejected load must not poison the memo: leaving the failed promise
+      // cached made one transient GLB fetch failure permanent for the whole
+      // session - every later remote was built with no rig and no retry was
+      // possible without a full page reload. Clearing the memo lets the next
+      // caller attempt a fresh load; already-loaded halves stay loaded via
+      // the per-asset guards above.
+      operatorAssetPromise = null;
+      throw error;
+    });
   return operatorAssetPromise;
 }
 
@@ -616,6 +1622,9 @@ export type FirstPersonArmChain = {
 export type FirstPersonFingerBone = {
   bone: THREE.Bone;
   bindQuaternion: THREE.Quaternion;
+  /** Captured so a clip can never leave a digit translated or scaled. */
+  bindPosition: THREE.Vector3;
+  bindScale: THREE.Vector3;
   side: 'left' | 'right';
   digit: 'index' | 'middle' | 'ring' | 'pinky' | 'thumb';
   joint: 1 | 2 | 3;
@@ -664,7 +1673,10 @@ export function firstPersonArmHandedness(visual: THREE.Object3D): FirstPersonArm
   });
 }
 
-export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPersonRiggedArms | null {
+export function createFirstPersonRiggedArms(
+  flattenMaterials: boolean,
+  skinId = 'default',
+): FirstPersonRiggedArms | null {
   if (!firstPersonArmsAsset) return null;
   const root = new THREE.Group();
   root.name = 'first-person-arms';
@@ -686,7 +1698,7 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
     // IK chains, which silently dropped whole arms from the render list.
     node.frustumCulled = false;
     const prepare = (material: THREE.Material) => {
-      const result = materialForFirstPerson(material, flattenMaterials);
+      const result = materialForFirstPerson(material, flattenMaterials, skinId);
       result.transparent = false;
       result.opacity = 1;
       result.depthWrite = true;
@@ -732,6 +1744,8 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
           fingers.push({
             bone,
             bindQuaternion: bone.quaternion.clone(),
+            bindPosition: bone.position.clone(),
+            bindScale: bone.scale.clone(),
             side,
             digit: digitName.toLowerCase() as FirstPersonFingerBone['digit'],
             joint,
@@ -750,7 +1764,18 @@ export function createFirstPersonRiggedArms(flattenMaterials: boolean): FirstPer
   const authoredTrackCount = firstPersonArmsAsset.clips.reduce((count, clip) => count + clip.tracks.length, 0);
   const runtimeTrackCount = runtimeClips.reduce((count, clip) => count + clip.tracks.length, 0);
   const actions = new Map(runtimeClips.map((clip) => [clip.name, mixer.clipAction(clip)]));
-  root.userData.firstPersonArmsRuntime = { mixer, actions, activeAction: null } satisfies FirstPersonArmsRuntime;
+  // HF-388: the original (unfiltered) clips are decomposed into IK-layer pose
+  // channels here, while the bones are still resting at their loaded bind pose.
+  root.userData.firstPersonArmAuthoredLayer = buildFirstPersonArmAuthoredPoseLayer(
+    firstPersonArmsAsset.clips,
+    chains.map((entry) => ({ side: entry.side, shoulder: entry.shoulder, elbow: entry.elbow, wrist: entry.wrist })),
+  );
+  root.userData.firstPersonArmsRuntime = {
+    mixer, actions, activeAction: null, baseAction: null,
+  } satisfies FirstPersonArmsRuntime;
+  root.userData.firstPersonArmSkinId = skinId;
+  root.userData.firstPersonArmSkinContract = FIRST_PERSON_ARM_SKIN_CONTRACT;
+  root.userData.firstPersonArmGirthContract = FIRST_PERSON_ARM_GIRTH_CONTRACT;
   root.userData.importedFirstPersonArms = false;
   root.userData.authoredFirstPersonArms = true;
   root.userData.firstPersonArmsSource = FIRST_PERSON_ARMS_URL;
@@ -773,17 +1798,64 @@ function firstPersonArmsRuntime(root: THREE.Object3D): FirstPersonArmsRuntime | 
   return (root.userData.firstPersonArmsRuntime as FirstPersonArmsRuntime | undefined) ?? null;
 }
 
+/**
+ * Restores the COMPLETE authored digit transform each frame, not only the
+ * rotation. The runtime clip filter already refuses translation and scale
+ * channels; this is the second guard, so a future asset that smuggles one in
+ * cannot leave a finger drifted off its knuckle.
+ */
 export function resetFirstPersonArmFingers(fingers: readonly FirstPersonFingerBone[]): void {
-  for (const finger of fingers) finger.bone.quaternion.copy(finger.bindQuaternion);
+  for (const finger of fingers) {
+    finger.bone.quaternion.copy(finger.bindQuaternion);
+    finger.bone.position.copy(finger.bindPosition);
+    finger.bone.scale.copy(finger.bindScale);
+  }
+}
+
+export const FIRST_PERSON_ARM_BASE_ACTION_NAMES = Object.freeze(['idle', 'walk', 'sprint'] as const);
+export type FirstPersonArmBaseAction = typeof FIRST_PERSON_ARM_BASE_ACTION_NAMES[number];
+
+/**
+ * Selects the looping locomotion clip for a movement state. Pure so the
+ * mapping is testable without a mixer.
+ */
+export function firstPersonArmBaseActionFor(moving: boolean, sprinting: boolean): FirstPersonArmBaseAction {
+  if (sprinting) return 'sprint';
+  return moving ? 'walk' : 'idle';
+}
+
+/**
+ * Crossfades the looping locomotion clip underneath the one-shots. Returns the
+ * action that is now the base, or null when the asset does not carry it.
+ */
+export function setFirstPersonArmBaseAction(root: THREE.Object3D, actionName: string): string | null {
+  const runtime = firstPersonArmsRuntime(root);
+  const action = runtime?.actions.get(actionName);
+  if (!runtime || !action) return null;
+  if (runtime.baseAction === actionName) return actionName;
+  const previous = runtime.baseAction ? runtime.actions.get(runtime.baseAction) : undefined;
+  action.reset().setLoop(THREE.LoopRepeat, Infinity);
+  action.clampWhenFinished = false;
+  action.enabled = true;
+  action.play();
+  if (previous && previous !== action) previous.crossFadeTo(action, 0.18, false);
+  else action.fadeIn(0.18);
+  runtime.baseAction = actionName;
+  return actionName;
 }
 
 export function playFirstPersonArmAction(root: THREE.Object3D, actionName: string): boolean {
   const runtime = firstPersonArmsRuntime(root);
   const action = runtime?.actions.get(actionName);
   if (!runtime || !action) return false;
-  runtime.mixer.stopAllAction();
+  // Stop only the previous ONE-SHOT. The old stopAllAction() here also killed
+  // the locomotion loop, which is why a single shot left the arms dead until
+  // the next shot.
+  const previousOneShot = runtime.activeAction ? runtime.actions.get(runtime.activeAction) : undefined;
+  if (previousOneShot && previousOneShot !== action) previousOneShot.stop();
   action.reset().setLoop(THREE.LoopOnce, 1);
   action.clampWhenFinished = false;
+  action.setEffectiveWeight(1);
   action.play();
   runtime.activeAction = actionName;
   return true;
@@ -792,6 +1864,11 @@ export function playFirstPersonArmAction(root: THREE.Object3D, actionName: strin
 export function updateFirstPersonArmAnimations(root: THREE.Object3D, dt: number): void {
   const runtime = firstPersonArmsRuntime(root);
   if (!runtime) return;
+  // The one-shot owns the digits while it runs; the locomotion loop is held at
+  // zero weight rather than stopped so it resumes mid-cycle instead of popping.
+  const oneShot = runtime.activeAction ? runtime.actions.get(runtime.activeAction) : undefined;
+  const base = runtime.baseAction ? runtime.actions.get(runtime.baseAction) : undefined;
+  if (base) base.setEffectiveWeight(oneShot?.isRunning() === true ? 0 : 1);
   runtime.mixer.update(Math.min(0.05, Math.max(0, dt)));
   if (runtime.activeAction && runtime.actions.get(runtime.activeAction)?.isRunning() !== true) runtime.activeAction = null;
 }
@@ -804,15 +1881,18 @@ export function resetFirstPersonArmAnimations(root: THREE.Object3D): void {
   for (const action of runtime.actions.values()) action.stop();
   runtime.mixer.setTime(0);
   runtime.activeAction = null;
+  runtime.baseAction = null;
 }
 
 export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): Readonly<{
   clips: number;
   activeAction: string | null;
+  baseAction: string | null;
   blendPolicy: string;
   trackPolicy: string;
   runtimeTracks: number;
   upperChainTracksExcluded: number;
+  skinId: string;
 }> | null {
   if (!root) return null;
   const runtime = firstPersonArmsRuntime(root);
@@ -820,6 +1900,8 @@ export function firstPersonArmAnimationState(root: THREE.Object3D | undefined): 
   return Object.freeze({
     clips: runtime.actions.size,
     activeAction: runtime.activeAction,
+    baseAction: runtime.baseAction,
+    skinId: String(root.userData.firstPersonArmSkinId ?? 'default'),
     blendPolicy: String(root.userData.authoredAnimationBlendPolicy ?? 'unknown'),
     trackPolicy: String(root.userData.authoredAnimationTrackPolicy ?? 'unknown'),
     runtimeTracks: Number(root.userData.authoredAnimationTrackCount ?? 0),
@@ -904,6 +1986,35 @@ export function resolveRiggedOperatorRuntimeRoot(root: THREE.Object3D): THREE.Ob
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+const DIRECTIONAL_ACTION_NAME_SET: ReadonlySet<string> = new Set(RIGGED_OPERATOR_DIRECTIONAL_ACTION_NAMES);
+
+/**
+ * The runtime lives in `userData`, which is an untyped bag: the Gun Range
+ * training dummy and other presentations assemble one by hand rather than going
+ * through `createRiggedOperator`, and TypeScript cannot see that. Rather than
+ * requiring every such site to know about the Pass 77 fields, the one function
+ * that reads them fills in whatever is missing, once, from the operator itself.
+ */
+function ensureAnimationRuntime(runtimeState: RiggedOperatorRuntime, root: THREE.Object3D): void {
+  // PASS 94: back-filled independently of the director, because a hand-built
+  // runtime that predates either field must gain both, and a future one might
+  // supply only the older half.
+  runtimeState.posture ??= createOperatorPostureLayer(runtimeState.stance ?? 'stand');
+  runtimeState.lastPosture ??= null;
+  if (runtimeState.director) return;
+  runtimeState.director = createOperatorAnimationDirector(
+    String(root.userData.operatorSkinId ?? 'default'),
+    root.name,
+  );
+  runtimeState.dead = runtimeState.currentBase === 'Death';
+  runtimeState.activeAnimationClips = runtimeState.currentBase ? [runtimeState.currentBase] : [];
+  runtimeState.visualYawRadians = root.rotation.y;
+  runtimeState.lastGroundX = root.position.x;
+  runtimeState.lastGroundZ = root.position.z;
+  runtimeState.lastAnimation = null;
+  runtimeState.lazilyBoundDirectionalClips = 0;
+}
+
 function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.AnimationAction | undefined {
   const existing = runtimeState.actions.get(name);
   if (existing) return existing;
@@ -911,6 +2022,7 @@ function actionFor(runtimeState: RiggedOperatorRuntime, name: string): THREE.Ani
   if (!clip) return undefined;
   const action = runtimeState.mixer.clipAction(clip);
   runtimeState.actions.set(name, action);
+  if (DIRECTIONAL_ACTION_NAME_SET.has(name)) runtimeState.lazilyBoundDirectionalClips += 1;
   return action;
 }
 
@@ -944,35 +2056,29 @@ export function prewarmRiggedOperatorActions(
   return performRiggedOperatorActionPrewarm(runtimeState, actionNames);
 }
 
-function switchBaseAction(runtimeState: RiggedOperatorRuntime, name: string): void {
-  if (runtimeState.currentBase === name) return;
-  const previous = actionFor(runtimeState, runtimeState.currentBase);
-  const next = actionFor(runtimeState, name);
-  if (!next) return;
-  next.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.14).play();
-  previous?.fadeOut(0.14);
-  runtimeState.currentBase = name;
-}
-
-function playOneShot(runtimeState: RiggedOperatorRuntime, name: string, timeScale = 1): void {
-  const action = actionFor(runtimeState, name);
-  if (!action) return;
-  action.reset();
-  action.enabled = true;
-  action.clampWhenFinished = true;
-  action.setLoop(THREE.LoopOnce, 1);
-  action.setEffectiveTimeScale(timeScale);
-  action.setEffectiveWeight(1);
-  action.fadeIn(0.035).play();
-}
+// Pass 77 retired `switchBaseAction` (one hard-coded 0.14 s cross-fade for every
+// transition, with nothing bounding how many partly-faded actions accumulated)
+// and `playOneShot` (clampWhenFinished with no finished listener, so a fired,
+// hit or meleed operator stayed a running average of frozen poses for the rest
+// of its life). Both are now decided by the director and applied by
+// `rigged-operator-animation-runtime`, which releases what leaves the mix.
 
 export function createRiggedOperator(
   team: Team,
   name: string,
   flattenMaterials: boolean,
   appearance: OperatorAppearance = 'team',
+  skinId = 'default',
 ): RiggedOperatorInstance | null {
-  const operatorAsset = flattenMaterials ? operatorAssets.performance : operatorAssets.quality;
+  // HF-360: a selected skin whose asset has not finished loading falls back to
+  // the default operator rather than blocking or failing the spawn — the skin
+  // is presentation only, and lobby-time prefetch makes the race unlikely.
+  const skinStore = skinId !== 'default' && operatorSkinAssetReady(skinId)
+    ? operatorSkinAssets.get(skinId)
+    : undefined;
+  const operatorAsset = flattenMaterials
+    ? skinStore?.performance ?? operatorAssets.performance
+    : skinStore?.quality ?? operatorAssets.quality;
   if (!operatorAsset) return null;
   const root = new THREE.Group();
   root.name = name;
@@ -985,7 +2091,7 @@ export function createRiggedOperator(
   // network yaw and authoritative hit proxies keep their established axes.
   visual.rotation.y = Math.PI;
   const embeddedWeaponsSuppressed = suppressEmbeddedWeaponObjects(visual);
-  const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance);
+  const prepareMaterial = createOperatorInstanceMaterialResolver(team, flattenMaterials, appearance, skinId);
   const canonicalSkinnedMeshes: THREE.SkinnedMesh[] = [];
   visual.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
@@ -1015,7 +2121,7 @@ export function createRiggedOperator(
   root.add(weaponSocket);
 
   const mixer = new THREE.AnimationMixer(visual);
-  const clips = new Map(riggedOperatorRuntimeClips(operatorAsset.clips).map((clip) => [clip.name, clip]));
+  const clips = new Map(riggedOperatorAvailableClips(operatorAsset.clips).map((clip) => [clip.name, clip]));
   const actions = new Map<string, THREE.AnimationAction>();
   const base = clips.has('Idle_Gun_Pointing') ? 'Idle_Gun_Pointing' : clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
   const baseClip = clips.get(base);
@@ -1093,14 +2199,33 @@ export function createRiggedOperator(
     weaponSocket,
     canonicalEvidence,
     stance: 'stand',
+    // HF-412: fixed-duration stance transition bookkeeping.
+    stanceBlendFrom: 'stand',
+    stanceBlendProgress: 1,
     crouchBlend: 0,
     proneBlend: 0,
     speed: 0,
+    // Keyed on the skin's archetype and the operator's replicated name, so two
+    // bots of one archetype are visibly out of phase and every peer agrees how.
+    director: createOperatorAnimationDirector(skinId, name),
+    posture: createOperatorPostureLayer('stand'),
+    lastPosture: null,
+    dead: false,
+    activeAnimationClips: base ? [base] : [],
+    visualYawRadians: root.rotation.y,
+    lastGroundX: root.position.x,
+    lastGroundZ: root.position.z,
+    // HF-382: no stance published yet - the skin profile's idle decides until
+    // a caller writes userData.operatorStanceId.
+    stanceIdleFade: { clipName: null, fadeFrom: null, fadeSeconds: 0 },
+    lastAnimation: null,
+    lazilyBoundDirectionalClips: 0,
     poseBones: {
       hips: poseBone('Hips'),
       abdomen: poseBone('Abdomen'),
       torso: poseBone('Torso'),
       chest: poseBone('Chest'),
+      neck: poseBone('Neck'),
       head: poseBone('Head'),
       upperLegLeft: poseBone('UpperLegL', 'UpperLeg.L'),
       upperLegRight: poseBone('UpperLegR', 'UpperLeg.R'),
@@ -1111,7 +2236,21 @@ export function createRiggedOperator(
     },
     armBindPose,
     handBindPose,
+    // Measured by the runtime each frame; the authored pose is used until then.
+    proneClearance: null,
   } satisfies RiggedOperatorRuntime;
+  // HF-509. Captured HERE, after the runtime exists and before `mixer.update`
+  // has ever been called, so these are the authored bind rotations rather than
+  // frame 0 of whatever clip happens to be bound.
+  {
+    const built = root.userData.riggedOperatorRuntime as RiggedOperatorRuntime;
+    built.legBindPose = [
+      built.poseBones.upperLegLeft, built.poseBones.lowerLegLeft, built.poseBones.footLeft,
+      built.poseBones.upperLegRight, built.poseBones.lowerLegRight, built.poseBones.footRight,
+    ]
+      .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
+      .map((bone) => ({ bone, quaternion: bone.quaternion.clone() }));
+  }
   root.userData.operatorAsset = {
     source: 'Atomic Acres Pass 65 operator / Quaternius CC0 derivative',
     assetUrl: operatorAsset.source,
@@ -1124,30 +2263,228 @@ export function createRiggedOperator(
     embeddedWeaponsSuppressed,
   };
   root.userData.operatorAppearance = appearance;
+  // Kept so a respawn can rebuild the same archetype movement identity without
+  // the caller having to hand the skin back.
+  root.userData.operatorSkinId = skinId;
   return { root, weaponSocket };
 }
 
-export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance: 'stand' | 'crouch' | 'prone'): boolean {
+/**
+ * Pass 77 / HF-375. Per-frame gameplay state the animation director consumes
+ * beyond the scalar speed every call site already supplies. Every field is
+ * optional: an unchanged call site still gets speed matching, direction-aware
+ * locomotion, turn-in-place and released one-shots, because direction and yaw
+ * error are MEASURED from the operator's own root motion rather than declared.
+ */
+export type RiggedOperatorMotion = Readonly<{
+  /** Radians, positive up, matching the camera/protocol pitch convention. */
+  aimPitchRadians?: number;
+  armed?: boolean;
+}>;
+
+/**
+ * HF-382: how long an idle-to-idle stance change cross-fades. Short enough to
+ * feel responsive in the menu turntable, long enough that the outgoing clip
+ * still carries weight on the first frame after the switch - a released and
+ * restarted action reads as a pose snap.
+ */
+export const OPERATOR_STANCE_IDLE_FADE_SECONDS = 0.28;
+
+/** The idle corpus the stance catalog draws from (same clips as the director's). */
+const STANCE_IDLE_CLIP_CORPUS: Readonly<Record<string, true>> = Object.freeze({
+  Idle_Gun_Pointing: true,
+  Idle_Gun: true,
+  Idle_Gun_Shoot: true,
+});
+
+/**
+ * The per-root stance preference, published by callers (the menu preview writes
+ * it directly; gameplay replication should write the same channel). Null when
+ * nothing valid is published, which preserves the pre-HF-382 behaviour exactly:
+ * the skin profile's own idle preference decides.
+ */
+export function rootOperatorStancePreference(root: THREE.Object3D): OperatorStanceId | null {
+  const value = root.userData.operatorStanceId;
+  return isOperatorStanceId(value) ? value : null;
+}
+
+/**
+ * HF-382: folds the selected IDLE STANCE into a director output. Advances the
+ * cross-fade state, then replaces every emitted idle-corpus layer with the
+ * stance's authored clip - split between the outgoing and incoming clips while
+ * the fade runs so the mixer never releases-and-restarts a visible pose. Weights
+ * are conserved, so the blend graph's renormalisation contract still holds.
+ *
+ * Pure with respect to the animation; the only mutation is `fadeState`, which
+ * lives on the per-operator runtime. Death layers pass through untouched.
+ */
+export function applyOperatorStanceIdlePreference(
+  animation: OperatorAnimationOutput,
+  availableClips: ReadonlySet<string>,
+  stance: OperatorStanceId,
+  fadeState: { clipName: string | null; fadeFrom: string | null; fadeSeconds: number },
+  deltaSeconds: number,
+): OperatorAnimationOutput {
+  const preferred = stanceIdleClip(stance, availableClips);
+  if (fadeState.clipName !== preferred) {
+    fadeState.fadeFrom = fadeState.clipName;
+    fadeState.clipName = preferred;
+    fadeState.fadeSeconds = 0;
+  }
+  let blend = 1;
+  if (fadeState.fadeFrom !== null && fadeState.fadeFrom !== fadeState.clipName) {
+    fadeState.fadeSeconds += Math.max(0, deltaSeconds);
+    blend = Math.min(1, fadeState.fadeSeconds / OPERATOR_STANCE_IDLE_FADE_SECONDS);
+    if (blend >= 1) fadeState.fadeFrom = null;
+  }
+  if (!availableClips.has(preferred)) return animation;
+  const touchesIdle = animation.layers.some((layer) => STANCE_IDLE_CLIP_CORPUS[layer.clip] === true)
+    || (animation.selectedClip !== null && STANCE_IDLE_CLIP_CORPUS[animation.selectedClip] === true);
+  if (!touchesIdle) return animation;
+
+  interface WeightedLayer {
+    clip: string;
+    weight: number;
+    timeScale: number;
+  }
+  const layers: WeightedLayer[] = [];
+  for (const layer of animation.layers) {
+    if (!STANCE_IDLE_CLIP_CORPUS[layer.clip]) {
+      layers.push({ ...layer });
+      continue;
+    }
+    if (fadeState.fadeFrom !== null && blend < 1) {
+      // Mid-fade: the outgoing idle keeps its share of this layer's weight.
+      if (fadeState.fadeFrom !== preferred && availableClips.has(fadeState.fadeFrom)) {
+        layers.push({
+          clip: fadeState.fadeFrom,
+          weight: layer.weight * (1 - blend),
+          timeScale: layer.timeScale,
+        });
+      }
+      layers.push({ clip: preferred, weight: layer.weight * blend, timeScale: layer.timeScale });
+    } else {
+      layers.push({ ...layer, clip: preferred });
+    }
+  }
+  const sorted = layers
+    .filter((layer) => availableClips.has(layer.clip))
+    .sort((left, right) => (right.weight - left.weight) || left.clip.localeCompare(right.clip));
+  return {
+    ...animation,
+    layers: Object.freeze(sorted),
+    selectedClip: STANCE_IDLE_CLIP_CORPUS[animation.selectedClip ?? ''] === true
+      ? preferred
+      : animation.selectedClip,
+  };
+}
+
+export function updateRiggedOperator(
+  root: THREE.Object3D,
+  speed: number,
+  stance: 'stand' | 'crouch' | 'prone',
+  motion?: RiggedOperatorMotion,
+): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
+  ensureAnimationRuntime(runtimeState, root);
   const now = performance.now();
   const dt = Math.min(0.05, Math.max(0, (now - runtimeState.lastUpdatedAt) / 1_000));
   runtimeState.lastUpdatedAt = now;
+  // HF-412: a NEW stance restarts the fixed transition window from the pose
+  // the body is actually in, so a stance change part-way through another one
+  // blends on from there instead of snapping back to the start.
+  if (stance !== runtimeState.stance) {
+    runtimeState.stanceBlendFrom = runtimeState.stance;
+    runtimeState.stanceBlendProgress = 0;
+  }
   runtimeState.stance = stance;
   runtimeState.speed = Math.max(0, Number.isFinite(speed) ? speed : 0);
+  // Published by the runtime on the operator root (the same userData channel
+  // the stance, melee and minigun state already use).
+  const publishedClearance = root.userData.proneClearance as ProneBodyClearance | undefined;
+  runtimeState.proneClearance = publishedClearance && Number.isFinite(publishedClearance.forwardM)
+    ? publishedClearance
+    : null;
   for (const entry of runtimeState.poseBeforeStance ?? []) {
     entry.bone.position.copy(entry.position);
     entry.bone.quaternion.copy(entry.quaternion);
   }
-  if (runtimeState.currentBase === 'Death') {
-    runtimeState.mixer.update(dt);
-    return true;
+  // Direction is measured from the operator's own root motion; magnitude comes
+  // from the caller. That combination is why no call site had to change to stop
+  // a strafing bot playing a forward run, and why the frozen debug presentation
+  // route (which declares a speed while standing still) keeps working.
+  const measured = localGroundVelocity(
+    root.position.x - runtimeState.lastGroundX,
+    root.position.z - runtimeState.lastGroundZ,
+    root.rotation.y,
+    dt,
+  );
+  runtimeState.lastGroundX = root.position.x;
+  runtimeState.lastGroundZ = root.position.z;
+  const velocity = directedGroundVelocity(runtimeState.speed, measured);
+
+  // Turn-in-place is presentation only. The authoritative yaw stays exactly
+  // where the caller put it - hit registration, replication and bot aim are
+  // untouched - and the VISIBLE body lags it and catches up at the archetype's
+  // turn rate, applied on the stance pivot the prone solve already owns.
+  const yawError = wrapAngleRadians(root.rotation.y - runtimeState.visualYawRadians);
+
+  // PASS 94. The posture layer is solved first, from the SAME stance the pose
+  // solve already uses, and its output is what the director times its clips
+  // against. Nothing here decides the stance; it only decides how a standing
+  // clip corpus should be played to represent it.
+  const posture = advanceOperatorPosture(runtimeState.posture, {
+    deltaSeconds: dt,
+    stance,
+    groundSpeedMps: Math.hypot(velocity.forwardMps, velocity.strafeMps),
+    dead: runtimeState.dead,
+  });
+
+  let animation = advanceOperatorAnimation(runtimeState.director, {
+    deltaSeconds: dt,
+    forwardMps: velocity.forwardMps,
+    strafeMps: velocity.strafeMps,
+    aimPitchRadians: stance === 'prone' ? 0 : motion?.aimPitchRadians ?? 0,
+    yawErrorRadians: yawError,
+    dead: runtimeState.dead,
+    armed: motion?.armed ?? true,
+    availableClips: [...runtimeState.clips.keys()],
+    stance: posture,
+  });
+  runtimeState.lastPosture = posture;
+  // HF-382: the published IDLE STANCE overrides which authored idle the mixer
+  // plays, cross-faded. Presentation only - it cannot reach hit proxies or
+  // movement authority, and an unpublished root behaves exactly as before.
+  const stancePreference = rootOperatorStancePreference(root);
+  if (stancePreference !== null) {
+    animation = applyOperatorStanceIdlePreference(
+      animation,
+      new Set(runtimeState.clips.keys()),
+      stancePreference,
+      runtimeState.stanceIdleFade,
+      dt,
+    );
   }
-  const next = stance !== 'stand'
-    ? 'Idle_Gun_Pointing'
-    : speed > 3.2 ? 'Run_Shoot' : speed > 0.18 ? 'Walk' : 'Idle_Gun_Pointing';
-  switchBaseAction(runtimeState, runtimeState.clips.has(next) ? next : speed > 0.18 ? 'Run' : 'Idle_Gun');
+  runtimeState.lastAnimation = animation;
+  runtimeState.visualYawRadians = wrapAngleRadians(
+    runtimeState.visualYawRadians + animation.aim.bodyYawDeltaRadians,
+  );
+
+  const plan = planOperatorMixer(animation, runtimeState.activeAnimationClips);
+  applyOperatorMixerPlan(plan, (clip) => actionFor(runtimeState, clip));
+  runtimeState.activeAnimationClips = plan.active;
+  // `activeClip` has always meant the clip the controller SELECTED, with the
+  // mixer cross-fading toward it. Reading the heaviest live layer instead would
+  // report the clip being left behind for the length of every transition.
+  runtimeState.currentBase = runtimeState.dead
+    ? 'Death'
+    : animation.selectedClip ?? runtimeState.currentBase;
+
   runtimeState.mixer.update(dt);
+  // A corpse keeps the stance pivot and weapon socket exactly where death left
+  // them, as it always has. Only the mixer runs, so the collapse can play out.
+  if (runtimeState.dead) return true;
   runtimeState.poseBeforeStance = Object.values(runtimeState.poseBones)
     .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
     .map((bone) => ({
@@ -1155,6 +2492,14 @@ export function updateRiggedOperator(root: THREE.Object3D, speed: number, stance
       position: bone.position.clone(),
       quaternion: bone.quaternion.clone(),
     }));
+  // Additive channels go on AFTER the clean pose is captured, so next frame's
+  // restore wipes them and they can never accumulate across frames.
+  applyOperatorAnimationPose(runtimeState.poseBones, animation);
+  // The stance pivot carries the visual yaw lag; the authoritative root yaw is
+  // never written here, so hit registration, replication and bot aim are
+  // untouched. Set before the stance solve, which world-matrixes the pivot to
+  // plant the crouch legs and must see the yaw the body is actually presenting.
+  runtimeState.stancePivot.rotation.y = wrapAngleRadians(runtimeState.visualYawRadians - root.rotation.y);
   applyStancePose(runtimeState, dt);
   return true;
 }
@@ -1434,25 +2779,69 @@ export function poseUnarmedRiggedOperatorHands(root: THREE.Object3D): Record<str
   };
 }
 
+/**
+ * Pass 77: a shot is an ACCENT on top of whatever the operator is doing, with a
+ * defined end - not a full-weight clip swap that stays clamped forever. The
+ * director owns the envelope; nothing has to remember to switch it off.
+ */
 export function fireRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.clips.has('Gun_Shoot') ? 'Gun_Shoot' : 'Idle_Gun_Shoot', 1.35);
+  ensureAnimationRuntime(runtimeState, root);
+  pushOperatorOneShot(runtimeState.director, 'fire');
   return true;
 }
 
-export function reactRiggedOperator(root: THREE.Object3D, alternate = false): boolean {
+/** Catalog emote id -> director one-shot kind. 'none' maps to nothing on purpose. */
+const EMOTE_ONE_SHOT_KINDS: Readonly<Record<string, OperatorOneShotKind>> = Object.freeze({
+  wave: 'emote-wave',
+  'salute-punch': 'emote-punch',
+  boot: 'emote-boot',
+});
+
+/**
+ * Play a replicated emote on a third-person rig as a bounded one-shot. Same
+ * contract as fireRiggedOperator: the director owns the envelope, so nothing has
+ * to remember to switch it off, and an off-catalog id is a no-op rather than a
+ * throw - the message was already host-validated, this is defence in depth.
+ */
+export function emoteRiggedOperator(root: THREE.Object3D, emoteId: string): boolean {
+  const kind = EMOTE_ONE_SHOT_KINDS[emoteId];
+  if (!kind) return false;
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, alternate && runtimeState.clips.has('HitRecieve_2') ? 'HitRecieve_2' : 'HitRecieve', 1.15);
+  ensureAnimationRuntime(runtimeState, root);
+  pushOperatorOneShot(runtimeState.director, kind);
+  return true;
+}
+
+/**
+ * `zone` used to be a boolean that only chose between the two authored hit
+ * clips. It now carries real severity and direction into the reaction layer, so
+ * a headshot flinches harder than a limb graze and a hit from the right rolls
+ * the torso left - while the operator keeps running underneath.
+ */
+export function reactRiggedOperator(
+  root: THREE.Object3D,
+  zone: HitReactionZone | boolean = 'body',
+  incomingYawRadians = 0,
+): boolean {
+  const runtimeState = runtime(root);
+  if (!runtimeState) return false;
+  ensureAnimationRuntime(runtimeState, root);
+  const resolved: HitReactionZone = typeof zone === 'boolean' ? (zone ? 'limb' : 'body') : zone;
+  pushOperatorHitImpulse(runtimeState.director, {
+    zone: resolved,
+    severity: resolved === 'head' ? 1 : resolved === 'body' ? 0.72 : 0.45,
+    incomingYawRadians,
+  });
   return true;
 }
 
 export function deathRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState || !runtimeState.clips.has('Death')) return false;
-  for (const action of runtimeState.actions.values()) action.fadeOut(0.04);
-  playOneShot(runtimeState, 'Death', 1.08);
+  runtimeState.dead = true;
   runtimeState.currentBase = 'Death';
   return true;
 }
@@ -1460,13 +2849,34 @@ export function deathRiggedOperator(root: THREE.Object3D): boolean {
 export function resetRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  for (const action of runtimeState.actions.values()) action.stop();
+  for (const action of runtimeState.actions.values()) {
+    action.stop();
+    action.enabled = false;
+    action.clampWhenFinished = false;
+  }
   const base = runtimeState.clips.has('Idle_Gun_Pointing')
     ? 'Idle_Gun_Pointing'
     : runtimeState.clips.has('Idle_Gun') ? 'Idle_Gun' : 'Idle_Gun_Shoot';
   actionFor(runtimeState, base)?.reset().setLoop(THREE.LoopRepeat, Infinity).play();
   runtimeState.currentBase = base;
+  runtimeState.dead = false;
+  // A respawn is a new life: the blend graph, the aim smoothing, the breathing
+  // phase and every live impulse start clean, but the archetype identity (which
+  // is a property of the skin, not of the life) is rebuilt from the same keys.
+  runtimeState.stanceIdleFade = { clipName: null, fadeFrom: null, fadeSeconds: 0 };
+  runtimeState.director = createOperatorAnimationDirector(
+    String(root.userData.operatorSkinId ?? 'default'),
+    root.name,
+  );
+  runtimeState.activeAnimationClips = [base];
+  runtimeState.lastAnimation = null;
+  runtimeState.visualYawRadians = root.rotation.y;
+  runtimeState.lastGroundX = root.position.x;
+  runtimeState.lastGroundZ = root.position.z;
   runtimeState.stance = 'stand';
+  // HF-412: a reset operator is already standing, not mid-transition.
+  runtimeState.stanceBlendFrom = 'stand';
+  runtimeState.stanceBlendProgress = 1;
   runtimeState.crouchBlend = 0;
   runtimeState.proneBlend = 0;
   runtimeState.poseBeforeStance = undefined;
@@ -1481,8 +2891,39 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
 export function meleeRiggedOperator(root: THREE.Object3D): boolean {
   const runtimeState = runtime(root);
   if (!runtimeState) return false;
-  playOneShot(runtimeState, runtimeState.clips.has('Punch_Right') ? 'Punch_Right' : 'Kick_Right', 1.4);
+  ensureAnimationRuntime(runtimeState, root);
+  pushOperatorOneShot(runtimeState.director, 'melee');
   return true;
+}
+
+/**
+ * HF-412: the CHEAP read of a rig's stance blend, for QA harnesses.
+ *
+ * `snapshot()` in `legacy-main` walks every bone chain in the scene to build
+ * its operator report; sampling the body through it stretched the sampling
+ * frame to ~65 ms, which turned a per-frame blend step into a sample delta and
+ * made the resulting numbers unusable as "per frame" evidence. This reads the
+ * five fields the body transition is made of and touches nothing else.
+ */
+export function riggedOperatorStanceSample(root: THREE.Object3D | null | undefined): Readonly<{
+  stance: 'stand' | 'crouch' | 'prone';
+  blendFrom: 'stand' | 'crouch' | 'prone';
+  blendProgress: number;
+  crouchBlend: number;
+  proneBlend: number;
+  pivotHeight: number;
+}> | null {
+  if (!root) return null;
+  const runtimeState = runtime(root);
+  if (!runtimeState) return null;
+  return Object.freeze({
+    stance: runtimeState.stance,
+    blendFrom: runtimeState.stanceBlendFrom ?? runtimeState.stance,
+    blendProgress: Number.isFinite(runtimeState.stanceBlendProgress) ? runtimeState.stanceBlendProgress : 1,
+    crouchBlend: runtimeState.crouchBlend,
+    proneBlend: runtimeState.proneBlend,
+    pivotHeight: runtimeState.stancePivot.position.y,
+  });
 }
 
 export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, unknown> | null {
@@ -1843,6 +3284,59 @@ export function riggedOperatorTelemetry(root: THREE.Object3D): Record<string, un
       pivotPitch: runtimeState.stancePivot.rotation.x,
       speed: runtimeState.speed,
       mixerBeforeSupportIk: true,
+      // Pass 77 / HF-375. Everything a live capture needs to prove the system is
+      // running, rather than merely compiled.
+      pass77: runtimeState.director === undefined ? null : {
+        contract: 'director-composed-operator-animation-v1',
+        archetype: runtimeState.director.profile.archetype,
+        state: runtimeState.lastAnimation?.state ?? null,
+        layers: (runtimeState.lastAnimation?.layers ?? []).map((layer) => ({
+          clip: layer.clip,
+          weight: Number(layer.weight.toFixed(4)),
+          timeScale: Number(layer.timeScale.toFixed(4)),
+        })),
+        baseWeightSum: Number(((runtimeState.lastAnimation?.layers ?? [])
+          .reduce((sum, layer) => sum + layer.weight, 0)).toFixed(6)),
+        additiveLayers: (runtimeState.lastAnimation?.additiveLayers ?? []).map((layer) => ({
+          clip: layer.clip,
+          weight: Number(layer.weight.toFixed(4)),
+        })),
+        mixedClips: [...runtimeState.activeAnimationClips],
+        // The whole point of the release path: an operator that has fired, been
+        // hit and meleed should NOT still be mixing three frozen poses.
+        // `isScheduled()` is the only honest predicate for "contributing to the
+        // mix". A freshly bound action is `enabled` with weight 1 but is not in
+        // the mixer's active list and affects nothing, so filtering on enabled
+        // alone reports the entire prewarmed set as live. `isRunning()` is the
+        // opposite mistake: it excludes paused actions, and a clamped finished
+        // one-shot is precisely a PAUSED action that still writes its frozen
+        // pose every frame - the exact defect this pass exists to remove.
+        mixedActions: [...runtimeState.actions.entries()]
+          .filter(([, action]) => action.isScheduled() && action.enabled && action.getEffectiveWeight() > 1e-4)
+          .map(([name, action]) => ({
+            name,
+            weight: Number(action.getEffectiveWeight().toFixed(4)),
+            paused: action.paused,
+          })),
+        boundActions: runtimeState.actions.size,
+        playbackRate: runtimeState.lastAnimation?.locomotion.playbackRate ?? null,
+        footSlideMps: runtimeState.lastAnimation
+          ? Number(runtimeState.lastAnimation.locomotion.footSlideMps.toFixed(4)) : null,
+        footSlideRatio: runtimeState.lastAnimation
+          ? Number(runtimeState.lastAnimation.locomotion.footSlideRatio.toFixed(4)) : null,
+        directional: runtimeState.lastAnimation?.locomotion.directional ?? null,
+        directionMismatch: runtimeState.lastAnimation
+          ? Number(runtimeState.lastAnimation.locomotion.directionMismatch.toFixed(4)) : null,
+        aimPitchRadians: runtimeState.lastAnimation
+          ? Number(runtimeState.lastAnimation.aim.aimPitchRadians.toFixed(4)) : null,
+        aimJointRadians: runtimeState.lastAnimation?.aim.aimJointRadians ?? null,
+        postureSpineRadians: runtimeState.director.profile.posture.spinePitchRadians,
+        turning: runtimeState.lastAnimation?.aim.turning ?? 0,
+        visualYawLagRadians: Number(runtimeState.stancePivot.rotation.y.toFixed(4)),
+        hitReactionWeight: runtimeState.lastAnimation
+          ? Number(runtimeState.lastAnimation.hitReaction.clipWeight.toFixed(4)) : null,
+        lazilyBoundDirectionalClips: runtimeState.lazilyBoundDirectionalClips,
+      },
     },
     skeletons: runtimeState.visual.getObjectsByProperty('isSkinnedMesh', true).length,
     visibleSkinnedMeshes,

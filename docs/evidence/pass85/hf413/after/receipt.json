@@ -1,0 +1,5252 @@
+{
+  "schema": "atomic-acres/pass65-first-person-arms-visual-gate@1",
+  "verdict": "fail",
+  "sourceRevision": "6312fd5af0eae5ae5c9b6a040fd571669b9b2695",
+  "route": "http://127.0.0.1:44205/?release=latest&renderer=webgpu&render=blender&map=gun-range&grass=off&mist=off&seed=650085",
+  "browser": "153.0.8010.12",
+  "renderer": {
+    "requested": "webgpu",
+    "actual": "webgpu",
+    "softwareAdapter": false,
+    "profile": "blender"
+  },
+  "representatives": [
+    {
+      "family": "handgun",
+      "weapon": "pistol"
+    },
+    {
+      "family": "compact",
+      "weapon": "mp5"
+    },
+    {
+      "family": "long-gun",
+      "weapon": "m4a1"
+    },
+    {
+      "family": "heavy",
+      "weapon": "minigun"
+    },
+    {
+      "family": "crossbow",
+      "weapon": "explosive-crossbow"
+    },
+    {
+      "family": "railgun",
+      "weapon": "railgun"
+    },
+    {
+      "family": "flare-handgun",
+      "weapon": "flare-gun"
+    }
+  ],
+  "evidence": [
+    {
+      "label": "handgun/pistol/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/handgun-pistol-hip.png",
+      "weapon": "pistol",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -4.570335512632987,
+          -1.0688201822605246
+        ],
+        "ndcMax": [
+          1.7515896247765137,
+          8.155140457551665
+        ],
+        "nearestDepth": -0.15166971511052374
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb",
+        "weapon": "pistol",
+        "clips": 13,
+        "meshes": 9,
+        "renderPrimitives": 9,
+        "triangles": 11656,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.8914359968605455,
+        "sightForwardDot": 0.9999999999999962,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.3402135711686293,
+          -0.4023398544683375,
+          -0.38412691292880285
+        ],
+        "rootRotation": [
+          0,
+          0.1,
+          0
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "pistol",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.3575894103619449,
+            1.211937250529874,
+            12.291493471529222
+          ],
+          "socketReachRatio": 0.49111151442185086,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.535238665946931,
+          "lowerLength": 0.5261748932941029,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.7186744476373439,
+            1.330688223740214,
+            11.934785273419916
+          ],
+          "elbow": [
+            0.8214333483203389,
+            1.1350594706925672,
+            12.422279292660424
+          ],
+          "wrist": [
+            0.3400019929112707,
+            1.3371842240212415,
+            12.357245110757916
+          ],
+          "palm": [
+            0.35758941033905595,
+            1.2119372505120365,
+            12.291493471557075
+          ],
+          "palmQuaternion": [
+            -0.5181576011373639,
+            -0.029668445384878884,
+            0.07028075496310343,
+            0.8518762207709487
+          ],
+          "palmTargetQuaternion": [
+            -0.518157600675779,
+            -0.029668461078487203,
+            0.0702807832806979,
+            0.8518762203399071
+          ],
+          "target": [
+            0.3575894103619449,
+            1.211937250529874,
+            12.291493471529222
+          ],
+          "wristTarget": [
+            0.34000198994892183,
+            1.337184225264958,
+            12.357245110357749
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.822769545292141,
+            -1.0333311958836424,
+            0.8588425789864775
+          ],
+          "shoulderEntryDisplacementMeters": 0.5806987168000273,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.9046217718222183,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.08899517883103476,
+            0.45314662472674305,
+            -0.8869825221748128
+          ],
+          "wristRollRadians": -0.16962634015954636,
+          "palmOrientationError": 0.00012163617722000561,
+          "contactIterationErrors": [
+            0.14254613507929587,
+            7.507687121064356e-9
+          ],
+          "contactError": 4.022296056689074e-11,
+          "wristContactError": 3.23766506640901e-9,
+          "reachRatio": 0.5345407390740926,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.1464299046354107,
+            0.5403861403360626,
+            -0.8132081767263255,
+            -0.15885075909986543
+          ],
+          "elbowQuaternion": [
+            -0.8175453640896968,
+            0.29132039838017204,
+            0.21433144489397282,
+            0.4481227899501705
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "pistol",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.37687940763469896,
+            1.3930842015115783,
+            11.925445047086919
+          ],
+          "socketReachRatio": 0.5797009983228858,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.5352385772667235,
+          "lowerLength": 0.5261747356710645,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -0.10031891882313504,
+            1.0902785942673399,
+            11.682160209595319
+          ],
+          "elbow": [
+            0.1841085589409711,
+            1.111218923779107,
+            12.135087234327395
+          ],
+          "wrist": [
+            0.39458591968883305,
+            1.5321880621732868,
+            11.899833857642212
+          ],
+          "palm": [
+            0.3768794076355019,
+            1.3930842015114053,
+            11.925445047086544
+          ],
+          "palmQuaternion": [
+            -0.6980209557102814,
+            -0.3203135148377228,
+            -0.3384731381356698,
+            0.5436928653146205
+          ],
+          "palmTargetQuaternion": [
+            -0.698020956606785,
+            -0.3203135154776833,
+            -0.33847313608262397,
+            0.5436928655872454
+          ],
+          "target": [
+            0.37687940763469896,
+            1.3930842015115783,
+            11.925445047086919
+          ],
+          "wristTarget": [
+            0.39458590904051366,
+            1.5321880408759194,
+            11.89983386954398
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            -0.07937323463223829,
+            -1.0523010276370885,
+            0.9025824784657333
+          ],
+          "shoulderEntryDisplacementMeters": 0.34037583982333736,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.904621747427366,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377563,
+            -0.20359463942371506,
+            -0.5421829880482231
+          ],
+          "wristRollRadians": -0.08090105787094497,
+          "palmOrientationError": 0.00004767300440875606,
+          "contactIterationErrors": [
+            0.1425459064649642,
+            1.8070459184728985e-8
+          ],
+          "contactError": 9.028138403087591e-13,
+          "wristContactError": 2.661985378096932e-8,
+          "reachRatio": 0.6578786466874315,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.2648861042446879,
+            -0.47416660137573036,
+            0.6405260886721301,
+            0.5428883086310148
+          ],
+          "elbowQuaternion": [
+            -0.38054251614156237,
+            -0.48315166637121687,
+            -0.6499418706984055,
+            0.4464610009893611
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 104.02219141803161,
+        "p95FrameMs": 11.200000000004366,
+        "maxFrameMs": 16.69999999999709
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "compact/mp5/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/compact-mp5-hip.png",
+      "weapon": "mp5",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -6.238905152524176,
+          -46.524020033154585
+        ],
+        "ndcMax": [
+          20.903673350038517,
+          6.104117886560258
+        ],
+        "nearestDepth": 0.033141540452202634
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod0.glb",
+        "weapon": "mp5",
+        "clips": 13,
+        "meshes": 6,
+        "renderPrimitives": 6,
+        "triangles": 8468,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9130087055406164,
+        "sightForwardDot": 0.9999744908198132,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.3406996247621788,
+          -0.3727587136634839,
+          -0.3683583780589352
+        ],
+        "rootRotation": [
+          1.2639770507802508,
+          0.1,
+          0
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "mp5",
+          "gripFamily": "compact",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "compact",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.35425666622877167,
+            1.2617091711390795,
+            11.928581907163368
+          ],
+          "socketReachRatio": 0.612657627519512,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.40895317973002837,
+          "lowerLength": 0.40202793519417895,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6326278024771285,
+            1.0244982468614736,
+            11.592272299020525
+          ],
+          "elbow": [
+            0.7335112885281242,
+            1.2718227439999956,
+            11.901942789553605
+          ],
+          "wrist": [
+            0.3554397266755996,
+            1.2492933262146713,
+            12.036778896253988
+          ],
+          "palm": [
+            0.35425666567549624,
+            1.2617091693718683,
+            11.928581906966624
+          ],
+          "palmQuaternion": [
+            0.05728185757004127,
+            0.0028117800523740346,
+            0.04585927562017022,
+            0.9973002605287031
+          ],
+          "palmTargetQuaternion": [
+            0.05728186672207708,
+            0.0028117417561857572,
+            0.04585929900824572,
+            0.9973002589729951
+          ],
+          "target": [
+            0.35425666622877167,
+            1.2617091711390795,
+            11.928581907163368
+          ],
+          "wristTarget": [
+            0.3554397215406769,
+            1.2492933259086814,
+            12.036778898085318
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.45097467906447686,
+            -1.0314605187731838,
+            0.9122732980811394
+          ],
+          "shoulderEntryDisplacementMeters": 0.4155780979512863,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.6888237316062934,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.0911488579214175,
+            0.9892314248786132,
+            0.11451233004462992
+          ],
+          "wristRollRadians": -0.03,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10891345878107954,
+            4.120766606406399e-9
+          ],
+          "contactError": 1.8622184456931476e-9,
+          "wristContactError": 5.460295753782873e-9,
+          "reachRatio": 0.7029088056857798,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.12073991829836564,
+            -0.9674265919870934,
+            -0.18209982995432925,
+            -0.12785661178111413
+          ],
+          "elbowQuaternion": [
+            -0.3459275997585259,
+            0.5417695954567411,
+            0.6215223365039495,
+            0.4478055229568029
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "mp5",
+          "gripFamily": "compact",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "compact",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.38378129285072093,
+            1.72540499585076,
+            12.012482207180092
+          ],
+          "socketReachRatio": 0.8493710397616645,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.40895311197323964,
+          "lowerLength": 0.40202781476109606,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.09396726047497159,
+            1.150381907179347,
+            11.76787153349874
+          ],
+          "elbow": [
+            0.20167968014989873,
+            1.4291338617245217,
+            12.047045413318022
+          ],
+          "wrist": [
+            0.39893210445141614,
+            1.7739608717324364,
+            12.108788410999296
+          ],
+          "palm": [
+            0.3837812928263961,
+            1.725404995837684,
+            12.01248220719051
+          ],
+          "palmQuaternion": [
+            -0.2358892482915919,
+            -0.04725170877757169,
+            -0.46547893365578746,
+            0.8517352294855115
+          ],
+          "palmTargetQuaternion": [
+            -0.23588924819978507,
+            -0.04725170998884179,
+            -0.4654789322120934,
+            0.8517352300765538
+          ],
+          "target": [
+            0.38378129285072093,
+            1.72540499585076,
+            12.012482207180092
+          ],
+          "wristTarget": [
+            0.3989320802369132,
+            1.7739608294018305,
+            12.108788403419787
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.08305174184979845,
+            -1.0810571310311063,
+            0.8911256153798441
+          ],
+          "shoulderEntryDisplacementMeters": 0.9863767388418226,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.6888237129672194,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377562,
+            0.4553712525008592,
+            -0.3578410151544553
+          ],
+          "wristRollRadians": -0.05449386789812183,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10891327590358404,
+            1.9126856618090308e-8
+          ],
+          "contactError": 2.9516434430240374e-11,
+          "wristContactError": 4.935252071003659e-8,
+          "reachRatio": 0.953604878781893,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.11726986619407717,
+            0.947510530501187,
+            0.24067812421598464,
+            0.17477303452208426
+          ],
+          "elbowQuaternion": [
+            -0.26806517595878004,
+            -0.6791590945442717,
+            0.13705989500644114,
+            0.6694016514147667
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 103.69858281167387,
+        "p95FrameMs": 11.200000000004366,
+        "maxFrameMs": 16.60000000000582
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "long-gun/m4a1/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/long-gun-m4a1-hip.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -6.875150398241262,
+          -55.458288342352354
+        ],
+        "ndcMax": [
+          22.921256512831942,
+          6.591452692261504
+        ],
+        "nearestDepth": 0.029346816818241805
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487697,
+        "sightForwardDot": 0.9994291737710199,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.33926867277708406,
+          -0.3767691477889543,
+          -0.40740735007210355
+        ],
+        "rootRotation": [
+          1.1773681640625158,
+          0.1,
+          0
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.34775732225418926,
+            1.2862013626080668,
+            11.890088648643859
+          ],
+          "socketReachRatio": 0.6546985879826772,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4176063790608399,
+          "lowerLength": 0.4105346005833232,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6372230147700636,
+            0.9830885817703496,
+            11.546149166052805
+          ],
+          "elbow": [
+            0.7060480608190108,
+            1.0895016272795097,
+            11.944061792770995
+          ],
+          "wrist": [
+            0.3504489853302657,
+            1.2865162389418638,
+            12.001273626594674
+          ],
+          "palm": [
+            0.34775732167243695,
+            1.2862013609470284,
+            11.890088648662644
+          ],
+          "palmQuaternion": [
+            -0.0008555630336034505,
+            0.012154137214949536,
+            0.04619041179440303,
+            0.9988583437009425
+          ],
+          "palmTargetQuaternion": [
+            -0.0008555549200650683,
+            0.012154102696620107,
+            0.04619043538026145,
+            0.9988583430561117
+          ],
+          "target": [
+            0.34775732225418926,
+            1.2862013626080668,
+            11.890088648643859
+          ],
+          "wristTarget": [
+            0.3504489797130587,
+            1.286516242053997,
+            12.00127362749842
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.43228529468739313,
+            -1.031525706970216,
+            0.916536793459757
+          ],
+          "shoulderEntryDisplacementMeters": 0.40204063907199766,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.70361041464586,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.0922962005026588,
+            0.9957314234103211,
+            -0.0005863497492728112
+          ],
+          "wristRollRadians": -0.013919315010097754,
+          "palmOrientationError": 0.000012285029166069526,
+          "contactIterationErrors": [
+            0.11121799983562003,
+            4.372614184548504e-9
+          ],
+          "contactError": 1.760067400616289e-9,
+          "wristContactError": 6.484993829375323e-9,
+          "reachRatio": 0.7457825859255861,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.08142655156095142,
+            -0.9913739273073402,
+            0.0671163160153508,
+            -0.07773579021686051
+          ],
+          "elbowQuaternion": [
+            -0.6074890067980799,
+            0.5193663994349254,
+            0.2734919806596486,
+            0.5351801437575451
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.3761218409016764,
+            1.7161100236369384,
+            11.958843966048196
+          ],
+          "socketReachRatio": 0.8496265444912925,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.41760630987035946,
+          "lowerLength": 0.4105344776019503,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.08998523819815024,
+            1.1209518539198577,
+            11.715985599039497
+          ],
+          "elbow": [
+            0.18748870160947406,
+            1.4243895347276123,
+            11.985825745223838
+          ],
+          "wrist": [
+            0.3911395233684303,
+            1.7746108752834726,
+            12.052233073141167
+          ],
+          "palm": [
+            0.3761218408806012,
+            1.7161100236269062,
+            11.958843966057866
+          ],
+          "palmQuaternion": [
+            -0.27421704947766423,
+            -0.07040556369529888,
+            -0.4620059931966643,
+            0.8404751804192473
+          ],
+          "palmTargetQuaternion": [
+            -0.2742170494225444,
+            -0.07040556486142582,
+            -0.46200599172186363,
+            0.8404751809873
+          ],
+          "target": [
+            0.3761218409016764,
+            1.7161100236369384,
+            11.958843966048196
+          ],
+          "wristTarget": [
+            0.3911394980370495,
+            1.7746108317207216,
+            12.052233064881001
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.07426885077411417,
+            -1.0526950806305182,
+            0.89836032924057
+          ],
+          "shoulderEntryDisplacementMeters": 1.0149513146715152,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7036103956123956,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377565,
+            0.4227109468381823,
+            -0.3958896628533508
+          ],
+          "wristRollRadians": -0.0617437916020774,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.11121781084332891,
+            1.9468603993613874e-8
+          ],
+          "contactError": 2.526513860870738e-11,
+          "wristContactError": 5.106488483858622e-8,
+          "reachRatio": 0.9592229414504916,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.1097799751719122,
+            0.9576531777172415,
+            0.22422341885276592,
+            0.14343154010642598
+          ],
+          "elbowQuaternion": [
+            -0.26751645521032125,
+            -0.6818638453228355,
+            0.09128047430368524,
+            0.6746588157314444
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 90.60706736430147,
+        "p95FrameMs": 16.69999999999709,
+        "maxFrameMs": 16.700000000004366
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "heavy/minigun/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/heavy-minigun-hip.png",
+      "weapon": "minigun",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -0.33964605057903613,
+          -8.401967192534817
+        ],
+        "ndcMax": [
+          4.00774594251743,
+          -0.2630339420707853
+        ],
+        "nearestDepth": 0.16106971736527953
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod0.glb",
+        "weapon": "minigun",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 10840,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9529463451536702,
+        "sightForwardDot": 0.9999999999999962,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.6874294802222564,
+        "rootPosition": [
+          0.3400110973124279,
+          -0.5109352199751892,
+          -0.39878426332952444
+        ],
+        "rootRotation": [
+          1.1520996093750013,
+          -0.07999999721253076,
+          0.10999999829654661
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "minigun",
+          "gripFamily": "heavy",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "heavy",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.18169350563960715,
+            1.3101061372239877,
+            11.95135751188316
+          ],
+          "socketReachRatio": 0.8206791515771142,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.3623404778705726,
+          "lowerLength": 0.35620457640589487,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.666696114319415,
+            1.1156298778383675,
+            11.678059903270537
+          ],
+          "elbow": [
+            0.5029431325039868,
+            1.3023124028025324,
+            11.941925803154245
+          ],
+          "wrist": [
+            0.16280722160564137,
+            1.332558204775909,
+            12.043288766471091
+          ],
+          "palm": [
+            0.1816935046784412,
+            1.3101061358561448,
+            11.951357512019761
+          ],
+          "palmQuaternion": [
+            -0.10369011997012877,
+            -0.11365718273965486,
+            -0.12992583846352176,
+            0.9795150225556007
+          ],
+          "palmTargetQuaternion": [
+            -0.10369011575470673,
+            -0.1136572147980107,
+            -0.12992581077230245,
+            0.9795150234244978
+          ],
+          "target": [
+            0.18169350563960715,
+            1.3101061372239877,
+            11.95135751188316
+          ],
+          "wristTarget": [
+            0.1628072127753601,
+            1.3325582055611211,
+            12.04328876910258
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.5248645363707438,
+            -1.0115704775702206,
+            0.9030706707925852
+          ],
+          "shoulderEntryDisplacementMeters": 0.10289583763149081,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.6091714294156607,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.278098826681684,
+            0.9447352871798708,
+            -0.17359804075921437
+          ],
+          "wristRollRadians": -0.02826852230110396,
+          "palmOrientationError": 0.000060653715519759596,
+          "contactIterationErrors": [
+            0.09649944587266457,
+            1.0495490990337774e-8
+          ],
+          "contactError": 1.677347425814507e-9,
+          "wristContactError": 9.247440417639985e-9,
+          "reachRatio": 0.9172082081734009,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.16444144550134268,
+            -0.9517818238554513,
+            -0.1127549579323546,
+            0.23314521277841505
+          ],
+          "elbowQuaternion": [
+            -0.3405994656202422,
+            0.6646004951189258,
+            0.2067188708626317,
+            0.632111931809678
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "minigun",
+          "gripFamily": "heavy",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "heavy",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.5340261731310736,
+            1.4017254903197036,
+            11.993952526923554
+          ],
+          "socketReachRatio": 0.8477847709549924,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.3623404178367403,
+          "lowerLength": 0.3562044696998395,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.22069502877244285,
+            1.0160158453843997,
+            11.641615367267223
+          ],
+          "elbow": [
+            0.3500508665404752,
+            1.187632142347112,
+            11.933343857124061
+          ],
+          "wrist": [
+            0.5382732665414609,
+            1.4552861411942644,
+            12.07411070227943
+          ],
+          "palm": [
+            0.5340261730934642,
+            1.4017254903028655,
+            11.993952526936797
+          ],
+          "palmQuaternion": [
+            -0.25425089061410117,
+            -0.141511723801094,
+            -0.5299124228085027,
+            0.7965699849620947
+          ],
+          "palmTargetQuaternion": [
+            -0.2542508906928682,
+            -0.14151172513297075,
+            -0.529912421334189,
+            0.7965699855929237
+          ],
+          "target": [
+            0.5340261731310736,
+            1.4017254903197036,
+            11.993952526923554
+          ],
+          "wristTarget": [
+            0.538273242808517,
+            1.455286107445797,
+            12.074110684530154
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.16636811255586179,
+            -1.1021203501999097,
+            0.9072048887951344
+          ],
+          "shoulderEntryDisplacementMeters": 0.6570828248912329,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.60917141290108,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.9161836239724568,
+            0.30909862059524035,
+            -0.25507961484763064
+          ],
+          "wristRollRadians": -0.0877480618395849,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.0964992696292439,
+            1.7204435685037882e-8
+          ],
+          "contactError": 4.328227455046033e-11,
+          "wristContactError": 4.4913789300692736e-8,
+          "reachRatio": 0.9650689671719835,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.19344861509171393,
+            0.9132910534153104,
+            0.1427676690995302,
+            0.32877724636984534
+          ],
+          "elbowQuaternion": [
+            -0.12070900832031707,
+            -0.7053125528067147,
+            0.23254300505492273,
+            0.658701213725637
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 78.76082961900185,
+        "p95FrameMs": 16.80000000000291,
+        "maxFrameMs": 16.80000000000291
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "crossbow/explosive-crossbow/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/crossbow-explosive-crossbow-hip.png",
+      "weapon": "explosive-crossbow",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -2.7153359592711133,
+          -20.957520757949954
+        ],
+        "ndcMax": [
+          8.038598764588102,
+          1.3201174812135288
+        ],
+        "nearestDepth": 0.08256029083726801
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb",
+        "weapon": "explosive-crossbow",
+        "clips": 13,
+        "meshes": 52,
+        "renderPrimitives": 52,
+        "triangles": 8732,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9559139982204813,
+        "sightForwardDot": 0.9999999999999961,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.34075465108192937,
+          -0.38717662527522406,
+          -0.4182122132465067
+        ],
+        "rootRotation": [
+          0.9775085449219207,
+          0.09999999336870086,
+          4.052460618730067e-9
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "explosive-crossbow",
+          "gripFamily": "crossbow",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "crossbow",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.3449585264954356,
+            1.3527405302240834,
+            12.01057244193704
+          ],
+          "socketReachRatio": 0.7844666763750856,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4375745969669308,
+          "lowerLength": 0.43016467515467893,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.652357093613218,
+            0.9737543215659352,
+            11.53597246252963
+          ],
+          "elbow": [
+            0.6536169658724112,
+            1.152136470239363,
+            11.93553440135319
+          ],
+          "wrist": [
+            0.3448952569732518,
+            1.3864868553068845,
+            12.122115338533284
+          ],
+          "palm": [
+            0.34495852571130403,
+            1.3527405285253058,
+            12.010572442450547
+          ],
+          "palmQuaternion": [
+            -0.1462117142422208,
+            0.00672366518997163,
+            0.0472958281962914,
+            0.9880992011099311
+          ],
+          "palmTargetQuaternion": [
+            -0.1462117083239487,
+            0.006723637633310139,
+            0.047295852492355205,
+            0.9880992011852807
+          ],
+          "target": [
+            0.3449585264954356,
+            1.3527405302240834,
+            12.01057244193704
+          ],
+          "wristTarget": [
+            0.3448952493241094,
+            1.386486861113341,
+            12.122115343156164
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.43788031555714646,
+            -1.0317749807079761,
+            0.9174225620351493
+          ],
+          "shoulderEntryDisplacementMeters": 0.285855199496493,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.737732326987694,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09543213722318106,
+            0.9527704773720278,
+            -0.28830734405022385
+          ],
+          "wristRollRadians": -0.03,
+          "palmOrientationError": 0.0000371972383425841,
+          "contactIterationErrors": [
+            0.11653599062178187,
+            9.232152430383469e-9
+          ],
+          "contactError": 1.9402055236789426e-9,
+          "wristContactError": 1.0658111159086083e-8,
+          "reachRatio": 0.898920324790759,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.004271397374549226,
+            -0.9956683496560126,
+            0.0864953551557263,
+            -0.0338355758666214
+          ],
+          "elbowQuaternion": [
+            -0.4144335562202907,
+            0.6381341085390918,
+            0.14213074981688145,
+            0.6331102091690772
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "explosive-crossbow",
+          "gripFamily": "crossbow",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "crossbow",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.32069245524194234,
+            1.656362792713885,
+            11.843203858167549
+          ],
+          "socketReachRatio": 0.8501775843713452,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4375745244680476,
+          "lowerLength": 0.4301645462928429,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.03506846088858556,
+            1.0155863980369924,
+            11.615007664660359
+          ],
+          "elbow": [
+            0.13940502510643732,
+            1.3586861668527253,
+            11.865742430841038
+          ],
+          "wrist": [
+            0.33584113362454054,
+            1.7365411444023262,
+            11.926405686519374
+          ],
+          "palm": [
+            0.32069245521511436,
+            1.6563627927048103,
+            11.843203858181175
+          ],
+          "palmQuaternion": [
+            -0.3587167224924429,
+            -0.11975870657182047,
+            -0.4510790893227843,
+            0.8083983056980492
+          ],
+          "palmTargetQuaternion": [
+            -0.3587167225259013,
+            -0.11975870763770033,
+            -0.45107908777228717,
+            0.8083983062202351
+          ],
+          "target": [
+            0.32069245524194234,
+            1.656362792713885,
+            11.843203858167549
+          ],
+          "wristTarget": [
+            0.33584110862193883,
+            1.7365410963085333,
+            11.926405678798089
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.025641101023342504,
+            -1.0695428162453307,
+            0.910008184967344
+          ],
+          "shoulderEntryDisplacementMeters": 0.8394686372183908,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7377323070441288,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.815222043248438,
+            0.33569993910959395,
+            -0.47193068461762133
+          ],
+          "wristRollRadians": -0.07067944968993368,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.1165357811623033,
+            2.1696278557309785e-8
+          ],
+          "contactError": 3.1428829898784815e-11,
+          "wristContactError": 5.475181507188119e-8,
+          "reachRatio": 0.9691357399857399,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.1151103568043802,
+            0.9686051189281083,
+            0.1732526501859591,
+            0.1361515646115576
+          ],
+          "elbowQuaternion": [
+            -0.23000503196560315,
+            -0.6905128069925011,
+            0.08875831235132581,
+            0.6800086107089994
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 94.63722398899978,
+        "p95FrameMs": 16.69999999999709,
+        "maxFrameMs": 16.700000000004366
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "railgun/railgun/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/railgun-railgun-hip.png",
+      "weapon": "railgun",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -3.876295340306645,
+          -32.230991449299424
+        ],
+        "ndcMax": [
+          13.324976590795789,
+          8.200114032668427
+        ],
+        "nearestDepth": 0.050744036662479175
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod0.glb",
+        "weapon": "railgun",
+        "clips": 13,
+        "meshes": 9,
+        "renderPrimitives": 9,
+        "triangles": 19728,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9429903362757764,
+        "sightForwardDot": 0.9999999999999962,
+        "firstPersonWidth": null,
+        "firstPersonOptic": {
+          "contract": "clear-glass-and-opaque-backer-component-v3",
+          "clearGlassLensMeshCount": 1,
+          "clearGlassLensMeshes": [
+            "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Lens"
+          ],
+          "opticWindowOpacity": 0.02,
+          "opaqueBackerAperture": {
+            "applied": true,
+            "contract": "semantic-lens-grid-spatial-degenerate-v1",
+            "rayCount": 15,
+            "submittedElements": 20868,
+            "suppressedElements": 564,
+            "suppressionRatio": 0.02702702702702703,
+            "lensDimensionsMeters": [
+              0.17000000178814,
+              0.0800064097285347,
+              0.01199499509061494
+            ],
+            "batches": [
+              {
+                "mesh": "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Primary_PBR",
+                "submittedElements": 13380,
+                "seedElements": 6,
+                "suppressedElements": 564
+              }
+            ]
+          },
+          "adsAuthority": "railgun-fullscreen-scope-unchanged"
+        }
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.33928807520918186,
+          -0.3703541177670379,
+          -0.43236995168962833
+        ],
+        "rootRotation": [
+          1.3508605957031092,
+          0.09999999999999999,
+          1.4156518462603513e-18
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "railgun",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.35666777030000024,
+            1.2342257514502002,
+            11.813801281511797
+          ],
+          "socketReachRatio": 0.5818482974354635,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.40027253896370585,
+          "lowerLength": 0.3934942930648996,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6251919677620827,
+            0.977382244546672,
+            11.539514338344596
+          ],
+          "elbow": [
+            0.7089400915279931,
+            1.0441944929016778,
+            11.925183205468217
+          ],
+          "wrist": [
+            0.35768028309216215,
+            1.2214611708529957,
+            11.919631064562479
+          ],
+          "palm": [
+            0.3566677697953811,
+            1.2342257498201468,
+            11.81380128132002
+          ],
+          "palmQuaternion": [
+            0.060136857217239284,
+            0.001908593286494095,
+            0.047324623752960315,
+            0.9970658432641842
+          ],
+          "palmTargetQuaternion": [
+            0.060136866446639375,
+            0.0019085547722289514,
+            0.04732464709530721,
+            0.997065841602231
+          ],
+          "target": [
+            0.35666777030000024,
+            1.2342257514502002,
+            11.813801281511797
+          ],
+          "wristTarget": [
+            0.35768027903058475,
+            1.2214611729027105,
+            11.91963106449828
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.421193806711868,
+            -1.0312345987419198,
+            0.9171164107732424
+          ],
+          "shoulderEntryDisplacementMeters": 0.5104794798725303,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.6739901563372128,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09414202916233484,
+            0.9882878701425674,
+            0.12010147407199451
+          ],
+          "wristRollRadians": -0.023840685382486414,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10660160633716323,
+            3.5738747776295104e-9
+          ],
+          "contactError": 1.7171176862779189e-9,
+          "wristContactError": 4.549930057207308e-9,
+          "reachRatio": 0.6614042000312633,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.10487347074683416,
+            -0.9905266924032434,
+            0.02531152295074437,
+            -0.08495736328369269
+          ],
+          "elbowQuaternion": [
+            -0.684129525219264,
+            0.45470045800859915,
+            0.30749367155528956,
+            0.4802727643365617
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "railgun",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.42352611512206656,
+            1.8593660349658148,
+            11.923200813227773
+          ],
+          "socketReachRatio": 0.8491036250181284,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4002724726451574,
+          "lowerLength": 0.39349417518818935,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.13083893451027376,
+            1.2549818996532747,
+            11.865609689469771
+          ],
+          "elbow": [
+            0.21577068302200708,
+            1.5799609978816094,
+            12.083309620606558
+          ],
+          "wrist": [
+            0.4384497440666012,
+            1.8983990795700079,
+            12.02127004751227
+          ],
+          "palm": [
+            0.42352611511115135,
+            1.8593660349592633,
+            11.92320081323204
+          ],
+          "palmQuaternion": [
+            -0.19830938227158162,
+            -0.026313761808828006,
+            -0.4672482178217313,
+            0.861196886916407
+          ],
+          "palmTargetQuaternion": [
+            -0.19830938214748764,
+            -0.026313763065350163,
+            -0.467248216407169,
+            0.8611968875291769
+          ],
+          "target": [
+            0.42352611512206656,
+            1.8593660349658148,
+            11.923200813227773
+          ],
+          "wristTarget": [
+            0.4384497188778696,
+            1.8983990435493272,
+            12.021270054529984
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.13345656139355763,
+            -1.0579357245282424,
+            0.8742832394746339
+          ],
+          "shoulderEntryDisplacementMeters": 1.259138797847616,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.6739901380937835,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377563,
+            0.48470498643320226,
+            -0.31697672762800955
+          ],
+          "wristRollRadians": -0.05291814114860087,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10660144497338736,
+            1.5101909512563584e-8
+          ],
+          "contactError": 1.3426418821904878e-11,
+          "wristContactError": 4.451078465292074e-8,
+          "reachRatio": 0.9196141182603945,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.08858812270410452,
+            0.9105880562211499,
+            0.3717510072132096,
+            0.15742529980633513
+          ],
+          "elbowQuaternion": [
+            -0.37609715016024864,
+            -0.6415123595528756,
+            0.11345514682320404,
+            0.6588935846110257
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 73.71007371439188,
+        "p95FrameMs": 16.80000000000291,
+        "maxFrameMs": 22.099999999998545
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "flare-handgun/flare-gun/hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/flare-handgun-flare-gun-hip.png",
+      "weapon": "flare-gun",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -14.53849541233629,
+          -1.1888468081493127
+        ],
+        "ndcMax": [
+          3.981665519418711,
+          37.44086597304022
+        ],
+        "nearestDepth": -0.04882252784873664
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod0.glb",
+        "weapon": "flare-gun",
+        "clips": 13,
+        "meshes": 10,
+        "renderPrimitives": 10,
+        "triangles": 5764,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9250198183784498,
+        "sightForwardDot": 0.9999999999999962,
+        "firstPersonWidth": {
+          "contract": "mesh-geometry-only-socket-invariant-width-v1",
+          "multiplier": 3.5,
+          "widenedMeshCount": 10,
+          "sourceWidth": 0.24000004684428686,
+          "widenedWidth": 0.7348622830931013,
+          "measuredMultiplier": 3.0619255819140876,
+          "maximumSocketDriftMeters": 0
+        },
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.3399917908237762,
+          -0.40836739147562,
+          -0.3943965772514981
+        ],
+        "rootRotation": [
+          0.7771911621094042,
+          0.09999999999999999,
+          3.2062681487901555e-28
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "flare-gun",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.35401992744394833,
+            1.1784096120612424,
+            12.056628054801873
+          ],
+          "socketReachRatio": 0.646573701493231,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.45758855059887305,
+          "lowerLength": 0.4498397109595925,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6650389070191731,
+            1.0180866523202239,
+            11.585668161450874
+          ],
+          "elbow": [
+            0.7234894073195208,
+            1.0279342966964824,
+            12.039401383967427
+          ],
+          "wrist": [
+            0.34008051889941915,
+            1.2246003722843533,
+            12.168536348120645
+          ],
+          "palm": [
+            0.3540199269383259,
+            1.1784096110522142,
+            12.056628055155375
+          ],
+          "palmQuaternion": [
+            -0.19656495937243204,
+            -0.047096807934035055,
+            0.05669490204559279,
+            0.9777166228119438
+          ],
+          "palmTargetQuaternion": [
+            -0.1965649541710334,
+            -0.04709683453432601,
+            0.05669492631328034,
+            0.9777166216746638
+          ],
+          "target": [
+            0.35401992744394833,
+            1.1784096120612424,
+            12.056628054801873
+          ],
+          "wristTarget": [
+            0.3400805123448799,
+            1.224600375646444,
+            12.168536350328264
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.4706550075773771,
+            -1.0320771314872474,
+            0.9129101518587374
+          ],
+          "shoulderEntryDisplacementMeters": 0.10420260968016072,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.7719323930453833,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09234796939854785,
+            0.9162958082441425,
+            -0.38970994899050054
+          ],
+          "wristRollRadians": -0.15322884703679357,
+          "palmOrientationError": 0.0000628836276390757,
+          "contactIterationErrors": [
+            0.12186615724937658,
+            1.112227306289597e-8
+          ],
+          "contactError": 1.182690021885069e-9,
+          "wristContactError": 7.690202922628154e-9,
+          "reachRatio": 0.769820097688642,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.12090345632741044,
+            -0.8981432359257122,
+            0.36059101221247986,
+            -0.22066989808434664
+          ],
+          "elbowQuaternion": [
+            -0.4601101278792841,
+            0.5441800565873199,
+            0.4423859403118516,
+            0.5444827050053372
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "flare-gun",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.3728635637630034,
+            1.5730983928411597,
+            11.927203702569495
+          ],
+          "socketReachRatio": 0.8506816285316515,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.45758847478400644,
+          "lowerLength": 0.4498395762038248,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.034188165311616614,
+            0.9840716639886511,
+            11.56083493422888
+          ],
+          "elbow": [
+            0.17848610009254257,
+            1.2987291926183233,
+            11.860094001124365
+          ],
+          "wrist": [
+            0.3882524683078086,
+            1.6730007964334628,
+            11.995277233287295
+          ],
+          "palm": [
+            0.37286356372193324,
+            1.5730983928326139,
+            11.927203702591317
+          ],
+          "palmQuaternion": [
+            -0.4391858741844416,
+            -0.1667885165840721,
+            -0.4354017407895169,
+            0.7679340355867652
+          ],
+          "palmTargetQuaternion": [
+            -0.43918587432107853,
+            -0.16678851755262916,
+            -0.4354017391567244,
+            0.7679340360660711
+          ],
+          "target": [
+            0.3728635637630034,
+            1.5730983928411597,
+            11.927203702569495
+          ],
+          "wristTarget": [
+            0.3882524410165904,
+            1.673000747739632,
+            11.995277215699561
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.02355555488319305,
+            -1.046451560992568,
+            0.9152247224962455
+          ],
+          "shoulderEntryDisplacementMeters": 0.6035172375947636,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7719323721896298,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377563,
+            0.23508218667225905,
+            -0.529291540873611
+          ],
+          "wristRollRadians": -0.07725596751445744,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.12186592234532981,
+            2.313714513813849e-8
+          ],
+          "contactError": 4.7286484718717044e-11,
+          "wristContactError": 5.852544854241401e-8,
+          "reachRatio": 0.9787022183192373,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.1581012413613025,
+            0.967291742793596,
+            0.02414237153950405,
+            0.19689547404598184
+          ],
+          "elbowQuaternion": [
+            -0.16760015604394585,
+            -0.7028079970221353,
+            0.11855477382522982,
+            0.681113700213869
+          ]
+        }
+      ],
+      "cadence": {
+        "frames": 30,
+        "meanFps": 77.39938080019262,
+        "p95FrameMs": 16.80000000000291,
+        "maxFrameMs": 16.900000000001455
+      },
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "handgun/pistol/hip-2560x1440",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/handgun-pistol-hip-2560x1440.png",
+      "weapon": "pistol",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -4.316301438469046,
+          -1.0700657098632083
+        ],
+        "ndcMax": [
+          1.6597128969290356,
+          7.692839358184745
+        ],
+        "nearestDepth": -0.16069593503915414
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb",
+        "weapon": "pistol",
+        "clips": 13,
+        "meshes": 9,
+        "renderPrimitives": 9,
+        "triangles": 11656,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.8914359968605443,
+        "sightForwardDot": 0.9999999999999961,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.340838605333714,
+          -0.4007382027964482,
+          -0.3841269130146405
+        ],
+        "rootRotation": [
+          1.0412778528886318e-10,
+          0.09999999999999999,
+          4.965207558637355e-36
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "pistol",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.3584648369790192,
+            1.214366533846036,
+            12.291493471289444
+          ],
+          "socketReachRatio": 0.49059518214928394,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.5352386659469306,
+          "lowerLength": 0.5261748932941017,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.7195498742544195,
+            1.3306882234180446,
+            11.934785273060296
+          ],
+          "elbow": [
+            0.8360328109768403,
+            1.1794125090889243,
+            12.434813075477877
+          ],
+          "wrist": [
+            0.3408774195335122,
+            1.3396135073243087,
+            12.357245110544472
+          ],
+          "palm": [
+            0.3584648369612974,
+            1.2143665338322265,
+            12.291493471311014
+          ],
+          "palmQuaternion": [
+            -0.5181576010264421,
+            -0.029668445394029814,
+            0.0702807549592401,
+            0.8518762208384174
+          ],
+          "palmTargetQuaternion": [
+            -0.5181576005648575,
+            -0.029668461087638393,
+            0.07028078327683482,
+            0.8518762204073757
+          ],
+          "target": [
+            0.3584648369790192,
+            1.214366533846036,
+            12.291493471289444
+          ],
+          "wristTarget": [
+            0.34087741648613085,
+            1.3396135083102496,
+            12.357245110067085
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.8237717709665144,
+            -1.0333311958818856,
+            0.8588425790765725
+          ],
+          "shoulderEntryDisplacementMeters": 0.5782699539947154,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.9046217718222178,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.08899517883103475,
+            0.4531466249577284,
+            -0.8869825220568057
+          ],
+          "wristRollRadians": -0.16962634015954636,
+          "palmOrientationError": 0.00012163617722000561,
+          "contactIterationErrors": [
+            0.14254613475217676,
+            7.267977007119804e-9
+          ],
+          "contactError": 3.114557020600093e-11,
+          "wristContactError": 3.238288262198639e-9,
+          "reachRatio": 0.5345718424445878,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.15952973636070203,
+            0.5666991078494779,
+            -0.7847716639220884,
+            -0.19374163177863415
+          ],
+          "elbowQuaternion": [
+            -0.8177798536379791,
+            0.28955512779395015,
+            0.21335708656142535,
+            0.449302451101811
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "pistol",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.37775483425177325,
+            1.3955134849230657,
+            11.925445046894316
+          ],
+          "socketReachRatio": 0.5808307543966069,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.5352385772667231,
+          "lowerLength": 0.5261747356710649,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -0.09944349220606036,
+            1.090278593939,
+            11.682160209235695
+          ],
+          "elbow": [
+            0.1856379854898384,
+            1.1131010874677496,
+            12.134584857220103
+          ],
+          "wrist": [
+            0.39510640310116074,
+            1.5345663757218007,
+            11.899319307404914
+          ],
+          "palm": [
+            0.37775483425259143,
+            1.3955134849228898,
+            11.925445046893929
+          ],
+          "palmQuaternion": [
+            -0.6987638715307751,
+            -0.3215088062630925,
+            -0.33693674718677563,
+            0.5429868940864696
+          ],
+          "palmTargetQuaternion": [
+            -0.6987638724339467,
+            -0.3215088069034514,
+            -0.3369367451353084,
+            0.5429868943558939
+          ],
+          "target": [
+            0.37775483425177325,
+            1.3955134849230657,
+            11.925445046894316
+          ],
+          "wristTarget": [
+            0.39510639246072987,
+            1.5345663543124999,
+            11.89931931935577
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            -0.07868058915118165,
+            -1.052301027636208,
+            0.9025824785087656
+          ],
+          "shoulderEntryDisplacementMeters": 0.33794807705114444,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.9046217474273653,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377563,
+            -0.2035946392825212,
+            -0.5421829881012427
+          ],
+          "wristRollRadians": -0.0853008489841896,
+          "palmOrientationError": 0.00004833745599984325,
+          "contactIterationErrors": [
+            0.14254590653677593,
+            1.827015857515408e-8
+          ],
+          "contactError": 9.221184572717793e-13,
+          "wristContactError": 2.6728260236147147e-8,
+          "reachRatio": 0.6589118236838243,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.2670737477044082,
+            -0.47185023400741305,
+            0.6382410857270429,
+            0.5465137568664097
+          ],
+          "elbowQuaternion": [
+            -0.37585531079725615,
+            -0.4845605419920361,
+            -0.6516204802640995,
+            0.44645785488696116
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "long-gun/m4a1/hip-2560x1440",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/long-gun-m4a1-hip-2560x1440.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -7.06709823280018,
+          -57.20633307639186
+        ],
+        "ndcMax": [
+          23.683451184331293,
+          6.918861093442734
+        ],
+        "nearestDepth": 0.028431840938345943
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487688,
+        "sightForwardDot": 0.9994291737710198,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.33979468396861406,
+          -0.3736028178422582,
+          -0.40740734932297296
+        ],
+        "rootRotation": [
+          1.1773681632411337,
+          0.09999999999999999,
+          1.4728766872602258e-43
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.34824649617868764,
+            1.2921382769055059,
+            11.890088657867036
+          ],
+          "socketReachRatio": 0.6587332853395211,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4176063790608404,
+          "lowerLength": 0.41053460058332314,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6377121886945614,
+            0.9830885888615384,
+            11.546149173990585
+          ],
+          "elbow": [
+            0.7037625712183204,
+            1.0936933664631705,
+            11.943388411554176
+          ],
+          "wrist": [
+            0.34915758635269495,
+            1.292288127335909,
+            12.001302825034209
+          ],
+          "palm": [
+            0.3482464955971513,
+            1.2921382752456052,
+            11.890088657874037
+          ],
+          "palmQuaternion": [
+            -0.0004841589072779034,
+            0.004122668189130461,
+            0.046195797627358676,
+            0.9989237796075128
+          ],
+          "palmTargetQuaternion": [
+            -0.00048415076587470386,
+            0.004122633481325292,
+            0.04619582120325649,
+            0.9989237786711114
+          ],
+          "target": [
+            0.34824649617868764,
+            1.2921382769055059,
+            11.890088657867036
+          ],
+          "wristTarget": [
+            0.34915758066662783,
+            1.2922881305203633,
+            12.001302825962863
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.4326171486589129,
+            -1.0315257070022386,
+            0.9165367927614906
+          ],
+          "shoulderEntryDisplacementMeters": 0.4079749351819639,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.7036104146458605,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09229620050265883,
+            0.9957314234027853,
+            -0.0005863625466084191
+          ],
+          "wristRollRadians": -0.03,
+          "palmOrientationError": 0.0000073129944062239804,
+          "contactIterationErrors": [
+            0.11121799989364163,
+            4.132819798401734e-9
+          ],
+          "contactError": 1.7588358947747328e-9,
+          "wristContactError": 6.58289505642174e-9,
+          "reachRatio": 0.7502533108898932,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.07806807679397446,
+            -0.9920643719890031,
+            0.06213640717146142,
+            -0.07650309875800768
+          ],
+          "elbowQuaternion": [
+            -0.604488752868463,
+            0.5228314651213845,
+            0.2678530454493248,
+            0.5380477235135179
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.3766110148261748,
+            1.7220469388180342,
+            11.958843969746102
+          ],
+          "socketReachRatio": 0.8496265444912902,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.41760630987035946,
+          "lowerLength": 0.4105344776019504,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.09158237999024704,
+            1.1257965798824368,
+            11.717365656834634
+          ],
+          "elbow": [
+            0.18812294062888496,
+            1.4302329744833695,
+            11.98642598055023
+          ],
+          "wrist": [
+            0.3914563908033487,
+            1.780773284687886,
+            12.052119030006256
+          ],
+          "palm": [
+            0.3766110148052504,
+            1.7220469388080724,
+            11.958843969755703
+          ],
+          "palmQuaternion": [
+            -0.27485205222291154,
+            -0.07156115043826065,
+            -0.46162850854896914,
+            0.840377576749663
+          ],
+          "palmTargetQuaternion": [
+            -0.27485205216925557,
+            -0.07156115160387087,
+            -0.4616285070739061,
+            0.8403775773164068
+          ],
+          "target": [
+            0.3766110148261748,
+            1.7220469388180342,
+            11.958843969746102
+          ],
+          "wristTarget": [
+            0.3914563655135846,
+            1.7807732410891486,
+            12.052119021835628
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.07572032985540518,
+            -1.0474302469657921,
+            0.8981803189293665
+          ],
+          "shoulderEntryDisplacementMeters": 1.0253168264387402,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7036103956123957,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377563,
+            0.4227109417501308,
+            -0.39588966828611444
+          ],
+          "wristRollRadians": -0.06449378522760636,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.11121781087942788,
+            1.9444873255312763e-8
+          ],
+          "contactError": 2.5084907283765173e-11,
+          "wristContactError": 5.106056456267932e-8,
+          "reachRatio": 0.9591867194758851,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.1088524063208444,
+            0.9576440490600906,
+            0.22557234045160143,
+            0.14207796507954246
+          ],
+          "elbowQuaternion": [
+            -0.2680633933932017,
+            -0.681793317614188,
+            0.09004826192977664,
+            0.6746785899245559
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "railgun/railgun/hip-2560x1440",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/railgun-railgun-hip-2560x1440.png",
+      "weapon": "railgun",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -3.7889420247765973,
+          -31.60427019208276
+        ],
+        "ndcMax": [
+          13.069038731987828,
+          7.937169059030458
+        ],
+        "nearestDepth": 0.051549793826875856
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod0.glb",
+        "weapon": "railgun",
+        "clips": 13,
+        "meshes": 9,
+        "renderPrimitives": 9,
+        "triangles": 19728,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9429903362757769,
+        "sightForwardDot": 0.9999999999999961,
+        "firstPersonWidth": null,
+        "firstPersonOptic": {
+          "contract": "clear-glass-and-opaque-backer-component-v3",
+          "clearGlassLensMeshCount": 1,
+          "clearGlassLensMeshes": [
+            "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Lens"
+          ],
+          "opticWindowOpacity": 0.02,
+          "opaqueBackerAperture": {
+            "applied": true,
+            "contract": "semantic-lens-grid-spatial-degenerate-v1",
+            "rayCount": 15,
+            "submittedElements": 20868,
+            "suppressedElements": 564,
+            "suppressionRatio": 0.02702702702702703,
+            "lensDimensionsMeters": [
+              0.17000000178814,
+              0.0800064097285347,
+              0.01199499509061494
+            ],
+            "batches": [
+              {
+                "mesh": "railgun_FP_LOD0_Runtime_static_MAT_Pass65_railgun_Primary_PBR",
+                "submittedElements": 13380,
+                "seedElements": 6,
+                "suppressedElements": 564
+              }
+            ]
+          },
+          "adsAuthority": "railgun-fullscreen-scope-unchanged"
+        }
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.33925449798166113,
+          -0.3764421286622313,
+          -0.4323699513096094
+        ],
+        "rootRotation": [
+          1.3508605956547297,
+          0.09999999999999999,
+          8.60333502954087e-52
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "railgun",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.35655882756464946,
+            1.2276707322401483,
+            11.813801283036682
+          ],
+          "socketReachRatio": 0.5772966205003977,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.40027253896370596,
+          "lowerLength": 0.3934942930649,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6250830250267343,
+            0.9773822458542218,
+            11.539514339805354
+          ],
+          "elbow": [
+            0.7044154394065457,
+            1.029296893249513,
+            11.928396503509825
+          ],
+          "wrist": [
+            0.3575572231778863,
+            1.2149048102660243,
+            11.919631038412385
+          ],
+          "palm": [
+            0.35655882706066006,
+            1.227670730612142,
+            11.813801282845056
+          ],
+          "palmQuaternion": [
+            0.06014000466441566,
+            0.0018422754118802031,
+            0.04732062376228106,
+            0.9970659680127589
+          ],
+          "palmTargetQuaternion": [
+            0.060140013894063225,
+            0.0018422368960046447,
+            0.047320647104725194,
+            0.9970659663480802
+          ],
+          "target": [
+            0.35655882756464946,
+            1.2276707322401483,
+            11.813801283036682
+          ],
+          "wristTarget": [
+            0.35755721922903333,
+            1.214904812379102,
+            11.919631038312593
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.4211204122868512,
+            -1.031234598744232,
+            0.9171164106465123
+          ],
+          "shoulderEntryDisplacementMeters": 0.5039262942262213,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.6739901563372135,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09414202916233487,
+            0.9882878701728239,
+            0.12010147382302051
+          ],
+          "wristRollRadians": -0.0239737114580875,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10660160623333016,
+            3.792784303508005e-9
+          ],
+          "contactError": 1.7149725289984936e-9,
+          "wristContactError": 4.479787456138287e-9,
+          "reachRatio": 0.6576138712850831,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.09855065619469348,
+            -0.9913485835271687,
+            0.0454932459975817,
+            -0.07379782294129796
+          ],
+          "elbowQuaternion": [
+            -0.6990091291413347,
+            0.4487615145928039,
+            0.2810190289177133,
+            0.48065335303479473
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "railgun",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.4234171723867158,
+            1.852811015783323,
+            11.92320081459517
+          ],
+          "socketReachRatio": 0.8491036250181299,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4002724726451573,
+          "lowerLength": 0.39349417518818874,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.12987343528183504,
+            1.2489187464858822,
+            11.8648149623965
+          ],
+          "elbow": [
+            0.22130815262737968,
+            1.569989556599431,
+            12.08565722185898
+          ],
+          "wrist": [
+            0.43834366805195546,
+            1.8918400082397993,
+            12.021271225321762
+          ],
+          "palm": [
+            0.42341717237384446,
+            1.8528110157755968,
+            11.923200814600202
+          ],
+          "palmQuaternion": [
+            -0.19829820270941073,
+            -0.026293156433810472,
+            -0.46725296253387116,
+            0.8611975162411194
+          ],
+          "palmTargetQuaternion": [
+            -0.19829820258529246,
+            -0.02629315769034019,
+            -0.4672529611193153,
+            0.8611975168539125
+          ],
+          "target": [
+            0.4234171723867158,
+            1.852811015783323,
+            11.92320081459517
+          ],
+          "wristTarget": [
+            0.438343643494301,
+            1.891839971822294,
+            12.021271232607065
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.1323060007032458,
+            -1.0675928942137716,
+            0.8744410893550676
+          ],
+          "shoulderEntryDisplacementMeters": 1.2478783802628153,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.6739901380937829,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377565,
+            0.48470498635334797,
+            -0.3169767277501188
+          ],
+          "wristRollRadians": -0.052870288150907496,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.10660144570096279,
+            1.569712374191456e-8
+          ],
+          "contactError": 1.583322929206832e-11,
+          "wristContactError": 4.452402408243164e-8,
+          "reachRatio": 0.9197348962505166,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.09366108684547315,
+            0.9102986409092765,
+            0.3667542543633039,
+            0.16755686221717594
+          ],
+          "elbowQuaternion": [
+            -0.36825357114142154,
+            -0.6432968314545475,
+            0.13597160206501474,
+            0.6573204830324421
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "flare-handgun/flare-gun/hip-2560x1440",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/flare-handgun-flare-gun-hip-2560x1440.png",
+      "weapon": "flare-gun",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -17.006996707704733,
+          -1.1791109591880948
+        ],
+        "ndcMax": [
+          4.84903911394188,
+          42.8679128345791
+        ],
+        "nearestDepth": -0.041836761520018584
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod0.glb",
+        "weapon": "flare-gun",
+        "clips": 13,
+        "meshes": 10,
+        "renderPrimitives": 10,
+        "triangles": 5764,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.92501981837845,
+        "sightForwardDot": 0.9999999999999962,
+        "firstPersonWidth": {
+          "contract": "mesh-geometry-only-socket-invariant-width-v1",
+          "multiplier": 3.5,
+          "widenedMeshCount": 10,
+          "sourceWidth": 0.24000004684428686,
+          "widenedWidth": 0.7348622830931013,
+          "measuredMultiplier": 3.0619255819140876,
+          "maximumSocketDriftMeters": 0
+        },
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 82,
+        "scaleMultiplier": 1.1328765329964674,
+        "rootScale": 0.9289587570571032,
+        "rootPosition": [
+          0.3406776503697992,
+          -0.4005646019021759,
+          -0.39439657792292443
+        ],
+        "rootRotation": [
+          0.7771911623015975,
+          0.09999999999999999,
+          7.967858480680743e-61
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "flare-gun",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.354829178359952,
+            1.1854110455671776,
+            12.056628039440874
+          ],
+          "socketReachRatio": 0.6487245025204378,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.45758855059887205,
+          "lowerLength": 0.4498397109595917,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6658481579351787,
+            1.018086638200269,
+            11.585668145675326
+          ],
+          "elbow": [
+            0.7315015576296363,
+            1.0510843241911565,
+            12.037318517232999
+          ],
+          "wrist": [
+            0.3409267855971172,
+            1.2316066442576958,
+            12.168538940121605
+          ],
+          "palm": [
+            0.35482917781840195,
+            1.1854110444865738,
+            12.056628039819659
+          ],
+          "palmQuaternion": [
+            -0.19657365810743277,
+            -0.04694669265933177,
+            0.05666472135537834,
+            0.9777238430932816
+          ],
+          "palmTargetQuaternion": [
+            -0.19657365290627155,
+            -0.04694671925641803,
+            0.05666474562428292,
+            0.9777238419602333
+          ],
+          "target": [
+            0.354829178359952,
+            1.1854110455671776,
+            12.056628039440874
+          ],
+          "wristTarget": [
+            0.34092677887065903,
+            1.2316066473666414,
+            12.168538942381478
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.4712277148053729,
+            -1.0320771314452144,
+            0.9129101533690256
+          ],
+          "shoulderEntryDisplacementMeters": 0.11116040387122034,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.7719323930453814,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.09234796939854784,
+            0.91629581117284,
+            -0.38970994210447346
+          ],
+          "wristRollRadians": -0.1529217745518344,
+          "palmOrientationError": 0.00006284058365370107,
+          "contactIterationErrors": [
+            0.12186615709835816,
+            1.0709985704807814e-8
+          ],
+          "contactError": 1.2666724695188582e-9,
+          "wristContactError": 7.747115892870964e-9,
+          "reachRatio": 0.7721213647678455,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.12730061555995248,
+            -0.9053114266710955,
+            0.33466573924279275,
+            -0.22848329696911765
+          ],
+          "elbowQuaternion": [
+            -0.42953410984666723,
+            0.550881421460393,
+            0.46835712540112023,
+            0.540991414954071
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "flare-gun",
+          "gripFamily": "handgun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "handgun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.37367281467900704,
+            1.580099827319728,
+            11.927203690174608
+          ],
+          "socketReachRatio": 0.8506816285316506,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4575884747840066,
+          "lowerLength": 0.44983957620382453,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.02931533732603947,
+            0.9730153581883932,
+            11.597437163121095
+          ],
+          "elbow": [
+            0.17719125623330953,
+            1.2998306438550977,
+            11.88153525372793
+          ],
+          "wrist": [
+            0.38911126773687343,
+            1.679956421790867,
+            11.995333191264828
+          ],
+          "palm": [
+            0.3736728146380575,
+            1.5800998273112106,
+            11.927203690196366
+          ],
+          "palmQuaternion": [
+            -0.43902922901109276,
+            -0.1665122785127026,
+            -0.4355596882767968,
+            0.7679939813371589
+          ],
+          "palmTargetQuaternion": [
+            -0.4390292291472646,
+            -0.1665122794814235,
+            -0.4355596866439752,
+            0.7679939818168247
+          ],
+          "target": [
+            0.37367281467900704,
+            1.580099827319728,
+            11.927203690174608
+          ],
+          "wristTarget": [
+            0.38911124021164273,
+            1.6799563724182296,
+            11.995333176484184
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.021017299938920736,
+            -1.1029809042898049,
+            0.9117687426190441
+          ],
+          "shoulderEntryDisplacementMeters": 0.6289652930701605,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7719323721896297,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.8152219515377561,
+            0.23508219064992164,
+            -0.529291539106952
+          ],
+          "wristRollRadians": -0.07653656809292972,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.12186592427274023,
+            2.3355462590632535e-8
+          ],
+          "contactError": 4.714706803731305e-11,
+          "wristContactError": 5.8427417240524126e-8,
+          "reachRatio": 0.9779667516426092,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.15957382535109113,
+            0.9641074929137727,
+            0.04756220333151143,
+            0.20681096002047647
+          ],
+          "elbowQuaternion": [
+            -0.1672762083313915,
+            -0.7030611327936457,
+            0.12491151765131957,
+            0.6797946943300107
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "long-gun/m4a1/ads",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/long-gun-m4a1-ads.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -8.612957861704434,
+          -39.075658789735094
+        ],
+        "ndcMax": [
+          10.444661652047783,
+          10.611520741196841
+        ],
+        "nearestDepth": 0.04463377288046466
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487694,
+        "sightForwardDot": 0.9994291737710201,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 62.09655899987664,
+        "scaleMultiplier": 0.85,
+        "rootScale": 0.6460004091176867,
+        "rootPosition": [
+          -0.000021683625745580123,
+          -0.02527868050111466,
+          -0.4446023654749887
+        ],
+        "rootRotation": [
+          0.7903905283557215,
+          0.0002249140397349352,
+          1.4501609604367424e-66
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            -0.00010861686168854877,
+            1.6328797029107232,
+            11.962795033364307
+          ],
+          "socketReachRatio": 0.76827627252535,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.326416241365236,
+          "lowerLength": 0.32088868367900225,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.24526107317531284,
+            1.3213327620246702,
+            11.662714252179898
+          ],
+          "elbow": [
+            0.2425194171274484,
+            1.4790966476784462,
+            11.94845994085808
+          ],
+          "wrist": [
+            -0.0006667840575206585,
+            1.665754649886076,
+            12.04326925599932
+          ],
+          "palm": [
+            -0.00010861750837084995,
+            1.632879701815924,
+            11.962795033807065
+          ],
+          "palmQuaternion": [
+            -0.19270374983280952,
+            -0.0028574579190323037,
+            0.002109664419067469,
+            0.9812505536285814
+          ],
+          "palmTargetQuaternion": [
+            -0.19270374478707206,
+            -0.002857483751508934,
+            0.0021096899939062027,
+            0.981250554516928
+          ],
+          "target": [
+            -0.00010861686168854877,
+            1.6328797029107232,
+            11.962795033364307
+          ],
+          "wristTarget": [
+            -0.000666789779730332,
+            1.6657546542781692,
+            12.043269258230199
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.2697091829968254,
+            -1.0108586956994956,
+            0.9048553267386804
+          ],
+          "shoulderEntryDisplacementMeters": 0.28998179053978257,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.5477836954302224,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.003038973313590585,
+            0.9257216319063373,
+            -0.3781933696693625
+          ],
+          "wristRollRadians": -0.0076739772786762,
+          "palmOrientationError": 0.000014731936382172769,
+          "contactIterationErrors": [
+            0.08693201126271316,
+            5.396445383859443e-9
+          ],
+          "contactError": 1.3464094618653882e-9,
+          "wristContactError": 7.55056189558605e-9,
+          "reachRatio": 0.8792574325788499,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.0008640761981590175,
+            -0.9902034193064485,
+            0.1368566905726638,
+            -0.027689131651966098
+          ],
+          "elbowQuaternion": [
+            -0.4420852301817122,
+            0.6232419539362043,
+            0.17743626191914208,
+            0.6201987496481484
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.048541223998492554,
+            1.952786660343221,
+            11.890763472960655
+          ],
+          "socketReachRatio": 0.8462531126731744,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.32641618728345667,
+          "lowerLength": 0.3208885875523154,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -0.1899905439093276,
+            1.4601213298553886,
+            11.911986774170753
+          ],
+          "elbow": [
+            -0.11932593849417243,
+            1.7648374072316466,
+            12.005272190561943
+          ],
+          "wrist": [
+            0.06105309876740243,
+            2.0224040340729923,
+            11.94130083923241
+          ],
+          "palm": [
+            0.048541223991764804,
+            1.9527866603420185,
+            11.890763472963977
+          ],
+          "palmQuaternion": [
+            -0.4232460724949736,
+            -0.17375219934717223,
+            -0.477871056550923,
+            0.7498747821560622
+          ],
+          "palmTargetQuaternion": [
+            -0.4232460726681602,
+            -0.1737522003906333,
+            -0.47787105489990644,
+            0.7498747826932456
+          ],
+          "target": [
+            0.048541223998492554,
+            1.952786660343221,
+            11.890763472960655
+          ],
+          "wristTarget": [
+            0.0610530766882744,
+            2.0224040025457883,
+            11.941300847062761
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            -0.29749912951024565,
+            -1.053031748695927,
+            0.8643327863269341
+          ],
+          "shoulderEntryDisplacementMeters": 1.0097257401384727,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.5477836805529797,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.863766779762492,
+            0.1850040337196583,
+            -0.4687008189519088
+          ],
+          "wristRollRadians": -0.07481354220947845,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.08693186308150629,
+            1.3903412239575582e-8
+          ],
+          "contactError": 7.598854665301162e-12,
+          "wristContactError": 3.9278071342812077e-8,
+          "reachRatio": 0.9523753366281682,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.08778616143217771,
+            0.9590500668457045,
+            0.25039241360958364,
+            0.09909691393288081
+          ],
+          "elbowQuaternion": [
+            -0.3002481176442405,
+            -0.6676134158331442,
+            0.0532829141927534,
+            0.679193879467284
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "long-gun/m4a1/reload",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/long-gun-m4a1-reload.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": "reload",
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -15.973103177982807,
+          -3.861711743467115
+        ],
+        "ndcMax": [
+          7.7444568727318215,
+          36.640225407457386
+        ],
+        "nearestDepth": -0.0511009441707575
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.924501266048769,
+        "sightForwardDot": 0.9994291737710198,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 81.34375323618742,
+        "scaleMultiplier": 1.1198381899099419,
+        "rootScale": 0.9181239664665956,
+        "rootPosition": [
+          0.12723202460913427,
+          -0.23752455846127513,
+          -0.4125787222413701
+        ],
+        "rootRotation": [
+          1.2205332864697398,
+          0.096495493299185,
+          0.4294019270954556
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            0.22032025136562697,
+            1.4653295177649805,
+            11.898010070448917
+          ],
+          "socketReachRatio": 0.6801732576349548,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4447784414792775,
+          "lowerLength": 0.43724652921110224,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.6343839382314667,
+            1.1049360249032398,
+            11.655969669676285
+          ],
+          "elbow": [
+            0.5722861077393115,
+            1.2780268996076176,
+            12.060952710819146
+          ],
+          "wrist": [
+            0.176893266866805,
+            1.4570092987330878,
+            12.007902506081294
+          ],
+          "palm": [
+            0.22032025093490615,
+            1.4653295159039108,
+            11.898010070137795
+          ],
+          "palmQuaternion": [
+            0.012901729519183521,
+            -0.18966928661428611,
+            0.11887136583736756,
+            0.9745402542900286
+          ],
+          "palmTargetQuaternion": [
+            0.012901740432416207,
+            -0.1896693254368007,
+            0.1188713876039813,
+            0.9745402430332304
+          ],
+          "target": [
+            0.22032025136562697,
+            1.4653295177649805,
+            11.898010070448917
+          ],
+          "wristTarget": [
+            0.1768932601786434,
+            1.4570093017606165,
+            12.007902505183937
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.5019264852051103,
+            -1.0316761312033174,
+            0.9056191737243952
+          ],
+          "shoulderEntryDisplacementMeters": 0.5175723734835672,
+          "shoulderReachAdjusted": false,
+          "maximumSocketReach": 0.7500423364302243,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.23658403074011672,
+            0.9714062766058373,
+            -0.01994598128805014
+          ],
+          "wristRollRadians": -0.03,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.11845453372898121,
+            1.9020867250283824e-9
+          ],
+          "contactError": 1.9354321955623494e-9,
+          "wristContactError": 7.396126342898536e-9,
+          "reachRatio": 0.766530599921478,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.13439625640645364,
+            -0.9739684658206323,
+            -0.03940949210928955,
+            -0.1782413133440795
+          ],
+          "elbowQuaternion": [
+            -0.5223050678866968,
+            0.5413628720184402,
+            0.3737088607519954,
+            0.542646610839195
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            0.25205108677353505,
+            1.6753994666056358,
+            11.869682110878715
+          ],
+          "socketReachRatio": 0.8503642358562533,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.4447783677868359,
+          "lowerLength": 0.4372463982277982,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            0.03464483036578567,
+            1.0160635695133784,
+            11.585826213444012
+          ],
+          "elbow": [
+            0.05872100708180404,
+            1.3633791194254066,
+            11.862629523402196
+          ],
+          "wrist": [
+            0.22981620026468869,
+            1.755157975698871,
+            11.954391163794577
+          ],
+          "palm": [
+            0.2520510867345156,
+            1.6753994665832808,
+            11.869682110889519
+          ],
+          "palmQuaternion": [
+            -0.21024517985881236,
+            -0.31342640663697774,
+            -0.6022687805375047,
+            0.7034437912863765
+          ],
+          "palmTargetQuaternion": [
+            -0.21024518025974373,
+            -0.3134264083614509,
+            -0.6022687791514268,
+            0.7034437919113644
+          ],
+          "target": [
+            0.25205108677353505,
+            1.6753994666056358,
+            11.869682110878715
+          ],
+          "wristTarget": [
+            0.22981617883698924,
+            1.7551579266330872,
+            11.95439115230249
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.02530787398065337,
+            -1.0679317602160479,
+            0.9128950179740772
+          ],
+          "shoulderEntryDisplacementMeters": 1.2568810537190802,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.7500423161583254,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.9791172509604499,
+            0.18613856367399578,
+            0.08174254696933024
+          ],
+          "wristRollRadians": -0.36335764267284115,
+          "palmOrientationError": 0.000042861790820890864,
+          "contactIterationErrors": [
+            0.11845432888425463,
+            2.1961098105138575e-8
+          ],
+          "contactError": 4.624917606539004e-11,
+          "wristContactError": 5.476007232939799e-8,
+          "reachRatio": 0.9621515832797604,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.16218200194200713,
+            0.9057446426673509,
+            0.3087615633415942,
+            0.24081099959995692
+          ],
+          "elbowQuaternion": [
+            -0.22413879939450776,
+            -0.6893005334793839,
+            0.1550211428888598,
+            0.6712637472770722
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 3.554447978966673e-16,
+        "handContactError": 5.438959822042073e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "melee/knife/0.12",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/melee-knife-0_12.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": "melee",
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -0.5135908937100548,
+          -7.604695508011108
+        ],
+        "ndcMax": [
+          2.9540935646801496,
+          1.5043190543438338
+        ],
+        "nearestDepth": 0.26575763675247366
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.924501266048769,
+        "sightForwardDot": 0.9994291737710199,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": true,
+        "ndcMin": [
+          0.028992834326915864,
+          -0.22231130581144565
+        ],
+        "ndcMax": [
+          0.41568047256094953,
+          0.28797498855899817
+        ],
+        "nearestDepth": 1.7180604098351804
+      },
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 81.99999999999991,
+        "scaleMultiplier": 1.1328765329964656,
+        "rootScale": 0.9289587570571017,
+        "rootPosition": [
+          0.5502159703373014,
+          -0.31272762014618755,
+          -0.4074073500735781
+        ],
+        "rootRotation": [
+          1.1773681640624993,
+          0.038659127512917564,
+          -0.14312870246985904
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "action": "melee",
+          "progress": 0.12,
+          "shoulderBindDelta": 0.44716971681884654,
+          "elbowBindDelta": 0.6960391551109248,
+          "wristBindDelta": 0.598095658148413,
+          "knifeAttachedToRightWrist": true,
+          "supportChainScale": null,
+          "supportChainPolicy": null,
+          "supportPoseSource": null,
+          "supportChainVisible": false,
+          "stowedWithoutScaling": null,
+          "shoulder": [
+            0.8701619922973309,
+            0.5206740311201861,
+            11.277525204888097
+          ],
+          "elbow": [
+            0.9647510237836071,
+            0.797118507536551,
+            10.75995192023233
+          ],
+          "wrist": [
+            0.7615232755620075,
+            1.3207870454186754,
+            10.599148205324735
+          ],
+          "palm": [
+            0.7245835038571754,
+            1.4602523808896781,
+            10.534031856627186
+          ]
+        },
+        {
+          "side": "left",
+          "action": "melee",
+          "progress": 0.12,
+          "shoulderBindDelta": 0.9848291425864703,
+          "elbowBindDelta": 0.2084046694619055,
+          "wristBindDelta": 1.1592556728132863,
+          "knifeAttachedToRightWrist": false,
+          "supportChainScale": 1,
+          "supportChainPolicy": "two-chain-intact-melee-guard-v1",
+          "supportPoseSource": "solved-authored-guard",
+          "supportChainVisible": true,
+          "stowedWithoutScaling": false,
+          "shoulder": [
+            -0.01279843018607607,
+            0.7073820364247827,
+            11.260870709275142
+          ],
+          "elbow": [
+            -0.007224499282015576,
+            1.2804228877933208,
+            11.418489871420507
+          ],
+          "wrist": [
+            0.010821666933719661,
+            1.8418212529757132,
+            11.579406457811347
+          ],
+          "palm": [
+            0.031691487697885455,
+            1.9890725926342974,
+            11.525215291995629
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "authored-rigged-arms",
+        "knifeVisible": true,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 5.551115123125783e-16,
+        "handContactError": 9.930136612989092e-16,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "melee/knife/0.42",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/melee-knife-0_42.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": "melee",
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -0.41070822644384314,
+          -11.191645083878967
+        ],
+        "ndcMax": [
+          5.547776315446813,
+          2.9998855782927043
+        ],
+        "nearestDepth": 0.18000675772196928
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487685,
+        "sightForwardDot": 0.9994291737710199,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          0.10233937947896675,
+          -0.2696626822932066
+        ],
+        "ndcMax": [
+          0.4536834503227963,
+          1.1150026499989691
+        ],
+        "nearestDepth": 0.9143520879575071
+      },
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 81.99999999999991,
+        "scaleMultiplier": 1.1328765329964656,
+        "rootScale": 0.9289587570571017,
+        "rootPosition": [
+          0.8753609382850331,
+          -0.2156192371220323,
+          -0.4074073500735781
+        ],
+        "rootRotation": [
+          1.1773681640624993,
+          -0.05522978025078091,
+          -0.3622028205851554
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "action": "melee",
+          "progress": 0.42,
+          "shoulderBindDelta": 0.9374556680188393,
+          "elbowBindDelta": 0.2153054264942524,
+          "wristBindDelta": 1.03655157900289,
+          "knifeAttachedToRightWrist": true,
+          "supportChainScale": null,
+          "supportChainPolicy": null,
+          "supportPoseSource": null,
+          "supportChainVisible": false,
+          "stowedWithoutScaling": null,
+          "shoulder": [
+            1.0484516600670486,
+            0.3312844698510653,
+            11.101825392032092
+          ],
+          "elbow": [
+            0.8285883466675986,
+            0.9681372573120589,
+            11.254258219225312
+          ],
+          "wrist": [
+            0.6103796691738308,
+            1.5907629515807737,
+            11.415055414924764
+          ],
+          "palm": [
+            0.5834085386730306,
+            1.7589300321975163,
+            11.345513686687857
+          ]
+        },
+        {
+          "side": "left",
+          "action": "melee",
+          "progress": 0.42,
+          "shoulderBindDelta": 0.9543616765152767,
+          "elbowBindDelta": 0.2110670669597245,
+          "wristBindDelta": 1.1251687536692303,
+          "knifeAttachedToRightWrist": false,
+          "supportChainScale": 1,
+          "supportChainPolicy": "two-chain-intact-melee-guard-v1",
+          "supportPoseSource": "solved-authored-guard",
+          "supportChainVisible": true,
+          "stowedWithoutScaling": false,
+          "shoulder": [
+            0.11874024918458248,
+            0.6880906998030392,
+            11.23973533386303
+          ],
+          "elbow": [
+            0.1703813480827671,
+            1.3557753040534104,
+            11.409109216362292
+          ],
+          "wrist": [
+            0.2347975168716238,
+            2.0098768798344744,
+            11.579798989031447
+          ],
+          "palm": [
+            0.2777906244942286,
+            2.176335834093508,
+            11.514327111368004
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "authored-rigged-arms",
+        "knifeVisible": true,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 4.965068306494546e-16,
+        "handContactError": 1.1322097734007351e-15,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "melee/knife/0.82",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/melee-knife-0_82.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -0.5192636776085221,
+          -9.293916894112245
+        ],
+        "ndcMax": [
+          3.801128242389853,
+          2.1156382177009525
+        ],
+        "nearestDepth": 0.21752138820027866
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487683,
+        "sightForwardDot": 0.9994291737710199,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": {
+        "finite": true,
+        "nearPlaneClear": true,
+        "intersectsViewport": true,
+        "fullyInsideViewport": true,
+        "ndcMin": [
+          0.040547958666709814,
+          -0.2983275806298084
+        ],
+        "ndcMax": [
+          0.34425638714593987,
+          0.6489497898184412
+        ],
+        "nearestDepth": 1.3124449548420785
+      },
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 81.99999999999991,
+        "scaleMultiplier": 1.1328765329964656,
+        "rootScale": 0.9289587570571017,
+        "rootPosition": [
+          0.6764296021398495,
+          -0.2723913414403154,
+          -0.4074073500735781
+        ],
+        "rootRotation": [
+          1.1773681640624993,
+          -0.010107189253652699,
+          -0.25691677492518966
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "action": "melee",
+          "progress": 0.82,
+          "shoulderBindDelta": 0.537431408630509,
+          "elbowBindDelta": 0.20985574140126534,
+          "wristBindDelta": 0.6752607542205513,
+          "knifeAttachedToRightWrist": true,
+          "supportChainScale": null,
+          "supportChainPolicy": null,
+          "supportPoseSource": null,
+          "supportChainVisible": false,
+          "stowedWithoutScaling": null,
+          "shoulder": [
+            0.9209597323628738,
+            0.4543193505723899,
+            11.215966875715978
+          ],
+          "elbow": [
+            0.7410111692337775,
+            1.0374547050969363,
+            11.09953209595852
+          ],
+          "wrist": [
+            0.5591499835297776,
+            1.6115955431055333,
+            10.997982752830769
+          ],
+          "palm": [
+            0.5288613531244528,
+            1.760991113329707,
+            10.933635092916205
+          ]
+        },
+        {
+          "side": "left",
+          "action": "melee",
+          "progress": 0.82,
+          "shoulderBindDelta": 0.9711134097781687,
+          "elbowBindDelta": 0.20945528030451557,
+          "wristBindDelta": 1.143544767417334,
+          "knifeAttachedToRightWrist": false,
+          "supportChainScale": 1,
+          "supportChainPolicy": "two-chain-intact-melee-guard-v1",
+          "supportPoseSource": "solved-authored-guard",
+          "supportChainVisible": true,
+          "stowedWithoutScaling": false,
+          "shoulder": [
+            0.03917832909158342,
+            0.7222552924787788,
+            11.27716568439612
+          ],
+          "elbow": [
+            0.06827482585952253,
+            1.3222296518274081,
+            11.435814636769683
+          ],
+          "wrist": [
+            0.109842810259487,
+            1.9099585693541066,
+            11.596656534737727
+          ],
+          "palm": [
+            0.1410583837879804,
+            2.0618428399419666,
+            11.53891805880906
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "authored-rigged-arms",
+        "knifeVisible": true,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 5.551115123125783e-16,
+        "handContactError": 1.047382306668854e-15,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-hip",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/contact-m4a1-prone-wall-floor-hip.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -3.1242550798625923,
+          -2.7243080117136964
+        ],
+        "ndcMax": [
+          0.6380905321765413,
+          5.992387778291846
+        ],
+        "nearestDepth": -0.21052488697725025
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487689,
+        "sightForwardDot": 0.9994291737710198,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 81.99999999999991,
+        "scaleMultiplier": 1.1328765329964656,
+        "rootScale": 0.7989045310691075,
+        "rootPosition": [
+          0.3392136698169128,
+          0.05049248195872813,
+          -0.30375701245282655
+        ],
+        "rootRotation": [
+          1.4999987569096978,
+          -0.039918537590176335,
+          0.08992675760506633
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            -20.149042017860033,
+            0.7199413116496632,
+            -14.854639779124952
+          ],
+          "socketReachRatio": 0.846486172330075,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.3314197819543393,
+          "lowerLength": 0.32580749392770786,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -20.236585512758957,
+            0.22462632560236562,
+            -15.09235073671405
+          ],
+          "elbow": [
+            -20.09276039984544,
+            0.5219635228829569,
+            -15.119627027327994
+          ],
+          "wrist": [
+            -20.065898944642072,
+            0.6925484011553485,
+            -14.843348577752073
+          ],
+          "palm": [
+            -20.14904201787592,
+            0.7199413116525976,
+            -14.854639779000806
+          ],
+          "palmQuaternion": [
+            0.10376175901055383,
+            0.6521281941533515,
+            -0.11999694280171024,
+            0.7413251989079864
+          ],
+          "palmTargetQuaternion": [
+            0.10376179955224872,
+            0.6521282141855896,
+            -0.11999694152876003,
+            0.7413251751023542
+          ],
+          "target": [
+            -20.149042017860033,
+            0.7199413116496632,
+            -14.854639779124952
+          ],
+          "wristTarget": [
+            -20.065898944062898,
+            0.6925484048334226,
+            -14.843348571795087
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.6534416167701184,
+            -1.0305197715939598,
+            0.8640015871712518
+          ],
+          "shoulderEntryDisplacementMeters": 0.8813947649317557,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.5563338011123168,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.3132455014664921,
+            0.9496684459548447,
+            -0.0026643139297534667
+          ],
+          "wristRollRadians": -0.03,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.08826456312601291,
+            1.341715462123088e-8
+          ],
+          "contactError": 1.251929164948749e-10,
+          "wristContactError": 7.024909523050946e-9,
+          "reachRatio": 0.847278603638415,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.05563632953288236,
+            -0.8631400160008196,
+            -0.5018753212759557,
+            0.003882461637897538
+          ],
+          "elbowQuaternion": [
+            -0.43996885500045524,
+            0.6307565412443762,
+            0.29760198447663333,
+            0.5656913037537254
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            -19.984831345467367,
+            1.021155930516207,
+            -14.901486569725737
+          ],
+          "socketReachRatio": 0.8464863457756502,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.33141972704355505,
+          "lowerLength": 0.32580739632752265,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -19.881803067870713,
+            0.5288678741261303,
+            -14.663694801566999
+          ],
+          "elbow": [
+            -19.769663331211188,
+            0.8399419668584638,
+            -14.685980225434381
+          ],
+          "wrist": [
+            -19.89908005048678,
+            1.0413320117959473,
+            -14.906986639313756
+          ],
+          "palm": [
+            -19.984831345465953,
+            1.0211559305216091,
+            -14.90148656968385
+          ],
+          "palmQuaternion": [
+            -0.45525966422256436,
+            0.5691189196907068,
+            -0.2938914309792512,
+            0.6184416896171038
+          ],
+          "palmTargetQuaternion": [
+            -0.45525966244966665,
+            0.5691189187487323,
+            -0.29389142919804323,
+            0.6184416899857423
+          ],
+          "target": [
+            -19.984831345467367,
+            1.021155930516207,
+            -14.901486569725737
+          ],
+          "wristTarget": [
+            -19.899080037806957,
+            1.0413319920644182,
+            -14.90698661766028
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.45695608665529314,
+            -1.0979064240811762,
+            0.6551712149731637
+          ],
+          "shoulderEntryDisplacementMeters": 1.73837724382765,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.5563337860070243,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.1546843493954083,
+            0.4127329351802944,
+            -0.8976214548848409
+          ],
+          "wristRollRadians": -0.07549234513375437,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.08826443145320204,
+            9.595835028288224e-9
+          ],
+          "contactError": 4.225707842535899e-11,
+          "wristContactError": 3.192153130565041e-8,
+          "reachRatio": 0.8635467745727694,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.009558532003873741,
+            0.835219578214354,
+            0.5478609797416384,
+            0.04653211267393533
+          ],
+          "elbowQuaternion": [
+            -0.504285029921656,
+            -0.5349209559078273,
+            -0.0014613017773611443,
+            0.6779041555593875
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 1.8610729195778454e-15,
+        "handContactError": 2.0350724194510405e-15,
+        "bindPoseRestored": true
+      }
+    },
+    {
+      "label": "contact/m4a1/prone-wall-floor-ads",
+      "screenshot": "artifacts/pass65/first-person-arms-visual-gate/contact-m4a1-prone-wall-floor-ads.png",
+      "weapon": "m4a1",
+      "armsSource": "authored-two-chain",
+      "armMeshCount": 4,
+      "armMaterials": {
+        "contract": "opaque-depth-writing",
+        "total": 4,
+        "transparent": 0,
+        "nonOpaque": 0,
+        "depthWriteDisabled": 0
+      },
+      "authoredFingerBoneCount": 30,
+      "authoredArmAnimation": {
+        "clips": 13,
+        "activeAction": null,
+        "baseAction": "idle",
+        "skinId": "default",
+        "blendPolicy": "finger-tracks-first-runtime-ik-last",
+        "trackPolicy": "finger-bones-only",
+        "runtimeTracks": 390,
+        "upperChainTracksExcluded": 1053
+      },
+      "armFraming": {
+        "finite": true,
+        "nearPlaneClear": false,
+        "intersectsViewport": true,
+        "fullyInsideViewport": false,
+        "ndcMin": [
+          -5.44812070548889,
+          -6.443311638337327
+        ],
+        "ndcMax": [
+          3.2610631805506096,
+          11.875722639986993
+        ],
+        "nearestDepth": -0.10425901929782455
+      },
+      "importedModel": {
+        "source": "./assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+        "weapon": "m4a1",
+        "clips": 13,
+        "meshes": 8,
+        "renderPrimitives": 8,
+        "triangles": 32300,
+        "detailMeshes": 0,
+        "socketContractReady": true,
+        "muzzleForwardDot": 0.9245012660487714,
+        "sightForwardDot": 0.9994291737710203,
+        "firstPersonWidth": null,
+        "firstPersonOptic": null
+      },
+      "meleeKnifeFraming": null,
+      "viewmodelViewport": {
+        "aspect": 1.7777777777777777,
+        "fov": 62.0167794381842,
+        "scaleMultiplier": 0.85,
+        "rootScale": 0.5718392049275488,
+        "rootPosition": [
+          0.015550719867808776,
+          0.06353009829927987,
+          -0.25721164559769755
+        ],
+        "rootRotation": [
+          1.4999999999999996,
+          -0.11478264130213266,
+          0.0738037593845685
+        ]
+      },
+      "riggedArms": [
+        {
+          "side": "right",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "grip-socket-r",
+          "socketTarget": [
+            -20.047171298152772,
+            0.7553352009832278,
+            -14.520690917134226
+          ],
+          "socketReachRatio": 0.8410382255175842,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.24404022257947786,
+          "lowerLength": 0.23990762671835353,
+          "authoredPoleRadians": 0.00034043988586728285,
+          "authoredWristRollRadians": -0.02999999999999998,
+          "authoredCarriageMeters": 0.0023141543688994766,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -20.168492957820092,
+            0.42299451661136955,
+            -14.721924358821505
+          ],
+          "elbow": [
+            -20.032887871168,
+            0.625887191538434,
+            -14.720719749216896
+          ],
+          "wrist": [
+            -19.985765018223738,
+            0.7356192318736492,
+            -14.512647685200545
+          ],
+          "palm": [
+            -20.047171297061414,
+            0.7553352069242357,
+            -14.520690910903328
+          ],
+          "palmQuaternion": [
+            0.07669953462666264,
+            0.6574495601471897,
+            -0.14490537952675017,
+            0.7354452347029069
+          ],
+          "palmTargetQuaternion": [
+            0.07669955011973922,
+            0.6574495452877912,
+            -0.1449053452326254,
+            0.7354452497197327
+          ],
+          "target": [
+            -20.047171298152772,
+            0.7553352009832278,
+            -14.520690917134226
+          ],
+          "wristTarget": [
+            -19.985765017158993,
+            0.7356192343530513,
+            -14.512647680499144
+          ],
+          "contactAnchor": "right-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            0.3995342585867971,
+            -1.0469221864492904,
+            0.8460828300586186
+          ],
+          "shoulderEntryDisplacementMeters": 0.5089060670770803,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.4070186404165008,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            0.3139920643206659,
+            0.9462392398688864,
+            -0.07771926708351438
+          ],
+          "wristRollRadians": -0.012543643830895396,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.06499341648401902,
+            9.914619239009435e-9
+          ],
+          "contactError": 8.678175681741235e-9,
+          "wristContactError": 5.420726862098612e-9,
+          "reachRatio": 0.8642148398863073,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            0.004960351794327618,
+            -0.8970616328877477,
+            -0.4367564380522526,
+            0.06707932267661351
+          ],
+          "elbowQuaternion": [
+            -0.404772921321221,
+            0.6398625521480115,
+            0.2988478404545659,
+            0.5808827461539553
+          ]
+        },
+        {
+          "side": "left",
+          "weapon": "m4a1",
+          "gripFamily": "long-gun",
+          "handPolicy": {
+            "contract": "right-firing-hand-two-hand-support-always-active-v2",
+            "gripFamily": "long-gun",
+            "firingHand": "right",
+            "supportHand": "active",
+            "activeChainCount": 2
+          },
+          "active": true,
+          "socket": "support-socket-l",
+          "socketTarget": [
+            -19.929818180235166,
+            0.9675968619884587,
+            -14.57165913930955
+          ],
+          "socketReachRatio": 0.8410383976989482,
+          "gripSocketCalibration": 0,
+          "upperLength": 0.2440401821460429,
+          "lowerLength": 0.2399075548506738,
+          "authoredPoleRadians": -0.00034018429421748045,
+          "authoredWristRollRadians": -0.000018363497388067945,
+          "authoredCarriageMeters": 0.0023105141121285986,
+          "armRecoilKickRadians": 0,
+          "armLandDipRadians": 0,
+          "shoulder": [
+            -19.878797106539796,
+            0.6036297183556425,
+            -14.396762218276319
+          ],
+          "elbow": [
+            -19.773007875856052,
+            0.8217045391333652,
+            -14.425181060290493
+          ],
+          "wrist": [
+            -19.866615629433877,
+            0.9814943039286571,
+            -14.577694867556653
+          ],
+          "palm": [
+            -19.929818180234268,
+            0.9675968619929287,
+            -14.571659139289828
+          ],
+          "palmQuaternion": [
+            -0.4781740731384069,
+            0.5637232163358706,
+            -0.31518885852721223,
+            0.595165253003509
+          ],
+          "palmTargetQuaternion": [
+            -0.47817407117307603,
+            0.5637232152817517,
+            -0.31518885662424717,
+            0.5951652534129237
+          ],
+          "target": [
+            -19.929818180235166,
+            0.9675968619884587,
+            -14.57165913930955
+          ],
+          "wristTarget": [
+            -19.866615620200967,
+            0.9814942881679478,
+            -14.577694852513602
+          ],
+          "contactAnchor": "left-palm-contact",
+          "poseChainContract": "authored-palm-full-transform-to-socket-frame-v2",
+          "shoulderEntryPolicy": "camera-space-below-frame-continuation-v1",
+          "shoulderEntryNdc": [
+            -0.42119154498989286,
+            -1.0623511530445935,
+            0.6506349826069129
+          ],
+          "shoulderEntryDisplacementMeters": 1.1272256563001264,
+          "shoulderReachAdjusted": true,
+          "maximumSocketReach": 0.4070186292937512,
+          "segmentLengthScale": 1,
+          "authoredSegmentDirectionsPreserved": true,
+          "handDirection": [
+            -0.16393673828070382,
+            0.34401108463533164,
+            -0.9245437358448256
+          ],
+          "wristRollRadians": -0.06694829687590186,
+          "palmOrientationError": 0,
+          "contactIterationErrors": [
+            0.06499332180558777,
+            7.485441551521048e-9
+          ],
+          "contactError": 2.0241317908925587e-11,
+          "wristContactError": 2.3663050670408e-8,
+          "reachRatio": 0.8660564166071205,
+          "withinStableReach": true,
+          "bindOffsetsPreserved": true,
+          "finite": true,
+          "shoulderQuaternion": [
+            -0.01032129176249491,
+            0.8632573988147568,
+            0.5033884509718712,
+            0.035779907155739615
+          ],
+          "elbowQuaternion": [
+            -0.49551789281021436,
+            -0.5558130537890194,
+            0.06653228209427355,
+            0.6641591093871841
+          ]
+        }
+      ],
+      "cadence": null,
+      "melee": {
+        "source": "inactive",
+        "knifeVisible": false,
+        "knifeParent": "right-wrist-knife-socket",
+        "gripError": 1.8610729195778454e-15,
+        "handContactError": 2.0350724194510405e-15,
+        "bindPoseRestored": true
+      }
+    }
+  ],
+  "browserErrors": [],
+  "violations": [
+    "handgun/pistol/hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "compact/mp5/hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "long-gun/m4a1/hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "railgun/railgun/hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "flare-handgun/flare-gun/hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "handgun/pistol/hip-2560x1440: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "long-gun/m4a1/hip-2560x1440: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "railgun/railgun/hip-2560x1440: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "flare-handgun/flare-gun/hip-2560x1440: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "long-gun/m4a1/ads: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "long-gun/m4a1/reload: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "contact/m4a1/prone-wall-floor-hip: arm framing is nonfinite, clipped by the near plane, or offscreen",
+    "contact/m4a1/prone-wall-floor-ads: arm framing is nonfinite, clipped by the near plane, or offscreen"
+  ]
+}

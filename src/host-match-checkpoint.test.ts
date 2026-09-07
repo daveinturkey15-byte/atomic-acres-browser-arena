@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WEAPON_IDS, MULTIPLAYER_PROTOCOL_VERSION, type WeaponId } from './protocol';
+import { hostedBotSnapshotStance } from './hosted-bots';
 import {
   HOST_MATCH_CHECKPOINT_SCHEMA_VERSION,
   HOST_MATCH_CHECKPOINT_STORAGE_KEY,
@@ -109,6 +110,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
       hostedBotCount: 2,
       autoBalance: true,
       durationMs: 300_000,
+      scoreLimit: null,
     },
     members: [
       { id: 'host-1', name: 'HOST', team: 0, ready: true, connected: true, pingMs: 0, dhv: 10 },
@@ -153,6 +155,7 @@ function checkpoint(overrides: Partial<HostMatchCheckpoint> = {}): HostMatchChec
         y: 0,
         z: -4,
         yaw: 1.2,
+        stance: 'stand' as const,
         hp: 100,
         kills: index === 0 ? 1 : 3,
         deaths: index === 0 ? 3 : 1,
@@ -212,6 +215,33 @@ describe('host active-match checkpoint', () => {
     expect(serialized).not.toContain('"resumeToken":');
   });
 
+  /**
+   * PASS 87 Lane AR item 3, skeptic follow-up. Bots gained a stance, and the
+   * exact key set is what makes a checkpoint valid. The storage key is still
+   * :v3 and the schema version still 3, so a checkpoint a PASS 86 host wrote -
+   * the owner reloads mid-match onto a newer build - is still a v3 checkpoint
+   * in every other respect. Requiring the new key would have discarded it and
+   * silently lost host match recovery across the pass boundary.
+   */
+  it('still restores a checkpoint written before bots had a stance', () => {
+    const storage = new MemoryStorage();
+    const value = checkpoint();
+    expect(value.bots.length).toBeGreaterThan(0);
+    const legacy = JSON.parse(JSON.stringify(value)) as HostMatchCheckpoint;
+    for (const bot of legacy.bots) delete (bot.snapshot as { stance?: unknown }).stance;
+    expect(legacy.bots.every((bot) => !Object.hasOwn(bot.snapshot, 'stance'))).toBe(true);
+    expect(isHostMatchCheckpoint(legacy, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+    storage.setItem(HOST_MATCH_CHECKPOINT_STORAGE_KEY, JSON.stringify(legacy));
+    const restored = loadHostMatchCheckpoint(storage, MULTIPLAYER_PROTOCOL_VERSION, legacy.roomCode, 1_010_000);
+    expect(restored).not.toBeNull();
+    expect(restored!.bots.map((bot) => hostedBotSnapshotStance(bot.snapshot))).toEqual(legacy.bots.map(() => 'stand'));
+    // An unknown key is still refused: this is tolerance for one named legacy
+    // field, not a hole in the exact-key set.
+    const bogus = JSON.parse(JSON.stringify(value)) as HostMatchCheckpoint;
+    (bogus.bots[0]!.snapshot as { crouching?: boolean }).crouching = true;
+    expect(isHostMatchCheckpoint(bogus, MULTIPLAYER_PROTOCOL_VERSION)).toBe(false);
+  });
+
   it('preserves a warmup only for the portion not consumed while the host was down', () => {
     const value = checkpoint({ phase: 'warmup', elapsedSinceActiveMs: -2_500 });
     expect(resolveHostMatchResumeTiming(value, 1_001_000, 10_000)).toEqual({
@@ -234,7 +264,7 @@ describe('host active-match checkpoint', () => {
     const value = checkpoint({
       config: {
         arenaId: 'gun-range', mode: 'ffa', capacity: 4,
-        hostedBotCount: 0, autoBalance: false, durationMs: 120_000,
+        hostedBotCount: 0, autoBalance: false, durationMs: 120_000, scoreLimit: null,
       },
       elapsedSinceActiveMs: 40_000,
       scores: checkpoint().scores.filter((score) => !score.id.startsWith('host-bot-')),
@@ -285,10 +315,15 @@ describe('host active-match checkpoint', () => {
 
   it('preserves scheduled, available, held and depleted railgun authority across a host crash', () => {
     const scheduled = createRailgunAuthorityState('atomic-acres', 1_000, 0, 12);
+    // HF-384 re-pin: the spawn delay is jittered (railgunSpawnDelayMs) so the remaining
+    // time is derived from the state's own spawn moment, not from a fixed 180 s literal.
+    // The checkpoint contract itself - remaining = spawnAt - now, restore = now + drift +
+    // remaining - is pinned exactly as before.
+    const scheduledRemainingMs = scheduled.spawnAtHostTimeMs! - 2_000;
     const scheduledCheckpoint = checkpointRailgunAuthority(scheduled, 2_000)!;
-    expect(scheduledCheckpoint).toMatchObject({ status: 'scheduled', spawnRemainingMs: 179_000, roundsRemaining: 8 });
+    expect(scheduledCheckpoint).toMatchObject({ status: 'scheduled', spawnRemainingMs: scheduledRemainingMs, roundsRemaining: 8 });
     expect(restoreRailgunAuthority({ savedAtEpochMs: 1_000_000, railgun: scheduledCheckpoint }, 1_004_000, 50))
-      .toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 175_050, roundsRemaining: 8 });
+      .toMatchObject({ status: 'scheduled', spawnAtHostTimeMs: 50 + scheduledRemainingMs - 4_000, roundsRemaining: 8 });
 
     const available = advanceRailgunAuthority(scheduled, scheduled.spawnAtHostTimeMs!).state;
     const availableCheckpoint = checkpointRailgunAuthority(available, 181_000)!;
@@ -499,6 +534,52 @@ describe('host active-match checkpoint', () => {
       },
       flareShotFeedback: [hostFeedback],
     }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(false);
+  });
+
+  it('carries the HF-325 succession term so a recovered host cannot restart the fence at zero', () => {
+    const valid = checkpoint();
+    // Optional: pre-HF-325 checkpoints stay loadable.
+    expect(isHostMatchCheckpoint(valid, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+
+    expect(isHostMatchCheckpoint({
+      ...valid,
+      succession: { term: 4, successorId: 'guest-1' },
+    }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+    // A host that never minted a mandate is at term zero with no successor.
+    expect(isHostMatchCheckpoint({
+      ...valid,
+      succession: { term: 0, successorId: null },
+    }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(true);
+
+    for (const succession of [
+      // A named successor implies a minted mandate, so term zero is incoherent.
+      { term: 0, successorId: 'guest-1' },
+      // The successor must be a real non-host member of this very roster.
+      { term: 4, successorId: 'host-1' },
+      { term: 4, successorId: 'guest-who-left' },
+      { term: -1, successorId: null },
+      { term: 1.5, successorId: null },
+      { term: 4 },
+      { term: 4, successorId: 'guest-1', extra: true },
+      { term: 4, successorId: 7 },
+      null,
+      'succession',
+    ]) {
+      expect(isHostMatchCheckpoint({ ...valid, succession }, MULTIPLAYER_PROTOCOL_VERSION)).toBe(false);
+    }
+  });
+
+  it('round-trips a succession term through storage', () => {
+    const storage = new MemoryStorage();
+    const withSuccession = { ...checkpoint(), succession: { term: 6, successorId: 'guest-1' } } as HostMatchCheckpoint;
+    expect(saveHostMatchCheckpoint(storage, withSuccession)).toBe(true);
+    const loaded = loadHostMatchCheckpoint(
+      storage,
+      MULTIPLAYER_PROTOCOL_VERSION,
+      'atomic-room-a',
+      withSuccession.savedAtEpochMs + 1_000,
+    );
+    expect(loaded?.succession).toEqual({ term: 6, successorId: 'guest-1' });
   });
 
   it('authenticates a recovered guest with a SHA-256 digest without persisting the raw token', async () => {

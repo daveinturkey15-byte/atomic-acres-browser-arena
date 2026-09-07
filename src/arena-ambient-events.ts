@@ -1,0 +1,280 @@
+/**
+ * Pass 75 - intermittent arena ambience ("a sense of place").
+ *
+ * WHY THIS EXISTS
+ * Each arena's ambience was exactly two CONTINUOUS voices: a low bed tone and
+ * a band-passed air tone (spatial-audio.ts ARENA_AUDIO_DEFINITIONS,
+ * continuousVoices: 2). That is a drone. A drone tells a player the audio
+ * system is alive; it does not tell them WHERE they are. Nothing ever happened
+ * in the soundscape, so every arena sounded like the same room with a
+ * different filter setting - which is what "the game needs to feel more
+ * immersive" is describing.
+ *
+ * This module adds the missing layer: sparse, characterful, SPATIALISED
+ * one-shots that give each arena an identity - gulls and hull creak at sea,
+ * insects and palm rustle in the jungle, stressed metal in the rig.
+ *
+ * EVERYTHING IS PROCEDURAL. No sampled or licensed audio: each event is a
+ * recipe (oscillator type, frequency sweep, envelope, optional noise burst)
+ * synthesised at play time, exactly like the existing weapon and explosion
+ * families. That keeps the project-original provenance rule intact.
+ *
+ * THIS FILE IS PURE. No WebAudio, no timers, no Math.random at module scope -
+ * the scheduler takes time and a random source as arguments so the cadence is
+ * testable and deterministic under test.
+ *
+ * BUDGET DISCIPLINE. Events are sparse by construction (see MIN/MAX gaps) and
+ * the caller still checks the shared voice budget before synthesising, so this
+ * layer can never starve combat audio. Sparseness is also an aesthetic choice:
+ * ambient events that fire often stop reading as environment and start reading
+ * as a loop.
+ */
+
+import type { ArenaId } from './arena-identity';
+
+export type AmbientEventShape = 'chirp' | 'call' | 'creak' | 'clank' | 'rustle' | 'whoosh' | 'thump';
+
+export type ArenaAmbientEvent = Readonly<{
+  id: string;
+  shape: AmbientEventShape;
+  /** Relative likelihood within its arena. Higher fires more often. */
+  weight: number;
+  /** Start and end of the primary frequency sweep, in Hz. */
+  sweepHz: readonly [number, number];
+  /** Seconds. Kept short - long ambient one-shots read as drones. */
+  durationSeconds: number;
+  /** Peak gain on the ambience bus, before distance attenuation. */
+  gain: number;
+  /** Band-pass Q for shaped-noise events; 0 selects a tonal oscillator. */
+  noiseQ: number;
+  /** Metres from the listener the event is placed, on a random bearing. */
+  distanceM: number;
+}>;
+
+export type ArenaAmbientProfile = Readonly<{
+  arenaId: ArenaId;
+  identity: string;
+  /** Shortest and longest gap between events, in seconds. */
+  gapSecondsRange: readonly [number, number];
+  events: readonly ArenaAmbientEvent[];
+}>;
+
+const profile = (
+  arenaId: ArenaId,
+  identity: string,
+  gapSecondsRange: readonly [number, number],
+  events: readonly ArenaAmbientEvent[],
+): ArenaAmbientProfile => Object.freeze({ arenaId, identity, gapSecondsRange, events: Object.freeze(events) });
+
+const event = (
+  id: string,
+  shape: AmbientEventShape,
+  weight: number,
+  sweepHz: readonly [number, number],
+  durationSeconds: number,
+  gain: number,
+  noiseQ: number,
+  distanceM: number,
+): ArenaAmbientEvent => Object.freeze({ id, shape, weight, sweepHz: Object.freeze(sweepHz), durationSeconds, gain, noiseQ, distanceM });
+
+export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfile>> = Object.freeze({
+  'atomic-acres': profile('atomic-acres', 'suburban-yard-life', [7, 17], [
+    event('aa.bird', 'chirp', 5, [2_100, 2_650], 0.11, 0.030, 0, 26),
+    event('aa.dog-bark', 'call', 2, [420, 300], 0.20, 0.026, 0, 40),
+    event('aa.wind-gust', 'whoosh', 4, [320, 140], 1.30, 0.020, 0.9, 14),
+    event('aa.distant-car', 'whoosh', 2, [180, 96], 1.80, 0.016, 0.7, 52),
+    event('aa.fence-tick', 'clank', 2, [1_450, 1_180], 0.09, 0.014, 0, 20),
+    event('aa.crow-call', 'call', 3, [860, 640], 0.28, 0.021, 0, 44),
+    event('aa.grass-sway', 'rustle', 4, [1_900, 1_150], 1.60, 0.014, 1.5, 11),
+    event('aa.silo-groan', 'creak', 2, [96, 62], 1.50, 0.019, 0, 30),
+    event('aa.gate-latch', 'clank', 2, [780, 560], 0.14, 0.016, 0, 25),
+    event('aa.tractor-cough', 'thump', 1, [58, 41], 0.70, 0.018, 0, 62),
+  ]),
+  'rustworks-1v1': profile('rustworks-1v1', 'stressed-rig-and-sea-metal', [6, 14], [
+    event('rw.hull-creak', 'creak', 5, [148, 92], 1.10, 0.024, 0, 17),
+    event('rw.pipe-clank', 'clank', 4, [1_180, 880], 0.13, 0.022, 0, 22),
+    event('rw.steam-hiss', 'rustle', 3, [3_100, 2_200], 0.75, 0.017, 1.6, 19),
+    event('rw.deck-thump', 'thump', 2, [78, 48], 0.34, 0.026, 0, 24),
+    event('rw.chain-rattle', 'clank', 3, [1_650, 1_050], 0.30, 0.018, 0, 21),
+    event('rw.wire-hum', 'rustle', 2, [1_450, 980], 1.70, 0.012, 2.4, 15),
+    event('rw.gantry-groan', 'creak', 3, [112, 68], 1.60, 0.022, 0, 26),
+    event('rw.relief-valve', 'whoosh', 2, [520, 220], 0.90, 0.016, 1.3, 18),
+    event('rw.pump-knock', 'thump', 2, [104, 66], 0.26, 0.019, 0, 20),
+  ]),
+  'gun-range': profile('gun-range', 'indoor-range-plant', [9, 20], [
+    event('gr.vent-thump', 'thump', 4, [88, 56], 0.42, 0.020, 0, 18),
+    event('gr.door-clunk', 'clank', 2, [520, 300], 0.19, 0.020, 0, 34),
+    event('gr.ballast-tick', 'clank', 3, [1_900, 1_650], 0.07, 0.011, 0, 12),
+    event('gr.air-sweep', 'whoosh', 3, [420, 220], 1.05, 0.015, 1.1, 16),
+    event('gr.brass-drop', 'clank', 3, [2_450, 1_950], 0.16, 0.013, 0, 9),
+    event('gr.strip-buzz', 'rustle', 2, [1_180, 1_320], 1.20, 0.010, 3.2, 8),
+    event('gr.target-carrier', 'creak', 2, [340, 210], 0.90, 0.014, 0, 24),
+    event('gr.range-tannoy', 'call', 1, [640, 820], 0.34, 0.013, 0, 30),
+  ]),
+  'skyline-terminal': profile('skyline-terminal', 'apron-and-concourse', [7, 16], [
+    event('st.jet-wash', 'whoosh', 5, [260, 120], 2.10, 0.022, 0.8, 60),
+    event('st.pa-blip', 'call', 2, [980, 1_240], 0.16, 0.015, 0, 30),
+    event('st.cart-rattle', 'clank', 3, [740, 560], 0.24, 0.016, 0, 28),
+    event('st.hvac-swell', 'rustle', 4, [2_400, 1_700], 1.40, 0.013, 1.4, 20),
+    event('st.tug-horn', 'call', 2, [210, 168], 0.85, 0.020, 0, 70),
+    event('st.belt-rumble', 'thump', 3, [72, 52], 0.75, 0.015, 0, 26),
+    event('st.shutter-rattle', 'clank', 2, [980, 700], 0.28, 0.015, 0, 33),
+    event('st.apron-gust', 'whoosh', 3, [380, 160], 1.90, 0.017, 1.2, 24),
+    event('st.jetway-creak', 'creak', 2, [150, 96], 1.20, 0.014, 0, 28),
+  ]),
+  farcrysis: profile('farcrysis', 'golden-hour-jungle', [4, 11], [
+    event('fc.insect-chirp', 'chirp', 6, [3_600, 4_200], 0.07, 0.020, 0, 12),
+    event('fc.bird-call', 'call', 4, [1_650, 2_400], 0.22, 0.024, 0, 30),
+    event('fc.palm-rustle', 'rustle', 5, [2_900, 1_800], 1.20, 0.019, 1.8, 15),
+    event('fc.distant-surf', 'whoosh', 3, [240, 110], 2.40, 0.017, 0.9, 48),
+    event('fc.branch-creak', 'creak', 2, [190, 120], 0.80, 0.014, 0, 22),
+    event('fc.cicada-wall', 'chirp', 5, [4_800, 5_400], 0.14, 0.016, 0, 9),
+    event('fc.frog-croak', 'call', 3, [420, 300], 0.30, 0.019, 0, 18),
+    event('fc.canopy-gust', 'whoosh', 4, [560, 240], 2.00, 0.016, 1.4, 20),
+    event('fc.monkey-whoop', 'call', 2, [900, 1_450], 0.34, 0.020, 0, 40),
+    event('fc.water-drip', 'clank', 3, [2_700, 2_150], 0.10, 0.012, 0, 7),
+    event('fc.trunk-thud', 'thump', 1, [70, 48], 0.50, 0.016, 0, 34),
+  ]),
+  'high-seas': profile('high-seas', 'open-water-superyacht', [5, 13], [
+    event('hs.gull-cry', 'call', 5, [1_900, 2_600], 0.26, 0.026, 0, 34),
+    event('hs.hull-creak', 'creak', 4, [130, 82], 1.30, 0.023, 0, 16),
+    event('hs.wave-slap', 'whoosh', 6, [300, 130], 1.05, 0.022, 1.0, 20),
+    event('hs.rigging-clink', 'clank', 3, [2_050, 1_720], 0.11, 0.015, 0, 18),
+    event('hs.diesel-thrum', 'thump', 2, [64, 44], 0.60, 0.020, 0, 26),
+    event('hs.deck-wash', 'whoosh', 4, [420, 180], 1.80, 0.018, 1.2, 12),
+    event('hs.mooring-groan', 'creak', 3, [104, 66], 1.60, 0.021, 0, 22),
+    event('hs.halyard-slap', 'clank', 3, [1_380, 980], 0.18, 0.016, 0, 15),
+    event('hs.gull-flock', 'call', 2, [1_500, 2_100], 0.55, 0.018, 0, 55),
+    event('hs.spray-hiss', 'rustle', 3, [3_400, 2_100], 0.95, 0.014, 1.9, 10),
+    event('hs.bilge-pump', 'thump', 2, [88, 58], 0.42, 0.015, 0, 19),
+  ]),
+  'test1': profile('test1', 'dry-open-air-range', [7, 16], [
+    event('t1.dry-gust', 'whoosh', 5, [340, 150], 1.60, 0.019, 1.0, 16),
+    event('t1.distant-bird', 'chirp', 4, [2_300, 2_900], 0.12, 0.020, 0, 42),
+    event('t1.canvas-flap', 'rustle', 4, [1_500, 900], 0.60, 0.017, 1.4, 13),
+    event('t1.sand-hiss', 'rustle', 3, [3_000, 2_000], 1.10, 0.012, 1.8, 10),
+    event('t1.container-tick', 'clank', 3, [1_350, 1_050], 0.10, 0.014, 0, 24),
+    event('t1.plywood-knock', 'thump', 2, [180, 120], 0.20, 0.016, 0, 20),
+    event('t1.tower-creak', 'creak', 2, [140, 90], 1.10, 0.015, 0, 26),
+    event('t1.hawk-cry', 'call', 2, [1_800, 1_350], 0.40, 0.018, 0, 60),
+  ]),
+  'test2': profile('test2', 'golden-hour-garden-estate', [6, 14], [
+    event('t2.garden-bird', 'chirp', 6, [2_400, 3_100], 0.10, 0.024, 0, 22),
+    event('t2.soft-breeze', 'whoosh', 4, [300, 130], 1.80, 0.016, 0.9, 15),
+    event('t2.hedge-rustle', 'rustle', 4, [2_200, 1_400], 1.30, 0.015, 1.6, 12),
+    event('t2.pool-lap', 'whoosh', 5, [380, 170], 0.95, 0.018, 1.1, 14),
+    event('t2.fountain-drip', 'clank', 3, [2_600, 2_100], 0.10, 0.012, 0, 10),
+    event('t2.awning-creak', 'creak', 2, [170, 110], 0.90, 0.013, 0, 20),
+    event('t2.dove-coo', 'call', 3, [520, 400], 0.34, 0.018, 0, 32),
+    event('t2.gate-clink', 'clank', 2, [1_600, 1_250], 0.12, 0.013, 0, 27),
+    event('t2.distant-songbird', 'call', 2, [1_900, 2_500], 0.45, 0.015, 0, 50),
+  ]),
+  // MAP3 (PREVIEW): a stone gallery on open scrub. Everything here is either
+  // the building settling or the wind finding an edge of it - there is no
+  // wildlife bed, because eight walled bays radiating off a paved hub is the
+  // one arena where the ambience should be architecture, not habitat.
+  'map3': profile('map3', 'stone-gallery-and-open-scrub', [7, 16], [
+    event('m3.pier-echo', 'clank', 5, [820, 640], 0.22, 0.017, 0, 24),
+    event('m3.wind-through-gap', 'whoosh', 6, [340, 150], 1.70, 0.019, 0.9, 16),
+    event('m3.grit-skitter', 'rustle', 4, [2_400, 1_500], 0.55, 0.014, 1.4, 11),
+    event('m3.lintel-creak', 'creak', 3, [190, 120], 1.00, 0.013, 0, 21),
+    event('m3.basin-lap', 'whoosh', 3, [400, 180], 0.90, 0.016, 1.1, 30),
+    event('m3.scrub-bird', 'chirp', 3, [2_200, 2_900], 0.12, 0.020, 0, 44),
+    event('m3.distant-hail', 'call', 2, [560, 430], 0.36, 0.016, 0, 58),
+  ]),
+  // NUKETOWN2 (PREVIEW, HF-407): the same test-town nobody lives in, heard
+  // from the road. Suburb ambience with the wildlife thinned right out and the
+  // hard bodies left in - a bus shell ticking as it cools, a garage door
+  // rattling in its channel, a fence board knocking - because the whole read of
+  // this map is that the houses are props and the street is the fight.
+  'nuketown2': profile('nuketown2', 'test-town-street-and-empty-houses', [8, 17], [
+    event('n2.bus-shell-tick', 'clank', 5, [780, 610], 0.20, 0.017, 0, 22),
+    event('n2.garage-door-rattle', 'clank', 4, [300, 210], 0.55, 0.016, 0, 26),
+    event('n2.fence-board-knock', 'creak', 4, [220, 140], 0.85, 0.014, 0, 19),
+    event('n2.street-gust', 'whoosh', 6, [330, 160], 1.60, 0.018, 0.8, 15),
+    event('n2.dry-lawn-rustle', 'rustle', 4, [2_300, 1_450], 0.50, 0.013, 1.3, 12),
+    event('n2.mains-hum-swell', 'call', 3, [120, 240], 1.20, 0.012, 0, 34),
+    event('n2.high-fence-bird', 'chirp', 2, [2_600, 3_100], 0.10, 0.019, 0, 47),
+  ]),
+  // RAID2 (PREVIEW, HF-408): the same estate fiction as test2 but a measurably
+  // more OPEN one - 21.9% of its ground is roofed against test2's 36.7% - so the
+  // bed leans on open-air voices and on the pool, and the gap range is longer
+  // because there are fewer surfaces close enough to make a near sound.
+  'raid2': profile('raid2', 'open-terrace-estate-and-pool', [7, 15], [
+    event('r2.terrace-bird', 'chirp', 6, [2_500, 3_200], 0.10, 0.023, 0, 26),
+    event('r2.court-breeze', 'whoosh', 5, [320, 140], 1.85, 0.017, 0.9, 19),
+    event('r2.pool-lap', 'whoosh', 5, [370, 165], 0.98, 0.019, 1.1, 16),
+    event('r2.colonnade-draught', 'whoosh', 4, [280, 125], 1.60, 0.015, 1.0, 22),
+    event('r2.fountain-spill', 'clank', 3, [2_500, 2_000], 0.11, 0.013, 0, 12),
+    event('r2.planting-rustle', 'rustle', 4, [2_100, 1_350], 1.25, 0.014, 1.5, 13),
+    event('r2.shutter-knock', 'clank', 2, [1_500, 1_180], 0.13, 0.012, 0, 29),
+    event('r2.hillside-call', 'call', 2, [540, 415], 0.38, 0.016, 0, 54),
+  ]),
+});
+
+/** Total weight of an arena's events; 0 when the arena has none. */
+export function ambientWeightTotal(profileForArena: ArenaAmbientProfile): number {
+  return profileForArena.events.reduce((total, entry) => total + Math.max(0, entry.weight), 0);
+}
+
+/**
+ * Picks the next event by weight. `roll` must be in [0, 1); values outside it
+ * are clamped rather than throwing, because a bad random source must degrade
+ * to a valid sound rather than silencing ambience.
+ */
+export function selectAmbientEvent(
+  profileForArena: ArenaAmbientProfile,
+  roll: number,
+): ArenaAmbientEvent | null {
+  const total = ambientWeightTotal(profileForArena);
+  if (total <= 0) return null;
+  const clamped = Number.isFinite(roll) ? Math.min(0.999_999, Math.max(0, roll)) : 0;
+  let cursor = clamped * total;
+  for (const entry of profileForArena.events) {
+    cursor -= Math.max(0, entry.weight);
+    if (cursor < 0) return entry;
+  }
+  return profileForArena.events[profileForArena.events.length - 1] ?? null;
+}
+
+/**
+ * Seconds until the next ambient event. Randomised inside the arena's gap
+ * range so the layer never develops an audible period - the same reason the
+ * continuous bed uses incommensurate loop lengths.
+ */
+export function nextAmbientGapSeconds(
+  profileForArena: ArenaAmbientProfile,
+  roll: number,
+): number {
+  const [minimum, maximum] = profileForArena.gapSecondsRange;
+  const low = Math.max(0.5, Math.min(minimum, maximum));
+  const high = Math.max(low, Math.max(minimum, maximum));
+  const clamped = Number.isFinite(roll) ? Math.min(1, Math.max(0, roll)) : 0.5;
+  return low + (high - low) * clamped;
+}
+
+/**
+ * Places an event on a random bearing at its authored distance, at ear height.
+ * Returned in metres relative to the listener, so the caller can offset by the
+ * live listener position without this module knowing anything about the world.
+ */
+export function ambientEventOffset(
+  entry: ArenaAmbientEvent,
+  bearingRoll: number,
+): Readonly<{ x: number; y: number; z: number }> {
+  const clamped = Number.isFinite(bearingRoll) ? Math.min(1, Math.max(0, bearingRoll)) : 0;
+  const bearing = clamped * Math.PI * 2;
+  const distance = Math.max(1, entry.distanceM);
+  return Object.freeze({
+    x: Math.cos(bearing) * distance,
+    // Slightly above ear height: overhead-ish sources (birds, gulls, vents)
+    // read as environment, whereas ground-level ones read as footsteps.
+    y: entry.shape === 'chirp' || entry.shape === 'call' ? 4.5 : 1.2,
+    z: Math.sin(bearing) * distance,
+  });
+}
+
+/** Every ambient event id, for inventory/coverage checks. */
+export const ARENA_AMBIENT_EVENT_IDS: readonly string[] = Object.freeze(
+  Object.values(ARENA_AMBIENT_PROFILES).flatMap((entry) => entry.events.map((item) => item.id)),
+);

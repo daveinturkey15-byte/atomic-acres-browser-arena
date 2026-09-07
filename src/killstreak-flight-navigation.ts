@@ -22,10 +22,11 @@ const definition = (
   arenaId: ArenaId,
   ceilingY: number,
   portals: readonly FlightPortalHint[],
+  floorY = 0,
 ): ArenaFlightNavigationDefinition => Object.freeze({
   id: `${arenaId}-support-flight-v1`,
   arenaId,
-  floorY: 0,
+  floorY,
   ceilingY,
   noFlyPolicy: 'authoritative-static-and-dynamic-solids',
   portals: Object.freeze(portals.map((portal) => Object.freeze(portal))),
@@ -57,6 +58,50 @@ export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavig
     { id: 'open-apron', xQ: 0, zQ: -0.52, altitudeM: 9 },
     { id: 'boarding-portal', xQ: 0, zQ: 0.08, altitudeM: 4.2 },
     { id: 'terminal-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
+  // HF-359 (Pass 74): ported from the Pass 69 hidden lane.
+  'farcrysis': definition('farcrysis', 42, [
+    { id: 'beach-overflight', xQ: -0.7, zQ: 0.6, altitudeM: 15 },
+    { id: 'jungle-air-gap', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
+  'high-seas': definition('high-seas', 50, [
+    { id: 'stern-air-gap', xQ: 0, zQ: 0.72, altitudeM: 14 },
+    { id: 'bow-air-gap', xQ: 0, zQ: -0.72, altitudeM: 14 },
+    { id: 'yacht-overflight', xQ: 0, zQ: 0, altitudeM: 26 },
+  ], 3.2),
+  // Open range ground: no authored recovery portals — the collider set alone
+  // is enough over a flat 52x38 field.
+  'test1': definition('test1', 40, []),
+  // RE-PINNED 2026-08-31 with the 100 x 76 m rebuild: the arena's half-diagonal
+  // is now hypot(50, 38) = 62.8 m, so a 45 m radius left the four corners of
+  // the map outside the support aircraft's navigable disc. 63 m is the measured
+  // half-diagonal rounded up.
+  'test2': definition('test2', 63, [
+    { id: 'estate-overflight', xQ: 0, zQ: 0, altitudeM: 20 },
+  ]),
+  // MAP3 (PREVIEW): nothing on this map is taller than the 5.2 m gantry beams,
+  // so the ceiling is set by sightline rather than by clearance. The hub is the
+  // one portal: it is the only place a support aircraft can descend without a
+  // pier line under it.
+  'map3': definition('map3', 58, [
+    { id: 'map3-hub-overflight', xQ: 0, zQ: 0, altitudeM: 24 },
+  ]),
+  // NUKETOWN2 (PREVIEW, HF-407): the same ceiling as the shipped Nuke Town,
+  // because it is the same kind of place at the same scale - nothing on it is
+  // taller than a 6.5 m roof deck. Three portals matching the shipped map's
+  // shape: the road either side of the bus, and one overflight of the centre.
+  // The bus roof carries the 2x core, so the centre portal sits well above it.
+  'nuketown2': definition('nuketown2', 42, [
+    { id: 'nuketown2-west-street-air-gap', xQ: -0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'nuketown2-east-street-air-gap', xQ: 0.62, zQ: 0, altitudeM: 7.5 },
+    { id: 'nuketown2-central-overflight', xQ: 0, zQ: 0, altitudeM: 18 },
+  ]),
+  // RAID2 (PREVIEW, HF-408): the tallest authored mass is the 5.3 m upper wall,
+  // so the ceiling is set by sightline like test2's. The courtyard is the one
+  // portal because it is the only place on the map that is open to the sky with
+  // no roof, slab or upper room over it.
+  'raid2': definition('raid2', 63, [
+    { id: 'raid2-courtyard-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
   ]),
 });
 

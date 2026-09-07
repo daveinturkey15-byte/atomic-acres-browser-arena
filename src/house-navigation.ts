@@ -194,12 +194,20 @@ function upperFrontWall(surface: 'aqua' | 'coral'): LocalSolid[] {
   ];
 }
 
+/**
+ * HF-387 player-body half: frame trim used to be authored non-collidable,
+ * so brushing a jamb put the camera eye up to 1.5 cm from (or inside) the
+ * visible trim slab while the wall opening itself stopped the capsule. The
+ * posts sit exactly on the opening edges, so giving them colliders does not
+ * narrow any walk-through width; it makes visible mass match movement and
+ * shot authority as the forging review requires.
+ */
 function doorFrame(id: string, x: number, z: number, baseY = 0): LocalSolid[] {
   const width = 2.2;
   return [
-    solid(`${id}-frame-left`, [x - width / 2 - 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', false, 'frame'),
-    solid(`${id}-frame-right`, [x + width / 2 + 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', false, 'frame'),
-    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [width + 0.36, 0.18, 0.16], 'trim', false, 'frame'),
+    solid(`${id}-frame-left`, [x - width / 2 - 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', true, 'frame'),
+    solid(`${id}-frame-right`, [x + width / 2 + 0.09, baseY + 1.42, z], [0.18, 2.84, 0.16], 'trim', true, 'frame'),
+    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [width + 0.36, 0.18, 0.16], 'trim', true, 'frame'),
   ];
 }
 
@@ -207,11 +215,12 @@ function sideDoorFrame(id: string, side: 1 | -1, z: number, baseY: number): Loca
   const width = 2.6;
   const x = side * (HALF_WIDTH + DOOR_FRAME_OUTSET);
   return [
-    solid(`${id}-frame-rear`, [x, baseY + 1.42, z - width / 2 - 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
-    solid(`${id}-frame-front`, [x, baseY + 1.42, z + width / 2 + 0.09], [0.16, 2.84, 0.18], 'trim', false, 'frame'),
-    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [0.16, 0.18, width + 0.36], 'trim', false, 'frame'),
+    solid(`${id}-frame-rear`, [x, baseY + 1.42, z - width / 2 - 0.09], [0.16, 2.84, 0.18], 'trim', true, 'frame'),
+    solid(`${id}-frame-front`, [x, baseY + 1.42, z + width / 2 + 0.09], [0.16, 2.84, 0.18], 'trim', true, 'frame'),
+    solid(`${id}-frame-head`, [x, baseY + 2.78, z], [0.16, 0.18, width + 0.36], 'trim', true, 'frame'),
   ];
 }
+
 
 function rampSolids(side: 1 | -1): LocalSolid[] {
   const slopeLength = Math.hypot(RAMP_RUN, RAMP_RISE);
@@ -305,6 +314,15 @@ function simplePlan(surface: 'aqua' | 'coral', rampSide: 1 | -1): {
     ...doorFrame('rear-entry', rearDoorX, -HALF_DEPTH - DOOR_FRAME_OUTSET),
     ...splitWallAroundDoor('ground-room-partition', 0, partitionOpeningX, 2.6, 'plaster', 0, true),
     solid('ground-floor-slab', [0, 0.06, 0], [WIDTH - 0.2, 0.12, DEPTH - 0.2], 'concrete', false, 'floor'),
+    // HF-387. The storage locker always existed as a SHOT surface and a rendered mesh
+    // (house-destruction.ts furniture fragment) but never as a movement solid, so its
+    // fragment sourceId ':authored-storage-locker' dangled and a player could stand -
+    // and prone - INSIDE a solid-looking cabinet, camera and all. Found by the eye-
+    // clearance sweep: 4 of Nuketown's 8 violations were legal capsule positions whose
+    // eye sat 0.000-0.045 m from this locker's faces. The fragment now reads THIS solid
+    // (same pattern as the wall fragments), so movement, ballistics and presentation
+    // finally agree on one box.
+    solid('authored-storage-locker', [indoorRampSide * 6.75, 0.82, -5.65], [1.24, 1.64, 0.72], 'metal', true, 'wall'),
 
     ...westUpperWall,
     ...eastUpperWall,
@@ -450,3 +468,42 @@ export function solidBounds(solidEntry: HouseSolid): { minX: number; maxX: numbe
     rotation: solidEntry.rotation,
   };
 }
+
+/**
+ * HF-344: Returns all authored breakable glass solids for a house architecture.
+ */
+export function houseGlassSolids(architecture: HouseArchitecture): HouseSolid[] {
+  return architecture.solids.filter((entry) => entry.kind === 'glass');
+}
+
+/**
+ * HF-344: Returns the authored solid bounds for all breakable glass solids in a house architecture.
+ */
+export function houseGlassSolidBounds(architecture: HouseArchitecture): Array<{ id: string; bounds: ReturnType<typeof solidBounds> }> {
+  return houseGlassSolids(architecture).map((solid) => ({
+    id: solid.id,
+    bounds: solidBounds(solid),
+  }));
+}
+
+/**
+ * HF-344: Finds the authored solid for a glass pane across house architectures.
+ */
+export function findHouseGlassSolid(houses: readonly HouseArchitecture[], paneId: string): HouseSolid | null {
+  for (const house of houses) {
+    const found = house.solids.find(
+      (solid) => solid.id === paneId || solid.name === paneId || solid.id.endsWith(`:${paneId}`) || paneId.endsWith(`:${solid.id}`),
+    );
+    if (found && found.kind === 'glass') return found;
+  }
+  return null;
+}
+
+/**
+ * HF-344: Returns the authored solid bounds for a glass pane across house architectures.
+ */
+export function findHouseGlassSolidBounds(houses: readonly HouseArchitecture[], paneId: string): ReturnType<typeof solidBounds> | null {
+  const solid = findHouseGlassSolid(houses, paneId);
+  return solid ? solidBounds(solid) : null;
+}
+

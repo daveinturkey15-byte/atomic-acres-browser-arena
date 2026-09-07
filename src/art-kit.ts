@@ -10,6 +10,7 @@ import {
   createPass65CrossbowModel,
   disposePass65WeaponModel,
   fireImportedWeapon,
+  importedWeaponAnimatedNodeNames,
   isPass65PresentationGenerationCurrent,
   loadPass65FieldKnifeAsset,
   loadPass65WeaponPresentation,
@@ -104,7 +105,16 @@ export function batchStaticMeshes(
 ): StaticBatchStats {
   const simplifyMaterials = materialMode !== 'preserve';
   root.updateWorldMatrix(true, true);
-  const groups = new Map<string, { material: THREE.Material; classification: string; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
+  destination.updateWorldMatrix(true, false);
+  // Merged geometry is baked into the DESTINATION's space, not world space.
+  // Baking world matrices and then adding the batch under a destination that
+  // carries its own transform applies that transform twice. Measured on the
+  // procedural magazines (optimizeAttachedWeapon batches each one into itself):
+  // carbine 0.222 m, SMG 0.273 m, LMG 0.277 m, pistol 0.302 m, machine pistol
+  // 0.352 m of drop - the magazine visibly detached and hung below the gun.
+  const destinationInverse = destination.matrixWorld.clone().invert();
+  const meshToDestination = new THREE.Matrix4();
+  const groups = new Map<string, { material: THREE.Material; classification: string; renderOrder: number; meshes: THREE.Mesh[]; geometries: THREE.BufferGeometry[]; palette: Set<string> }>();
   root.traverse((node) => {
     const hasDynamicAncestor = (() => {
       let current: THREE.Object3D | null = node;
@@ -120,6 +130,13 @@ export function batchStaticMeshes(
       || node.userData.targetRoot
       || node.userData.pass73CollisionVisualOwner === true
       || Array.isArray(node.material)) return;
+    // InstancedMesh is already a single draw call, and its per-instance
+    // transforms live in instanceMatrix, NOT in node.geometry. Cloning the
+    // geometry here batched exactly ONE copy at the mesh origin and hid the
+    // source — on Farcrysis that silently deleted every instanced vegetation
+    // layer (2000+ plants collapsed to single strays at the arena centre).
+    // Leave instanced meshes alone: there is nothing to win by merging them.
+    if ((node as THREE.InstancedMesh).isInstancedMesh) return;
     const sourceMaterial = node.material as THREE.MeshBasicMaterial;
     const canvasMap = typeof HTMLCanvasElement !== 'undefined' && sourceMaterial.map?.image instanceof HTMLCanvasElement;
     if (simplifyMaterials && canvasMap) return;
@@ -133,11 +150,26 @@ export function batchStaticMeshes(
     const firstPersonSemanticKey = firstPersonMaterialContract === PASS70_FIRST_PERSON_OPTIC_WINDOW_CONTRACT
       ? `${firstPersonMaterialContract}:${String(firstPersonSurface)}`
       : '';
+    // Draw order is part of a mesh's identity, not a cosmetic detail: merging a
+    // renderOrder -1 sky dome with a renderOrder 3 glitter path produces one
+    // batch that can only be drawn at a single order, so one of the two
+    // composites wrong. Keying on it keeps each pass in its own batch.
+    const orderKey = `ro${node.renderOrder}`;
+    // HF-536 night: in `preserve` mode nothing is stripped, so two geometries
+    // that share a material but not an attribute set (the vehicle-forge merged
+    // buckets carry `forgeVehicleAnchor`; the kit boxes on the same shared
+    // chrome/lining material do not) cannot be merged - three's
+    // mergeGeometries logs "make sure ... attribute exists among all
+    // geometries", returns null, and the whole group is left unbatched. The
+    // attribute signature is part of a geometry's identity for batching, so
+    // it is part of the key. The simplify modes strip to a fixed set below and
+    // keep a single group per material.
+    const attributeSignature = simplifyMaterials ? '' : `:${Object.keys(node.geometry.attributes).sort().join(',')}`;
     const key = vertexPalette
-      ? `vertex:${opacityKey}:${firstPersonSemanticKey}:${classification}`
+      ? `vertex:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
       : simplifyMaterials && !preserveMappedMaterial
-      ? `${displayColor.getHexString()}:${opacityKey}:${firstPersonSemanticKey}:${classification}`
-      : `${materialBatchKey(node.material)}:${firstPersonSemanticKey}:${classification}`;
+      ? `${displayColor.getHexString()}:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
+      : `${materialBatchKey(node.material)}:${orderKey}:${firstPersonSemanticKey}:${classification}${attributeSignature}`;
     let entry = groups.get(key);
     if (!entry) {
       const material = preserveMappedMaterial
@@ -174,6 +206,7 @@ export function batchStaticMeshes(
       entry = {
         material,
         classification,
+        renderOrder: node.renderOrder,
         meshes: [],
         geometries: [],
         palette: new Set<string>(),
@@ -187,7 +220,7 @@ export function batchStaticMeshes(
       geometry = geometry.toNonIndexed();
       indexed.dispose();
     }
-    geometry.applyMatrix4(node.matrixWorld);
+    geometry.applyMatrix4(meshToDestination.multiplyMatrices(destinationInverse, node.matrixWorld));
     if (vertexPalette) {
       const colors = new Float32Array(geometry.getAttribute('position').count * 3);
       for (let index = 0; index < colors.length; index += 3) {
@@ -224,6 +257,10 @@ export function batchStaticMeshes(
       continue;
     }
     const mesh = new THREE.Mesh(geometry, entry.material);
+    // Carry the authored draw order onto the batch. Without this every batch
+    // renders at 0 and the transparent layering an arena authored - sky behind,
+    // glow above water, god rays last - collapses into source order.
+    mesh.renderOrder = entry.renderOrder;
     mesh.userData.sourcePalette = [...entry.palette];
     if (entry.classification) mesh.userData.hitZone = entry.classification;
     const preserveShadowResponse = materialMode === 'preserve' || materialMode === 'texture-lit';
@@ -240,6 +277,34 @@ export function batchStaticMeshes(
   }
   destination.add(batches);
   return { sourceMeshes, batches: batchCount };
+}
+
+function isDescendantOf(node: THREE.Object3D, ancestor: THREE.Object3D): boolean {
+  for (let current: THREE.Object3D | null = node; current; current = current.parent) {
+    if (current === ancestor) return true;
+  }
+  return false;
+}
+
+/**
+ * The node a merged weapon batch must hang from: the deepest authored-clip-
+ * driven node that still contains every mesh in the weapon. The Pass 65
+ * firearms park their whole frame under `weapon-action-driver`, so merging
+ * "static" meshes into the weapon ROOT lifts them out of the node the clips
+ * animate. Falls back to the weapon root for procedural models, which have no
+ * authored clips at all.
+ */
+function authoredAnimationBatchDestination(weapon: THREE.Group, animated: ReadonlySet<string>): THREE.Object3D {
+  if (animated.size === 0) return weapon;
+  const meshes: THREE.Mesh[] = [];
+  weapon.traverse((node) => { if (node instanceof THREE.Mesh) meshes.push(node); });
+  const first = meshes[0];
+  if (!first) return weapon;
+  for (let node: THREE.Object3D | null = first.parent; node && node !== weapon.parent; node = node.parent) {
+    if (!animated.has(node.name)) continue;
+    if (meshes.every((mesh) => isDescendantOf(mesh, node!))) return node;
+  }
+  return weapon;
 }
 
 /** Batch immutable pieces of a socket-attached third-person weapon. */
@@ -261,8 +326,25 @@ export function optimizeAttachedWeapon(
     const articulated = weapon.getObjectByName(name);
     if (articulated) articulated.userData.dynamic = true;
   }
-  const stats = batchStaticMeshes(weapon, weapon, () => '', materialMode);
+  // A mesh is only "static" relative to the node the authored clips drive.
+  // Merging the Pass 65 frames into the weapon root froze the merged body
+  // while every node still under `weapon-action-driver` - the action, the
+  // magazine and the semantic optic LENS - kept following the clip, so those
+  // pieces flew off the gun by the clip's own translation: measured on
+  // m14-ebr/slug-shotgun fp-lod0, 0.070 m fire, 0.129 m reload, 0.271 m melee
+  // and 0.400 m unequip in weapon-local units. Batch INTO the driver instead.
+  const animatedNames = importedWeaponAnimatedNodeNames(weapon);
+  const destination = authoredAnimationBatchDestination(weapon, animatedNames);
+  // Anything else the clips drive stays articulated for the same reason, even
+  // when it is not in the hardcoded procedural list (the crossbow's semantic
+  // loaded bolt, for instance).
+  for (const name of animatedNames) {
+    const driven = weapon.getObjectByName(name);
+    if (driven && driven !== destination && isDescendantOf(driven, destination)) driven.userData.dynamic = true;
+  }
+  const stats = batchStaticMeshes(weapon, destination, () => '', materialMode);
   weapon.userData.attachedWeaponBatchStats = stats;
+  weapon.userData.attachedWeaponBatchDestination = destination.name || null;
   return stats;
 }
 
@@ -353,7 +435,8 @@ const MAT = {
   gunmetal: (weapon: WeaponId) => {
     const finish = weaponFinishProfile(weapon);
     const material = texturedMaterial(finish.albedo, {
-      color: 0xffffff, roughness: 0.48, metalness: finish.metalness,
+      // HF-334: livery tint multiplies the shared albedo (crimson variant).
+      color: finish.tintHex ?? 0xffffff, roughness: 0.48, metalness: finish.metalness,
       repeatX: finish.textureRepeat, repeatY: finish.textureRepeat,
       normalPath: finish.normal, roughnessPath: finish.roughness,
       normalScale: finish.normalScale,
@@ -410,6 +493,7 @@ const PROCEDURAL_WEAPON_BASE: Partial<Record<WeaponId, WeaponId>> = {
   'flashlight-pistol': 'pistol',
   'explosive-crossbow': 'pistol',
   flamethrower: 'lmg',
+  'crimson-flamethrower': 'lmg', // HF-334: shares the flamethrower chassis
   'flare-gun': 'pistol',
 };
 
@@ -477,7 +561,7 @@ function buildProceduralWeaponVariant(id: WeaponId, baseId: WeaponId, flattenMat
     string.rotation.z = Math.PI / 2;
     string.position.set(0, 0.09, -0.66);
     root.add(string);
-  } else if (id === 'flamethrower') {
+  } else if (id === 'flamethrower' || id === 'crimson-flamethrower') { // HF-334: shared chassis
     const inheritedMagazine = root.getObjectByName('magazine');
     if (inheritedMagazine) inheritedMagazine.visible = false;
     for (const side of [-1, 1]) {
@@ -1058,6 +1142,7 @@ export function buildWeaponModel(id: WeaponId, flattenMaterials = false, preferI
 
 function wheel(root: THREE.Group, x: number, z: number, radius: number): void {
   const tyre = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.42, 24), MAT.rubber());
+  tyre.name = 'coach-wheel';
   tyre.rotation.z = Math.PI / 2;
   tyre.position.set(x, radius, z);
   tyre.castShadow = true;
@@ -1083,21 +1168,94 @@ function decal(textValue: string, width: number, height: number): THREE.Mesh {
 export function buildRetroCoach(): THREE.Group {
   const root = new THREE.Group(); root.name = 'original-atomic-coach';
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd09b32, roughness: 0.48, metalness: 0.25 });
-  part(root, roundedBox('coach-body', [5.3, 3.45, 13.6], bodyMat, 0.38, 5), [0, 2.02, 0]);
-  part(root, roundedBox('coach-lower', [5.42, 0.72, 13.2], MAT.tealMetal(), 0.2), [0, 0.78, 0]);
-  part(root, roundedBox('coach-roof', [5.08, 0.34, 12.8], MAT.cream(), 0.16), [0, 3.88, 0]);
-  const glass = MAT.glass();
+  // v4 (owner 2026-08-29): the coach is ENTERABLE - the solid body becomes a
+  // hull with a door aperture per side (local z +/-2.8, mirroring the
+  // collision), an open interior, and the same silhouette.
+  // v6 (owner 2026-08-30 playtest): taller two-tier coach - hull to 1.1,
+  // glass band 1.1-2.1, END DECKS top 2.25 over cab/engine bays, MAIN roof
+  // top 3.0. Cab (driver) and engine bay interiors mirror the colliders.
   for (const side of [-1, 1]) {
-    for (let z = -4.8; z <= 4.8; z += 2.4) part(root, roundedBox('coach-window', [0.055, 1.34, 1.85], glass, 0.08), [side * 2.67, 2.68, z]);
+    const doorLocalZ = side * 2.8;
+    const segments: Array<[number, number]> = [[-6.8, doorLocalZ - 0.85], [doorLocalZ + 0.85, 6.8]];
+    for (const [fromZ, toZ] of segments) {
+      const length = toZ - fromZ;
+      part(root, roundedBox('coach-body', [0.3, 1.1, length], bodyMat, 0.12, 3), [side * 2.5, 0.55, (fromZ + toZ) / 2]);
+    }
+    // Mid roof-band wall (underside 2.2 = door headroom) + end deck lips.
+    part(root, roundedBox('coach-roof-band', [0.3, 0.8, 8.2], bodyMat, 0.08, 3), [side * 2.5, 2.6, 0]);
+    for (const deckEnd of [-1, 1]) {
+      part(root, roundedBox('coach-deck-lip', [0.3, 0.15, 2.2], bodyMat, 0.06), [side * 2.5, 2.175, deckEnd * 5.2]);
+    }
+    part(root, roundedBox('coach-lower', [0.36, 0.4, 13.2], MAT.tealMetal(), 0.14), [side * 2.53, 0.2, 0]);
   }
-  part(root, roundedBox('windshield', [4.28, 1.36, 0.08], glass, 0.09), [0, 2.64, -6.82], [-0.08, 0, 0]);
-  part(root, roundedBox('rear-glass', [4.18, 1.18, 0.08], glass, 0.09), [0, 2.64, 6.82]);
-  for (const x of [-1.8, 1.8]) for (const z of [-4.6, 4.6]) wheel(root, x, z, 0.74);
+  for (const end of [-1, 1]) {
+    part(root, roundedBox('coach-end-cap', [5.3, 2.1, 0.34], bodyMat, 0.16, 3), [0, 1.05, end * 6.63]);
+    part(root, roundedBox('coach-end-roofline', [5.3, 0.15, 0.34], bodyMat, 0.1, 3), [0, 2.175, end * 6.63]);
+  }
+  part(root, roundedBox('coach-floor', [4.9, 0.12, 13.2], MAT.dark(), 0.05), [0, 0.1, 0]);
+  // Two-tier walkable top: end decks at 2.25, main roof at 3.0, risers between.
+  for (const deckEnd of [-1, 1]) {
+    part(root, roundedBox('coach-deck', [5.08, 0.12, 2.2], MAT.cream(), 0.06), [0, 2.19, deckEnd * 5.2]);
+    part(root, roundedBox('coach-roof-riser', [5.08, 0.75, 0.2], bodyMat, 0.06), [0, 2.625, deckEnd * 4.1]);
+  }
+  part(root, roundedBox('coach-roof', [5.08, 0.12, 8.2], MAT.cream(), 0.06), [0, 2.94, 0]);
+  // Dark headliner so the interior ceiling reads as trim instead of a
+  // blown-out cream field a foot above the camera.
+  part(root, roundedBox('coach-headliner', [4.6, 0.03, 8.0], MAT.dark(), 0.01), [0, 2.82, 0]);
+  for (const deckEnd of [-1, 1]) {
+    part(root, roundedBox('coach-deck-headliner', [4.6, 0.03, 2.0], MAT.dark(), 0.01), [0, 2.13, deckEnd * 5.2]);
+  }
+  const glass = MAT.glass();
+  // v6: the coach no longer authors its own side glass. The map's BREAKABLE
+  // window panes (map.ts, 'central-bus-pane-*') are the visible glass AND
+  // the ballistic authority, so the bus has exactly ONE source of truth for
+  // a window: shoot it, it shatters, and the frame behind it is this art.
+  // Art glass here sat 0.15 m inboard of those panes, which is inside the
+  // hull but outside every ballistic footprint - the parity gate correctly
+  // called that a ghost surface. End glazing below keeps its own proxies.
+  part(root, roundedBox('windshield', [4.28, 1.0, 0.08], glass, 0.07), [0, 1.6, -6.82], [-0.08, 0, 0]);
+  part(root, roundedBox('rear-glass', [4.18, 0.95, 0.08], glass, 0.07), [0, 1.58, 6.82]);
+  // Interior benches mirror the seat colliders (rotated frame: collider x
+  // becomes local z, collider z becomes local x).
+  const seatMat = new THREE.MeshStandardMaterial({ color: 0x2e6b70, roughness: 0.6, metalness: 0.1 });
+  // v6 benches mirror the recentred colliders (world (x,z) -> local (z,x));
+  // backs sit toward the near end so each bench's 180-degree twin matches.
+  for (const [worldX, worldZ, backX] of [
+    [-1.1, -1.95, -1.78], [1.1, -1.95, 0.42], [1.1, 1.95, 1.78], [-1.1, 1.95, -0.42],
+  ] as const) {
+    // The park rotation maps local (ox, oz) -> world (-oz, ox), so a world
+    // (x, z) collider is authored here at local (z, -x). Getting this sign
+    // wrong mirrors the art against its own colliders (the parity gate
+    // caught exactly that on the first v6 cut).
+    part(root, roundedBox('coach-seat', [0.75, 0.45, 1.5], seatMat, 0.08), [worldZ, 0.225, -worldX]);
+    part(root, roundedBox('coach-seat-back', [0.75, 0.58, 0.14], seatMat, 0.06), [worldZ, 0.66, -backX]);
+  }
+  // Cab (driver) and its engine-bay twin, matching the interior colliders.
+  const cabMat = MAT.dark();
+  for (const bayEnd of [-1, 1]) {
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-dash' : 'coach-engine-bench', [2.3, 1.5, 1.0], cabMat, 0.08), [bayEnd * -1.35, 0.75, bayEnd * 5.6]);
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-bulkhead' : 'coach-engine-bulkhead', [1.6, 1.9, 0.14], bodyMat, 0.05), [bayEnd * -1.65, 0.95, bayEnd * 3.9]);
+    part(root, roundedBox(bayEnd < 0 ? 'coach-cab-seat' : 'coach-engine-crate', [0.7, 0.6, 0.7], seatMat, 0.06), [bayEnd * -1.35, 0.3, bayEnd * 4.5]);
+  }
+  const wheelRim = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 8, 16), MAT.brass());
+  wheelRim.name = 'coach-steering-wheel';
+  wheelRim.position.set(-1.35, 1.35, 5.05);
+  wheelRim.rotation.x = Math.PI / 2.6;
+  root.add(wheelRim);
+  for (const [stanchionWorldX, stanchionWorldZ] of [
+    [-0.48, -1.5], [1.72, -1.5], [0.48, 1.5], [-1.72, 1.5],
+  ] as const) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 1.2, 8), MAT.brass());
+    pole.name = 'coach-stanchion';
+    pole.position.set(stanchionWorldZ, 1.5, -stanchionWorldX);
+    root.add(pole);
+  }
+  for (const x of [-1.8, 1.8]) for (const z of [-4.6, 4.6]) wheel(root, x, z, 0.45);
   for (const x of [-1.75, 1.75]) {
-    const light = new THREE.Mesh(new THREE.CircleGeometry(0.26, 20), new THREE.MeshStandardMaterial({ color: 0xfff0b2, emissive: 0xffb84d, emissiveIntensity: 2.3 }));
-    light.position.set(x, 1.55, -6.88); root.add(light);
+    const light = new THREE.Mesh(new THREE.CircleGeometry(0.2, 20), new THREE.MeshStandardMaterial({ color: 0xfff0b2, emissive: 0xffb84d, emissiveIntensity: 2.3 }));
+    light.position.set(x, 0.72, -6.88); root.add(light);
   }
-  const sign = decal('ATOM-LINER 86', 3.6, 0.9); sign.position.set(0, 3.25, -6.9); root.add(sign);
+  const sign = decal('ATOM-LINER 86', 3.2, 0.7); sign.position.set(0, 2.08, -6.9); root.add(sign);
   return root;
 }
 
@@ -1181,6 +1339,7 @@ const RIGGED_SUPPORT_GRIP_POSITION: Record<WeaponId, [number, number, number]> =
   'flashlight-pistol': [-0.06, -0.15, 0.03],
   'explosive-crossbow': [-0.06, -0.12, -0.25],
   flamethrower: [-0.06, -0.13, -0.3],
+  'crimson-flamethrower': [-0.06, -0.13, -0.3],
   'flare-gun': [-0.06, -0.15, 0.03],
 };
 
@@ -1767,7 +1926,9 @@ export function reactOperator(root: THREE.Group, zone: 'head' | 'body' | 'limb')
   root.userData.operatorHitAt = performance.now();
   root.userData.operatorHitZone = zone;
   root.userData.operatorHitSign = Number(root.userData.operatorHitSign ?? -1) * -1;
-  reactRiggedOperator(root, zone === 'limb');
+  // The zone reaches the reaction layer intact now. It used to be flattened to
+  // "is this a limb hit", which only chose between the two authored clips.
+  reactRiggedOperator(root, zone);
 }
 
 export function deathOperator(root: THREE.Group): void {
@@ -1796,7 +1957,11 @@ export function poseOperator(
   speed: number,
   _phase: number,
   _blend = 1,
-  _aimPitch = 0,
+  // Pass 77 / HF-375: this used to be `_aimPitch` - received from every call
+  // site, including the local operator path passing the real replicated pitch,
+  // and dropped on the floor. Bodies aimed at the horizon while their bullets
+  // left at 30 degrees. It now reaches the spine.
+  aimPitch = 0,
   explicitDeltaSeconds?: number,
 ): void {
   const rig = operatorRig(root);
@@ -1824,7 +1989,10 @@ export function poseOperator(
     entry.bone.position.copy(entry.position);
     entry.bone.quaternion.copy(entry.quaternion);
   }
-  updateRiggedOperator(root, speed, stance);
+  updateRiggedOperator(root, speed, stance, {
+    aimPitchRadians: aimPitch,
+    armed: rig.weaponId !== null,
+  });
   if (rig.weapon) updateImportedWeapon(rig.weapon, animationDeltaSeconds);
   if (rig.weaponId === 'minigun' && rig.weapon) {
     const now = performance.now();
@@ -1885,8 +2053,9 @@ export function buildOperator(
   flattenMaterials = false,
   weaponId: WeaponId | null = 'carbine',
   appearance: OperatorAppearance = 'team',
+  skinId = 'default', // HF-360
 ): THREE.Group {
-  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance);
+  const rigged = createRiggedOperator(team, name, flattenMaterials, appearance, skinId);
   if (rigged) {
     const { root, weaponSocket } = rigged;
     const hitProxyRoot = new THREE.Group();

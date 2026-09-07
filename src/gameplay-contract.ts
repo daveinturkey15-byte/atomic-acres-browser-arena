@@ -50,7 +50,8 @@ import {
 
 const renderProfiles: readonly RenderProfile[] = ['performance', 'blender', 'compat'];
 // UI card order is a presentation choice. Keep the frozen Pass 62 gameplay
-// contract order stable so a naming/menu pass cannot rewrite benchmark bytes.
+// contract order stable so a naming/menu pass, including HF-495, cannot rewrite
+// benchmark bytes.
 const GAMEPLAY_CONTRACT_ARENA_IDS = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'] as const;
 // Host-authoritative map pickups are verified by their own protocol and
 // lifecycle contracts. Do not let adding one rewrite the retained pre-HITL

@@ -1,0 +1,40 @@
+HF-473 handedness - built geometry projected into the authored back-yard review cameras
+NUKETOWN2_HANDEDNESS = -1
+
+--- north back yard -------------------------------------------------
+camera at (10.00, -29.00)  IS an authored spawn point
+looking at (1.25, -21.50)
+house centre  (1.25, -16.50)  14.8 m ahead, 14.4 deg left
+garage centre (-6.75, -19.50)  18.9 m ahead, 11.0 deg RIGHT
+VERDICT: garage is on the RIGHT of the house from this yard
+
+--- south back yard -------------------------------------------------
+camera at (-10.00, 29.00)  IS an authored spawn point
+looking at (-1.25, 21.50)
+house centre  (-1.25, 16.50)  14.8 m ahead, 14.4 deg left
+garage centre (6.75, 19.50)  18.9 m ahead, 11.0 deg RIGHT
+VERDICT: garage is on the RIGHT of the house from this yard
+
+HF-465 stations - subject angle off aim (a 60 deg camera sees +/- 30):
+  nuketown2-north-balcony at (9.5, 1.8, -27.5)
+    north balcony deck              10.6 m away,   9.0 deg off aim
+    north yard stair 5               6.7 m away,   6.4 deg off aim
+    north balcony rail outboard     10.3 m away,  13.9 deg off aim
+  nuketown2-front-porch at (8.0, 1.9, -4.6)
+    north verge front hedge          5.2 m away,  13.4 deg off aim
+    north porch canopy wing 0        7.0 m away,   3.3 deg off aim
+    north window ledge sill          8.5 m away,   0.3 deg off aim
+
+Every spawn, not just the camera station:
+  north spawn (   -13,  -24) -> garage RIGHT
+  north spawn (     5,  -25) -> garage RIGHT
+  north spawn (    -1,  -25) -> garage RIGHT
+  north spawn (    -7,  -25) -> garage RIGHT
+  north spawn (    10,  -29) -> garage RIGHT
+  north spawn (   -14,  -31) -> garage RIGHT
+  south spawn (    13,   24) -> garage RIGHT
+  south spawn (    -5,   25) -> garage RIGHT
+  south spawn (     1,   25) -> garage RIGHT
+  south spawn (     7,   25) -> garage RIGHT
+  south spawn (   -10,   29) -> garage RIGHT
+  south spawn (    14,   31) -> garage RIGHT

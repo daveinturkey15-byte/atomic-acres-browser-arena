@@ -116,6 +116,17 @@ function scanRuntimeSoundCallsites(): ObservedRuntimeSoundCallsite[] {
   const groups = new Map<string, ObservedRuntimeSoundCallsite>();
   for (const sourcePath of runtimeTypeScriptPaths()) {
     const source = readFileSync(sourcePath, 'utf8');
+    // Parsing every non-test source into a full TypeScript AST is what this scan
+    // costs, and legacy-main.ts alone is ~31.5k lines. The visitor below only ever
+    // matches a call whose expression is the IDENTIFIER `audio`, so a file whose
+    // text does not contain that substring anywhere cannot contribute a call site.
+    // Skipping those is a necessary-condition filter, not a narrowing of scope:
+    // the observed set is identical, and the digest assertion below would fail
+    // immediately if it were not.
+    //
+    // Not `audio.` - a call may legally be written with a line break before
+    // the dot, and a filter that missed that would silently drop a real call site.
+    if (!source.includes('audio')) continue;
     const sourceFile = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)
@@ -252,7 +263,8 @@ describe('Pass 65 sound-event inventory', () => {
     for (const symbol of emitterSymbols) expect(audioSource).toMatch(new RegExp(`\\n  ${symbol}\\(`));
   });
 
-  it('pins current weapon variants and all four implemented arena ambience identities', () => {
+  // HF-359: 5 implemented arena ambience identities
+  it('pins current weapon variants and all five implemented arena ambience identities', () => {
     expect(PASS64_WEAPON_AUDIO_VARIANTS).toEqual(WEAPON_IDS);
     const ambience = SOUND_EVENT_INVENTORY.find((event) => event.id === 'ambience.arena-bed');
     expect(ambience).toBeDefined();
@@ -275,7 +287,19 @@ describe('Pass 65 sound-event inventory', () => {
   it('has a stable inventory digest', () => {
     const digest = createHash('sha256').update(canonicalSoundEventInventoryJson()).digest('hex');
     expect(REQUIRED_SOUND_EVENT_IDS).toHaveLength(SOUND_EVENT_INVENTORY.length);
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55');
+    // owner 2026-08-30: Test1/Test2 arenas added — digest recomputed over the
+    // eight-arena variant rows. owner 2026-09-02 (HF-405): recomputed again
+    // over Map 3's bed, event and music variant rows. owner 2026-09-02
+    // (HF-407): recomputed again over the Nuke Town Rebuild's bed, event and
+    // music variant rows.
+    // (HF-408, 2026-09-03): recomputed once more at integration over the MERGED
+    // inventory - the Raid rebuild's two bed sources, its one event source and
+    // its music variant row now sit alongside the Nuke Town Rebuild's, so
+    // neither branch's pin was correct on its own.
+    // (HF-509, 2026-09-05): recomputed over the killstreak-awareness rows -
+    // one new announce event and four planned support loops/bomb events that
+    // now have real emitters (syncSupportFlightLoops, bombRelease).
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

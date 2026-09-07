@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DataConnection } from 'peerjs';
+import type { DataConnection, Peer } from 'peerjs';
 import {
   ArenaNetwork,
   CLIENT_HOST_LIVENESS_MAX_SCHEDULING_GAP_MS,
@@ -665,7 +665,7 @@ describe('guest event connection lifecycle', () => {
   });
 
   it('rejects a v17 peer before it can mix with the required v18 support-shot schema', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(19);
     const currentSupportResult = {
       type: 'killstreak-damage-result' as const,
       by: 'host',
@@ -829,5 +829,106 @@ describe('guest event connection lifecycle', () => {
     expect(network.activePlayerIds(12_000, bundle.lastValidMessageMonoMs + 11_999)).toEqual(['player-1']);
     expect(network.activePlayerIds(12_000, bundle.lastValidMessageMonoMs + 12_001)).toEqual([]);
     expect(connection.open).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HF-325 — promoteToHost claims the room id as the mutual-exclusion lock
+// ---------------------------------------------------------------------------
+
+class FakePeer {
+  readonly preferredId: string | undefined;
+  destroyed = false;
+  reconnects = 0;
+  private readonly handlers = new Map<string, Array<(payload?: unknown) => void>>();
+  constructor(preferredId?: string) { this.preferredId = preferredId; }
+  on(event: string, handler: (payload?: unknown) => void): this {
+    this.handlers.set(event, [...this.handlers.get(event) ?? [], handler]);
+    return this;
+  }
+  emit(event: string, payload?: unknown): void {
+    for (const handler of this.handlers.get(event) ?? []) handler(payload);
+  }
+  connect(): FakeConnection { return new FakeConnection('remote'); }
+  reconnect(): void { this.reconnects += 1; }
+  destroy(): void { this.destroyed = true; }
+}
+
+describe('HF-325 promoteToHost room-id claim', () => {
+  const windowStub = {
+    location: { search: '', hostname: 'localhost' },
+    setTimeout: (callback: () => void) => { callback(); return 0; },
+    clearTimeout: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  };
+
+  function promotionHarness() {
+    vi.stubGlobal('window', windowStub);
+    const statuses: Array<[string, string | undefined]> = [];
+    const peers: FakePeer[] = [];
+    const network = new ArenaNetwork(
+      () => undefined,
+      (text, kind) => statuses.push([text, kind]),
+      () => undefined,
+      (preferredId?: string) => {
+        const peer = new FakePeer(preferredId);
+        peers.push(peer);
+        return peer as unknown as Peer;
+      },
+    );
+    return { network, statuses, peers };
+  }
+
+  it('claims the exact joined room id and becomes the host when the id is free', () => {
+    const { network, peers } = promotionHarness();
+    network.role = 'client';
+    network.roomCode = 'room-alpha';
+    let ready = false;
+    network.promoteToHost('room-alpha', () => { ready = true; });
+    expect(network.role).toBe('host');
+    expect(peers).toHaveLength(1);
+    expect(peers[0].preferredId).toBe('room-alpha');
+    peers[0].emit('open', 'room-alpha');
+    expect(network.roomCode).toBe('room-alpha');
+    expect(ready).toBe(true);
+  });
+
+  it('aborts PERMANENTLY on unavailable-id: offline, no retry, no fresh room', () => {
+    const { network, statuses, peers } = promotionHarness();
+    network.role = 'client';
+    network.roomCode = 'room-alpha';
+    network.promoteToHost('room-alpha', () => undefined);
+    peers[0].emit('error', { type: 'unavailable-id' });
+    expect(network.role).toBe('offline');
+    expect(network.roomCode).toBe('');
+    // The one claim peer was destroyed and nothing else was minted: no reclaim
+    // ramp (that races a possibly-live host) and no fresh-room fallback.
+    expect(peers).toHaveLength(1);
+    expect(peers[0].destroyed).toBe(true);
+    expect(statuses.some(([text]) => text.includes('promotion abandoned'))).toBe(true);
+  });
+
+  it('refuses to promote toward any room other than the one this client joined', () => {
+    const { network, peers } = promotionHarness();
+    network.role = 'client';
+    network.roomCode = 'room-alpha';
+    network.promoteToHost('room-bravo', () => undefined);
+    expect(network.role).toBe('client');
+    expect(peers).toHaveLength(0);
+  });
+
+  it('stands an established host down when its released id was claimed by a successor', () => {
+    const { network, statuses, peers } = promotionHarness();
+    network.host(() => undefined);
+    peers[0].emit('open', 'room-alpha');
+    expect(network.role).toBe('host');
+    expect(network.roomCode).toBe('room-alpha');
+    // Signalling dropped, the id lapsed, a successor claimed it; the reconnect
+    // then surfaces unavailable-id. The host surrenders instead of fighting.
+    peers[0].emit('error', { type: 'unavailable-id' });
+    expect(network.role).toBe('offline');
+    expect(network.roomCode).toBe('');
+    expect(statuses.some(([text]) => text.includes('standing down'))).toBe(true);
   });
 });

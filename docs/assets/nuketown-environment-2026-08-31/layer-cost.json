@@ -1,0 +1,82 @@
+{
+  "1280x720": {
+    "baseline": {
+      "frames": 702,
+      "meanMs": 8.559,
+      "medianMs": 8.5,
+      "p95Ms": 13.1,
+      "fps": 116.8
+    },
+    "without:nuketown-lawn": {
+      "found": true,
+      "frames": 614,
+      "meanMs": 9.784,
+      "medianMs": 10.1,
+      "p95Ms": 12.6,
+      "fps": 102.2
+    },
+    "without:nuketown-forest-surround": {
+      "found": true,
+      "frames": 612,
+      "meanMs": 9.814,
+      "medianMs": 9.3,
+      "p95Ms": 13.9,
+      "fps": 101.9
+    },
+    "without:nuketown-mountain-backdrop": {
+      "found": true,
+      "frames": 757,
+      "meanMs": 7.932,
+      "medianMs": 8.1,
+      "p95Ms": 11.8,
+      "fps": 126.1
+    },
+    "without:all-three": {
+      "frames": 1020,
+      "meanMs": 5.886,
+      "medianMs": 5.4,
+      "p95Ms": 11.3,
+      "fps": 169.9
+    }
+  },
+  "2560x1440": {
+    "baseline": {
+      "frames": 960,
+      "meanMs": 6.25,
+      "medianMs": 6.3,
+      "p95Ms": 9.6,
+      "fps": 160
+    },
+    "without:nuketown-lawn": {
+      "found": true,
+      "frames": 874,
+      "meanMs": 6.866,
+      "medianMs": 6.9,
+      "p95Ms": 9.6,
+      "fps": 145.7
+    },
+    "without:nuketown-forest-surround": {
+      "found": true,
+      "frames": 979,
+      "meanMs": 6.131,
+      "medianMs": 6,
+      "p95Ms": 9.8,
+      "fps": 163.1
+    },
+    "without:nuketown-mountain-backdrop": {
+      "found": true,
+      "frames": 931,
+      "meanMs": 6.446,
+      "medianMs": 6.4,
+      "p95Ms": 10.8,
+      "fps": 155.1
+    },
+    "without:all-three": {
+      "frames": 856,
+      "meanMs": 7.015,
+      "medianMs": 7.1,
+      "p95Ms": 10,
+      "fps": 142.6
+    }
+  }
+}

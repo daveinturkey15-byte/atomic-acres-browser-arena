@@ -1,0 +1,1463 @@
+[
+  {
+    "pose": "garage-door-stand-yaw270",
+    "eye": {
+      "x": 17.69997787475586,
+      "y": 1.8401975560188295,
+      "z": -6.19999885559082
+    },
+    "playerPosition": [
+      17.69997787475586,
+      1.7001975560188294,
+      -6.19999885559082
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": "dressing",
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": true,
+    "lastGroundedFeetY": 0.00019755601882942564,
+    "activeClipPlanes": 7,
+    "clippedVertices": 13,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0.32,
+    "worstMesh": "Pass65_Arms_Batch_Sleeve",
+    "worstPoint": [
+      18.010738374479544,
+      1.3249304523960017,
+      -5.99625529423623
+    ],
+    "worstBox": {
+      "minX": 17.65999999642372,
+      "maxX": 18.34000000357628,
+      "minY": 0.18499999046325688,
+      "maxY": 1.9150000095367432,
+      "minZ": -6.3233592212200165,
+      "maxZ": -5.6766407787799835
+    },
+    "maxBelowFloorM": 0,
+    "lowestDrawnVertex": {
+      "x": 18.092,
+      "y": 0.776,
+      "z": -5.897,
+      "mesh": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+      "skinned": false
+    },
+    "planes": [
+      {
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "constant": 1017.7,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "constant": 6.388,
+        "eyeSignedDistance": 0.188,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "constant": 1017.7,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "constant": 1017.7,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "constant": 1017.7,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -1,
+          0,
+          0
+        ],
+        "constant": 1017.7,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.8134983837260219,
+      "foldPitchRadians": 0.68,
+      "scale": 0.72,
+      "nearPlaneLimitZ": -0.32650161627397817,
+      "forwardReachMeters": 0.5596067382413307,
+      "muzzleForwardMeters": 0.3415066046042486,
+      "residualMeters": 0.43012236897384426,
+      "clipPlaneDistanceMeters": null
+    }
+  },
+  {
+    "pose": "garage-door-stand-yaw300",
+    "eye": {
+      "x": 17.69997787475586,
+      "y": 1.8401975560188295,
+      "z": -6.19999885559082
+    },
+    "playerPosition": [
+      17.69997787475586,
+      1.7001975560188294,
+      -6.19999885559082
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": "dressing",
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": true,
+    "lastGroundedFeetY": 0.00019755601882942564,
+    "activeClipPlanes": 7,
+    "clippedVertices": 8150,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0.289,
+    "worstMesh": "Pass65_Arms_Batch_Sleeve",
+    "worstPoint": [
+      18.051459992109546,
+      1.6260223572531949,
+      -6.016484371192014
+    ],
+    "worstBox": {
+      "minX": 17.65999999642372,
+      "maxX": 18.34000000357628,
+      "minY": 0.18499999046325688,
+      "maxY": 1.9150000095367432,
+      "minZ": -6.3233592212200165,
+      "maxZ": -5.6766407787799835
+    },
+    "maxBelowFloorM": 0,
+    "lowestDrawnVertex": {
+      "x": 18.247,
+      "y": 0.778,
+      "z": -6.012,
+      "mesh": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Rubber",
+      "skinned": false
+    },
+    "planes": [
+      {
+        "normal": [
+          -0.866,
+          0,
+          0.5
+        ],
+        "constant": 18.809,
+        "eyeSignedDistance": 0.38,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "constant": 6.388,
+        "eyeSignedDistance": 0.188,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          0.5
+        ],
+        "constant": 1018.429,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          0.5
+        ],
+        "constant": 1018.429,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          0.5
+        ],
+        "constant": 1018.429,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          0.5
+        ],
+        "constant": 1018.429,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.8134983837260219,
+      "foldPitchRadians": 0.68,
+      "scale": 0.72,
+      "nearPlaneLimitZ": -0.32650161627397817,
+      "forwardReachMeters": 0.5596067382413307,
+      "muzzleForwardMeters": 0.3415066046042486,
+      "residualMeters": 0.43012236897384426,
+      "clipPlaneDistanceMeters": 0.4000022888183582
+    }
+  },
+  {
+    "pose": "garage-door-prone-yaw240",
+    "eye": {
+      "x": 17.69997787475586,
+      "y": 0.7501975250244141,
+      "z": -6.199899673461914
+    },
+    "playerPosition": [
+      17.69997787475586,
+      0.610197525024414,
+      -6.199899673461914
+    ],
+    "stance": "prone",
+    "stanceReached": "prone",
+    "grounded": true,
+    "worstBoxSource": "dressing",
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": true,
+    "lastGroundedFeetY": 0.00019752502441405806,
+    "activeClipPlanes": 7,
+    "clippedVertices": 55,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0.219,
+    "worstMesh": "Pass65_Arms_Batch_Sleeve",
+    "worstPoint": [
+      17.878768250258688,
+      1.0925439914973265,
+      -5.9906408375788605
+    ],
+    "worstBox": {
+      "minX": 17.65999999642372,
+      "maxX": 18.34000000357628,
+      "minY": 0.18499999046325688,
+      "maxY": 1.9150000095367432,
+      "minZ": -6.3233592212200165,
+      "maxZ": -5.6766407787799835
+    },
+    "maxBelowFloorM": 0.004,
+    "lowestDrawnVertex": {
+      "x": 17.922,
+      "y": 0.035,
+      "z": -5.21,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1012.229,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "constant": 6.388,
+        "eyeSignedDistance": 0.188,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 0.762,
+        "parked": false
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1012.229,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1012.229,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1012.229,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1012.229,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.8134983837260219,
+      "foldPitchRadians": 0.68,
+      "scale": 0.72,
+      "nearPlaneLimitZ": -0.32650161627397817,
+      "forwardReachMeters": 0.5596067382413307,
+      "muzzleForwardMeters": 0.3415066046042486,
+      "residualMeters": 0.43012236897384426,
+      "clipPlaneDistanceMeters": null
+    }
+  },
+  {
+    "pose": "bus-van-gap-stand-yaw240",
+    "eye": {
+      "x": 4.5,
+      "y": 1.8649957108497621,
+      "z": -3.75
+    },
+    "playerPosition": [
+      4.5,
+      1.724995710849762,
+      -3.75
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.024995710849762043,
+    "activeClipPlanes": 7,
+    "clippedVertices": 1718,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0,
+    "lowestDrawnVertex": {
+      "x": 4.674,
+      "y": 1.112,
+      "z": -3.152,
+      "mesh": "Pass65_Arms_Batch_WristAccent",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 3.734,
+        "eyeSignedDistance": 1.712,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          -1,
+          0
+        ],
+        "constant": 2.088,
+        "eyeSignedDistance": 0.223,
+        "parked": false
+      },
+      {
+        "normal": [
+          1,
+          0,
+          0
+        ],
+        "constant": -4.232,
+        "eyeSignedDistance": 0.268,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": -1.112,
+        "eyeSignedDistance": 0.753,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0,
+          -1
+        ],
+        "constant": -2.892,
+        "eyeSignedDistance": 0.858,
+        "parked": false
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1002.022,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          -0.866,
+          0,
+          -0.5
+        ],
+        "constant": 1002.022,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.7500420171990063,
+      "foldPitchRadians": 0.6976566569010418,
+      "scale": 0.808798828125,
+      "nearPlaneLimitZ": -0.3899450869959459,
+      "forwardReachMeters": 0.6957321713351297,
+      "muzzleForwardMeters": 0.5956177574427579,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 1.7320508006863253
+    }
+  },
+  {
+    "pose": "open-ground-down-stand",
+    "eye": {
+      "x": -0.00005092815263196826,
+      "y": 1.8401827144622804,
+      "z": -0.0000030129704100545496
+    },
+    "playerPosition": [
+      -0.00005092815263196826,
+      1.7001827144622803,
+      -0.0000030129704100545496
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.00018271446228035337,
+    "activeClipPlanes": 7,
+    "clippedVertices": 144,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": 0.719,
+      "y": 0,
+      "z": 0.9,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 0.089,
+        "eyeSignedDistance": 1.804,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          -1,
+          0
+        ],
+        "constant": 2.868,
+        "eyeSignedDistance": 1.028,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.285,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.285,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.285,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.285,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0,
+      "foldPitchRadians": 0.560302734375,
+      "scale": 0.89541015625,
+      "nearPlaneLimitZ": -0.6893779352143912,
+      "forwardReachMeters": 1.76392446088972,
+      "muzzleForwardMeters": 1.755156077610187,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 1.8239578421068252
+    }
+  },
+  {
+    "pose": "open-ground-down-crouch",
+    "eye": {
+      "x": -0.00005543436418520287,
+      "y": 1.3001829099655153,
+      "z": -0.000009782686902326532
+    },
+    "playerPosition": [
+      -0.00005543436418520287,
+      1.1601829099655152,
+      -0.000009782686902326532
+    ],
+    "stance": "crouch",
+    "stanceReached": "crouch",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.0001829099655152877,
+    "activeClipPlanes": 7,
+    "clippedVertices": 742,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": 0.411,
+      "y": -0.012,
+      "z": 0.189,
+      "mesh": "Pass65_Arms_Batch_Skin",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 0.013,
+        "eyeSignedDistance": 1.225,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 1.312,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.788,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.788,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.788,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.788,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 998.788,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.29895801255097876,
+      "foldPitchRadians": 0.682930684407552,
+      "scale": 0.83872314453125,
+      "nearPlaneLimitZ": -0.48421660447256415,
+      "forwardReachMeters": 1.1845829981434806,
+      "muzzleForwardMeters": 1.1678933283156279,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 1.2445829981434806
+    }
+  },
+  {
+    "pose": "open-ground-down-prone",
+    "eye": {
+      "x": 0,
+      "y": 0.7808464121818542,
+      "z": 0
+    },
+    "playerPosition": [
+      0,
+      0.6408464121818542,
+      0
+    ],
+    "stance": "prone",
+    "stanceReached": "prone",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.030846412181854244,
+    "activeClipPlanes": 7,
+    "clippedVertices": 1315,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.007,
+    "lowestDrawnVertex": {
+      "x": 0.599,
+      "y": 0.024,
+      "z": 0.248,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": -0.093,
+        "eyeSignedDistance": 0.634,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": -0.019,
+        "eyeSignedDistance": 0.762,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 999.272,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 999.272,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 999.272,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 999.272,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.932,
+          0.362
+        ],
+        "constant": 999.272,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.8030036219000487,
+      "foldPitchRadians": 0.6201642464900364,
+      "scale": 0.7613232421875,
+      "nearPlaneLimitZ": -0.3369919972641504,
+      "forwardReachMeters": 0.5944789904030372,
+      "muzzleForwardMeters": 0.4074428159761038,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 0.6544789904030373
+    }
+  },
+  {
+    "pose": "grass-slope-down-stand-yaw0",
+    "eye": {
+      "x": -24,
+      "y": 1.8649871277809145,
+      "z": 26
+    },
+    "playerPosition": [
+      -24,
+      1.7249871277809143,
+      26
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.024987127780914387,
+    "activeClipPlanes": 7,
+    "clippedVertices": 55,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": -24.329,
+      "y": 0.025,
+      "z": 26.266,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": -16.318,
+        "eyeSignedDistance": 2.243,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": -0.013,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 981.439,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 981.439,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 981.439,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 981.439,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 981.439,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0,
+      "foldPitchRadians": 0,
+      "scale": 1,
+      "nearPlaneLimitZ": -0.8018833205803816,
+      "forwardReachMeters": 1.9714180698476254,
+      "muzzleForwardMeters": 1.9714180698476254,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 2.2628035928642984
+    }
+  },
+  {
+    "pose": "grass-slope-down-prone-yaw0",
+    "eye": {
+      "x": -24.0000057220459,
+      "y": 0.750199670791626,
+      "z": 26.0000057220459
+    },
+    "playerPosition": [
+      -24.0000057220459,
+      0.610199670791626,
+      26.0000057220459
+    ],
+    "stance": "prone",
+    "stanceReached": "prone",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.00019967079162597212,
+    "activeClipPlanes": 7,
+    "clippedVertices": 2105,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": -23.54,
+      "y": -0.012,
+      "z": 26.055,
+      "mesh": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+      "skinned": false
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": -16.931,
+        "eyeSignedDistance": 0.792,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 0.762,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 982.277,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 982.277,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 982.277,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 982.277,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.751,
+          0.66
+        ],
+        "constant": 982.277,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.6369926330060022,
+      "foldPitchRadians": 0.8342234965891078,
+      "scale": 0.72517822265625,
+      "nearPlaneLimitZ": -0.3378621156731009,
+      "forwardReachMeters": 0.7519471715571895,
+      "muzzleForwardMeters": 0.5268520038568514,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 0.8119471715571894
+    }
+  },
+  {
+    "pose": "upper-room-stand-yaw0",
+    "eye": {
+      "x": -0.000009883328857540619,
+      "y": 1.8401991057395937,
+      "z": -19.9999942779541
+    },
+    "playerPosition": [
+      -0.000009883328857540619,
+      1.7001991057395935,
+      -19.9999942779541
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.0001991057395935858,
+    "activeClipPlanes": 7,
+    "clippedVertices": 28,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.009,
+    "lowestDrawnVertex": {
+      "x": 0.945,
+      "y": -0.008,
+      "z": -20.727,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1017.705,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": false,
+      "retreatMeters": 0,
+      "foldPitchRadians": 0,
+      "scale": 1,
+      "nearPlaneLimitZ": null,
+      "forwardReachMeters": 0,
+      "muzzleForwardMeters": 0,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": null
+    }
+  },
+  {
+    "pose": "upper-room-prone-yaw0",
+    "eye": {
+      "x": -0.000011661100870696828,
+      "y": 0.750199134349823,
+      "z": -19.9999942779541
+    },
+    "playerPosition": [
+      -0.000011661100870696828,
+      0.610199134349823,
+      -19.9999942779541
+    ],
+    "stance": "prone",
+    "stanceReached": "prone",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.0001991343498229936,
+    "activeClipPlanes": 7,
+    "clippedVertices": 2242,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": 0.373,
+      "y": -0.012,
+      "z": -20.365,
+      "mesh": "carbine_FP_LOD0_Runtime_static_MAT_Pass65_carbine_Polymer_PBR",
+      "skinned": false
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 19.676,
+        "eyeSignedDistance": 1.546,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": 0.012,
+        "eyeSignedDistance": 0.762,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1018.129,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1018.129,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1018.129,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1018.129,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.389,
+          0.921
+        ],
+        "constant": 1018.129,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": true,
+      "retreatMeters": 0.14398115333022377,
+      "foldPitchRadians": 0.6890808423913044,
+      "scale": 0.86562255859375,
+      "nearPlaneLimitZ": -0.6097099922775484,
+      "forwardReachMeters": 1.5064387978841476,
+      "muzzleForwardMeters": 1.493448596796194,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": 1.5664387978841476
+    }
+  },
+  {
+    "pose": "zone-b-court-stand-yaw0",
+    "eye": {
+      "x": 3.8060957763264014e-7,
+      "y": 1.8649952936172487,
+      "z": 14.000000953674316
+    },
+    "playerPosition": [
+      3.8060957763264014e-7,
+      1.7249952936172486,
+      14.000000953674316
+    ],
+    "stance": "stand",
+    "stanceReached": "stand",
+    "grounded": true,
+    "worstBoxSource": null,
+    "eyeInsideColliderBox": false,
+    "eyeInsideDressingBox": false,
+    "lastGroundedFeetY": 0.024995293617248615,
+    "activeClipPlanes": 7,
+    "clippedVertices": 57,
+    "verticesMeasured": 15577,
+    "maxPenetrationM": 0,
+    "worstMesh": null,
+    "worstPoint": null,
+    "worstBox": null,
+    "maxBelowFloorM": 0.012,
+    "lowestDrawnVertex": {
+      "x": -0.052,
+      "y": 0.014,
+      "z": 13.945,
+      "mesh": "Pass65_Arms_Batch_Sleeve",
+      "skinned": true
+    },
+    "planes": [
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          1,
+          0
+        ],
+        "constant": -0.013,
+        "eyeSignedDistance": 1.852,
+        "parked": false
+      },
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      },
+      {
+        "normal": [
+          0,
+          0.565,
+          0.825
+        ],
+        "constant": 987.392,
+        "eyeSignedDistance": 1000,
+        "parked": true
+      }
+    ],
+    "contactFold": {
+      "contract": "measured-viewmodel-contact-fold-v2",
+      "engaged": false,
+      "retreatMeters": 0,
+      "foldPitchRadians": 0,
+      "scale": 1,
+      "nearPlaneLimitZ": null,
+      "forwardReachMeters": 0,
+      "muzzleForwardMeters": 0,
+      "residualMeters": 0,
+      "clipPlaneDistanceMeters": null
+    }
+  }
+]

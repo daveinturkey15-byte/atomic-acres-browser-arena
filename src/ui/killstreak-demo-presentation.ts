@@ -1,4 +1,4 @@
-import type { Pass65KillstreakId } from '../killstreak-catalog';
+import type { SelectableKillstreakId } from '../killstreak-catalog';
 import { killstreakDemoPosterPath, killstreakDemoVideoPath } from '../killstreak-demo-capture-contract';
 
 export type KillstreakDemoKind =
@@ -20,7 +20,7 @@ export type KillstreakDemoMedia = Readonly<{
 }>;
 
 export type KillstreakDemoDefinition = Readonly<{
-  id: Pass65KillstreakId;
+  id: SelectableKillstreakId;
   kind: KillstreakDemoKind;
   eyebrow: string;
   title: string;
@@ -34,11 +34,11 @@ function definition(value: KillstreakDemoDefinition): KillstreakDemoDefinition {
   return Object.freeze({ ...value, beats: Object.freeze([...value.beats]) as KillstreakDemoDefinition['beats'], media: Object.freeze(value.media) });
 }
 
-export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, KillstreakDemoDefinition>> = Object.freeze({
+export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<SelectableKillstreakId, KillstreakDemoDefinition>> = Object.freeze({
   'scout-sweep': definition({
     id: 'scout-sweep', kind: 'radar-sweep', eyebrow: 'RECON PULSE', title: 'SCOUT SWEEP',
     summary: 'A verified test-bay clip shows the real short reveal cadence without starting a menu gameplay renderer.',
-    accent: '#70eee1', beats: ['Emit tactical sweep', 'Resolve enemy pings', 'Expire after scan window'],
+    accent: '#f5d4bd', beats: ['Emit tactical sweep', 'Resolve enemy pings', 'Expire after scan window'],
     media: { posterPath: killstreakDemoPosterPath('scout-sweep'), videoPath: killstreakDemoVideoPath('scout-sweep') },
   }),
   adrenaline: definition({
@@ -56,13 +56,13 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, Killstre
   yardhawk: definition({
     id: 'yardhawk', kind: 'yardhawk-orbit', eyebrow: 'AUTONOMOUS HUNTER', title: 'YARDHAWK',
     summary: 'The real test-bay recording shows a single hunter orbiting before it commits to a target.',
-    accent: '#72e7ff', beats: ['Spawn above map centre', 'Acquire visible target', 'Attack then re-form orbit'],
+    accent: '#f4d0b8', beats: ['Spawn above map centre', 'Acquire visible target', 'Attack then re-form orbit'],
     media: { posterPath: killstreakDemoPosterPath('yardhawk'), videoPath: killstreakDemoVideoPath('yardhawk') },
   }),
   'piloted-drone': definition({
     id: 'piloted-drone', kind: 'pilot-feed', eyebrow: 'OPTIONAL POSSESSION', title: 'PILOTED DRONE',
     summary: 'The real test-bay recording distinguishes autonomous patrol from the optional gun-control window.',
-    accent: '#7be9de', beats: ['Deploy at map centre', 'Patrol autonomously', 'Press its assigned key again to operate'],
+    accent: '#f3d0b9', beats: ['Deploy at map centre', 'Patrol autonomously', 'Press its assigned key again to operate'],
     media: { posterPath: killstreakDemoPosterPath('piloted-drone'), videoPath: killstreakDemoVideoPath('piloted-drone') },
   }),
   'tri-pass': definition({
@@ -80,13 +80,13 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, Killstre
   'hunter-swarm': definition({
     id: 'hunter-swarm', kind: 'hunter-cluster', eyebrow: 'CLUSTERED HUNTERS', title: 'HUNTER SWARM',
     summary: 'The real test-bay recording shows the spread formation separating into target clusters.',
-    accent: '#79efe3', beats: ['Spawn spread formation', 'Assign target clusters', 'Maintain separation while engaging'],
+    accent: '#f6d6c1', beats: ['Spawn spread formation', 'Assign target clusters', 'Maintain separation while engaging'],
     media: { posterPath: killstreakDemoPosterPath('hunter-swarm'), videoPath: killstreakDemoVideoPath('hunter-swarm') },
   }),
   chopper: definition({
     id: 'chopper', kind: 'chopper-orbit', eyebrow: 'AIRBORNE GUN PLATFORM', title: 'CHOPPER GUNNER',
     summary: 'The real test-bay recording shows the elevated orbit, damage and optional gunner-control sightline.',
-    accent: '#5ce9ff', beats: ['Enter authored orbit', 'Track visible targets', 'Press its assigned key again to operate'],
+    accent: '#f4d0b8', beats: ['Enter authored orbit', 'Track visible targets', 'Press its assigned key again to operate'],
     media: { posterPath: killstreakDemoPosterPath('chopper'), videoPath: killstreakDemoVideoPath('chopper') },
   }),
   nuke: definition({
@@ -98,7 +98,7 @@ export const KILLSTREAK_DEMO_MEDIA: Readonly<Record<Pass65KillstreakId, Killstre
   'drone-swarm': definition({
     id: 'drone-swarm', kind: 'drone-cloud', eyebrow: 'ULTIMATE AIRSPACE', title: 'DRONE SWARM',
     summary: 'The real test-bay recording shows separated clusters holding altitude while distributing targets.',
-    accent: '#8ef6df', beats: ['Fill centre airspace', 'Spread into clusters', 'Engage without ground-hugging'],
+    accent: '#f8dfce', beats: ['Fill centre airspace', 'Spread into clusters', 'Engage without ground-hugging'],
     media: { posterPath: killstreakDemoPosterPath('drone-swarm'), videoPath: killstreakDemoVideoPath('drone-swarm') },
   }),
 });
@@ -111,7 +111,7 @@ function beatsMarkup(definitionValue: KillstreakDemoDefinition): string {
   return definitionValue.beats.map((beat, index) => `<li><i>0${index + 1}</i><span>${escapeHtml(beat)}</span></li>`).join('');
 }
 
-export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string {
+export function killstreakDemoRailMarkup(initialId: SelectableKillstreakId): string {
   const initial = KILLSTREAK_DEMO_MEDIA[initialId];
   return `<aside id="killstreak-demo-rail" class="killstreak-demo-rail" aria-labelledby="killstreak-demo-title" data-demo-id="${initial.id}" data-demo-kind="${initial.kind}" data-motion="inactive" data-media="poster" style="--killstreak-demo-accent:${initial.accent}">
     <header><small data-demo-eyebrow>${initial.eyebrow}</small><strong id="killstreak-demo-title" data-demo-title>${initial.title}</strong></header>
@@ -128,12 +128,12 @@ export function killstreakDemoRailMarkup(initialId: Pass65KillstreakId): string 
 }
 
 export type KillstreakDemoRailBinding = Readonly<{
-  show: (id: Pass65KillstreakId) => void;
+  show: (id: SelectableKillstreakId) => void;
   syncMotion: () => void;
   dispose: () => void;
 }>;
 
-export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65KillstreakId): KillstreakDemoRailBinding {
+export function bindKillstreakDemoRail(root: ParentNode, initialId: SelectableKillstreakId): KillstreakDemoRailBinding {
   const rail = root.querySelector<HTMLElement>('#killstreak-demo-rail');
   if (!rail) return Object.freeze({ show: () => undefined, syncMotion: () => undefined, dispose: () => undefined });
   const motionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -206,7 +206,7 @@ export function bindKillstreakDemoRail(root: ParentNode, initialId: Pass65Killst
     playCurrent();
   };
 
-  const show = (id: Pass65KillstreakId): void => {
+  const show = (id: SelectableKillstreakId): void => {
     currentId = id;
     manualPaused = false;
     const next = KILLSTREAK_DEMO_MEDIA[id];

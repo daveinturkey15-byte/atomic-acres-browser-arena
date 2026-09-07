@@ -137,18 +137,18 @@
       "kind": "original-project-complete-blender-environment",
       "creator": "Atomic Acres project / Jigglyclaw",
       "source": "scripts/blender/create-atomic-acres-blender-arena.py",
-      "generatedAsOf": "2026-07-24",
+      "generatedAsOf": "2026-08-31",
       "license": "Original project work",
       "files": "public/assets/original/models/atomic-acres-blender-arena.glb",
-      "sha256": "3626e4f368bd225d049e267a61c965e990b0292a682f2d1d5e5b53f6cf96c68a",
+      "sha256": "ed679d49fe979cfb71f443193a6a658ad9fd24ece7cf3ca23bef670f6b2172b3",
       "sourceBlend": "source-assets/blender/atomic-acres-blender-arena.blend",
-      "sourceBlendSha256": "b860e8f0a4ea72f93066bccce00ac1f8d53b693f47aa102b2af8b85832daa88a",
+      "sourceBlendSha256": "4827389379244a2e73d594c6caf46dba20894fbb7125c4c4cf857a217ee17005",
       "sourceSpec": "source-assets/blender/atomic-acres-arena-spec.json",
-      "sourceSpecSha256": "08d20deac38baf8a06e0e9a7cb84e001d2dc4c0c10a0dfd15449658565ce8bfc",
+      "sourceSpecSha256": "a9c5dcbf806f0e766aadcb901e724e29e87d7f0e31781d157929b90fd2909d4a",
       "sourceProvenance": "source-assets/blender/atomic-acres-blender-arena.provenance.json",
       "preview": "artifacts/blender-render/atomic-acres-blender-arena-preview.png",
-      "format": "glTF 2.0 binary with lossless WebP textures and Meshopt geometry, 45 meshes, 29 exported materials, 44300 triangles, 10 semantic collision-visual owners, 6 semantic breakable windows, 16 audited house apertures with 144 clearance samples, 3 semantic route landmarks, 2 modeled transit buses, 4 authored large physical cover assets, 2 authored house furnishing sets, 33 embedded project-authored images, 33 deduplicated texture bindings and 20 exported PBR materials",
-      "modifications": "Atomic Acres-owned complete environment, deterministically regenerated in Blender 5.1.2 from project primitives, project-authored textures and the checked-in TypeScript-derived arena specification. Pass 62 derives the runtime GLB with pinned lossless WebP texture and Meshopt geometry compression, removes the decorative floating house squares, counter strip and upper headboards, eliminates opaque opening lintels from the interior routes, and gives the upper-floor underside a dedicated untextured plaster material so structural edges cannot read as floating timber. Pass 63 replaces facade-spanning corner strips with true corner posts and adds a deterministic nine-ray clearance receipt for every declared house door, passage and window. Pass 73 tags one exact rendered collision owner for each audited wall, floor, underside, canopy and window route on both houses, removes the duplicate canopy and floating floor-wear overlay, and aligns the Quality sill geometry with TypeScript movement, physics and shot authority. No commercial model, downloaded model, copied texture, logo, signage, map geometry, audio or extracted game asset is used. Checked-in procedural authority owns collision and ballistics.",
+      "format": "glTF 2.0 binary with lossless WebP textures and Meshopt geometry, 54 meshes, 28 exported materials, 32236 triangles, 10 semantic collision-visual owners, 6 semantic breakable windows, 16 audited house apertures with 144 clearance samples, 3 semantic route landmarks, 1 modeled transit bus, 4 authored large physical cover assets, 2 authored house furnishing sets, 33 embedded project-authored images, 33 deduplicated texture bindings and 20 exported PBR materials",
+      "modifications": "Atomic Acres-owned complete environment, deterministically regenerated in Blender 5.1.2 from project primitives, project-authored textures and the checked-in TypeScript-derived arena specification. Pass 62 derives the runtime GLB with pinned lossless WebP texture and Meshopt geometry compression, removes the decorative floating house squares, counter strip and upper headboards, eliminates opaque opening lintels from the interior routes, and gives the upper-floor underside a dedicated untextured plaster material so structural edges cannot read as floating timber. Pass 63 replaces facade-spanning corner strips with true corner posts and adds a deterministic nine-ray clearance receipt for every declared house door, passage and window. Pass 73 tags one exact rendered collision owner for each audited wall, floor, underside, canopy and window route on both houses, removes the duplicate canopy and floating floor-wear overlay, and aligns the Quality sill geometry with TypeScript movement, physics and shot authority. No commercial model, downloaded model, copied texture, logo, signage, map geometry, audio or extracted game asset is used. Checked-in procedural authority owns collision and ballistics. Pass 81 rebakes the arena from a re-derived spec: the exporter had hardcoded the roadway and boundary geometry at the pre-HF-383 62 x 60 m arena with a 10 m road, so the Quality profile drew a smaller map than the one TypeScript collides with. Boundaries, carriageway, kerbs and pavements are now derived from ARENA_BOUNDS and STREET_HALF_WIDTH, and this bake is the first to carry the deepened 62 x 63 m footprint, the 13 m carriageway, the mid-street vans and the restaged hedges. 2026-08-31 yard-tree removal rebake (owner: \"trees ... still feel poor on nuketown\"): the eight BLD_PROP_tree_trunk_* cylinders and their thirty-two BLD_PROP_tree_crown_* UV spheres are deleted from the generator. On the default Quality route those forty nodes WERE the tree - one cylinder plus four identical spheres in the flat MAT_foliage_military material, batched into one draw, all eight trees differing only by three scale values - because resolveRenderProfile(\"\") returns \"blender\" and the rich procedural tree in src/environment-assets.ts never runs there. Real multi-part trees are planted at the same eight authored positions by buildNuketownYardVegetation() in src/nuketown-forest-surround.ts from the pass31-neighbourhood-life group, which renders on every profile, so the eight authored-tree-trunk-collider-* boxes keep a visible owner and the quality-composition parity gate passes. Triangles 37900 -> 32236, bytes 7394184 -> 7335192; mesh nodes, materials, images, semantic route landmarks, semantic window ids and the house-aperture audit are unchanged. The \"44 meshes / 36712 triangles\" this row previously carried were stale: the retained baseline GLB measures 54 mesh nodes and 37900 triangles by the method named in the provenance, so both figures are now the measured shipped values.",
       "attributionRequired": false
     },
     {
@@ -206,13 +206,13 @@
       "sourceBlend": "source-assets/blender/pass65-weapon-families.blend",
       "sourceBlendSha256": "650f0286bc702996887fc80d291494d86f040a5f5ae3d1712aa8f61d7695f892",
       "sourceScript": "scripts/blender/create-pass65-weapon-families.py",
-      "sourceScriptSha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178",
+      "sourceScriptSha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df",
       "geometryModule": "scripts/blender/pass65_weapon_production_geometry.py",
-      "geometryModuleSha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276",
+      "geometryModuleSha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157",
       "sourceSpec": "source-assets/blender/pass65-weapon-family-specs.json",
       "sourceSpecSha256": "86d8568971b88f84438330875ddc295d4cf823bf1a648197bc36df0c095cd706",
       "sourceProvenance": "source-assets/blender/pass65-weapon-families.provenance.json",
-      "sourceProvenanceSha256": "ad875d90df95b6755a7ed0d9f4f06e076564d2036fe6b0123861cbd6f8221f73",
+      "sourceProvenanceSha256": "596bcb3ec7dd8f63502f2f1b373b85ea8e0c3ceec9f24302718975a0c1a8fd31",
       "preview": "docs/assets/pass65-weapons/firearms/pass65-weapon-family-contact-sheet.png",
       "format": "Nineteen unique firearm families; each has two first-person, three world and one independently exported drop optimized self-contained glTF 2.0 binary with Meshopt geometry, embedded WebP PBR textures, authored sockets and thirteen core action clips",
       "modifications": "Project-original platform-specific silhouettes, materials, reload components, optics and action motion authored in Blender from a checked-in deterministic specification. Real platform names are catalog labels only; no commercial-game geometry, textures, logos or extracted assets are used. Gameplay authority remains TypeScript-owned.",
@@ -504,9 +504,9 @@
       "sourceBlend": "source-assets/blender/pass69-3-first-person-operator-arms.blend",
       "sourceBlendSha256": "464e5821cae0ea48b5da3587ee8edab98a1cf02fbe0a7c6770c721def8180742",
       "sourceScript": "scripts/blender/export-pass69-3-first-person-operator-arms.py",
-      "sourceScriptSha256": "04239b76c587cb8e1b6cb8619c81e07be84081d907ec77a79a385cde7183a5d3",
+      "sourceScriptSha256": "6b7a7a383bfd3af9ece2596137324d434104a10d4fa6fdcec2d00b623a64a7a8",
       "sourceProvenance": "source-assets/blender/pass69-3-first-person-operator-arms.provenance.json",
-      "sourceProvenanceSha256": "0b9acc1d8b657eb90c424b9f4fcb718563e446868958e83bb4d3522411512089",
+      "sourceProvenanceSha256": "bc52950d32a09283dae892e3bc5b55f2eaf90f389d730db1fe3a11bb1bcac794",
       "preview": "docs/assets/pass69-3-operators/first-person-arms/pass69-3-first-person-arms-review-sheet.png",
       "format": "Two decreasing optimized self-contained glTF 2.0 skinned LODs with 37-bone dedicated skeleton, four material-compatible skinned renderables per LOD, embedded WebP PBR textures, opaque materials and thirteen action clips",
       "modifications": "Retained the licensed 37-bone/30-finger-bone derivative and its thirteen clips; manually added local wrist/cuff deformation loops, smoothed forearm-to-glove volume, repainted LowerArm/Wrist transitions, separated and rounded all articulated digit branches, added two wrist-parented full-transform palm contacts, exported a reduced LOD1, and generated five deterministic master reviews while preserving runtime IK and weapon authority.",
@@ -541,7 +541,7 @@
       "generatedAsOf": "2026-07-23",
       "license": "Original project work",
       "files": "public/assets/original/models/rustworks-central-tower.glb",
-      "sha256": "4da23a6a944ef58f8d70f8735d6a6e07099eddc2ee8c24bb5f8189a160d84780",
+      "sha256": "9fc59b25d7dd2c5d7d1f8c66360adede22c5b0c712821018ce5901ba91987c49",
       "sourceBlend": "source-assets/blender/rustworks-central-tower.blend",
       "sourceBlendSha256": "271337c132aac4169265c43b3396274ccdfc8e0d288e10c9bd6906319452e6c1",
       "sourceScript": "scripts/blender/create-rustworks-central-tower.py",
@@ -575,14 +575,70 @@
       "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
       "generatedAsOf": "2026-08-11",
       "license": "Original project work",
-      "files": "public/assets/original/menu-previews/*",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.mp4",
+          "sha256": "eaf9311df48b6a9eaa926f87eb10e544b042adc61e66e602ea01c25cebcd7865"
+        },
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.webm",
+          "sha256": "2e587dbbb2f85ae4a53d10c529ba4790ae205102d0df34acc835c8183b42f4c4"
+        },
+        {
+          "path": "public/assets/original/menu-previews/atomic-acres.webp",
+          "sha256": "1f7ab1a21c95901baac8f613454d4e6b39f1102b6c0f7c9203db7cc26d2ed630"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.mp4",
+          "sha256": "28c9d908aa66cd2a136d88d7fba937d7b3a7530d044ea8d96e747e9996a6dfe4"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.webm",
+          "sha256": "e21f10cca5d641ae32ee98eaec661851036343560f7bb30be932b39c9fbda4a3"
+        },
+        {
+          "path": "public/assets/original/menu-previews/gun-range.webp",
+          "sha256": "a2eddd02ddee15e95486d04f765a326ff5fdea3a868f7f7e0a12cfd7bafed401"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.mp4",
+          "sha256": "67a9c9e19b48d1bbc6e3efc506c908699e0c119963aae31c6d10326f282dda73"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.webm",
+          "sha256": "34edbd96c5270392a7d49d4e5c64704c7eb5926f325a6dec622c17c99f319223"
+        },
+        {
+          "path": "public/assets/original/menu-previews/rustworks-1v1.webp",
+          "sha256": "b4e2825cc6b50843d02164b5836331a39b108f3615f0a9d0ae342f3876e41505"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.mp4",
+          "sha256": "2c8d8731dd8b66cbc849eff5cca9380fccf01d64d203bb9eb2c84f6b3867d96a"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.webm",
+          "sha256": "c4863313d81597e2425ef823eeff65494c1e12344fc48eb49dbe8e4741dadb3c"
+        },
+        {
+          "path": "public/assets/original/menu-previews/skyline-terminal.webp",
+          "sha256": "269040879c9430b6681919f7e2315508711e9e780ead0d6f6c9e4a7c1c8ba51f"
+        }
+      ],
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
+      "sourceScriptSha256": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15",
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
       "sourceProvenanceSha256": "74eeb6b24b909c5367d2038d8d4be0fbb2b010be02dc7890d9e7619be163632b",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
       "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time; the reviewed 1280x720 logical overlay is losslessly authored at exact 2x output scale so its fixed-pixel details retain their intended proportions. Three map flyovers bake perspective-aware elliptic rotor arcs with subdued moving spokes, measured mast/hub/header occlusion, two visible structural ties into the side canopy rails, a restrained tail camera and compact green-on-graphite cockpit avionics; Gun Range bakes compact charcoal/silver ears, forelegs and top-facing paws. Runtime loading/menu playback remains one selected metadata-preload decoder with poster-first readiness, reduced motion is poster-only, and no downloaded or sampled assets are used. The former byte-identical Gun Range media gate is explicitly superseded.",
-      "attributionRequired": false
+      "attributionRequired": false,
+      "sourceScriptRepin": {
+        "date": "2026-08-30",
+        "asset": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+        "from": "c450443ae83cc604dbebc12ce5bd65b72f079c7621b6ecbe6514f1a53c26baa6",
+        "to": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15",
+        "reason": "The capture generator changed and this field pins the tool BYTES that exist, so it moves with the file. The change merges the pass79 test-arena choreography into the capture roster (without it the generator described six arenas while ARENA_SELECTIONS had eight, and every capture was rejected) and launches the capture browser with --mute-audio. No retained Pass 66 media byte moves: the four retained previews listed above are untouched and still re-derive to the digests recorded with them."
+      }
     },
     {
       "id": "atomic-acres-pass66-real-gun-range-killstreak-demo-posters-2026-08-02",
@@ -642,14 +698,15 @@
         }
       ],
       "sourceScript": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
-      "sourceScriptSha256": "503a0908c9a73ce4bcb024e6b7ceaba08f002f04ffdd1d768a3f8c57b2fe9513",
+      "sourceScriptSha256": "b49121349ed7141b080c86f4af36e62db8374a06e920a73d6c3c0f3efcb85e50",
       "sourceSpec": "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
       "sourceSpecSha256": "1cb7311b1bf7889d590c35a520e9fd5248db995ca3fed3446a6dfbf94d862051",
       "sourceProvenance": "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
       "sourceProvenanceSha256": "c03cfa106a1ae7cb81e244b789451a66f74b411a2cde03e210b531cb368e2dc0",
       "format": "Eleven distinct 960x540 JPEG poster frames from the real Gun Range grey test bay, one per canonical support, plus a fail-closed digest and capture-proof manifest",
       "modifications": "Each clean-session Chromium frame is admitted only after its nearby canonical station wins the actual keyboard F press lifecycle, the normal host/offline training grant traverses canonical activation, and support-specific runtime telemetry proves the expected effect. No video is claimed; the menu decodes these bounded local posters and starts no live gameplay renderer.",
-      "attributionRequired": false
+      "attributionRequired": false,
+      "sourceScriptRepin": "Re-pinned 2026-08-31 (commit b96e145d). The capture spec gained --mute-audio under the owner standing instruction that every browser this repo launches stays silent while he is at the PC. A playback flag cannot change an output byte: no media digest in this entry moved, and none was re-pinned."
     },
     {
       "id": "quaternius-ultimate-modular-males-swat-2026-07-13",
@@ -721,6 +778,465 @@
           "sha256": "2263a601a95e584bd9069f74f90b6418ee0f319f6b2800949dcc2e94902e5d4a"
         }
       ]
+    },
+    {
+      "id": "atomic-acres-pass77-farcrysis-high-seas-menu-previews",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-08-23",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.mp4",
+          "sha256": "6d8eef44066a85329d7588205338ccf3aab819319fc2167cd085ed3788b1045e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.webm",
+          "sha256": "c79ed27159d75d9a6235f700dc9497fbdb5df288960a81aae6e24b4826958be6"
+        },
+        {
+          "path": "public/assets/original/menu-previews/farcrysis.webp",
+          "sha256": "e47523c45d0e079cf0ef0df3620003000fccbea95287de0640a805cdc556330e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.mp4",
+          "sha256": "1c9834b5975930e4bd5a0ece25495deacdaa0f9111673bd6e96203f1ea082603"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.webm",
+          "sha256": "132873e79cf467bf57b8382427fbdeed97cd83ed4b0079640612aab1f5b7fb21"
+        },
+        {
+          "path": "public/assets/original/menu-previews/high-seas.webp",
+          "sha256": "43804a7161c9f6a0165102a3247dc0e0d7715ffda13fc5fc731d4a16b5ae755b"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass77-menu-previews/farcrysis-review-frames.webp",
+        "docs/assets/pass77-menu-previews/high-seas-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass77-arena-menu-previews.mjs",
+      "sourceScriptSha256": "8106aaad36be5ba65695b440f56aa770b8c9b5d11895156900d6162b7fed69b3",
+      "sourceProvenance": "source-assets/menu/pass77-arena-previews/provenance.json",
+      "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
+      "modifications": "Captured offline from the actual authoritative Farcrysis and High Seas runtime arenas with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. High Seas was captured on the WebGPU route; Farcrysis was captured on the WebGL2 compat route because it cannot currently complete a WebGPU prewarm (HF-374), which its provenance records and which requires a WebGPU re-capture once that is fixed. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "pass74-operator-skin-explorer-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-26",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb",
+          "sha256": "4d30fac34d57611d92944f568e75e7cb3a7e4fa3621503d7d248989456c2bd3b"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb",
+          "sha256": "d1673992acc8c18b101ef444b11533c4c864bbf28817ee793d95cdf7ec7eb217"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-explorer.provenance.json",
+      "sourceProvenanceSha256": "9e42d981f82ea299696d3eb19ab6121f17adf926113737e3c8dfdadf8f6c6076",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.explorer",
+      "placeholderStatus": "production",
+      "format": "Sunspire Wayfarer explorer archetype skinned GLB, quality tier lod0 (5812384 bytes) and performance tier lod1 (4949848 bytes)",
+      "modifications": "Project-original Sunspire Wayfarer archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
+    },
+    {
+      "id": "pass74-operator-skin-symbiote-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-22",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb",
+          "sha256": "61b4e93fc678e8244e8fdd44a8ea1b54c00f945da1bd196896b6537737f64cf0"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb",
+          "sha256": "f2c796cdd170f8afd7320c3f6d316d2de4513be07e3313e8f79b7906a45f0644"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-symbiote.provenance.json",
+      "sourceProvenanceSha256": "62a663a5185233299f6f3efd91f577b5b4f4e275b9aef85fb449423406f9aeca",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.symbiote",
+      "placeholderStatus": "production",
+      "format": "Carapace Bulwark symbiote archetype skinned GLB, quality tier lod0 (5706668 bytes) and performance tier lod1 (4841768 bytes)",
+      "modifications": "Project-original Carapace Bulwark archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
+    },
+    {
+      "id": "pass74-operator-skin-navalops-2026-08-22",
+      "kind": "original-project-blender-operator-archetype-skin",
+      "creator": "Atomic Acres project",
+      "source": "scripts/blender/create-pass74-operator-archetype-skins.py",
+      "generatedAsOf": "2026-08-22",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "files": [
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb",
+          "sha256": "c5d6ae652bc2f83c0d2be7816aab3da9f10c5b257ad515dfd37e19160fa3c263"
+        },
+        {
+          "path": "public/assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb",
+          "sha256": "c72d41bc4562644a8edb168d030d0e233f0cb4986ec1c239b2919fa979532124"
+        }
+      ],
+      "sourceSpec": "source-assets/blender/pass74-operator-skin-specs.json",
+      "sourceSpecSha256": "83190c0d490f138462afd860d3bcf011a0f4bc55206a0b0f0b03584de4521c10",
+      "sourceProvenance": "source-assets/blender/pass74-operator-skin-navalops.provenance.json",
+      "sourceProvenanceSha256": "e0e96b33e24a30155a1337f292211341a896b16d02ccb7701c4be21ec33a9e58",
+      "owner": "src/operator-model.ts OPERATOR_SKIN_MODEL_URLS.navalops",
+      "placeholderStatus": "production",
+      "format": "Tidewrack Operative navalops archetype skinned GLB, quality tier lod0 (5775664 bytes) and performance tier lod1 (4912156 bytes)",
+      "modifications": "Project-original Tidewrack Operative archetype authored from the checked-in spec by the pass74 Blender generator over the same vendored CC0 Quaternius SWAT canonical rig used by the Pass 65 third-party operator. Shipped public lod0/lod1 byte-match the artifact hashes recorded in the per-archetype provenance receipt; the non-shipped lod2 remains under artifacts/blender-operator-skins/raw/."
+    },
+    {
+      "id": "atomic-acres-pass79-test-arena-menu-previews",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/test1.mp4",
+          "sha256": "db5f0ebc63bcac07b84e1ddbfecf14fa9f7100017aba6051b63f8cdfae53414e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test1.webm",
+          "sha256": "2fde904290e05e4934c44c7aeb33fb3a5b745b9afbe9162a883d2c2266f252ec"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test1.webp",
+          "sha256": "3867859c7183f9629a05f479afa40359112ad1ff0fe91c3b4dd217d3315e519f"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.mp4",
+          "sha256": "a4eacdb3cc9720d83b74e7028d16a605b0b8cefb903ad2e24729d57ea0634817"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.webm",
+          "sha256": "0134638d23896ad2cc53087b4b1a8e151926af53ab5a5ff7085874c4bceb81d3"
+        },
+        {
+          "path": "public/assets/original/menu-previews/test2.webp",
+          "sha256": "d9d6a3f4ab15613f2086c68633a951a3f7b81c25bda546d05c1c4834eeec1e58"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass79-menu-previews/test1-review-frames.webp",
+        "docs/assets/pass79-menu-previews/test2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass79-test-arena-menu-previews.mjs",
+      "sourceScriptSha256": "de82cdc761f0cb2bb7587888ce4ce81ed43e1517b8c83f2de852fd5da9bed655",
+      "sourceProvenance": "source-assets/menu/pass79-test-arena-previews/provenance.json",
+      "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
+      "modifications": "Captured offline from the actual authoritative Test1 and Test2 runtime arenas on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. These files replace placeholder stubs that were byte-identical copies of the gun-range and high-seas previews. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass79-test-arena-loading-backdrops",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Test1 and Test2 authoritative runtime arenas",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass79-test-arena-loading/provenance.json",
+      "sourceProvenanceSha256": "ea83159806b78da53dd2745d1bb4a85667be8642293355b74513b914d2f98b29",
+      "sourceScript": "scripts/assets/finalize_pass79_test_arena_loading_backdrops.py",
+      "sourceScriptSha256": "7612170305b47c70a08aafe9079b2b50d3c72f6734364bd9fde63829cfc2148d",
+      "files": [
+        {
+          "path": "public/assets/original/loading/test1-loading.webp",
+          "sha256": "a8c429949f7a589545cf6a40b6e8b7765508070c62925228086d63e89d74b12a"
+        },
+        {
+          "path": "public/assets/original/loading/test2-loading.webp",
+          "sha256": "d8b6a346474fa9c847f53f0cd68b61e5f76a443dff61c17af5dd2f6003bd2d48"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP per arena (Pillow, method 6, quality test1 85, test2 88), matching the six Lane I backdrops in format, resampler and 169200-239202 byte size band; quality is stepped down from the family ceiling of 88 because a runtime capture carries more detail than the generated art. PNG masters preserved byte-for-byte under source-assets/loading/pass79-test-arena-loading/",
+      "modifications": "Captured offline at native 1440p from each actual authoritative production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. These two files replace placeholders that were byte-for-byte copies of gun-range-loading.webp (test1) and high-seas-loading.webp (test2), which made the deployment loading screen for both arenas show another map. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-operator-skin-cards-2026-08-31",
+      "kind": "original-project-ai-assisted-operator-skin-card-art",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/skin-cards/default-card.webp",
+          "sha256": "42f64b73660dfd455a7baee68be30eafd5e97842fe19a0b2bd4b2fd3c2dba0bd"
+        },
+        {
+          "path": "public/assets/original/skin-cards/explorer-card.webp",
+          "sha256": "331f07b22af777b564a220eb523fbeaa488060f9a9f44833b198b453d93e7232"
+        },
+        {
+          "path": "public/assets/original/skin-cards/symbiote-card.webp",
+          "sha256": "578e22c7e7befe3c7f155a0f2ad791ca0500349c326e3723ec4937dd77bc9515"
+        },
+        {
+          "path": "public/assets/original/skin-cards/navalops-card.webp",
+          "sha256": "9d2326c23d6ecdc8d799c15287c49f406ed91995e6de1326dcbb3cd7a46611c5"
+        }
+      ],
+      "owner": "wiringNotes: operator skin select cards (one portrait per selectable skin in src/operator-skin-catalog.ts)",
+      "placeholderStatus": "production",
+      "format": "448x576 quality-90 lossy WebP per card, derived by Lanczos reduction from 896x1152 PNG masters preserved byte-for-byte under source-assets/art-gen/skin-cards/",
+      "modifications": "Four operator portrait cards generated locally with Qwen-Image-2512, one per selectable skin (default, explorer, symbiote, navalops), art directed to each skin's authored card palette and material read (ISSUE WEAVE, CANVAS, CHITIN, WET SHELL). Exact prompts and seeds recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-arena-deployment-loading-art-2026-08-31",
+      "kind": "original-project-ai-assisted-arena-loading-backdrop",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/loading/atomic-acres-loading.webp",
+          "sha256": "62da36cf2d00ae364bd88b93775e19de3b207669ce868c52aaa7d4c47fbdbdb2"
+        },
+        {
+          "path": "public/assets/original/loading/skyline-terminal-loading.webp",
+          "sha256": "0f0cd0364b002220728c541c8c9fb4e7fb7d27b302cac3f19e5ea55dcd8bb656"
+        },
+        {
+          "path": "public/assets/original/loading/rustworks-loading.webp",
+          "sha256": "884fd5e57d5a33d98b9b475c6d473ccba06b2dadacf2cbfcdae38a756477ac97"
+        },
+        {
+          "path": "public/assets/original/loading/gun-range-loading.webp",
+          "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
+        },
+        {
+          "path": "public/assets/original/loading/farcrysis-loading.webp",
+          "sha256": "b6c697230455738657597c07350b924aff6525d3d428fa7ff45270990df69fdc"
+        },
+        {
+          "path": "public/assets/original/loading/high-seas-loading.webp",
+          "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena in src/arena-identity.ts)",
+      "placeholderStatus": "production",
+      "format": "1536x864 quality-88 lossy WebP per arena, native generation resolution, PNG masters preserved byte-for-byte under source-assets/art-gen/loading/",
+      "modifications": "Six deployment/loading backdrops generated locally with Qwen-Image-2512, one per arena, grounded in each arena's authored grade identity description and deployment briefing approach line. Exact prompts and seeds recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-main-menu-backdrop-2026-08-31",
+      "kind": "original-project-ai-assisted-menu-key-art",
+      "creator": "Atomic Acres project / local Qwen-Image-2512 (ComfyUI, dave-gaming-pc)",
+      "source": "Local ComfyUI Qwen-Image-2512 fp8 + Lightning 4-step LoRA on the owner's RTX 5080; owner-cleared non-commercial local generation; no hosted or paid API",
+      "generatedAsOf": "2026-08-31",
+      "license": "Original project AI-assisted artwork",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/art-gen/lane-i.provenance.json",
+      "sourceProvenanceSha256": "a0553dccc9ceb23083dfa2b2326c9416ea93a580f242278d7759d15a859ff35c",
+      "sourceScript": "scripts/art-gen/comfy_generate.py",
+      "sourceScriptSha256": "c6ae35b7d79ef91b54b064d57137e8541a69fe8cd76cc7ea85f0369106c1352a",
+      "files": [
+        {
+          "path": "public/assets/original/menu/main-menu-backdrop.webp",
+          "sha256": "06fe14380ae6077bc0552ed76dd7e5c5de372601aa2c14bb95b43cfc204eb163"
+        }
+      ],
+      "owner": "wiringNotes: main menu backdrop key art",
+      "placeholderStatus": "production",
+      "format": "1536x864 quality-88 lossy WebP, native generation resolution, PNG master preserved byte-for-byte under source-assets/art-gen/menu/",
+      "modifications": "One main-menu key-art backdrop generated locally with Qwen-Image-2512: four operator silhouettes over the project's coastal-suburb-and-superyacht identity, composed with negative space for UI. Exact prompt and seed recorded in the source provenance record."
+    },
+    {
+      "id": "atomic-acres-pass84-map3-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/map3.mp4",
+          "sha256": "74c3ca982640c38b0cf23a1f1f514f574eacfe108b5efcb302180da3faa75464"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webm",
+          "sha256": "77846e8b6a4b4f47c37b9c790eb79e7711a9d88d6f846228cac5b466207cad28"
+        },
+        {
+          "path": "public/assets/original/menu-previews/map3.webp",
+          "sha256": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass84-menu-previews/map3-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass84-map3-menu-preview.mjs",
+      "sourceScriptSha256": "5cd6bfbd6132562bc95aff654930a2880f803951e0596b94e9e2639b53dbb4e3",
+      "sourceProvenance": "source-assets/menu/pass84-map3-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Map 3 runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass84-map3-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Map 3 authoritative runtime arena",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass84-map3-loading/provenance.json",
+      "sourceProvenanceSha256": "0aa078cedd41fcaf307d53af39c0b9e8eeee6a8c965b3cbbec1ff331a4755db0",
+      "sourceScript": "scripts/assets/finalize_pass84_map3_loading_backdrop.py",
+      "sourceScriptSha256": "92ec1b50a569dddeab16fe4b6d369465f1fe1c1126788731346b5733730a27b1",
+      "files": [
+        {
+          "path": "public/assets/original/loading/map3-loading.webp",
+          "sha256": "89ec16a2d2b6fe88954921b55ee67b88a2a37ef0343661578e089635b5aab40c"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 43.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass84-map3-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Map 3 production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.mp4",
+          "sha256": "88ab344dad32add5c015a630e1b90e7166931679a11f2553c47804c01fdae42e"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webm",
+          "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
+        },
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webp",
+          "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass85-menu-previews/nuketown2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
+      "sourceScriptSha256": "e58b41dfb042db6b0961ab82a57e7d7bdde166fcc92225cc72add56bd66c7f8d",
+      "sourceProvenance": "source-assets/menu/pass85-nuketown2-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Nuke Town Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass85-nuketown2-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Nuke Town Rebuild authoritative runtime arena",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass85-nuketown2-loading/provenance.json",
+      "sourceProvenanceSha256": "1a26299ebd6c7654db7d0bb0dbeda16f2fb88a5a06ef5238bf38a76675d39a06",
+      "sourceScript": "scripts/assets/finalize_pass85_nuketown2_loading_backdrop.py",
+      "sourceScriptSha256": "028b11e1c1100c315523a739ae5e4cd3eb50a90d86153cb6426d2f615d561b11",
+      "files": [
+        {
+          "path": "public/assets/original/loading/nuketown2-loading.webp",
+          "sha256": "131d939356bd66592e0e2d4f47786628034d57a5bad0238bb198acb3dceedf6c"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the nine shipped backdrops in format, resampler, output size and payload budget. Measured 40.36 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass85-nuketown2-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Nuke Town Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
+    },
+    {
+      "id": "atomic-acres-pass87-raid2-menu-preview",
+      "kind": "original-project-prerecorded-authoritative-runtime-menu-video-family",
+      "creator": "Atomic Acres project",
+      "source": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+      "generatedAsOf": "2026-09-02",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/raid2.mp4",
+          "sha256": "70078fbf29f557327ce8bfc56c121d9c679c704322d32e5e46fab0abed2fe228"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webm",
+          "sha256": "8a5735c8546af5423f47bf1679359c8ea6f27b42a9a8e208731ae017355aed36"
+        },
+        {
+          "path": "public/assets/original/menu-previews/raid2.webp",
+          "sha256": "3054a0219a35bc6d316c0d0efbcbc898e65999974b548718c5b16db5528e29de"
+        }
+      ],
+      "contactSheet": [
+        "docs/assets/pass87-menu-previews/raid2-review-frames.webp"
+      ],
+      "sourceScript": "scripts/assets/finalize-pass87-raid2-menu-preview.mjs",
+      "sourceScriptSha256": "2759775cc61100cc435e8b81dda411ebb068ba37378ca0082821562dc496b87b",
+      "sourceProvenance": "source-assets/menu/pass87-raid2-preview/provenance.json",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
+      "modifications": "Captured offline from the actual authoritative Raid Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-pass87-raid2-loading-backdrop",
+      "kind": "original-project-authoritative-runtime-arena-loading-backdrop",
+      "creator": "Atomic Acres project",
+      "source": "Offline WebGPU capture of the Raid Rebuild authoritative runtime arena",
+      "generatedAsOf": "2026-09-03",
+      "license": "Original project work",
+      "attributionRequired": false,
+      "sourceProvenance": "source-assets/loading/pass87-raid2-loading/provenance.json",
+      "sourceProvenanceSha256": "2b0e67dc4ec4ce04392302c63302c77d0560fe015012cec0351acb9b1c94b997",
+      "sourceScript": "scripts/assets/finalize_pass87_raid2_loading_backdrop.py",
+      "sourceScriptSha256": "57f87f9966f44b6c0c5c4a1f2ac60fab5689d1f98a16cecad5128892dcc2a074",
+      "files": [
+        {
+          "path": "public/assets/original/loading/raid2-loading.webp",
+          "sha256": "94ff72c5c530fc9b7a4ec1b72d01c6aa84c7f1237a073bc2dc7e82ada60e84ff"
+        }
+      ],
+      "owner": "wiringNotes: deployment loading surface backdrops (one per arena)",
+      "placeholderStatus": "production",
+      "format": "1536x864 lossy WebP (Pillow, method 6, quality 88), matching the eight shipped backdrops in format, resampler, output size and payload budget. Measured 42.49 dB PSNR against its own PNG master, over the 40.0 dB floor. PNG master preserved byte-for-byte under source-assets/loading/pass87-raid2-loading/",
+      "modifications": "Captured offline at native 1440p from the actual authoritative Raid Rebuild production WebGPU arena with deterministic camera and visual time, then Lanczos-downscaled to 1536x864 and encoded with the shipped Lane I WebP profile. No downloaded or sampled art is used."
     }
   ],
   "rejectedCandidates": [
@@ -774,6 +1290,10 @@
     {
       "id": "kenney-v2-foundation-models",
       "reason": "Removed from the structured release because the owner rejected their low-poly art direction; no Kenney runtime asset ships in this build."
+    },
+    {
+      "id": "pass74-hand-drawn-operator-cards",
+      "reason": "Three 6-7 KB hand-drawn ui/operator-skins/{explorer,navalops,symbiote}-operator-card.webp portraits deleted 2026-08-23: referenced nowhere in src/ (the only source mention is the negative assertion in src/operator-skin-appearance.test.ts pinning that operator-card.webp is absent) and superseded by the generated Qwen-Image-2512 card art shipped under public/assets/original/skin-cards/ (atomic-acres-operator-skin-cards-2026-08-23)."
     }
   ]
 }

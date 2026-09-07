@@ -1,0 +1,26 @@
+nuketown2 street-vehicle budget
+  street vehicles   21 draw calls, 252 triangles
+  rest of the arena 266 draw calls, 10897 triangles
+  arena total       287 draw calls, 11149 triangles
+  colliders 226, physics colliders 228, shot surfaces 238
+    Nuketown2 arena/nuketown2 street-vehicle truck cab  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck deck  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box bulkhead  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 0 pier 0  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 0 pier 1  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 0 header  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 1 pier 0  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 1 pier 1  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box flank 1 header  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck box roof  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck roof step 0  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck roof step 1  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle truck roof step 2  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle coach body  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle coach roof cap  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle head car body  12 tris
+    Nuketown2 arena/nuketown2 street-vehicle head car cabin  12 tris
+    Nuketown2 arena/nuketown2 north car body  12 tris
+    Nuketown2 arena/nuketown2 south car body  12 tris
+    Nuketown2 arena/nuketown2 north car cabin  12 tris
+    Nuketown2 arena/nuketown2 south car cabin  12 tris

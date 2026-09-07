@@ -9,39 +9,6 @@ These rules apply to Codex, Hermes, Gemini/AGY, and any future human or automate
 - The `gh-pages` branch is production output only. Never develop on it or publish to it from a feature worktree.
 - `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md` is the canonical contribution and release procedure.
 
-### Ancestry rules (HF-536, 2026-09-06)
-
-These four are executable, not advisory. `scripts/release/pipeline-guard.mjs` refuses a
-violating tree in every non-`doctor` mode, and
-`scripts/release/acceptance-gate.mjs --phase reconciliation` refuses a violating merge.
-
-- **`main` is the only base.** Every contribution branch is cut from exact `origin/main`
-  (`git worktree add -b contrib/<machine>/<harness>/<slug> <absolute-path> origin/main`) and
-  must still contain `origin/main` at handoff. There is no long-lived alternative base.
-- **Never create a new root commit.** Full-tree snapshot imports — `git checkout --orphan`,
-  `git init` plus a copy, importing a directory as a fresh history — are banned. Every
-  parentless commit that may appear in this repository is listed in
-  `.github/ancestry-roots.json`; a root that is not listed fails the guard. Adding an entry
-  to that file is an explicit reviewed decision and is never the fix for a red guard.
-- **Never publish from a line that does not contain `origin/main`.** The publisher must
-  refuse a source SHA for which `git merge-base --is-ancestor origin/main <sha>` fails, and
-  must record `containsOriginMain` and `originMainSha` in the receipt. An owner override is
-  an explicit flag with a written reason stamped into the receipt, never a silent default.
-- **Integration and gauntlet lines are short-lived.** An `integration/*` or gauntlet line is
-  itself cut from `origin/main` and merges back to `main` by pull request within one pass
-  (one publish cycle). A line that has published a pass and has not merged to `main` is a
-  release-blocking condition for the NEXT pass, not background hygiene.
-- **`release/<passN>` branches carry evidence only.** They are cut from the exact `main` SHA
-  that CI proved green and may contain nothing but `docs/evidence/**` and acceptance
-  receipts. A runtime commit on a `release/*` branch is how a fix ships without ever
-  touching `main`.
-
-Why these exist: seven parentless full-tree snapshot imports on 2026-09-03..05 severed the
-shipping line from `origin/main`. Nothing executable refused them, so the break survived 21
-passes and turned a lossless fast-forward into 385 phantom merge conflicts against a tree
-that was already a strict superset of `main`. Full record with every command:
-`docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md`.
-
 ## Pass 65 routing
 
 - Before any Pass 65 work, read `docs/PASS65_P0_RELEASE_FOUNDATION_2026-07-25.md`, `docs/PASS65_REQUIREMENTS_MATRIX.md`, `docs/PASS65_DECISION_RECEIPTS.json`, `docs/PASS65_WORK_BREAKDOWN_RUNBOOK.md`, and the relevant sections of `docs/PASS65_TECHNICAL_CONTRACT_SKETCHES.md`; every correction-wave owner must also read `docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md`, while release/HITL owners must read `docs/PASS65_OWNER_HITL_CHECKLIST.md`.
@@ -57,6 +24,25 @@ that was already a strict superset of `main`. Full record with every command:
 - Normal browser throttling is an operating constraint: hidden presentation frames are forbidden. Generation-owned fetch/decode/preparation may progress where Chromium permits, hosted authority runs only its minimum fixed-step/network path, offline simulation pauses, and one coalesced foreground recovery resumes the existing admission.
 - Solo skirmish starts with exactly one enemy bot on every bot-enabled arena. Hosted-lobby choices, arena-specific reinforcements and hard caps remain separate catalog values; graphics profiles never change gameplay counts.
 - Smoke colour, lifetime, radius, shot corridors, human LOS and bot perception are projections of one host-authoritative volume contract. Glass presentation, collision, damage state and projectile aperture are likewise one authoritative lifecycle in every graphics profile.
+
+## Multi-agent discipline (all harnesses)
+
+**Read `docs/MULTI_AGENT_REPO_DISCIPLINE.md` before writing anything in this repository.**
+It applies to Claude Code, Codex, Cursor, Antigravity/Gemini, Pi, OMP, Hermes desktop and
+Hermes headless alike, and every rule in it was written after a real incident on this
+machine. The five that cause the most damage when ignored:
+
+- **Confirm the worktree path and branch; never infer them.** There are 365 worktrees and
+  458 branches here. A worker once wrote into the protected Pass 62 benchmark checkout and
+  its critic then reviewed that copy and approved it.
+- **Feature worktrees edit and test; they never publish.** One canonical checkout performs
+  release, compliance, vault sync and backup.
+- **Exit code 0 is not success.** Six of eleven workers once reported success having done
+  nothing — quota rejections that still exit 0. Verify against the repository.
+- **Never weaken a test, threshold or assertion to reach green.** A correct failure stays
+  failing and its row stays OPEN. A red test you can trust beats a green one you cannot.
+- **Boot the app before claiming a candidate works.** 2,858 passing tests once accompanied a
+  build that would not start, because unit tests never boot the DOM.
 
 ## Contribution isolation
 
@@ -94,13 +80,26 @@ that was already a strict superset of `main`. Full record with every command:
 - Every Pass 62+ `runtime` or `release-shell` PR must change exactly one `acceptance/pass-<number>.json`, map every requested outcome to evidence, and record Dave's approval of the immutable PR preview's exact source SHA. Runtime/release-shell changes after that preview invalidate approval.
 - Pass 66 is the narrow exception to a new owner-preview interaction: after the immutable preview exists and every blocking gate is green, a process-only manifest update may bind Dave's already-recorded standing conditional publication instruction to that exact SHA. The receipt must truthfully say that Dave did not inspect that immutable preview in a new HITL round, use the actual later binding timestamp, and invalidate on any runtime or release-shell drift.
 - A separate integrator reviews the actual diff and checks. The PR must contain current `origin/main` before merge.
-- A **release-line reconciliation** PR is the single narrow exception to "exactly one enforced acceptance manifest per PR". It must be a two-parent merge whose tree is byte-identical to its first parent and whose second parent is the PR base, it must carry the `reconciliation` label so `verify.yml` selects `--phase reconciliation`, and it grants no acceptance: the receipt records `grantsAcceptance: false` and owner approval of the bytes remains owed on the contribution line. Every other shape still throws. It runs the FULL browser matrix — do not shortcut it.
 - `requirements-acceptance` is a required check alongside both static/unit and both bounded-browser checks. Green tests without complete requirement coverage are not release evidence.
-- Production promotion is serialized by `.github/workflows/release-production.yml`. Supply the exact green `main` SHA and release pass; never deploy from a feature branch or local dirty tree.
-- Do not describe a change as live until the workflow receipt names the source SHA and Pages SHA and the canonical HTTPS site is checked.
-- The production workflow must revalidate the acceptance manifest and pass its post-Pages canonical live smoke before writing a successful receipt.
+- Release VERIFICATION is serialized by `.github/workflows/release-production.yml` (workflow `release-verification`, job `verify`). Supply the exact green `main` SHA and release pass; it builds, revalidates the acceptance manifest, runs the static gates, checks the HF-400 two-channel policy, stages and verifies the whole channel topology and writes a `published: false` receipt. It has `contents: read` and cannot publish.
+- Production PUBLICATION is `python scripts/orchestration/publish_pass<N>.py` from the canonical checkout, and nothing else. Run `--dry-run` first; `--rollback` re-points the default without deleting a tree. `scripts/orchestration/roll_pass.py` rolls the stamp to the next pass. Never deploy from a feature branch or local dirty tree, and never run `npm run deploy` or `npm run deploy:ci`.
+- Do not describe a change as live until the publish script's asserted post-state and the canonical HTTPS site both name the new pass, and gh-pages carries exactly the live pass and its pinned safe backup (HF-400).
 - The first successful receipt plus cache-busted live smoke is terminal for that release task. Report success immediately; route non-blocking hygiene to a later PR instead of silently extending the release.
 - Do not run synchronous or duplicate `gh run watch` processes from an agent turn. Use one-shot status reads, report material state changes, and keep waits bounded.
+
+## Pass 95 required gate list
+
+- **REQUIRED before any Pass 95 publish:** from the candidate checkout, set
+  `PASS73_NATIVE_WEBGPU=1` and run `npm run qa:mp-soak`. This is the three-peer,
+  three-minute, headless installed-Chrome soak on ports 4227-4228 with seeded 120 ms
+  RTT and 1% packet loss. It must complete with exit code 0 and a passing table in
+  `artifacts/qa/mp-soak-gate/`; any failed row is a release-blocking finding.
+- The gate must retain its 1.5 m position bound, one-RTT damage bound, no-console-error
+  assertion, and final scoreboard agreement. Do not replace it with a shorter smoke,
+  a two-peer run, a headed browser, or a rerun with weaker thresholds.
+- The gate's own browser-free logic is covered by
+  `npm run qa:mp-soak:contract`; the real soak remains required even when that unit
+  test is green.
 
 ## Durable gotcha
 

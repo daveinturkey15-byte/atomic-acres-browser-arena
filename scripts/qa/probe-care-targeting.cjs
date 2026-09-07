@@ -24,7 +24,7 @@ async function main() {
     cwd: REPO, stdio: 'ignore', detached: true, shell: true,
   });
   await new Promise((r) => setTimeout(r, 2500));
-  const browser = await chromium.launch({ args: ['--ignore-gpu-blocklist', '--disable-software-rasterizer', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
+  const browser = await chromium.launch({ args: ['--mute-audio', '--ignore-gpu-blocklist', '--disable-software-rasterizer', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
   try {
     const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
     page.on('pageerror', (e) => console.log('PAGEERROR:', e.message));

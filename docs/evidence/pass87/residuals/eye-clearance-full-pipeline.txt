@@ -1,0 +1,119 @@
+
+> atomic-acres-browser-arena@1.0.0 qa:eye-clearance
+> npm run qa:eye-clearance:contract && npx tsx scripts/qa/sweep-eye-clearance-spots.ts && node scripts/qa/run-with-preview-server.mjs node scripts/qa/sweep-eye-clearance-live.mjs --check && npm run qa:eye-clearance:runtime
+
+
+> atomic-acres-browser-arena@1.0.0 qa:eye-clearance:contract
+> node --test scripts/qa/eye-clearance-sweep-contract.test.mjs scripts/qa/camera-near-plane-contract.test.mjs
+
+✔ reads the shipped near plane through a named constant (8.2664ms)
+✔ the shipped camera really is built from the constant, not a literal (3.9946ms)
+✔ a numeric third argument still works (0.2313ms)
+✔ the PASS 85 defect, reproduced: a named constant used to be unreadable (10.9026ms)
+✔ an unresolvable constant throws rather than guessing (0.563ms)
+✔ a camera construction it cannot find at all throws (0.1812ms)
+✔ stage 3 follows QA_BASE_URL, so the preview-server runner can drive it (0.3103ms)
+✔ the selectable roster this test measures against is the real one (1.9336ms)
+✔ the sweep derives its roster instead of hardcoding one (0.2138ms)
+✔ the sweep keeps a floor under the derived roster (0.1176ms)
+✔ legality is asked at the stance capsule top, not at a sunken probe height (0.0897ms)
+✔ every selectable arena actually resolves to a builder at runtime (717.7556ms)
+✔ stage 1 asks legality against the same state-posed authority stage 2 can hit (0.1432ms)
+✔ the door artefact case now reports correctly, and the old model still shows the bug (0.0764ms)
+✔ every annotated surface is genuinely non-solid, so standing inside it is by design (0.0828ms)
+✔ annotations are named, dated, capped and scoped to a selectable arena (0.6869ms)
+✔ the live sweep judges the ceiling on unannotated rows and fails a stale annotation (0.1704ms)
+✔ both browser stages derive their roster instead of hardcoding one (0.193ms)
+✔ the shared roster derivation keeps a floor, so a dead scrape cannot pass (0.6572ms)
+✔ the shared derivation actually resolves the selectable roster (1.515ms)
+✔ a narrowed --arenas cannot produce a ratchet verdict (0.062ms)
+✔ the ratchet fails on an arena it never measured (0.0506ms)
+✔ stage 3 treats a missing stage-2 artifact as uncovered, not clean (0.0325ms)
+✔ the gate that names this pipeline actually runs all three of its stages (0.6592ms)
+✔ stage 3 forgives on the surface it actually hit, not the one stage 2 flagged (0.243ms)
+✔ a row stage 3 could not measure is ratcheted, not just warned about (0.5856ms)
+✔ a spot stage 2 stops flagging is still re-probed at runtime (0.5981ms)
+✔ stage 3 measures a seat only after the body it teleported has stopped moving (0.0682ms)
+✔ the gap between the modelled eye and the shipped camera stays the number that was measured (3.718ms)
+✔ every arena-conditional ballistic splice in legacy-main has a stage-1 authority model (4.1581ms)
+✔ the ledger carries exactly one ceiling per selectable arena (0.8201ms)
+✔ a new arena enters the ratchet unmeasured, never pre-forgiven (0.1604ms)
+✔ the runtime-resolve record covers the roster too (0.5979ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1878.5499
+eye-clearance sweep: 9 selectable arenas derived from src/map-selection.ts -> atomic-acres, skyline-terminal, rustworks-1v1, gun-range, high-seas, test1, test2, map3, nuketown2
+atomic-acres: thinned to every 3th spot
+atomic-acres: 237 colliders (0 floor, 0 state-posed dynamic authority) -> 3511 legal hug spots (8 colliders with no legal adjacent stance)
+skyline-terminal: thinned to every 3th spot
+skyline-terminal: 176 colliders (0 floor, 0 state-posed dynamic authority) -> 3764 legal hug spots (4 colliders with no legal adjacent stance)
+rustworks-1v1: thinned to every 2th spot
+rustworks-1v1: 85 colliders (0 floor, 0 state-posed dynamic authority) -> 2048 legal hug spots (12 colliders with no legal adjacent stance)
+gun-range: thinned to every 2th spot
+gun-range: 37 colliders (2 floor, 1 state-posed dynamic authority) -> 2904 legal hug spots (0 colliders with no legal adjacent stance)
+high-seas: thinned to every 4th spot
+high-seas: 213 colliders (1 floor, 0 state-posed dynamic authority) -> 3896 legal hug spots (0 colliders with no legal adjacent stance)
+test1: thinned to every 2th spot
+test1: 122 colliders (1 floor, 0 state-posed dynamic authority) -> 3694 legal hug spots (0 colliders with no legal adjacent stance)
+test2: thinned to every 5th spot
+test2: 307 colliders (31 floor, 0 state-posed dynamic authority) -> 3467 legal hug spots (9 colliders with no legal adjacent stance)
+map3: thinned to every 3th spot
+map3: 232 colliders (2 floor, 0 state-posed dynamic authority) -> 3399 legal hug spots (3 colliders with no legal adjacent stance)
+nuketown2: thinned to every 3th spot
+nuketown2: 209 colliders (5 floor, 0 state-posed dynamic authority) -> 3037 legal hug spots (10 colliders with no legal adjacent stance)
+[eye-clearance] live sweep roster (9): atomic-acres, skyline-terminal, rustworks-1v1, gun-range, high-seas, test1, test2, map3, nuketown2
+atomic-acres       spots=3511 traces=24528 VIOLATIONS=15 (unannotated 15) {"stand":6,"prone":7,"crouch":2}
+skyline-terminal   spots=3764 traces=26348 VIOLATIONS=0 (unannotated 0) {}
+rustworks-1v1      spots=2048 traces=14336 VIOLATIONS=0 (unannotated 0) {}
+gun-range          spots=2904 traces=20317 VIOLATIONS=2 (unannotated 0) {"crouch":2}
+  [annotation gun-range-wallbang-walkthrough-panels] 2/2 rows - intentional-fixture
+      gun-range-wallbang-panel-glass crouch d=0.052 at (-17.98, 1.16, -7.67)
+      gun-range-wallbang-panel-brick crouch d=0 at (-9.02, 1.16, -7.67)
+high-seas          spots=3896 traces=27272 VIOLATIONS=0 (unannotated 0) {}
+test1              spots=3694 traces=25858 VIOLATIONS=0 (unannotated 0) {}
+test2              spots=3467 traces=24269 VIOLATIONS=0 (unannotated 0) {}
+map3               spots=3399 traces=23721 VIOLATIONS=24 (unannotated 24) {"prone":24}
+nuketown2          spots=3037 traces=21241 VIOLATIONS=18 (unannotated 18) {"prone":18}
+[{"arena":"atomic-acres","spots":3511,"violations":15,"unannotated":15,"annotated":{},"byStance":{"stand":6,"prone":7,"crouch":2}},{"arena":"skyline-terminal","spots":3764,"violations":0,"unannotated":0,"annotated":{},"byStance":{}},{"arena":"rustworks-1v1","spots":2048,"violations":0,"unannotated":0,"annotated":{},"byStance":{}},{"arena":"gun-range","spots":2904,"violations":2,"unannotated":0,"annotated":{"gun-range-wallbang-walkthrough-panels":2},"byStance":{"crouch":2}},{"arena":"high-seas","spots":3896,"violations":0,"unannotated":0,"annotated":{},"byStance":{}},{"arena":"test1","spots":3694,"violations":0,"unannotated":0,"annotated":{},"byStance":{}},{"arena":"test2","spots":3467,"violations":0,"unannotated":0,"annotated":{},"byStance":{}},{"arena":"map3","spots":3399,"violations":24,"unannotated":24,"annotated":{},"byStance":{"prone":24}},{"arena":"nuketown2","spots":3037,"violations":18,"unannotated":18,"annotated":{},"byStance":{"prone":18}}]
+
+> atomic-acres-browser-arena@1.0.0 qa:eye-clearance:runtime
+> node scripts/qa/run-with-preview-server.mjs node scripts/qa/verify-eye-clearance-runtime.mjs --check
+
+[eye-clearance] runtime verifier roster (9): atomic-acres, skyline-terminal, rustworks-1v1, gun-range, high-seas, test1, test2, map3, nuketown2
+atomic-acres       sweep=15 checked=11 REMAINING=8 (unannotated 8, measured 4, unverified 4) forced=0
+   {"x":-29.71,"z":-16.26,"eyeY":1.7,"stance":"stand","kind":"face","dir":[0.8,0.6,0],"distance":0.071,"surface":"exterior-access-ramp","runtime":{"distance":0.15,"surface":"exterior-access-ramp","dir":[0,-1,0]},"seat":[-29.71,2.085,-16.26],"resolve":{"x":-29.71000862121582,"y":2.0853145970200884,"z":-16.260299682617188,"pushedM":0.245310458073555},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":-11.48,"z":-11.68,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,0,1],"distance":0.081,"surface":"interior-access-ramp","runtime":{"distance":0.143,"surface":"interior-access-ramp","dir":[0,0.6,0.8]},"seat":[-11.48,0.505,-11.68],"resolve":{"x":-11.48009967803955,"y":0.5052363481585729,"z":-11.679986953735352,"pushedM":0.2448627993996394},"posed":{"settled":true,"frames":17,"rangeM":0}}
+   {"x":-9.82,"z":-11.68,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,0,1],"distance":0.081,"surface":"interior-access-ramp","runtime":{"distance":0.143,"surface":"interior-access-ramp","dir":[0,0.6,0.8]},"seat":[-9.82,0.505,-11.68],"resolve":{"x":-9.819968223571777,"y":0.5052438421928787,"z":-11.680000305175781,"pushedM":0.2448858825481034},"posed":{"settled":true,"frames":18,"rangeM":0}}
+   {"x":29.69,"z":13.21,"eyeY":0.61,"stance":"prone","kind":"face","dir":[-0.83,0,-0.56],"distance":0.028,"surface":"exterior-access-ramp","runtime":{"distance":0.15,"surface":"exterior-access-ramp","dir":[0,-1,0]},"seat":[29.69,0.956,13.21],"resolve":{"x":29.690000534057617,"y":0.9560547286417534,"z":13.210000038146973,"pushedM":0.20605470360780265},"posed":{"settled":true,"frames":18,"rangeM":0}}
+   {"x":29.71,"z":15.54,"eyeY":1.7,"stance":"stand","kind":"face","dir":[-0.8,-0.6,0],"distance":0.053,"surface":"exterior-access-ramp","note":"stance-blocked:prone","landed":{"settled":true,"frames":17,"rangeM":0},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":29.71,"z":16.3,"eyeY":1.7,"stance":"stand","kind":"face","dir":[-0.8,0.6,0],"distance":0.099,"surface":"exterior-access-ramp","note":"stance-blocked:prone","landed":{"settled":true,"frames":17,"rangeM":0},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":29.78,"z":14.07,"eyeY":1.16,"stance":"crouch","kind":"face","dir":[-0.8,-0.6,0],"distance":0.057,"surface":"exterior-access-ramp","note":"stance-blocked:prone","landed":{"settled":true,"frames":10,"rangeM":0},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":29.78,"z":14.81,"eyeY":1.16,"stance":"crouch","kind":"face","dir":[-0.8,0.6,0],"distance":0.079,"surface":"exterior-access-ramp","note":"stance-blocked:prone","landed":{"settled":true,"frames":10,"rangeM":0},"posed":{"settled":true,"frames":10,"rangeM":0}}
+skyline-terminal   sweep=0 checked=0 REMAINING=0 (unannotated 0, measured 0, unverified 0) forced=3
+   [forced] {"id":"skyline-nacelle-prone-a","stance":"prone","achievedStance":"prone","settled":true,"settleFrames":22,"seat":[-0.63,0.75,13.72],"resolve":{"x":-0.6299999952316284,"y":0.7501000416278839,"z":13.720000267028809,"pushedM":0},"runtime":null,"landed":{"settled":true,"frames":10,"rangeM":0}}
+   [forced] {"id":"skyline-nacelle-prone-b","stance":"prone","achievedStance":"prone","settled":true,"settleFrames":18,"seat":[0.75,0.63,12.38],"resolve":{"x":0.7500383853912354,"y":0.6300000000000001,"z":12.380025863647461,"pushedM":0.12008877635002124},"runtime":null,"landed":{"settled":true,"frames":23,"rangeM":0}}
+   [forced] {"id":"skyline-nacelle-prone-c","stance":"prone","achievedStance":"prone","settled":true,"settleFrames":21,"seat":[-0.63,0.776,-9.72],"resolve":{"x":-0.6299999356269836,"y":0.7756249558925629,"z":-9.720000267028809,"pushedM":0},"runtime":null,"landed":{"settled":true,"frames":19,"rangeM":0}}
+gun-range          sweep=2 checked=2 REMAINING=2 (unannotated 0, measured 0, unverified 0) forced=0
+   {"x":-17.98,"z":-7.67,"eyeY":1.16,"stance":"crouch","kind":"face","dir":[-0.83,0,0.56],"distance":0.052,"surface":"gun-range-wallbang-panel-glass","runtime":{"distance":0.03,"surface":"gun-range-wallbang-panel-glass","dir":[0,0,1]},"seat":[-17.98,1.3,-7.67],"resolve":{"x":-17.979997634887695,"y":1.3001000595092775,"z":-7.670000076293945,"pushedM":0},"posed":{"settled":true,"frames":16,"rangeM":0.0029}}
+   {"x":-9.02,"z":-7.67,"eyeY":1.16,"stance":"crouch","kind":"face","dir":[1,0,0],"distance":0,"surface":"gun-range-wallbang-panel-brick","runtime":{"distance":0,"surface":"gun-range-wallbang-panel-brick","dir":[1,0,6.123233995736766e-17]},"seat":[-9.02,1.3,-7.67],"resolve":{"x":-9.020079612731934,"y":1.3001160335540773,"z":-7.670000076293945,"pushedM":0},"posed":{"settled":true,"frames":17,"rangeM":0}}
+map3               sweep=24 checked=24 REMAINING=0 (unannotated 0, measured 0, unverified 0) forced=0
+nuketown2          sweep=18 checked=18 REMAINING=7 (unannotated 7, measured 7, unverified 0) forced=0
+   {"x":-24.92,"z":-2.4,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 north truck deck","runtime":{"distance":0.003,"surface":"nuketown2 north truck deck","dir":[0,0.6,0.8]},"seat":[-24.92,0.748,-2.4],"resolve":{"x":-24.91983413696289,"y":0.7483088028430939,"z":-2.40019154548645,"pushedM":0},"posed":{"settled":true,"frames":22,"rangeM":0}}
+   {"x":24.92,"z":2.4,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 south truck deck","runtime":{"distance":0.15,"surface":"nuketown2 south truck box flank 0","dir":[0,0,-1]},"seat":[24.92,1.814,2.55],"resolve":{"x":24.919504165649414,"y":1.8144792270660401,"z":2.5500000000000003,"pushedM":0.1499963283538821},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":-24.77,"z":-2.4,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 north truck deck","runtime":{"distance":0.15,"surface":"nuketown2 north truck box flank 0","dir":[0,0,1]},"seat":[-24.77,1.763,-2.55],"resolve":{"x":-24.76950454711914,"y":1.7634375047683717,"z":-2.5500000000000003,"pushedM":0.14970021247863796},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":24.77,"z":2.4,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 south truck deck","runtime":{"distance":0.15,"surface":"nuketown2 south truck box flank 0","dir":[0,0,-1]},"seat":[24.77,1.763,2.55],"resolve":{"x":24.76950454711914,"y":1.7634375047683717,"z":2.5500000000000003,"pushedM":0.14970021247863796},"posed":{"settled":true,"frames":10,"rangeM":0}}
+   {"x":-22.44,"z":-1.87,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 north truck deck","runtime":{"distance":0.14,"surface":"nuketown2 north truck deck","dir":[0,-1,0]},"seat":[-22.44,1.09,-1.87],"resolve":{"x":-22.440000534057617,"y":1.0900000250339508,"z":-1.8700000047683716,"pushedM":0.34},"posed":{"settled":true,"frames":26,"rangeM":0}}
+   {"x":-21.01,"z":-0.53,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 north truck deck","runtime":{"distance":0.14,"surface":"nuketown2 north truck deck","dir":[0,-1,0]},"seat":[-21.01,1.09,-0.53],"resolve":{"x":-21.010000228881836,"y":1.0900000250339508,"z":-0.5299999713897705,"pushedM":0.34},"posed":{"settled":true,"frames":23,"rangeM":0}}
+   {"x":22.44,"z":0.53,"eyeY":0.61,"stance":"prone","kind":"face","dir":[0,1,0],"distance":0.14,"surface":"nuketown2 south truck deck","runtime":{"distance":0.14,"surface":"nuketown2 south truck deck","dir":[0,-1,0]},"seat":[22.44,1.09,0.53],"resolve":{"x":22.440000534057617,"y":1.0900000250339508,"z":0.5299999713897705,"pushedM":0.34},"posed":{"settled":true,"frames":23,"rangeM":0}}
+SUMMARY [{"arena":"atomic-acres","sweep":15,"remaining":8,"unannotated":[{"distance":0.15,"surface":"exterior-access-ramp","stance":"stand","seat":[-29.71,2.085,-16.26]},{"distance":0.143,"surface":"interior-access-ramp","stance":"prone","seat":[-11.48,0.505,-11.68]},{"distance":0.143,"surface":"interior-access-ramp","stance":"prone","seat":[-9.82,0.505,-11.68]},{"distance":0.15,"surface":"exterior-access-ramp","stance":"prone","seat":[29.69,0.956,13.21]}],"unverified":[{"surface":"exterior-access-ramp","stance":"stand","sweepDistance":0.053,"note":"stance-blocked:prone"},{"surface":"exterior-access-ramp","stance":"stand","sweepDistance":0.099,"note":"stance-blocked:prone"},{"surface":"exterior-access-ramp","stance":"crouch","sweepDistance":0.057,"note":"stance-blocked:prone"},{"surface":"exterior-access-ramp","stance":"crouch","sweepDistance":0.079,"note":"stance-blocked:prone"}],"forced":[]},{"arena":"skyline-terminal","sweep":0,"remaining":0,"unannotated":[],"unverified":[],"forced":[{"id":"skyline-nacelle-prone-a","stance":"prone","achievedStance":"prone","settled":true,"seat":[-0.63,0.75,13.72],"pushedM":0,"distance":null,"surface":null},{"id":"skyline-nacelle-prone-b","stance":"prone","achievedStance":"prone","settled":true,"seat":[0.75,0.63,12.38],"pushedM":0.12008877635002124,"distance":null,"surface":null},{"id":"skyline-nacelle-prone-c","stance":"prone","achievedStance":"prone","settled":true,"seat":[-0.63,0.776,-9.72],"pushedM":0,"distance":null,"surface":null}]},{"arena":"rustworks-1v1","sweep":0,"remaining":0,"unannotated":[],"unverified":[],"forced":[]},{"arena":"gun-range","sweep":2,"remaining":2,"unannotated":[],"unverified":[],"forced":[]},{"arena":"high-seas","sweep":0,"remaining":0,"unannotated":[],"unverified":[],"forced":[]},{"arena":"test1","sweep":0,"remaining":0,"unannotated":[],"unverified":[],"forced":[]},{"arena":"test2","sweep":0,"remaining":0,"unannotated":[],"unverified":[],"forced":[]},{"arena":"map3","sweep":24,"remaining":0,"unannotated":[],"unverified":[],"forced":[]},{"arena":"nuketown2","sweep":18,"remaining":7,"unannotated":[{"distance":0.003,"surface":"nuketown2 north truck deck","stance":"prone","seat":[-24.92,0.748,-2.4]},{"distance":0.15,"surface":"nuketown2 south truck box flank 0","stance":"prone","seat":[24.92,1.814,2.55]},{"distance":0.15,"surface":"nuketown2 north truck box flank 0","stance":"prone","seat":[-24.77,1.763,-2.55]},{"distance":0.15,"surface":"nuketown2 south truck box flank 0","stance":"prone","seat":[24.77,1.763,2.55]},{"distance":0.14,"surface":"nuketown2 north truck deck","stance":"prone","seat":[-22.44,1.09,-1.87]},{"distance":0.14,"surface":"nuketown2 north truck deck","stance":"prone","seat":[-21.01,1.09,-0.53]},{"distance":0.14,"surface":"nuketown2 south truck deck","stance":"prone","seat":[22.44,1.09,0.53]}],"unverified":[],"forced":[]}]
+[eye-clearance] runtime verdict floor = the shipped camera near plane, 0.02 m
+[eye-clearance] atomic-acres: UNVERIFIED row on exterior-access-ramp (stand, sweep d=0.053) - stance-blocked:prone. Stage 3 measured nothing here; it is neither clean nor a clip.
+[eye-clearance] atomic-acres: UNVERIFIED row on exterior-access-ramp (stand, sweep d=0.099) - stance-blocked:prone. Stage 3 measured nothing here; it is neither clean nor a clip.
+[eye-clearance] atomic-acres: UNVERIFIED row on exterior-access-ramp (crouch, sweep d=0.057) - stance-blocked:prone. Stage 3 measured nothing here; it is neither clean nor a clip.
+[eye-clearance] atomic-acres: UNVERIFIED row on exterior-access-ramp (crouch, sweep d=0.079) - stance-blocked:prone. Stage 3 measured nothing here; it is neither clean nor a clip.
+[eye-clearance] nuketown2: the REAL camera seat [-24.92,0.748,-2.4] sits 0.003 m from nuketown2 north truck deck (prone), inside the 0.02 m near plane. The player sees through that surface after the runtime resolve has already had its say. Fix the geometry - the resolve is the backstop, not the answer.

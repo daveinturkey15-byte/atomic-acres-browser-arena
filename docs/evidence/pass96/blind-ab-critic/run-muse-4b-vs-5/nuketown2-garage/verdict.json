@@ -1,0 +1,78 @@
+{
+  "station": "nuketown2-garage",
+  "assignment": {
+    "left": "B",
+    "right": "A"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "left",
+  "winner": "B",
+  "confidence": 0.85,
+  "probes": {
+    "left": {
+      "expected": "NRNT",
+      "answered": "NRNT"
+    },
+    "right": {
+      "expected": "DYEY",
+      "answered": "DYEY"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate5\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "3b049ebbbd003d8dd69725fc3b24e3cfc843047865eb9b585dc9e19b33d78d79",
+      "shownSha256": "4e785616a67d69463127439dc474860f4e69cfabdf540fbe762b174a127aba44",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate4b\\captures\\nuketown2\\nuketown2-garage.png",
+      "sourceSha256": "79d661b4353bba61a48611ef4de83ec1b63d32132f2719dfac1005a415ca2f29",
+      "shownSha256": "b38d4b4e12b788f860361afb99676d06e41db5574a00c18263e82420cdbd28f1",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.jpg",
+        "sha256": "cba85d16337fce8629b31e3f03dd0946a0de1ffbc34c8890b4d9624f06d3dc82"
+      },
+      {
+        "shownAs": "reference-2.jpg",
+        "sha256": "07fa58a75eeb0ee87244caa7e5255da49b0bc965e182ce7f42d22a84479406da"
+      },
+      {
+        "shownAs": "reference-3.jpg",
+        "sha256": "8a5eab97781e4201d3955063e2d5179f8301d3caf418798e3cb4c2995336fd3d"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "e7cbd0aaf9430d5da85897ba3f9b8ebbb2ffe1148f1ded824dc4846cb4abd07d"
+      }
+    ]
+  },
+  "why": "Structure, openings and car placement in r1c1 are identical, so the decision is material and value: LEFT's off-white horizontal siding in r1c0 and r1c2 matches the pale yellow/white house siding in reference-2 r2c2 and the light house walls in the aerial reference r1c1, while RIGHT's saturated pure-red full walls in r1c0 and r1c2 introduce a wall material class not shown in any reference where red appears only as small accents in r1c0; LEFT's neutral diffuse bounce and soft contact shadow in r2c0 and r2c1 preserve the daylight value relationships of the references, whereas RIGHT throws strong orange bounce into r1c0.",
+  "leftCloser": [
+    "Off-white horizontal siding read in r1c0 and r1c2 agrees with pale siding walls in reference-2 r2c2 and aerial houses vs saturated red",
+    "Neutral wall-to-floor value and soft contact shadow in r2c0 and r2c1 matches daylight references without orange color bleed",
+    "Driveway, car, and background landscape in r1c1 read with neutral grade consistent with references"
+  ],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r1c2",
+    "what": "interior side-wall albedo: off-white siding in LEFT versus saturated pure-red siding in RIGHT"
+  },
+  "elapsedMs": 63004,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3",
+  "revalidated": {
+    "at": "2026-09-04T21:41:35.610Z",
+    "previousInvalidReason": "schema-invalid",
+    "previousErrors": [
+      "confidence must be a number in 0..1"
+    ]
+  }
+}

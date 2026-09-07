@@ -49,41 +49,4 @@ export function committedManifestBytes(
   head: string,
 ): Buffer;
 
-export type AncestryRootAllowlist = Readonly<{
-  legitimate: string[];
-  quarantined: string[];
-  allowed: string[];
-}>;
-
-export type ReconciliationMergeFacts = Readonly<{
-  head?: unknown;
-  base?: unknown;
-  parents?: unknown;
-  headTree?: unknown;
-  firstParentTree?: unknown;
-  firstParentIsRoot?: unknown;
-  firstParentRoots?: unknown;
-  allowedRoots?: unknown;
-  quarantinedRoots?: unknown;
-}>;
-
-export type ReconciliationMergeShape = Readonly<{
-  reconciliation: true;
-  treeIdenticalTo: string;
-  base: string;
-  head: string;
-  tree: string;
-  rootCount: number;
-  quarantinedRoots: string[];
-}>;
-
-export function readAncestryRootAllowlist(source: unknown): AncestryRootAllowlist;
-
-export function assertReconciliationMergeShape(facts: ReconciliationMergeFacts): ReconciliationMergeShape;
-
-export function selectReconciliationManifest(
-  manifestPaths: readonly string[],
-  policy: Readonly<{ manifestDirectory: string; enforceFromPass: number }>,
-): string;
-
 export function evaluateAcceptance(values: Readonly<Record<string, string>>): unknown;

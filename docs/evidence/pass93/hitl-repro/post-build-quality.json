@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "post-build",
+  "profile": "quality",
+  "requestedPreset": "high",
+  "baseUrl": "http://127.0.0.1:4300/",
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--enable-unsafe-webgpu",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "deviceScaleFactor": 1
+  },
+  "startedAt": "2026-09-04T06:17:35.160Z",
+  "finishedAt": "2026-09-04T06:18:32.954Z",
+  "deployClickedAt": "2026-09-04T06:17:36.957Z",
+  "ok": true,
+  "liveFrame": true,
+  "fatalError": null,
+  "initialMarker": {
+    "url": "http://127.0.0.1:4300/",
+    "title": "Nuke Town — Browser Arena FPS",
+    "releaseText": "PASS 92",
+    "releaseFooter": "PASS 92",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "atomic-acres",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment"
+    },
+    "menuVisible": true,
+    "selectedArena": "atomic-acres",
+    "graphicsPreset": "high"
+  },
+  "finalMarker": {
+    "url": "http://127.0.0.1:4300/",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "nuketown2",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "hidden",
+      "pointerLockLifecycle": "denied",
+      "menuPreview": "inactive",
+      "gameplayArena": "nuketown2",
+      "graphicsStaged": "",
+      "menuArenaId": "nuketown2",
+      "killstreakPossession": "none",
+      "combatAudioPrewarm": "ready",
+      "glassImpactAudioPrewarm": "ready",
+      "grenadeEffectsAudioPrewarm": "ready",
+      "rayTracedLayer": "reflections",
+      "overdrive": "charging",
+      "rayTracedProxy": "24/146:8",
+      "bakedIndirect": "24x12x24:703f3aed:24:0.380"
+    },
+    "menuHidden": true,
+    "transitionHidden": true,
+    "hudHidden": false,
+    "snapshot": {
+      "gameStarted": true,
+      "matchPhase": "active",
+      "matchAdmissionProfile": {
+        "arenaId": "nuketown2",
+        "mode": "solo",
+        "durationMs": 51901.9,
+        "steps": [
+          {
+            "name": "admission-open",
+            "durationMs": 39255
+          },
+          {
+            "name": "bot-spawn",
+            "durationMs": 1765.2
+          },
+          {
+            "name": "corpse-pool",
+            "durationMs": 508.7
+          },
+          {
+            "name": "bot-presentations",
+            "durationMs": 1887.9
+          },
+          {
+            "name": "rest-composition-compile",
+            "durationMs": 238.8
+          },
+          {
+            "name": "weapon-switch-rehearsal",
+            "durationMs": 797.3
+          },
+          {
+            "name": "match-bound-first-shots",
+            "durationMs": 1864.9
+          },
+          {
+            "name": "initial-match-settle",
+            "durationMs": 336.7
+          },
+          {
+            "name": "stable-cadence-wait",
+            "durationMs": 5247.4
+          }
+        ],
+        "admissionWeaponIds": [
+          "carbine",
+          "pistol",
+          "railgun",
+          "crimson-flamethrower"
+        ],
+        "rehearsedWeaponIds": [
+          "carbine",
+          "pistol",
+          "railgun",
+          "crimson-flamethrower"
+        ],
+        "deferredWeaponIds": [
+          "smg",
+          "lmg",
+          "scattergun",
+          "sniper",
+          "mini-uzi",
+          "mp5",
+          "m4a1",
+          "ak-47",
+          "minigun",
+          "m14-ebr",
+          "slug-shotgun",
+          "machine-pistol",
+          "magnum",
+          "flashlight-pistol",
+          "explosive-crossbow",
+          "flamethrower",
+          "flare-gun"
+        ],
+        "achievedWaitMs": 5062.0999999999985,
+        "exitReason": "ceiling-timeout"
+      },
+      "matchAdmissionCadence": {
+        "backend": "webgpu",
+        "waitedMs": 5062.0999999999985,
+        "stableWindowMs": 72.19999999999709,
+        "samples": 83,
+        "resets": 82,
+        "maximumGapMs": 72.20000000000437,
+        "startingSubmissionSequence": 52,
+        "startingCompletedSequence": 52,
+        "admittedDegraded": true,
+        "visibilityState": "visible",
+        "documentHasFocus": true,
+        "exitReason": "ceiling-timeout",
+        "consecutiveStableFrames": 0,
+        "endingSubmissionSequence": 135,
+        "endingCompletedSequence": 135,
+        "submissionAdvances": 83,
+        "completionAdvances": 83,
+        "maximumSubmissionGapMs": 115.69999992847443,
+        "maximumCompletionGapMs": 68.39999997615814,
+        "maximumPendingForMs": 69.5,
+        "maximumCompletionLatencyMs": 69.5,
+        "drained": false
+      },
+      "presentedGameplayFrame": 37
+    }
+  },
+  "consoleMessages": [
+    {
+      "at": "2026-09-04T06:17:35.382Z",
+      "type": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:29.730Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:30.088Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:30.406Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:30.716Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:31.038Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:31.122Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:31.213Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:31.542Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:31.910Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:32.276Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:32.650Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    },
+    {
+      "at": "2026-09-04T06:18:32.844Z",
+      "type": "error",
+      "text": "[atomic-acres:deferred weapon rehearsal] Error: Forced WebGPU submission requires an idle completion frontier; 1 submission(s) remain\n    at e.submitFrame (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:27:71169)\n    at PB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218069)\n    at FB (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:218266)\n    at async _H (http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js:754:233585)",
+      "location": {
+        "url": "http://127.0.0.1:4300/assets/legacy-main-C0cfls2f.js",
+        "line": 704,
+        "column": 304056,
+        "lineNumber": 704,
+        "columnNumber": 304056
+      }
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "badResponses": [],
+  "steps": [
+    {
+      "at": "2026-09-04T06:17:35.160Z",
+      "action": "goto-root"
+    },
+    {
+      "at": "2026-09-04T06:17:36.085Z",
+      "action": "menu-ready",
+      "marker": {
+        "url": "http://127.0.0.1:4300/",
+        "title": "Nuke Town — Browser Arena FPS",
+        "releaseText": "PASS 92",
+        "releaseFooter": "PASS 92",
+        "documentData": {
+          "uiContract": "pass64-command-v2",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "graphicsLiveProfile": "blender",
+          "graphicsFrameRateLimit": "uncapped",
+          "graphicsAntialiasSamples": "4",
+          "graphicsToneMapping": "aces",
+          "reducedSensory": "false",
+          "reducedMotion": "false",
+          "tintSwizzleShim": "true",
+          "tslNodeBuildErrors": "0",
+          "renderBackend": "webgpu",
+          "webglShadowSampler": "pcf-soft",
+          "atomicSignalRenderer": "hardware",
+          "atomicSignal": "tsl-hdr",
+          "webglContext": "ready",
+          "adaptiveShadows": "on",
+          "arenaId": "atomic-acres",
+          "inputScheme": "keyboard",
+          "graphicsRegistryCount": "41",
+          "menuLifecycle": "pre-match",
+          "pointerLockLifecycle": "unlocked",
+          "menuPreview": "prerecorded-video",
+          "gameplayArena": "deferred-until-deployment"
+        },
+        "menuVisible": true,
+        "selectedArena": "atomic-acres",
+        "graphicsPreset": "high"
+      }
+    },
+    {
+      "at": "2026-09-04T06:17:36.085Z",
+      "action": "select-high-graphics-profile"
+    },
+    {
+      "at": "2026-09-04T06:17:36.950Z",
+      "action": "select-nuketown2-card"
+    },
+    {
+      "at": "2026-09-04T06:17:36.957Z",
+      "action": "visitor-callsign-observed",
+      "value": "OPERATOR"
+    },
+    {
+      "at": "2026-09-04T06:17:36.957Z",
+      "action": "click-deploy",
+      "selector": "#solo"
+    }
+  ]
+}

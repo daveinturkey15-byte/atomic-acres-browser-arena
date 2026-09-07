@@ -13,13 +13,20 @@ import {
 } from './changelog';
 
 describe('changelog', () => {
-  it('keeps the pending Pass 73 release first and freezes the published Pass 72, Pass 70 and Pass 69 timestamps', () => {
+  it('keeps the pending Pass 94 candidate first and freezes every published timestamp behind it', () => {
     expect(CHANGELOG.length).toBeGreaterThan(0);
     const latest = latestChangelogEntry();
-    expect(latest.id).toBe('pass73');
+    expect(latest.id).toBe('pass94');
     expect(latest.id).toBe(CHANGELOG[0]?.id);
-    expect(latest.title).toContain('Pass 73');
-    expect(latest.summary).toContain('Pass 73');
+    expect(latest.title).toContain('Pass 94');
+    expect(latest.summary).toContain('Pass 94');
+    // HF-406: Pass 73 stopped being the current entry on 2026-09-02. Its Pages
+    // publication receipt is e138853f ("PASS 73 from 506d6142", 2026-08-21T20:27:27Z),
+    // so it is history with a real timestamp, not a candidate that never shipped.
+    expect(CHANGELOG.find((entry) => entry.id === 'pass83')?.releasedAt).toBe('2026-09-01T21:36:44+01:00');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass82')?.releasedAt).toBe('2026-09-01T21:09:05+01:00');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass81')?.releasedAt).toBe('2026-08-28T17:49:47+01:00');
+    expect(CHANGELOG.find((entry) => entry.id === 'pass73')?.releasedAt).toBe('2026-08-21T20:27:27Z');
     expect(CHANGELOG.find((entry) => entry.id === 'pass72')?.releasedAt).toBe('2026-08-21T00:25:40Z');
     expect(CHANGELOG.find((entry) => entry.id === 'pass70')?.releasedAt).toBe('2026-08-16T19:32:01Z');
     expect(CHANGELOG.find((entry) => entry.id === 'pass69')?.releasedAt).toBe('2026-08-10T21:19:47Z');
@@ -31,12 +38,44 @@ describe('changelog', () => {
     expect(formatChangelogTimestampDetail('2026-07-23T22:51:43Z')).toBe(
       '23 JUL 2026 · 23:51 BST · UTC+1 · 23:51:43',
     );
-    expect(lastUpdatedButtonLabel(latest)).toBe('HITL CANDIDATE · NOT LIVE');
-    expect(latest.highlights.join('\n')).toContain('sleeves are thicker and extend beyond the lower frame');
-    expect(latest.highlights.join('\n')).toContain('Railgun and M14 EBR ADS');
-    expect(latest.highlights.join('\n')).toContain('single exact 40-percent reduction to 37.2 / 24');
-    expect(latest.highlights.join('\n')).toContain('Quality-to-Performance changes apply live-safe');
-    expect(latest.highlights.join('\n')).toContain('Installed Firefox');
+    // HF-406: the badge leads with the pass number the build is stamped with. The old
+    // label ('HITL CANDIDATE · NOT LIVE') named no pass at all - that is the surface
+    // the owner read as "pass 73 HITL".
+    expect(lastUpdatedButtonLabel(latest)).toBe('PASS 94 · RELEASE CANDIDATE');
+    expect(latest.highlights.join('\n')).toContain('Nuke Town Rebuild is first in the map se');
+    const pass93Highlights = CHANGELOG.find((entry) => entry.id === 'pass93')?.highlights.join('\n') ?? '';
+    expect(pass93Highlights).toContain('Fix: arenas load again in stock Chrome 1');
+    const pass92Highlights = CHANGELOG.find((entry) => entry.id === 'pass92')?.highlights.join('\n') ?? '';
+    expect(pass92Highlights).toContain('Nuke Town: z-fighting removed, stairs wa');
+    const pass91Highlights = CHANGELOG.find((entry) => entry.id === 'pass91')?.highlights.join('\n') ?? '';
+    expect(pass91Highlights).toContain('NUKE TOWN REBUILD · PREVIEW refined: the');
+    const pass90Highlights = CHANGELOG.find((entry) => entry.id === 'pass90')?.highlights.join('\n') ?? '';
+    expect(pass90Highlights).toContain('NUKE TOWN REBUILD · PREVIEW now follows ');
+    const pass89Highlights = CHANGELOG.find((entry) => entry.id === 'pass89')?.highlights.join('\n') ?? '';
+    expect(pass89Highlights).toContain('A new BALANCED graphics mode sits between Performance and Quality');
+    const pass88Highlights = CHANGELOG.find((entry) => entry.id === 'pass88')?.highlights.join('\n') ?? '';
+    expect(pass88Highlights).toContain('Switching arenas mid-session no longer f');
+    const pass87Highlights = CHANGELOG.find((entry) => entry.id === 'pass87')?.highlights.join('\n') ?? '';
+    expect(pass87Highlights).toContain('RAID REBUILD · PREVIEW: a code-authored ');
+    const pass86Highlights = CHANGELOG.find((entry) => entry.id === 'pass86')?.highlights.join('\n') ?? '';
+    expect(pass86Highlights).toContain('NUKE TOWN REBUILD · PREVIEW');
+    const pass85Highlights = CHANGELOG.find((entry) => entry.id === 'pass85')?.highlights.join('\n') ?? '';
+    expect(pass85Highlights).toContain('Drop shots work the Black Ops 2 way');
+    const pass84Highlights = CHANGELOG.find((entry) => entry.id === 'pass84')?.highlights.join('\n') ?? '';
+    expect(pass84Highlights).toContain('pulls back half as far when you brush a wall');
+    expect(pass84Highlights).toContain('M14 EBR hits 40 percent harder');
+    expect(pass84Highlights).toContain('chopper gunner ride stops flushing prewarmed thermal-reveal records');
+    expect(pass84Highlights).toContain('read one source, so the build can no longer name an older pass');
+    const pass73 = CHANGELOG.find((entry) => entry.id === 'pass73');
+    expect(pass73?.highlights.join('\n')).toContain('sleeves are thicker and extend beyond the lower frame');
+    expect(pass73?.highlights.join('\n')).toContain('Railgun and M14 EBR ADS');
+    expect(pass73?.highlights.join('\n')).toContain('single exact 40-percent reduction to 37.2 / 24');
+    expect(pass73?.highlights.join('\n')).toContain('Quality-to-Performance changes apply live-safe');
+    expect(pass73?.highlights.join('\n')).toContain('Installed Firefox');
+    const pass82 = CHANGELOG.find((entry) => entry.id === 'pass82');
+    expect(pass82?.highlights.join('\n')).toContain('Chrome 8.49 percent frozen to 0');
+    const pass83 = CHANGELOG.find((entry) => entry.id === 'pass83');
+    expect(pass83?.highlights.join('\n')).toContain('5-4-3-2-1 countdown');
     const pass72 = CHANGELOG.find((entry) => entry.id === 'pass72');
     expect(pass72?.highlights.join('\n')).toContain('base / minimum body-damage values are exactly 37.2 / 24');
     expect(pass72?.highlights.join('\n')).toContain('Multiplayer protocol 18 rejects cached protocol-17 peers');
@@ -85,11 +124,14 @@ describe('changelog', () => {
       summary: expect.stringContaining('mechanically gated publication candidate'),
       lineage: expect.stringContaining('publication-first authorization'),
     });
-    expect(pass73ReleaseCopy(PENDING_PRODUCTION_RELEASE).lineage).toContain('public owner HITL follows');
+    expect(pass73ReleaseCopy(PENDING_PRODUCTION_RELEASE).lineage).toContain('public owner review follows');
     expect(pass73ReleaseCopy(PENDING_PRODUCTION_RELEASE).summary).not.toContain('owner-review candidate');
     const released73 = pass73ReleaseCopy('2026-08-21T08:00:00Z');
     expect(released73.summary).not.toContain('candidate');
-    expect(released73.lineage).toContain('public owner HITL for Pass 73 remains pending');
+    // HF-406: the released lineage renders in the player-facing panel, so it carries no
+    // internal review acronym and no stale "still pending" claim about a shipped pass.
+    expect(released73.lineage).toContain('Pass 63 remains the stable WebGL fallback');
+    expect(released73.lineage).not.toMatch(/HITL/u);
     expect(pass72ReleaseCopy('2026-08-21T00:25:40Z').lineage).toContain('corrections tracked in Pass 73');
     expect(pass70ReleaseCopy(PENDING_PRODUCTION_RELEASE)).toMatchObject({
       summary: expect.stringContaining('local owner-review candidate'),

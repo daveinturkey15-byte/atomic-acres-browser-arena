@@ -5,7 +5,7 @@ const baseUrl = process.argv[2] ?? process.env.QA_BASE_URL ?? 'http://127.0.0.1:
 const output = 'artifacts/pass62-visual-acceptance';
 await mkdir(output, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));

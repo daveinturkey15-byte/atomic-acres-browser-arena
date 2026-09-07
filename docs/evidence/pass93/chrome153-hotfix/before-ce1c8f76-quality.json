@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "before-ce1c8f76",
+  "profile": "quality",
+  "requestedPreset": "high",
+  "baseUrl": "http://127.0.0.1:4301/",
+  "browser": {
+    "channel": "chrome",
+    "headless": true,
+    "args": [
+      "--mute-audio",
+      "--disable-background-timer-throttling",
+      "--disable-renderer-backgrounding",
+      "--disable-backgrounding-occluded-windows",
+      "--window-position=-32000,-32000",
+      "--window-size=2640,1520"
+    ],
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "deviceScaleFactor": 1
+  },
+  "startedAt": "2026-09-04T06:25:50.739Z",
+  "finishedAt": "2026-09-04T06:26:52.708Z",
+  "deployClickedAt": "2026-09-04T06:25:52.544Z",
+  "ok": false,
+  "liveFrame": false,
+  "fatalError": "page.waitForFunction: Timeout 60000ms exceeded.",
+  "initialMarker": {
+    "url": "http://127.0.0.1:4301/",
+    "title": "Nuke Town — Browser Arena FPS",
+    "releaseText": "PASS 92",
+    "releaseFooter": "PASS 92",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "atomic-acres",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment"
+    },
+    "menuVisible": true,
+    "selectedArena": "atomic-acres",
+    "graphicsPreset": "high"
+  },
+  "finalMarker": {
+    "url": "http://127.0.0.1:4301/",
+    "documentData": {
+      "uiContract": "pass64-command-v2",
+      "renderProfile": "blender",
+      "graphicsPreset": "high",
+      "graphicsLiveProfile": "blender",
+      "graphicsFrameRateLimit": "uncapped",
+      "graphicsAntialiasSamples": "4",
+      "graphicsToneMapping": "aces",
+      "reducedSensory": "false",
+      "reducedMotion": "false",
+      "tintSwizzleShim": "true",
+      "tslNodeBuildErrors": "0",
+      "renderBackend": "webgpu",
+      "webglShadowSampler": "pcf-soft",
+      "atomicSignalRenderer": "hardware",
+      "atomicSignal": "tsl-hdr",
+      "webglContext": "ready",
+      "adaptiveShadows": "on",
+      "arenaId": "nuketown2",
+      "inputScheme": "keyboard",
+      "graphicsRegistryCount": "41",
+      "menuLifecycle": "pre-match",
+      "pointerLockLifecycle": "unlocked",
+      "menuPreview": "prerecorded-video",
+      "gameplayArena": "deferred-until-deployment",
+      "graphicsStaged": "",
+      "menuArenaId": "nuketown2",
+      "killstreakPossession": "none",
+      "combatAudioPrewarm": "ready",
+      "glassImpactAudioPrewarm": "ready",
+      "grenadeEffectsAudioPrewarm": "ready",
+      "rayTracedLayer": "reflections",
+      "tintPipelineRepairs": "1",
+      "tintPipelineLastPurge": "1",
+      "tintAdmissionSweeps": "4",
+      "tintAdmissionLastPurge": "0"
+    },
+    "menuHidden": false,
+    "transitionHidden": true,
+    "hudHidden": true,
+    "snapshot": {
+      "gameStarted": false,
+      "matchPhase": "warmup",
+      "presentedGameplayFrame": 0
+    }
+  },
+  "consoleMessages": [
+    {
+      "at": "2026-09-04T06:25:50.982Z",
+      "type": "warning",
+      "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/webgpu-tint-swizzle-shim-Dz5rrnev.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:04.760Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Render pipeline creation failed (renderPipeline_RenderPipeline_25): An error occurred while generating Tint IR\nerror: swizzle view instruction still has usages after lowering\n - While initializing [RenderPipeline \"renderPipeline_RenderPipeline_25\"]\n - While calling [Device].CreateRenderPipeline([RenderPipelineDescriptor \"\"renderPipeline_RenderPipeline_25\"\"]).\n",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.084Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"] is invalid due to a previous error.\n - While encoding [RenderPassEncoder (unlabeled)].SetPipeline([Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"]).\n - While finishing [CommandEncoder \"renderContext_3\"].\n",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.084Z",
+      "type": "warning",
+      "text": "[Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"] is invalid due to a previous error.\n - While encoding [RenderPassEncoder (unlabeled)].SetPipeline([Invalid RenderPipeline \"renderPipeline_RenderPipeline_25\"]).\n - While finishing [CommandEncoder \"renderContext_3\"].\n",
+      "location": {
+        "url": "http://127.0.0.1:4301/",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.084Z",
+      "type": "error",
+      "text": "THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.084Z",
+      "type": "warning",
+      "text": "[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n",
+      "location": {
+        "url": "http://127.0.0.1:4301/",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.224Z",
+      "type": "warning",
+      "text": "[atomic-acres:webgpu] recovered 1 errored pipeline(s), sweep 1",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 753,
+        "column": 220712,
+        "lineNumber": 753,
+        "columnNumber": 220712
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:05.935Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion failed: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at Qre (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:53298)\n    at async e.waitForSubmittedWork (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:72969)\n    at async http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:70441\n    at async u2 (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:353026)",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:10.197Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:12.012Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:13.918Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    },
+    {
+      "at": "2026-09-04T06:26:15.793Z",
+      "type": "error",
+      "text": "[Nuke Town Rebuild map selection failed] Error: WebGPU uncaptured error: GPUError: [Invalid CommandBuffer from CommandEncoder \"renderContext_3\"] is invalid due to a previous error.\n - While calling [Queue].Submit([[Invalid CommandBuffer from CommandEncoder \"renderContext_3\"]])\n\n    at e.submitFrame (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:27:70896)\n    at LB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218311)\n    at RB (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:218508)\n    at async WTe (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:758:25564)\n    at async e3 (http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js:754:459769)",
+      "location": {
+        "url": "http://127.0.0.1:4301/assets/legacy-main-DavbKrzs.js",
+        "line": 704,
+        "column": 301694,
+        "lineNumber": 704,
+        "columnNumber": 301694
+      }
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "badResponses": [],
+  "steps": [
+    {
+      "at": "2026-09-04T06:25:50.739Z",
+      "action": "goto-root"
+    },
+    {
+      "at": "2026-09-04T06:25:51.647Z",
+      "action": "menu-ready",
+      "marker": {
+        "url": "http://127.0.0.1:4301/",
+        "title": "Nuke Town — Browser Arena FPS",
+        "releaseText": "PASS 92",
+        "releaseFooter": "PASS 92",
+        "documentData": {
+          "uiContract": "pass64-command-v2",
+          "renderProfile": "blender",
+          "graphicsPreset": "high",
+          "graphicsLiveProfile": "blender",
+          "graphicsFrameRateLimit": "uncapped",
+          "graphicsAntialiasSamples": "4",
+          "graphicsToneMapping": "aces",
+          "reducedSensory": "false",
+          "reducedMotion": "false",
+          "tintSwizzleShim": "true",
+          "tslNodeBuildErrors": "0",
+          "renderBackend": "webgpu",
+          "webglShadowSampler": "pcf-soft",
+          "atomicSignalRenderer": "hardware",
+          "atomicSignal": "tsl-hdr",
+          "webglContext": "ready",
+          "adaptiveShadows": "on",
+          "arenaId": "atomic-acres",
+          "inputScheme": "keyboard",
+          "graphicsRegistryCount": "41",
+          "menuLifecycle": "pre-match",
+          "pointerLockLifecycle": "unlocked",
+          "menuPreview": "prerecorded-video",
+          "gameplayArena": "deferred-until-deployment"
+        },
+        "menuVisible": true,
+        "selectedArena": "atomic-acres",
+        "graphicsPreset": "high"
+      }
+    },
+    {
+      "at": "2026-09-04T06:25:51.647Z",
+      "action": "select-high-graphics-profile"
+    },
+    {
+      "at": "2026-09-04T06:25:52.538Z",
+      "action": "select-nuketown2-card"
+    },
+    {
+      "at": "2026-09-04T06:25:52.544Z",
+      "action": "visitor-callsign-observed",
+      "value": "OPERATOR"
+    },
+    {
+      "at": "2026-09-04T06:25:52.544Z",
+      "action": "click-deploy",
+      "selector": "#solo"
+    },
+    {
+      "at": "2026-09-04T06:26:52.675Z",
+      "action": "probe-failed",
+      "error": "page.waitForFunction: Timeout 60000ms exceeded."
+    }
+  ]
+}

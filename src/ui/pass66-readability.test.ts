@@ -38,9 +38,32 @@ describe('Pass 66 dense-surface readability contract', () => {
   });
 
   it('replaces the inherited grey Options wash with an explicit high-contrast instrument surface', () => {
-    expect(css).toContain('linear-gradient(140deg, rgba(8, 24, 29, 0.98), rgba(4, 12, 16, 0.99))');
+    // Pass 79 reskin: the instrument surface moved from the rejected cold
+    // blue-black wash onto the warm instrument sheet, and the muted label
+    // moved from cold grey #c4d8d7 to warm bone #e8ddcb. Same structural
+    // pins, warmer values, PLUS the legibility intent enforced numerically:
+    // the new pair must compute at least the old pair's 12.2:1 contrast.
+    expect(css).toContain('linear-gradient(140deg, rgba(43, 36, 28, 0.98), rgba(20, 16, 12, 0.99))');
     expect(css).toContain('#menu-panel-options .audio-setting-row');
-    expect(css).toContain('color: #c4d8d7');
+    expect(css).toContain('color: #e8ddcb');
+
+    const channel = (hex: string, index: number): number => {
+      const c = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    const luminance = (hex: string): number =>
+      0.2126 * channel(hex, 0) + 0.7152 * channel(hex, 1) + 0.0722 * channel(hex, 2);
+    const contrast = (a: string, b: string): number => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // Solid approximations of the composited grounds (verified by eye against
+    // the rendered panels; both slightly BRIGHTER than the true composite, so
+    // the bound is conservative).
+    const oldGround = '#0a1a1f';
+    const newGround = '#241d16';
+    expect(contrast('#e8ddcb', newGround)).toBeGreaterThanOrEqual(contrast('#c4d8d7', oldGround));
+    expect(contrast('#e8ddcb', newGround)).toBeGreaterThanOrEqual(12);
   });
 
   it('keeps Field Kit metrics and the killstreak demo rail responsive and motion-safe', () => {

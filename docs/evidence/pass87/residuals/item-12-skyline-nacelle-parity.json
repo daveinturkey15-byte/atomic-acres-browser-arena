@@ -1,0 +1,45 @@
+{
+  "item": "Lane AR item 12 - skyline-terminal jetliner nacelle collider transposed against its visual",
+  "arena": "skyline-terminal",
+  "toleranceM": 0.06,
+  "beforeRepair": {
+    "note": "Reverting src/additional-maps.ts to the pre-repair box fails this same assertion with a 2.20 m delta on x.",
+    "authorityXM": 1.9,
+    "podXM": 4.1,
+    "deltaXM": 2.2
+  },
+  "afterRepair": [
+    {
+      "podIndex": 0,
+      "authority": "skyline-jetliner-engine-1",
+      "centreDistanceM": 0,
+      "podSizeM": {
+        "x": 4.1,
+        "y": 1.9,
+        "z": 1.9
+      },
+      "authoritySizeM": {
+        "x": 4.1,
+        "y": 1.9,
+        "z": 1.9
+      },
+      "maxAxisDeltaM": 0
+    },
+    {
+      "podIndex": 1,
+      "authority": "skyline-jetliner-engine-2",
+      "centreDistanceM": 0,
+      "podSizeM": {
+        "x": 4.1,
+        "y": 1.9,
+        "z": 1.9
+      },
+      "authoritySizeM": {
+        "x": 4.1,
+        "y": 1.9,
+        "z": 1.9
+      },
+      "maxAxisDeltaM": 0
+    }
+  ]
+}

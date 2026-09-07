@@ -22,6 +22,13 @@ export type WeaponPenetrationProfile = Readonly<{
   /** Abstract close-range energy before the built-in FMJ multiplier. */
   penetrationPower: number;
   fmjMultiplier: number;
+  /**
+   * HF-368: per-weapon wallbang scalar on the close-range energy budget. Optional
+   * here and defaulted to 1 by `weaponPenetrationEnergy` so a profile authored
+   * before this term - test fixtures, ad-hoc drone/killstreak rays - keeps its
+   * exact Pass 64 behaviour rather than silently gaining or losing penetration.
+   */
+  wallPenetrationMultiplier?: number;
   energyFalloffStart: number;
   energyFalloffEnd: number;
   minimumEnergyRetention: number;
@@ -76,6 +83,69 @@ export const BALLISTIC_MATERIALS: Readonly<Record<BallisticMaterialId, MaterialR
   reinforced: Object.freeze({ entryCost: 1_000, costPerMeter: 1_000 }),
 });
 
+/**
+ * HF-467, owner after PASS 93: "glass or blocks have no penetration; metal and
+ * glass should be shot through, glass breaks; thin metal (the shed) should get
+ * a hole with no collision after".
+ *
+ * That statement is a claim about CLASSES of surface, not about individual
+ * props, so it is written once here as a projection of the material table
+ * rather than as a second hand-maintained roster (AGENTS.md: "a second
+ * hand-maintained eligibility list is a release blocker"). Every consumer -
+ * the wallbang lab, the arena raters, the probes - derives from this map, so a
+ * new `BallisticMaterialId` cannot be added without deciding, in review, which
+ * of the four behaviours it has.
+ *
+ *   shatter   penetrable, and the surface BREAKS OPEN on admitted damage.
+ *             The glass authority owns the lifecycle; at `breached` the pane
+ *             leaves `activeBallisticSurfaces()` AND stops emitting a dynamic
+ *             movement collider, so the opening is real for bullets, players
+ *             and bot line of sight at the same instant.
+ *   perforate penetrable, and each admitted hit leaves a PERSISTENT aperture
+ *             that later rays pass through untouched (`apertureQuery`). The
+ *             movement collider is deliberately KEPT: a bullet hole is not a
+ *             doorway, and "no collision after" means no BALLISTIC collision
+ *             at the hole.
+ *   penetrate penetrable, energy-costed, no persistent state change.
+ *   stop      structural cover: no persistent state change, and priced so a
+ *             sidearm cannot cross it at cover thickness. Stated honestly,
+ *             because the shipped table does NOT make these invulnerable -
+ *             brick's entryCost is 1.7 against a sniper's 10.90 budget, so a
+ *             rifle wallbang through half a metre of brick is intended and
+ *             measured (`keeps the material table physically ordered`). What
+ *             the class promises is that the arena raters reach for it when
+ *             they mean "go around this", and that nothing in `shatter` or
+ *             `perforate` is ever priced as high as the cheapest of these.
+ *
+ * `reinforced` is in `stop` because it is the classifier's failure sentinel,
+ * not a material an arena may author: a surface that reaches it is an
+ * authoring defect, reported by `classification: 'fallback'`. It is the one
+ * member of the class that really is unreachable by every catalogue firearm.
+ */
+export type BallisticMaterialClass = 'shatter' | 'perforate' | 'penetrate' | 'stop';
+
+export const BALLISTIC_MATERIAL_CLASS: Readonly<Record<BallisticMaterialId, BallisticMaterialClass>> = Object.freeze({
+  glass: 'shatter',
+  'thin-metal': 'perforate',
+  fence: 'penetrate',
+  wood: 'penetrate',
+  'interior-wall': 'penetrate',
+  vehicle: 'penetrate',
+  container: 'penetrate',
+  'structural-metal': 'penetrate',
+  brick: 'stop',
+  concrete: 'stop',
+  earth: 'stop',
+  reinforced: 'stop',
+});
+
+/** Minimum material depth charged for one stop-class ballistic hit. */
+export const BALLISTIC_STOP_MINIMUM_THICKNESS_METERS = 0.6;
+
+export function ballisticMaterialClass(material: BallisticMaterialId): BallisticMaterialClass {
+  return BALLISTIC_MATERIAL_CLASS[material];
+}
+
 export type BallisticSurfaceEvidence = Readonly<{
   name: string;
   impactSurface?: ImpactSurface;
@@ -86,22 +156,44 @@ export type BallisticSurfaceEvidence = Readonly<{
  * Central material rule. Unknown future shot blockers stay safe as reinforced
  * cover and fail the arena coverage verifier through `classification=fallback`.
  */
+export function isBallisticMaterialId(candidate: unknown): candidate is BallisticMaterialId {
+  return typeof candidate === 'string' && Object.hasOwn(BALLISTIC_MATERIALS, candidate);
+}
+
 export function classifyBallisticMaterial(
   evidence: BallisticSurfaceEvidence,
 ): Pick<BallisticSurface, 'material' | 'classification'> {
-  if (evidence.material) return { material: evidence.material, classification: 'explicit' };
+  // HF-390: an authored material is only authority when the shared resistance
+  // table actually rates it. `farcrysis` shipped `'metal'` - an ImpactSurface,
+  // not a BallisticMaterialId - through an `as` cast, and every shot that met
+  // one of those 21 surfaces threw `Cannot read properties of undefined
+  // (reading 'entryCost')` inside traceBallisticPath. Trusting the cast turned
+  // an authoring typo into a runtime crash; failing it closed turns the same
+  // typo into a `fallback` row the arena penetration gate reports by name.
+  if (evidence.material !== undefined) {
+    if (isBallisticMaterialId(evidence.material)) {
+      return { material: evidence.material, classification: 'explicit' };
+    }
+    return { material: 'reinforced', classification: 'fallback' };
+  }
   const name = evidence.name.toLowerCase();
   if (/(glass|window|pane)/.test(name)) return { material: 'glass', classification: 'rule' };
   if (/(fence|mesh barrier|chain.?link)/.test(name)) return { material: 'fence', classification: 'rule' };
-  if (/(shipping.container|cargo.stack|freight.crate|tarmac.cargo|pallet|luggage|baggage.item)/.test(name)) {
+  // HF-390: freight only. `pallet` used to live here, which rated 56 Skyline
+  // Terminal pallet boards and runners - named `skyline-wood-pallet-*` - as
+  // sealed shipping containers, harder to shoot through than concrete. A
+  // pallet is the timber the freight sits on, so it is matched as wood below.
+  if (/(shipping.container|cargo.stack|freight.crate|tarmac.cargo|baggage.item)/.test(name)) {
     return { material: 'container', classification: 'rule' };
   }
-  if (/(bus|coach|shuttle|vehicle|trailer|jetliner|fuselage|wing|engine|airstair|luggage cart)/.test(name)) {
+  // `luggage.cart` (not `luggage cart`) so a hyphenated authored name matches
+  // the wheeled-vehicle family instead of falling through to freight.
+  if (/(bus|coach|shuttle|vehicle|trailer|jetliner|fuselage|wing|engine|airstair|luggage.cart)/.test(name)) {
     return { material: 'vehicle', classification: 'rule' };
   }
   if (/(berm|soil|ground|grass|sand|earth)/.test(name)) return { material: 'earth', classification: 'rule' };
   if (/(brick|masonry)/.test(name)) return { material: 'brick', classification: 'rule' };
-  if (/(timber|wood|deck|ramp|landing|bench|seat|counter)/.test(name)) return { material: 'wood', classification: 'rule' };
+  if (/(timber|wood|pallet|deck|ramp|landing|bench|seat|counter)/.test(name)) return { material: 'wood', classification: 'rule' };
   if (/(plaster|partition|house|garage|hut|kiosk|wall|ceiling)/.test(name)) {
     return { material: 'interior-wall', classification: 'rule' };
   }
@@ -141,6 +233,20 @@ export type BallisticSurfaceImpact = Readonly<{
   thickness: number;
   penetrated: boolean;
   entryNormal: Point3;
+  /**
+   * HF-467: the round's REMAINING energy at this surface's entry face, on the
+   * same x10 quantised scale the interactive world's perforation thresholds
+   * use (`DestructibleShedDefinition.thresholds.perforateEnergyQ`).
+   *
+   * It exists because perforation admission used to be computed from the
+   * MUZZLE constant `penetrationPower * fmjMultiplier * 10`, which is the same
+   * number at 5 m through clear air and at 60 m through two walls. The trace
+   * has always known the real answer - distance falloff and every earlier
+   * surface's traversal cost are already charged against `energy` here - it
+   * simply never left this function. Reporting it is additive and cannot
+   * change any existing penetration outcome.
+   */
+  energyAtEntryQ: number;
 }>;
 
 export type BallisticTrace = Readonly<{
@@ -236,6 +342,21 @@ function surfaceInterval(
     entryNormal: { x: normal.x, y: normal.y, z: normal.z },
   };
 }
+/**
+ * HF-368: single place the per-weapon wallbang scalar enters the model. It scales
+ * the energy budget only - material entry/traversal costs are untouched - so more
+ * penetration means thicker surfaces become shootable and more damage survives a
+ * surface, never that a crossed surface becomes free damage: every material still
+ * charges its full toll, and `damageMultiplier` stays strictly below 1 for any
+ * traversed surface because `entryCost` is positive for every material.
+ */
+export function weaponPenetrationEnergy(profile: WeaponPenetrationProfile): number {
+  const scalar = Number.isFinite(profile.wallPenetrationMultiplier) && (profile.wallPenetrationMultiplier ?? 0) > 0
+    ? (profile.wallPenetrationMultiplier as number)
+    : 1;
+  return Math.max(0, profile.penetrationPower * profile.fmjMultiplier * scalar);
+}
+
 export function penetrationEnergyRetention(profile: WeaponPenetrationProfile, distance: number): number {
   const clamped = Math.max(0, Number.isFinite(distance) ? distance : 0);
   if (clamped <= profile.energyFalloffStart) return 1;
@@ -244,6 +365,18 @@ export function penetrationEnergyRetention(profile: WeaponPenetrationProfile, di
     (clamped - profile.energyFalloffStart) / Math.max(0.001, profile.energyFalloffEnd - profile.energyFalloffStart),
   );
   return 1 + (profile.minimumEnergyRetention - 1) * progress;
+}
+
+/**
+ * The x10 quantisation the interactive world's damage authority already uses
+ * for every energy threshold. Kept in one place so the trace and the shed
+ * cannot drift onto two scales.
+ */
+export const BALLISTIC_ENERGY_Q = 10;
+
+function quantiseEnergy(energy: number): number {
+  if (!Number.isFinite(energy) || energy <= 0) return 0;
+  return Math.max(0, Math.round(energy * BALLISTIC_ENERGY_Q));
 }
 
 /** Shared deterministic FMJ-like trace used by local, bot, and network authority. */
@@ -274,7 +407,7 @@ export function traceBallisticPath(
       z: origin.z + unit.z * entry.entryDistance,
     }))
     .sort((a, b) => a.entryDistance - b.entryDistance || a.exitDistance - b.exitDistance || a.surface.id.localeCompare(b.surface.id));
-  const initialEnergy = Math.max(0, profile.penetrationPower * profile.fmjMultiplier);
+  const initialEnergy = weaponPenetrationEnergy(profile);
   let energy = initialEnergy;
   let lastDistance = 0;
   let penetratedSurfaces = 0;
@@ -285,7 +418,10 @@ export function traceBallisticPath(
     energy *= priorRetention > 0 ? entryRetention / priorRetention : 0;
     const thickness = Math.max(0, interval.exitDistance - interval.entryDistance);
     const resistance = BALLISTIC_MATERIALS[interval.surface.material];
-    const traversalCost = resistance.entryCost + resistance.costPerMeter * thickness;
+    const chargedThickness = ballisticMaterialClass(interval.surface.material) === 'stop'
+      ? Math.max(thickness, BALLISTIC_STOP_MINIMUM_THICKNESS_METERS)
+      : thickness;
+    const traversalCost = resistance.entryCost + resistance.costPerMeter * chargedThickness;
     const exceedsSurfaceLimit = penetratedSurfaces >= profile.maxPenetratedSurfaces;
     if (exceedsSurfaceLimit || energy <= traversalCost + 1e-8) {
       const afterEntry = Math.max(0, energy - resistance.entryCost);
@@ -300,6 +436,7 @@ export function traceBallisticPath(
         thickness: distanceIntoSurface,
         penetrated: false,
         entryNormal: interval.entryNormal,
+        energyAtEntryQ: quantiseEnergy(energy),
       });
       return {
         reachedDistance: false,
@@ -310,6 +447,7 @@ export function traceBallisticPath(
         stoppedBy: interval.surface,
       };
     }
+    const energyAtEntryQ = quantiseEnergy(energy);
     energy -= traversalCost;
     penetratedSurfaces += 1;
     lastDistance = interval.exitDistance;
@@ -320,6 +458,7 @@ export function traceBallisticPath(
       thickness,
       penetrated: true,
       entryNormal: interval.entryNormal,
+      energyAtEntryQ,
     });
   }
   const targetRetention = penetrationEnergyRetention(profile, targetDistance);
@@ -353,6 +492,20 @@ export function applyPenetrationDamage(baseDamage: number, multiplier: number): 
   // A clear trace must preserve the canonical damage value byte-for-byte;
   // wallbang attenuation retains the existing integer admission envelope.
   return boundedMultiplier >= 1 ? baseDamage : Math.max(1, Math.round(baseDamage * boundedMultiplier));
+}
+
+// HF-343: apply a graduated obstruction/high-ready spread penalty from the viewmodel
+// fire admission so a partially raised weapon shoots less accurately without moving
+// the authoritative shot ray.
+export function applyObstructionSpreadPenalty(
+  baseSpreadRadians: number,
+  penaltyRadians: number,
+): number {
+  if (!Number.isFinite(baseSpreadRadians) || baseSpreadRadians <= 0) return baseSpreadRadians;
+  if (!Number.isFinite(penaltyRadians) || penaltyRadians <= 0) return baseSpreadRadians;
+  // Additive in radians matches the gameplay spread model; saturation is handled
+  // by the caller (fireBlocked means full penalty, not arbitrary escalation).
+  return baseSpreadRadians + penaltyRadians;
 }
 
 export function ballisticImpactSurface(material: BallisticMaterialId): ImpactSurface {

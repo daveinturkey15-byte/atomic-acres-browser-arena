@@ -17,41 +17,16 @@ incident is named so the rule is arguable rather than arbitrary.
 
 ## 1. Worktree lifecycle — the sprawl is the hazard
 
-**Measured 2026-08-22: 365 worktrees and 458 branches.**
-**Re-measured 2026-09-06: 577 registered worktrees, 215 of them `aa-*`, and 561 local
-branches:**
+**Measured 2026-08-22: 365 worktrees and 458 branches on this repository.**
 
-```bash
-git worktree list --porcelain | grep -c '^worktree '                    # 577
-git worktree list --porcelain | grep '^worktree ' | grep -ci '/aa-'     # 215
-git branch --list | wc -l                                               # 561
-```
+No agent — frontier or otherwise — reliably picks the right target from 365 options. This
+is not a model-quality problem and cannot be fixed by using a better model.
 
-It grew by four worktrees and five branches *during the single working day* this section
-was rewritten. No agent — frontier or otherwise — reliably picks the right target from 577
-options. This is not a model-quality problem and cannot be fixed by using a better model. It
-is the condition under which agents pick the wrong tree.
-
-- **One worktree per bounded lane.** Create it **from a named absolute path**, use it, prune
-  it at merge. Never infer the path from a remembered name or a similar directory.
+- **One worktree per pass or per bounded task.** Create it, use it, remove it at merge.
 - **`git worktree prune` is part of finishing**, not housekeeping someone does later.
 - **A worktree older than its pass is a trap.** It looks like current source and is not.
 - **Never create a worktree inside another worktree**, and never beside one with a similar
   name. Similar names are how the wrong one gets chosen.
-- **Real `npm ci --ignore-scripts` per worktree — never a `node_modules` junction.** A
-  junction into one shared install is gutted by any other lane's `npm install` or
-  `git worktree remove`. A clean install here takes about ten seconds; the junction wipe
-  costs an afternoon.
-- **Removal is never covered by an archive tag.** `git worktree remove --force` destroys
-  uncommitted **and git-ignored** evidence — measured 2026-09-02: 319 clean worktrees were
-  holding 58,069 ignored files, and `node_modules` was a Windows junction in roughly 173 of
-  them. Before removing anything: refuse the main working tree (`git rev-parse
-  --git-common-dir` returning literal `.git`), refuse anything dirty, refuse anything
-  holding ignored evidence, and drop a `node_modules` junction with `cmd //c rmdir` first.
-- **A lane's branch is cut from exact `origin/main` and still contains it at handoff.**
-  Enforced by `scripts/release/pipeline-guard.mjs` in every non-`doctor` mode since HF-536;
-  see `docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md` for what 21 passes of unchecked
-  drift cost.
 
 > **Incident.** A worker wrote `src/test-bay-dummy-colliders.ts`, its test, and a 19-line
 > `legacy-main.ts` edit into `atomic-acres-production-27e0858` — a *different* checkout, on

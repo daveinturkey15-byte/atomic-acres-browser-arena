@@ -3,6 +3,7 @@ import { auditLocalLightOcclusion } from './rendering/light-occlusion';
 import { describe, expect, it } from 'vitest';
 import type { Point3 } from './collision';
 import { isBlocked, pointInsideBounds } from './collision';
+import { recordResidualReceipt } from './pass87-residual-receipt.test-helper';
 import {
   GUN_RANGE_FIRING_LINE_BARRIER,
   GUN_RANGE_FIRING_LINE_Z,
@@ -24,8 +25,10 @@ import {
   createGunRangeTestBayDoorState,
   gunRangeTestBayDoorDynamicColliders,
 } from './gun-range-test-bay';
+import { BALLISTIC_MATERIAL_CLASS, traceBallisticPath } from './ballistics';
 import type { ArenaMap } from './map';
-import { WEAPONS, type Stance } from './gameplay';
+import { WEAPONS, movementProfile, type Stance } from './gameplay';
+import { EYE_CLEARANCE_RADIUS_M } from './camera-eye-clearance';
 import { CharacterPhysics, STANCE_SHAPES } from './physics';
 import { definition as rustworksVisualDefinition } from './rendering/arenas/rustworks-1v1';
 import { definition as gunRangeVisualDefinition } from './rendering/arenas/gun-range';
@@ -668,12 +671,18 @@ describe('additional authored maps', () => {
     expect(map.id).toBe('gun-range');
     expect(map.label).toBe('Indoor Gun Range');
     const scoreRangeTargets = map.targets.filter((target) => target.kind !== 'training-dummy');
-    expect(scoreRangeTargets).toHaveLength(16);
-    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(7);
+    // HF-467: 16 -> 18 and near 7 -> 9. The penetration lab gained a
+    // thin-metal and a structural-metal lane, and every lane carries one
+    // 50-point scored plate behind its panel, so the plate census moves with
+    // the lane census by construction rather than by remembering this literal.
+    const wallbangLanes = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
+    expect(scoreRangeTargets.filter((target) => target.scoreValue === 50)).toHaveLength(wallbangLanes.length);
+    expect(scoreRangeTargets).toHaveLength(18);
+    expect(scoreRangeTargets.filter((target) => target.distanceBand === 'near')).toHaveLength(9);
     expect(scoreRangeTargets.filter((target) => target.distanceBand === 'mid')).toHaveLength(6);
     expect(scoreRangeTargets.filter((target) => target.distanceBand === 'far')).toHaveLength(3);
     expect(scoreRangeTargets.map((target) => target.scoreValue).sort((a, b) => a - b)).toEqual([
-      50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
+      50, 50, 50, 50, 50, 50, 100, 100, 100, 200, 200, 200, 250, 250, 300, 300, 300, 500,
     ]);
     expect(map.targets.every((target) => target.root.userData.scoreValue === target.scoreValue)).toBe(true);
     expect(map.targets.filter((target) => target.kind === 'plate').every((target) => target.maxHealth === 500 && target.health === 500)).toBe(true);
@@ -698,8 +707,48 @@ describe('additional authored maps', () => {
     expect(map.root.getObjectByName('gun-range-acoustic-baffle')).toBeTruthy();
     expect(map.root.getObjectByName('gun-range-wallbang-panel-glass')).toBeTruthy();
     const wallbangSurfaces = map.shotSurfaces.filter((surface) => surface.name.startsWith('gun-range-wallbang-panel-'));
-    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual(['glass', 'wood', 'interior-wall', 'brick']);
-    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.24, 0.42, 0.7]);
+    // HF-467: the lab gained a thin-metal and a structural-metal lane, so the
+    // two families the owner named ("metal and glass should be shot through")
+    // can be compared here. The assertion is written against the CLASS
+    // projection rather than a material literal, so a future lane is covered
+    // by the same rule that admits it instead of needing this list edited.
+    expect(wallbangSurfaces.map((surface) => surface.material)).toEqual([
+      'glass', 'thin-metal', 'wood', 'interior-wall', 'structural-metal', 'brick',
+    ]);
+    expect(wallbangSurfaces.map((surface) => Number((surface.bounds.maxZ - surface.bounds.minZ).toFixed(2)))).toEqual([0.08, 0.06, 0.24, 0.42, 0.18, 0.7]);
+    // Every class the material table defines must have a lane, so the lab
+    // cannot silently stop representing one of the owner's four behaviours.
+    expect(new Set(wallbangSurfaces.map((surface) => BALLISTIC_MATERIAL_CLASS[surface.material])))
+      .toEqual(new Set(['shatter', 'perforate', 'penetrate', 'stop']));
+    // Lanes must not overlap: 1.5 m panels on a 1.6 m pitch, inside the lab's
+    // own side walls (inner faces -18.36 and -8.64).
+    const laneEdges = wallbangSurfaces.map((surface) => [surface.bounds.minX, surface.bounds.maxX] as const);
+    for (let i = 1; i < laneEdges.length; i += 1) {
+      expect(laneEdges[i]![0], 'wallbang lanes must not overlap').toBeGreaterThan(laneEdges[i - 1]![1]);
+    }
+    expect(Math.min(...laneEdges.map(([minX]) => minX))).toBeGreaterThan(-18.36);
+    expect(Math.max(...laneEdges.map(([, maxX]) => maxX))).toBeLessThan(-8.64);
+    // The lab's contract, stated against the SHIPPED budgets rather than an
+    // assumption: a sidearm crosses every penetrable lane and is stopped by
+    // the one `stop` lane, while a sniper crosses all six. Note that this is
+    // NOT "no firearm crosses brick" - a 0.7 m brick lane costs 5.2 and the
+    // sniper carries 10.90, so a rifle wallbang through it is intended and is
+    // exactly what the far end of this lab is for.
+    const fire = (surface: (typeof wallbangSurfaces)[number], profile: typeof WEAPONS['pistol']['penetration']) => {
+      const midX = (surface.bounds.minX + surface.bounds.maxX) / 2;
+      return traceBallisticPath({ x: midX, y: 1.45, z: -5 }, { x: 0, y: 0, z: -1 }, 8, profile, [surface]);
+    };
+    for (const surface of wallbangSurfaces) {
+      const shouldCross = BALLISTIC_MATERIAL_CLASS[surface.material] !== 'stop';
+      expect(
+        fire(surface, WEAPONS.pistol.penetration).impacts[0]?.penetrated ?? false,
+        `${surface.name}: pistol expected ${shouldCross ? 'to cross' : 'to be stopped'}`,
+      ).toBe(shouldCross);
+      expect(
+        fire(surface, WEAPONS.sniper.penetration).impacts[0]?.penetrated ?? false,
+        `${surface.name}: the sniper must cross every lane in the lab`,
+      ).toBe(true);
+    }
     expect(map.root.children.filter((child) => child.name === 'gun-range-interior-light')).toHaveLength(7);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-light')).toHaveLength(4);
     expect(map.root.children.filter((child) => child.name === 'gun-range-cycling-neon-strip')).toHaveLength(8);
@@ -1113,7 +1162,14 @@ describe('additional authored maps', () => {
   it('keeps every authored Skyline spawn clear, separated, and inside the playable bounds', () => {
     const map = buildSkylineTerminal(new THREE.Scene());
     for (const team of [0, 1] as const) {
-      expect(map.spawns[team]).toHaveLength(6);
+      // PASS 94 (HF-456): Skyline gained a seventh and eighth authored point per
+      // team when the spawn-distribution lane widened every arena's tables. The
+      // count pin is raised to the new authored reality rather than relaxed into
+      // a floor - src/spawn-layout-quality.test.ts owns the >= 8 floor, and this
+      // stays the exact-count tripwire that notices a table changing size at
+      // all. Every clearance, bounds and 6 m separation check below still runs
+      // over the whole table, so the two new points are proved, not waved past.
+      expect(map.spawns[team]).toHaveLength(8);
       for (const spawn of map.spawns[team]) {
         expect(pointInsideBounds(spawn, map.bounds, 0.5)).toBe(true);
         expect(isBlocked(spawn, map.colliders, 0.44), `${team}:${spawn.toArray().join(',')}`).toBe(false);
@@ -1189,7 +1245,18 @@ describe('additional authored maps', () => {
 
     const engine = map.root.getObjectByName('skyline-jetliner-engine-1') as THREE.Mesh<THREE.BoxGeometry>;
     const fuel = map.root.getObjectByName('skyline-fuel-trailer') as THREE.Mesh<THREE.BoxGeometry>;
-    expect(engine.geometry.parameters).toMatchObject({ width: 1.9, height: 1.9, depth: 4.1 });
+    // PASS 87 Lane AR item 12: was `toMatchObject({ width: 1.9, height: 1.9,
+    // depth: 4.1 })`. Those three literals pinned the authority box to a
+    // footprint TRANSPOSED against the pod it is supposed to be - and pinned it
+    // hard enough that the defect survived every gate for as long as it existed.
+    // A literal cannot notice that. The pin now comes from the visual itself,
+    // which is asserted separately in "the nacelle collider matches the pod it
+    // is drawn as"; here it just has to be non-degenerate and box-shaped, which
+    // is all this HF-188 block was ever about.
+    expect(engine.geometry.type).toBe('BoxGeometry');
+    for (const axis of ['width', 'height', 'depth'] as const) {
+      expect(engine.geometry.parameters[axis], `engine ${axis}`).toBeGreaterThan(0);
+    }
     expect(fuel.geometry.parameters).toMatchObject({ width: 5.2, height: 2.2, depth: 2.2 });
     expect(audit.entries.filter((entry) => entry.placeholder.includes('skyline-tarmac-cargo-'))).toHaveLength(10);
 
@@ -1203,6 +1270,180 @@ describe('additional authored maps', () => {
       const materials = Array.isArray(placeholder.material) ? placeholder.material : [placeholder.material];
       expect(placeholder.userData.skylineCollisionPresentationVisible, entry.placeholder).toBe(false);
       expect(materials.every((material) => material.colorWrite && material.depthWrite), entry.placeholder).toBe(true);
+    }
+  });
+
+  it('seats both jetliner nacelles on the wing underside and keeps the prone crawl space under them', () => {
+    // Lane J, 2026-09-02 (eye-clearance triage), pinned in the Lane J repair.
+    //
+    // NACELLE_CENTRE_Y = 1.73 was the pass's only landed gameplay-geometry
+    // change and nothing tested it: the HF-188 block above pins the nacelle's
+    // SIZE (1.9 x 1.9 x 4.1) and says nothing about where it sits. Both facts
+    // the seat height was chosen for are silent invariants between two bodies
+    // authored 150 lines apart, so either one moving would restore the defect
+    // with every gate still green - and `qa:eye-clearance`, the gate that would
+    // notice, is referenced by no CI workflow.
+    //
+    // Derived from the built arena and from the shipped stance profile, never
+    // from a literal, so a change to the prone eye height or to the clearance
+    // radius re-derives this instead of quietly invalidating it.
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const wingAuthority: THREE.Object3D[] = [];
+    map.root.traverse((object) => {
+      if (/^skyline-jetliner-wing-(port|starboard)-authority-\d+$/u.test(object.name)) wingAuthority.push(object);
+    });
+    expect(wingAuthority.length, 'the wing authority slices must exist to seat the nacelle against')
+      .toBeGreaterThan(0);
+    const wingAuthorityUnderside = [...new Set(
+      wingAuthority.map((object) => Number(new THREE.Box3().setFromObject(object).min.y.toFixed(4))),
+    )];
+    expect(wingAuthorityUnderside, 'every wing authority slice shares one underside').toHaveLength(1);
+    const undersideY = wingAuthorityUnderside[0];
+
+    const proneEyeY = movementProfile({
+      crouched: false, prone: true, ads: false, sprinting: false, grounded: true,
+    }).eyeHeight;
+    const prone = STANCE_SHAPES.prone;
+    // The prone capsule's top, measured from the eye the camera actually uses.
+    const proneCapsuleTopY = proneEyeY - prone.eyeFromCenter + prone.halfHeight + prone.radius;
+
+    for (const name of ['skyline-jetliner-engine-1', 'skyline-jetliner-engine-2']) {
+      const nacelle = map.root.getObjectByName(name);
+      expect(nacelle, name).toBeTruthy();
+      const bounds = new THREE.Box3().setFromObject(nacelle!);
+      // Seated, not floating: the engines hung 0.13 m below the wing they are
+      // bolted to before this pass.
+      expect(Number(bounds.max.y.toFixed(4)), `${name}: nacelle top must land on the wing underside`)
+        .toBe(undersideY);
+      // The belly must clear the prone eye by at least the radius the runtime
+      // resolve and the sweep both probe at, or the camera is inside the engine
+      // again (it measured 0.035 m at the real seat before the fix). This is the
+      // MODELLED eye - the number stage 2 judges. The shipped camera adds a flat
+      // 0.14 m floor standoff on top of it, so the real seat starts 0.03 m under
+      // this belly and resolveEyeClearance pushes it back down; that half is
+      // measured every run by the skyline-nacelle-prone-* forced probes, and the
+      // divergence is recorded in docs/eye-clearance/ledger.json.
+      expect(bounds.min.y - proneEyeY, `${name}: belly over the ${proneEyeY} m prone eye`)
+        .toBeGreaterThanOrEqual(EYE_CLEARANCE_RADIUS_M);
+      // ...and the crawl space has to be real: if the prone CAPSULE does not
+      // fit, the character controller ejects the player sideways instead and
+      // the clearance above is measured at a seat nobody occupies.
+      expect(bounds.min.y, `${name}: prone capsule top ${proneCapsuleTopY} must fit under the belly`)
+        .toBeGreaterThanOrEqual(proneCapsuleTopY);
+    }
+  });
+
+  /**
+   * PASS 87 Lane AR, item 12 (Lane J's withheld F1 patch).
+   *
+   * The nacelle has two bodies authored 50 lines apart: `qualityPlaceholderBox`
+   * makes the collision authority, `engineNacelles` makes what the player sees.
+   * They disagreed on which way the engine points. The visual is a cylinder of
+   * length 4.1 rotated about Z so its axis lies along X (fore-aft, along the
+   * fuselage); the authority box was 1.9 x 1.9 x 4.1, i.e. 4.1 across Z, so the
+   * solid ran ACROSS the aircraft. Measured on the built arena before the fix:
+   * 1.10 m of invisible solid fore and aft of a pod that visibly ends, and
+   * 1.10 m of visible pod each side carrying no movement or shot authority.
+   *
+   * This is the forging review's "authored visible mass matches movement and
+   * projectile authority" rule, so it is asserted from the two real bodies
+   * rather than from either one's numbers.
+   */
+  it('the nacelle collider matches the pod it is drawn as, on both engines', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    const receipt: unknown[] = [];
+    const visual = map.root.getObjectByName('skyline-aircraft-engine-nacelles') as THREE.InstancedMesh;
+    expect(visual, 'the instanced nacelle visual must exist').toBeTruthy();
+    expect(visual.count).toBe(2);
+    visual.updateMatrixWorld(true);
+    visual.geometry.computeBoundingBox();
+
+    const authorities = ['skyline-jetliner-engine-1', 'skyline-jetliner-engine-2']
+      .map((name) => {
+        const mesh = map.root.getObjectByName(name);
+        expect(mesh, name).toBeTruthy();
+        return { name, bounds: new THREE.Box3().setFromObject(mesh!) };
+      });
+
+    const instanceMatrix = new THREE.Matrix4();
+    for (let index = 0; index < visual.count; index += 1) {
+      visual.getMatrixAt(index, instanceMatrix);
+      const podBounds = visual.geometry.boundingBox!.clone()
+        .applyMatrix4(instanceMatrix.premultiply(visual.matrixWorld));
+      const podCentre = podBounds.getCenter(new THREE.Vector3());
+      const match = authorities
+        .map((entry) => ({ entry, distance: entry.bounds.getCenter(new THREE.Vector3()).distanceTo(podCentre) }))
+        .sort((a, b) => a.distance - b.distance)[0]!;
+      expect(match.distance, `pod ${index} must be co-sited with a collision authority`).toBeLessThan(0.5);
+
+      const podSize = podBounds.getSize(new THREE.Vector3());
+      const authoritySize = match.entry.bounds.getSize(new THREE.Vector3());
+      for (const axis of ['x', 'y', 'z'] as const) {
+        expect(
+          Math.abs(podSize[axis] - authoritySize[axis]),
+          `${match.entry.name}: authority is ${authoritySize[axis].toFixed(2)} m on ${axis} `
+            + `while the pod drawn there is ${podSize[axis].toFixed(2)} m. A collider transposed `
+            + 'against its visual is an invisible wall on one axis and a shoot-through on another.',
+        ).toBeLessThanOrEqual(0.06);
+      }
+      receipt.push({
+        podIndex: index,
+        authority: match.entry.name,
+        centreDistanceM: Number(match.distance.toFixed(4)),
+        podSizeM: { x: Number(podSize.x.toFixed(4)), y: Number(podSize.y.toFixed(4)), z: Number(podSize.z.toFixed(4)) },
+        authoritySizeM: {
+          x: Number(authoritySize.x.toFixed(4)),
+          y: Number(authoritySize.y.toFixed(4)),
+          z: Number(authoritySize.z.toFixed(4)),
+        },
+        maxAxisDeltaM: Number(Math.max(
+          Math.abs(podSize.x - authoritySize.x),
+          Math.abs(podSize.y - authoritySize.y),
+          Math.abs(podSize.z - authoritySize.z),
+        ).toFixed(4)),
+      });
+    }
+    recordResidualReceipt('item-12-skyline-nacelle-parity', {
+      item: 'Lane AR item 12 - skyline-terminal jetliner nacelle collider transposed against its visual',
+      arena: 'skyline-terminal',
+      toleranceM: 0.06,
+      beforeRepair: {
+        note: 'Reverting src/additional-maps.ts to the pre-repair box fails this same assertion with a 2.20 m delta on x.',
+        authorityXM: 1.9,
+        podXM: 4.1,
+        deltaXM: 2.2,
+      },
+      afterRepair: receipt,
+    });
+  });
+
+  /**
+   * The nacelles are hard cover; `physicalCover` is what bot cover selection
+   * and the minimap read. Lane AR item 12: the one row that existed described
+   * the transposed footprint, and the north engine had no row at all.
+   */
+  it('gives both nacelles a physicalCover row that follows the repaired authority', () => {
+    const map = buildSkylineTerminal(new THREE.Scene());
+    for (const [name, coverId] of [
+      ['skyline-jetliner-engine-1', 'jetliner-engine-south'],
+      ['skyline-jetliner-engine-2', 'jetliner-engine-north'],
+    ] as const) {
+      const authority = new THREE.Box3().setFromObject(map.root.getObjectByName(name)!);
+      const cover = map.physicalCover.find((entry) => entry.id === coverId);
+      expect(cover, `${coverId} must exist`).toBeTruthy();
+      expect(cover!.blocksMovement).toBe(true);
+      expect(cover!.blocksShots).toBe(true);
+      // Same margin the other cover rows carry, checked as a band rather than a
+      // literal so the row cannot drift back to a transposed footprint.
+      for (const [lo, hi, min, max, axis] of [
+        [cover!.bounds.minX, cover!.bounds.maxX, authority.min.x, authority.max.x, 'x'],
+        [cover!.bounds.minZ, cover!.bounds.maxZ, authority.min.z, authority.max.z, 'z'],
+      ] as const) {
+        expect(lo, `${coverId} ${axis} min`).toBeLessThanOrEqual(min + 0.01);
+        expect(hi, `${coverId} ${axis} max`).toBeGreaterThanOrEqual(max - 0.01);
+        expect(lo, `${coverId} ${axis} min margin`).toBeGreaterThanOrEqual(min - 0.3);
+        expect(hi, `${coverId} ${axis} max margin`).toBeLessThanOrEqual(max + 0.3);
+      }
     }
   });
 

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "runLabel": "after-shim",
+  "generatedAt": "2026-09-04T06:39:07.229Z",
+  "summary": [
+    {
+      "profile": "default",
+      "ok": true,
+      "liveFrame": true,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "consoleWarnings": 1,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": null
+    },
+    {
+      "profile": "quality",
+      "ok": true,
+      "liveFrame": true,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "consoleWarnings": 1,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": null
+    },
+    {
+      "profile": "max",
+      "ok": true,
+      "liveFrame": true,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "consoleWarnings": 2,
+      "failedRequests": 0,
+      "badResponses": 0,
+      "fatalError": null
+    }
+  ]
+}

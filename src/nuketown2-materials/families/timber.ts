@@ -1,0 +1,162 @@
+/**
+ * families/timber.ts — fence pickets, deck boards and painted trim.
+ *
+ * REAL SIZES. A dog-ear fence picket is 143 mm wide (a nominal 6 in board) at
+ * 3 mm gaps; a deck board is 140 mm at 5 mm gaps with two fixings per joist at
+ * 400 mm centres. Softwood grain is 1-3 mm between latewood bands with a knot
+ * every 0.3-0.9 m, and both are what a camera resolves first at arm's length.
+ *
+ * WEAR:
+ *   - grain    1.2 mm : latewood bands and the saw's own fibre
+ *   - scuff    55 mm  : knots, end checks, splinter tear, boot scrub
+ *   - traffic  1.8 m  : the silvering — UV bleaches exposed timber to a pale
+ *                       grey while the sheltered face keeps its colour — and
+ *                       the dark damp foot in the first 0.2 m off the ground
+ *
+ * SILVERING IS A LIGHT STEP. Weathered softwood goes UP in luminance, not
+ * down; a fence that only ever gets dirtier is a fence nobody has looked at.
+ */
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import * as TSL from 'three/tsl';
+import { boxUv, buildWear, detailFalloff, linearSwatch } from '../wear';
+import { reliefNormal } from '../relief';
+import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
+import { hash2 } from '../../map3/noise';
+import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
+
+const { abs, clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } =
+  TSL as unknown as Record<string, any>;
+
+/** Picket pitch, metres (143 mm board + 3 mm gap). */
+export const PICKET_PITCH_M = 0.146;
+/** Deck board pitch, metres (140 mm board + 5 mm gap). */
+export const DECK_PITCH_M = 0.145;
+
+/** A picket or deck board stands this proud of the rail behind it, metres. */
+const BOARD_PROUD_M = 0.019;
+/**
+ * Latewood bands stand proud of the softer earlywood after weathering, metres.
+ *
+ * Faded over the same band as the concrete broom and for the same reason: the
+ * latewood phase is a 2.2 mm sawtooth, and a height sampled below Nyquist
+ * differentiates into per-pixel noise rather than into shading. Full strength
+ * inside 1.2 m, gone by 3 m.
+ */
+const GRAIN_RELIEF_M = 0.0006;
+const GRAIN_RELIEF_NEAR_M = 1.2;
+const GRAIN_RELIEF_FAR_M = 3.0;
+/**
+ * Latewood band period, metres. The albedo sawtooth below runs at this pitch;
+ * 2.2 mm is sub-pixel past ~2 m on the review capture, where point sampling
+ * turns it into dotted scallops along the boards (row 6). Exported for the
+ * pattern-period gate.
+ */
+export const LATEWOOD_PERIOD_M = 0.0022;
+/** A knot is harder than the board and weathers PROUD, metres. */
+const KNOT_RELIEF_M = 0.0011;
+/**
+ * Silvering lift on unpainted timber, as a fraction of albedo. The lift is
+ * modulated by the 1.8 m traffic fBm soil field, so at full 0.55 it laid
+ * metre-scale soft blotches over the sunlit (orange) fence runs that read as
+ * a swirl rather than as weathering (row 6, perimeter-wall-end-close).
+ * Bounded to 0.36: still well above a visible wear step, no longer blobby
+ * under the low key. Painted trim keeps its own 0.25 in the graph.
+ */
+export const TIMBER_SILVER_LIFT = 0.36;
+
+export type TimberVariant = 'fence' | 'deck' | 'painted-trim';
+
+export function timberSpec(name: string, baseSrgb: number, variant: TimberVariant): Nuketown2MaterialSpec {
+  const painted = variant === 'painted-trim';
+  return assertSpec({
+    name,
+    family: 'timber',
+    baseSrgb,
+    roughness: painted ? 0.66 : 0.90,
+    metalness: 0.0,
+    grain: { sizeM: 0.0012, albedo: painted ? 0.028 : 0.045, roughness: 0.07 },
+    scuff: { sizeM: 0.055, albedo: painted ? 0.055 : 0.065, roughness: 0.10 },
+    traffic: { sizeM: 1.8, albedo: painted ? 0.060 : 0.075, roughness: 0.08 },
+    soil: painted ? 0.075 : 0.085,
+  });
+}
+
+let timberGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
+
+function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
+  if (timberGraph) return timberGraph;
+  const spec = timberSpec('nuketown2-timber-shared', 0x673b24, 'fence');
+  const p = positionWorld;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const variant = uniforms.timberVariant as any;
+  const vertical = variant.lessThan(float(0.5));
+  const painted = variant.greaterThan(float(1.5));
+  const pitch = vertical.select(float(PICKET_PITCH_M), float(DECK_PITCH_M));
+  const boardCoord = vertical.select(p.x.add(p.z), p.z);
+  const boardV = boardCoord.div(pitch);
+  const boardIdx = floor(boardV);
+  const boardEdge = abs(fract(boardV).sub(float(0.5))).mul(float(2));
+  const rawGap = smoothstep(float(1).sub(float(0.006).div(pitch).mul(float(2))), float(1.0), boardEdge);
+  const gap = painted.select(float(0), rawGap);
+  const boardTone = hash2(vec2(boardIdx, vertical.select(float(41.3), float(7.9)))).sub(float(0.5)).mul(float(0.16));
+  const along = vertical.select(p.y, p.x);
+  const bandPhase = along.mul(float(1 / LATEWOOD_PERIOD_M)).add(hash2(vec2(boardIdx, float(3.1))).mul(float(30)));
+  const latewood = abs(fract(bandPhase).sub(float(0.5))).mul(float(2));
+  // DOTTED-SCALLOP FIX (row 6). The albedo latewood sawtooth ran unfaded at a
+  // 2.2 mm pitch, so past ~2 m every sample aliased into per-board dots and
+  // scallop arcs on the fence. The relief already fades over 1.2-3 m; the
+  // albedo now fades over the same band. Boards keep boardTone, knots, scuff
+  // and silvering at range - the scales the frame actually resolves.
+  const grainFade = detailFalloff(GRAIN_RELIEF_NEAR_M, GRAIN_RELIEF_FAR_M);
+  const latewoodAlbedo = latewood.mul(grainFade);
+  const knotCell = floor(along.div(float(0.55)));
+  const knotCentre = hash2(vec2(boardIdx, knotCell)).mul(float(0.55)).add(knotCell.mul(float(0.55)));
+  const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
+  const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
+  const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
+  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
+  const grained = wood.mul(float(1).sub(latewoodAlbedo.mul(painted.select(float(0.03), float(0.11)))));
+  const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
+  const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(TIMBER_SILVER_LIFT))));
+  const footed = weathered.mul(float(1).sub(dampFoot.mul(float(0.17))));
+  // RELIEF. The board face is proud of the gap behind it, the latewood bands
+  // stand out of the weathered face, and a knot weathers proud because it is
+  // denser than the board it sits in. Painted trim gets grain relief only: a
+  // paint film fills the gap and buries the grain.
+  const height = gap.mul(float(-BOARD_PROUD_M))
+    .add(latewood.sub(float(0.5))
+      .mul(painted.select(float(GRAIN_RELIEF_M * 0.25), float(GRAIN_RELIEF_M * 2)))
+      .mul(detailFalloff(GRAIN_RELIEF_NEAR_M, GRAIN_RELIEF_FAR_M)))
+    .add(knot.mul(painted.select(float(KNOT_RELIEF_M * 0.3), float(KNOT_RELIEF_M))))
+    .add(boardTone.mul(float(0.004)));
+  timberGraph = {
+    colorNode: mix(footed, linearSwatch(0x1a120c), gap),
+    roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
+    normalNode: reliefNormal(height),
+  };
+  return timberGraph;
+}
+
+export function createTimberMaterial(
+  name: string,
+  baseSrgb: number,
+  variant: TimberVariant = 'fence',
+): MeshStandardNodeMaterial {
+  const spec = timberSpec(name, baseSrgb, variant);
+  const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
+  mat.name = name;
+  mat.type = 'MeshStandardMaterial';
+  mat.color.setHex(baseSrgb);
+
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  setNuketown2FamilyUniform(uniforms, 'timberVariant', variant === 'fence' ? 0 : variant === 'deck' ? 1 : 2);
+  const shared = sharedTimberGraph(uniforms);
+  mat.colorNode = shared.colorNode;
+  mat.roughnessNode = shared.roughnessNode;
+  mat.normalNode = shared.normalNode;
+  return mat;
+}
+
+export function createNuketown2FenceMaterial(): MeshStandardNodeMaterial {
+  return createTimberMaterial('nuketown2-timber-fence', 0x673b24, 'fence');
+}

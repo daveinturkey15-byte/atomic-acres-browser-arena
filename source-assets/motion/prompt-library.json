@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "libraryId": "pass80-operator-motion-prompt-library-v1",
+  "generator": {
+    "tool": "kimodo.cpp",
+    "pin": "92341f31940d54d4f0a44aa5975e470b78b2ab5c",
+    "codeLicence": "Apache-2.0 (LICENSE read 2026-08-26; added upstream in 2b14016)",
+    "motionModel": "kimodo-soma-rp-v1.1-f32.gguf",
+    "motionModelLicence": "NVIDIA Open Model License - commercial, worldwide, no country exclusion, no ownership claimed over outputs",
+    "textEncoder": "LocalAI-io/Llama-3-Kimodo-GGML LLM2Vec bundle (Meta Llama 3 Community License, separate terms)",
+    "skeleton": "soma30",
+    "note": "Embeddings are baked ONCE with kmd-encode and committed. Motion generation then runs from the embedding alone (kmd-generate-embed), which loads only the 1.1 GB motion model and never the ~15 GB text bundle. Verified byte-identical to the text path at the same seed."
+  },
+  "generationDefaults": {
+    "steps": 20,
+    "textCfgWeight": 2.0,
+    "constraintCfgWeight": 2.0,
+    "note": "CFG weights mirror kmd-generate's hardcoded generate_text(..., 2.F, 2.F). Changing them changes the output; they are pinned here so a rebake is reproducible."
+  },
+  "prompts": [
+    {
+      "id": "idle-alert-stand",
+      "text": "a soldier stands alert holding a rifle, breathing steadily, making small idle adjustments",
+      "frames": 120,
+      "seed": 101,
+      "intent": "base standing idle; the clip the player sees most and the one existing 24-clip set is thinnest on",
+      "expect": { "inPlace": true, "loopable": true }
+    },
+    {
+      "id": "idle-crouch-alert",
+      "text": "a soldier crouches low holding a rifle and stays alert, shifting weight slightly",
+      "frames": 120,
+      "seed": 102,
+      "intent": "crouched idle; pairs with the stance system",
+      "expect": { "inPlace": true, "loopable": true }
+    },
+    {
+      "id": "reload-crouched",
+      "text": "a soldier crouches and reloads a rifle",
+      "frames": 90,
+      "seed": 77,
+      "intent": "reload while crouched - the canary that proved the model responds to stance (hip 0.372 m vs 1.006 m standing)",
+      "expect": { "inPlace": true, "loopable": false }
+    },
+    {
+      "id": "walk-forward",
+      "text": "a person walks forward at a steady pace",
+      "frames": 60,
+      "seed": 1234,
+      "intent": "locomotion reference; first canary, travels 5.30 m on +Z",
+      "expect": { "inPlace": false, "loopable": false }
+    },
+    {
+      "id": "vault-low-obstacle",
+      "text": "a person runs forward and vaults over a low obstacle, landing and continuing",
+      "frames": 90,
+      "seed": 103,
+      "intent": "traversal the authored set has no coverage for",
+      "expect": { "inPlace": false, "loopable": false }
+    },
+    {
+      "id": "hit-reaction-chest",
+      "text": "a person flinches backward sharply as if struck in the chest, then recovers stance",
+      "frames": 60,
+      "seed": 104,
+      "intent": "damage feedback; complements the existing HitRecieve clips with a distinct read",
+      "expect": { "inPlace": true, "loopable": false }
+    }
+  ]
+}

@@ -4,12 +4,15 @@ import {
   pass25aSoakFailures,
   summarizePass25aSoakBrowserIssues,
 } from './pass25a-soak-contract.mjs';
+import { OFFSCREEN_ARGS } from './lib/browser-launch-flags.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const durationMs = Number(process.env.QA_SOAK_MS ?? 1_800_000);
 const sampleIntervalMs = Number(process.env.QA_SOAK_SAMPLE_MS ?? 5_000);
 if (!Number.isFinite(durationMs) || durationMs < 30_000) throw new Error('QA_SOAK_MS must be at least 30000');
-const chromiumArgs = ['--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+const chromiumArgs = [
+  ...OFFSCREEN_ARGS,
+      '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
 const headed = process.env.QA_HEADED === '1';
 const browser = await chromium.launch({ headless: !headed, args: chromiumArgs });
 const browserIssues = [];

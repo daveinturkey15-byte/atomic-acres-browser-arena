@@ -63,6 +63,10 @@ jobs:
       - run: npm test
       - name: Verify Pass 73 required browser-group wiring
         run: npm run qa:pass73:ci-wiring-contract
+      - name: Verify Pass 74 Chopper HUD browser-group wiring
+        run: npm run qa:pass74:chopper-hud-wiring-contract
+      - name: Verify Pass 84 gamepad browser-group wiring
+        run: npm run qa:pass84:gamepad-wiring-contract
       - run: npm run leaderboard:check
       - run: npm run build
         env:
@@ -102,32 +106,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Build candidate bytes for acceptance verification
         run: npm run build
-      # HF-536. A release-line reconciliation PR is the one shape --phase ci
-      # cannot evaluate: its tree is byte-identical to its first parent, so it
-      # necessarily touches every enforced pass manifest at once and
-      # selectCiAcceptanceManifest correctly throws "found 6".
-      #
-      # The reconciliation phase is entered ONLY when a repository writer has
-      # applied the `reconciliation` label to the pull request. It is never
-      # inferred from the commit shape, so an accidental two-parent head still
-      # takes the normal --phase ci path and still fails there. The phase is
-      # fail-closed on every other shape and grants no acceptance.
       - name: Verify changed acceptance manifest and write the selector receipt
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'reconciliation') }}
         run: node scripts/release/acceptance-gate.mjs --phase ci --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha || github.event.before }}" --head "${{ github.event.pull_request.head.sha || github.sha }}" --output artifacts/pipeline/acceptance-coverage.json
       - name: Verify the selected immutable preview provenance and bytes
-        if: ${{ !contains(github.event.pull_request.labels.*.name, 'reconciliation') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/verify-pr-preview-provenance.mjs --acceptance-receipt artifacts/pipeline/acceptance-coverage.json --output artifacts/pipeline/pr-preview-provenance.json
-      # Preview provenance is inherited by tree identity here and is therefore
-      # asserted, not skipped: the reconciliation gate proves head^{tree} ==
-      # head^1^{tree}, so the merge ships exactly the bytes of a commit that
-      # already exists on the contribution line. Owner acceptance of those bytes
-      # stays owed on that line; the receipt records grantsAcceptance:false.
-      - name: Verify the release-line reconciliation merge shape
-        if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'reconciliation') }}
-        run: node scripts/release/acceptance-gate.mjs --phase reconciliation --impact "${{ needs.classify-change.outputs.mode }}" --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}" --output artifacts/pipeline/acceptance-coverage.json
       - name: Upload acceptance coverage receipt
         if: always()
         uses: actions/upload-artifact@v4

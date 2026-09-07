@@ -48,6 +48,25 @@ export const FIELD_SHED_DEFINITION: DestructibleShedDefinition = Object.freeze({
       id: 'wall-south-header', role: 'wall' as const, detachableChunkId: null,
       frame: Object.freeze({ centre: { x: 0, y: 2.3, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 0.72, halfV: 0.1 }),
     }),
+    // Pass 79 owner report ("I keep seeing through its walls"): the envelope
+    // skinned four walls stopping at the 2.4 m eaves plus two roof sheets
+    // rising to the 3.44 m ridge, and nothing at all between them. That left
+    // 1.872 m^2 of open air at each end - 17.8% of the end cross-section,
+    // permanently, on an undamaged shed (probed in
+    // destructible-shed-definition.test.ts). These two panels are the gable
+    // closures. They carry no detachable chunk because the six pre-authored
+    // major chunks are frozen by SHED_MAX_MAJOR_CHUNKS and by the one-to-one
+    // chunk/surface rule. Their frame is the gable BOUNDING box (2.40 m eaves
+    // to 3.44 m ridge -> centre 2.92, halfV 0.52); clipping the rendered
+    // outline down to the triangle is presentation's job, not the envelope's.
+    Object.freeze({
+      id: 'gable-north', role: 'wall' as const, detachableChunkId: null,
+      frame: Object.freeze({ centre: { x: 0, y: 2.92, z: -2.1 }, uAxis: { x: -1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.8, halfV: 0.52, outlineUVQ: Object.freeze([Object.freeze({ uQ: -10_000, vQ: -10_000 }), Object.freeze({ uQ: 10_000, vQ: -10_000 }), Object.freeze({ uQ: 0, vQ: 10_000 })]), }),
+    }),
+    Object.freeze({
+      id: 'gable-south', role: 'wall' as const, detachableChunkId: null,
+      frame: Object.freeze({ centre: { x: 0, y: 2.92, z: 2.1 }, uAxis: { x: 1, y: 0, z: 0 }, vAxis: { x: 0, y: 1, z: 0 }, halfU: 1.8, halfV: 0.52, outlineUVQ: Object.freeze([Object.freeze({ uQ: -10_000, vQ: -10_000 }), Object.freeze({ uQ: 10_000, vQ: -10_000 }), Object.freeze({ uQ: 0, vQ: 10_000 })]), }),
+    }),
     Object.freeze({
       id: 'roof-east', role: 'roof' as const, detachableChunkId: 'chunk-roof-east',
       frame: Object.freeze({ centre: { x: 0.9, y: 2.92, z: 0 }, uAxis: { x: 0, y: 0, z: -1 }, vAxis: { x: -ROOF_COS, y: ROOF_SIN, z: 0 }, halfU: 2.22, halfV: 1.04 }),

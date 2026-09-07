@@ -1,0 +1,11 @@
+﻿{
+  "schemaVersion": 3,
+  "fixtureOnly": true,
+  "kind": "arena-audio-evidence",
+  "arenaId": "farcrysis",
+  "ambienceEventId": "ambience.arena-bed",
+  "variantId": "farcrysis.breeze",
+  "sourceBudget": 4,
+  "settledSourceCount": 0,
+  "artifactPath": "fixture-payloads/audio/arenas/farcrysis.json"
+}

@@ -1,12 +1,25 @@
 import * as THREE from 'three';
+// HF-401: three's own console routing, so a node-build failure it SWALLOWS
+// becomes a receipt this runtime publishes instead of a line nobody reads.
+import { getConsoleFunction, setConsoleFunction } from 'three';
 import type { RenderPipeline, WebGPURenderer } from 'three/webgpu';
 import { assertTslCutoverReady } from './tsl-migration-inventory';
+import { installTintSwizzleShimOnDevice } from '../webgpu-tint-swizzle-shim';
+import {
+  installFilmicGradeChain,
+  type FilmicGradeChainHandle,
+  type PostAntiAliasingMode,
+  type SpatialUpscalingRequest,
+} from './filmic-grade-chain';
+import { DEFAULT_GRADE_PROFILE_ID, type GradeProfileId } from './grade-profile';
 import type { ToneMappingMode } from '../graphics-settings-registry';
 import { FramePacingSampler, type FramePacingSummary } from '../frame-pacing';
 import {
   browserOwnsForegroundPresentation,
+  browserPresentationIsVisible,
   waitForVisibleBrowserPreparation,
 } from '../browser-preparation-scheduler';
+import { createNuketown2ClusteredLighting } from './clustered-lights';
 
 export type RenderBackendId = 'webgl2' | 'webgpu';
 
@@ -25,6 +38,12 @@ export type RenderRuntimeTelemetry = Readonly<{
   adapterLabel: string;
   adapterClass: string;
   deviceClass: string | null;
+  /**
+   * Optional WebGPU device features actually GRANTED at device creation.
+   * WebGPU hands a device only the optional features the caller asked for, so
+   * this is the receipt that a feature-gated effect (SSGI) can run at all.
+   */
+  deviceFeatures: readonly string[];
   softwareAdapter: boolean;
   canvasAlphaMode: 'opaque';
   canvasAntialias: boolean;
@@ -50,11 +69,18 @@ export type RenderRuntimeTelemetry = Readonly<{
     contextId: number | null;
     lightsNodeId: number | null;
   }>[];
+  /** HF-401 — TSL node-build failures three swallowed. See `TslNodeBuildDiagnostics`. */
+  tslNodeBuild: TslNodeBuildDiagnostics;
   presentation: PresentationFreshnessTelemetry;
 }>;
 
 export type RenderRuntimeHealthTelemetry = Readonly<{
   actualBackend: RenderBackendId;
+  // HF-331: adapter identity rides on the live health/diagnostics surface so
+  // live Firefox probing can confirm which physical adapter (or masked
+  // "WebGPU adapter info unavailable" label) backs the reported backend
+  // without a separate full telemetry() sample. Additive only.
+  adapterLabel: string;
   deviceLost: boolean;
   uncapturedErrors: number;
   presentation: PresentationFreshnessTelemetry;
@@ -65,7 +91,10 @@ export type PresentationFreshnessTelemetry = Readonly<{
   submissionMode: 'synchronous' | WebGpuSubmissionMode;
   maximumInFlightSubmissions: number;
   inFlightSubmissions: number;
+  /** Oldest submission still awaiting its completion observer. */
   completionProbeTargetSequence: number | null;
+  /** Completion observers currently in flight - one per unretired submission. */
+  outstandingCompletionProbes: number;
   completionProbeCount: number;
   submissionSequence: number;
   completedSequence: number;
@@ -79,6 +108,28 @@ export type PresentationFreshnessTelemetry = Readonly<{
   backpressureActive: boolean;
   skippedSubmissions: number;
   progress: PresentationProgressTelemetry;
+}>;
+
+/**
+ * The cheap presented-frame counter surface. Deliberately allocation-light and
+ * sort-free: a presented-frame sampler polls it faster than the frame rate it
+ * is measuring.
+ */
+export type PresentationCounters = Readonly<{
+  submissionSequence: number;
+  completedSequence: number;
+  inFlightSubmissions: number;
+  maximumInFlightSubmissions: number;
+  skippedSubmissions: number;
+  starvationRecoveries: number;
+  consecutiveRefusedSubmissions: number;
+  outstandingCompletionProbes: number;
+  lastSubmittedAt: number | null;
+  /** Exact clock stamp of the most recently GPU-confirmed (presented) frame. */
+  lastCompletedAt: number | null;
+  lastCompletionLatencyMs: number | null;
+  calls: number;
+  triangles: number;
 }>;
 
 export type PresentationProgressTelemetry = Readonly<{
@@ -97,6 +148,130 @@ export type PresentationProgressTelemetry = Readonly<{
   submissionPacing: FramePacingSummary;
   completionPacing: FramePacingSummary;
 }>;
+
+// ---------------------------------------------------------------------------
+// HF-401 — the swallowed TSL node-build failure, made observable
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS EXISTS.
+ *
+ * Three r185 builds a render object's node graph inside a `try` in
+ * `Nodes.getForRender()`. When that build throws, three does NOT rethrow: it
+ * rebuilds the render object against a bare `NodeMaterial`, logs
+ * `THREE.TSL: <error>` through its own `error()` helper, and carries on. The
+ * draw succeeds, the arena admits, every gate stays green — and the object is
+ * rendering a DEFAULT material instead of the one that was authored.
+ *
+ * That is the worst failure shape this renderer has: a feature that silently
+ * stops being the feature, indistinguishable from one that was never built.
+ * A console line nobody reads is not a gate.
+ *
+ * Three exposes `setConsoleFunction`, so the runtime can watch its own console
+ * routing and publish a COUNT that a test can assert on. Everything is still
+ * forwarded to the real console exactly as three would have printed it, so this
+ * hides nothing; it only adds a receipt.
+ */
+export type TslNodeBuildDiagnostics = Readonly<{
+  /** How many node-build failures three has swallowed since install. */
+  count: number;
+  /** The distinct messages, capped, most recent last. */
+  messages: readonly string[];
+}>;
+
+/** Dataset key the swallowed-failure count is published under. */
+export const TSL_NODE_BUILD_ERROR_ATTRIBUTE = 'tslNodeBuildErrors';
+
+/** Minimum surface the receipt needs, so a suite can supply one without a DOM. */
+export type TslDiagnosticsTarget = { dataset: Record<string, string | undefined> };
+
+export type TslNodeBuildDiagnosticsHandle = Readonly<{
+  read(): TslNodeBuildDiagnostics;
+  reset(): void;
+  uninstall(): void;
+}>;
+
+const TSL_NODE_BUILD_MESSAGE_CAP = 8;
+
+type ThreeConsoleFunction = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]) => void;
+
+/**
+ * Three's runtime stores whatever it is given and `getConsoleFunction()`
+ * returns `null` when nothing is installed — its `.d.ts` declares both as
+ * non-nullable. These two wrappers keep the honest nullability at our boundary
+ * instead of pretending a missing hook is a function.
+ */
+const currentThreeConsoleFunction = (): ThreeConsoleFunction | null =>
+  (getConsoleFunction() as ThreeConsoleFunction | null) ?? null;
+const installThreeConsoleFunction = (fn: ThreeConsoleFunction | null): void => {
+  (setConsoleFunction as unknown as (value: ThreeConsoleFunction | null) => void)(fn);
+};
+
+/** Every message three routes through `error()` from the node-build catch. */
+const TSL_NODE_BUILD_ERROR_PREFIX = 'THREE.TSL:';
+
+/**
+ * Installs the observer. Idempotent per target: calling it again replaces the
+ * previous installation rather than stacking forwarders.
+ */
+export function installTslNodeBuildDiagnostics(
+  target: TslDiagnosticsTarget | null = typeof document === 'undefined'
+    ? null
+    : (document.documentElement as unknown as TslDiagnosticsTarget),
+): TslNodeBuildDiagnosticsHandle {
+  const messages: string[] = [];
+  let count = 0;
+  const previous = currentThreeConsoleFunction();
+
+  const publish = (): void => {
+    if (!target) return;
+    target.dataset[TSL_NODE_BUILD_ERROR_ATTRIBUTE] = String(count);
+  };
+
+  const forward = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]): void => {
+    if (previous) {
+      previous(type, message, ...params);
+      return;
+    }
+    // Reproduce three's own native routing exactly, including the StackTrace
+    // rendering, so installing this changes nothing a developer sees.
+    const stackTrace = params[0] as { isStackTrace?: boolean; getError?: (message: string) => Error } | undefined;
+    const rendered = stackTrace?.isStackTrace && stackTrace.getError
+      ? [stackTrace.getError(message)]
+      : [message, ...params];
+    if (type === 'error') console.error(...rendered);
+    else if (type === 'warn') console.warn(...rendered);
+    else console.log(...rendered);
+  };
+
+  const observer = (type: 'log' | 'warn' | 'error', message: string, ...params: unknown[]): void => {
+    if (type === 'error' && typeof message === 'string' && message.startsWith(TSL_NODE_BUILD_ERROR_PREFIX)) {
+      count += 1;
+      if (!messages.includes(message)) {
+        messages.push(message);
+        if (messages.length > TSL_NODE_BUILD_MESSAGE_CAP) messages.shift();
+      }
+      publish();
+    }
+    forward(type, message, ...params);
+  };
+
+  installThreeConsoleFunction(observer);
+  publish();
+
+  return Object.freeze({
+    read: (): TslNodeBuildDiagnostics => Object.freeze({ count, messages: Object.freeze([...messages]) }),
+    reset: (): void => {
+      count = 0;
+      messages.length = 0;
+      publish();
+    },
+    uninstall: (): void => {
+      if (currentThreeConsoleFunction() === observer) installThreeConsoleFunction(previous);
+      if (target) delete target.dataset[TSL_NODE_BUILD_ERROR_ATTRIBUTE];
+    },
+  });
+}
 
 export function sequenceProgressRate(input: Readonly<{
   baselineSequence: number;
@@ -121,13 +296,15 @@ function emptyFramePacingSummary(reason: string): FramePacingSummary {
   return {
     ready: false,
     sampleCount: 0,
+    rateHz: 0,
     cadenceHz: 0,
+    meanMs: 0,
+    p05Ms: 0,
     medianMs: 0,
     p95Ms: 0,
     p99Ms: 0,
     maxMs: 0,
     longFrames: { over20Ms: 0, over33Ms: 0, over50Ms: 0, over100Ms: 0 },
-    displayLimited: false,
     lastResetReason: reason,
   };
 }
@@ -216,9 +393,67 @@ export function shouldBackpressureWebGpuSubmissions(
     && now - pendingSince >= thresholdMs;
 }
 
-export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): 1 | 2 | 3 {
-  if (mode === 'input-response') return 3;
-  return mode === 'warmed-live' ? 2 : 1;
+/**
+ * How deep the warmed live queue may run before admission refuses a frame.
+ *
+ * MEASURED, not chosen. Presentation is bounded by depth / completion-fence
+ * latency, and the fence on this hardware resolves in 18-46 ms while the frame
+ * itself costs the GPU almost nothing (14-18% utilisation across every soak).
+ * A depth of two therefore capped presentation at ~50 fps no matter how cheap
+ * the frame was: 107.9 requestAnimationFrame callbacks per second against 50.9
+ * presented frames, with 52.8% of submissions refused. Reproduce with
+ * `node scripts/qa/measure-presented-frames.mjs --no-vsync`.
+ */
+export const WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS = 3;
+
+export function maximumInFlightWebGpuSubmissions(mode: WebGpuSubmissionMode): number {
+  // An input-response frame is allowed exactly one slot beyond the warmed live
+  // frontier so a shot or a turn is never the frame that admission refuses.
+  if (mode === 'input-response') return WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS + 1;
+  return mode === 'warmed-live' ? WARMED_LIVE_MAX_IN_FLIGHT_SUBMISSIONS : 1;
+}
+
+/**
+ * The relief valve for the presentation collapse.
+ *
+ * THE COLLAPSE. Completion latency walks from ~5 ms to ~48 ms in about three
+ * seconds and never recovers: admission refuses frames, the starved GPU drops
+ * to 700-780 MHz, the low clocks keep the fence slow, and the slow fence keeps
+ * refusing. It is hysteresis, and nothing in the loop breaks it - the match
+ * finishes pinned near 20 fps with the GPU at 14% utilisation.
+ *
+ * Backpressure is right when the GPU is genuinely saturated and wrong when it
+ * is asleep, and a page cannot read GPU utilisation. Draw calls and triangles
+ * are the available proxy for frame cost: below these ceilings no frame can
+ * plausibly be occupying a discrete GPU for a quarter of a second, so a long
+ * refusal streak is starvation rather than saturation, and admitting one frame
+ * both re-feeds the GPU and re-opens the observation window.
+ *
+ * It admits ONE frame and resets the streak, so it is a bounded floor of one
+ * frame per `refusalStreakThreshold` refused attempts - never an override of
+ * backpressure for a device that is really wedged.
+ */
+export function shouldRecoverStarvedPresentation(input: Readonly<{
+  consecutiveRefusedSubmissions: number;
+  refusalStreakThreshold: number;
+  inFlightSubmissions: number;
+  maximumInFlightSubmissions: number;
+  drawCalls: number;
+  triangles: number;
+  trivialDrawCallCeiling: number;
+  trivialTriangleCeiling: number;
+}>): boolean {
+  if (input.refusalStreakThreshold <= 0) return false;
+  if (input.consecutiveRefusedSubmissions < input.refusalStreakThreshold) return false;
+  // Pinned AT the bound, not merely near it: this is the queue-depth clause of
+  // backpressure refusing, which is the clause that starves the GPU.
+  if (input.inFlightSubmissions < input.maximumInFlightSubmissions) return false;
+  // An unknown frame cost is not a cheap frame. Three's WebGPU backend reports
+  // `drawCalls`, and a snapshot taken from the wrong field yields undefined -
+  // which must keep backpressure, never open the valve.
+  if (!Number.isFinite(input.drawCalls) || !Number.isFinite(input.triangles)) return false;
+  return input.drawCalls <= input.trivialDrawCallCeiling
+    && input.triangles <= input.trivialTriangleCeiling;
 }
 
 export function pendingCompletionStartAfterProgress(input: Readonly<{
@@ -244,12 +479,44 @@ export function centeredReadbackRegion(
   });
 }
 
+/**
+ * Never let a diagnostic string be the thing that throws. A `describe` hook
+ * reads live runtime state, and a failure inside it during an already-failing
+ * deadline would replace a precise queue error with an unrelated one.
+ */
+function describeFrontier(describe: (() => string) | undefined): string {
+  if (!describe) return '';
+  try {
+    const detail = describe();
+    return detail ? `, ${detail}` : '';
+  } catch {
+    return ', frontier description unavailable';
+  }
+}
+
+/**
+ * Fails closed on a queue-completion deadline, and SAYS WHY.
+ *
+ * The message this rejects with is the one the player reads when a deployment
+ * bounces ("Deployment preparation failed: WebGPU queue completion exceeded
+ * 4000 ms for submission 35"). It used to carry only the bound and the target
+ * sequence, which is not enough to tell a wedged device apart from a cold
+ * first-use compile, nor to locate WHICH of the several fences in the
+ * admission path blew - two passes at the MAX-preset admission bound were
+ * spent re-deriving that from stage timings. `describe` lets the caller attach
+ * the live frontier state to the failure so the next reader gets it for free.
+ *
+ * The bound itself is untouched: same timeout, same fail-closed decision, same
+ * message prefix. Only the diagnosis is richer.
+ */
 export async function awaitSubmissionCompletionTarget(input: Readonly<{
   targetSequence: number;
   completedSequence: () => number;
   createProbe: () => Promise<void> | null;
   failure: () => string | null;
   timeoutMs: number;
+  /** Optional one-line frontier description appended to a deadline failure. */
+  describe?: () => string;
 }>): Promise<void> {
   if (input.completedSequence() >= input.targetSequence) return;
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -267,7 +534,10 @@ export async function awaitSubmissionCompletionTarget(input: Readonly<{
           } else if (input.completedSequence() >= input.targetSequence) {
             resolve();
           } else {
-            reject(new Error(`WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`));
+            reject(new Error(
+              `WebGPU queue completion exceeded ${input.timeoutMs} ms for submission ${input.targetSequence}`
+              + ` (completed ${input.completedSequence()}${describeFrontier(input.describe)})`,
+            ));
           }
         });
       },
@@ -353,18 +623,15 @@ export type PresentationPrewarmRuntime = Readonly<{
 }>;
 
 export function resolveRenderRuntimeRequest(search: string, webGpuAvailable = true): RenderRuntimeRequest {
-  const query = new URLSearchParams(search);
-  const explicit = query.get('renderer');
-  // An explicit ?renderer=webgpu stays a hard WebGPU contract (HITL evidence and
-  // rollback boundary must not silently become WebGL2). ?renderer=webgl2 forces
-  // the compatibility backend.
-  if (explicit === 'webgl2') return { requestedBackend: 'webgl2', requireWebGPU: false };
-  if (explicit === 'webgpu') return { requestedBackend: 'webgpu', requireWebGPU: true };
-  // Default: prefer WebGPU, but on browsers that do not expose it at all
-  // (Firefox and Safari ship without WebGPU; older Edge too) gracefully use
-  // WebGL2 so the game still runs. The backend reported back is still the true
-  // one, so nothing is misrepresented as WebGPU.
-  if (!webGpuAvailable) return { requestedBackend: 'webgl2', requireWebGPU: false };
+  // Owner 2026-08-30: "retire all webgl2 stuff, full webgpu, no fallback."
+  // WebGPU is the only route. Chrome ships it everywhere; Firefox ships it on
+  // Windows since 141 (installed Firefox 154 exposes navigator.gpu here). A
+  // browser without navigator.gpu gets the honest requirement screen at
+  // renderer init instead of a silently slower second engine. ?renderer=webgl2
+  // is retired with the fallback; ?renderer=webgpu stays the explicit HITL
+  // contract spelling of the same thing.
+  void search;
+  void webGpuAvailable;
   return { requestedBackend: 'webgpu', requireWebGPU: true };
 }
 
@@ -412,9 +679,15 @@ export class LegacyWebGlRenderRuntime {
   readonly renderer: THREE.WebGLRenderer;
   private readonly adapterLabel: string;
 
+  private readonly tslDiagnostics: TslNodeBuildDiagnosticsHandle;
+
   private constructor(renderer: THREE.WebGLRenderer) {
     this.renderer = renderer;
     this.adapterLabel = webGlAdapterLabel(renderer);
+    // The compatibility route builds no TSL graphs, so this reports a truthful
+    // zero. It is installed anyway so the receipt exists on both backends and a
+    // gate never has to special-case "the field is missing" as "no failures".
+    this.tslDiagnostics = installTslNodeBuildDiagnostics();
   }
 
   static async create(parameters: THREE.WebGLRendererParameters): Promise<LegacyWebGlRenderRuntime> {
@@ -432,6 +705,7 @@ export class LegacyWebGlRenderRuntime {
       adapterLabel: this.adapterLabel,
       adapterClass: gl.constructor.name || 'WebGL2RenderingContext',
       deviceClass: null,
+      deviceFeatures: EMPTY_DEVICE_FEATURES,
       softwareAdapter: /swiftshader|llvmpipe|software|softpipe|\bwarp\b|microsoft basic render driver/i.test(this.adapterLabel),
       canvasAlphaMode: 'opaque',
       canvasAntialias: gl.getContextAttributes()?.antialias ?? false,
@@ -442,17 +716,46 @@ export class LegacyWebGlRenderRuntime {
       deviceLost: gl.isContextLost(),
       uncapturedErrors: 0,
       lastUncapturedError: null,
+      tslNodeBuild: this.tslDiagnostics.read(),
       presentation: this.presentationTelemetry(),
     };
+  }
+
+  /** HF-401 — parity surface with the WebGPU runtime; always zero on this route. */
+  tslNodeBuildDiagnostics(): TslNodeBuildDiagnostics {
+    return this.tslDiagnostics.read();
   }
 
   healthTelemetry(now = performance.now()): RenderRuntimeHealthTelemetry {
     const deviceLost = this.renderer.getContext().isContextLost();
     return {
       actualBackend: 'webgl2',
+      adapterLabel: this.adapterLabel,
       deviceLost,
       uncapturedErrors: 0,
       presentation: this.presentationTelemetry(now),
+    };
+  }
+
+  /**
+   * WebGL presents synchronously inside the draw call, so submitted, completed
+   * and presented are the same event and nothing is ever refused.
+   */
+  presentationCounters(): PresentationCounters {
+    return {
+      submissionSequence: 0,
+      completedSequence: 0,
+      inFlightSubmissions: 0,
+      maximumInFlightSubmissions: 0,
+      skippedSubmissions: 0,
+      starvationRecoveries: 0,
+      consecutiveRefusedSubmissions: 0,
+      outstandingCompletionProbes: 0,
+      lastSubmittedAt: null,
+      lastCompletedAt: null,
+      lastCompletionLatencyMs: null,
+      calls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
     };
   }
 
@@ -465,6 +768,7 @@ export class LegacyWebGlRenderRuntime {
       maximumInFlightSubmissions: 0,
       inFlightSubmissions: 0,
       completionProbeTargetSequence: null,
+      outstandingCompletionProbes: 0,
       completionProbeCount: 0,
       submissionSequence: 0,
       completedSequence: 0,
@@ -586,13 +890,19 @@ export class LegacyWebGlRenderRuntime {
     // AtomicSignal coverage and match-composition renders still prove the full
     // world. This removes redundant whole-map raster/driver work without
     // deferring any effect geometry, texture, material or upload into combat.
-    while (true) {
+    // Same bounded-patience rule as the WebGPU path: wait for real focus a few
+    // times, then accept a visible document. An unfocused window used to spin
+    // here forever and never finish loading.
+    for (let attempt = 0; ; attempt += 1) {
       await waitForVisibleBrowserPreparation();
       const restoreVisibility = suppressUnrelatedWebGlRenderables(scene, root);
       try {
         // The visibility traversal itself can race a tab switch. Recheck at
         // the final synchronous boundary and retry without authoring a frame.
-        if (!browserOwnsForegroundPresentation()) continue;
+        const ready = attempt >= 3
+          ? browserPresentationIsVisible()
+          : browserOwnsForegroundPresentation();
+        if (!ready) continue;
         this.renderer.render(scene, camera);
         return;
       } finally {
@@ -631,23 +941,191 @@ type GpuDeviceShape = Readonly<{
   addEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
   removeEventListener?: (type: 'uncapturederror', listener: (event: unknown) => void) => void;
   destroy?: () => void;
+  features?: GpuFeatureSetShape;
   constructor?: { name?: string };
 }>;
 
 type GpuAdapterInfoShape = Readonly<Record<string, string | number | boolean | undefined>>;
+type GpuFeatureSetShape = Readonly<{ has(name: string): boolean }>;
+type GpuLimitsShape = Readonly<Record<string, number | undefined>>;
 type GpuAdapterShape = Readonly<{
   info?: GpuAdapterInfoShape;
   isFallbackAdapter?: boolean;
+  features?: GpuFeatureSetShape;
+  limits?: GpuLimitsShape;
   requestAdapterInfo?: () => Promise<GpuAdapterInfoShape>;
-  requestDevice(): Promise<GpuDeviceShape>;
+  requestDevice(descriptor?: Readonly<{
+    requiredFeatures?: readonly string[];
+    requiredLimits?: Readonly<Record<string, number>>;
+  }>): Promise<GpuDeviceShape>;
   constructor?: { name?: string };
 }>;
 
 type GpuNavigatorShape = Readonly<{
   gpu?: Readonly<{
-    requestAdapter(options: Readonly<{ powerPreference: 'high-performance' }>): Promise<GpuAdapterShape | null>;
+    requestAdapter(options?: Readonly<{ powerPreference?: 'high-performance' | 'low-power' }>): Promise<GpuAdapterShape | null>;
   }>;
 }>;
+
+/**
+ * FAILURE PATH ONLY - the two `throw`s in adapter acquisition below.
+ *
+ * The requirement screen used to end the story at "no GPU adapter was
+ * available at all", which is the one fact the player already knew and cannot
+ * act on. This gathers what the PAGE can observe - navigator.gpu, each
+ * powerPreference separately, WebGL2's unmasked renderer, secure context - and
+ * hangs it on the error, where the failure screen picks it up and prints it.
+ *
+ * It costs the success path nothing: the diagnostics live behind a dynamic
+ * `import()` reached only from here, so an acquired adapter never loads, parses
+ * or runs a line of it. Diagnostics are also a courtesy, never a replacement:
+ * whatever they do, the caller still gets the real failure with its original
+ * message.
+ */
+async function diagnosedWebGpuFailure(headline: string): Promise<Error> {
+  const failure = new Error(headline);
+  try {
+    const diagnostics = await import('./webgpu-adapter-diagnostics');
+    const report = await diagnostics.collectWebGpuDiagnostics();
+    diagnostics.attachWebGpuDiagnostics(failure, report);
+    // Also on the console, because a player who can reach devtools - or a QA
+    // run reading console output - should not have to reproduce the screen.
+    console.error(`[Nuke Town WebGPU diagnostics]\n${diagnostics.formatWebGpuDiagnostics(report)}`);
+  } catch {
+    // A diagnostic that throws must not become the reported failure.
+  }
+  return failure;
+}
+
+const EMPTY_DEVICE_FEATURES: readonly string[] = Object.freeze([]);
+
+/**
+ * Optional WebGPU device features this renderer asks for when the adapter has
+ * them. This is an ALLOWLIST with a named consumer per entry, never a blanket
+ * `[...adapter.features]`: every granted feature is surface a driver bug can
+ * reach, so one is only added when something in the app actually needs it.
+ *
+ * WHY THIS EXISTS AT ALL. WebGPU grants a device exactly the optional features
+ * the caller requests — an adapter advertising a feature does NOT put it on the
+ * device. This runtime called `requestDevice()` with no descriptor, so every
+ * optional feature was structurally absent and the MAX preset's SSGI died at
+ * pipeline creation on every machine:
+ *   "THREE.SSGINode: The device does not support the 'rg11b10ufloat-renderable'
+ *    feature which is required for SSGI"
+ * followed by an invalid command buffer that failed the whole queue submit and
+ * took arena admission down with it. Headless QA could never see it: headless
+ * Chromium here has no navigator.gpu at all, so nothing automated ever ran the
+ * MAX WebGPU route.
+ */
+export const OPTIONAL_WEBGPU_DEVICE_FEATURES: readonly string[] = Object.freeze([
+  // Consumer: THREE.SSGINode's RG11B10 GI render target (MAX preset).
+  'rg11b10ufloat-renderable',
+  // Consumer: linear filtering of the float HDR targets the bloom downsample
+  // chain and the grade chain sample; without it those silently drop to point.
+  'float32-filterable',
+]);
+
+/**
+ * Intersects the allowlist with what the adapter actually advertises. Pure and
+ * exported so the contract is testable without a GPU — and the intersection is
+ * mandatory, because requesting a feature the adapter lacks makes
+ * `requestDevice` reject outright, turning a missing nicety into a dead
+ * renderer.
+ */
+export function selectOptionalDeviceFeatures(
+  adapterFeatures: Readonly<{ has(name: string): boolean }> | undefined,
+  allowList: readonly string[] = OPTIONAL_WEBGPU_DEVICE_FEATURES,
+): readonly string[] {
+  if (!adapterFeatures || typeof adapterFeatures.has !== 'function') return EMPTY_DEVICE_FEATURES;
+  return Object.freeze(allowList.filter((feature) => {
+    try { return adapterFeatures.has(feature) === true; } catch { return false; }
+  }));
+}
+
+const EMPTY_DEVICE_LIMITS: Readonly<Record<string, number>> = Object.freeze({});
+
+/**
+ * Per-stage binding limits this renderer asks the DEVICE to inherit from the
+ * adapter.
+ *
+ * WHY THIS EXISTS, measured rather than assumed. WebGPU does not give a device
+ * the adapter's capabilities: an unrequested limit is granted at the SPEC
+ * DEFAULT, not at what the hardware can do. `requestDevice()` was called here
+ * with no `requiredLimits`, so every device this game has ever created was
+ * capped at the default 16 sampled textures per stage while the adapter on this
+ * machine advertises more. High Seas' fragment stage binds 17:
+ *   "The number of sampled textures (17) in the Fragment stage exceeds the
+ *    maximum per-stage limit (16). This adapter supports a higher
+ *    maxSampledTexturesPerShaderStage"
+ * The rejected bind group cascades into an invalid CommandBuffer, the queue
+ * submit fails, `performArenaSelection` throws and rolls the player back to the
+ * previously prepared arena. This is the exact same defect class as the
+ * optional-features one documented above, on the limits axis instead of the
+ * feature axis.
+ *
+ * Requesting the adapter's own value can never be rejected for being too high
+ * (per spec a device request only fails when it asks for MORE than the adapter
+ * exposes), so this widens nothing and lowers nothing - it stops the device
+ * from being built weaker than the hardware it is built on.
+ */
+export const INHERITED_WEBGPU_DEVICE_LIMITS: readonly string[] = Object.freeze([
+  // Consumer: the High Seas fragment stage (shared-ocean water + ship material
+  // families) binds 17 sampled textures; the spec default is 16.
+  'maxSampledTexturesPerShaderStage',
+  // Same axis, same stage, same failure mode once a material family adds one
+  // more sampler than the default 16.
+  'maxSamplersPerShaderStage',
+]);
+
+/**
+ * Reads the named limits off the adapter. Pure and exported so the contract is
+ * testable without a GPU, mirroring `selectOptionalDeviceFeatures`.
+ *
+ * A limit the adapter does not report is OMITTED rather than guessed: requesting
+ * a limit the adapter lacks makes `requestDevice` reject outright, which would
+ * turn extra headroom into a dead renderer.
+ */
+export function selectInheritedDeviceLimits(
+  adapterLimits: GpuLimitsShape | undefined,
+  limitNames: readonly string[] = INHERITED_WEBGPU_DEVICE_LIMITS,
+): Readonly<Record<string, number>> {
+  if (!adapterLimits || typeof adapterLimits !== 'object') return EMPTY_DEVICE_LIMITS;
+  const requested: Record<string, number> = {};
+  for (const name of limitNames) {
+    let value: unknown;
+    try { value = (adapterLimits as Record<string, unknown>)[name]; } catch { continue; }
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) continue;
+    requested[name] = value;
+  }
+  return Object.freeze(requested);
+}
+
+/**
+ * Asks for the negotiated device, then degrades one axis at a time rather than
+ * killing the renderer - the courtesy the feature request already extended.
+ *
+ * Limits are dropped BEFORE features: a device short of binding headroom loses
+ * the arenas that need it, while a device short of `rg11b10ufloat-renderable`
+ * loses SSGI on every arena at pipeline creation.
+ */
+async function requestNegotiatedDevice(
+  adapter: GpuAdapterShape,
+  requiredFeatures: readonly string[],
+  requiredLimits: Readonly<Record<string, number>>,
+): Promise<GpuDeviceShape> {
+  const hasFeatures = requiredFeatures.length > 0;
+  const hasLimits = Object.keys(requiredLimits).length > 0;
+  if (hasFeatures && hasLimits) {
+    try { return await adapter.requestDevice({ requiredFeatures, requiredLimits }); } catch { /* degrade below */ }
+  }
+  if (hasLimits) {
+    try { return await adapter.requestDevice({ requiredLimits }); } catch { /* degrade below */ }
+  }
+  if (hasFeatures) {
+    try { return await adapter.requestDevice({ requiredFeatures }); } catch { /* degrade below */ }
+  }
+  return adapter.requestDevice();
+}
 
 function adapterInfoLabel(info: GpuAdapterInfoShape): string {
   const orderedKeys = ['vendor', 'architecture', 'device', 'description'];
@@ -664,6 +1142,13 @@ export class WebGpuRenderRuntime {
   readonly backend = 'webgpu' as const;
   readonly renderer: WebGPURenderer;
   readonly renderPipeline: RenderPipeline;
+  /**
+   * HF-362 — the filmic grade chain that owns everything after the scene
+   * pass's linear-HDR output, including the explicit tone map. It is installed
+   * on the RenderPipeline at construction so the profile reaches the screen
+   * regardless of which module assembles the scene pass.
+   */
+  private readonly filmicGrade: FilmicGradeChainHandle;
   private deviceLost = false;
   private disposed = false;
   private readonly canvasAntialias: boolean;
@@ -671,6 +1156,7 @@ export class WebGpuRenderRuntime {
   private readonly adapterLabel: string;
   private readonly adapterClass: string;
   private readonly deviceClass: string;
+  private readonly deviceFeatures: readonly string[];
   private readonly softwareAdapter: boolean;
   private readonly device: GpuDeviceShape;
   private readonly clock: () => number;
@@ -681,8 +1167,11 @@ export class WebGpuRenderRuntime {
   private lastSubmittedAt: number | null = null;
   private lastCompletedAt: number | null = null;
   private pendingCompletionStartedAt: number | null = null;
-  private completionProbe: Promise<void> | null = null;
-  private completionProbeTargetSequence: number | null = null;
+  /**
+   * One outstanding completion observer per submission, keyed by the sequence
+   * it proves. Several may be in flight; they settle in submission order.
+   */
+  private readonly completionProbes = new Map<number, Promise<void>>();
   private completionProbeCount = 0;
   private submissionMode: WebGpuSubmissionMode = 'serialized';
   private presentationPrewarmBatch: Promise<void> | null = null;
@@ -702,6 +1191,12 @@ export class WebGpuRenderRuntime {
     this.lastFailure = `WebGPU uncaptured error: ${message}`;
   };
   private skippedSubmissions = 0;
+  /**
+   * Refusals since the last admitted frame. A streak is the only in-page
+   * evidence that admission - not GPU cost - is what stopped presenting.
+   */
+  private consecutiveRefusedSubmissions = 0;
+  private starvationRecoveries = 0;
   private readonly submissionPacing = new FramePacingSampler();
   private readonly completionPacing = new FramePacingSampler();
   private progressWindowStartedAt = 0;
@@ -731,9 +1226,32 @@ export class WebGpuRenderRuntime {
     contextId: number | null;
     lightsNodeId: number | null;
   }>> = [];
-  private nextCompletionProbeAt = 0;
-  private static readonly COMPLETION_PROBE_INTERVAL_MS = 250;
+  private readonly tslDiagnostics: TslNodeBuildDiagnosticsHandle;
+  /**
+   * Polite attempts to acquire real focus before cold prewarm settles for a
+   * visible-but-unfocused document. Each attempt costs one foreground-wait
+   * fallback, so this is a few seconds of patience, not a spin.
+   */
+  private static readonly PREWARM_FOCUS_ATTEMPTS = 3;
+
   private static readonly SUBMISSION_BACKPRESSURE_MS = 250;
+  /**
+   * Refusals in a row before starvation relief admits one frame. At the
+   * ~110 admission attempts per second this frame loop makes, eight refusals is
+   * about 70 ms of no presentation - long enough that it is not a single
+   * expensive frame, short enough that the relief valve keeps a floor well
+   * above the ~20 fps the collapse pinned the owner at.
+   */
+  private static readonly STARVATION_REFUSAL_STREAK = 8;
+  /**
+   * "This frame cannot be what is keeping the GPU busy." A live Atomic Acres
+   * frame measures ~181 draw calls and ~528k triangles at 1440p (measured by
+   * scripts/qa/measure-presented-frames.mjs); these ceilings sit an order of
+   * magnitude above that, so genuine GPU saturation still keeps its
+   * backpressure while a starved-but-cheap frame gets relief.
+   */
+  private static readonly STARVATION_TRIVIAL_DRAW_CALLS = 6_000;
+  private static readonly STARVATION_TRIVIAL_TRIANGLES = 12_000_000;
   // Cold compilation, prewarm, transitions and explicit renderer mutations
   // remain one-deep. Only the already-fenced, warmed live path may keep two
   // submissions in flight; that is the smallest frontier which avoids making
@@ -755,9 +1273,11 @@ export class WebGpuRenderRuntime {
       adapterLabel: string;
       adapterClass: string;
       deviceClass: string;
+      deviceFeatures?: readonly string[];
       softwareAdapter: boolean;
       device: GpuDeviceShape;
       now?: () => number;
+      gradeProfileId?: GradeProfileId;
     }>,
   ) {
     this.renderer = renderer;
@@ -767,10 +1287,23 @@ export class WebGpuRenderRuntime {
     this.adapterLabel = identity.adapterLabel;
     this.adapterClass = identity.adapterClass;
     this.deviceClass = identity.deviceClass;
+    this.deviceFeatures = identity.deviceFeatures ?? EMPTY_DEVICE_FEATURES;
     this.softwareAdapter = identity.softwareAdapter;
     this.device = identity.device;
     this.clock = identity.now ?? (() => performance.now());
+    // Install before any scene-pass assembler publishes an outputNode. The
+    // chain intercepts that assignment, keeps the published node as its
+    // linear-HDR source, and takes over the output transform (stage 7) so the
+    // display-referred stages can exist at all.
+    this.filmicGrade = installFilmicGradeChain(renderPipeline, {
+      profileId: identity.gradeProfileId ?? DEFAULT_GRADE_PROFILE_ID,
+    });
     this.resetPresentationProgressTelemetry('renderer initialized', this.clock());
+    // HF-401: watch three's console routing for the node-build failures it
+    // catches and hides. Installed unconditionally and before any arena graph
+    // is assembled, because the failure it catches happens during the very
+    // first pipeline build of a transition.
+    this.tslDiagnostics = installTslNodeBuildDiagnostics();
     this.installNodeBuildTrace();
     identity.device.addEventListener?.('uncapturederror', this.uncapturedErrorListener);
     void identity.device.lost?.then((info) => {
@@ -841,14 +1374,56 @@ export class WebGpuRenderRuntime {
     antialias: boolean;
     samples: number;
     requireWebGPU: boolean;
+    gradeProfileId?: GradeProfileId;
+    clusteredLightingEnabled?: boolean;
   }>): Promise<WebGpuRenderRuntime> {
     const gpu = (navigator as unknown as GpuNavigatorShape).gpu;
-    if (!gpu) throw new Error('WebGPU was required, but navigator.gpu is unavailable');
-    const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) throw new Error('WebGPU was required, but no high-performance adapter was available');
+    if (!gpu) throw await diagnosedWebGpuFailure('WebGPU was required, but navigator.gpu is unavailable');
+    // Owner 2026-08-31: he could not launch the game at all in his everyday
+    // Chrome - "This game needs WebGPU ... (WebGPU was required, but no
+    // high-performance adapter was available)" - while a fresh Chrome, a copy of
+    // his GPU caches and a pristine profile all acquired an adapter fine on the
+    // same machine, same URL, same second.
+    //
+    // The cause was here, not on his machine. powerPreference is a HINT, not a
+    // requirement: per spec a browser may return null for a hinted request while
+    // a perfectly usable default adapter exists, and it does so in real
+    // conditions - power saving, an integrated GPU preferred, or an instance
+    // that has been running long enough to be holding many GPU contexts. This
+    // asked for high-performance and then gave up on the whole game.
+    //
+    // Note the asymmetry it sat next to: requestDevice below already falls back
+    // to a bare device "rather than killing the whole renderer". The adapter
+    // deserved the same courtesy.
+    let adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+    let adapterFallback: 'high-performance' | 'default' = 'high-performance';
+    if (!adapter) {
+      adapter = await gpu.requestAdapter();
+      adapterFallback = 'default';
+    }
+    if (!adapter) throw await diagnosedWebGpuFailure('WebGPU was required, but no GPU adapter was available at all');
     const adapterInfo = adapter.info ?? await adapter.requestAdapterInfo?.() ?? {};
-    const adapterLabel = adapterInfoLabel(adapterInfo);
-    const device = await adapter.requestDevice();
+    // Surface the fallback rather than hiding it: if we are running on the
+    // default adapter because the high-performance hint came back empty, that
+    // is worth seeing in telemetry and in any bug report.
+    const adapterLabel = adapterFallback === 'default'
+      ? `${adapterInfoLabel(adapterInfo)} (default adapter; high-performance hint unavailable)`
+      : adapterInfoLabel(adapterInfo);
+    const requiredFeatures = selectOptionalDeviceFeatures(adapter.features);
+    // Limits are NOT inherited from the adapter; an unrequested one is granted
+    // at the spec default. See INHERITED_WEBGPU_DEVICE_LIMITS for the High Seas
+    // 17-sampled-texture rejection this exists to stop.
+    const requiredLimits = selectInheritedDeviceLimits(adapter.limits);
+    // Ask with the intersected list, and fall back a step at a time rather than
+    // killing the whole renderer if a driver rejects what it advertised.
+    const device = await requestNegotiatedDevice(adapter, requiredFeatures, requiredLimits);
+    // Chrome 153 Tint chained-swizzle workaround (PASS 93): wrap createShaderModule
+    // on the device this runtime negotiated, before the renderer builds its first
+    // pipeline. Applied to the DEVICE, not to navigator.gpu, so the feature
+    // negotiation above stays exactly as observable as it is (an injected gpu
+    // fake without createShaderModule is left alone). Idempotent with the
+    // navigator.gpu wrap legacy-main installs for its telemetry stamp.
+    installTintSwizzleShimOnDevice(device);
     const module = await import('three/webgpu');
     const renderer = new module.WebGPURenderer({
       canvas: parameters.canvas,
@@ -861,6 +1436,11 @@ export class WebGpuRenderRuntime {
       powerPreference: 'high-performance',
       device,
     });
+    // RenderLists capture this manager during init(); it is a cold-session
+    // topology choice, never an in-combat manager replacement.
+    if (parameters.clusteredLightingEnabled === true) {
+      renderer.lighting = createNuketown2ClusteredLighting();
+    }
     await renderer.init();
     const backend = renderer.backend as WebGpuBackendShape;
     if (parameters.requireWebGPU && backend.isWebGPUBackend !== true) {
@@ -874,8 +1454,10 @@ export class WebGpuRenderRuntime {
       adapterLabel,
       adapterClass: adapter.constructor?.name || 'GPUAdapter',
       deviceClass: device.constructor?.name || 'GPUDevice',
+      deviceFeatures: selectOptionalDeviceFeatures(device.features),
       softwareAdapter: adapter.isFallbackAdapter === true || /swiftshader|llvmpipe|software|softpipe|\bwarp\b/i.test(adapterLabel),
       device,
+      gradeProfileId: parameters.gradeProfileId,
     });
   }
 
@@ -890,6 +1472,7 @@ export class WebGpuRenderRuntime {
       adapterLabel: this.adapterLabel,
       adapterClass: this.adapterClass,
       deviceClass: this.deviceClass,
+      deviceFeatures: this.deviceFeatures,
       softwareAdapter: this.softwareAdapter,
       canvasAlphaMode: 'opaque',
       canvasAntialias: this.canvasAntialias,
@@ -901,17 +1484,55 @@ export class WebGpuRenderRuntime {
       uncapturedErrors: this.uncapturedErrors,
       lastUncapturedError: this.lastUncapturedError,
       slowNodeBuilds: Object.freeze(this.slowNodeBuilds.map((entry) => Object.freeze({ ...entry }))),
+      tslNodeBuild: this.tslDiagnostics.read(),
       presentation: this.presentationTelemetry(),
     };
+  }
+
+  /** HF-401 — TSL node-build failures three caught and hid, as a readable count. */
+  tslNodeBuildDiagnostics(): TslNodeBuildDiagnostics {
+    return this.tslDiagnostics.read();
   }
 
   healthTelemetry(now = this.clock()): RenderRuntimeHealthTelemetry {
     const backend = this.renderer.backend as WebGpuBackendShape;
     return {
       actualBackend: backend.isWebGPUBackend === true ? 'webgpu' : 'webgl2',
+      adapterLabel: this.adapterLabel,
       deviceLost: this.deviceLost,
       uncapturedErrors: this.uncapturedErrors,
       presentation: this.presentationTelemetry(now),
+    };
+  }
+
+  /**
+   * The presented-frame counters ONLY, with no pacing-window sort.
+   *
+   * WHY THIS EXISTS: `presentationTelemetry()` sorts two 180-sample windows on
+   * every call, so it is a four-Hz surface. A presented-frame instrument has to
+   * sample faster than the frames it is counting, and it must not become the
+   * cost it is measuring. These fields are plain reads.
+   *
+   * `lastCompletedAt` is the exact clock stamp of the frame the GPU most
+   * recently confirmed, so a sampler polling faster than the presentation rate
+   * reconstructs an exact presented-frame interval series from it - it never
+   * has to time a requestAnimationFrame callback and call that a frame.
+   */
+  presentationCounters(): PresentationCounters {
+    return {
+      submissionSequence: this.submissionSequence,
+      completedSequence: this.completedSequence,
+      inFlightSubmissions: Math.max(0, this.submissionSequence - this.completedSequence),
+      maximumInFlightSubmissions: maximumInFlightWebGpuSubmissions(this.submissionMode),
+      skippedSubmissions: this.skippedSubmissions,
+      starvationRecoveries: this.starvationRecoveries,
+      consecutiveRefusedSubmissions: this.consecutiveRefusedSubmissions,
+      outstandingCompletionProbes: this.outstandingCompletionProbeCount(),
+      lastSubmittedAt: this.lastSubmittedAt,
+      lastCompletedAt: this.lastCompletedAt,
+      lastCompletionLatencyMs: this.lastCompletionLatencyMs,
+      calls: this.lastSubmittedRenderInfo.calls,
+      triangles: this.lastSubmittedRenderInfo.triangles,
     };
   }
 
@@ -948,7 +1569,8 @@ export class WebGpuRenderRuntime {
       submissionMode: this.submissionMode,
       maximumInFlightSubmissions,
       inFlightSubmissions,
-      completionProbeTargetSequence: this.completionProbeTargetSequence,
+      completionProbeTargetSequence: this.oldestOutstandingProbeSequence(),
+      outstandingCompletionProbes: this.completionProbes.size,
       completionProbeCount: this.completionProbeCount,
       submissionSequence: this.submissionSequence,
       completedSequence: this.completedSequence,
@@ -1010,22 +1632,46 @@ export class WebGpuRenderRuntime {
     this.progressMaximumCompletionLatencyMs = 0;
   }
 
-  private scheduleCompletionProbe(now: number, force = false): Promise<void> | null {
-    if (this.completionProbe) return this.completionProbe;
-    if (!force && now < this.nextCompletionProbeAt) return null;
+  private outstandingCompletionProbeCount(): number {
+    return this.completionProbes.size;
+  }
+
+  private oldestOutstandingProbeSequence(): number | null {
+    let oldest: number | null = null;
+    for (const sequence of this.completionProbes.keys()) {
+      if (oldest === null || sequence < oldest) oldest = sequence;
+    }
+    return oldest;
+  }
+
+  /**
+   * Observe ONE submission's retirement.
+   *
+   * WHY PER SUBMISSION. This used to keep a single mutable probe: while it was
+   * outstanding, no second observer could be attached, so the completion
+   * frontier could advance at most one probe-resolution at a time. Combined
+   * with a queue-depth bound, that made the fence the frame timer - and an
+   * `onSubmittedWorkDone` round trip costs 18-46 ms on this hardware whether
+   * the frame drew 181 calls or nothing at all. Presentation was therefore
+   * pinned near 50 fps with the GPU at 14% utilisation.
+   *
+   * `onSubmittedWorkDone()` resolves once everything submitted before the call
+   * has retired, so a probe attached after submission N proves the frontier has
+   * reached at least N. Attaching one per submission lets those observations
+   * pipeline: several can be in flight, they settle in order, and the frontier
+   * advances with each one instead of waiting for a fresh round trip.
+   */
+  private attachCompletionProbe(sequence: number, startedAt: number): Promise<void> | null {
+    if (sequence <= this.completedSequence) return Promise.resolve();
+    const existing = this.completionProbes.get(sequence);
+    if (existing) return existing;
     const queue = this.device.queue;
     if (!queue?.onSubmittedWorkDone) return null;
-    const sequence = this.submissionSequence;
-    if (sequence <= this.completedSequence) return Promise.resolve();
-    const startedAt = now;
     this.pendingCompletionStartedAt ??= startedAt;
-    this.nextCompletionProbeAt = now + WebGpuRenderRuntime.COMPLETION_PROBE_INTERVAL_MS;
-    this.completionProbeTargetSequence = sequence;
     this.completionProbeCount += 1;
     const probe = queue.onSubmittedWorkDone()
       .then(() => {
         const completedAt = this.clock();
-        const latencyStartedAt = Math.max(startedAt, this.pendingCompletionStartedAt ?? startedAt);
         const priorCompletedSequence = this.completedSequence;
         this.completedSequence = Math.max(this.completedSequence, sequence);
         if (this.completedSequence > priorCompletedSequence) {
@@ -1033,6 +1679,22 @@ export class WebGpuRenderRuntime {
           this.progressMaximumCompletionGapMs = Math.max(this.progressMaximumCompletionGapMs, completionGapMs);
           this.completionPacing.record(completionGapMs / Math.max(1, this.completedSequence - priorCompletedSequence));
           this.progressLastCompletionAt = completedAt;
+          this.lastCompletedAt = completedAt;
+          // This probe's OWN submission stamp, so the reported latency is the
+          // real queue residency of THIS frame. Pipelined observers each carry
+          // their own start; a single shared pending age would report one
+          // number for frames with genuinely different residencies.
+          //
+          // The floor is the current observation epoch: a tab that was hidden,
+          // unfocused or paused between submit and retire must not charge that
+          // wall-clock time to the device. In steady play the frame's own stamp
+          // is the later of the two, so this clamp is inert.
+          const latencyStartedAt = Math.max(startedAt, this.pendingCompletionStartedAt ?? startedAt);
+          this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
+          this.progressMaximumCompletionLatencyMs = Math.max(
+            this.progressMaximumCompletionLatencyMs,
+            this.lastCompletionLatencyMs,
+          );
         }
         if (this.pendingCompletionStartedAt !== null) {
           this.progressMaximumPendingForMs = Math.max(
@@ -1040,12 +1702,6 @@ export class WebGpuRenderRuntime {
             completedAt - this.pendingCompletionStartedAt,
           );
         }
-        this.lastCompletedAt = completedAt;
-        this.lastCompletionLatencyMs = Math.max(0, completedAt - latencyStartedAt);
-        this.progressMaximumCompletionLatencyMs = Math.max(
-          this.progressMaximumCompletionLatencyMs,
-          this.lastCompletionLatencyMs,
-        );
         // A continuously busy queue is healthy when its completion frontier is
         // advancing. Measure pending age from the latest progress, not from the
         // moment any backlog first appeared, or long play is misclassified as
@@ -1061,14 +1717,20 @@ export class WebGpuRenderRuntime {
         this.lastFailure = error instanceof Error ? error.message : String(error);
       })
       .finally(() => {
-        if (this.completionProbe === probe) {
-          this.completionProbe = null;
-          this.completionProbeTargetSequence = null;
-          if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
-        }
+        this.completionProbes.delete(sequence);
+        if (this.completedSequence >= this.submissionSequence) this.pendingCompletionStartedAt = null;
       });
-    this.completionProbe = probe;
+    this.completionProbes.set(sequence, probe);
     return probe;
+  }
+
+  /**
+   * Observe the CURRENT frontier. Used by the drain paths and by admission when
+   * it refuses, where the caller wants "tell me when everything submitted so
+   * far has retired", not a specific frame.
+   */
+  private scheduleCompletionProbe(now: number): Promise<void> | null {
+    return this.attachCompletionProbe(this.submissionSequence, now);
   }
 
   assertCandidateReady(): void {
@@ -1091,10 +1753,100 @@ export class WebGpuRenderRuntime {
     this.bloomSamples = bloomSamples;
   }
 
-  configureOutput(exposure: number, toneMapping: ToneMappingMode = 'aces'): void {
+  configureOutput(
+    exposure: number,
+    toneMapping: ToneMappingMode = 'aces',
+    gradeProfileId?: GradeProfileId,
+  ): void {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = toneMappingForMode(toneMapping);
     this.renderer.toneMappingExposure = exposure;
+    // Tone mapping mode and exposure are consumed by the chain's explicit
+    // stage-7 renderOutput() through the RenderPipeline context, so both keep
+    // working unchanged; the pipeline rebuilds when either value moves.
+    if (gradeProfileId !== undefined) this.filmicGrade.setProfile(gradeProfileId);
+  }
+
+  /** HF-362 - selects the frozen filmic grade profile for this session. */
+  setGradeProfile(gradeProfileId: GradeProfileId): void {
+    this.filmicGrade.setProfile(gradeProfileId);
+  }
+
+  gradeProfileId(): GradeProfileId {
+    return this.filmicGrade.profileId();
+  }
+
+  /** The built chain receipt, in order. Matches GRADE_CHAIN_STAGES. */
+  gradeChainStages(): readonly string[] {
+    return this.filmicGrade.stages();
+  }
+
+  /**
+   * The PLAYER'S vignette setting, handed to the display-referred stage. The
+   * chain composes the current arena's authored vignette character on top and
+   * caps the result (see art-direction.ts DISPLAY_VIGNETTE_MAXIMUM), so the
+   * screen periphery enemies enter from keeps a proven luminance floor.
+   */
+  setDisplayVignetteStrength(strength: number): void {
+    this.filmicGrade.setDisplayVignetteStrength(strength);
+  }
+
+  /**
+   * Lane L — the arena art direction currently composed into the grade chain,
+   * for diagnostics and QA receipts. Null until the Pass 64 scene assembler
+   * pushes the first arena.
+   */
+  arenaArtDirectionId(): string | null {
+    return this.filmicGrade.arenaArtDirection()?.id ?? null;
+  }
+
+  /** Arena-authored grain strength, in 8-bit output steps. */
+  setGradeGrainStrength(strength8Bit: number): void {
+    this.filmicGrade.setGrainStrength8Bit(strength8Bit);
+  }
+
+  /**
+   * Display-side post anti-aliasing (FXAA/SMAA) appended after the grade
+   * chain. Selecting a mode rebuilds only the chain's output graph; MSAA on
+   * the principal target remains the separate renderer-construction path.
+   */
+  setPostAntiAliasing(mode: PostAntiAliasingMode): void {
+    this.filmicGrade.setPostAntiAliasing(mode);
+  }
+
+  postAntiAliasing(): PostAntiAliasingMode {
+    return this.filmicGrade.postAntiAliasing();
+  }
+
+  /** Player sharpness 0..1 for the display-side RCAS stage; zero bypasses it. */
+  setSharpness(uiSharpness: number): void {
+    this.filmicGrade.setSharpness(uiSharpness);
+  }
+
+  sharpness(): number {
+    return this.filmicGrade.sharpness();
+  }
+
+  /**
+   * HF-364 — FSR 1 spatial upscaling. The scene-pass assembler must apply the
+   * same `sceneResolutionScale` to `pass()`; this half only owns the EASU/RCAS
+   * reconstruction at the end of the display chain.
+   */
+  setSpatialUpscaling(request: SpatialUpscalingRequest): void {
+    this.filmicGrade.setSpatialUpscaling(request);
+  }
+
+  spatialUpscaling(): SpatialUpscalingRequest {
+    return this.filmicGrade.spatialUpscaling();
+  }
+
+  /**
+   * HF-364 — publishes the linear-side stage list the scene-pass assembler is
+   * about to build, so the chain's order receipt covers the optional
+   * screen-space stages. Call BEFORE the assembler publishes its outputNode.
+   */
+  setGradeLinearSourceStages(stages: readonly string[]): void {
+    this.filmicGrade.setLinearSourceStages(stages);
   }
 
   setExposure(exposure: number): void {
@@ -1214,12 +1966,20 @@ export class WebGpuRenderRuntime {
       // Queue retirement may finish after the browser lost focus. Reacquire
       // foreground ownership at the actual encode boundary, not only when the
       // caller entered this method.
+      // Wait politely for real foreground ownership, but do not wait forever.
+      // submitFrame refuses without focus, and waitForVisibleBrowserPreparation
+      // falls back on a timer, so a visible-but-unfocused window span this loop
+      // indefinitely and never finished loading the map. After the polite
+      // attempts, a VISIBLE document is enough - the hidden-tab contract is
+      // about hidden tabs, and this still refuses to submit for one.
       let submitted = false;
-      while (!submitted) {
+      for (let attempt = 0; !submitted; attempt += 1) {
         await waitForVisibleBrowserPreparation();
+        const force = attempt >= WebGpuRenderRuntime.PREWARM_FOCUS_ATTEMPTS;
+        if (force && !browserPresentationIsVisible()) continue;
         const restoreVisibility = suppressUnrelatedRenderables(scene, roots);
         try {
-          submitted = this.submitFrame(this.clock(), true);
+          submitted = this.submitFrame(this.clock(), true, 'serialized', force);
         } finally {
           restoreVisibility();
         }
@@ -1244,11 +2004,18 @@ export class WebGpuRenderRuntime {
     _frameTimestamp = this.clock(),
     force = false,
     submissionMode: WebGpuSubmissionMode = 'serialized',
+    /**
+     * Admission prewarm only: accept a VISIBLE document that does not hold
+     * focus. Gameplay submission never sets this - it keeps the strict gate.
+     */
+    allowUnfocusedVisible = false,
   ): boolean {
     if (this.disposed) return false;
     if (this.deviceLost) throw new Error(this.lastFailure ?? 'WebGPU device lost');
     if (this.uncapturedErrors > 0) throw new Error(this.lastFailure ?? 'WebGPU uncaptured error');
-    if (!browserOwnsForegroundPresentation()) return false;
+    if (allowUnfocusedVisible
+      ? !browserPresentationIsVisible()
+      : !browserOwnsForegroundPresentation()) return false;
     const admissionCheckedAt = this.clock();
     this.submissionMode = submissionMode;
     const inFlightSubmissions = Math.max(0, this.submissionSequence - this.completedSequence);
@@ -1271,11 +2038,36 @@ export class WebGpuRenderRuntime {
           admissionCheckedAt - this.pendingCompletionStartedAt,
         );
       }
-      this.scheduleCompletionProbe(admissionCheckedAt, true);
-      this.skippedSubmissions += 1;
-      return false;
+      this.scheduleCompletionProbe(admissionCheckedAt);
+      this.consecutiveRefusedSubmissions += 1;
+      if (!shouldRecoverStarvedPresentation({
+        consecutiveRefusedSubmissions: this.consecutiveRefusedSubmissions,
+        refusalStreakThreshold: WebGpuRenderRuntime.STARVATION_REFUSAL_STREAK,
+        inFlightSubmissions,
+        maximumInFlightSubmissions,
+        drawCalls: this.lastSubmittedRenderInfo.calls,
+        triangles: this.lastSubmittedRenderInfo.triangles,
+        trivialDrawCallCeiling: WebGpuRenderRuntime.STARVATION_TRIVIAL_DRAW_CALLS,
+        trivialTriangleCeiling: WebGpuRenderRuntime.STARVATION_TRIVIAL_TRIANGLES,
+      })) {
+        this.skippedSubmissions += 1;
+        return false;
+      }
+      // Break the hysteresis: admit this one frame, and start a fresh
+      // observation epoch so the pending-age clause judges the recovered queue
+      // rather than the age that starved it. The stall guard is not disarmed -
+      // it simply gets a new window, and fires again in
+      // SUBMISSION_BACKPRESSURE_MS if the device really has stopped retiring.
+      this.starvationRecoveries += 1;
+      this.resetPresentationProgressWindow(admissionCheckedAt);
+      if (this.pendingCompletionStartedAt !== null) this.pendingCompletionStartedAt = admissionCheckedAt;
     }
+    this.consecutiveRefusedSubmissions = 0;
     this.renderer.info.reset();
+    // Stage 12 advances on a profile-quantised clock, and the profile's bloom
+    // tuning is re-asserted here so a graphics-settings write cannot silently
+    // drop the threshold back under 1.0 linear.
+    this.filmicGrade.beforeRender(admissionCheckedAt);
     this.renderPipeline.render();
     // Queue latency begins only after Three has encoded/submitted the frame.
     // The rAF timestamp is intentionally not used: it predates simulation and
@@ -1291,10 +2083,10 @@ export class WebGpuRenderRuntime {
     this.submissionPacing.record(submissionGapMs);
     this.progressLastSubmissionAt = submittedAt;
     this.lastSubmittedAt = submittedAt;
-    // Attach one observer to the current completion frontier. A warmed live
-    // frame may join behind that target, but never creates a second mutable
-    // probe; the next observer is attached only after this frontier retires.
-    this.scheduleCompletionProbe(submittedAt, true);
+    // Observe THIS frame's retirement. Every admitted frame gets its own
+    // observer so the completion frontier advances per frame instead of once
+    // per queue round trip.
+    this.attachCompletionProbe(this.submissionSequence, submittedAt);
     return true;
   }
 
@@ -1328,16 +2120,39 @@ export class WebGpuRenderRuntime {
     await awaitSubmissionCompletionTarget({
       targetSequence,
       completedSequence: () => this.completedSequence,
-      createProbe: () => this.scheduleCompletionProbe(this.clock(), true),
+      createProbe: () => this.scheduleCompletionProbe(this.clock()),
       failure: () => this.lastFailure,
       timeoutMs,
+      // What the player sees when a deployment bounces. The frontier state is
+      // what separates a genuinely wedged device from one frame of cold
+      // first-use pipeline creation: a cold compile shows a healthy prior
+      // latency, one in-flight submission and a large draw count, while a
+      // wedged device shows a pending age far past the bound and no probe
+      // progress at all.
+      describe: () => this.describeCompletionFrontier(),
     });
+  }
+
+  private describeCompletionFrontier(): string {
+    const now = this.clock();
+    const pendingForMs = this.pendingCompletionStartedAt === null
+      ? 0
+      : Math.max(0, now - this.pendingCompletionStartedAt);
+    return [
+      `mode ${this.submissionMode}`,
+      `in-flight ${Math.max(0, this.submissionSequence - this.completedSequence)}`,
+      `pending ${Math.round(pendingForMs)} ms`,
+      `probes ${this.completionProbeCount}`,
+      `prior latency ${this.lastCompletionLatencyMs === null ? 'none' : `${Math.round(this.lastCompletionLatencyMs)} ms`}`,
+      `fenced draws ${this.lastSubmittedRenderInfo.calls}`,
+    ].join(', ');
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.device.removeEventListener?.('uncapturederror', this.uncapturedErrorListener);
+    this.filmicGrade.dispose();
     this.renderPipeline.dispose();
     this.renderer.dispose();
     this.device.destroy?.();

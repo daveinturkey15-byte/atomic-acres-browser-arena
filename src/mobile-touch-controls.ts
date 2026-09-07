@@ -91,7 +91,59 @@ export const MOBILE_TOUCH_ACTION_GROUPS = Object.freeze([
 
 export const MOBILE_CONTROLS_STORAGE_KEY = 'atomic-acres-mobile-controls';
 
-const LOOK_STICK_SENSITIVITY = 0.035;
+/**
+ * HF-357: touch look speed is expressed in radians/second and integrated
+ * against real frame time, so camera turn rate no longer depends on the
+ * display refresh rate (previously a fixed 0.035 rad per rendered frame made
+ * a 120Hz phone turn twice as fast as a 60Hz one, and jank directly slowed
+ * aim). 2.1 rad/s reproduces the legacy 60Hz feel exactly at full deflection
+ * (0.035 rad/frame * 60fps).
+ */
+export const MOBILE_LOOK_FULL_RATE_RAD_PER_SEC = 2.1;
+
+/**
+ * HF-357: acceleration/release shaping mirrors the gamepad right-stick curve
+ * (`integrateGamepadLookRate` in gameplay.ts — replicated locally rather than
+ * imported because the gamepad curve bakes in its own max-rate/ADS/flick
+ * model, while the touch stick keeps its legacy 2.1 rad/s ceiling and the
+ * caller-side ADS sensitivity scale). Constants are kept equal to the gamepad
+ * ones so both sticks share one feel: quick build-up for target acquisition,
+ * faster release so letting go leaves no tail.
+ */
+const MOBILE_LOOK_ACCELERATION_RAD_PER_SEC2 = 22;
+const MOBILE_LOOK_RELEASE_RAD_PER_SEC2 = 29;
+
+/** Legacy per-frame cadence assumed for callers that do not pass dt yet. */
+const MOBILE_LOOK_FALLBACK_DT = 1 / 60;
+
+const clampLookDt = (dt: number): number =>
+  Number.isFinite(dt) ? Math.max(0, Math.min(0.05, dt)) : MOBILE_LOOK_FALLBACK_DT;
+
+export type MobileLookRate = Readonly<{ x: number; y: number }>;
+
+/**
+ * Advances the smoothed look angular velocity (rad/s) toward the held stick
+ * deflection. Pure and frame-rate independent: integrating at 120Hz covers the
+ * same angle as integrating at 60Hz.
+ */
+export function integrateMobileLookRate(
+  current: MobileLookRate,
+  input: Readonly<{ x: number; y: number }>,
+  dt = MOBILE_LOOK_FALLBACK_DT,
+): MobileLookRate {
+  const safeDt = clampLookDt(dt);
+  const integrateAxis = (value: number, target: number): number => {
+    const building = (value === 0 || Math.sign(value) === Math.sign(target))
+      && Math.abs(target) > Math.abs(value);
+    const slew = (building ? MOBILE_LOOK_ACCELERATION_RAD_PER_SEC2 : MOBILE_LOOK_RELEASE_RAD_PER_SEC2) * safeDt;
+    const difference = target - value;
+    return Math.abs(difference) <= slew ? target : value + Math.sign(difference) * slew;
+  };
+  return Object.freeze({
+    x: integrateAxis(current.x, THREE.MathUtils.clamp(input.x, -1, 1) * MOBILE_LOOK_FULL_RATE_RAD_PER_SEC),
+    y: integrateAxis(current.y, THREE.MathUtils.clamp(input.y, -1, 1) * MOBILE_LOOK_FULL_RATE_RAD_PER_SEC),
+  });
+}
 
 export type TouchStickBounds = Readonly<{
   left: number;
@@ -120,14 +172,33 @@ export function mobileTouchFireBypassesPointerLock(presentationActive: boolean, 
   return presentationActive && firing;
 }
 
+/**
+ * PASS 84 Lane E: the overlay shows only while the toggle is on, a match is
+ * live and no gamepad is connected. A connected pad suppresses the overlay
+ * instead of fighting it for the same thumbs; disconnecting restores it.
+ */
+export function mobileOverlayVisible(enabled: boolean, inMatch: boolean, gamepadSuppressed: boolean): boolean {
+  return enabled && inMatch && !gamepadSuppressed;
+}
+
 export function shouldSuppressMobileBrowserSelection(presentationActive: boolean, editableTarget: boolean): boolean {
   return presentationActive && !editableTarget;
 }
 
-export function sustainedMobileLookDelta(x: number, y: number): Readonly<{ x: number; y: number }> {
+/**
+ * Steady-state look delta for a held deflection over one frame of `dt`
+ * seconds. HF-357: the default dt keeps the legacy 60Hz numbers
+ * (full deflection = 0.035 rad) for callers not yet passing frame time.
+ */
+export function sustainedMobileLookDelta(
+  x: number,
+  y: number,
+  dt = MOBILE_LOOK_FALLBACK_DT,
+): Readonly<{ x: number; y: number }> {
+  const safeDt = clampLookDt(dt);
   return Object.freeze({
-    x: THREE.MathUtils.clamp(x, -1, 1) * LOOK_STICK_SENSITIVITY,
-    y: THREE.MathUtils.clamp(y, -1, 1) * LOOK_STICK_SENSITIVITY,
+    x: THREE.MathUtils.clamp(x, -1, 1) * MOBILE_LOOK_FULL_RATE_RAD_PER_SEC * safeDt,
+    y: THREE.MathUtils.clamp(y, -1, 1) * MOBILE_LOOK_FULL_RATE_RAD_PER_SEC * safeDt,
   });
 }
 
@@ -173,6 +244,7 @@ export class MobileTouchControls {
 
   private enabled = false;
   private inMatch = false;
+  private gamepadSuppressed = false;
   private disposed = false;
 
   constructor(private readonly callbacks: MobileTouchCallbacks) {}
@@ -220,6 +292,22 @@ export class MobileTouchControls {
     return this.enabled;
   }
 
+  /**
+   * PASS 84 Lane E: a connected gamepad hides the overlay and releases every
+   * held touch so the pad and the thumbsticks never fight; disconnecting
+   * restores the overlay in the same match.
+   */
+  setGamepadSuppressed(suppressed: boolean): void {
+    if (this.gamepadSuppressed === suppressed) return;
+    this.gamepadSuppressed = suppressed;
+    if (suppressed) this.resetInput();
+    this.applyVisibility();
+  }
+
+  isGamepadSuppressed(): boolean {
+    return this.gamepadSuppressed;
+  }
+
   /** Releases every owned pointer before viewport/orientation geometry changes. */
   resetForViewportChange(): void {
     this.resetInput();
@@ -242,7 +330,7 @@ export class MobileTouchControls {
   }
 
   private applyVisibility(): void {
-    if (this.root) this.root.hidden = !(this.enabled && this.inMatch);
+    if (this.root) this.root.hidden = !mobileOverlayVisible(this.enabled, this.inMatch, this.gamepadSuppressed);
   }
 
   private resetInput(): void {
@@ -273,6 +361,35 @@ export class MobileTouchControls {
   private bind(): void {
     const root = this.root;
     if (!root) return;
+    // PASS 85 Lane AE - THE PAUSE TAP FELL THROUGH ONTO THE MENU IT UNCOVERED.
+    //
+    // Measured on emulated phone/tablet profiles: tapping the overlay's PAUSE
+    // button opened the pause menu AND the project-map modal on top of it, so
+    // the pause surface arrived already unusable - the options tab and the
+    // RESUME button both sat under a full-screen modal (z 28/29 over the menu's
+    // z 20) and could not be tapped at all.
+    //
+    // Cause, isolated: a touch tap is TWO things. The overlay acts on
+    // `pointerdown`, which synchronously hides the overlay and shows the menu;
+    // then, on `touchend`, the browser synthesises a compatibility `click` at
+    // the same coordinates and hit-tests it against the DOM AS IT IS BY THEN -
+    // the overlay is gone, so the click lands on whatever the menu put there.
+    // The mobile PAUSE button sits at the top-right safe-area corner, which is
+    // exactly where the menu header's project-map button is. Proof: dispatching
+    // only `pointerdown` leaves the modal closed; a real touch tap at the same
+    // point opens it.
+    //
+    // `event.preventDefault()` in `onPointerDown` does NOT stop this. Per the
+    // Pointer Events spec, cancelling a pointerdown does not suppress the
+    // compatibility mouse events; only cancelling `touchstart` does. Hence this
+    // listener, which must be non-passive to be allowed to cancel anything.
+    //
+    // Every control is cancelled, not just PAUSE: any control that changes the
+    // surface has the same trap waiting, and the overlay's own handlers are
+    // pointer-based, so nothing here needs the synthesised click.
+    root.addEventListener('touchstart', (event) => {
+      if ((event.target as HTMLElement | null)?.closest('[data-mtc]')) event.preventDefault();
+    }, { passive: false });
     root.addEventListener('pointerdown', (event) => this.onPointerDown(event));
     root.addEventListener('pointermove', (event) => this.onPointerMove(event));
     const release = (event: PointerEvent) => this.onPointerUp(event);

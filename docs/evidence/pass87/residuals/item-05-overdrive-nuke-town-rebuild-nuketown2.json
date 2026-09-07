@@ -1,0 +1,10 @@
+{
+  "item": "Lane AR item 5 - 2x Damage Core claimed through the bus roof slab",
+  "arena": "nuke-town rebuild (nuketown2)",
+  "slabUndersideM": 2.9499999999999997,
+  "sweepFromEyeM": 0.6,
+  "sweepStepM": 0.05,
+  "sweptEyeHeights": 47,
+  "claimsWithHeightWindowOnly": 22,
+  "claimsWithLineOfSight": 0
+}

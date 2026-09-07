@@ -37,9 +37,10 @@ export type ArenaLightingProfile = {
 };
 
 const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
+  // Owner 2026-08-29 shadow-side lift (see ATOMIC_BLENDER_LIGHTING).
   exposure: 1.02,
-  hemisphereIntensity: 1.05,
-  ambientIntensity: 0.32,
+  hemisphereIntensity: 1.3,
+  ambientIntensity: 0.42,
   sunIntensity: 2.65,
   shadowBias: -0.00028,
   shadowNormalBias: 0.025,
@@ -60,7 +61,7 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xffedc8,
   sunPosition: [-48, 42, 30],
   fillColor: 0xcce0ed,
-  fillIntensity: 0.28,
+  fillIntensity: 0.45,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 2.4,
   streetLightIntensity: 3.2,
@@ -73,9 +74,13 @@ const ATOMIC_DEFAULT_LIGHTING: ArenaLightingProfile = {
 };
 
 const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
-  exposure: 1,
-  hemisphereIntensity: 0.72,
-  ambientIntensity: 0.18,
+  // Owner 2026-08-29 ("the lighting was bad"): shadow sides crushed to
+  // featureless black - lit:shadow ratio measured ~4.6:1 with combined
+  // ambient+hemisphere at 0.9 vs sun 3.25. Fill light trio lifted so shadow
+  // sides read (~2.9:1) while the sun keeps golden-hour directionality.
+  exposure: 1.06,
+  hemisphereIntensity: 1.2,
+  ambientIntensity: 0.42,
   sunIntensity: 3.25,
   shadowBias: -0.00012,
   shadowNormalBias: 0.04,
@@ -96,11 +101,12 @@ const ATOMIC_BLENDER_LIGHTING: ArenaLightingProfile = {
   sunColor: 0xfff0cb,
   sunPosition: [-48, 42, 30],
   fillColor: 0xc9dfef,
-  fillIntensity: 0.2,
+  fillIntensity: 0.52,
   fillPosition: [54, 20, -42],
   routeLightIntensity: 3,
   streetLightIntensity: 3.8,
-  interiorLightIntensity: 10,
+  // Owner 2026-08-30 interior richness: 10 read as murk inside the houses.
+  interiorLightIntensity: 16,
   routeLightCount: 3,
   streetLightCount: 4,
   interiorLightCount: 4,
@@ -213,12 +219,65 @@ const RUSTWORKS_BRIGHTENING: Readonly<Partial<ArenaLightingProfile>> = Object.fr
   exposure: 1.275,
 });
 
+/**
+ * HF-535. THE NUKE TOWN SHADOW FLOOR, AS ONE MEASURED NUMBER.
+ *
+ * WHAT WAS WRONG. Under the arena's OWN authored sky (golden hour, 17.6 h) the
+ * coach/building shadow footprint on `nuketown2-asphalt-road` renders at max
+ * channel <= 6 over 19.5-25.4% of the `nuketown2-coach-elevation` frame — the
+ * "black slab" down the middle of the street. Measured 2026-09-06 at base
+ * 3278a930, 1280x720, native WebGPU, `render=quality`, `?tod=authored`:
+ * `artifacts/shadowfloor/step1/terms.json` and `step2-combos/terms.json`.
+ *
+ * NO TERM IS ZERO — THE TONE CURVE'S TOE IS. Forced one at a time on the live
+ * scene at the committed review frame, every indirect term measurably reaches
+ * the shadowed road: scene.environmentIntensity 0.24 -> 1.0 takes the frame
+ * from 19.5% to 4.9% exact-black, ambient x4 to 7.5%, hemisphere x4 to 4.4%,
+ * this fill x4 to 11.7%. The shaded road's composed irradiance is ~0.5 and its
+ * albedo ~0.04, so its radiance is ~0.0064; ACES (toneMapping 4) at exposure
+ * 1.08 has a slope of ~0.21 down there, which lands the pixel on 4-6/255 —
+ * inside the exact-black test band. The material's own `envMapIntensity` is the
+ * ONE lever with literally no effect (19.54% before and after x8): on this
+ * route `scene.environment` is scaled by `scene.environmentIntensity` alone.
+ *
+ * WHY THE FILL AND NOTHING ELSE. Per point of frame luma spent on the SUNLIT
+ * half of the picture, the shadow-side fill buys 26 points of exact-black back;
+ * ambient, hemisphere and the environment each buy about 2. At x6 this fill
+ * takes the frame from 19.5% to 5.2% exact-black for +0.4% on sunlit pixels,
+ * +0.0% on the sky and +0.1% on the roofs, and it lifts the previously-black
+ * footprint to a mean max-channel of 28.8 — which is where the generated target
+ * board `refs-boards/nuketown2/coach-elevation.target.png` puts its own darkest
+ * 5% (p5 = 29). The number below is that measurement, not a taste.
+ *
+ * WHAT THIS IS NOT. No light is created, destroyed, parented or toggled, no
+ * material is added or cloned, no family graph is edited and no uniform node is
+ * introduced: this is one intensity VALUE on the `shadow-side-arena-fill`
+ * `DirectionalLight` that every profile already builds, so the WebGPU light set
+ * and the program set are untouched. It is arena-scoped exactly the way
+ * `RUSTWORKS_BRIGHTENING` already is, so no other arena moves.
+ */
+export const NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY = 1.5;
+
+/**
+ * The floor this arena's shadow side must not fall below again. The applied
+ * value may rise above it; a future edit that drops under it fails
+ * `src/nuketown2-shadow-floor.test.ts` rather than silently re-blacking the
+ * street.
+ */
+export const NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY = 1.4;
+
+const NUKETOWN2_SHADOW_FLOOR: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
+  fillIntensity: NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY,
+});
+
 export function arenaLightingProfile(profile: RenderProfile, arenaId?: string): ArenaLightingProfile {
   const base = profile === 'blender' ? BLENDER_LIGHTING : profile === 'compat' ? COMPAT_LIGHTING : DEFAULT_LIGHTING;
   const source = arenaId === 'atomic-acres' && profile !== 'compat'
     ? profile === 'blender' ? ATOMIC_BLENDER_LIGHTING : ATOMIC_DEFAULT_LIGHTING
     : arenaId === 'rustworks-1v1' && profile !== 'compat'
       ? { ...base, ...RUSTWORKS_BRIGHTENING }
-      : base;
+      : arenaId === 'nuketown2' && profile !== 'compat'
+        ? { ...base, ...NUKETOWN2_SHADOW_FLOOR }
+        : base;
   return { ...source, sunPosition: [...source.sunPosition], fillPosition: [...source.fillPosition] };
 }

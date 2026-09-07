@@ -73,6 +73,13 @@ export type WeaponPenetrationProfile = Readonly<{
   calibreLabel: string;
   power: number;
   fmjMultiplier: number;
+  /**
+   * HF-368: per-weapon wallbang scalar applied to the close-range energy budget
+   * (power x fmjMultiplier) and to nothing else. Every weapon authors 1 so the
+   * shared material table stays the single arena-wide resistance authority;
+   * only a weapon the owner has explicitly re-tuned may leave the default.
+   */
+  wallPenetrationMultiplier: number;
   materialPolicyId: typeof WEAPON_MATERIAL_POLICY_ID;
   energyFalloffStartM: number;
   energyFalloffEndM: number;
@@ -700,6 +707,7 @@ function validatePenetration(value: unknown, path: string, issues: WeaponSchemaI
       'calibreLabel',
       'power',
       'fmjMultiplier',
+      'wallPenetrationMultiplier',
       'materialPolicyId',
       'energyFalloffStartM',
       'energyFalloffEndM',
@@ -721,6 +729,9 @@ function validatePenetration(value: unknown, path: string, issues: WeaponSchemaI
   }
   boundedNumber(penetration.power, 0, 100_000, `${path}.power`, issues);
   boundedNumber(penetration.fmjMultiplier, 1, 4, `${path}.fmjMultiplier`, issues);
+  // HF-368: bounded well below the railgun's power term so a wallbang tune can
+  // never smuggle in a second, unbounded damage or energy channel.
+  boundedNumber(penetration.wallPenetrationMultiplier, 0.25, 4, `${path}.wallPenetrationMultiplier`, issues);
   if (penetration.materialPolicyId !== WEAPON_MATERIAL_POLICY_ID) {
     issue(issues, `${path}.materialPolicyId`, 'unsupported-value', `must equal ${WEAPON_MATERIAL_POLICY_ID}`);
   }

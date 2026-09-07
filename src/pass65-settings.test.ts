@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   AUDIO_BUS_IDS,
   advancePresentationFrameAnchor,
@@ -11,7 +11,11 @@ import {
   resolveDisplayedGraphicsPreset,
   resolveGraphicsRuntime,
   writePass65Settings,
+  GTAO_RADIUS_METRES,
 } from './pass65-settings';
+import { GRAPHICS_PRESET_VALUES } from './graphics-settings-registry';
+import { activeWeatherPresentation, resetWeatherPresentation } from './weather/weather-settings';
+import { sampleWeather } from './weather/weather-state';
 
 describe('Pass 65 settings contract', () => {
   it('defaults capable machines to a real High configuration', () => {
@@ -19,14 +23,17 @@ describe('Pass 65 settings contract', () => {
     expect(settings.graphics).toMatchObject({
       schemaVersion: 1, preset: 'high', renderScale: 1, adaptiveResolution: true, targetFps: 240,
       frameRateLimit: 0, antiAliasing: 'msaa-4x', geometryDetail: 'full', shadows: 'high',
-      shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'off', volumetricQuality: 'high',
+      // HF-438: QUALITY carries the retired RAY TRACED rung's trace (light
+      // tier) and its AO tier.
+      shadowResolution: 'high', indirectLighting: 'high', ambientOcclusion: 'high', volumetricQuality: 'high',
       anisotropy: 8, bloomQuality: 'cinematic', toneMapping: 'aces',
     });
+    expect(settings.graphics.rayTracing).toBe('reflections');
     expect(resolveGraphicsRuntime(settings.graphics)).toMatchObject({
       renderProfile: 'blender', adaptive: true, shadows: true, antialiasSamples: 4,
       shadowMapSize: 2048, maximumAnisotropy: 8,
       ambientOcclusion: {
-        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52,
       },
     });
     expect(Object.keys(settings.audio.gains).sort()).toEqual([...AUDIO_BUS_IDS].sort());
@@ -74,7 +81,12 @@ describe('Pass 65 settings contract', () => {
   });
 
   it('keeps every named profile uncapped while preserving an explicit Custom cap', () => {
-    for (const preset of ['performance', 'high', 'max'] as const) {
+    // DERIVED, not listed. This loop used to name three presets by hand, so
+    // RAY TRACED went unchecked from the day it shipped and BALANCED would
+    // have too: a roster written out beside a registry is a gate that stops
+    // looking at the newest thing. Reading the registry means a new preset is
+    // covered the moment it exists.
+    for (const preset of Object.keys(GRAPHICS_PRESET_VALUES) as ReadonlyArray<keyof typeof GRAPHICS_PRESET_VALUES>) {
       const named = normalizePass65Settings({
         graphics: { preset, targetFps: 60, frameRateLimit: 60 },
       });
@@ -98,7 +110,9 @@ describe('Pass 65 settings contract', () => {
     expect(quality.graphics).toMatchObject({
       preset: 'high', renderScale: 1, adaptiveResolution: true,
       shadows: 'high', shadowUpdateMode: 'static', particleQuality: 'high',
-      ambientOcclusion: 'off', targetFps: 240, frameRateLimit: 0,
+      // HF-438: the canonical QUALITY value is now HIGH, so a stored override
+      // of anything else is discarded in favour of it.
+      ambientOcclusion: 'high', targetFps: 240, frameRateLimit: 0,
     });
   });
 
@@ -133,6 +147,28 @@ describe('Pass 65 settings contract', () => {
       ...optedIn,
       privacy: { schemaVersion: 1, shareGlobalLeaderboard: 'yes' as unknown as boolean },
     }).privacy.shareGlobalLeaderboard).toBe(false);
+  });
+
+  it('migrates the pre-retune game-music gain once and then respects a deliberate 100', () => {
+    // Pre-retune storage: no marker, gain at the OLD default -> migrates to 50.
+    const preRetune = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 100 }, mutes: {} },
+    });
+    expect(preRetune.audio.gains['game-music']).toBe(50);
+    expect(preRetune.audio.gameMusicRetuned).toBe(true);
+    // Post-retune storage where the user deliberately chose 100 again: kept.
+    const deliberate = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 100 }, mutes: {}, gameMusicRetuned: true },
+    });
+    expect(deliberate.audio.gains['game-music']).toBe(100);
+    // A pre-retune CUSTOM value (not the old default) is the user's own mix: kept.
+    const custom = normalizePass65Settings({
+      version: 1,
+      audio: { schemaVersion: 1, gains: { 'game-music': 80 }, mutes: {} },
+    });
+    expect(custom.audio.gains['game-music']).toBe(80);
   });
 
   it('recovers corrupt storage and clamps every numeric boundary', () => {
@@ -170,14 +206,24 @@ describe('Pass 65 settings contract', () => {
   });
 
   it('normalizes and resolves every bounded WebGPU GTAO tier', () => {
+    // A hostile tier falls back to the QUALITY preset's canonical tier, never
+    // to the most expensive one a hostile payload could name. HF-438 made that
+    // canonical tier HIGH (QUALITY carries the trace with its AO), still one
+    // step below MAX's ultra — the fail-safe property is re-pinned, not moved.
     expect(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'invented' } }).graphics.ambientOcclusion)
-      .toBe('off');
+      .toBe(GRAPHICS_PRESET_VALUES.high.ambientOcclusion);
+    expect(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'invented' } }).graphics.ambientOcclusion)
+      .not.toBe('ultra');
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'off' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0 });
+      .toEqual({ quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false });
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'low' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'low', enabled: true, resolutionScale: 0.35, samples: 8, radius: 0.18, strength: 0.42 });
+      .toEqual({ quality: 'low', enabled: true, resolutionScale: 0.35, samples: 8, radius: GTAO_RADIUS_METRES.low, strength: 0.42, denoise: false });
+    // Pass 76: High and Ultra add the depth/normal-aware denoise pass; Low
+    // stays the raw cheap tier.
+    expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'high' } }).graphics).ambientOcclusion)
+      .toEqual({ quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: GTAO_RADIUS_METRES.high, strength: 0.52, denoise: true });
     expect(resolveGraphicsRuntime(normalizePass65Settings({ graphics: { preset: 'custom', ambientOcclusion: 'ultra' } }).graphics).ambientOcclusion)
-      .toEqual({ quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16, radius: 0.25, strength: 0.62 });
+      .toEqual({ quality: 'ultra', enabled: true, resolutionScale: 0.75, samples: 16, radius: GTAO_RADIUS_METRES.ultra, strength: 0.62, denoise: true });
   });
 
   it('canonicalizes custom supersampling to the renderer-supported 125% ceiling', () => {
@@ -263,5 +309,65 @@ describe('Pass 65 settings contract', () => {
     };
     expect(writePass65Settings(throwingStorage, settings)).toBe(false);
     expect([...values.values()][0]).toBe(prior);
+  });
+});
+
+describe('weather settings reach the weather systems', () => {
+  afterEach(() => {
+    resetWeatherPresentation();
+  });
+
+  it('resolves the player weather clamp onto the runtime', () => {
+    const settings = normalizePass65Settings({
+      graphics: {
+        preset: 'custom',
+        weatherIntensity: 'moderate',
+        rainDensity: 0.6,
+        windStrength: 1.4,
+        lightning: false,
+      },
+    }).graphics;
+    expect(resolveGraphicsRuntime(settings).weather).toMatchObject({
+      intensity: 'moderate',
+      ceilingState: 'light-rain',
+      rainDensity: 0.6,
+      windStrength: 1.4,
+      lightning: false,
+      weatherEnabled: true,
+    });
+  });
+
+  it('PUBLISHES it, because nothing else ever hands the weather systems settings', () => {
+    // The weather systems are constructed at module scope before any settings
+    // exist and the frame loop never passes them any. Without this publish
+    // every weather row in Options is a switch wired to nothing, which is the
+    // exact defect the audit recorded.
+    resetWeatherPresentation();
+    const quiet = normalizePass65Settings({
+      graphics: { preset: 'custom', weatherIntensity: 'off', rainDensity: 0.25, lightning: false },
+    }).graphics;
+    resolveGraphicsRuntime(quiet);
+    expect(activeWeatherPresentation()).toMatchObject({ intensity: 'off', weatherEnabled: false, lightning: false });
+    // ...and the weather model itself picks it up with no further plumbing.
+    expect(sampleWeather('high-seas', 4_242, 420).rainRate).toBe(0);
+  });
+
+  it('keeps publishing on the compatibility route, where wind still matters', () => {
+    resetWeatherPresentation();
+    const settings = normalizePass65Settings({
+      graphics: { preset: 'custom', weatherIntensity: 'light', windStrength: 0.5 },
+    }).graphics;
+    const runtime = resolveGraphicsRuntime(settings, true);
+    expect(runtime.renderProfile).toBe('compat');
+    expect(runtime.weather).toMatchObject({ intensity: 'light', windStrength: 0.5 });
+    expect(activeWeatherPresentation().windStrength).toBe(0.5);
+  });
+
+  it('is idempotent - resolving twice publishes the same numbers', () => {
+    const settings = normalizePass65Settings({ graphics: { preset: 'max' } }).graphics;
+    const first = resolveGraphicsRuntime(settings).weather;
+    const second = resolveGraphicsRuntime(settings).weather;
+    expect(second).toEqual(first);
+    expect(activeWeatherPresentation()).toEqual(first);
   });
 });

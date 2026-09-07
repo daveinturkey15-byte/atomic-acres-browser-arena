@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const main = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+const pickupAuthority = readFileSync(new URL('./mp-remote-pickup-authority.ts', import.meta.url), 'utf8');
 
 function functionBody(name: string, nextName: string): string {
   const start = main.indexOf(`function ${name}`);
@@ -66,7 +67,18 @@ describe('same-browser hosted active-match recovery integration', () => {
 
     const repair = functionBody('sendClientWorldRepairReady', 'rejectLobbyPlayer');
     expect(repair).toContain('pendingClientReconnectWorldRepairConnectionEpoch === localConnectionEpoch');
-    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission) && !reconnectRepair) return;');
+    // HF-535: the reconnect arm used to be an unconditional bypass of the
+    // attempt gate (`&& !reconnectRepair`). Two repair-ready sends 0.4 ms apart
+    // — startMatch's own, then the parked killstreak-state replayed later in
+    // the SAME task — therefore spent both of MAX_CLIENT_WORLD_REPAIR_ATTEMPTS
+    // in one millisecond and the guest killed itself before the host's
+    // authority was on the wire (day-mp soak, guestB 225e2719). The arm is
+    // still reachable and the epoch is still consumed exactly once; it now
+    // also has to pass the spacing fence, which can only ever REFUSE a send
+    // this line previously made. Pinned at full strength so a future edit
+    // cannot quietly restore the bypass.
+    expect(repair).toContain('if (!clientWorldRepairCanAttempt(admission, repairReadyNow) && !(reconnectRepair && canSpendReconnectRepairAttempt({ attempts: clientReconnectWorldRepairAttempts, lastAttemptAtMs: lastReconnectWorldRepairAttemptAtMs, hostContactAtMs: hostMatchContactAtMs, awaitingCanonicalGuestAuthority, maxAttempts: MAX_CLIENT_WORLD_REPAIR_ATTEMPTS }, repairReadyNow))) return;');
+    expect(repair).toContain('lastReconnectWorldRepairAttemptAtMs = repairReadyNow;');
     expect(repair).toContain('if (reconnectRepair) pendingClientReconnectWorldRepairConnectionEpoch = null;');
     expect(repair.match(/pendingClientReconnectWorldRepairConnectionEpoch = null/g)).toHaveLength(1);
     expect(repair.indexOf('network.send(loadoutMessage);'))
@@ -80,7 +92,7 @@ describe('same-browser hosted active-match recovery integration', () => {
       'network.confirmPlayerAdmission(message.playerId, message.resumeToken, message.connectionEpoch)',
     );
     const connectedAt = hostAdmission.indexOf('hostLobbyMembers.set(message.playerId, restored);');
-    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(currentPhase);');
+    const lobbyAt = hostAdmission.indexOf('broadcastHostLobby(phaseAtCommit);');
     const receiverReadyAt = hostAdmission.indexOf(
       'sendKillstreakStateToPlayer(message.playerId, performance.now(), true);',
     );
@@ -249,8 +261,8 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(shotAdmission).toContain('applyLocalCombatInventoryProjection(message.combatInventory, true, message.shotSeq)');
     expect(main).toContain('setGuestCombatInventoryGrenades(inventory, admission.state.remaining)');
     expect(main).toContain('resetRemoteCombatInventory(admittedIncoming, grenadeCount)');
-    expect(main).toContain('setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0)');
-    expect(main).toContain('remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary }');
+    expect(pickupAuthority).toContain('setGuestCombatInventoryWeapon(inventory, remote.snapshot.primary, 0, 0)');
+    expect(pickupAuthority).toContain('remote.snapshot = { ...remote.snapshot, primary: result.inventory.primary, weapon: result.inventory.primary }');
   });
 
   it('commits a redeploy loadout, inventory and checkpoint before publishing the receipt', () => {
@@ -295,5 +307,12 @@ describe('same-browser hosted active-match recovery integration', () => {
     expect(admission).toContain('message.matchEpoch !== killstreakMatchEpoch');
     expect(admission).toContain("message.weaponGeneration !== timedMapWeaponStates['flare-gun'].generation");
     expect(admission).toContain('flareProjectileSystem.reconcilePresentationState(');
+  });
+
+  it('HF-322: bounds guest resume authority handshake and allows retry within attempt cap', () => {
+    const mainText = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
+    expect(mainText).toContain('clientReconnectWorldRepairAttempts < MAX_CLIENT_WORLD_REPAIR_ATTEMPTS');
+    expect(mainText).toContain('pendingClientReconnectWorldRepairConnectionEpoch = localConnectionEpoch;');
+    expect(mainText).toContain('handleGuestResumeTimeout();');
   });
 });

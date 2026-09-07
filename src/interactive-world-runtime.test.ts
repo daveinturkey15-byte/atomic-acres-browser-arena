@@ -4,7 +4,7 @@ import { traceBallisticPath, type WeaponPenetrationProfile } from './ballistics'
 import { circleIntersectsBox, isBlocked, segmentIntersectsBox } from './collision';
 import type { ShedPlacement } from './destructible-world';
 import { FIELD_SHED_DEFINITION } from './destructible-shed-presentation';
-import { InteractiveWorldRuntime } from './interactive-world-runtime';
+import { InteractiveWorldRuntime, isInteractiveWorldStateEnvelope } from './interactive-world-runtime';
 
 const placement: ShedPlacement = Object.freeze({
   id: 'atomic-shed-vertical-slice',
@@ -27,6 +27,19 @@ const weakProfile: WeaponPenetrationProfile = Object.freeze({
 });
 
 describe('shared interactive-world runtime adapter', () => {
+  it('round-trips empty canonical state for shed-free High Seas and Farcrysis arenas', () => {
+    for (const arenaId of ['farcrysis', 'high-seas'] as const) {
+      const host = new InteractiveWorldRuntime(arenaId, 75, [], true);
+      const guest = new InteractiveWorldRuntime(arenaId, 75, [], false);
+      const envelope = JSON.parse(JSON.stringify(host.stateEnvelope()));
+      expect(isInteractiveWorldStateEnvelope(envelope)).toBe(true);
+      expect(guest.applyAuthoritativeEnvelope(envelope)).toBe(true);
+      expect(guest.stateEnvelope()).toEqual(host.stateEnvelope());
+      host.dispose();
+      guest.dispose();
+    }
+  });
+
   it('publishes one revision for movement, ballistics, rendering and diagnostics', () => {
     const runtime = new InteractiveWorldRuntime('atomic-acres', 7, [placement], true);
     const collision = runtime.collisions();
@@ -40,7 +53,10 @@ describe('shared interactive-world runtime adapter', () => {
       revision: 0,
       consumers: FIELD_SHED_DEFINITION.consumers,
     });
-    expect(runtime.telemetry()).toMatchObject({ sheds: 1, presentationDraws: 4, movementColliders: 9, ballisticSurfaces: 9 });
+    // Re-pinned 2026-08-30 (owner: "i keep seeing through its walls"): the
+    // authored envelope gained gable-north/gable-south to close the open ends,
+    // so the shed publishes 11 surfaces, not 9. Nothing was loosened.
+    expect(runtime.telemetry()).toMatchObject({ sheds: 1, presentationDraws: 4, movementColliders: 11, ballisticSurfaces: 11 });
     runtime.dispose();
   });
 
@@ -261,6 +277,105 @@ describe('shared interactive-world runtime adapter', () => {
     expect(lateJoin.majorDebrisPhysicsBodies()).toHaveLength(1);
     lateJoin.dispose();
     runtime.dispose();
+  });
+
+  it('knocks shot debris along the round in world space, not straight up', () => {
+    // Every authored placement is yawed, and debris velocity is stored in the
+    // shed's local frame, so this exercises the conversion as well as the
+    // direction. Owner 2026-08-30: "its physics to destruction and push need
+    // some help" - a shot panel used to hop vertically wherever it was hit.
+    const yawed: ShedPlacement = Object.freeze({ ...placement, id: 'atomic-shed-yawed', yaw: Math.PI / 2 });
+    const runtime = new InteractiveWorldRuntime('atomic-acres', 12, [yawed], true);
+    expect(runtime.applyExplosion({
+      placementId: yawed.id,
+      surfaceId: 'wall-west',
+      damageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ,
+    })?.accepted).toBe(true);
+    const debrisSurface = runtime.collisions().ballisticSurfaces
+      .find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!;
+    const beforeBody = runtime.majorDebrisPhysicsBodies()[0]!;
+    const before = beforeBody.linearVelocity;
+    // A detached panel leaves the frame under its own kick instead of being
+    // placed at rest and dropping straight down.
+    expect(Math.hypot(before.x, before.y, before.z)).toBeGreaterThan(0.5);
+
+    expect(runtime.applyBulletImpact({
+      surface: debrisSurface,
+      point: {
+        x: (debrisSurface.bounds.minX + debrisSurface.bounds.maxX) / 2,
+        y: ((debrisSurface.bounds.minY ?? 0) + (debrisSurface.bounds.maxY ?? 0)) / 2,
+        z: (debrisSurface.bounds.minZ + debrisSurface.bounds.maxZ) / 2,
+      },
+      tick: 4,
+      damageQ: 20,
+      penetrationEnergyQ: 100,
+      radiusUQ: 300,
+      radiusVQ: 300,
+      direction: { x: 1, y: 0, z: 0 },
+    })?.accepted).toBe(true);
+    const after = runtime.majorDebrisPhysicsBodies()[0]!.linearVelocity;
+    // 100 * 20 Q of knock: two metres per second along the round, a quarter of
+    // that as lift, and nothing sideways once the placement yaw is undone.
+    expect(after.x - before.x).toBeCloseTo(2, 2);
+    expect(after.y - before.y).toBeCloseTo(0.5, 2);
+    expect(after.z - before.z).toBeCloseTo(0, 2);
+    // The knock also tumbles it: one radian per second about the axis the shot
+    // acts around, still expressed in world space.
+    expect(runtime.majorDebrisPhysicsBodies()[0]!.angularVelocity.z - beforeBody.angularVelocity.z)
+      .toBeCloseTo(-1, 2);
+    runtime.dispose();
+  });
+
+  it('lets a host player shove loose debris on contact and converges instead of accelerating it', () => {
+    const host = new InteractiveWorldRuntime('atomic-acres', 13, [placement], true);
+    const guest = new InteractiveWorldRuntime('atomic-acres', 13, [placement], false);
+    for (const runtime of [host, guest]) {
+      expect(runtime.applyExplosion({
+        placementId: placement.id,
+        surfaceId: 'wall-west',
+        damageQ: FIELD_SHED_DEFINITION.thresholds.detachDamageQ,
+      })?.accepted).toBe(runtime === host);
+    }
+    expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
+    const bounds = host.collisions().ballisticSurfaces
+      .find((surface) => surface.majorDebris?.chunkId === 'chunk-west')!.bounds;
+    const contact = {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: ((bounds.minY ?? 0) + (bounds.maxY ?? 0)) / 2,
+      z: (bounds.minZ + bounds.maxZ) / 2,
+    };
+    const walk = { x: 0, y: 0, z: 3 };
+    expect(guest.pushDebrisFromPlayerContact({ actorPosition: contact, actorVelocity: walk })).toBe(0);
+    expect(host.pushDebrisFromPlayerContact({
+      actorPosition: { x: contact.x + 40, y: contact.y, z: contact.z },
+      actorVelocity: walk,
+    })).toBe(0);
+
+    const before = host.majorDebrisPhysicsBodies()[0]!;
+    expect(host.pushDebrisFromPlayerContact({ actorPosition: contact, actorVelocity: walk })).toBe(1);
+    const pushed = host.majorDebrisPhysicsBodies()[0]!;
+    // 55% of a three metre per second walk, and the shove tumbles the panel
+    // rather than skating it flat along the ground.
+    expect(pushed.linearVelocity.z - before.linearVelocity.z).toBeCloseTo(1.65, 2);
+    expect(pushed.angularVelocity.x - before.angularVelocity.x).toBeCloseTo(0.825, 2);
+    // Standing in it does not keep accelerating it: the panel is already
+    // leaving at the speed one contact can transfer.
+    expect(host.pushDebrisFromPlayerContact({ actorPosition: contact, actorVelocity: walk })).toBe(0);
+    expect(host.majorDebrisPhysicsBodies()[0]!.linearVelocity).toEqual(pushed.linearVelocity);
+    expect(guest.applyAuthoritativeEnvelope(JSON.parse(JSON.stringify(host.stateEnvelope())))).toBe(true);
+    expect(guest.stateEnvelope()).toEqual(host.stateEnvelope());
+
+    // Settled wreckage stays where the physics left it.
+    expect(host.adoptMajorDebrisPhysics([{
+      ...host.majorDebrisPhysicsBodies()[0]!,
+      linearVelocity: { x: 0, y: 0, z: 0 },
+      angularVelocity: { x: 0, y: 0, z: 0 },
+      sleeping: true,
+      flat: true,
+    }])).toBe(true);
+    expect(host.pushDebrisFromPlayerContact({ actorPosition: contact, actorVelocity: walk })).toBe(0);
+    host.dispose();
+    guest.dispose();
   });
 
   it('applies bounded radial explosion damage only under host authority', () => {

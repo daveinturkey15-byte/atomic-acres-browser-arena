@@ -27,6 +27,9 @@ export const LEGACY_WEAPON_ENUMERATION_ORDER = Object.freeze([
   'explosive-crossbow',
   'flamethrower',
   'flare-gun',
+  // HF-334: appended, never inserted - the legacy enumeration order is an
+  // observable Pass 64 contract and every existing index must stay put.
+  'crimson-flamethrower',
 ] as const satisfies readonly WeaponId[]);
 
 const RAW_B1_WEAPON_DEFINITIONS = [
@@ -37,7 +40,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.012, adsMultiplier: 0.28, movementMultiplier: 1.65, standMultiplier: 1, crouchMultiplier: 0.78, proneMultiplier: 0.65, sustainedPerShot: 0.0016, maximumRadians: 0.045 },
     recoil: { pitchRadians: 0.016, yawRadians: 0.006, recoveryPerSecond: 12, adsMultiplier: 0.72, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.65, deterministicPatternId: 'carbine-pattern-v1' },
     ammo: { magazine: 30, reserve: 120, reloadSeconds: 1.8, emptyReloadSeconds: 2.05, switchSeconds: 0.48 },
-    penetration: { calibreLabel: '5.56 mm', power: 5.8, fmjMultiplier: 1.12, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 20, energyFalloffEndM: 76, minimumEnergyRetention: 0.48, minimumWallDamageMultiplier: 0.34, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '5.56 mm', power: 5.8, fmjMultiplier: 1.12, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 20, energyFalloffEndM: 76, minimumEnergyRetention: 0.48, minimumWallDamageMultiplier: 0.34, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0xffd166, muzzleFlashScale: 1, reportGain: 1, flashlight: null },
     optic: { kind: 'standard', magnification: 1.25, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'station', stationId: 'range-carbine' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -50,7 +53,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.018, adsMultiplier: 0.42, movementMultiplier: 1.45, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0.0021, maximumRadians: 0.058 },
     recoil: { pitchRadians: 0.011, yawRadians: 0.009, recoveryPerSecond: 15, adsMultiplier: 0.78, standMultiplier: 1, crouchMultiplier: 0.88, proneMultiplier: 0.72, deterministicPatternId: 'smg-pattern-v1' },
     ammo: { magazine: 32, reserve: 128, reloadSeconds: 1.5, emptyReloadSeconds: 1.75, switchSeconds: 0.4 },
-    penetration: { calibreLabel: '9 mm', power: 3.05, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 8, energyFalloffEndM: 38, minimumEnergyRetention: 0.22, minimumWallDamageMultiplier: 0.22, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '9 mm', power: 3.05, fmjMultiplier: 1.08, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 8, energyFalloffEndM: 38, minimumEnergyRetention: 0.22, minimumWallDamageMultiplier: 0.22, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0x65e7ff, muzzleFlashScale: 0.78, reportGain: 0.86, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'station', stationId: 'range-smg' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -63,7 +66,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.022, adsMultiplier: 0.34, movementMultiplier: 1.78, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.6, sustainedPerShot: 0.0025, maximumRadians: 0.064 },
     recoil: { pitchRadians: 0.019, yawRadians: 0.01, recoveryPerSecond: 10, adsMultiplier: 0.76, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.6, deterministicPatternId: 'lmg-pattern-v1' },
     ammo: { magazine: 62, reserve: 186, reloadSeconds: 3.25, emptyReloadSeconds: 3.6, switchSeconds: 0.78 },
-    penetration: { calibreLabel: '7.62 mm', power: 6.9, fmjMultiplier: 1.14, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 90, minimumEnergyRetention: 0.58, minimumWallDamageMultiplier: 0.4, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '7.62 mm', power: 6.9, fmjMultiplier: 1.14, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 90, minimumEnergyRetention: 0.58, minimumWallDamageMultiplier: 0.4, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0x9fda72, muzzleFlashScale: 1.14, reportGain: 1.06, flashlight: null },
     optic: { kind: 'standard', magnification: 1.25, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'station', stationId: 'range-lmg' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -78,7 +81,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.082, adsMultiplier: 0.74, movementMultiplier: 1.24, standMultiplier: 1, crouchMultiplier: 0.88, proneMultiplier: 0.8, sustainedPerShot: 0.0024, maximumRadians: 0.112 },
     recoil: { pitchRadians: 0.052, yawRadians: 0.012, recoveryPerSecond: 8, adsMultiplier: 0.84, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.8, deterministicPatternId: 'scattergun-pattern-v1' },
     ammo: { magazine: 8, reserve: 40, reloadSeconds: 2.35, emptyReloadSeconds: 2.7, switchSeconds: 0.62 },
-    penetration: { calibreLabel: '12 ga pellet', power: 2.15, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 4, energyFalloffEndM: 20, minimumEnergyRetention: 0.16, minimumWallDamageMultiplier: 0.18, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '12 ga pellet', power: 2.15, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 4, energyFalloffEndM: 20, minimumEnergyRetention: 0.16, minimumWallDamageMultiplier: 0.18, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xff8a5b, muzzleFlashScale: 1.45, reportGain: 1.14, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'station', stationId: 'range-scattergun' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -91,7 +94,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.052, adsMultiplier: 0.05, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.72, proneMultiplier: 0.52, sustainedPerShot: 0.004, maximumRadians: 0.07 },
     recoil: { pitchRadians: 0.072, yawRadians: 0.016, recoveryPerSecond: 6.5, adsMultiplier: 0.6, standMultiplier: 1, crouchMultiplier: 0.76, proneMultiplier: 0.52, deterministicPatternId: 'sniper-pattern-v1' },
     ammo: { magazine: 5, reserve: 25, reloadSeconds: 2.6, emptyReloadSeconds: 2.9, switchSeconds: 0.68 },
-    penetration: { calibreLabel: '7.62 mm', power: 9.4, fmjMultiplier: 1.16, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 58, energyFalloffEndM: 120, minimumEnergyRetention: 0.7, minimumWallDamageMultiplier: 0.48, maximumSurfaces: 3 },
+    penetration: { calibreLabel: '7.62 mm', power: 9.4, fmjMultiplier: 1.16, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 58, energyFalloffEndM: 120, minimumEnergyRetention: 0.7, minimumWallDamageMultiplier: 0.48, maximumSurfaces: 3 },
     effects: { tracerColorHex: 0xa9e7ff, muzzleFlashScale: 1.22, reportGain: 1.12, flashlight: null },
     optic: { kind: 'standard', magnification: 4, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'station', stationId: 'range-sniper' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -104,7 +107,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.035, adsMultiplier: 0, movementMultiplier: 1, standMultiplier: 1, crouchMultiplier: 1, proneMultiplier: 1, sustainedPerShot: 0, maximumRadians: 0.035 },
     recoil: { pitchRadians: 0.085, yawRadians: 0, recoveryPerSecond: 5.8, adsMultiplier: 1, standMultiplier: 1, crouchMultiplier: 1, proneMultiplier: 1, deterministicPatternId: 'railgun-pattern-v1' },
     ammo: { magazine: 8, reserve: 0, reloadSeconds: 1.5, emptyReloadSeconds: 1.75, switchSeconds: 0.72 },
-    penetration: { calibreLabel: 'electromagnetic sabot', power: 100_000, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 512, energyFalloffEndM: 513, minimumEnergyRetention: 1, minimumWallDamageMultiplier: 1, maximumSurfaces: 64 },
+    penetration: { calibreLabel: 'electromagnetic sabot', power: 100_000, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 512, energyFalloffEndM: 513, minimumEnergyRetention: 1, minimumWallDamageMultiplier: 1, maximumSurfaces: 64 },
     effects: { tracerColorHex: 0x7df8ff, muzzleFlashScale: 1.5, reportGain: 1.2, flashlight: null },
     optic: { kind: 'special-authority', magnification: 2.5, solidOcclusion: 'required', authorityPolicyId: 'host-railgun-v1' }, projectileId: null,
     policies: { loadout: 'pickup-only', bot: 'never', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-railgun-v1' },
@@ -117,7 +120,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.02, adsMultiplier: 0.34, movementMultiplier: 1.42, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.7, sustainedPerShot: 0.0024, maximumRadians: 0.052 },
     recoil: { pitchRadians: 0.021, yawRadians: 0.008, recoveryPerSecond: 14, adsMultiplier: 0.74, standMultiplier: 1, crouchMultiplier: 0.86, proneMultiplier: 0.7, deterministicPatternId: 'pistol-pattern-v1' },
     ammo: { magazine: 15, reserve: 60, reloadSeconds: 1.35, emptyReloadSeconds: 1.55, switchSeconds: 0.28 },
-    penetration: { calibreLabel: '9 mm', power: 3.65, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 12, energyFalloffEndM: 48, minimumEnergyRetention: 0.3, minimumWallDamageMultiplier: 0.26, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '9 mm', power: 3.65, fmjMultiplier: 1.08, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 12, energyFalloffEndM: 48, minimumEnergyRetention: 0.3, minimumWallDamageMultiplier: 0.26, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xe8c77b, muzzleFlashScale: 0.7, reportGain: 0.82, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'companion-sidearm', primaryIds: ['carbine', 'smg', 'lmg', 'scattergun'] }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -130,7 +133,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.026, adsMultiplier: 0.3, movementMultiplier: 1.5, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.68, sustainedPerShot: 0.006, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.05, yawRadians: 0.012, recoveryPerSecond: 8, adsMultiplier: 0.74, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.68, deterministicPatternId: 'magnum-pattern-v1' },
     ammo: { magazine: 6, reserve: 30, reloadSeconds: 1.75, emptyReloadSeconds: 2, switchSeconds: 0.34 },
-    penetration: { calibreLabel: '.50 AE', power: 4.7, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 82, minimumEnergyRetention: 0.4, minimumWallDamageMultiplier: 0.3, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '.50 AE', power: 4.7, fmjMultiplier: 1.08, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 82, minimumEnergyRetention: 0.4, minimumWallDamageMultiplier: 0.3, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xffd36a, muzzleFlashScale: 1.12, reportGain: 1.2, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'companion-sidearm', primaryIds: ['carbine', 'smg', 'lmg', 'scattergun', 'sniper'] }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -143,7 +146,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.026, adsMultiplier: 0.46, movementMultiplier: 1.55, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.78, sustainedPerShot: 0.0032, maximumRadians: 0.072 },
     recoil: { pitchRadians: 0.014, yawRadians: 0.012, recoveryPerSecond: 13, adsMultiplier: 0.82, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.78, deterministicPatternId: 'machine-pistol-pattern-v1' },
     ammo: { magazine: 20, reserve: 80, reloadSeconds: 1.55, emptyReloadSeconds: 1.75, switchSeconds: 0.3 },
-    penetration: { calibreLabel: '9 mm', power: 2.75, fmjMultiplier: 1.06, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 6, energyFalloffEndM: 30, minimumEnergyRetention: 0.18, minimumWallDamageMultiplier: 0.2, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '9 mm', power: 2.75, fmjMultiplier: 1.06, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 6, energyFalloffEndM: 30, minimumEnergyRetention: 0.18, minimumWallDamageMultiplier: 0.2, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xff9f43, muzzleFlashScale: 0.76, reportGain: 0.84, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'companion-sidearm', primaryIds: ['sniper'] }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -156,7 +159,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.022, adsMultiplier: 0.5, movementMultiplier: 1.35, standMultiplier: 1, crouchMultiplier: 0.86, proneMultiplier: 0.76, sustainedPerShot: 0.003, maximumRadians: 0.078 },
     recoil: { pitchRadians: 0.013, yawRadians: 0.013, recoveryPerSecond: 14, adsMultiplier: 0.84, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.78, deterministicPatternId: 'mini-uzi-pattern-v1' },
     ammo: { magazine: 32, reserve: 128, reloadSeconds: 1.55, emptyReloadSeconds: 1.8, switchSeconds: 0.34 },
-    penetration: { calibreLabel: '9 mm', power: 2.35, fmjMultiplier: 1.05, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 5, energyFalloffEndM: 26, minimumEnergyRetention: 0.14, minimumWallDamageMultiplier: 0.18, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '9 mm', power: 2.35, fmjMultiplier: 1.05, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 5, energyFalloffEndM: 26, minimumEnergyRetention: 0.14, minimumWallDamageMultiplier: 0.18, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xffb25b, muzzleFlashScale: 0.82, reportGain: 0.86, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -169,7 +172,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.016, adsMultiplier: 0.34, movementMultiplier: 1.38, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.7, sustainedPerShot: 0.0017, maximumRadians: 0.052 },
     recoil: { pitchRadians: 0.01, yawRadians: 0.0065, recoveryPerSecond: 16, adsMultiplier: 0.72, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.7, deterministicPatternId: 'mp5-pattern-v1' },
     ammo: { magazine: 30, reserve: 120, reloadSeconds: 1.65, emptyReloadSeconds: 1.9, switchSeconds: 0.38 },
-    penetration: { calibreLabel: '9 mm', power: 3.15, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 10, energyFalloffEndM: 44, minimumEnergyRetention: 0.24, minimumWallDamageMultiplier: 0.23, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '9 mm', power: 3.15, fmjMultiplier: 1.08, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 10, energyFalloffEndM: 44, minimumEnergyRetention: 0.24, minimumWallDamageMultiplier: 0.23, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0x66e6c7, muzzleFlashScale: 0.72, reportGain: 0.82, flashlight: null },
     optic: { kind: 'standard', magnification: 1.2, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -182,7 +185,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.011, adsMultiplier: 0.27, movementMultiplier: 1.58, standMultiplier: 1, crouchMultiplier: 0.76, proneMultiplier: 0.64, sustainedPerShot: 0.0014, maximumRadians: 0.042 },
     recoil: { pitchRadians: 0.014, yawRadians: 0.005, recoveryPerSecond: 13.5, adsMultiplier: 0.7, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.64, deterministicPatternId: 'm4a1-pattern-v1' },
     ammo: { magazine: 30, reserve: 120, reloadSeconds: 1.75, emptyReloadSeconds: 2, switchSeconds: 0.46 },
-    penetration: { calibreLabel: '5.56 mm', power: 5.7, fmjMultiplier: 1.12, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 22, energyFalloffEndM: 78, minimumEnergyRetention: 0.47, minimumWallDamageMultiplier: 0.34, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '5.56 mm', power: 5.7, fmjMultiplier: 1.12, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 22, energyFalloffEndM: 78, minimumEnergyRetention: 0.47, minimumWallDamageMultiplier: 0.34, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0xffd98c, muzzleFlashScale: 0.96, reportGain: 0.96, flashlight: null },
     optic: { kind: 'standard', magnification: 1.25, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -195,7 +198,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.015, adsMultiplier: 0.32, movementMultiplier: 1.7, standMultiplier: 1, crouchMultiplier: 0.78, proneMultiplier: 0.62, sustainedPerShot: 0.0021, maximumRadians: 0.054 },
     recoil: { pitchRadians: 0.021, yawRadians: 0.009, recoveryPerSecond: 10, adsMultiplier: 0.76, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.62, deterministicPatternId: 'ak-47-pattern-v1' },
     ammo: { magazine: 30, reserve: 120, reloadSeconds: 2.05, emptyReloadSeconds: 2.35, switchSeconds: 0.54 },
-    penetration: { calibreLabel: '7.62x39 mm', power: 7.35, fmjMultiplier: 1.15, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 94, minimumEnergyRetention: 0.6, minimumWallDamageMultiplier: 0.42, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '7.62x39 mm', power: 7.35, fmjMultiplier: 1.15, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 30, energyFalloffEndM: 94, minimumEnergyRetention: 0.6, minimumWallDamageMultiplier: 0.42, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0xffad66, muzzleFlashScale: 1.16, reportGain: 1.12, flashlight: null },
     optic: { kind: 'standard', magnification: 1.15, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -208,7 +211,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.026, adsMultiplier: 0.7, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0.0012, maximumRadians: 0.06 },
     recoil: { pitchRadians: 0.008, yawRadians: 0.008, recoveryPerSecond: 14, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.86, proneMultiplier: 0.72, deterministicPatternId: 'minigun-pattern-v1' },
     ammo: { magazine: 240, reserve: 480, reloadSeconds: 5.4, emptyReloadSeconds: 5.8, switchSeconds: 1.05 },
-    penetration: { calibreLabel: '7.62 mm', power: 6.5, fmjMultiplier: 1.12, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 24, energyFalloffEndM: 82, minimumEnergyRetention: 0.52, minimumWallDamageMultiplier: 0.38, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '7.62 mm', power: 6.5, fmjMultiplier: 1.12, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 24, energyFalloffEndM: 82, minimumEnergyRetention: 0.52, minimumWallDamageMultiplier: 0.38, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0xffef9a, muzzleFlashScale: 1.25, reportGain: 1.04, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'diagnostic-only', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -216,14 +219,24 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'm14-ebr', displayName: 'M14 EBR', slot: 'primary', family: 'marksman',
-    fireKind: 'hitscan', fireMode: 'semi', rpm: 37, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
-    // Pass 72 balance correction: reduce the complete damage envelope by
-    // exactly 40%; range and hit-zone multipliers remain authored unchanged.
-    damage: { policy: 'standard', base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
+    fireKind: 'hitscan', fireMode: 'semi', rpm: 46, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
+    // HF-398 (2026-09-02): owner wants +40% damage and +25% fire rate on the
+    // EBR. Base 37.2 -> 52.1 (minimum floor scales 24 -> 33.6 to keep the
+    // envelope shape), rpm 37 -> 46. Range falloff and hit-zone multipliers
+    // stay authored unchanged, as do the HF-368 penetration scalars. The
+    // Pass 72 "envelope -40%" correction is superseded by this instruction.
+    damage: { policy: 'standard', base: 52.1, minimum: 33.6, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7, limbMultiplier: 0.82 },
     spread: { hipRadians: 0.032, adsMultiplier: 0.08, movementMultiplier: 1.85, standMultiplier: 1, crouchMultiplier: 0.7, proneMultiplier: 0.5, sustainedPerShot: 0.004, maximumRadians: 0.062 },
     recoil: { pitchRadians: 0.045, yawRadians: 0.012, recoveryPerSecond: 7.5, adsMultiplier: 0.62, standMultiplier: 1, crouchMultiplier: 0.74, proneMultiplier: 0.5, deterministicPatternId: 'm14-ebr-pattern-v1' },
     ammo: { magazine: 20, reserve: 80, reloadSeconds: 2.35, emptyReloadSeconds: 2.65, switchSeconds: 0.66 },
-    penetration: { calibreLabel: '7.62 mm', power: 0.55, fmjMultiplier: 1.16, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 45, energyFalloffEndM: 112, minimumEnergyRetention: 0.68, minimumWallDamageMultiplier: 0.12, maximumSurfaces: 1 },
+    // HF-368: the owner wants "maybe 50% more pen" on the EBR. The +50% rides on a
+    // per-weapon wallbang scalar rather than power or the shared material table, so
+    // every other weapon and every arena surface stays exactly where Pass 64 put it.
+    // Budget goes 0.55 x 1.16 = 0.638 -> 0.957, which buys interior-wall depth
+    // 0.21 m -> 0.51 m; brick (1.7 entry) and up still stop the round dead.
+    // The thermal/ADS see-through-walls optic below is HF-353 RETAINED-POSITIVE and
+    // is deliberately untouched - this row changes damage survival, not visibility.
+    penetration: { calibreLabel: '7.62 mm', power: 0.55, fmjMultiplier: 1.16, wallPenetrationMultiplier: 1.5, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 45, energyFalloffEndM: 112, minimumEnergyRetention: 0.68, minimumWallDamageMultiplier: 0.12, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0x9ceaff, muzzleFlashScale: 1.08, reportGain: 1.08, flashlight: null },
     optic: { kind: 'thermal-smoke-only', magnification: 2.5, solidOcclusion: 'required', targetPolicy: 'living-targets-through-smoke', authority: 'presentation-only' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -236,7 +249,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.025, adsMultiplier: 0.16, movementMultiplier: 1.72, standMultiplier: 1, crouchMultiplier: 0.72, proneMultiplier: 0.62, sustainedPerShot: 0.006, maximumRadians: 0.052 },
     recoil: { pitchRadians: 0.082, yawRadians: 0.015, recoveryPerSecond: 5.5, adsMultiplier: 0.68, standMultiplier: 1, crouchMultiplier: 0.78, proneMultiplier: 0.62, deterministicPatternId: 'slug-shotgun-pattern-v1' },
     ammo: { magazine: 8, reserve: 32, reloadSeconds: 2.55, emptyReloadSeconds: 2.9, switchSeconds: 0.68 },
-    penetration: { calibreLabel: '12 ga slug', power: 8.1, fmjMultiplier: 1.1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 18, energyFalloffEndM: 78, minimumEnergyRetention: 0.62, minimumWallDamageMultiplier: 0.45, maximumSurfaces: 2 },
+    penetration: { calibreLabel: '12 ga slug', power: 8.1, fmjMultiplier: 1.1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 18, energyFalloffEndM: 78, minimumEnergyRetention: 0.62, minimumWallDamageMultiplier: 0.45, maximumSurfaces: 2 },
     effects: { tracerColorHex: 0xffbd78, muzzleFlashScale: 1.35, reportGain: 1.16, flashlight: null },
     optic: { kind: 'standard', magnification: 1.35, solidOcclusion: 'required' }, projectileId: null,
     policies: { loadout: 'eligible', bot: 'eligible', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -249,7 +262,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.022, adsMultiplier: 0.32, movementMultiplier: 1.48, standMultiplier: 1, crouchMultiplier: 0.8, proneMultiplier: 0.7, sustainedPerShot: 0.003, maximumRadians: 0.055 },
     recoil: { pitchRadians: 0.032, yawRadians: 0.01, recoveryPerSecond: 10, adsMultiplier: 0.72, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.7, deterministicPatternId: 'flashlight-pistol-pattern-v1' },
     ammo: { magazine: 10, reserve: 50, reloadSeconds: 1.5, emptyReloadSeconds: 1.75, switchSeconds: 0.3 },
-    penetration: { calibreLabel: '.45 ACP', power: 4.1, fmjMultiplier: 1.08, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 14, energyFalloffEndM: 52, minimumEnergyRetention: 0.34, minimumWallDamageMultiplier: 0.28, maximumSurfaces: 1 },
+    penetration: { calibreLabel: '.45 ACP', power: 4.1, fmjMultiplier: 1.08, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 14, energyFalloffEndM: 52, minimumEnergyRetention: 0.34, minimumWallDamageMultiplier: 0.28, maximumSurfaces: 1 },
     effects: { tracerColorHex: 0xffd7a1, muzzleFlashScale: 1.08, reportGain: 1.4, flashlight: { kind: 'always-on', colorHex: 0xe6f4ff, intensity: 8, rangeM: 18, coneAngleRadians: 0.42, solidOcclusion: 'required' } },
     optic: null, projectileId: null,
     policies: { loadout: 'eligible', bot: 'diagnostic-only', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -257,14 +270,25 @@ const RAW_B1_WEAPON_DEFINITIONS = [
   },
   {
     id: 'explosive-crossbow', displayName: 'TAC-15 Explosive Crossbow', slot: 'secondary', family: 'launcher',
-    fireKind: 'projectile', fireMode: 'semi', rpm: 36, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
+    // Owner 2026-08-31: "double fire rate and reload rate somehow". 36 -> 72 rpm
+    // takes the shot interval from 1.67 s to 0.83 s.
+    fireKind: 'projectile', fireMode: 'semi', rpm: 72, pellets: 1, spinUpMs: 0, movementMultiplier: 0.94,
     damage: { policy: 'standard', base: 45, minimum: 45, falloffStartM: 120, falloffEndM: 121, headMultiplier: 1, limbMultiplier: 1 },
     spread: { hipRadians: 0.028, adsMultiplier: 0.12, movementMultiplier: 1.8, standMultiplier: 1, crouchMultiplier: 0.72, proneMultiplier: 0.58, sustainedPerShot: 0, maximumRadians: 0.028 },
     recoil: { pitchRadians: 0.024, yawRadians: 0.004, recoveryPerSecond: 8, adsMultiplier: 0.72, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.58, deterministicPatternId: 'explosive-crossbow-pattern-v1' },
-    ammo: { magazine: 1, reserve: 8, reloadSeconds: 2.45, emptyReloadSeconds: 2.45, switchSeconds: 0.58 },
-    penetration: { calibreLabel: 'explosive bolt', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    // Reload rate doubled with the fire rate: 2.45 s -> 1.22 s to rack a bolt.
+    ammo: { magazine: 1, reserve: 8, reloadSeconds: 1.22, emptyReloadSeconds: 1.22, switchSeconds: 0.58 },
+    penetration: { calibreLabel: 'explosive bolt', power: 0, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
     effects: { tracerColorHex: 0xff724f, muzzleFlashScale: 0.2, reportGain: 0.5, flashlight: null },
-    optic: { kind: 'standard', magnification: 1.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
+    // THE "NO ZOOM" DEFECT, and it is arithmetic rather than rendering. The
+    // generic iron-sight ADS already takes 20 degrees off the base FOV, which
+    // at the default 82 is 62 degrees - about 1.45x on its own. An authored
+    // 1.5x resolves to 60.2 degrees, so `adsAimingFovDegrees` handed the
+    // crossbow a 1.04x sight picture over its own iron sights: measurably
+    // magnified, perceptually nothing, exactly as the owner reported. 2.5x
+    // resolves to 38.3 degrees - a real 1.73x over iron - which is a mid-range
+    // launcher optic and still well short of the 4x sniper.
+    optic: { kind: 'standard', magnification: 2.5, solidOcclusion: 'required' }, projectileId: 'explosive-bolt-v1',
     policies: { loadout: 'eligible', bot: 'never', drop: 'droppable', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
     modelSetId: 'explosive-crossbow-model-set-v1', presentationId: 'explosive-crossbow-family-view-v1', audioId: 'explosive-crossbow-audio-v1', provenanceId: 'explosive-crossbow-procedural-cc0-v1', evidenceIds: ['r223-explosive-crossbow', 'r232-explosive-crossbow'],
   },
@@ -277,7 +301,7 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.038, adsMultiplier: 0.72, movementMultiplier: 1.4, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, sustainedPerShot: 0.0008, maximumRadians: 0.055 },
     recoil: { pitchRadians: 0.004, yawRadians: 0.003, recoveryPerSecond: 18, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, deterministicPatternId: 'flamethrower-pattern-v1' },
     ammo: { magazine: 100, reserve: 100, reloadSeconds: 3.8, emptyReloadSeconds: 4.2, switchSeconds: 0.85 },
-    penetration: { calibreLabel: 'ignited fuel stream', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 18, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    penetration: { calibreLabel: 'ignited fuel stream', power: 0, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 18, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
     effects: { tracerColorHex: 0xff7a24, muzzleFlashScale: 1.8, reportGain: 0.92, flashlight: null },
     optic: null, projectileId: null,
     policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
@@ -290,11 +314,31 @@ const RAW_B1_WEAPON_DEFINITIONS = [
     spread: { hipRadians: 0.04, adsMultiplier: 0.2, movementMultiplier: 1.5, standMultiplier: 1, crouchMultiplier: 0.82, proneMultiplier: 0.72, sustainedPerShot: 0, maximumRadians: 0.04 },
     recoil: { pitchRadians: 0.035, yawRadians: 0.006, recoveryPerSecond: 8, adsMultiplier: 0.75, standMultiplier: 1, crouchMultiplier: 0.84, proneMultiplier: 0.72, deterministicPatternId: 'flare-gun-pattern-v1' },
     ammo: { magazine: 1, reserve: 5, reloadSeconds: 2.1, emptyReloadSeconds: 2.1, switchSeconds: 0.42 },
-    penetration: { calibreLabel: '37 mm signal flare', power: 0, fmjMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    penetration: { calibreLabel: '37 mm signal flare', power: 0, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 1, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
     effects: { tracerColorHex: 0xff3c20, muzzleFlashScale: 0.9, reportGain: 0.82, flashlight: null },
     optic: { kind: 'standard', magnification: 1.1, solidOcclusion: 'required' }, projectileId: 'signal-flare-v1',
     policies: { loadout: 'pickup-only', bot: 'eligible', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-projectile-v1' },
     modelSetId: 'flare-gun-model-set-v1', presentationId: 'flare-gun-family-view-v1', audioId: 'flare-gun-audio-v1', provenanceId: 'flare-gun-original-project-v1', evidenceIds: ['pass66-flare-gun-canonical-family'],
+  },
+  {
+    // HF-334: the care-package reward variant. A distinct weapon instance from
+    // the arena-bound map flamethrower above, so a package grant never
+    // cannibalises the world pickup — that cannibalisation is exactly why the
+    // naive single-instance wiring was refused. Red livery; direct damage is
+    // exactly 70% of the map flamethrower's 81 (owner: "30% less").
+    id: 'crimson-flamethrower', displayName: 'Crimson Flamethrower', slot: 'special', family: 'launcher',
+    fireKind: 'hitscan', fireMode: 'automatic', rpm: 600, pellets: 1, spinUpMs: 180, movementMultiplier: 0.82,
+    damage: { policy: 'standard', base: 56.7, minimum: 0, falloffStartM: 8, falloffEndM: 18, headMultiplier: 1, limbMultiplier: 1 },
+    spread: { hipRadians: 0.038, adsMultiplier: 0.72, movementMultiplier: 1.4, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, sustainedPerShot: 0.0008, maximumRadians: 0.055 },
+    recoil: { pitchRadians: 0.004, yawRadians: 0.003, recoveryPerSecond: 18, adsMultiplier: 0.9, standMultiplier: 1, crouchMultiplier: 0.9, proneMultiplier: 0.82, deterministicPatternId: 'crimson-flamethrower-pattern-v1' },
+    // Care-package fuel load: one tank, no resupply, so the reward is powerful
+    // but finite rather than a permanent upgrade.
+    ammo: { magazine: 100, reserve: 0, reloadSeconds: 3.8, emptyReloadSeconds: 4.2, switchSeconds: 0.85 },
+    penetration: { calibreLabel: 'ignited fuel stream', power: 0, fmjMultiplier: 1, wallPenetrationMultiplier: 1, materialPolicyId: 'pass64-ballistic-materials-v1', energyFalloffStartM: 0, energyFalloffEndM: 18, minimumEnergyRetention: 0, minimumWallDamageMultiplier: 0, maximumSurfaces: 0 },
+    effects: { tracerColorHex: 0xff1f14, muzzleFlashScale: 1.8, reportGain: 0.92, flashlight: null },
+    optic: null, projectileId: null,
+    policies: { loadout: 'pickup-only', bot: 'never', drop: 'map-pickup', range: { kind: 'never' }, replay: 'serialized', telemetry: 'standard', stance: { stand: 'allowed', crouch: 'allowed', prone: 'allowed' }, authority: 'host-shot-v1' },
+    modelSetId: 'crimson-flamethrower-model-set-v1', presentationId: 'crimson-flamethrower-family-view-v1', audioId: 'crimson-flamethrower-audio-v1', provenanceId: 'crimson-flamethrower-original-project-v1', evidenceIds: ['pass74-crimson-flamethrower-canonical-family'],
   },
 ] as const satisfies readonly WeaponDefinition[];
 

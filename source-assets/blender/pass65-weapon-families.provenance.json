@@ -10,11 +10,11 @@
   "blenderVersion": "5.1.2",
   "generator": {
     "path": "scripts/blender/create-pass65-weapon-families.py",
-    "sha256": "1860eb34cb08fbd1184d03911566bc7da96cc95179c22b4b57d1db0cafb4a178"
+    "sha256": "f034d857c9f792c8f72a67c0731acecd2a5e946ae937c70e12a63c05559205df"
   },
   "geometryModule": {
     "path": "scripts/blender/pass65_weapon_production_geometry.py",
-    "sha256": "e02739a666de0a704b3f2a25d11c91dcc1d2142bf12ec630b4f248ee7399b276"
+    "sha256": "f2cf28ff2cbbcb6bed8090e87ee04a4630636ecfc6fc91c76807639b4d4b0157"
   },
   "sourceBlend": {
     "path": "source-assets/blender/pass65-weapon-families.blend",
@@ -72,12 +72,12 @@
   "deliveriesPerWeapon": 6,
   "independentBinaryCount": 114,
   "independentBinaryHashes": [
-    "5e015b68b554d78a619bebbc29a0079bedb8b15f55abdeb7ec4788ce05fa129e",
-    "1c998f772831293ea1d251d3ea781c912f2c08966d10b8e3ecd60182cd3f9868",
-    "c0d005b370a863804b8ecba76f51a40305870dd3e987627858cf7788de98f320",
-    "8798adddea9c942ca0b6f9b129e27c875fb6045a2e0c845f531d521f514c701b",
-    "6e6e4dcf960ea8eb1744b04bd6e16a1fc6ab85bf8816c045e597d3c52dbac135",
-    "3a2bd14ef59bd4116665c0490032537a303428a34f0d115f7dbd5779cc6401a9",
+    "3e181f006a102150a64bfe22ea88f96d3525dcc96fa7edf0056f32ce8d58594e",
+    "5f593e1d238f2773ecd63821dd507c8c2cab77fa4151976ffc4a2b51f61beac1",
+    "206ce89361c48630b229db419d51e5b3ca4667e98a446fb110655dbcd303d9cb",
+    "eabb90877b9f7adf5107630fff4f690a95ecea627ba490641fa7b5d7053f3f76",
+    "6b9786352af9a1336d1ba6f5f2aa9768c27513d693e2723a452a367be2beffd8",
+    "a26bbc9b851c0687914492caf9be94f93fe33b4daba7e67f9d80fd8df94f9a43",
     "f3e63925bd1b013b4da169ec1068c54857f7a758c0b43f4cffa739ae6f4c2a2c",
     "363d43e9394aa076a5f07b9299a364efad19c935170848a7daccd0a1817a8deb",
     "3316e3bb869952981c97e6eb4e56a647973eedf93f30d3e4cd997cafdac26b46",
@@ -102,12 +102,12 @@
     "9fe84f50dcba5c593fdf7753d81d87e204974459dca67c1f9014a1d658a53c3c",
     "d1bf6cf6e1d46af165f39c80e11ec75609d61e1257f65dc4202054249bf69e11",
     "1093d912468bfd234be23aac73188699bbb53481accd5510358e12da4bdfba95",
-    "1fe88eb8442d23e15a387d756735017a15976ea73b08d7a0acbd52aef84a4c5c",
-    "b3437426529154819b68b61bbb6cfb4ea1cedc3c3868db29f47a0c1a136f200d",
-    "bafe9ba42593858cf8c5b3c71e9a94b80d689b792011652fe98a49d3b3ac776b",
-    "d5b9c14cf2fbd0b5e460b67494de4a22f7de2e177f32fb7a4a1b619ab3c6831f",
-    "2cf7abe947d5ece078eb70066a107a03da54ae9c2e7e1aff3fdea8c28442efaf",
-    "87c1959b8c45d21de0f2b082cb6a70dd574c3d798f2a96f60c22da5836c7604e",
+    "c2a1fa7938f381934beee29e8165d4c9a8631ac7e5931b14a813180296639eb2",
+    "cd6345847f60fd65121994397b50bfe7fd720aabaf1b1ea533e91004fdc6a682",
+    "a842a3e2eead21a9fe9d222e6ff31ab03b6d4aea836d61547e909f2375186a22",
+    "08da2f7a7741491a8b05bcd93aa2843c903cc28fb57579363a9018b3984bfd92",
+    "abab20ad50707e1fa0c58911ac2b0d17726b6d6cebbe8ea9d97037a7a02dc42a",
+    "db7a888d5f09e60014a952b1b42a9b128001fe7d2eaf6ac702cfc7d25983a3ba",
     "9b1069a4b668ae3a6f0983df51d5ca293da4d6e44abbd9629d7ad36f4a875aff",
     "3001d0542c79d0892de8edc71e84e24287d4cb99e79a018ab0e7f1288d96b2c0",
     "85bb433e2fa62a42db892d6e3129442e5bdfef69309cb11b4d1b43cd7dbe47bb",
@@ -138,12 +138,12 @@
     "d525a24e539c4db1fd10aad3f7ace422dc5c6dda83f65fe5a832f4ca56415136",
     "8d2790ef7fbbf0d57830a0c42bb484f15d740b3214e7c948abe43f8cbbbfaae4",
     "8be37982a7aec9d52527af07777df877af702d95924ced4f4c5ccf6b8415592b",
-    "e6a458085e5ea33b02372cd6ae8baf022773cc25e36e06297d608c9849203090",
-    "646f184ca11677336b3c63eb1caa163337837cfddddbd794f17d4077f092cecb",
-    "ca237f9049de72fa4abdf7c306cb0c7295ddf21c61e4c58d142bd062c4ea184d",
-    "6c13c1fad80ad08e16ab486cc311587480cb66b297f426dcf92cf3106b786de1",
-    "419a68d272dc95e4e099d66ab62155142d0cf55224d1fd75f0ffc2fda496271f",
-    "edf34a32a0fcb52e425829c23c047ce23d4044fb0b86c932664623e68eaee510",
+    "9b52f1e02d9aa73f3141d4640eb4034cae25540e281141f06895f0fb94226e35",
+    "418de36cb53d68e1bd7e0ece539845fb97ebc7a09d01a1f51ceb6f3b6d23529b",
+    "2091e247a428f331da0a7581ec413eba5df2a2ab85729b159d41a72765f85c96",
+    "e17d6627ea903e5421ae62f8fabe8bfc5dd1f93c421c5fdd384b2b9f41c435aa",
+    "e08b160ab75eefb809f3b8888fa0190ecd7efad9b3927db929d1afedf2b3063a",
+    "1e262d6c12590a3320ad755d869263ed01891cafc9ecaf890d643bb0b04ff7bb",
     "6973ab8a4f9d8ba143f258651c226d2c18df3b33d4987e8993450aa7cdbd70ec",
     "3e8abaeebca7f9758b694385100d43eca3407320473536d3ff412b54dea3f844",
     "ebdbb05babc8b08260010ba7868d06f45c58435518c4c26e44a8b644c0393ed6",
@@ -156,18 +156,18 @@
     "5b844bb66d5bcbdaab4f1aed21070b481a61d76f0415196e153b1fcb36ddb70c",
     "cc0a9f99a0c0cd0fd8c2b566f6cd65a456bb6253c6cd60cecdaf1aace9b6fdb5",
     "db4c0b9b844772b660bec18cc1d5ab684155e8cd9ae59e74b6a81d49ac5e70c9",
-    "4a841b30a972349174102ec749324acb85fb81581cc69eb32fcbfeb4e4f53aea",
-    "1c95056221f747b7ab65026465589336427200a805a528b1e4457a5cdf79f6f6",
-    "6cdb8ba67dd3e574c8ad79be01846d8be82dae7d477248623c2a2fa57df1db60",
-    "0b5151bac4ff4f0520d61a0d74d9a3db3ef1a61d1514d05d29795153488ab0fe",
-    "a308141eeb0795d90b72ddf0d436cd003cd8d2112528d3247cee8ad1d02c8fa4",
-    "0bd856b4a154c613994b6cedfdc60b0f6af6adb6866b7ab663a8b860b35da066",
-    "63a3760613685c6300298320397ff3f9c18fcf68d48fecca6e58862888708de5",
-    "d0a9f79bff138cd0e4b2c9590895ad76d7cb352cc739f5507d1597c0fcd61b8a",
-    "6502244a23858bf42160c7e32c647e98b7f5d5949cf0d83966ec14dcd5ff1d7b",
-    "6711118a8f0bbf05d1517d0431a1d6853a04acd4b9831390d35c120816858f54",
-    "3a168af61b8bfe2159d2d8f1679c0111e124243752101fbaf4959c491d9913ba",
-    "b555e4f33b86a18d91daabf65d87c277c7669652e800e8928a983b700c01f467",
+    "8e6c85f4216436eea451344a06b6a76d5da51e742171962f8851cae9b79f2a4b",
+    "f225f389f74d6a8bc8b0486a0274e287eb69b5b11aecce6b24e94072943ba836",
+    "7a7c85aae3f68d651e49762357a57fcb9ad6bdb5af70abe518cdddf4b787a158",
+    "df199e109551beb8082f56c22cead266dfbab6e6b8653198168d415c633214d1",
+    "e4b7bfad95c6610b969dceba31074dd2a93de20abe7d73177cc0f3d43d60b75a",
+    "6a5b7b89b3cb4ef9f024a67adda63d0b3551c155bc91a5c29def259bf81f9772",
+    "8f74adb17d1d81dd555166e91fc233774c793fce5d1df07dc320759dc225494d",
+    "320043c8855d30363382f896bdc036353be8f2ae43129b50d89569c614806dac",
+    "3eeccb2600247f9c83b3191cb1ad97fd60dbb50bd13ce817b34ca0dec0b581fd",
+    "49141e6952c61a1efb2be7708b85acbb2510fe1320973659859abd5fce94b39a",
+    "359c75008e13088247122f875c58b52cbe08438af5cf948e5330b42192484019",
+    "b1511d7fe964541811f6fd3f4e788981ce8f8a12cbd2a9a1c6d85c200dd3c1e2",
     "c3e26b8730fee03e2f23f1e41a0d8404a8282581e8033eeb7ffd975d80819727",
     "2724bcd880a5264d61946808ee8e34cb746e27084a28f2c22a108c932de7bcc5",
     "aa9ba5fd4a4c6b4be42611b36343f2cf59f92dd201140195efcb0b8db5194e58",
@@ -194,79 +194,79 @@
   "weaponProvenances": [
     {
       "path": "source-assets/blender/pass65-weapons/carbine.provenance.json",
-      "sha256": "6c5a97de3fdd09dc01e79ba7279fe8da2aa2e7751ae090a933d3c95ea96ad2a2"
+      "sha256": "008c08bcca6f92353411bdeea7bb438b2f5cf0fe9c748ce2695006f29bb40286"
     },
     {
       "path": "source-assets/blender/pass65-weapons/smg.provenance.json",
-      "sha256": "30444ff1f7f46f87aaa0ff83100736150c02f54063c272f116167bd481aead78"
+      "sha256": "bf906d6a9fbccb0520416ded368a7ae9546d3c64cb6a1c30c4d64cd37aee226e"
     },
     {
       "path": "source-assets/blender/pass65-weapons/lmg.provenance.json",
-      "sha256": "871e469c14d2f4ef5c214210a9ca4f8f6eabe67ab65a152ca3b19db89694e121"
+      "sha256": "b39581bf281f7d43b699ac194429f9e70c73567775adf5f687f24cf176c4c5ac"
     },
     {
       "path": "source-assets/blender/pass65-weapons/scattergun.provenance.json",
-      "sha256": "276720e41be32ff24b34746054331ca514f228b01978e16d12bc40a99207f6d9"
+      "sha256": "dae0f17775686aa780264ad2c75c71d5f2d9abf1dfd610feffe519b6e14913b0"
     },
     {
       "path": "source-assets/blender/pass65-weapons/sniper.provenance.json",
-      "sha256": "07512c86a2f367b0bf28c094c0602c9aeed45b93592d014f292fdd1b9e2c4fcc"
+      "sha256": "19f39560c782b70dd47689f83bbac72e12075b120f3723cf87d69273bc2bb832"
     },
     {
       "path": "source-assets/blender/pass65-weapons/railgun.provenance.json",
-      "sha256": "b7b95e5ebcee0435e7d96eb05fe5d51fdd9289471ae338b3f98a449ff79f77ef"
+      "sha256": "7b688e883ad2ae7a03d9a2af995b66634c3e51bc69a5d2c91d4bb6d68064d14d"
     },
     {
       "path": "source-assets/blender/pass65-weapons/pistol.provenance.json",
-      "sha256": "b77361c8c944843e6ddb5aead39cc177dc86b7d1876e59e6b12b579e012bbd65"
+      "sha256": "38b141140b3262917782f3858558f62ac90a7d2052e28c2a0cc1dfc0decd8670"
     },
     {
       "path": "source-assets/blender/pass65-weapons/magnum.provenance.json",
-      "sha256": "b91b76f33089951b4bff0146bdcfe5113ab538497d07974f219a27986ae3ca85"
+      "sha256": "ecce170131c63c3cabeb68df84c8fd7ed1d1e4fc0cab15980308162633808731"
     },
     {
       "path": "source-assets/blender/pass65-weapons/machine-pistol.provenance.json",
-      "sha256": "a18be6b0733d8d9d2bb1606ec3e6595d654d595d242bc03a855c7eeca2cf59f5"
+      "sha256": "1b30a15c7b260dab40d4af8ac7ce82804af779bc1499e4ed5ab722d75e122580"
     },
     {
       "path": "source-assets/blender/pass65-weapons/mini-uzi.provenance.json",
-      "sha256": "44441cc749f4b644082aa11a3516df2d6a6421b41256e8cb3610a84ecad7a752"
+      "sha256": "ae7d08f5dd7675357fb58b04e1448ff988f802db4405342019119193faaa3b63"
     },
     {
       "path": "source-assets/blender/pass65-weapons/mp5.provenance.json",
-      "sha256": "c5b39849763b4e3ad83c18601afa3dfc4ddf1ee14602d961fb595b430b935669"
+      "sha256": "11dc92f9bd2d0f79a3adff9ca73bb7fcfe19c364b7fc6d1918042e727ed3ad4b"
     },
     {
       "path": "source-assets/blender/pass65-weapons/m4a1.provenance.json",
-      "sha256": "6e6e554e638b5b169fec702d131b5ec2f075d6118d293332199c63e7a737057a"
+      "sha256": "9026be518ae445db346691a1053c9f9303cedce736ed2a7aeb4df53fb38929e7"
     },
     {
       "path": "source-assets/blender/pass65-weapons/ak-47.provenance.json",
-      "sha256": "6d9009c18ee4ab8cb39cc8a77e264f2881676fd2aef98cc1b17ad9682e1fb644"
+      "sha256": "9d75ad1448ea98c7f654e18aad1cfe93d9b8b5a434d44553e6ff2eb0df891603"
     },
     {
       "path": "source-assets/blender/pass65-weapons/minigun.provenance.json",
-      "sha256": "3b36b00d1cdb9a79ec773855f9e7bd29472800f5ea8b26a60d8262f014c61926"
+      "sha256": "bcc61595a821fbf7227aff2a957dffd9ec935a635c98e7720d10aa191680d70f"
     },
     {
       "path": "source-assets/blender/pass65-weapons/m14-ebr.provenance.json",
-      "sha256": "404002ebcfe80f31b1c0cfef1df304848eb932a0464ee267bed48aa4fa8b7ce2"
+      "sha256": "208533ad29aa673a92fc98fdb2c638932a37615bbfd6e8058259e55a1d368b2b"
     },
     {
       "path": "source-assets/blender/pass65-weapons/slug-shotgun.provenance.json",
-      "sha256": "45471cf8105589dcf65b6d0491e23d8069ffdd772a0e66acc0fcda1b9c5a0989"
+      "sha256": "5194727ed4da1c91759034d8f0c7cb1b1fd605e92c2f06bf7546a7d9e9bbe429"
     },
     {
       "path": "source-assets/blender/pass65-weapons/flashlight-pistol.provenance.json",
-      "sha256": "78a823fbacad68315ba3bcfa474dc355d7137db0dc4d91066a5a154d5ed3b4f6"
+      "sha256": "ec5ccc5ad9aafe808f74cf73a7a198b77221b28d078041763aeeda5917f215b2"
     },
     {
       "path": "source-assets/blender/pass65-weapons/flamethrower.provenance.json",
-      "sha256": "a3a10ce157e3f6ec0a2d591f14dbc44f71ce7de90a0554a7d7a0b93c933ec163"
+      "sha256": "3d83168b27566ddcde27f700cce8fb6e48752ddb151e9ff52efdf947254bb87e"
     },
     {
       "path": "source-assets/blender/pass65-weapons/flare-gun.provenance.json",
-      "sha256": "248a0221219c5e2fd85199b583c5984563aa9f6756320823e2bebe9ad06575ad"
+      "sha256": "bc60688745d1345a550be4a3e25face3e0f6722534171a88822cd74a15fc1559"
     }
   ],
   "review": {

@@ -10,8 +10,6 @@ import { classifyPaths } from './change-impact.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
 const POLICY_PATH = join(REPOSITORY_ROOT, 'acceptance', 'policy.json');
-const ANCESTRY_ROOTS_RELATIVE_PATH = '.github/ancestry-roots.json';
-const ANCESTRY_ROOTS_PATH = join(REPOSITORY_ROOT, '.github', 'ancestry-roots.json');
 const PASS66_MANIFEST_PATH = 'acceptance/pass-66.json';
 const PASS66_LEDGER_PATH = 'docs/PASS65_HITL_ROUND1_CORRECTION_LEDGER_2026-07-26.md';
 const PASS66_GRAPH_RELATIVE_PATH = 'docs/PASS65_OWNER_FEEDBACK_COMPLETENESS_GRAPH.json';
@@ -54,13 +52,32 @@ function parseArgs(argv) {
   return values;
 }
 
-function git(...args) {
-  return execFileSync('git', ['-C', REPOSITORY_ROOT, ...args], { encoding: 'utf8' }).trim();
-}
+// Preview-to-head deltas on this repository legitimately exceed Node's default
+// 1 MiB execFileSync maxBuffer (17,798 changed paths / ~1.5 MB measured
+// 2026-08-25), which made approvalStillMatchesPreview fail with ENOBUFS before
+// any policy evaluation ran. 64 MiB holds roughly half a million path entries;
+// gate semantics are unchanged.
+const GIT_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 
+function git(...args) {
+  return execFileSync('git', ['-C', REPOSITORY_ROOT, ...args], { encoding: 'utf8', maxBuffer: GIT_OUTPUT_MAX_BUFFER }).trim();
+}
 function passNumber(value) {
   const match = /^PASS ([1-9][0-9]*)$/.exec(value ?? '');
   return match ? Number(match[1]) : null;
+}
+
+
+function changedPaths(base, head) {
+  // Every status this filter admits is kept, so a detected rename (R: old+new)
+  // and its undetected form (D: old + A: new) contribute the same path set.
+  // Disabling rename detection skips similarity scoring over the whole delta:
+  // identical sorted output verified against the preview-to-head diff
+  // (17,798 paths), ~7x faster under load. Semantics unchanged.
+  return git('diff', '--name-only', '--no-renames', '--diff-filter=ACDMRTUXB', base, head)
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((path) => path.replaceAll('\\', '/'));
 }
 
 function manifestPathForPass(releasePass, policy) {
@@ -87,13 +104,6 @@ function safeRepositoryPath(reference) {
   const absolute = resolve(REPOSITORY_ROOT, normalize(reference));
   if (relative(REPOSITORY_ROOT, absolute).startsWith('..')) return null;
   return absolute;
-}
-
-function changedPaths(base, head) {
-  return git('diff', '--name-only', '--diff-filter=ACDMRTUXB', base, head)
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((path) => path.replaceAll('\\', '/'));
 }
 
 export function committedManifestBytes(worktreeBytes, headBytes, manifestPath, head) {
@@ -463,196 +473,10 @@ export function selectCiAcceptanceManifest(impact, manifestPaths) {
   return manifests[0];
 }
 
-// ---------------------------------------------------------------------------
-// Reconciliation phase (HF-536, 2026-09-06)
-//
-// A release line that severed its ancestry from origin/main is restored by ONE
-// merge commit whose tree is byte-identical to the contribution head's tree and
-// whose second parent is origin/main. That shape changes no shipped byte, so it
-// cannot be evaluated by --phase ci: the reconciliation PR necessarily touches
-// every enforced pass manifest at once and selectCiAcceptanceManifest correctly
-// throws "found 6".
-//
-// This phase is the narrow, fail-closed exception. It asserts a tree identity
-// that NOTHING in this repository asserts today, and it grants no acceptance:
-// the receipt carries grantsAcceptance:false so a reconciliation receipt can
-// never be read as owner approval of the bytes it carries across.
-//
-// Every shape other than the exact one below throws. See
-// docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md.
-// ---------------------------------------------------------------------------
-
-export function readAncestryRootAllowlist(source) {
-  const document = typeof source === 'string' || Buffer.isBuffer(source) ? JSON.parse(String(source)) : source;
-  if (!document || typeof document !== 'object' || Array.isArray(document)) {
-    throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} must be an object`);
-  }
-  if (document.schemaVersion !== 1) throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} schemaVersion must be 1`);
-  const collect = (key) => {
-    const entries = document[key];
-    if (!Array.isArray(entries)) throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} ${key} must be an array`);
-    return entries.map((entry, index) => {
-      const sha = entry?.sha;
-      if (!SHA40.test(sha ?? '')) {
-        throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} ${key}[${index}].sha must be a full 40-character SHA`);
-      }
-      return sha;
-    });
-  };
-  const legitimate = collect('legitimate');
-  const quarantined = collect('quarantined');
-  if (legitimate.length === 0) {
-    throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} must list at least one legitimate root`);
-  }
-  const allowed = [...legitimate, ...quarantined];
-  if (new Set(allowed).size !== allowed.length) {
-    throw new Error(`${ANCESTRY_ROOTS_RELATIVE_PATH} lists a root twice`);
-  }
-  return { legitimate, quarantined, allowed };
-}
-
-export function assertReconciliationMergeShape(facts) {
-  const {
-    head, base, parents, headTree, firstParentTree,
-    firstParentIsRoot, firstParentRoots, allowedRoots, quarantinedRoots = [],
-  } = facts ?? {};
-  if (!SHA40.test(head ?? '')) throw new Error('reconciliation acceptance needs one exact --head SHA');
-  if (!SHA40.test(base ?? '')) throw new Error('reconciliation acceptance needs one exact --base SHA');
-  if (!Array.isArray(parents) || parents.some((parent) => !SHA40.test(parent ?? ''))) {
-    throw new Error('reconciliation head parents must be exact 40-character SHAs');
-  }
-  if (parents.length !== 2) {
-    throw new Error(`reconciliation head ${head} must be a two-parent merge; found ${parents.length} parent(s)`);
-  }
-  if (parents[0] === parents[1]) {
-    throw new Error(`reconciliation head ${head} names ${parents[0]} as both parents`);
-  }
-  if (!SHA40.test(headTree ?? '') || !SHA40.test(firstParentTree ?? '')) {
-    throw new Error('reconciliation acceptance needs exact head and first-parent tree SHAs');
-  }
-  if (headTree !== firstParentTree) {
-    throw new Error(`reconciliation merge tree ${headTree} differs from first parent ${parents[0]} tree ${firstParentTree}; a reconciliation merge must carry the contribution tree unchanged`);
-  }
-  if (parents[1] !== base) {
-    throw new Error(`reconciliation second parent ${parents[1]} must equal the pull-request base ${base}`);
-  }
-  if (firstParentIsRoot === true) {
-    throw new Error(`reconciliation first parent ${parents[0]} is itself a root commit`);
-  }
-  if (!Array.isArray(allowedRoots) || allowedRoots.length === 0
-    || allowedRoots.some((root) => !SHA40.test(root ?? ''))) {
-    throw new Error(`reconciliation acceptance needs a non-empty ${ANCESTRY_ROOTS_RELATIVE_PATH} allowlist of exact SHAs`);
-  }
-  if (!Array.isArray(firstParentRoots) || firstParentRoots.length === 0
-    || firstParentRoots.some((root) => !SHA40.test(root ?? ''))) {
-    throw new Error('reconciliation acceptance needs the exact root-commit set of the first parent');
-  }
-  const allowed = new Set(allowedRoots);
-  const unlisted = [...new Set(firstParentRoots.filter((root) => !allowed.has(root)))].sort();
-  if (unlisted.length > 0) {
-    throw new Error(`reconciliation first parent ${parents[0]} introduces ${unlisted.length} root commit(s) absent from ${ANCESTRY_ROOTS_RELATIVE_PATH} (${unlisted.join(', ')}); a parentless full-tree snapshot import severs ancestry and is banned`);
-  }
-  const quarantined = new Set(quarantinedRoots);
-  return {
-    reconciliation: true,
-    treeIdenticalTo: parents[0],
-    base: parents[1],
-    head,
-    tree: headTree,
-    rootCount: new Set(firstParentRoots).size,
-    quarantinedRoots: [...new Set(firstParentRoots.filter((root) => quarantined.has(root)))].sort(),
-  };
-}
-
-export function selectReconciliationManifest(manifestPaths, policy) {
-  const pattern = new RegExp(`^${policy.manifestDirectory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\/pass-([1-9][0-9]*)\\.json$`);
-  const enforced = [...new Set(manifestPaths.map((path) => String(path).replaceAll('\\', '/')).filter(Boolean))]
-    .map((path) => ({ path, number: Number(pattern.exec(path)?.[1] ?? Number.NaN) }))
-    .filter((entry) => Number.isInteger(entry.number) && entry.number >= policy.enforceFromPass)
-    .sort((left, right) => right.number - left.number);
-  if (enforced.length === 0) {
-    throw new Error(`reconciliation first parent carries no enforced acceptance manifest (PASS ${policy.enforceFromPass}+)`);
-  }
-  return enforced[0].path;
-}
-
-function evaluateReconciliation(values, policy) {
-  const head = values.head || git('rev-parse', 'HEAD');
-  const base = values.base;
-  if (!SHA40.test(head ?? '')) throw new Error('reconciliation acceptance needs one exact --head SHA');
-  if (!SHA40.test(base ?? '')) throw new Error('reconciliation acceptance needs one exact --base SHA');
-
-  const parents = git('rev-list', '--parents', '-n', '1', head).split(/\s+/).filter(Boolean).slice(1);
-  const firstParent = parents[0];
-  const roots = readAncestryRootAllowlist(readFileSync(ANCESTRY_ROOTS_PATH, 'utf8'));
-  const shape = assertReconciliationMergeShape({
-    head,
-    base,
-    parents,
-    headTree: git('rev-parse', `${head}^{tree}`),
-    firstParentTree: SHA40.test(firstParent ?? '') ? git('rev-parse', `${firstParent}^{tree}`) : null,
-    firstParentIsRoot: SHA40.test(firstParent ?? '')
-      ? git('rev-list', '--parents', '-n', '1', firstParent).split(/\s+/).filter(Boolean).length === 1
-      : undefined,
-    firstParentRoots: SHA40.test(firstParent ?? '')
-      ? git('rev-list', '--max-parents=0', firstParent).split(/\r?\n/).filter(Boolean)
-      : [],
-    allowedRoots: roots.allowed,
-    quarantinedRoots: roots.quarantined,
-  });
-
-  const manifestPath = selectReconciliationManifest(
-    git('ls-tree', '-r', '--name-only', firstParent, `${policy.manifestDirectory}/`).split(/\r?\n/).filter(Boolean),
-    policy,
-  );
-  // The merge tree equals the first parent's tree, so the worktree bytes, the
-  // bytes at head and the bytes at head^1 are the same object by construction.
-  const absolute = join(REPOSITORY_ROOT, manifestPath);
-  if (!existsSync(absolute)) throw new Error(`acceptance manifest does not exist: ${manifestPath}`);
-  const bytes = committedManifestBytes(
-    readFileSync(absolute),
-    readCommittedManifest(manifestPath, head),
-    manifestPath,
-    head,
-  );
-  const manifest = JSON.parse(bytes.toString('utf8'));
-  const releasePass = manifest.releasePass;
-  const errors = [];
-  if (passNumber(releasePass) === null || manifestPath !== manifestPathForPass(releasePass, policy)) {
-    errors.push(`bound manifest path must match releasePass (${manifestPath} declares ${JSON.stringify(releasePass ?? null)})`);
-  }
-  // A manifest that CLAIMS acceptance must survive full validation. A manifest
-  // still marked candidate is reported honestly as unapproved; this phase never
-  // upgrades it, because the merge introduces no byte to approve.
-  const approved = manifest.status === 'accepted';
-  const validation = approved ? validateAcceptanceManifest(manifest, { policy }) : null;
-  if (approved && !validation.ok) {
-    errors.push(...validation.errors.map((error) => `bound accepted manifest invalid: ${error}`));
-  }
-
-  return {
-    schemaVersion: 1,
-    ok: errors.length === 0,
-    phase: 'reconciliation',
-    impact: values.impact ?? null,
-    ...shape,
-    manifestPath,
-    manifestSha256: createHash('sha256').update(bytes).digest('hex'),
-    headSha: head,
-    releasePass: releasePass ?? null,
-    boundManifestStatus: manifest.status ?? null,
-    boundManifestApproved: approved && validation.ok,
-    grantsAcceptance: false,
-    grantsAcceptanceReason: 'a reconciliation merge changes no byte relative to its first parent, so it approves nothing; owner acceptance remains owed on the contribution line',
-    errors,
-  };
-}
-
 export function evaluateAcceptance(values) {
   const policy = readPolicy();
   const phase = values.phase;
-  if (phase === 'reconciliation') return evaluateReconciliation(values, policy);
-  if (!['ci', 'release'].includes(phase)) throw new Error('--phase must be ci, release, or reconciliation');
+  if (!['ci', 'release'].includes(phase)) throw new Error('--phase must be ci or release');
   const head = values.head || git('rev-parse', 'HEAD');
   let manifestPath;
   let releasePass = values.pass;

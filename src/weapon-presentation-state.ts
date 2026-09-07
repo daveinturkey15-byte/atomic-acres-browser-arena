@@ -18,7 +18,68 @@ export type HitReactionState = {
 export type ViewmodelObstructionPose = Readonly<{
   retreat: number;
   lift: number;
+  /**
+   * Metres from the eye, along camera-forward, to the nearest obstruction
+   * inside the MEASURED rig envelope - or null when the rig is clear.
+   *
+   * `retreat` above is deliberately NOT this. `retreat` is derived from the
+   * AUTHORED probe profile and is an input to the HF-343 fire gate, so its
+   * value must stay byte-identical; this field is the presentation-only
+   * geometry the contact fold solves against, and nothing gameplay reads it.
+   */
+  contactDepthMeters: number | null;
 }>;
+
+/**
+ * MEASURED camera-space envelope of the presented first-person rig, taken at
+ * the NEUTRAL (unfolded, un-retreated) pose so that folding the weapon cannot
+ * feed back into the probe that asked for the fold.
+ *
+ * Owner, repeatedly: "the gun clipping is still happening everywhere". Five
+ * measured defects sat behind that; two of them were here. The authored
+ * profile claimed a 1.65 m carbine envelope against a muzzle measured 1.958 m
+ * from the eye, so at a 1.8 m gap the lattice reported "clear" while the
+ * muzzle was already 15.8 cm inside the wall. The authored lattice was also
+ * centred on the EYE (camera-space X -0.386..+0.386, Y -0.426..+0.396) while
+ * the rig actually occupies X +0.076..+0.559, Y -0.772..-0.043 - so 17.3 cm
+ * of the weapon's right side and 34.6 cm of its underside were never sampled
+ * and about half the sampled volume held no weapon at all.
+ *
+ * Nothing here is authored. Every number is read off the mounted model.
+ */
+export const VIEWMODEL_CONTACT_ENVELOPE_CONTRACT = 'measured-viewmodel-contact-envelope-v1';
+
+export type ViewmodelContactEnvelope = Readonly<{
+  contract: typeof VIEWMODEL_CONTACT_ENVELOPE_CONTRACT;
+  weapon: WeaponId;
+  /** Camera-space span the rig actually occupies. */
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  /** Camera-forward metres to the forward-most rig point at the neutral pose. */
+  forwardReachMeters: number;
+}>;
+
+/** One placed probe ray: where it starts relative to the eye, and how far it runs. */
+export type ViewmodelProbeLattice = Readonly<{
+  /** Camera-space centre of the sampled volume. Zero for the authored fallback. */
+  centreRightMeters: number;
+  centreUpMeters: number;
+  halfWidthMeters: number;
+  upperOffsetMeters: number;
+  lowerOffsetMeters: number;
+  lengthMeters: number;
+  paddingMeters: number;
+  source: 'measured-envelope' | 'authored-profile';
+}>;
+
+/**
+ * How far past the forward-most rig point the envelope sweep still looks. The
+ * fold has to begin BEFORE the muzzle reaches the surface, not at the instant
+ * it arrives, or the weapon snaps instead of folding.
+ */
+export const VIEWMODEL_ENVELOPE_PROBE_LEAD_METERS = 0.35;
 
 export type ViewmodelContactProfile = Readonly<{
   weapon: WeaponId;
@@ -55,6 +116,11 @@ export type ViewmodelContactResponse = Readonly<{
   yawRadians: number;
   rollRadians: number;
   additionalLiftMeters: number;
+  /** Constant presentation lift while prone. Reload/recoil dips ride up to
+   * ~5 cm lower than the settled pose; the old full-fold lift absorbed them
+   * by accident, the flat-prone baseline does not. Kept OUT of
+   * additionalLiftMeters so contact-delta identities stay exact. */
+  proneFloorGuardMeters: number;
   additionalDropMeters: number;
   scale: number;
   minimumScale: number;
@@ -97,8 +163,65 @@ export function viewmodelContactProbePaddingMeters(profile: ViewmodelContactProf
     profile.probeLowerOffsetMeters * 0.52,
   );
 }
+
+/**
+ * Places the nine-probe lattice over the volume the weapon is ACTUALLY in.
+ *
+ * With no measured envelope this returns the authored profile unchanged and
+ * centred on the eye - that path is what the HF-343 fire gate samples, and its
+ * numbers must not move. With a measured envelope the lattice is re-centred
+ * and re-sized onto the rig, and its reach is the rig's own forward reach plus
+ * a lead, so a longer weapon gets a longer probe instead of an authored guess.
+ */
+export function viewmodelProbeLattice(
+  profile: ViewmodelContactProfile,
+  envelope: ViewmodelContactEnvelope | null | undefined,
+): ViewmodelProbeLattice {
+  const authoredPadding = viewmodelContactProbePaddingMeters(profile);
+  if (!envelope || envelope.contract !== VIEWMODEL_CONTACT_ENVELOPE_CONTRACT) {
+    return Object.freeze({
+      centreRightMeters: 0,
+      centreUpMeters: 0,
+      halfWidthMeters: profile.probeHalfWidthMeters,
+      upperOffsetMeters: profile.probeUpperOffsetMeters,
+      lowerOffsetMeters: profile.probeLowerOffsetMeters,
+      lengthMeters: profile.probeLengthMeters,
+      paddingMeters: authoredPadding,
+      source: 'authored-profile',
+    });
+  }
+  const centreRight = (envelope.minX + envelope.maxX) / 2;
+  const centreUp = (envelope.minY + envelope.maxY) / 2;
+  const halfWidth = Math.max(0.05, (envelope.maxX - envelope.minX) / 2);
+  const halfHeight = Math.max(0.05, (envelope.maxY - envelope.minY) / 2);
+  // Padded until neighbouring samples overlap, exactly as the authored lattice
+  // is - a thin doorjamb must not pass between two probes.
+  const padding = Math.max(0.085, halfWidth * 0.52, halfHeight * 0.52);
+  return Object.freeze({
+    centreRightMeters: finite(centreRight),
+    centreUpMeters: finite(centreUp),
+    halfWidthMeters: halfWidth,
+    upperOffsetMeters: halfHeight,
+    lowerOffsetMeters: halfHeight,
+    lengthMeters: Math.max(
+      profile.probeLengthMeters,
+      Math.max(0, finite(envelope.forwardReachMeters)) + VIEWMODEL_ENVELOPE_PROBE_LEAD_METERS,
+    ),
+    paddingMeters: padding,
+    source: 'measured-envelope',
+  });
+}
 const VIEWMODEL_PRONE_BASE_RETREAT_METERS = 0.09;
-const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.115;
+// Owner 2026-08-30 ("clipping ... or prone, longtime issue"): flat-ground
+// prone probes ~0.19 m of floor lift, and with the old 0.115 baseline every
+// open-field prone sat at ~0.88 highReadyBlend - the weapon folded ~90
+// degrees with the forearm rammed through the camera, which is what the
+// prone view has been showing. The baseline is the measured FLAT-GROUND
+// value (+1 cm slack), so the fold engages only when clearance is genuinely
+// tighter than normal prone (under low cover, muzzle to a wall). The fire
+// gate already passed lift as 0 for exactly this reason; presentation now
+// matches it.
+const VIEWMODEL_PRONE_BASE_LIFT_METERS = 0.2;
 const VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS = 0.085;
 const VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS = 0.04;
 
@@ -164,8 +287,38 @@ export const VIEWMODEL_CONTACT_PROFILES: Readonly<Record<WeaponId, ViewmodelCont
   'explosive-crossbow': contactProfile('explosive-crossbow', 0.78, 0.8, 1.75, 0.32, 0.26, 0.32, 0.86, -0.13, 0.085, 0.055, 0.22),
   railgun: contactProfile('railgun', 0.98, 0.75, 2, 0.34, 0.3, 0.36, 1, -0.18, 0.11, 0.07, 0.26),
   flamethrower: contactProfile('flamethrower', 0.96, 0.75, 1.9, 0.34, 0.3, 0.38, 0.98, -0.18, 0.11, 0.07, 0.26),
+  'crimson-flamethrower': contactProfile('crimson-flamethrower', 0.96, 0.75, 1.9, 0.34, 0.3, 0.38, 0.98, -0.18, 0.11, 0.07, 0.26),
   'flare-gun': contactProfile('flare-gun', 0.55, 0.87, 1.2, 0.18, 0.19, 0.21, 0.62, -0.08, 0.06, 0.035, 0.18),
 });
+
+/**
+ * HF-410 - THE POSE THE OWNER ASKED TO HAVE REMOVED.
+ *
+ * Owner, 2026-09-02, on PASS 84 with two Firing Range screenshots: "gun
+ * clipping through walls and floor aswell as HOLDING IT UP when near floor or
+ * prone or walls is super bad, needs a re work and fix". Screenshot 1 is this
+ * response at full blend: the rig lifted and pitched into a near-vertical
+ * high-ready that fills the frame.
+ *
+ * The lift and the pitch were bought to hide a rig that hung outside the
+ * player's collision body. That rig is now fitted inside it
+ * (src/viewmodel-body-fit.ts), so the probe that drives this response is sized
+ * to a 0.32 m envelope and cannot reach a surface the capsule may stand next
+ * to: on normal poses `obstructionBlend` is zero and this whole response is
+ * inert. These two ceilings are the belt to that braces: even if a pose ever
+ * does drive the blend, the discretionary part of the lift may not exceed
+ * three centimetres and the high-ready pitch may not exceed a few degrees.
+ *
+ * What is NOT capped, deliberately: `additionalDropMeters` (a drop is not
+ * "holding it up"), and the MEASURED floor clearance terms `lift * floorBlend`
+ * and the wall-drop counter-lift. Those are physical - they are what keeps the
+ * muzzle above the prone floor - and capping them would trade the owner's
+ * complaint for the one underneath it.
+ */
+/** Ceiling on the discretionary "raise it out of the way" lift, in metres. */
+export const VIEWMODEL_CONTACT_POSE_LIFT_CAP_METERS = 0.03;
+/** Ceiling on the high-ready pitch. Roughly three degrees; formerly up to 0.36 rad. */
+export const VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS = 0.05;
 
 /**
  * Presentation-only contact fold. ADS reduces the fold but cannot cancel it:
@@ -209,22 +362,34 @@ export function viewmodelContactResponse(
     floorBlend,
     obstructionBlend,
     highReadyBlend,
-    pitchRadians: highReadyBlend === 0 ? 0 : profile.maximumHighReadyPitchRadians * highReadyBlend,
+    pitchRadians: highReadyBlend === 0
+      ? 0
+      : Math.min(
+        VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
+        profile.maximumHighReadyPitchRadians * highReadyBlend,
+      ),
     yawRadians: highReadyBlend === 0 ? 0 : profile.maximumYawRadians * highReadyBlend,
     rollRadians: highReadyBlend === 0 ? 0 : profile.maximumRollRadians * highReadyBlend,
-    additionalLiftMeters: profile.maximumAdditionalLiftMeters
-      * Math.max(wallBlend, floorBlend)
-      * (0.72 + 0.28 * adsRemaining)
+    additionalLiftMeters: Math.min(
+      VIEWMODEL_CONTACT_POSE_LIFT_CAP_METERS,
+      profile.maximumAdditionalLiftMeters
+        * Math.max(wallBlend, floorBlend)
+        * (0.72 + 0.28 * adsRemaining),
+    )
       // The probe's measured floor pressure is real world-space clearance.
       // Carry it into the camera-space root so the complete skinned sleeves and
       // receiver remain above the prone floor instead of only reporting lift.
       + lift * floorBlend
-      // Retain the accepted wall-drop telemetry and response, while a real
-      // floor contact counter-lifts ninety-two percent of it. This keeps the
-      // connected weapon/hands above the prone plane without weakening the
-      // established high-ready/drop gate or changing gameplay authority.
-      + wallDropMeters * floorBlend * 0.92,
+      // Retain the accepted wall-drop telemetry and response, while floor
+      // contact counter-lifts ninety-two percent of it. PRONE keys the
+      // counter-lift directly: lying down, the floor plane is always 0.61 m
+      // below the eye, so a wall-contact drop must be countered even when the
+      // floor-lift blend reads zero (the 2026-08-30 baseline re-measure made
+      // flat-ground prone read zero, and the anatomy gate caught the muzzle
+      // digging 3.6 cm through the prone floor at full wall retreat).
+      + wallDropMeters * Math.max(prone ? 1 : 0, floorBlend) * 0.92,
     additionalDropMeters: wallDropMeters,
+    proneFloorGuardMeters: prone ? 0.1 : 0,
     scale: 1 - (1 - profile.minimumScale) * highReadyBlend,
     minimumScale: profile.minimumScale,
     aimAuthority: 'camera-forward-unchanged',
@@ -262,6 +427,98 @@ export function advanceAdsBlend(current: number, ads: boolean, dt: number, weapo
   const safeDt = Math.max(0, finite(dt));
   const blend = 1 - Math.exp(-(ads ? ADS_IN_RESPONSE_PER_SECOND : ADS_OUT_RESPONSE_PER_SECOND) * safeDt);
   return clamp01(safeCurrent + ((ads ? 1 : 0) - safeCurrent) * blend);
+}
+
+// ---------------------------------------------------------------------------
+// HF-388 arms-animation polish: authored motion curves.
+//
+// All three are PURE, deterministic functions of (time | blend) so focused
+// tests can pin the exact trajectory; the live update loop only advances
+// clocks and reads these. None of them touches camera-space Z, gameplay rays,
+// recoil authority or multiplayer state - presentation only.
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared underdamped second-order remainder: 1 at t=0 with ZERO initial
+ * slope, decaying through one bounded reverse excursion before settling.
+ * `1 - remainder` is therefore a step response that rises, overshoots rest by
+ * exp(-pi*zeta/sqrt(1-zeta^2)) and settles - the shape of an equip settle.
+ */
+const underdampedRestFraction = (seconds: number, zeta: number, omegaNatural: number): number => {
+  const damping = zeta * omegaNatural;
+  const omegaDamped = omegaNatural * Math.sqrt(1 - zeta * zeta);
+  return Math.exp(-damping * seconds)
+    * (Math.cos(omegaDamped * seconds) + (damping / omegaDamped) * Math.sin(omegaDamped * seconds));
+};
+
+export const VIEWMODEL_EQUIP_SETTLE_CONTRACT = 'hf388-underdamped-equip-settle-v1';
+/** Seconds until the rising blend first crosses rest (remainder's first zero). */
+export const VIEWMODEL_EQUIP_RISE_SECONDS =
+  (Math.PI - Math.atan(Math.sqrt(1 - 0.75 * 0.75) / 0.75)) / (15.2 * Math.sqrt(1 - 0.75 * 0.75));
+export const VIEWMODEL_EQUIP_SETTLED_SECONDS = 0.6;
+/** Authored follow-through: fraction of the drop that rebounds past rest once. */
+export const VIEWMODEL_EQUIP_OVERSHOOT = Math.exp(-Math.PI * 0.75 / Math.sqrt(1 - 0.75 * 0.75));
+
+/**
+ * Equip/holster settle for the weapon-switch drop. Returns the settledness
+ * blend (0 = fully holstered, 1 = at rest) along an underdamped timeline:
+ * soft attack, first crossing of rest at VIEWMODEL_EQUIP_RISE_SECONDS, one
+ * bounded ~2.8% rebound above rest, then exact rest. Never negative, never
+ * further above rest than twice the authored overshoot.
+ */
+export function viewmodelEquipBlendAt(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  if (seconds >= VIEWMODEL_EQUIP_SETTLED_SECONDS) return 1;
+  const blend = 1 - underdampedRestFraction(seconds, 0.75, 15.2);
+  // Clamp the microscopic reverse tail so the applied drop never exceeds its
+  // authored -0.52 m bound, and cap the rebound headroom explicitly.
+  return Math.min(1 + 2 * VIEWMODEL_EQUIP_OVERSHOOT, Math.max(0, blend));
+}
+
+export const FIRST_PERSON_LAND_DIP_METERS = 0.075;
+export const VIEWMODEL_LAND_DIP_ONSET_SECONDS = 0.06;
+export const VIEWMODEL_LAND_DIP_SETTLE_SECONDS = 0.5;
+/** Rebound fraction of the dip amplitude, derived from the shared remainder. */
+export const VIEWMODEL_LAND_DIP_REBOUND = Math.exp(-Math.PI * 0.4557 / Math.sqrt(1 - 0.4557 * 0.4557));
+const LAND_DIP_ZETA = 0.4557;
+const LAND_DIP_OMEGA_NATURAL = 22;
+
+/**
+ * Landing envelope shape in [0, 1]: fast-but-finite attack over the onset
+ * window (the old code snapped to full depth inside ONE frame), then a C1
+ * continuous damped release whose single rebound carries
+ * VIEWMODEL_LAND_DIP_REBOUND (~20%) of the dip ABOVE rest before settling.
+ */
+export function viewmodelLandDipShapeAt(ageSeconds: number): number {
+  if (!Number.isFinite(ageSeconds) || ageSeconds <= 0) return 0;
+  if (ageSeconds >= VIEWMODEL_LAND_DIP_SETTLE_SECONDS) return 0;
+  const onset = Math.min(1, Math.max(0, ageSeconds / VIEWMODEL_LAND_DIP_ONSET_SECONDS));
+  const attack = onset * onset * (3 - 2 * onset);
+  if (ageSeconds <= VIEWMODEL_LAND_DIP_ONSET_SECONDS) return attack;
+  return attack * underdampedRestFraction(ageSeconds - VIEWMODEL_LAND_DIP_ONSET_SECONDS, LAND_DIP_ZETA, LAND_DIP_OMEGA_NATURAL);
+}
+
+/**
+ * Signed vertical landing offset in metres: negative below rest while dipping,
+ * positive during the rebound. `impulse01` is the clamped impact strength the
+ * movement loop already scaled by the accessibility motion setting.
+ */
+export function viewmodelLandDropMetersAt(ageSeconds: number, impulse01: number): number {
+  if (!Number.isFinite(impulse01)) return 0;
+  return -FIRST_PERSON_LAND_DIP_METERS * Math.min(1, Math.max(0, impulse01)) * viewmodelLandDipShapeAt(ageSeconds);
+}
+
+export const VIEWMODEL_SPRINT_POSE_EASE_CONTRACT = 'hf388-smoothstep-sprint-pose-v1';
+/**
+ * S-curve applied to the VISUAL sprint terms only (drop, yaw, roll). The raw
+ * sprintBlend keeps feeding action contracts and stance gating byte-identically;
+ * easing here removes the instantaneous lurch at sprint key-down/key-up while
+ * preserving both endpoints exactly.
+ */
+export function viewmodelSprintPoseEase(blend: number): number {
+  if (!Number.isFinite(blend)) return 0;
+  const b = Math.min(1, Math.max(0, blend));
+  return b * b * (3 - 2 * b);
 }
 
 /** Bounded heat accumulator used only for original presentation smoke/flash layering. */
@@ -309,6 +566,12 @@ export function viewmodelObstructionPose(
     )),
     lift: Math.min(0.2, Math.max(0, (prone ? VIEWMODEL_PRONE_BASE_LIFT_METERS : 0)
       + Math.max(proneGroundedLift, floorPressure * (prone ? VIEWMODEL_PRONE_FLOOR_LIFT_BUDGET_METERS : VIEWMODEL_STANDING_FLOOR_LIFT_BUDGET_METERS)))),
+    // Null from the pure reducer by construction: this reducer only ever sees
+    // the AUTHORED probe distance, and handing that to the fold would rebuild
+    // the same authored-guess problem one layer down. The runtime resolver in
+    // systems/viewmodel-contact-probe.ts fills it from the measured envelope
+    // sweep, which is the only sweep that knows where the weapon really is.
+    contactDepthMeters: null,
   };
 }
 
@@ -339,6 +602,108 @@ export function fireCycleAt(weapon: WeaponId, rawAgeMs: number, heat: number): F
     smokeScale: 0.72 + clamp01(finite(heat)) * 1.28,
     casingReady: ageMs >= (weapon === 'scattergun' ? 230 : weapon === 'sniper' ? 150 : fastAuto ? 24 : 34),
   };
+}
+
+// HF-343: the near-wall high-ready raise was presentation-only with zero
+// effect on firing ("when behind cover gun moves up but can still shoot like
+// crosshair"). This typed admission is the handoff seam: the viewmodel contact
+// response already measures how far the weapon is raised, so gameplay (the
+// legacy-main tryFire gate) can consume one frozen record instead of
+// re-deriving blends. Presentation still applies nothing itself — the
+// authoritative shot ray, hit timing and recoil stay exactly where they are;
+// aimAuthority records that contract on every record.
+export const VIEWMODEL_FIRE_ADMISSION_CONTRACT = 'viewmodel-fire-admission-hf343-v1';
+/**
+ * Block firing once the weapon is fully raised against cover: either the
+ * forward probe hit within the authored full-stow distance, or the high-ready
+ * blend reached ~0.9 (the owner asked for "a balance", not a hair trigger).
+ */
+export const VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND = 0.9;
+/**
+ * Graduated accuracy penalty while partially raised. 0.014 rad (~0.8 degrees)
+ * is comparable to the carbine's authored hip spread (0.012 rad): a half
+ * raised weapon shoots roughly like strafing, a fully raised one is blocked,
+ * and open space is untouched.
+ */
+export const VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS = 0.014;
+
+export type ViewmodelFireBlockReason = 'open-space' | 'full-stow' | 'high-ready';
+
+export type ViewmodelFireAdmission = Readonly<{
+  contract: typeof VIEWMODEL_FIRE_ADMISSION_CONTRACT;
+  weapon: WeaponId;
+  /** Typed obstruction/high-ready blends mirrored from the contact response. */
+  obstructionBlend: number;
+  highReadyBlend: number;
+  /** Recommended policy: true when the trigger should be refused this frame. */
+  fireBlocked: boolean;
+  blockReason: ViewmodelFireBlockReason;
+  /** Additive radians the host should add to the sampled spread cone. */
+  spreadPenaltyRadians: number;
+  policy: 'block-full-stow-graduate-partial-v1';
+  aimAuthority: 'camera-forward-unchanged';
+}>;
+
+/**
+ * HF-343 recommended fire policy from one contact response. Full stow is
+ * detected two equivalent ways: an explicit forward-probe distance at or
+ * inside the profile's full-stow range, or the wall blend saturating (the
+ * retreat already clamped to its maximum, which the obstruction pose only
+ * produces at that same distance). The spread penalty ramps linearly with the
+ * high-ready blend and saturates at the block threshold so blocked shots
+ * report the maximum penalty rather than an arbitrary one.
+ */
+export function viewmodelFireAdmissionFromResponse(
+  weapon: WeaponId,
+  response: ViewmodelContactResponse,
+  nearestForwardSurfaceMeters: number | null = null,
+): ViewmodelFireAdmission {
+  const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
+  const distance = nearestForwardSurfaceMeters === null || !Number.isFinite(nearestForwardSurfaceMeters)
+    ? null
+    : Math.max(0, nearestForwardSurfaceMeters);
+  const fullStow = (distance !== null && distance <= profile.fullStowDistanceMeters)
+    || response.wallBlend >= 1;
+  const highReadyBlend = clamp01(finite(response.highReadyBlend));
+  const raisedPastThreshold = highReadyBlend >= VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND;
+  const fireBlocked = fullStow || raisedPastThreshold;
+  const blockReason: ViewmodelFireBlockReason = !fireBlocked
+    ? 'open-space'
+    : fullStow ? 'full-stow' : 'high-ready';
+  const raiseRamp = clamp01(highReadyBlend / VIEWMODEL_FIRE_BLOCK_HIGH_READY_BLEND);
+  return Object.freeze({
+    contract: VIEWMODEL_FIRE_ADMISSION_CONTRACT,
+    weapon,
+    obstructionBlend: clamp01(finite(response.obstructionBlend)),
+    highReadyBlend,
+    fireBlocked,
+    blockReason,
+    spreadPenaltyRadians: fireBlocked
+      ? VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS
+      : VIEWMODEL_FIRE_MAXIMUM_SPREAD_PENALTY_RADIANS * raiseRamp,
+    policy: 'block-full-stow-graduate-partial-v1',
+    aimAuthority: 'camera-forward-unchanged',
+  });
+}
+
+/**
+ * HF-343 convenience wrapper mirroring viewmodelContactResponse's signature,
+ * so the host can gate firing from the same per-frame obstruction inputs the
+ * presentation consumes (plus the raw forward-probe distance when it has one).
+ */
+export function viewmodelFireAdmission(
+  weapon: WeaponId,
+  surfaceRetreatMeters: number,
+  surfaceLiftMeters: number,
+  prone: boolean,
+  adsBlend: number,
+  nearestForwardSurfaceMeters: number | null = null,
+): ViewmodelFireAdmission {
+  return viewmodelFireAdmissionFromResponse(
+    weapon,
+    viewmodelContactResponse(weapon, surfaceRetreatMeters, surfaceLiftMeters, prone, adsBlend),
+    nearestForwardSurfaceMeters,
+  );
 }
 
 /** Presentation-only reaction envelope; authoritative operator hit meshes do not consume these rotations. */

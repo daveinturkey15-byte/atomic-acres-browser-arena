@@ -1,0 +1,4356 @@
+{
+  "lane": "AB",
+  "generatedAt": "2026-09-03T01:11:42.286Z",
+  "gitSha": "a5348dcd7fdb8bd42bf9ea8772d3caf54647d761",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "frameSamples": 90,
+  "safety": {
+    "maximumShadowMassGrowthPoints": 3,
+    "maximumShadowFloorDropSteps": 2,
+    "maximumHighlightMassGrowthPoints": 6,
+    "maximumDrawCallDelta": 0
+  },
+  "instrument": {
+    "version": "interleaved-identity-baseline-v2",
+    "pinnedNullTolerancePoints": 0.5,
+    "pinnedArenas": [
+      "gun-range",
+      "map3"
+    ]
+  },
+  "environmentInvalid": null,
+  "runs": [
+    {
+      "arena": "atomic-acres",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 15,
+            "deviation": 0.625,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 13.3,
+            "p95": 15.8,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 78.55,
+            "meanG": 75.73,
+            "meanB": 62.24,
+            "meanLuma": 75.36,
+            "meanSaturation": 56.66,
+            "shadowMassPercent": 15.37,
+            "highlightMassPercent": 0.17,
+            "lumaP05": 5,
+            "lumaP50": 64,
+            "lumaP95": 186
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 13.4,
+              "p95": 16.4,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.14,
+              "meanG": 72.44,
+              "meanB": 60.48,
+              "meanLuma": 72.15,
+              "meanSaturation": 55.79,
+              "shadowMassPercent": 19.73,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 59,
+              "lumaP95": 186
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -4.36,
+            "shadowFloorDropSteps": 2,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.1,
+            "meanLumaDelta": 3.21,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 17,
+            "deviation": 0.125,
+            "sunIntensityScale": 1.1117,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 13,
+            "p95": 16.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 77.36,
+            "meanG": 74.5,
+            "meanB": 61.44,
+            "meanLuma": 74.17,
+            "meanSaturation": 56.27,
+            "shadowMassPercent": 16.25,
+            "highlightMassPercent": 0.17,
+            "lumaP05": 7,
+            "lumaP50": 61,
+            "lumaP95": 188
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.14,
+              "meanG": 72.44,
+              "meanB": 60.49,
+              "meanLuma": 72.15,
+              "meanSaturation": 55.78,
+              "shadowMassPercent": 19.72,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 59,
+              "lumaP95": 186
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -3.47,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.4,
+            "meanLumaDelta": 2.02,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 19,
+            "deviation": 0.375,
+            "sunIntensityScale": 0.7253,
+            "shadowFloorScale": 1.3159,
+            "exposureScale": 1.0659,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15.2,
+            "p95": 20.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 75.29,
+            "meanG": 75.23,
+            "meanB": 65.5,
+            "meanLuma": 74.54,
+            "meanSaturation": 50.12,
+            "shadowMassPercent": 23.13,
+            "highlightMassPercent": 0.18,
+            "lumaP05": 11,
+            "lumaP50": 63,
+            "lumaP95": 189
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.13,
+              "meanG": 72.43,
+              "meanB": 60.48,
+              "meanLuma": 72.14,
+              "meanSaturation": 55.8,
+              "shadowMassPercent": 19.73,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 59,
+              "lumaP95": 186
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 3.4,
+            "shadowFloorDropSteps": -4,
+            "highlightMassGrowthPoints": 0.01,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.8,
+            "meanLumaDelta": 2.4,
+            "withinInstrumentNoise": false,
+            "pass": false
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 0.01,
+      "pinned": false,
+      "ok": true,
+      "ms": 88077
+    },
+    {
+      "arena": "atomic-acres",
+      "weather": "heavy-rain",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 15,
+            "deviation": 0.3438,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 4,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14.1,
+            "p95": 16.5,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 79.26,
+            "meanG": 76.45,
+            "meanB": 63.17,
+            "meanLuma": 76.09,
+            "meanSaturation": 55.86,
+            "shadowMassPercent": 15.66,
+            "highlightMassPercent": 0.17,
+            "lumaP05": 6,
+            "lumaP50": 64,
+            "lumaP95": 189
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 3,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 15.1,
+              "p95": 17.9,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.74,
+              "meanG": 73.25,
+              "meanB": 61.52,
+              "meanLuma": 72.93,
+              "meanSaturation": 55.1,
+              "shadowMassPercent": 19.11,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 60,
+              "lumaP95": 187
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -3.45,
+            "shadowFloorDropSteps": 1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -1,
+            "meanLumaDelta": 3.16,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 17,
+            "deviation": 0.0688,
+            "sunIntensityScale": 1.0624,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 6,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14,
+            "p95": 16.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 77.06,
+            "meanG": 74.43,
+            "meanB": 62.1,
+            "meanLuma": 74.1,
+            "meanSaturation": 55.33,
+            "shadowMassPercent": 16.73,
+            "highlightMassPercent": 0.17,
+            "lumaP05": 7,
+            "lumaP50": 61,
+            "lumaP95": 188
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 5,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.8,
+              "meanG": 73.29,
+              "meanB": 61.55,
+              "meanLuma": 72.98,
+              "meanSaturation": 55.07,
+              "shadowMassPercent": 19.1,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 60,
+              "lumaP95": 187
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -2.37,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -1.1,
+            "meanLumaDelta": 1.12,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 19,
+            "deviation": 0.2063,
+            "sunIntensityScale": 0.7731,
+            "shadowFloorScale": 1.261,
+            "exposureScale": 1.0545,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 8,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15,
+            "p95": 18.8,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 76.34,
+            "meanG": 76.06,
+            "meanB": 65.76,
+            "meanLuma": 75.38,
+            "meanSaturation": 50.64,
+            "shadowMassPercent": 21.68,
+            "highlightMassPercent": 0.18,
+            "lumaP05": 11,
+            "lumaP50": 63,
+            "lumaP95": 189
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\atomic-acres\\atomic-acres--heavy-rain--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 7,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 75.84,
+              "meanG": 73.35,
+              "meanB": 61.62,
+              "meanLuma": 73.03,
+              "meanSaturation": 55.02,
+              "shadowMassPercent": 19.07,
+              "highlightMassPercent": 0.17,
+              "lumaP05": 7,
+              "lumaP50": 60,
+              "lumaP95": 187
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 2.61,
+            "shadowFloorDropSteps": -4,
+            "highlightMassGrowthPoints": 0.01,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.1,
+            "meanLumaDelta": 2.35,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.52,
+      "identityDriftPoints": 0.04,
+      "pinned": false,
+      "ok": true,
+      "ms": 90296
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 5.8,
+            "deviation": 0.2553,
+            "sunIntensityScale": 0.695,
+            "shadowFloorScale": 1.3507,
+            "exposureScale": 1.0732,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14.2,
+            "p95": 19.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 120.15,
+            "meanG": 130.67,
+            "meanB": 155.26,
+            "meanLuma": 130.21,
+            "meanSaturation": 46.59,
+            "shadowMassPercent": 14.23,
+            "highlightMassPercent": 0.02,
+            "lumaP05": 16,
+            "lumaP50": 151,
+            "lumaP95": 217
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 13.9,
+              "p95": 20.8,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 117.85,
+              "meanG": 128.18,
+              "meanB": 153.44,
+              "meanLuma": 127.81,
+              "meanSaturation": 47.28,
+              "shadowMassPercent": 8.91,
+              "highlightMassPercent": 0,
+              "lumaP05": 17,
+              "lumaP50": 147,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 5.32,
+            "shadowFloorDropSteps": 1,
+            "highlightMassGrowthPoints": 0.02,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.3,
+            "meanLumaDelta": 2.4,
+            "withinInstrumentNoise": false,
+            "pass": false
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 8.15,
+            "deviation": 0.2447,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15.6,
+            "p95": 22,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 120.26,
+            "meanG": 131.47,
+            "meanB": 157.06,
+            "meanLuma": 130.94,
+            "meanSaturation": 45.77,
+            "shadowMassPercent": 5.31,
+            "highlightMassPercent": 0,
+            "lumaP05": 21,
+            "lumaP50": 147,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 117.85,
+              "meanG": 128.18,
+              "meanB": 153.44,
+              "meanLuma": 127.81,
+              "meanSaturation": 47.28,
+              "shadowMassPercent": 8.91,
+              "highlightMassPercent": 0,
+              "lumaP05": 17,
+              "lumaP50": 147,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -3.6,
+            "shadowFloorDropSteps": -4,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.7,
+            "meanLumaDelta": 3.13,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 10.5,
+            "deviation": 0.7447,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15.4,
+            "p95": 26.5,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 122.34,
+            "meanG": 134.56,
+            "meanB": 160.7,
+            "meanLuma": 133.85,
+            "meanSaturation": 44.67,
+            "shadowMassPercent": 3.49,
+            "highlightMassPercent": 0.01,
+            "lumaP05": 48,
+            "lumaP50": 147,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 117.85,
+              "meanG": 128.18,
+              "meanB": 153.44,
+              "meanLuma": 127.81,
+              "meanSaturation": 47.28,
+              "shadowMassPercent": 8.91,
+              "highlightMassPercent": 0,
+              "lumaP05": 17,
+              "lumaP50": 147,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -5.42,
+            "shadowFloorDropSteps": -31,
+            "highlightMassGrowthPoints": 0.01,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.5,
+            "meanLumaDelta": 6.04,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 0,
+      "pinned": false,
+      "ok": true,
+      "ms": 88066
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "heavy-rain",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 5.8,
+            "deviation": 0.1404,
+            "sunIntensityScale": 0.7685,
+            "shadowFloorScale": 1.2663,
+            "exposureScale": 1.0556,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12,
+            "p95": 17.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 116.4,
+            "meanG": 126.44,
+            "meanB": 151.4,
+            "meanLuma": 126.1,
+            "meanSaturation": 49.1,
+            "shadowMassPercent": 18.95,
+            "highlightMassPercent": 0,
+            "lumaP05": 10,
+            "lumaP50": 146,
+            "lumaP95": 217
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 12.6,
+              "p95": 19.1,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 114.45,
+              "meanG": 124.12,
+              "meanB": 149.29,
+              "meanLuma": 123.88,
+              "meanSaturation": 49.81,
+              "shadowMassPercent": 18.87,
+              "highlightMassPercent": 0,
+              "lumaP05": 12,
+              "lumaP50": 143,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.08,
+            "shadowFloorDropSteps": 2,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.6,
+            "meanLumaDelta": 2.22,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 8.15,
+            "deviation": 0.1346,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.1,
+            "p95": 18.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 115.31,
+            "meanG": 125.34,
+            "meanB": 150.62,
+            "meanLuma": 125.03,
+            "meanSaturation": 49.11,
+            "shadowMassPercent": 15.63,
+            "highlightMassPercent": 0,
+            "lumaP05": 15,
+            "lumaP50": 145,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 114.39,
+              "meanG": 124.09,
+              "meanB": 149.29,
+              "meanLuma": 123.85,
+              "meanSaturation": 49.84,
+              "shadowMassPercent": 18.9,
+              "highlightMassPercent": 0,
+              "lumaP05": 12,
+              "lumaP50": 143,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -3.27,
+            "shadowFloorDropSteps": -3,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.5,
+            "meanLumaDelta": 1.18,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 10.5,
+            "deviation": 0.4096,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.45,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.5,
+            "p95": 15.3,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 115.92,
+            "meanG": 126.32,
+            "meanB": 151.82,
+            "meanLuma": 125.95,
+            "meanSaturation": 48.39,
+            "shadowMassPercent": 11.27,
+            "highlightMassPercent": 0,
+            "lumaP05": 19,
+            "lumaP50": 145,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\skyline-terminal\\skyline-terminal--heavy-rain--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 7,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.45,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 114.46,
+              "meanG": 124.16,
+              "meanB": 149.36,
+              "meanLuma": 123.92,
+              "meanSaturation": 49.8,
+              "shadowMassPercent": 18.74,
+              "highlightMassPercent": 0,
+              "lumaP05": 12,
+              "lumaP50": 143,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -7.47,
+            "shadowFloorDropSteps": -7,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -1.1,
+            "meanLumaDelta": 2.03,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.02,
+      "identityDriftPoints": 0.16,
+      "pinned": false,
+      "ok": true,
+      "ms": 87784
+    },
+    {
+      "arena": "rustworks-1v1",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 20,
+            "deviation": 0.5,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 4,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12,
+            "p95": 14.1,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 51.23,
+            "meanG": 55.31,
+            "meanB": 73.14,
+            "meanLuma": 55.73,
+            "meanSaturation": 38.76,
+            "shadowMassPercent": 4.49,
+            "highlightMassPercent": 0.1,
+            "lumaP05": 27,
+            "lumaP50": 50,
+            "lumaP95": 87
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 3,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 11.5,
+              "p95": 14.6,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 50.46,
+              "meanG": 53.1,
+              "meanB": 71.04,
+              "meanLuma": 53.83,
+              "meanSaturation": 37.88,
+              "shadowMassPercent": 4.47,
+              "highlightMassPercent": 0.1,
+              "lumaP05": 26,
+              "lumaP50": 48,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.02,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.5,
+            "meanLumaDelta": 1.9,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 21,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 5,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.8,
+            "p95": 14,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 50.45,
+            "meanG": 53.09,
+            "meanB": 71.03,
+            "meanLuma": 53.82,
+            "meanSaturation": 37.89,
+            "shadowMassPercent": 4.48,
+            "highlightMassPercent": 0.1,
+            "lumaP05": 26,
+            "lumaP50": 48,
+            "lumaP95": 87
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 5,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 50.44,
+              "meanG": 53.08,
+              "meanB": 71.02,
+              "meanLuma": 53.82,
+              "meanSaturation": 37.89,
+              "shadowMassPercent": 4.48,
+              "highlightMassPercent": 0.1,
+              "lumaP05": 26,
+              "lumaP50": 48,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.3,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 22,
+            "deviation": 0.5,
+            "sunIntensityScale": 0.7152,
+            "shadowFloorScale": 1.3276,
+            "exposureScale": 1.0684,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 6,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.2,
+            "p95": 14.4,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 52.55,
+            "meanG": 54.17,
+            "meanB": 73.23,
+            "meanLuma": 55.2,
+            "meanSaturation": 35.11,
+            "shadowMassPercent": 1.02,
+            "highlightMassPercent": 0,
+            "lumaP05": 32,
+            "lumaP50": 49,
+            "lumaP95": 92
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 5,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 49.87,
+              "meanG": 52.99,
+              "meanB": 72.24,
+              "meanLuma": 53.71,
+              "meanSaturation": 37.12,
+              "shadowMassPercent": 0.86,
+              "highlightMassPercent": 0,
+              "lumaP05": 33,
+              "lumaP50": 48,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.16,
+            "shadowFloorDropSteps": 1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.3,
+            "meanLumaDelta": 1.49,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 3.62,
+      "identityDriftPoints": 3.62,
+      "pinned": false,
+      "ok": true,
+      "ms": 92410
+    },
+    {
+      "arena": "rustworks-1v1",
+      "weather": "storm",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 20,
+            "deviation": 0.21,
+            "sunIntensityScale": 1.1069,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.2,
+            "p95": 13.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 50.5,
+            "meanG": 53.9,
+            "meanB": 72.51,
+            "meanLuma": 54.52,
+            "meanSaturation": 37.04,
+            "shadowMassPercent": 5.76,
+            "highlightMassPercent": 0.12,
+            "lumaP05": 22,
+            "lumaP50": 48,
+            "lumaP95": 87
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 11.3,
+              "p95": 13.4,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 50.19,
+              "meanG": 53.25,
+              "meanB": 71.85,
+              "meanLuma": 53.94,
+              "meanSaturation": 36.81,
+              "shadowMassPercent": 6.26,
+              "highlightMassPercent": 0.12,
+              "lumaP05": 22,
+              "lumaP50": 47,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.5,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.1,
+            "meanLumaDelta": 0.58,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 21,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.58,
+            "identity": true,
+            "sunReaims": 6,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.3,
+            "p95": 14.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 49.39,
+            "meanG": 53.04,
+            "meanB": 73.01,
+            "meanLuma": 53.71,
+            "meanSaturation": 36.11,
+            "shadowMassPercent": 3.49,
+            "highlightMassPercent": 0.01,
+            "lumaP05": 27,
+            "lumaP50": 47,
+            "lumaP95": 87
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 50.57,
+              "meanG": 53.52,
+              "meanB": 72.1,
+              "meanLuma": 54.24,
+              "meanSaturation": 36.58,
+              "shadowMassPercent": 6.24,
+              "highlightMassPercent": 0.12,
+              "lumaP05": 22,
+              "lumaP50": 48,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -2.75,
+            "shadowFloorDropSteps": -5,
+            "highlightMassGrowthPoints": -0.11,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0,
+            "meanLumaDelta": -0.53,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 22,
+            "deviation": 0.21,
+            "sunIntensityScale": 0.8822,
+            "shadowFloorScale": 1.1355,
+            "exposureScale": 1.0283,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14.7,
+            "p95": 23.4,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 50.62,
+            "meanG": 53.95,
+            "meanB": 74.07,
+            "meanLuma": 54.7,
+            "meanSaturation": 35.57,
+            "shadowMassPercent": 3.32,
+            "highlightMassPercent": 0.01,
+            "lumaP05": 27,
+            "lumaP50": 48,
+            "lumaP95": 89
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\rustworks-1v1\\rustworks-1v1--storm--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 21,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 49.35,
+              "meanG": 53.01,
+              "meanB": 72.99,
+              "meanLuma": 53.67,
+              "meanSaturation": 36.14,
+              "shadowMassPercent": 3.51,
+              "highlightMassPercent": 0.01,
+              "lumaP05": 27,
+              "lumaP50": 47,
+              "lumaP95": 87
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.19,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 3.4,
+            "meanLumaDelta": 1.03,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.01,
+      "identityDriftPoints": 2.75,
+      "pinned": false,
+      "ok": true,
+      "ms": 84657
+    },
+    {
+      "arena": "gun-range",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 12,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 7,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.1,
+            "p95": 15.4,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 44.82,
+            "meanG": 49.65,
+            "meanB": 44.35,
+            "meanLuma": 48.24,
+            "meanSaturation": 46.37,
+            "shadowMassPercent": 36.26,
+            "highlightMassPercent": 0.15,
+            "lumaP05": 0,
+            "lumaP50": 43,
+            "lumaP95": 188
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 6,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 12.2,
+              "p95": 15.7,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 43.5,
+              "meanG": 47.25,
+              "meanB": 43.46,
+              "meanLuma": 46.18,
+              "meanSaturation": 44.97,
+              "shadowMassPercent": 37.17,
+              "highlightMassPercent": 0.15,
+              "lumaP05": 0,
+              "lumaP50": 40,
+              "lumaP95": 188
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.91,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.1,
+            "meanLumaDelta": 2.06,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 12,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 9,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 10.5,
+            "p95": 12.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 43.89,
+            "meanG": 49.75,
+            "meanB": 46.09,
+            "meanLuma": 48.24,
+            "meanSaturation": 48.95,
+            "shadowMassPercent": 36.28,
+            "highlightMassPercent": 0.17,
+            "lumaP05": 0,
+            "lumaP50": 43,
+            "lumaP95": 189
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 8,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 43.83,
+              "meanG": 49.69,
+              "meanB": 45.18,
+              "meanLuma": 48.12,
+              "meanSaturation": 48.28,
+              "shadowMassPercent": 36.3,
+              "highlightMassPercent": 0.16,
+              "lumaP05": 0,
+              "lumaP50": 43,
+              "lumaP95": 189
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.02,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0.01,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -1.7,
+            "meanLumaDelta": 0.12,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 12,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 11,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11,
+            "p95": 15.1,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 42.98,
+            "meanG": 46.84,
+            "meanB": 43.99,
+            "meanLuma": 45.82,
+            "meanSaturation": 45.3,
+            "shadowMassPercent": 37.21,
+            "highlightMassPercent": 0.1,
+            "lumaP05": 0,
+            "lumaP50": 40,
+            "lumaP95": 188
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\gun-range\\gun-range--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 10,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 42.87,
+              "meanG": 47.14,
+              "meanB": 44.02,
+              "meanLuma": 46.01,
+              "meanSaturation": 45.43,
+              "shadowMassPercent": 37.18,
+              "highlightMassPercent": 0.11,
+              "lumaP05": 0,
+              "lumaP50": 40,
+              "lumaP95": 188
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.03,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": -0.01,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -1.2,
+            "meanLumaDelta": -0.19,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.06,
+      "identityDriftPoints": 0.88,
+      "pinned": true,
+      "ok": true,
+      "ms": 85944
+    },
+    {
+      "arena": "farcrysis",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 9,
+            "deviation": 0.4375,
+            "sunIntensityScale": 0.8401,
+            "shadowFloorScale": 1.1838,
+            "exposureScale": 1.0384,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 4,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 27.7,
+            "p95": 36,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 69.75,
+            "meanG": 135.58,
+            "meanB": 110.02,
+            "meanLuma": 119.74,
+            "meanSaturation": 66.69,
+            "shadowMassPercent": 15.72,
+            "highlightMassPercent": 0,
+            "lumaP05": 0,
+            "lumaP50": 136,
+            "lumaP95": 197
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 3,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 31.5,
+              "p95": 50.7,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 71.53,
+              "meanG": 135.94,
+              "meanB": 109.44,
+              "meanLuma": 120.33,
+              "meanSaturation": 69.44,
+              "shadowMassPercent": 14.63,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 135,
+              "lumaP95": 197
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 1.09,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -3.8,
+            "meanLumaDelta": -0.59,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 13,
+            "deviation": 0.0625,
+            "sunIntensityScale": 0.9948,
+            "shadowFloorScale": 1.006,
+            "exposureScale": 1.0013,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 6,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 39.6,
+            "p95": 67,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 71.39,
+            "meanG": 135.92,
+            "meanB": 109.35,
+            "meanLuma": 120.28,
+            "meanSaturation": 69.73,
+            "shadowMassPercent": 14.54,
+            "highlightMassPercent": 0,
+            "lumaP05": 0,
+            "lumaP50": 135,
+            "lumaP95": 197
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 5,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 71.53,
+              "meanG": 135.94,
+              "meanB": 109.44,
+              "meanLuma": 120.33,
+              "meanSaturation": 69.44,
+              "shadowMassPercent": 14.63,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 135,
+              "lumaP95": 197
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.09,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 8.1,
+            "meanLumaDelta": -0.05,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 17,
+            "deviation": 0.5625,
+            "sunIntensityScale": 0.5755,
+            "shadowFloorScale": 1.4882,
+            "exposureScale": 1.1019,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 8,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 31.1,
+            "p95": 52.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 73.62,
+            "meanG": 139.93,
+            "meanB": 113.49,
+            "meanLuma": 123.92,
+            "meanSaturation": 68.82,
+            "shadowMassPercent": 12.87,
+            "highlightMassPercent": 0,
+            "lumaP05": 1,
+            "lumaP50": 141,
+            "lumaP95": 199
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 7,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 71.53,
+              "meanG": 135.93,
+              "meanB": 109.43,
+              "meanLuma": 120.33,
+              "meanSaturation": 69.44,
+              "shadowMassPercent": 14.63,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 135,
+              "lumaP95": 197
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -1.76,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.4,
+            "meanLumaDelta": 3.59,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 0,
+      "pinned": false,
+      "ok": true,
+      "ms": 107744
+    },
+    {
+      "arena": "farcrysis",
+      "weather": "storm",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 9,
+            "deviation": 0.1838,
+            "sunIntensityScale": 0.9468,
+            "shadowFloorScale": 1.0611,
+            "exposureScale": 1.0128,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 30,
+            "p95": 42.1,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 71.27,
+            "meanG": 136.46,
+            "meanB": 110.9,
+            "meanLuma": 120.76,
+            "meanSaturation": 67.72,
+            "shadowMassPercent": 14.91,
+            "highlightMassPercent": 0,
+            "lumaP05": 0,
+            "lumaP50": 136,
+            "lumaP95": 198
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 28.1,
+              "p95": 38.3,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 73.02,
+              "meanG": 137.18,
+              "meanB": 111.13,
+              "meanLuma": 121.66,
+              "meanSaturation": 68.81,
+              "shadowMassPercent": 14.51,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 137,
+              "lumaP95": 199
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.4,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.9,
+            "meanLumaDelta": -0.9,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 13,
+            "deviation": 0.0263,
+            "sunIntensityScale": 0.9978,
+            "shadowFloorScale": 1.0025,
+            "exposureScale": 1.0005,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 30.5,
+            "p95": 48.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 73.04,
+            "meanG": 137.25,
+            "meanB": 111.19,
+            "meanLuma": 121.71,
+            "meanSaturation": 68.99,
+            "shadowMassPercent": 14.4,
+            "highlightMassPercent": 0,
+            "lumaP05": 0,
+            "lumaP50": 137,
+            "lumaP95": 199
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 73,
+              "meanG": 137.18,
+              "meanB": 111.13,
+              "meanLuma": 121.65,
+              "meanSaturation": 68.81,
+              "shadowMassPercent": 14.49,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 137,
+              "lumaP95": 199
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.09,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 2.4,
+            "meanLumaDelta": 0.06,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 17,
+            "deviation": 0.2363,
+            "sunIntensityScale": 0.8724,
+            "shadowFloorScale": 1.1467,
+            "exposureScale": 1.0306,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 33.6,
+            "p95": 68.7,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 71.66,
+            "meanG": 137.27,
+            "meanB": 111.29,
+            "meanLuma": 121.45,
+            "meanSaturation": 68.74,
+            "shadowMassPercent": 13.65,
+            "highlightMassPercent": 0,
+            "lumaP05": 1,
+            "lumaP50": 138,
+            "lumaP95": 198
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\farcrysis\\farcrysis--storm--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 12.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 73.09,
+              "meanG": 137.23,
+              "meanB": 111.14,
+              "meanLuma": 121.71,
+              "meanSaturation": 68.79,
+              "shadowMassPercent": 14.49,
+              "highlightMassPercent": 0,
+              "lumaP05": 0,
+              "lumaP50": 137,
+              "lumaP95": 199
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.84,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 5.5,
+            "meanLumaDelta": -0.26,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.02,
+      "identityDriftPoints": 0.02,
+      "pinned": false,
+      "ok": true,
+      "ms": 119381
+    },
+    {
+      "arena": "high-seas",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 7.5,
+            "deviation": 0.4783,
+            "sunIntensityScale": 0.5734,
+            "shadowFloorScale": 1.4906,
+            "exposureScale": 1.1024,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15.4,
+            "p95": 25.7,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 105.51,
+            "meanG": 142.46,
+            "meanB": 156.22,
+            "meanLuma": 135.6,
+            "meanSaturation": 49.39,
+            "shadowMassPercent": 5.83,
+            "highlightMassPercent": 0.12,
+            "lumaP05": 22,
+            "lumaP50": 176,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 11.6,
+              "p95": 14.2,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 102.37,
+              "meanG": 139.15,
+              "meanB": 150.39,
+              "meanLuma": 132.15,
+              "meanSaturation": 51.51,
+              "shadowMassPercent": 9.09,
+              "highlightMassPercent": 0.1,
+              "lumaP05": 20,
+              "lumaP50": 170,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -3.26,
+            "shadowFloorDropSteps": -2,
+            "highlightMassGrowthPoints": 0.02,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 3.8,
+            "meanLumaDelta": 3.45,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 13.25,
+            "deviation": 0.0217,
+            "sunIntensityScale": 0.9994,
+            "shadowFloorScale": 1.0007,
+            "exposureScale": 1.0001,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 16.4,
+            "p95": 23.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 102.36,
+            "meanG": 139.12,
+            "meanB": 150.36,
+            "meanLuma": 132.11,
+            "meanSaturation": 51.5,
+            "shadowMassPercent": 9.15,
+            "highlightMassPercent": 0.1,
+            "lumaP05": 20,
+            "lumaP50": 170,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 102.37,
+              "meanG": 139.15,
+              "meanB": 150.39,
+              "meanLuma": 132.14,
+              "meanSaturation": 51.51,
+              "shadowMassPercent": 9.09,
+              "highlightMassPercent": 0.1,
+              "lumaP05": 20,
+              "lumaP50": 170,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.06,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 4.8,
+            "meanLumaDelta": -0.03,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 19,
+            "deviation": 0.5217,
+            "sunIntensityScale": 0.55,
+            "shadowFloorScale": 1.5175,
+            "exposureScale": 1.108,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 16.2,
+            "p95": 21.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 103.21,
+            "meanG": 141.6,
+            "meanB": 159.28,
+            "meanLuma": 134.72,
+            "meanSaturation": 51.24,
+            "shadowMassPercent": 3.51,
+            "highlightMassPercent": 0,
+            "lumaP05": 26,
+            "lumaP50": 174,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 100.84,
+              "meanG": 139.73,
+              "meanB": 153.23,
+              "meanLuma": 132.44,
+              "meanSaturation": 53.23,
+              "shadowMassPercent": 4.87,
+              "highlightMassPercent": 0,
+              "lumaP05": 24,
+              "lumaP50": 170,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -1.36,
+            "shadowFloorDropSteps": -2,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 4.6,
+            "meanLumaDelta": 2.28,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 4.23,
+      "identityDriftPoints": 4.22,
+      "pinned": false,
+      "ok": true,
+      "ms": 107763
+    },
+    {
+      "arena": "high-seas",
+      "weather": "storm",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 7.5,
+            "deviation": 0.2009,
+            "sunIntensityScale": 0.8572,
+            "shadowFloorScale": 1.1642,
+            "exposureScale": 1.0343,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 15.5,
+            "p95": 20.3,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 96.43,
+            "meanG": 135.04,
+            "meanB": 152.11,
+            "meanLuma": 128.06,
+            "meanSaturation": 52.81,
+            "shadowMassPercent": 5.36,
+            "highlightMassPercent": 0,
+            "lumaP05": 24,
+            "lumaP50": 171,
+            "lumaP95": 216
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 13.7,
+              "p95": 17.1,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 96.39,
+              "meanG": 135.73,
+              "meanB": 151.17,
+              "meanLuma": 128.48,
+              "meanSaturation": 53.73,
+              "shadowMassPercent": 5.8,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 169,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.44,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.8,
+            "meanLumaDelta": -0.42,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 13.25,
+            "deviation": 0.0091,
+            "sunIntensityScale": 0.9997,
+            "shadowFloorScale": 1.0003,
+            "exposureScale": 1.0001,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14.9,
+            "p95": 19,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 96.44,
+            "meanG": 135.8,
+            "meanB": 151.27,
+            "meanLuma": 128.55,
+            "meanSaturation": 53.61,
+            "shadowMassPercent": 5.81,
+            "highlightMassPercent": 0,
+            "lumaP05": 23,
+            "lumaP50": 169,
+            "lumaP95": 215
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 96.4,
+              "meanG": 135.81,
+              "meanB": 151.23,
+              "meanLuma": 128.54,
+              "meanSaturation": 53.73,
+              "shadowMassPercent": 5.79,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 169,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.02,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.2,
+            "meanLumaDelta": 0.01,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 19,
+            "deviation": 0.2191,
+            "sunIntensityScale": 0.8282,
+            "shadowFloorScale": 1.1975,
+            "exposureScale": 1.0412,
+            "skyDarkenAmount": 0.58,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 14.7,
+            "p95": 18.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 96.45,
+            "meanG": 134.72,
+            "meanB": 152,
+            "meanLuma": 127.83,
+            "meanSaturation": 52.79,
+            "shadowMassPercent": 5.82,
+            "highlightMassPercent": 0,
+            "lumaP05": 23,
+            "lumaP50": 171,
+            "lumaP95": 216
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\high-seas\\high-seas--storm--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 13,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.58,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 96.42,
+              "meanG": 135.78,
+              "meanB": 151.22,
+              "meanLuma": 128.53,
+              "meanSaturation": 53.71,
+              "shadowMassPercent": 5.8,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 169,
+              "lumaP95": 215
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0.02,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1,
+            "meanLumaDelta": -0.7,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.04,
+      "identityDriftPoints": 0.01,
+      "pinned": false,
+      "ok": true,
+      "ms": 100518
+    },
+    {
+      "arena": "test1",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 9,
+            "deviation": 0.375,
+            "sunIntensityScale": 0.8854,
+            "shadowFloorScale": 1.1318,
+            "exposureScale": 1.0275,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 5,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.6,
+            "p95": 18.7,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 99.09,
+            "meanG": 103.5,
+            "meanB": 85.85,
+            "meanLuma": 101.29,
+            "meanSaturation": 49.65,
+            "shadowMassPercent": 13.88,
+            "highlightMassPercent": 0.11,
+            "lumaP05": 17,
+            "lumaP50": 67,
+            "lumaP95": 213
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 4,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 12.9,
+              "p95": 20.3,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 109.59,
+              "meanG": 112.67,
+              "meanB": 88.81,
+              "meanLuma": 110.29,
+              "meanSaturation": 48.71,
+              "shadowMassPercent": 10.4,
+              "highlightMassPercent": 0.11,
+              "lumaP05": 18,
+              "lumaP50": 90,
+              "lumaP95": 211
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 3.48,
+            "shadowFloorDropSteps": 1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.3,
+            "meanLumaDelta": -9,
+            "withinInstrumentNoise": false,
+            "pass": false
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 11,
+            "deviation": 0.125,
+            "sunIntensityScale": 1.0282,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 7,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 13.7,
+            "p95": 18.3,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 113.95,
+            "meanG": 116.52,
+            "meanB": 90.78,
+            "meanLuma": 114.12,
+            "meanSaturation": 48.14,
+            "shadowMassPercent": 9.46,
+            "highlightMassPercent": 0.11,
+            "lumaP05": 19,
+            "lumaP50": 101,
+            "lumaP95": 211
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 6,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 109.6,
+              "meanG": 112.67,
+              "meanB": 88.82,
+              "meanLuma": 110.29,
+              "meanSaturation": 48.71,
+              "shadowMassPercent": 10.39,
+              "highlightMassPercent": 0.11,
+              "lumaP05": 18,
+              "lumaP50": 90,
+              "lumaP95": 211
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.93,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.8,
+            "meanLumaDelta": 3.83,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 13,
+            "deviation": 0.625,
+            "sunIntensityScale": 1.0282,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 9,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.6,
+            "p95": 15.8,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 114.5,
+            "meanG": 117.66,
+            "meanB": 91.15,
+            "meanLuma": 115.07,
+            "meanSaturation": 48.48,
+            "shadowMassPercent": 6.53,
+            "highlightMassPercent": 0,
+            "lumaP05": 21,
+            "lumaP50": 103,
+            "lumaP95": 211
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test1\\test1--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10.5,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 8,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 109.87,
+              "meanG": 113.47,
+              "meanB": 88.95,
+              "meanLuma": 110.94,
+              "meanSaturation": 49.21,
+              "shadowMassPercent": 7.28,
+              "highlightMassPercent": 0,
+              "lumaP05": 20,
+              "lumaP50": 91,
+              "lumaP95": 211
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.75,
+            "shadowFloorDropSteps": -1,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.3,
+            "meanLumaDelta": 4.13,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0.01,
+      "identityDriftPoints": 3.12,
+      "pinned": false,
+      "ok": true,
+      "ms": 71493
+    },
+    {
+      "arena": "test2",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 16,
+            "deviation": 0.4,
+            "sunIntensityScale": 1.15,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 4,
+            "uniformWrites": 8,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.8,
+            "p95": 16.3,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 169.68,
+            "meanG": 126.25,
+            "meanB": 82.76,
+            "meanLuma": 132.35,
+            "meanSaturation": 62.39,
+            "shadowMassPercent": 0.68,
+            "highlightMassPercent": 0,
+            "lumaP05": 41,
+            "lumaP50": 135,
+            "lumaP95": 194
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 3,
+              "uniformWrites": 7,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 12,
+              "p95": 17.1,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 154.32,
+              "meanG": 114.95,
+              "meanB": 81.57,
+              "meanLuma": 120.91,
+              "meanSaturation": 61.85,
+              "shadowMassPercent": 0.73,
+              "highlightMassPercent": 0,
+              "lumaP05": 38,
+              "lumaP50": 131,
+              "lumaP95": 194
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.05,
+            "shadowFloorDropSteps": -3,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.8,
+            "meanLumaDelta": 11.44,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 17.25,
+            "deviation": 0.1,
+            "sunIntensityScale": 0.9385,
+            "shadowFloorScale": 1.0708,
+            "exposureScale": 1.0148,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 6,
+            "uniformWrites": 10,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.7,
+            "p95": 16.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 149.3,
+            "meanG": 112.56,
+            "meanB": 84.09,
+            "meanLuma": 118.32,
+            "meanSaturation": 59.25,
+            "shadowMassPercent": 4.55,
+            "highlightMassPercent": 0.11,
+            "lumaP05": 31,
+            "lumaP50": 133,
+            "lumaP95": 195
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 5,
+              "uniformWrites": 9,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 154,
+              "meanG": 114.74,
+              "meanB": 81.55,
+              "meanLuma": 120.69,
+              "meanSaturation": 61.83,
+              "shadowMassPercent": 0.73,
+              "highlightMassPercent": 0,
+              "lumaP05": 38,
+              "lumaP50": 131,
+              "lumaP95": 194
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 3.82,
+            "shadowFloorDropSteps": 7,
+            "highlightMassGrowthPoints": 0.11,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.7,
+            "meanLumaDelta": -2.37,
+            "withinInstrumentNoise": false,
+            "pass": false
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 18.5,
+            "deviation": 0.6,
+            "sunIntensityScale": 0.5738,
+            "shadowFloorScale": 1.4902,
+            "exposureScale": 1.1023,
+            "skyDarkenAmount": 0,
+            "identity": false,
+            "sunReaims": 8,
+            "uniformWrites": 12,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.6,
+            "p95": 14,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 144.28,
+            "meanG": 114.71,
+            "meanB": 93.58,
+            "meanLuma": 119.47,
+            "meanSaturation": 53.03,
+            "shadowMassPercent": 4.48,
+            "highlightMassPercent": 0.11,
+            "lumaP05": 34,
+            "lumaP50": 135,
+            "lumaP95": 199
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\test2\\test2--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 17,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 7,
+              "uniformWrites": 11,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 151.63,
+              "meanG": 113.28,
+              "meanB": 82.82,
+              "meanLuma": 119.24,
+              "meanSaturation": 60.07,
+              "shadowMassPercent": 4.55,
+              "highlightMassPercent": 0.11,
+              "lumaP05": 32,
+              "lumaP50": 132,
+              "lumaP95": 195
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.07,
+            "shadowFloorDropSteps": -2,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.4,
+            "meanLumaDelta": 0.23,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 3.82,
+      "pinned": false,
+      "ok": true,
+      "ms": 72337
+    },
+    {
+      "arena": "map3",
+      "weather": "clear",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 7,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 13.6,
+            "p95": 31,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.09,
+            "meanG": 116.43,
+            "meanB": 120.12,
+            "meanLuma": 115.35,
+            "meanSaturation": 13.91,
+            "shadowMassPercent": 5.27,
+            "highlightMassPercent": 0,
+            "lumaP05": 23,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 6,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 13,
+              "p95": 18.9,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.09,
+              "meanG": 116.43,
+              "meanB": 120.12,
+              "meanLuma": 115.35,
+              "meanSaturation": 13.91,
+              "shadowMassPercent": 5.28,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": -0.01,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.6,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": false,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 9,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 12.4,
+            "p95": 17.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.09,
+            "meanG": 116.43,
+            "meanB": 120.12,
+            "meanLuma": 115.35,
+            "meanSaturation": 13.92,
+            "shadowMassPercent": 5.28,
+            "highlightMassPercent": 0,
+            "lumaP05": 23,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 8,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.1,
+              "meanG": 116.43,
+              "meanB": 120.13,
+              "meanLuma": 115.35,
+              "meanSaturation": 13.91,
+              "shadowMassPercent": 5.28,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -0.6,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 11,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 10,
+            "p95": 14.6,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.1,
+            "meanG": 116.43,
+            "meanB": 120.13,
+            "meanLuma": 115.35,
+            "meanSaturation": 13.91,
+            "shadowMassPercent": 5.28,
+            "highlightMassPercent": 0,
+            "lumaP05": 23,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--clear--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 10,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.1,
+              "meanG": 116.43,
+              "meanB": 120.13,
+              "meanLuma": 115.35,
+              "meanSaturation": 13.91,
+              "shadowMassPercent": 5.28,
+              "highlightMassPercent": 0,
+              "lumaP05": 23,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": -3,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 0,
+      "pinned": true,
+      "ok": true,
+      "ms": 65248
+    },
+    {
+      "arena": "map3",
+      "weather": "overcast",
+      "states": [
+        {
+          "tod": "early",
+          "choice": "early",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--early.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "early",
+            "localOverride": "early",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.16,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 7,
+            "resolves": 8
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 10.7,
+            "p95": 16.2,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.53,
+            "meanG": 116.95,
+            "meanB": 120.65,
+            "meanLuma": 115.85,
+            "meanSaturation": 13.81,
+            "shadowMassPercent": 5.04,
+            "highlightMassPercent": 0,
+            "lumaP05": 24,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--authored-for-early.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.16,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 6,
+              "resolves": 7
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": {
+              "p50": 10.2,
+              "p95": 14.7,
+              "frames": 90
+            },
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.53,
+              "meanG": 116.95,
+              "meanB": 120.65,
+              "meanLuma": 115.85,
+              "meanSaturation": 13.81,
+              "shadowMassPercent": 5.04,
+              "highlightMassPercent": 0,
+              "lumaP05": 24,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 0.5,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "midday",
+          "choice": "midday",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--midday.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "midday",
+            "localOverride": "midday",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.16,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 9,
+            "resolves": 10
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.3,
+            "p95": 18.1,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.52,
+            "meanG": 116.94,
+            "meanB": 120.64,
+            "meanLuma": 115.84,
+            "meanSaturation": 13.81,
+            "shadowMassPercent": 5.04,
+            "highlightMassPercent": 0,
+            "lumaP05": 24,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--authored-for-midday.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.16,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 8,
+              "resolves": 9
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.52,
+              "meanG": 116.94,
+              "meanB": 120.64,
+              "meanLuma": 115.84,
+              "meanSaturation": 13.81,
+              "shadowMassPercent": 5.04,
+              "highlightMassPercent": 0,
+              "lumaP05": 24,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.1,
+            "meanLumaDelta": 0,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        },
+        {
+          "tod": "late",
+          "choice": "late",
+          "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--late.png",
+          "telemetry": {
+            "accepted": true,
+            "choice": "late",
+            "localOverride": "late",
+            "hour": 10,
+            "deviation": 0,
+            "sunIntensityScale": 1,
+            "shadowFloorScale": 1,
+            "exposureScale": 1,
+            "skyDarkenAmount": 0.16,
+            "identity": true,
+            "sunReaims": 2,
+            "uniformWrites": 11,
+            "resolves": 12
+          },
+          "budget": {
+            "drawCalls": 0,
+            "triangles": 0
+          },
+          "frame": {
+            "p50": 11.6,
+            "p95": 19.9,
+            "frames": 90
+          },
+          "stats": {
+            "width": 1280,
+            "height": 720,
+            "meanR": 110.53,
+            "meanG": 116.95,
+            "meanB": 120.65,
+            "meanLuma": 115.85,
+            "meanSaturation": 13.81,
+            "shadowMassPercent": 5.04,
+            "highlightMassPercent": 0,
+            "lumaP05": 24,
+            "lumaP50": 74,
+            "lumaP95": 218
+          },
+          "before": {
+            "choice": "authored",
+            "file": "C:\\Users\\david\\projects\\aa-claude-lighting\\artifacts\\lane-ab-sweep3\\map3\\map3--overcast--authored-for-late.png",
+            "telemetry": {
+              "accepted": true,
+              "choice": "authored",
+              "localOverride": "authored",
+              "hour": 10,
+              "deviation": 0,
+              "sunIntensityScale": 1,
+              "shadowFloorScale": 1,
+              "exposureScale": 1,
+              "skyDarkenAmount": 0.16,
+              "identity": true,
+              "sunReaims": 2,
+              "uniformWrites": 10,
+              "resolves": 11
+            },
+            "budget": {
+              "drawCalls": 0,
+              "triangles": 0
+            },
+            "frame": null,
+            "stats": {
+              "width": 1280,
+              "height": 720,
+              "meanR": 110.53,
+              "meanG": 116.95,
+              "meanB": 120.65,
+              "meanLuma": 115.86,
+              "meanSaturation": 13.81,
+              "shadowMassPercent": 5.04,
+              "highlightMassPercent": 0,
+              "lumaP05": 24,
+              "lumaP50": 74,
+              "lumaP95": 218
+            }
+          },
+          "verdict": {
+            "shadowMassGrowthPoints": 0,
+            "shadowFloorDropSteps": 0,
+            "highlightMassGrowthPoints": 0,
+            "drawCallDelta": 0,
+            "frameP50DeltaMs": 1.4,
+            "meanLumaDelta": -0.01,
+            "withinInstrumentNoise": true,
+            "pass": true
+          }
+        }
+      ],
+      "pairNoisePoints": 0,
+      "identityDriftPoints": 0,
+      "pinned": true,
+      "ok": true,
+      "ms": 67207
+    }
+  ],
+  "findings": [
+    "atomic-acres/clear/late: shadowMass +3.4pt, floor --4 steps, highlight +0.01pt, draws +0",
+    "skyline-terminal/clear/early: shadowMass +5.32pt, floor -1 steps, highlight +0.02pt, draws +0",
+    "test1/clear/early: shadowMass +3.48pt, floor -1 steps, highlight +0pt, draws +0",
+    "test2/clear/midday: shadowMass +3.82pt, floor -7 steps, highlight +0.11pt, draws +0"
+  ],
+  "instrumentFindings": [
+    "gun-range/clear/early: PINNED arena moved -0.91pt on an identity write"
+  ]
+}

@@ -1,0 +1,3057 @@
+{
+  "capturedAt": "2026-09-07T00:06:24.527184+00:00",
+  "sourceSha": "4e807e60e6959ed1b7d0e2de660d04f2c08714be",
+  "preview": "http://127.0.0.1:4285/?release=latest&renderer=webgpu&render=quality",
+  "bundle": "legacy-main-B0LVRpfC.js",
+  "servedBundleMatchesDisk": true,
+  "bundleSha256": "8fc3a2001b740bdfa216bfc53bff509e0a13bbc32ddd2a14d71effc1bd6827f8",
+  "distFileCount": 609,
+  "distTreeSha256": "eb3257f937bba82a08c8208c55f28834132c71dbf4d42e1e35e33c72fe19f5f6",
+  "files": [
+    {
+      "path": "assets/additional-maps-6CF2WzHl.js",
+      "bytes": 111535,
+      "sha256": "1cffa1fe41ca9ab2d1e90bf0947efeafbf7532be6a9ca933856b5e49153d4745"
+    },
+    {
+      "path": "assets/atomic-acres-CKr-mhaI.js",
+      "bytes": 1708,
+      "sha256": "b67d78f40fcf85d00a1805ff449feb07afc23ac0696ed6121806e562b92626bc"
+    },
+    {
+      "path": "assets/changelog-CasHtdVI.js",
+      "bytes": 52386,
+      "sha256": "6fb2772aa0d07430c89a6f04043c384c3ac7ed85ebe48dd9a1191255f51d6833"
+    },
+    {
+      "path": "assets/combat-feedback-CAXCT_qQ.js",
+      "bytes": 9886,
+      "sha256": "1fe2882695b20efae6425da13fb73a551bef1b4fd8b999fdb55577a5fd107808"
+    },
+    {
+      "path": "assets/corridor-colosseum-DBLt3jZZ.js",
+      "bytes": 97250,
+      "sha256": "54e90bd5a016026ce4fcdf913e54476d04131787cfd6df5079fe09f202d89c88"
+    },
+    {
+      "path": "assets/deterministic-rng-nx90o3TI.js",
+      "bytes": 9830,
+      "sha256": "1303e9e77e6d84bcb9d4744c1c18af0067547b87be3d5e8c9c7ca96362d64798"
+    },
+    {
+      "path": "assets/facade-Dk6H0Z8c.js",
+      "bytes": 24189,
+      "sha256": "ae3150e153fe047cb81ca59877ab0424dd49ec5bceb653e73ab33b5a0e6cd189"
+    },
+    {
+      "path": "assets/farcrysis-CUduWmhE.js",
+      "bytes": 1696,
+      "sha256": "5167873c0111a9079e89e0cfeccffe82d22a5fecb8ae2a1f55d0cf70eb32cab3"
+    },
+    {
+      "path": "assets/farcrysis-DMsj4Q24.js",
+      "bytes": 147837,
+      "sha256": "c1ffd0045900bb5969a8460dd7ca9d2d0d79d5c83aebe164951d8def2ac59bdb"
+    },
+    {
+      "path": "assets/forgeFacade-s9Y6MYkA.js",
+      "bytes": 2568,
+      "sha256": "257e273741291b6120cfcbec488108fce2470fcb63bdc86f4847db7470c2a007"
+    },
+    {
+      "path": "assets/gameplay-CZQg3zki.js",
+      "bytes": 541837,
+      "sha256": "54602e61eafdfa7edf0741670f0f91d33310cc070d532154cb22682425012754"
+    },
+    {
+      "path": "assets/gun-range-C_6iw0B-.js",
+      "bytes": 5048,
+      "sha256": "546cbd67df2c4b292c7bc61b0d332d453ccb0bebd58debe84236390a7f9e3505"
+    },
+    {
+      "path": "assets/gun-range-rack-presentation-BEqratxl.js",
+      "bytes": 3577,
+      "sha256": "04df0265fd934650025b36f41b6c8c101d72e59da055457af4a24f29ce2388a4"
+    },
+    {
+      "path": "assets/high-seas-BbhJRmbN.js",
+      "bytes": 2422,
+      "sha256": "b13c2c271934d031123fb2614338dee67c61064bfd6ffa6a23e52e8749d06678"
+    },
+    {
+      "path": "assets/high-seas-Dx1u2yKp.js",
+      "bytes": 45443,
+      "sha256": "b1644dda5ce835230d897fe4d79626eb4bd1f13ea420da5618dc0a92cdfa773d"
+    },
+    {
+      "path": "assets/index-B5cf4iKQ.js",
+      "bytes": 4244,
+      "sha256": "a426e7e531fcd501b5984a0694bf9c42f37e7b149fc9ce5144e5c74ff0562464"
+    },
+    {
+      "path": "assets/index-DuippQot.css",
+      "bytes": 206488,
+      "sha256": "c235d2a4f7f758f10ef5e29b90f3ac36190886bfe06d3c814402ec52ff3e52b4"
+    },
+    {
+      "path": "assets/legacy-main-B0LVRpfC.js",
+      "bytes": 1986899,
+      "sha256": "8fc3a2001b740bdfa216bfc53bff509e0a13bbc32ddd2a14d71effc1bd6827f8"
+    },
+    {
+      "path": "assets/legacy-main-BSThLq4n.css",
+      "bytes": 17979,
+      "sha256": "f4ebe7c28937bbfb6499f41ce5d9f3b50f5b3c2dd0e5f9bfdd8e28403e648590"
+    },
+    {
+      "path": "assets/main-By57FMAU.js",
+      "bytes": 1702,
+      "sha256": "730f58ff5f7242ec3f4cfc35557622ed17f5bb385231d9f3757e41a7837297bf"
+    },
+    {
+      "path": "assets/map-RfF39jwa.js",
+      "bytes": 44501,
+      "sha256": "da163b7cbec5e9209b6fc6457bf9b9bd694dbdb10e4889e7c61e25f2e9bc3917"
+    },
+    {
+      "path": "assets/map3-arena-DBrBj6ij.js",
+      "bytes": 250,
+      "sha256": "ba931167967609fd5da683fcfb58806a697eade455bb82fe54e5d4930e4c7e42"
+    },
+    {
+      "path": "assets/map3-arena-fwSucu0M.js",
+      "bytes": 4311,
+      "sha256": "eea2784be3faaff863085e332031d1709c6a49662d40b3bb1e9ddc40d530ae26"
+    },
+    {
+      "path": "assets/map3-BnXWM60R.js",
+      "bytes": 1186,
+      "sha256": "6cb7090d06e3b4e7bec5a6b12f184cdd6165a78f74c0b4a9cf98806959a95a5b"
+    },
+    {
+      "path": "assets/map3-CHH1rFnm.js",
+      "bytes": 16950,
+      "sha256": "2e40e0aa631df54e10b0b17bdbe5f90e05e88be720f87812cc757a79ca514f44"
+    },
+    {
+      "path": "assets/modulepreload-polyfill-Dezn_h7o.js",
+      "bytes": 698,
+      "sha256": "785597bca2e7dd97a652a20a197c077079e635a5663433448e0e1d9fd8c98a64"
+    },
+    {
+      "path": "assets/noise-BGWLfxYE.js",
+      "bytes": 1094,
+      "sha256": "52a33b1a6653653b97008b49f08bac9080f3d74a2d91f2f102a9571be6c1dbd3"
+    },
+    {
+      "path": "assets/nuke-event-CGjWDhlW.js",
+      "bytes": 251521,
+      "sha256": "a4dfb68e5ea73f9ceea1210ed627870a2456e3194f0e46fcbcebef8bbef4c42a"
+    },
+    {
+      "path": "assets/nuketown2-BBHZPJNv.js",
+      "bytes": 3829,
+      "sha256": "ead51a39147a78ee0eab6681e50d93f1d65b2a6a3cb7995d44dbe5665ae7495c"
+    },
+    {
+      "path": "assets/original/killstreak-demo/adrenaline.jpg",
+      "bytes": 98250,
+      "sha256": "b43a4bf89bf20b8392843a2652664e2823e3b3fdf25f300a64bc3bac618c3967"
+    },
+    {
+      "path": "assets/original/killstreak-demo/care-package.jpg",
+      "bytes": 96226,
+      "sha256": "67b0fff02ea1571f771f4be60a0e1fbab11c1507ba707772e5c914288f89931b"
+    },
+    {
+      "path": "assets/original/killstreak-demo/carpet-bomber.jpg",
+      "bytes": 92845,
+      "sha256": "b4036f834f3e191cd7cd9244c89e7d3b2707c36367aaccfb41373242668912ab"
+    },
+    {
+      "path": "assets/original/killstreak-demo/chopper.jpg",
+      "bytes": 115727,
+      "sha256": "ebd2b82fb1cb08ad212ab28898524f9cd17d9435b18536150edf91c3bde1eda3"
+    },
+    {
+      "path": "assets/original/killstreak-demo/drone-swarm.jpg",
+      "bytes": 101132,
+      "sha256": "b0f9cf5e353bb756795a01df5c119e4fcd05931857e627f7cade766b1989ea04"
+    },
+    {
+      "path": "assets/original/killstreak-demo/hunter-swarm.jpg",
+      "bytes": 95779,
+      "sha256": "4bd2d6024c13cf505e92e328bf69c88bc06517ada6793f7bf9fc23237cbf75b4"
+    },
+    {
+      "path": "assets/original/killstreak-demo/manifest.json",
+      "bytes": 4834,
+      "sha256": "3ff6e9abcc6178ca5f7b2e240b065c48765496a9ab47200d3c43572c9e08c533"
+    },
+    {
+      "path": "assets/original/killstreak-demo/nuke.jpg",
+      "bytes": 99856,
+      "sha256": "e092a02621160a7e547fddbaca18740760f6cf5176a01a3ef42023da55489f9c"
+    },
+    {
+      "path": "assets/original/killstreak-demo/piloted-drone.jpg",
+      "bytes": 107909,
+      "sha256": "c6ce8cd03ecfe47b48c449c23ec005e82c9bc9bb2ba3fe5e7ec44e850dc55d75"
+    },
+    {
+      "path": "assets/original/killstreak-demo/scout-sweep.jpg",
+      "bytes": 94960,
+      "sha256": "536af552c9f19c4cd4f6d8ecde2c3eddbf33330cf2e6dd7e7ffd837577111230"
+    },
+    {
+      "path": "assets/original/killstreak-demo/tri-pass.jpg",
+      "bytes": 98406,
+      "sha256": "fb5df06a0a015313e6077c45e7e07a5121c3340e18f6b05ed75e4d8ea851b597"
+    },
+    {
+      "path": "assets/original/killstreak-demo/yardhawk.jpg",
+      "bytes": 97459,
+      "sha256": "2e799b9dd4dd41c1182cbcccfc45c5274420fbb1840835438dc0545c87665203"
+    },
+    {
+      "path": "assets/original/loading/atomic-acres-loading.webp",
+      "bytes": 239202,
+      "sha256": "62da36cf2d00ae364bd88b93775e19de3b207669ce868c52aaa7d4c47fbdbdb2"
+    },
+    {
+      "path": "assets/original/loading/farcrysis-loading.webp",
+      "bytes": 237000,
+      "sha256": "b6c697230455738657597c07350b924aff6525d3d428fa7ff45270990df69fdc"
+    },
+    {
+      "path": "assets/original/loading/gun-range-loading.webp",
+      "bytes": 169200,
+      "sha256": "5f367e3b1a2f9c3f6611a3045b09f23c187eb8bbc68dbcfcbbfcfc0c13960df6"
+    },
+    {
+      "path": "assets/original/loading/high-seas-loading.webp",
+      "bytes": 208500,
+      "sha256": "b97bb548cb02463bab8f683d1328d6f46e46bc508b3105b36e4caa2721d8b083"
+    },
+    {
+      "path": "assets/original/loading/map3-loading.webp",
+      "bytes": 60858,
+      "sha256": "89ec16a2d2b6fe88954921b55ee67b88a2a37ef0343661578e089635b5aab40c"
+    },
+    {
+      "path": "assets/original/loading/nuketown2-loading.webp",
+      "bytes": 82654,
+      "sha256": "131d939356bd66592e0e2d4f47786628034d57a5bad0238bb198acb3dceedf6c"
+    },
+    {
+      "path": "assets/original/loading/raid2-loading.webp",
+      "bytes": 63840,
+      "sha256": "94ff72c5c530fc9b7a4ec1b72d01c6aa84c7f1237a073bc2dc7e82ada60e84ff"
+    },
+    {
+      "path": "assets/original/loading/rustworks-loading.webp",
+      "bytes": 180524,
+      "sha256": "884fd5e57d5a33d98b9b475c6d473ccba06b2dadacf2cbfcdae38a756477ac97"
+    },
+    {
+      "path": "assets/original/loading/skyline-terminal-loading.webp",
+      "bytes": 170644,
+      "sha256": "0f0cd0364b002220728c541c8c9fb4e7fb7d27b302cac3f19e5ea55dcd8bb656"
+    },
+    {
+      "path": "assets/original/loading/test1-loading.webp",
+      "bytes": 238726,
+      "sha256": "a8c429949f7a589545cf6a40b6e8b7765508070c62925228086d63e89d74b12a"
+    },
+    {
+      "path": "assets/original/loading/test2-loading.webp",
+      "bytes": 192942,
+      "sha256": "d8b6a346474fa9c847f53f0cd68b61e5f76a443dff61c17af5dd2f6003bd2d48"
+    },
+    {
+      "path": "assets/original/menu/main-menu-backdrop.webp",
+      "bytes": 159264,
+      "sha256": "06fe14380ae6077bc0552ed76dd7e5c5de372601aa2c14bb95b43cfc204eb163"
+    },
+    {
+      "path": "assets/original/menu-previews/atomic-acres.mp4",
+      "bytes": 7533119,
+      "sha256": "eaf9311df48b6a9eaa926f87eb10e544b042adc61e66e602ea01c25cebcd7865"
+    },
+    {
+      "path": "assets/original/menu-previews/atomic-acres.webm",
+      "bytes": 7054849,
+      "sha256": "2e587dbbb2f85ae4a53d10c529ba4790ae205102d0df34acc835c8183b42f4c4"
+    },
+    {
+      "path": "assets/original/menu-previews/atomic-acres.webp",
+      "bytes": 435602,
+      "sha256": "1f7ab1a21c95901baac8f613454d4e6b39f1102b6c0f7c9203db7cc26d2ed630"
+    },
+    {
+      "path": "assets/original/menu-previews/farcrysis.mp4",
+      "bytes": 7597215,
+      "sha256": "6d8eef44066a85329d7588205338ccf3aab819319fc2167cd085ed3788b1045e"
+    },
+    {
+      "path": "assets/original/menu-previews/farcrysis.webm",
+      "bytes": 6646425,
+      "sha256": "c79ed27159d75d9a6235f700dc9497fbdb5df288960a81aae6e24b4826958be6"
+    },
+    {
+      "path": "assets/original/menu-previews/farcrysis.webp",
+      "bytes": 266346,
+      "sha256": "e47523c45d0e079cf0ef0df3620003000fccbea95287de0640a805cdc556330e"
+    },
+    {
+      "path": "assets/original/menu-previews/gun-range.mp4",
+      "bytes": 7484987,
+      "sha256": "28c9d908aa66cd2a136d88d7fba937d7b3a7530d044ea8d96e747e9996a6dfe4"
+    },
+    {
+      "path": "assets/original/menu-previews/gun-range.webm",
+      "bytes": 3533559,
+      "sha256": "e21f10cca5d641ae32ee98eaec661851036343560f7bb30be932b39c9fbda4a3"
+    },
+    {
+      "path": "assets/original/menu-previews/gun-range.webp",
+      "bytes": 83282,
+      "sha256": "a2eddd02ddee15e95486d04f765a326ff5fdea3a868f7f7e0a12cfd7bafed401"
+    },
+    {
+      "path": "assets/original/menu-previews/high-seas.mp4",
+      "bytes": 7966835,
+      "sha256": "1c9834b5975930e4bd5a0ece25495deacdaa0f9111673bd6e96203f1ea082603"
+    },
+    {
+      "path": "assets/original/menu-previews/high-seas.webm",
+      "bytes": 6574988,
+      "sha256": "132873e79cf467bf57b8382427fbdeed97cd83ed4b0079640612aab1f5b7fb21"
+    },
+    {
+      "path": "assets/original/menu-previews/high-seas.webp",
+      "bytes": 248186,
+      "sha256": "43804a7161c9f6a0165102a3247dc0e0d7715ffda13fc5fc731d4a16b5ae755b"
+    },
+    {
+      "path": "assets/original/menu-previews/map3.mp4",
+      "bytes": 7504044,
+      "sha256": "74c3ca982640c38b0cf23a1f1f514f574eacfe108b5efcb302180da3faa75464"
+    },
+    {
+      "path": "assets/original/menu-previews/map3.webm",
+      "bytes": 6454887,
+      "sha256": "77846e8b6a4b4f47c37b9c790eb79e7711a9d88d6f846228cac5b466207cad28"
+    },
+    {
+      "path": "assets/original/menu-previews/map3.webp",
+      "bytes": 127696,
+      "sha256": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9"
+    },
+    {
+      "path": "assets/original/menu-previews/nuketown2.mp4",
+      "bytes": 7418965,
+      "sha256": "88ab344dad32add5c015a630e1b90e7166931679a11f2553c47804c01fdae42e"
+    },
+    {
+      "path": "assets/original/menu-previews/nuketown2.webm",
+      "bytes": 6840387,
+      "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
+    },
+    {
+      "path": "assets/original/menu-previews/nuketown2.webp",
+      "bytes": 262904,
+      "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
+    },
+    {
+      "path": "assets/original/menu-previews/raid2.mp4",
+      "bytes": 7451950,
+      "sha256": "70078fbf29f557327ce8bfc56c121d9c679c704322d32e5e46fab0abed2fe228"
+    },
+    {
+      "path": "assets/original/menu-previews/raid2.webm",
+      "bytes": 6164666,
+      "sha256": "8a5735c8546af5423f47bf1679359c8ea6f27b42a9a8e208731ae017355aed36"
+    },
+    {
+      "path": "assets/original/menu-previews/raid2.webp",
+      "bytes": 115418,
+      "sha256": "3054a0219a35bc6d316c0d0efbcbc898e65999974b548718c5b16db5528e29de"
+    },
+    {
+      "path": "assets/original/menu-previews/rustworks-1v1.mp4",
+      "bytes": 8089001,
+      "sha256": "67a9c9e19b48d1bbc6e3efc506c908699e0c119963aae31c6d10326f282dda73"
+    },
+    {
+      "path": "assets/original/menu-previews/rustworks-1v1.webm",
+      "bytes": 6522471,
+      "sha256": "34edbd96c5270392a7d49d4e5c64704c7eb5926f325a6dec622c17c99f319223"
+    },
+    {
+      "path": "assets/original/menu-previews/rustworks-1v1.webp",
+      "bytes": 141012,
+      "sha256": "b4e2825cc6b50843d02164b5836331a39b108f3615f0a9d0ae342f3876e41505"
+    },
+    {
+      "path": "assets/original/menu-previews/skyline-terminal.mp4",
+      "bytes": 7854469,
+      "sha256": "2c8d8731dd8b66cbc849eff5cca9380fccf01d64d203bb9eb2c84f6b3867d96a"
+    },
+    {
+      "path": "assets/original/menu-previews/skyline-terminal.webm",
+      "bytes": 6428717,
+      "sha256": "c4863313d81597e2425ef823eeff65494c1e12344fc48eb49dbe8e4741dadb3c"
+    },
+    {
+      "path": "assets/original/menu-previews/skyline-terminal.webp",
+      "bytes": 164136,
+      "sha256": "269040879c9430b6681919f7e2315508711e9e780ead0d6f6c9e4a7c1c8ba51f"
+    },
+    {
+      "path": "assets/original/menu-previews/test1.mp4",
+      "bytes": 7432291,
+      "sha256": "db5f0ebc63bcac07b84e1ddbfecf14fa9f7100017aba6051b63f8cdfae53414e"
+    },
+    {
+      "path": "assets/original/menu-previews/test1.webm",
+      "bytes": 7326435,
+      "sha256": "2fde904290e05e4934c44c7aeb33fb3a5b745b9afbe9162a883d2c2266f252ec"
+    },
+    {
+      "path": "assets/original/menu-previews/test1.webp",
+      "bytes": 642782,
+      "sha256": "3867859c7183f9629a05f479afa40359112ad1ff0fe91c3b4dd217d3315e519f"
+    },
+    {
+      "path": "assets/original/menu-previews/test2.mp4",
+      "bytes": 7601913,
+      "sha256": "a4eacdb3cc9720d83b74e7028d16a605b0b8cefb903ad2e24729d57ea0634817"
+    },
+    {
+      "path": "assets/original/menu-previews/test2.webm",
+      "bytes": 7253941,
+      "sha256": "0134638d23896ad2cc53087b4b1a8e151926af53ab5a5ff7085874c4bceb81d3"
+    },
+    {
+      "path": "assets/original/menu-previews/test2.webp",
+      "bytes": 453014,
+      "sha256": "d9d6a3f4ab15613f2086c68633a951a3f7b81c25bda546d05c1c4834eeec1e58"
+    },
+    {
+      "path": "assets/original/models/atomic-acres-blender-arena.glb",
+      "bytes": 7335192,
+      "sha256": "ed679d49fe979cfb71f443193a6a658ad9fd24ece7cf3ca23bef670f6b2172b3"
+    },
+    {
+      "path": "assets/original/models/frag-grenade.glb",
+      "bytes": 260396,
+      "sha256": "f61879017d6ea343644a1bcb2718155f543ecea858246e676fc2e28c15543ed8"
+    },
+    {
+      "path": "assets/original/models/operators/pass65-first-person-arms-lod0.glb",
+      "bytes": 427020,
+      "sha256": "962b8658b7f350e750bf92ee9c81a38af602fadbbd8d54115191b4d2a3d3aac3"
+    },
+    {
+      "path": "assets/original/models/operators/pass65-first-person-arms-lod1.glb",
+      "bytes": 411052,
+      "sha256": "dd4cadc1ed9826b62b537b2b29c3aa86f742780977c3856cc33f7e22582e6b39"
+    },
+    {
+      "path": "assets/original/models/operators/pass65-third-person-operator-lod0.glb",
+      "bytes": 1277904,
+      "sha256": "bda77a9d5f2fe20c83f9c460c916f9802b6d08ef23ba673108ecdf74a13e8c57"
+    },
+    {
+      "path": "assets/original/models/operators/pass65-third-person-operator-lod1.glb",
+      "bytes": 835252,
+      "sha256": "6f7fcaae615279a73b10b3bb24adbc5b04bf3f1afc7569751b92f2484ef091e8"
+    },
+    {
+      "path": "assets/original/models/operators/pass65-third-person-operator-lod2.glb",
+      "bytes": 794472,
+      "sha256": "38af1b2eb28402d3ce6440e24d8c110a0f9206720a443c1d56bc9eecb256c519"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod0.glb",
+      "bytes": 5880860,
+      "sha256": "4d30fac34d57611d92944f568e75e7cb3a7e4fa3621503d7d248989456c2bd3b"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-explorer-lod1.glb",
+      "bytes": 5013648,
+      "sha256": "d1673992acc8c18b101ef444b11533c4c864bbf28817ee793d95cdf7ec7eb217"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod0.glb",
+      "bytes": 5783160,
+      "sha256": "c5d6ae652bc2f83c0d2be7816aab3da9f10c5b257ad515dfd37e19160fa3c263"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-navalops-lod1.glb",
+      "bytes": 4916116,
+      "sha256": "c72d41bc4562644a8edb168d030d0e233f0cb4986ec1c239b2919fa979532124"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod0.glb",
+      "bytes": 5755948,
+      "sha256": "61b4e93fc678e8244e8fdd44a8ea1b54c00f945da1bd196896b6537737f64cf0"
+    },
+    {
+      "path": "assets/original/models/operators/pass74-operator-skins/pass74-operator-skin-symbiote-lod1.glb",
+      "bytes": 4886168,
+      "sha256": "f2c796cdd170f8afd7320c3f6d316d2de4513be07e3313e8f79b7906a45f0644"
+    },
+    {
+      "path": "assets/original/models/ordnance/semtex-bundle-lod0.glb",
+      "bytes": 63636,
+      "sha256": "fa83a5c4ff4f5d0d83f70f41cf1836038ba67ca8f2ff4d082e36e086cc17295b"
+    },
+    {
+      "path": "assets/original/models/ordnance/semtex-bundle-lod1.glb",
+      "bytes": 54932,
+      "sha256": "7bd0569c88fade19a71af0f04efcb06412a730b112e290ff97dde1511dc777e5"
+    },
+    {
+      "path": "assets/original/models/ordnance/semtex-bundle-lod2.glb",
+      "bytes": 50944,
+      "sha256": "c66ffdc04fa4ddd9a3e537f601d443737fc36da33fdcaac97a808edb9801d084"
+    },
+    {
+      "path": "assets/original/models/rustworks-central-tower.glb",
+      "bytes": 6575900,
+      "sha256": "9fc59b25d7dd2c5d7d1f8c66360adede22c5b0c712821018ce5901ba91987c49"
+    },
+    {
+      "path": "assets/original/models/support/hunter-drone-lod0.glb",
+      "bytes": 194592,
+      "sha256": "1e6d828f2d4efa08b1a9e1b4ffe64cdf1ce4ce38fa4e9d99ae2985d24a554fb0"
+    },
+    {
+      "path": "assets/original/models/support/hunter-drone-lod1.glb",
+      "bytes": 179576,
+      "sha256": "17e0ca5333a308da8e50f9a48ce111342250278fd5c031cb00b49617ca80283f"
+    },
+    {
+      "path": "assets/original/models/support/hunter-drone-lod2.glb",
+      "bytes": 155344,
+      "sha256": "e03e56d125b4c4ee49040360dcd011d7e7618d38eddfb75e1dc20da295850a9a"
+    },
+    {
+      "path": "assets/original/models/support/pass65-care-aircraft-lod0.glb",
+      "bytes": 320760,
+      "sha256": "fa69a075d70f5c45d954abe19b7fff31d1662d158a4f130412f333fc593c20d2"
+    },
+    {
+      "path": "assets/original/models/support/pass65-care-aircraft-lod1.glb",
+      "bytes": 280228,
+      "sha256": "0442f594b3cff65b1ff042e8dac8c1871bf6e267836c21f2598da287c6f4b687"
+    },
+    {
+      "path": "assets/original/models/support/pass65-care-aircraft-lod2.glb",
+      "bytes": 240432,
+      "sha256": "0fd23651634da95f03af9d92cc6ee6ec367dfdc49a93c0cf63bf19d17532245c"
+    },
+    {
+      "path": "assets/original/models/support/pass65-care-crate-lod0.glb",
+      "bytes": 170292,
+      "sha256": "c2fc77b2d9dac12a972530a71670b08c4c19d27ee27946cc66b8be7e0dc0b812"
+    },
+    {
+      "path": "assets/original/models/support/pass65-care-crate-lod1.glb",
+      "bytes": 149448,
+      "sha256": "fbd3e5d6a32ccb2376a3673334c599b94a451b60f2d60d9fc2536e80d1dc9e86"
+    },
+    {
+      "path": "assets/original/models/support/pass65-carpet-aircraft-lod0.glb",
+      "bytes": 246164,
+      "sha256": "29563df5d972a347a8c4a94a6b1b20afe75ce29220ccb9b9a969854a7a5277d5"
+    },
+    {
+      "path": "assets/original/models/support/pass65-carpet-aircraft-lod1.glb",
+      "bytes": 223016,
+      "sha256": "344a3965871534fc36a88f8121ad68f601f0e103d26e20684cab186b423df7ee"
+    },
+    {
+      "path": "assets/original/models/support/pass65-carpet-aircraft-lod2.glb",
+      "bytes": 181544,
+      "sha256": "93cc0cfa360d1bf76ec0319927e7c40df0b738869a03efcce287fdef0b68ea0c"
+    },
+    {
+      "path": "assets/original/models/support/pass65-chopper-gunner-lod0.glb",
+      "bytes": 952336,
+      "sha256": "d1ce0b797f5f1176f23b69b74717c64bb17d4bf29c42539d2ecea757a93a180d"
+    },
+    {
+      "path": "assets/original/models/support/pass65-chopper-gunner-lod1.glb",
+      "bytes": 831436,
+      "sha256": "3faeb020eb3e11f144b4438f93811fa0b17e9d0447ccf4ba5e19e3c97ae9ad62"
+    },
+    {
+      "path": "assets/original/models/support/pass65-chopper-gunner-lod2.glb",
+      "bytes": 571380,
+      "sha256": "a397f5b628acc49a541628b4f5280a98517231161465be1876c32ed9e51f4f36"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-drop-lod0.glb",
+      "bytes": 277456,
+      "sha256": "66213816026d706de1ee356f0dcddd36d529feb0260f7c98d6eda118b777a45f"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod0.glb",
+      "bytes": 283332,
+      "sha256": "9e36d4b661ce075b5f928a7d25ec977803fbc62a673e249c62378baa89e83f31"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-fp-lod1.glb",
+      "bytes": 275860,
+      "sha256": "7eaca2a39e493af7a0b06645bb1fcfb5d766fea2d17a91e441e026ee5c0f7b0e"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-world-lod0.glb",
+      "bytes": 286984,
+      "sha256": "3574050c94cd2a889afabc5aae20fe3de2a486d3265b2d7e0894a33f6f56759b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-world-lod1.glb",
+      "bytes": 272660,
+      "sha256": "f8c328aca12cbb342ab0fedff5f79e314cb5b3162dd58ce696c673acaed42d66"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-crossbow/pass65-crossbow-world-lod2.glb",
+      "bytes": 229120,
+      "sha256": "c03ad9176d5a2f4f52fc95d01d6698cb5836fb9c1815e6a6567ceb35c41f0d86"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-field-knife/pass65-field-knife-drop-lod0.glb",
+      "bytes": 142464,
+      "sha256": "943a06c17a899b4f4c081362a580d23569d039649884a1c42f459504b8f36745"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod0.glb",
+      "bytes": 156980,
+      "sha256": "982e51c5eba6c9fc30897b23fbc4886263c9e27242a107cff80e55952334bf85"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-field-knife/pass65-field-knife-fp-lod1.glb",
+      "bytes": 154416,
+      "sha256": "0e5ef7882927d1a39eaa763777b8a89ddae22bba6f1b9c77114849f6c4361e10"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod0.glb",
+      "bytes": 154280,
+      "sha256": "bec9122488dcf13d5a5da2bb8d1ef818e290191fa868adfb6fc31222f2c1e21d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-field-knife/pass65-field-knife-world-lod1.glb",
+      "bytes": 139748,
+      "sha256": "9b2aa2e683524194d39348f23683e453d1c9fed1fc59f1eb70e298a01869605b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-drop-lod0.glb",
+      "bytes": 285428,
+      "sha256": "1083e5ff06ac092b302260341da97b70fa61ea91911762be23cfadae6f139420"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-fp-lod0.glb",
+      "bytes": 288300,
+      "sha256": "6973ab8a4f9d8ba143f258651c226d2c18df3b33d4987e8993450aa7cdbd70ec"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-fp-lod1.glb",
+      "bytes": 264204,
+      "sha256": "3e8abaeebca7f9758b694385100d43eca3407320473536d3ff412b54dea3f844"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-world-lod0.glb",
+      "bytes": 292932,
+      "sha256": "ebdbb05babc8b08260010ba7868d06f45c58435518c4c26e44a8b644c0393ed6"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-world-lod1.glb",
+      "bytes": 285440,
+      "sha256": "209bf27b96b25ef1be7b696a87cb852aaa6b592681d439e84029e63cdd701b7c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/ak-47/ak-47-world-lod2.glb",
+      "bytes": 241284,
+      "sha256": "8c81e3e3c7bf205ac27e0996053218211061136a76ed2390c229ea2cd6037fa1"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-drop-lod0.glb",
+      "bytes": 326096,
+      "sha256": "a26bbc9b851c0687914492caf9be94f93fe33b4daba7e67f9d80fd8df94f9a43"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod0.glb",
+      "bytes": 338312,
+      "sha256": "3e181f006a102150a64bfe22ea88f96d3525dcc96fa7edf0056f32ce8d58594e"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-fp-lod1.glb",
+      "bytes": 300768,
+      "sha256": "5f593e1d238f2773ecd63821dd507c8c2cab77fa4151976ffc4a2b51f61beac1"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod0.glb",
+      "bytes": 342716,
+      "sha256": "206ce89361c48630b229db419d51e5b3ca4667e98a446fb110655dbcd303d9cb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod1.glb",
+      "bytes": 326104,
+      "sha256": "eabb90877b9f7adf5107630fff4f690a95ecea627ba490641fa7b5d7053f3f76"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/carbine/carbine-world-lod2.glb",
+      "bytes": 249900,
+      "sha256": "6b9786352af9a1336d1ba6f5f2aa9768c27513d693e2723a452a367be2beffd8"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-drop-lod0.glb",
+      "bytes": 235888,
+      "sha256": "4d2ab7e0de8b7caf3fcd1e6aa11d40bfa340f1ff4770f32beedc1041015cb3d7"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod0.glb",
+      "bytes": 281016,
+      "sha256": "38a0dcb260763de46575cb92c7091b0f199613b99df6cbc94ac5e5fd4150fd0c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-fp-lod1.glb",
+      "bytes": 240104,
+      "sha256": "84d7f12c11b2d4fc8d83c9622eacc0000bfe2ee76cbe94c7d5abb047524bcb3d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod0.glb",
+      "bytes": 262420,
+      "sha256": "c0e9280dd9c4ad5a518ee84ebb48aef70088445d9d64cdab358be7e4b6c04679"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod1.glb",
+      "bytes": 235900,
+      "sha256": "d8ce9ea39eb58a2b2146c5e3dbc3a92d86d66ca290a3c5c2642ef952ff7a231e"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flamethrower/flamethrower-world-lod2.glb",
+      "bytes": 207872,
+      "sha256": "c4f38f75e4b7262c9764a0b8c8ae291f8b74e8f08e656c3790537c78153967ff"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-drop-lod0.glb",
+      "bytes": 218952,
+      "sha256": "d11f4608da0dd75692e9f994c9ff072df8315a9ca62fbd9c2b7440d1629e222d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod0.glb",
+      "bytes": 223900,
+      "sha256": "d1610e21e095c60bb7c61c295fe4bed83286f3f25cf39ff70edbdf5a85d8d869"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-fp-lod1.glb",
+      "bytes": 206892,
+      "sha256": "5f6b74d84ba8f7ce937efa8f8f1d775eebe4de88e63a445dfbee3a91dfe57dda"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod0.glb",
+      "bytes": 225028,
+      "sha256": "7df598157c9143367c3e223f767996aec7e33d01b548b16f024fabeaf0627d27"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod1.glb",
+      "bytes": 218968,
+      "sha256": "a4125cdfb7e3760f534aa6233992c8d9c5bbce7a470eebdd5f27a54530147801"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flare-gun/flare-gun-world-lod2.glb",
+      "bytes": 194692,
+      "sha256": "d1b2a9dfeb0f7fd8a6a78f2bbcd0863507185c2ac590ec7175e791e3d5848dfb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-drop-lod0.glb",
+      "bytes": 351364,
+      "sha256": "bac2010aac5ec1ae42135747893c75220145072fb01834fa8df214359fcb2f18"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod0.glb",
+      "bytes": 395156,
+      "sha256": "c3e26b8730fee03e2f23f1e41a0d8404a8282581e8033eeb7ffd975d80819727"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-fp-lod1.glb",
+      "bytes": 333020,
+      "sha256": "2724bcd880a5264d61946808ee8e34cb746e27084a28f2c22a108c932de7bcc5"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-world-lod0.glb",
+      "bytes": 380540,
+      "sha256": "aa9ba5fd4a4c6b4be42611b36343f2cf59f92dd201140195efcb0b8db5194e58"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-world-lod1.glb",
+      "bytes": 351368,
+      "sha256": "34ab7cfe698b0c9dfdb79d6f6174dc654fbb7f1f962e02fcdabbd3add7712944"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-world-lod2.glb",
+      "bytes": 240204,
+      "sha256": "ec66bad6b97d0706072fb9d92badff381b51a6ddf3991a7d91706f909f5ca90c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-drop-lod0.glb",
+      "bytes": 273832,
+      "sha256": "c76d029b0489dc35f796245d49b192c10ee5cb691315b447e022986343233857"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-fp-lod0.glb",
+      "bytes": 303164,
+      "sha256": "b271e80ebd6146511a30e393c57965c130f6e22592d0b92a34ce7d62bfc996b7"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-fp-lod1.glb",
+      "bytes": 248992,
+      "sha256": "bf75ef0300e4641773854ae142a73191bf382e73d3bd06b2b3d0a93df5412250"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod0.glb",
+      "bytes": 303364,
+      "sha256": "cb63cbcf38ee4e578009c36e176bf36b2b83a614402fbff3e177b1af609369e7"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod1.glb",
+      "bytes": 273844,
+      "sha256": "4240b0cd53ce7be8c03fd765617f0e6060d1e5885946ad7b87ee95e498c4896f"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/lmg/lmg-world-lod2.glb",
+      "bytes": 222372,
+      "sha256": "dc353eb696bb63a6c7ad8f0ca11fc28a0a312a402c26d297ed21961011d76974"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-drop-lod0.glb",
+      "bytes": 269540,
+      "sha256": "6a5b7b89b3cb4ef9f024a67adda63d0b3551c155bc91a5c29def259bf81f9772"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod0.glb",
+      "bytes": 291556,
+      "sha256": "8e6c85f4216436eea451344a06b6a76d5da51e742171962f8851cae9b79f2a4b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-fp-lod1.glb",
+      "bytes": 255716,
+      "sha256": "f225f389f74d6a8bc8b0486a0274e287eb69b5b11aecce6b24e94072943ba836"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod0.glb",
+      "bytes": 291796,
+      "sha256": "7a7c85aae3f68d651e49762357a57fcb9ad6bdb5af70abe518cdddf4b787a158"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod1.glb",
+      "bytes": 269552,
+      "sha256": "df199e109551beb8082f56c22cead266dfbab6e6b8653198168d415c633214d1"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m14-ebr/m14-ebr-world-lod2.glb",
+      "bytes": 224076,
+      "sha256": "e4b7bfad95c6610b969dceba31074dd2a93de20abe7d73177cc0f3d43d60b75a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-drop-lod0.glb",
+      "bytes": 446024,
+      "sha256": "1e262d6c12590a3320ad755d869263ed01891cafc9ecaf890d643bb0b04ff7bb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod0.glb",
+      "bytes": 535112,
+      "sha256": "9b52f1e02d9aa73f3141d4640eb4034cae25540e281141f06895f0fb94226e35"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-fp-lod1.glb",
+      "bytes": 519448,
+      "sha256": "418de36cb53d68e1bd7e0ece539845fb97ebc7a09d01a1f51ceb6f3b6d23529b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod0.glb",
+      "bytes": 519476,
+      "sha256": "2091e247a428f331da0a7581ec413eba5df2a2ab85729b159d41a72765f85c96"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod1.glb",
+      "bytes": 446036,
+      "sha256": "e17d6627ea903e5421ae62f8fabe8bfc5dd1f93c421c5fdd384b2b9f41c435aa"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/m4a1/m4a1-world-lod2.glb",
+      "bytes": 384328,
+      "sha256": "e08b160ab75eefb809f3b8888fa0190ecd7efad9b3927db929d1afedf2b3063a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-drop-lod0.glb",
+      "bytes": 322820,
+      "sha256": "51acf3e2f7e930fc4f38632863540e8e355639a30f17add1fccc14e7e3c70f86"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-fp-lod0.glb",
+      "bytes": 332928,
+      "sha256": "06a4c5769fdeb6ec9c63455a32ab19dcba2b3b0318453665d43030fd344896fb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-fp-lod1.glb",
+      "bytes": 298264,
+      "sha256": "428bc380f03d72cfc73513a104f1f68b8bc26c59d9eea2be81c8d34ca03dfc05"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-world-lod0.glb",
+      "bytes": 338140,
+      "sha256": "ea251db4bc982ea09be7bec3e9df2a28f6ce4814b547fc6a4419cc56b0e4363d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-world-lod1.glb",
+      "bytes": 322836,
+      "sha256": "417303f7b6e0196b084bd621ab6542bce85426b5076d3bf30ca69b80eef46ab5"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/machine-pistol/machine-pistol-world-lod2.glb",
+      "bytes": 198684,
+      "sha256": "bdb679263c30cd0ba5917bc4aab2055b132fe123f43fb7b168bf14b94a19f53d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-drop-lod0.glb",
+      "bytes": 296904,
+      "sha256": "9d9a07fe6f8e8da6c898edf7a94e76debfc3e9f77ce36179b013bb1367ecabdd"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-fp-lod0.glb",
+      "bytes": 313408,
+      "sha256": "e5a8b7eddbc38a0b2906edb3333459b775e31acf2c0dc2689249e76c0e973048"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-fp-lod1.glb",
+      "bytes": 270992,
+      "sha256": "28b3b9661141ce2d6f6ee81af4ca0ff4fd3a457c3c6684fd898c654732e112fd"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-world-lod0.glb",
+      "bytes": 322780,
+      "sha256": "e721d6272b2dc80a2860ec6089a21e18e06d330a93d503a89b912969150182ea"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-world-lod1.glb",
+      "bytes": 296908,
+      "sha256": "a943b0746a22e6f12963b9868f23432d5a0073bcdddf065146155cbb3acc2632"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/magnum/magnum-world-lod2.glb",
+      "bytes": 208016,
+      "sha256": "6cc7a7d134240e0c4159816fe9395197ec95897a161b02c86f898383cef3754a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-drop-lod0.glb",
+      "bytes": 248840,
+      "sha256": "0a5078ad0ac3cc9941bd484eadb35d53458ceeb7c343a6f7ccd5ea30084e99c1"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-fp-lod0.glb",
+      "bytes": 260456,
+      "sha256": "1dfd91a34d7d64503561d8ec741ff10ed7f431f545c7ff3a41fe88534f8a0428"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-fp-lod1.glb",
+      "bytes": 239344,
+      "sha256": "47287af94dcd7a54788c81c6fad3741626ba474158b6562db42f115b5f9c59a6"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-world-lod0.glb",
+      "bytes": 267384,
+      "sha256": "e3e7b487fd70661505dfa606649fa01aefacab18a19bef931926d366634fc1a3"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-world-lod1.glb",
+      "bytes": 248852,
+      "sha256": "1c46a7990a97a7aa0e15346a22b2f9eda1c4d381b36c02ce694e647d4a627c21"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mini-uzi/mini-uzi-world-lod2.glb",
+      "bytes": 202372,
+      "sha256": "1889c256fb06ed4166bc392cc64fd6ba271acfd56ed1caa1cda77666f75233b6"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-drop-lod0.glb",
+      "bytes": 182552,
+      "sha256": "db4c0b9b844772b660bec18cc1d5ab684155e8cd9ae59e74b6a81d49ac5e70c9"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod0.glb",
+      "bytes": 213428,
+      "sha256": "bc7c965c3931ca2cce575a98552532b46fae11f41e313d3b03940cf726583a3b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-fp-lod1.glb",
+      "bytes": 181848,
+      "sha256": "ee938f709c39d0ccf4a6594786d2f8bd23534659a829d515e69b7589d9be8e5a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod0.glb",
+      "bytes": 196240,
+      "sha256": "0302f01ddae85ad5aace8b356068e3fba4c1d255b0b5504c31f726d129e0eacd"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod1.glb",
+      "bytes": 182556,
+      "sha256": "5b844bb66d5bcbdaab4f1aed21070b481a61d76f0415196e153b1fcb36ddb70c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/minigun/minigun-world-lod2.glb",
+      "bytes": 147684,
+      "sha256": "cc0a9f99a0c0cd0fd8c2b566f6cd65a456bb6253c6cd60cecdaf1aace9b6fdb5"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-drop-lod0.glb",
+      "bytes": 236236,
+      "sha256": "8be37982a7aec9d52527af07777df877af702d95924ced4f4c5ccf6b8415592b"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod0.glb",
+      "bytes": 239332,
+      "sha256": "cc59b90320395b672662f6ea44fc56e34167485bee7fb1a9ce488cf633033247"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-fp-lod1.glb",
+      "bytes": 218348,
+      "sha256": "0079b8698288ce7ddca5a6af788ee6fec38f1f2803d39cc82f7c8d8a8e4a334c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-world-lod0.glb",
+      "bytes": 242004,
+      "sha256": "707bc9826cc4df41bb5307a0517a0a00a49845a2f113ae2f768c330be1ba10c6"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-world-lod1.glb",
+      "bytes": 236244,
+      "sha256": "d525a24e539c4db1fd10aad3f7ace422dc5c6dda83f65fe5a832f4ca56415136"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/mp5/mp5-world-lod2.glb",
+      "bytes": 193664,
+      "sha256": "8d2790ef7fbbf0d57830a0c42bb484f15d740b3214e7c948abe43f8cbbbfaae4"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-drop-lod0.glb",
+      "bytes": 283964,
+      "sha256": "e91cfb2f46ddc8519a231352c73a1d94dcfeb8642ecfb4671971f42b99e3a912"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod0.glb",
+      "bytes": 297552,
+      "sha256": "9b1069a4b668ae3a6f0983df51d5ca293da4d6e44abbd9629d7ad36f4a875aff"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-fp-lod1.glb",
+      "bytes": 267140,
+      "sha256": "3001d0542c79d0892de8edc71e84e24287d4cb99e79a018ab0e7f1288d96b2c0"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-world-lod0.glb",
+      "bytes": 302768,
+      "sha256": "85bb433e2fa62a42db892d6e3129442e5bdfef69309cb11b4d1b43cd7dbe47bb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-world-lod1.glb",
+      "bytes": 283976,
+      "sha256": "38a177d6a0c97429a287992eff008206ca39ddfd3769c9f4feef07f6fbf741c9"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/pistol/pistol-world-lod2.glb",
+      "bytes": 207496,
+      "sha256": "bd6d0e6f2917a38f74d83927dda413d48518cf7cb9bd4acfddea2ff0a6e74800"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-drop-lod0.glb",
+      "bytes": 281036,
+      "sha256": "db7a888d5f09e60014a952b1b42a9b128001fe7d2eaf6ac702cfc7d25983a3ba"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod0.glb",
+      "bytes": 346004,
+      "sha256": "c2a1fa7938f381934beee29e8165d4c9a8631ac7e5931b14a813180296639eb2"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-fp-lod1.glb",
+      "bytes": 282992,
+      "sha256": "cd6345847f60fd65121994397b50bfe7fd720aabaf1b1ea533e91004fdc6a682"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod0.glb",
+      "bytes": 338384,
+      "sha256": "a842a3e2eead21a9fe9d222e6ff31ab03b6d4aea836d61547e909f2375186a22"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod1.glb",
+      "bytes": 281084,
+      "sha256": "08da2f7a7741491a8b05bcd93aa2843c903cc28fb57579363a9018b3984bfd92"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/railgun/railgun-world-lod2.glb",
+      "bytes": 235700,
+      "sha256": "abab20ad50707e1fa0c58911ac2b0d17726b6d6cebbe8ea9d97037a7a02dc42a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-drop-lod0.glb",
+      "bytes": 209680,
+      "sha256": "2ba03457801ea1bdb541053e81a0bc673327a310b59d63e41d51f8cf21047ce0"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-fp-lod0.glb",
+      "bytes": 213116,
+      "sha256": "f2a53fc2406edcfd3ae39b1562d3d164b28fbe2fed3f7a20d2f20e9074c279ba"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-fp-lod1.glb",
+      "bytes": 203404,
+      "sha256": "68277adcd9e1f2b56ec721b4f925fefc7015531d53f402b300216292cfd550d8"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod0.glb",
+      "bytes": 232372,
+      "sha256": "bb52dcf62af875800f5e4f05c4afde66049a5f4773a9336f98b10c19a86bc33f"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod1.glb",
+      "bytes": 209692,
+      "sha256": "75b6f31fd8da4f7d9f7670d0302db54cf7e55673bd18044beee25e9933af15af"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/scattergun/scattergun-world-lod2.glb",
+      "bytes": 175824,
+      "sha256": "7dc21fa75ecbece1a235974b6e6d7bcaa0a293baf24fd30c1a1968c97b522008"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-drop-lod0.glb",
+      "bytes": 260416,
+      "sha256": "b1511d7fe964541811f6fd3f4e788981ce8f8a12cbd2a9a1c6d85c200dd3c1e2"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod0.glb",
+      "bytes": 255576,
+      "sha256": "8f74adb17d1d81dd555166e91fc233774c793fce5d1df07dc320759dc225494d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-fp-lod1.glb",
+      "bytes": 242368,
+      "sha256": "320043c8855d30363382f896bdc036353be8f2ae43129b50d89569c614806dac"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod0.glb",
+      "bytes": 277396,
+      "sha256": "3eeccb2600247f9c83b3191cb1ad97fd60dbb50bd13ce817b34ca0dec0b581fd"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod1.glb",
+      "bytes": 260424,
+      "sha256": "49141e6952c61a1efb2be7708b85acbb2510fe1320973659859abd5fce94b39a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/slug-shotgun/slug-shotgun-world-lod2.glb",
+      "bytes": 215904,
+      "sha256": "359c75008e13088247122f875c58b52cbe08438af5cf948e5330b42192484019"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-drop-lod0.glb",
+      "bytes": 232816,
+      "sha256": "382a284e635e1b0621a212b900fe428f6130421a46bfed06c4a82afcc946922d"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-fp-lod0.glb",
+      "bytes": 237476,
+      "sha256": "f3e63925bd1b013b4da169ec1068c54857f7a758c0b43f4cffa739ae6f4c2a2c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-fp-lod1.glb",
+      "bytes": 227236,
+      "sha256": "363d43e9394aa076a5f07b9299a364efad19c935170848a7daccd0a1817a8deb"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-world-lod0.glb",
+      "bytes": 245052,
+      "sha256": "3316e3bb869952981c97e6eb4e56a647973eedf93f30d3e4cd997cafdac26b46"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-world-lod1.glb",
+      "bytes": 232828,
+      "sha256": "669846717a19e858792b1897f4e9b73773a19c74975054788d208fd5731c0655"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/smg/smg-world-lod2.glb",
+      "bytes": 191604,
+      "sha256": "447a4608994428adb2f8c5f1a9acaf72b43252ff4b7f3e745a2e6d3942283524"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-drop-lod0.glb",
+      "bytes": 240508,
+      "sha256": "1093d912468bfd234be23aac73188699bbb53481accd5510358e12da4bdfba95"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-fp-lod0.glb",
+      "bytes": 254136,
+      "sha256": "f74b56ff53742064de26d9bc39052fdd25091720033a4ebdc957e0f3c2edbcf4"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-fp-lod1.glb",
+      "bytes": 227452,
+      "sha256": "7388293c84d6b5c7f1c127b5abec68226b115ebe4367f214bd4446dc10a76e64"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod0.glb",
+      "bytes": 250448,
+      "sha256": "c62f2fb53b1b70d63ba10a8f5793d540a3fc0417571e244763216537005f3f6a"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod1.glb",
+      "bytes": 240516,
+      "sha256": "9fe84f50dcba5c593fdf7753d81d87e204974459dca67c1f9014a1d658a53c3c"
+    },
+    {
+      "path": "assets/original/models/weapons/pass65-firearms/sniper/sniper-world-lod2.glb",
+      "bytes": 196016,
+      "sha256": "d1bf6cf6e1d46af165f39c80e11ec75609d61e1257f65dc4202054249bf69e11"
+    },
+    {
+      "path": "assets/original/skies/atomic-acres-sunset.webp",
+      "bytes": 1120742,
+      "sha256": "7a1ad1c445af528afb461d0e3bc5ad5607618dd87df078529fdc41e7d071396b"
+    },
+    {
+      "path": "assets/original/skies/rustworks-industrial-night.webp",
+      "bytes": 825088,
+      "sha256": "d5a0fc1d1f60678fa78f22a8b89fd1df2a9aab14998e5a75576bb92393b08450"
+    },
+    {
+      "path": "assets/original/skies/terminal-airport-dawn.webp",
+      "bytes": 985934,
+      "sha256": "e36b73cfe0c291d25815e04a67c36921a6a1259049531371d35d96a04b307600"
+    },
+    {
+      "path": "assets/original/skin-cards/default-card.webp",
+      "bytes": 55544,
+      "sha256": "42f64b73660dfd455a7baee68be30eafd5e97842fe19a0b2bd4b2fd3c2dba0bd"
+    },
+    {
+      "path": "assets/original/skin-cards/explorer-card.webp",
+      "bytes": 62208,
+      "sha256": "331f07b22af777b564a220eb523fbeaa488060f9a9f44833b198b453d93e7232"
+    },
+    {
+      "path": "assets/original/skin-cards/navalops-card.webp",
+      "bytes": 53302,
+      "sha256": "9d2326c23d6ecdc8d799c15287c49f406ed91995e6de1326dcbb3cd7a46611c5"
+    },
+    {
+      "path": "assets/original/skin-cards/symbiote-card.webp",
+      "bytes": 53470,
+      "sha256": "578e22c7e7befe3c7f155a0f2ad791ca0500349c326e3723ec4937dd77bc9515"
+    },
+    {
+      "path": "assets/original/textures/asphalt-aged-normal.png",
+      "bytes": 414525,
+      "sha256": "348c260de695a34bdf1a6d89d33ab397a7d682f695d2993b0decff9b7e3242a4"
+    },
+    {
+      "path": "assets/original/textures/asphalt-aged-roughness.png",
+      "bytes": 23630,
+      "sha256": "7da52a9bb325cf0750450a0edbd2f86d92657dbf7056537a5b36bd1ccd6d3078"
+    },
+    {
+      "path": "assets/original/textures/asphalt-aged.png",
+      "bytes": 1109387,
+      "sha256": "ea1d66a5cef2c3db1903d106b7f43dc0a699fa182a0bf8a3f096638b0af008e3"
+    },
+    {
+      "path": "assets/original/textures/brick-warm-normal.png",
+      "bytes": 105214,
+      "sha256": "0515ae9ef4b2be0176cfbd23638c786b3450e8213aa4dc401891daffc8400465"
+    },
+    {
+      "path": "assets/original/textures/brick-warm-roughness.png",
+      "bytes": 8558,
+      "sha256": "8cadd4e3ce94cb7d7525906dc8ce08f9af772b129e72063cc976620e4932fca2"
+    },
+    {
+      "path": "assets/original/textures/brick-warm.png",
+      "bytes": 90659,
+      "sha256": "24320acb32db3b58cba99baf8509b0919029ccc2685ace3dc0f01b2c3f0242fe"
+    },
+    {
+      "path": "assets/original/textures/ceiling-acoustic.png",
+      "bytes": 273144,
+      "sha256": "d88adae82ec1842e8c642e7141ad7582d1668903f0999bb0782bc426c0400d93"
+    },
+    {
+      "path": "assets/original/textures/concrete-poured-normal.png",
+      "bytes": 388096,
+      "sha256": "31b99ee286cd6af7525b63de816f1226e3d19cb5d2805bbc3e9e8494be237deb"
+    },
+    {
+      "path": "assets/original/textures/concrete-poured-roughness.png",
+      "bytes": 28572,
+      "sha256": "af6ae06a258570c2fc458ebd00be2818bdab3a509563a100c23af26d43d7206e"
+    },
+    {
+      "path": "assets/original/textures/concrete-poured.png",
+      "bytes": 1010446,
+      "sha256": "b7beab61413f47524e88dabacab84836a72bf74b4efdc3af4fb676443181225f"
+    },
+    {
+      "path": "assets/original/textures/fabric-weave-normal.png",
+      "bytes": 1419,
+      "sha256": "47811ead6dbe240925fa0498e09e2ad56e7ad379418cf52ca886fd8d295d6c75"
+    },
+    {
+      "path": "assets/original/textures/fabric-weave-roughness.png",
+      "bytes": 609,
+      "sha256": "59f495ff115b8bf5db568aa5beed8ca4cfcf1903c92ecfb03e3cab490fc9cac3"
+    },
+    {
+      "path": "assets/original/textures/fabric-weave.png",
+      "bytes": 2335,
+      "sha256": "1daffa3f1c5bd8634db6c5ada42f4b290131f6bec9eb225963f62d57bca887d6"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-bark-normal.png",
+      "bytes": 2331703,
+      "sha256": "a7fdd3f7ebfa2e56f1a24fa8c67c8c621b23feb31d7cd0c8a7b25793f4bfca8d"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-bark-roughness.png",
+      "bytes": 58682,
+      "sha256": "57c7f093b44959e3ee3d73d9f5947d9c24bc0cde676c770e1722018e8904a8cd"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-bark.png",
+      "bytes": 2192379,
+      "sha256": "83384e9944b849e56bf0f1ea539e5d98fcd09778025dc9279b122319c447bca4"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-crate-normal.png",
+      "bytes": 1829991,
+      "sha256": "6dad7e62254f5b33c96efb441b6707b3ca9f38f560685e787713989314c5b6c0"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-crate-roughness.png",
+      "bytes": 68228,
+      "sha256": "67d44607270af98a05be1fc3e811121431b1403ac9cce99bfb5248b3b6dfea0f"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-crate.png",
+      "bytes": 1934015,
+      "sha256": "60bbcece8596e416e4ac156882da3d19e31f5ebeeda144e3bcdf2882e485c9f1"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-frond-normal.png",
+      "bytes": 894936,
+      "sha256": "67ed1cb4b94bc1b64544477fb342326cf519a7ef83ef46bdd402dc83e1865693"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-frond-roughness.png",
+      "bytes": 55578,
+      "sha256": "93514701bd2b1b9d3d8633851dd5fea8efa910e848851296ca7798bfdd5ce0cc"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-frond.png",
+      "bytes": 856191,
+      "sha256": "d3e7827db351b50a049b3fd72f80cdd87f2932069f022ed49d54c6c49924c68d"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-rock-normal.png",
+      "bytes": 2361881,
+      "sha256": "2b1936248a4e50261527780e5b2b35861a8af79a55992dbc561a3cf451f633bb"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-rock-roughness.png",
+      "bytes": 66095,
+      "sha256": "8ccb406d9ae51c7f83936128d33abecbc0669daf29da3d1ab26f486c6b4744a2"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-rock.png",
+      "bytes": 2064002,
+      "sha256": "4f857c7239ce7c4cd8583e59a156fe4057cfcb51ca980ebd1eae84b5da3fbba0"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-sand-normal.png",
+      "bytes": 1888461,
+      "sha256": "91c97078419e258c06346f30d8a974d8e00006ed43cead7b97e3f3fc60b3a286"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-sand-roughness.png",
+      "bytes": 67668,
+      "sha256": "9f1c041cb31341f1ed3624e3c1157f0b41c6da583061a20fe5c554fdcee2e172"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-sand.png",
+      "bytes": 2414714,
+      "sha256": "d178faea4e540d32c02d4a47e092a878bfda8dc60e4fe137461d388cbace53b5"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-water-normal.png",
+      "bytes": 1726690,
+      "sha256": "7cd4077b9efe4627706879614b35b8a9e6326bbde61e341c5b4e9b22de774e8b"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-water-roughness.png",
+      "bytes": 65507,
+      "sha256": "bdeeef84b4532604c64eedbd220a55fc63193b1f41a01cd3e5e45c76d2274c51"
+    },
+    {
+      "path": "assets/original/textures/farcrysis-water.png",
+      "bytes": 1533538,
+      "sha256": "d1756a75d29f93126c775d4cfb5ab47f38422ecd6bf6c7df4ab703130d4eae77"
+    },
+    {
+      "path": "assets/original/textures/grass-turf-normal.png",
+      "bytes": 399204,
+      "sha256": "61593b812a4f9674c88d9979e9ed2e1228e027fd4d68dec9b361b28332a48e36"
+    },
+    {
+      "path": "assets/original/textures/grass-turf-roughness.png",
+      "bytes": 15493,
+      "sha256": "db80f9ab91fc764077ed0b2b9699e095fc34be914e302ac00660884169328ad8"
+    },
+    {
+      "path": "assets/original/textures/grass-turf.png",
+      "bytes": 1078509,
+      "sha256": "35bf1bb7c2f763920ef26dc2d28f1ee4573a0097966240045c36a78c8b1644b6"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-baseColor.png",
+      "bytes": 760659,
+      "sha256": "079a08dd975d6ae93e6d70b7423a165b0991608ed630cae47bf91cf012939b5d"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-metallic.png",
+      "bytes": 20726,
+      "sha256": "b423c3205b957f68b072235b9343520f84b1adde4b216bd44893a20e9398f704"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-normal.png",
+      "bytes": 1077030,
+      "sha256": "58948e90fa391de01dcf5f2bed98d19f1a8e5d729e29bb3c0a0708558b824d43"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-first-person-arms/pass65-first-person-arms-roughness.png",
+      "bytes": 505926,
+      "sha256": "5ef34ec574d1675f033a2de5ecb94bf90ae0dfaaccae9acde1da6ae3fbc44e58"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-skin-baseColor.png",
+      "bytes": 366791,
+      "sha256": "41660dcf9b179c2c711d51d6f625655181037fefba1a561ef6ffa475a3757636"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-skin-metallic.png",
+      "bytes": 5807,
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-skin-normal.png",
+      "bytes": 300851,
+      "sha256": "d38ed62cfa2acbd593720fe76c7dd3e609b0c054e42e3b0ae77fda82265f1db0"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-skin-roughness.png",
+      "bytes": 314440,
+      "sha256": "3ed1806dcd403a2401c73daf8dc2e50506122dfc0b3343de63cbf41c09259589"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-baseColor.png",
+      "bytes": 422204,
+      "sha256": "51473059c242d92e89429acd350c10720e3af3067fde059354751f46cbafc9e5"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-black-baseColor.png",
+      "bytes": 384645,
+      "sha256": "4193fa150b909871f387026e04769fd56869c265d0440c77f08c365298690c80"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-black-metallic.png",
+      "bytes": 6270,
+      "sha256": "f22dce8feaeba3d8839928836dd45fc343e9dbaf8dd042e98a3b316a5e6a1d58"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-black-normal.png",
+      "bytes": 367932,
+      "sha256": "8084b89bd2069b4a33bcd41a2a255224d293f89e2af2dfe500cd57ade58c4e0e"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-black-roughness.png",
+      "bytes": 320142,
+      "sha256": "d119888d1a1e3c7a056060c1cda888eb6eece47da6fa1c63c882257b31594e7d"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-metallic.png",
+      "bytes": 5806,
+      "sha256": "7d5ac10b211f9a35106b6d11bd899b210148ff12c1a2cda605297894395fb96f"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-normal.png",
+      "bytes": 337213,
+      "sha256": "818b256cd6853410234835e33910a2acca109128e69ac1f1b1001d0d51f59562"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-swat-roughness.png",
+      "bytes": 341107,
+      "sha256": "3dedec56b230e4260ccc6fe58cd2993c1ecc95c0c777a0ffaa4abbde5acd009b"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-visor-baseColor.png",
+      "bytes": 5918,
+      "sha256": "dca50ef8053bded3224d6208b4f28169dbe6b9a6b727ae58b261b9c5901df0a8"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-visor-metallic.png",
+      "bytes": 289279,
+      "sha256": "a81ca87892de90f8335d1e256c0938560cf1a4ba63b35ad15e896a49a6ebf027"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-visor-normal.png",
+      "bytes": 148043,
+      "sha256": "59b6120da8eec443fa6f3ea25a2186d7b9dcf50bb63a8bcb8e55ba29f1a04ccb"
+    },
+    {
+      "path": "assets/original/textures/operators/pass65-third-person-operator/pass65-third-person-operator-visor-roughness.png",
+      "bytes": 296560,
+      "sha256": "fe0ce456e40c931a51c5fd8aba71a4a6c29a24aef120f7e77d141907b889ddcb"
+    },
+    {
+      "path": "assets/original/textures/ordnance/semtex-bundle-albedo.png",
+      "bytes": 61603,
+      "sha256": "0da721de0c0a5681d714a27c1fe8f263a9b9872198f94b1a7fbd6cfc470ded3b"
+    },
+    {
+      "path": "assets/original/textures/ordnance/semtex-bundle-emissive.png",
+      "bytes": 2061,
+      "sha256": "53c7d6c057d902b7d56205ae4aa69ae4050352962ba614a5f417604788c75f78"
+    },
+    {
+      "path": "assets/original/textures/ordnance/semtex-bundle-normal.png",
+      "bytes": 40332,
+      "sha256": "62f57f9dd5eedb62a95435060c878ae558951ff09e9c4ce677c03641d6b3519c"
+    },
+    {
+      "path": "assets/original/textures/ordnance/semtex-bundle-orm.png",
+      "bytes": 35634,
+      "sha256": "14dc7c94dce8e89ab04daa664bc4637070382aeb92e85ed4518eb43f0b8a8c0f"
+    },
+    {
+      "path": "assets/original/textures/painted-metal-teal-normal.png",
+      "bytes": 212612,
+      "sha256": "669f7c8e5b820e54a6657c5224724b194dda22f90f4225988a92f6c02f602134"
+    },
+    {
+      "path": "assets/original/textures/painted-metal-teal-roughness.png",
+      "bytes": 52390,
+      "sha256": "f09b6f67c6bdee595abf7bea4aa0b892b95f64939e8101c88ec866da9c4cbf19"
+    },
+    {
+      "path": "assets/original/textures/painted-metal-teal.png",
+      "bytes": 863959,
+      "sha256": "53f4e5b5e9bd8dfc5025270579a2e98c8a1a68dd2713f1bc0a75d99e65ca593a"
+    },
+    {
+      "path": "assets/original/textures/plaster-warm-normal.png",
+      "bytes": 215667,
+      "sha256": "ad9ae36fcf14f9447091a25b56ebbba1f9a187c09d9199321c0e8a1accc93e36"
+    },
+    {
+      "path": "assets/original/textures/plaster-warm-roughness.png",
+      "bytes": 48594,
+      "sha256": "6d53ed0f5dfae49993f1a723ee598cb7123309edab46f8265956fabcef41a117"
+    },
+    {
+      "path": "assets/original/textures/plaster-warm.png",
+      "bytes": 324738,
+      "sha256": "fdde1c8f1eba286f68ddda4124a097ad820c507f5618caa8396e660867e85623"
+    },
+    {
+      "path": "assets/original/textures/roof-shingles-normal.png",
+      "bytes": 154312,
+      "sha256": "989f32d6a7ded8a2e94674565bb3f9bb0edc501d1ade7090860eb791b1f70065"
+    },
+    {
+      "path": "assets/original/textures/roof-shingles-roughness.png",
+      "bytes": 7373,
+      "sha256": "96546423a186a14aacb14766aa099b2e5512ea18556c9337300ed5b685ab34d4"
+    },
+    {
+      "path": "assets/original/textures/roof-shingles.png",
+      "bytes": 135609,
+      "sha256": "94134ec967f16a0d407de872cbf02c485df14eab858498c7b6d175d4f78f35ae"
+    },
+    {
+      "path": "assets/original/textures/rustworks-asphalt-normal.png",
+      "bytes": 254557,
+      "sha256": "d32594aefe68173d0debc1d8d59601a46dd4a9abe5c642f74d7da719ed0d8cc6"
+    },
+    {
+      "path": "assets/original/textures/rustworks-asphalt-roughness.png",
+      "bytes": 48605,
+      "sha256": "88eff06a1a94b62f950463a8546b1b18ec6686319565d4ed2c2ab4affda66c9b"
+    },
+    {
+      "path": "assets/original/textures/rustworks-asphalt.png",
+      "bytes": 76720,
+      "sha256": "c8cbf5e9d7cb9b40e25e5f6f722327f176156b8079362711266969e19d3aa27e"
+    },
+    {
+      "path": "assets/original/textures/rustworks-concrete-normal.png",
+      "bytes": 99253,
+      "sha256": "c74ec6362b2bac87a3cb58154018629a623a536684521d89bf1c866b7fc9a77e"
+    },
+    {
+      "path": "assets/original/textures/rustworks-concrete-roughness.png",
+      "bytes": 62155,
+      "sha256": "d8ba27cd1cd2341e346551b10ec7969f7ee149fef307569aed55b07148903a35"
+    },
+    {
+      "path": "assets/original/textures/rustworks-concrete.png",
+      "bytes": 242250,
+      "sha256": "031c9f662565f292bdcebc31fbc5acad6cc6e9231a1bf00c8633d748238a5001"
+    },
+    {
+      "path": "assets/original/textures/rustworks-corrugated-normal.png",
+      "bytes": 4734,
+      "sha256": "0000c5d4f806d14921868fda44c849fc9404b0fd2c589b47a58af985fb3988fe"
+    },
+    {
+      "path": "assets/original/textures/rustworks-corrugated-roughness.png",
+      "bytes": 79780,
+      "sha256": "9647feabbd0870e1b0cc4e994104138d77f1415225cfb7b2801f6551f18a4219"
+    },
+    {
+      "path": "assets/original/textures/rustworks-corrugated.png",
+      "bytes": 136251,
+      "sha256": "d70f0a593c32b185472cf07a25b926ae2ea9f7f52b4c1b7dee175baf2dc8ed68"
+    },
+    {
+      "path": "assets/original/textures/rustworks-diamond-plate-normal.png",
+      "bytes": 19673,
+      "sha256": "b1a6fbd206e2ef4e8b053316e848f6754ca973057aa732454b3bf360aa522d5b"
+    },
+    {
+      "path": "assets/original/textures/rustworks-diamond-plate-roughness.png",
+      "bytes": 104825,
+      "sha256": "5275ebfe633da90eff0e1653bd257f709d2a568a7fc8368ff3bec7650afcaccb"
+    },
+    {
+      "path": "assets/original/textures/rustworks-diamond-plate.png",
+      "bytes": 103264,
+      "sha256": "51a7dbcfe1ebe7a193b81ac66072f9cd96de5c007832664d726a97e13ac0aa9c"
+    },
+    {
+      "path": "assets/original/textures/rustworks-grate-metal-normal.png",
+      "bytes": 13792,
+      "sha256": "763952be5fdd63cb4d92c7ca412beddcc6da58b0d4eef6eb4aba5c903252d39e"
+    },
+    {
+      "path": "assets/original/textures/rustworks-grate-metal-roughness.png",
+      "bytes": 90412,
+      "sha256": "d9838dfcab1d55bed4c07460d7c3143aa574f4024c8e3e4a500f3dc9499211b8"
+    },
+    {
+      "path": "assets/original/textures/rustworks-grate-metal.png",
+      "bytes": 2019953,
+      "sha256": "cb3afbea890d20f4d74c540a73dc076633b52276640a5a093df7d0118b1db513"
+    },
+    {
+      "path": "assets/original/textures/rustworks-hazard-normal.png",
+      "bytes": 14559,
+      "sha256": "23ecfaf75f20e1d80ecacc3a16536050c03254c869dc89af5dfa39094768e2bc"
+    },
+    {
+      "path": "assets/original/textures/rustworks-hazard-roughness.png",
+      "bytes": 100135,
+      "sha256": "c989b36852b8e0966952b6fd9c3e677f51ab1aa50e9ab639766dd4b443fc3571"
+    },
+    {
+      "path": "assets/original/textures/rustworks-hazard.png",
+      "bytes": 1908808,
+      "sha256": "eaa6b67b634f39b84a19f9cc3e052749df0e472bb89c68de5cddf35091186631"
+    },
+    {
+      "path": "assets/original/textures/rustworks-oxide-normal.png",
+      "bytes": 258520,
+      "sha256": "97415085394b559d28b0a4f816574e36a5403ad611daff4bc78f1e3288eedb6b"
+    },
+    {
+      "path": "assets/original/textures/rustworks-oxide-roughness.png",
+      "bytes": 36315,
+      "sha256": "003393454bf9053b34e3927c8f18dbd41957384f118d0a778820a2ef5db764b7"
+    },
+    {
+      "path": "assets/original/textures/rustworks-oxide.png",
+      "bytes": 129310,
+      "sha256": "e2f3daf6ee1f74c4b8e8512e26ad87f4dbe4515daeb629268884378454b3e25f"
+    },
+    {
+      "path": "assets/original/textures/rustworks-plate-steel-normal.png",
+      "bytes": 13281,
+      "sha256": "65643e8c9834ee1234fcd52e57bb152f236ec61c6fa4cd62fd9f7eb3cab6cf53"
+    },
+    {
+      "path": "assets/original/textures/rustworks-plate-steel-roughness.png",
+      "bytes": 78502,
+      "sha256": "c2175cd2006a7d838e9c6cf36f88dba3576b98f2456e57f7b4f57c0fc1ec84ed"
+    },
+    {
+      "path": "assets/original/textures/rustworks-plate-steel.png",
+      "bytes": 86094,
+      "sha256": "391ff0502471f2ea81a0d6ca93f1a94cdc3b3f1af07625976745df7bf93851d9"
+    },
+    {
+      "path": "assets/original/textures/rustworks-signage-normal.png",
+      "bytes": 5637,
+      "sha256": "9eb3c4d3a86e9301d638ff3393ae548ad165f3a8ab662646d80ec89d87b0b26a"
+    },
+    {
+      "path": "assets/original/textures/rustworks-signage-roughness.png",
+      "bytes": 75074,
+      "sha256": "9cf79f928893f8c76eb7bfe535d48c8b1aa2e3a95cbf6445f290ab1681e0551a"
+    },
+    {
+      "path": "assets/original/textures/rustworks-signage.png",
+      "bytes": 4941,
+      "sha256": "dcdd56f35042b393af8f363689c3cb9a7d6f9a36b6961a9db6fd3dea0753393d"
+    },
+    {
+      "path": "assets/original/textures/rustworks-steel-rust-normal.png",
+      "bytes": 306886,
+      "sha256": "dbf4724a404e5bed8f9d8fba7571bd9126b1298415e48a2107159abdb57538b3"
+    },
+    {
+      "path": "assets/original/textures/rustworks-steel-rust-roughness.png",
+      "bytes": 85655,
+      "sha256": "9e043f9d1fea9afda1e566524c46060a1b485d461004f179137638e68f557704"
+    },
+    {
+      "path": "assets/original/textures/rustworks-steel-rust.png",
+      "bytes": 517324,
+      "sha256": "b258fd907c664a74bfc3918073892ccf073150b5b08cf90eae89bda1e66c0cd8"
+    },
+    {
+      "path": "assets/original/textures/rustworks-tank-paint-normal.png",
+      "bytes": 26473,
+      "sha256": "32f21f164c2ac20e43d6568ec11c7af05e871f1b7cf5adcb52e7c81e905daa9d"
+    },
+    {
+      "path": "assets/original/textures/rustworks-tank-paint-roughness.png",
+      "bytes": 84753,
+      "sha256": "1647d1a2189c9ac3202a5ccfb97d4999f2eaf0c49ee1332eaf3dd26150730d02"
+    },
+    {
+      "path": "assets/original/textures/rustworks-tank-paint.png",
+      "bytes": 100077,
+      "sha256": "5c79cad05a755878588f8a748495c203e35b02c3a4a700a78e2bd8b936ae59e6"
+    },
+    {
+      "path": "assets/original/textures/siding-aqua-normal.png",
+      "bytes": 295961,
+      "sha256": "34b61166f5287301da619e16b318722f06cde45ab32c12c94e458279d2b0f9b5"
+    },
+    {
+      "path": "assets/original/textures/siding-aqua-roughness.png",
+      "bytes": 10097,
+      "sha256": "49274a064c202a1dc88359ee4ac0048220c781e5a94da82185aa8e09223d467d"
+    },
+    {
+      "path": "assets/original/textures/siding-aqua.png",
+      "bytes": 745983,
+      "sha256": "60c2bb3bb003de5afbf85b74b6594a64ad3d48560cdd641307b5403e74253bc6"
+    },
+    {
+      "path": "assets/original/textures/siding-coral-normal.png",
+      "bytes": 294424,
+      "sha256": "b70743cd93bcc665ced590f70e716d9dbef35a600e0d53a57a006a16f9bd4231"
+    },
+    {
+      "path": "assets/original/textures/siding-coral-roughness.png",
+      "bytes": 8115,
+      "sha256": "87635441eb08a2c702dae5e8f7d8803128eaab925f1a79178ab50fe504e88fca"
+    },
+    {
+      "path": "assets/original/textures/siding-coral.png",
+      "bytes": 744563,
+      "sha256": "b9ca816c3a587264228b77fb6db13490db0dbe9fb69472032a5b1fbc91e88e92"
+    },
+    {
+      "path": "assets/original/textures/support/hunter-drone-albedo.png",
+      "bytes": 186813,
+      "sha256": "40c94c78cb1a25db1a401db198609512a068cf47bb9c688477b674b3c56018cf"
+    },
+    {
+      "path": "assets/original/textures/support/hunter-drone-emissive.png",
+      "bytes": 8658,
+      "sha256": "22e565672203c83c86323d152c90f449bb0fff02e2e1c3326ff1a4e60b6fd6f9"
+    },
+    {
+      "path": "assets/original/textures/support/hunter-drone-normal.png",
+      "bytes": 115069,
+      "sha256": "2197cb3066c249f9263928444131f756c4324bf096dd50b614a9f0df85a16b73"
+    },
+    {
+      "path": "assets/original/textures/support/hunter-drone-orm.png",
+      "bytes": 161526,
+      "sha256": "6b758408c2c9239f8beb77cab501f3ac5ad46bda395d998ab6b5cc76a13e8e29"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-care-aircraft-albedo.png",
+      "bytes": 256384,
+      "sha256": "e38c3126030f9fd39f442750c4e38aa0528814e816eb4a2becc5e2323e2b13fb"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-care-aircraft-emissive.png",
+      "bytes": 5807,
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-care-aircraft-normal.png",
+      "bytes": 159584,
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-care-aircraft-orm.png",
+      "bytes": 206426,
+      "sha256": "f7a6b6bb064146a7eb03e01e5cf7434d7224b287648c45d0ef59fbe86fa32495"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-carpet-aircraft-albedo.png",
+      "bytes": 258562,
+      "sha256": "1462ab032956fe4ce92d0b15b80ac418c10576a06b56be997da97db2552accb5"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-carpet-aircraft-emissive.png",
+      "bytes": 5807,
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-carpet-aircraft-normal.png",
+      "bytes": 159584,
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-carpet-aircraft-orm.png",
+      "bytes": 194375,
+      "sha256": "0006d9c8024b77e5c46be66f999b48aa0523ab7b59d9ade4f996f06f3b452649"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-chopper-albedo.png",
+      "bytes": 229357,
+      "sha256": "245e185d4578825299e5b7ec2f03ae9af653b5b9e0db1f18cc5120d885920737"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-chopper-emissive.png",
+      "bytes": 5807,
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-chopper-normal.png",
+      "bytes": 159584,
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-chopper-orm.png",
+      "bytes": 197465,
+      "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-support-aircraft-albedo.png",
+      "bytes": 213081,
+      "sha256": "b2a1c5cc389787ad1a2e5b699260682f5598838aee0e74e58e8815bed1dbd7eb"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-support-aircraft-emissive.png",
+      "bytes": 5807,
+      "sha256": "55aea7bfe6f9c90c71df2379611c12eada3014444ccbce4f3352d3303077a44f"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-support-aircraft-normal.png",
+      "bytes": 159584,
+      "sha256": "8ea8fba6ea9b7cddcde40feaadf1418b18e485a8479174bff737e08626a93ae4"
+    },
+    {
+      "path": "assets/original/textures/support/pass65-support-aircraft-orm.png",
+      "bytes": 197465,
+      "sha256": "81558c4fa073553817382a13b74ffb4a00a90749c6bdc33c6f546773eee424bf"
+    },
+    {
+      "path": "assets/original/textures/weapon-carbine-normal.png",
+      "bytes": 217565,
+      "sha256": "50e792c04f35589a01ecaf202ea119eaff1c4bfc835158efe1adc3003315f09b"
+    },
+    {
+      "path": "assets/original/textures/weapon-carbine-roughness.png",
+      "bytes": 90848,
+      "sha256": "25e6987c27bd57ea8bffc2f9067ba131ed0bc55a0bd7052986138bea582af1a5"
+    },
+    {
+      "path": "assets/original/textures/weapon-carbine.png",
+      "bytes": 141151,
+      "sha256": "a7e4099d0941e5fbe6c14c924c76d8831960f285745baa8675ef385d811d210f"
+    },
+    {
+      "path": "assets/original/textures/weapon-gunmetal-normal.png",
+      "bytes": 238475,
+      "sha256": "a0a48ca1daa58cae70c58610e4f8dc0b3300aee58de6a6adefe283e4df1b2b42"
+    },
+    {
+      "path": "assets/original/textures/weapon-gunmetal-roughness.png",
+      "bytes": 55648,
+      "sha256": "52a4aebec00ee3fff6d67a188124dbecf6d60e9e34ef26765583e6eeec58905e"
+    },
+    {
+      "path": "assets/original/textures/weapon-gunmetal.png",
+      "bytes": 826134,
+      "sha256": "1d6ad250edf0139f29b3a636d9803d2adc0ed7748f686f333a371c8b5c8f08df"
+    },
+    {
+      "path": "assets/original/textures/weapon-lmg-normal.png",
+      "bytes": 221018,
+      "sha256": "ee365c1b11638a5fc4e982774c8e3ab0240c8d9eca5315b23a576b3049debfab"
+    },
+    {
+      "path": "assets/original/textures/weapon-lmg-roughness.png",
+      "bytes": 96240,
+      "sha256": "c30077de8c35ab895050b433430d53e1746ee61354863c88c0db47ff0398bd75"
+    },
+    {
+      "path": "assets/original/textures/weapon-lmg.png",
+      "bytes": 157074,
+      "sha256": "702647e204e9412cf6fceec60e940c3aaadd36850749265bc52f82a41db7441b"
+    },
+    {
+      "path": "assets/original/textures/weapon-machine-pistol-normal.png",
+      "bytes": 201965,
+      "sha256": "5b554bbe7c2da0e463253f5ffb0125b0b4e669c4b9b1e7f44942a07d5dae90d5"
+    },
+    {
+      "path": "assets/original/textures/weapon-machine-pistol-roughness.png",
+      "bytes": 92558,
+      "sha256": "5f89857794902e205ae6eb6edbb36e6974968c5a1c84ec63d8aeea73c1aca94a"
+    },
+    {
+      "path": "assets/original/textures/weapon-machine-pistol.png",
+      "bytes": 149117,
+      "sha256": "cbb0403788779ece9dd609ff08589b187ffccb3b36f54e3cbb5b91648adb7bc1"
+    },
+    {
+      "path": "assets/original/textures/weapon-magnum-normal.png",
+      "bytes": 211222,
+      "sha256": "1192fd9db957d43951a21763ada9c0fada3dd2c0a869ec03ef22c9d13ad3fb09"
+    },
+    {
+      "path": "assets/original/textures/weapon-magnum-roughness.png",
+      "bytes": 97694,
+      "sha256": "defa322c05ab40f123e267c1b1b71b01d2e1e7bc30e252cfd99bca867474c949"
+    },
+    {
+      "path": "assets/original/textures/weapon-magnum.png",
+      "bytes": 154620,
+      "sha256": "1a8992aa3d8fc3137cee4179cd588fe4c7e6cdcf2b2ef3510afeb54b0b84c932"
+    },
+    {
+      "path": "assets/original/textures/weapon-pistol-normal.png",
+      "bytes": 211222,
+      "sha256": "1192fd9db957d43951a21763ada9c0fada3dd2c0a869ec03ef22c9d13ad3fb09"
+    },
+    {
+      "path": "assets/original/textures/weapon-pistol-roughness.png",
+      "bytes": 97694,
+      "sha256": "defa322c05ab40f123e267c1b1b71b01d2e1e7bc30e252cfd99bca867474c949"
+    },
+    {
+      "path": "assets/original/textures/weapon-pistol.png",
+      "bytes": 154620,
+      "sha256": "1a8992aa3d8fc3137cee4179cd588fe4c7e6cdcf2b2ef3510afeb54b0b84c932"
+    },
+    {
+      "path": "assets/original/textures/weapon-scattergun-normal.png",
+      "bytes": 210545,
+      "sha256": "5ac8ad7ecba1a877dd8b5b7a792fc53246325d92aeb1beb6f3374ac54b787377"
+    },
+    {
+      "path": "assets/original/textures/weapon-scattergun-roughness.png",
+      "bytes": 88945,
+      "sha256": "129fc87f3f3d752d89431015000197527ebb3d9ec0b14e015e43bf1fc6b0eab3"
+    },
+    {
+      "path": "assets/original/textures/weapon-scattergun.png",
+      "bytes": 133188,
+      "sha256": "f1949063dfd942a3315c647130553288c1ad5397efbeae2875aeecd06dd2db4d"
+    },
+    {
+      "path": "assets/original/textures/weapon-smg-normal.png",
+      "bytes": 232761,
+      "sha256": "3c90f08885f0fb31677444ee57b59b5b131d5bdda2dadb3e51d00791aa004b35"
+    },
+    {
+      "path": "assets/original/textures/weapon-smg-roughness.png",
+      "bytes": 100865,
+      "sha256": "ee3c25a2867db1538a027d56df9fb4c471569506ec553ceec5294b9397572b58"
+    },
+    {
+      "path": "assets/original/textures/weapon-smg.png",
+      "bytes": 160748,
+      "sha256": "40ade51957239e1b65ec44162314b60c3c2004d4a860542c2b0a70a2f76030dd"
+    },
+    {
+      "path": "assets/original/textures/weapon-sniper-normal.png",
+      "bytes": 216745,
+      "sha256": "4959017ac948bb7c6147f9a5b7b45b4a85349e5f7bfc845d4d8ba41ec070b755"
+    },
+    {
+      "path": "assets/original/textures/weapon-sniper-roughness.png",
+      "bytes": 91657,
+      "sha256": "d801abeadcebdd0627a1b58f52e6bd05c7582433ea8e87395b18a62d732f21b2"
+    },
+    {
+      "path": "assets/original/textures/weapon-sniper.png",
+      "bytes": 151731,
+      "sha256": "4c13920b11c6c53425df5ba1fe5df8d1ead08cbe417286abc3adce480923f3a3"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-crossbow/pass65-crossbow-baseColor.png",
+      "bytes": 230124,
+      "sha256": "9d04b4e1c83b1083bd9d1ed2a4ba62e38d8533b31fb73acf9c2d04c2f539b33d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-crossbow/pass65-crossbow-emissive.png",
+      "bytes": 6658,
+      "sha256": "c6ae6e43cd61ec300648521ff09bf41da80f70d0b523b42cbe491712cf4771c4"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-crossbow/pass65-crossbow-metallic.png",
+      "bytes": 6798,
+      "sha256": "5313349f0ac0df9147754ce9e2bdcfe265abdd050ade02b746b237117337f16d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-crossbow/pass65-crossbow-normal.png",
+      "bytes": 165801,
+      "sha256": "ba77c24176dd81449ace65d60a4465bd304dcf597fb7e610bf6bc17887bb4037"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-crossbow/pass65-crossbow-roughness.png",
+      "bytes": 155435,
+      "sha256": "0052e48ba484d6395e6411edf437a9aad7e9a09d923c3a7bb5943db7fd2b1921"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-field-knife/pass65-field-knife-baseColor.png",
+      "bytes": 306307,
+      "sha256": "de1034a05879f1f48a4d4768c0439f1e8e4cfa7c8f9f75cbe6f9946f35d7b769"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-field-knife/pass65-field-knife-handleBaseColor.png",
+      "bytes": 263321,
+      "sha256": "37fa8febf06410e9b4fd4bacf9cfea91dad72a6b906a48882710d5693052d4c3"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-field-knife/pass65-field-knife-metallic.png",
+      "bytes": 142011,
+      "sha256": "8d56ed11da634bb9af7d9dfb9ec7bd5eee972ba11ba23fa4625357425ec5e792"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-field-knife/pass65-field-knife-normal.png",
+      "bytes": 170157,
+      "sha256": "2aefbae42d615f1eb081e9b549e0ed77ed17fc0fad3f572a9c091909ad4f0445"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-field-knife/pass65-field-knife-roughness.png",
+      "bytes": 168031,
+      "sha256": "17684eb081e62d047bfcb9a70bafc89d17bac78650e148694ca51525d90f161e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-baseColor.png",
+      "bytes": 245442,
+      "sha256": "c154db2ad7af871e10f12b6032664beeac7782bd26ca0e1b1399a42894b159d6"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-metallic.png",
+      "bytes": 169431,
+      "sha256": "7d17681ab0efe9b68b84ceb0dcef6fa98245bc60f3ef352e7ebf39432b458089"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-normal.png",
+      "bytes": 179425,
+      "sha256": "d79f924ef39e51d3949a133d8d607aa1b6ca33688d0b5085c78a7aa28ec860c3"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-polymerBaseColor.png",
+      "bytes": 209245,
+      "sha256": "0dece908cb5009304b00003504b54c5a9a1b95b889fbd44686471ee13e25e76d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-polymerMetallic.png",
+      "bytes": 136168,
+      "sha256": "10bc3e64fc3331d4a7d5dbe62c3c2047a2a68aabf605a422aa9f6d13bf13dea5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-polymerRoughness.png",
+      "bytes": 174823,
+      "sha256": "a76902d41d2bfebb8afba0cabb6e1ce361b9700bfa328c9ba45e58ca1dc748df"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/ak-47/ak-47-roughness.png",
+      "bytes": 187275,
+      "sha256": "6416f3951f6e01b23466d91fb822d852d881f7f5a42ff6c51bc51acf3f76cecd"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-baseColor.png",
+      "bytes": 221648,
+      "sha256": "1f7875a840895ed1852820e8f3e5dfbafc81d067fbc455c1673b4d1c850e072c"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-metallic.png",
+      "bytes": 149303,
+      "sha256": "e9acb28a59c517bfb877a474b193515b9902e7efcf4e651b2c451fe4a73002af"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-normal.png",
+      "bytes": 180709,
+      "sha256": "0aa4e3dde7f4c6b9229a9e5b9070658e13e30c8aa9037b72f7c5c3869de19df4"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-polymerBaseColor.png",
+      "bytes": 151158,
+      "sha256": "48766ffaff0178f82a0462ef0ea347f129d3545f34a0b5bd6e3c8542b2451eb8"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-polymerMetallic.png",
+      "bytes": 133037,
+      "sha256": "0c291004dae1dc316f050097b281640af0206d4c0b50a9a0944351e4d88f6077"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-polymerRoughness.png",
+      "bytes": 163229,
+      "sha256": "eb9792aa29cdb85c4616278583096b7c709d0282addf94002e7942453d5342d0"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/carbine/carbine-roughness.png",
+      "bytes": 177996,
+      "sha256": "51684f6a808e88a68392a2ce2511f721c2683554f47ae60b914e158958f5e5e9"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-baseColor.png",
+      "bytes": 208951,
+      "sha256": "a7c4a8dac2576b81d1e6e778e5a194964f8afb1436dbe780f6310543fb163455"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-metallic.png",
+      "bytes": 144553,
+      "sha256": "380be6cc4a6d2b1b53cfc54f5d4f01d5f80329f40ea248642c4d7577ce5fdd68"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-normal.png",
+      "bytes": 185557,
+      "sha256": "838f67f58ce095747787f37830372f4607d75cf2f85a44fb10593cbce627653c"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerBaseColor.png",
+      "bytes": 115745,
+      "sha256": "9731000d45db8315faf8f73b4aa3f9ffaf0bfcaa6de15e27fc4876dbdd55fcc2"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerMetallic.png",
+      "bytes": 120218,
+      "sha256": "d56854a9d6e56807148b1c907c9f6d0536d91631046ee76c66d577e67c13d49c"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-polymerRoughness.png",
+      "bytes": 158118,
+      "sha256": "563b31d4a761899163ffa23bce5d264d5d449408073681de75b809789023cf19"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flamethrower/flamethrower-roughness.png",
+      "bytes": 170575,
+      "sha256": "08f7b058a1f582401a7e7c5187e74a4cc032352fa60eb395ce0d73eb387b4c1a"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-baseColor.png",
+      "bytes": 247809,
+      "sha256": "5f610c4b528e0f7820ece89982f94e56c45ede55cf88ebc5f58ef3c1edb42c59"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-metallic.png",
+      "bytes": 168814,
+      "sha256": "1ecdf9c0996754e0964b0ca6ee31a3a74993cd78b72f7ea64ff37e52041d838a"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-normal.png",
+      "bytes": 175373,
+      "sha256": "db032fa83811015023fd405aadc25742673c52ade520d57218e4a7ff65b0152d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerBaseColor.png",
+      "bytes": 181186,
+      "sha256": "c221ff7c51f7b54671e92597c5c4cd0bf1d67f25eec94f13a17e7897d84813eb"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerMetallic.png",
+      "bytes": 143483,
+      "sha256": "bf6ad618915e57e8f5563bd1e009691b4e5b8d9b6d181f1d2fd60c88a5bcd25e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-polymerRoughness.png",
+      "bytes": 173853,
+      "sha256": "d07af7b1b63e24cab6363db61263a6070a3b9a7883633cca4776e459b0213e20"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flare-gun/flare-gun-roughness.png",
+      "bytes": 186408,
+      "sha256": "a7d449a3a932e15c52e5d157125e16f749133b84bc6bebaf1b6d7bca1f2877a6"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-baseColor.png",
+      "bytes": 227171,
+      "sha256": "f443d6095b8d89a540e62925ffff30cb102de59db8b548d0f172a4825bb90bf0"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-metallic.png",
+      "bytes": 163318,
+      "sha256": "2b66d5c184cea04aa94cca55a41c529acf53a639a0f655b1c0ed64fb761cdbee"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-normal.png",
+      "bytes": 176585,
+      "sha256": "071e2ee13fceaadc40df4eaaf3ef642ebfee0eff7c0c13f5e7280d045e5ceb4e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-polymerBaseColor.png",
+      "bytes": 166667,
+      "sha256": "e70ba590554e9a77451e7084c208624bfe1869aeeb4fe917bd3e8e2a4c4a1e52"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-polymerMetallic.png",
+      "bytes": 128659,
+      "sha256": "7901e35b9f14d98e90433ca8263ec801118005fc88413b1f17396dbcba1fc850"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-polymerRoughness.png",
+      "bytes": 161483,
+      "sha256": "c753f6b68a1d6dd1d423b7692421c28175b26155166709a2c95017b77285c444"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/flashlight-pistol/flashlight-pistol-roughness.png",
+      "bytes": 181804,
+      "sha256": "c504abb7aa7ef6d4f5888f40dfaff874fa45e9bd467ec56b4e554e8a326a048a"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-baseColor.png",
+      "bytes": 251030,
+      "sha256": "8c46c705cbe8bdccef1595a2138711b3bd413eb9d31cfc0a6d52f2bf6adec3db"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-metallic.png",
+      "bytes": 160263,
+      "sha256": "a8dc5042b81fb132b3ea55fe6493f3737fbf94ad15155d1452036ae4f984d7d8"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-normal.png",
+      "bytes": 181086,
+      "sha256": "345e680876eaebf071998403ade6c16bc2c365e242c5df50ffe8a54b2caca4c1"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-polymerBaseColor.png",
+      "bytes": 146621,
+      "sha256": "f639655759b167f017415b9209f1aa09616baa1a7ccd4aaeb7167530674d45e0"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-polymerMetallic.png",
+      "bytes": 135820,
+      "sha256": "a4a94d00f8f144d9d854cf761db3e73626a659549319b55ed57d76e96a36b8d6"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-polymerRoughness.png",
+      "bytes": 170956,
+      "sha256": "e44a4debf0a725457242cf9f61ba4dbe6164f05798308e130796283adab77b01"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/lmg/lmg-roughness.png",
+      "bytes": 179196,
+      "sha256": "7aeeae7eee21b7aea1d96882f9ccbc4b0d916b4b58fcb2d3b9554ba96cfe56ee"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-baseColor.png",
+      "bytes": 229747,
+      "sha256": "179d22ce76f4dc0b13c50fa53f4b040c9478a67023abdcfef86c8cd9f5b91da7"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-metallic.png",
+      "bytes": 145883,
+      "sha256": "fbc123b5ad299e80a751abad41a7b7bd635df69420fe08dad92e49e5385ff455"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-normal.png",
+      "bytes": 184362,
+      "sha256": "c46d8ece2f56087f8afc5018e41e035b5486c17c7642b39e6d65ee2af40c7e97"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-polymerBaseColor.png",
+      "bytes": 148315,
+      "sha256": "f31436cd3f4618f241d0681d9e86d8171a4c17c1e82f8ce3beed99dbca3100dd"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-polymerMetallic.png",
+      "bytes": 122082,
+      "sha256": "9cc3be376b62f0bd432f0dd0f8cbd324b035e9dab8ca57a4c03ca8b84f08394b"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-polymerRoughness.png",
+      "bytes": 159277,
+      "sha256": "9d576f96ccf1672f8d8b522b9e245d93d0d61393b74b484d557aba1cb98b4064"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m14-ebr/m14-ebr-roughness.png",
+      "bytes": 170940,
+      "sha256": "62c46bb361c6b920cad6dc0dd5ac5df33619af8492291b43808b8ed20e4d0206"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-baseColor.png",
+      "bytes": 210239,
+      "sha256": "0dc516877498814bc66be945daf3128e6910305e3beb62ea04eb00c506b97035"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-metallic.png",
+      "bytes": 141354,
+      "sha256": "51ed77a4e90d7ecde1c2eee474be7f223eacec200142f4ae7ce4192b1d4b1e15"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-normal.png",
+      "bytes": 179431,
+      "sha256": "181f8a43eb6e0bdba9e169eea23eb918a0791d76f770e56ced074b5b5867ea9f"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerBaseColor.png",
+      "bytes": 140726,
+      "sha256": "fdde0f5c1a20737f8ac0ed005ec1c95d64df7f251445a955483049baf323039b"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerMetallic.png",
+      "bytes": 124784,
+      "sha256": "f5796692204c5c136fe903a3fafff3e29e01b52188578ccf6c6ae776e582561b"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-polymerRoughness.png",
+      "bytes": 165470,
+      "sha256": "221b813b518d39c5aa314f98cd1eb1b5a278e96b6bbbfbbed229b0865ff94646"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/m4a1/m4a1-roughness.png",
+      "bytes": 171336,
+      "sha256": "da0ee9332fc5cf6628a3826be94e23bce590c4a06403d52e306f60f45cb1f72c"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-baseColor.png",
+      "bytes": 196304,
+      "sha256": "7c9c27a55524a40195b153f8d2bfb8942764acf2d05ff3d9281485866c8ddb39"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-metallic.png",
+      "bytes": 165093,
+      "sha256": "4f8e0bafde535ce24beefe4fe65179353cf321a30232af46376f66073b4f9278"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-normal.png",
+      "bytes": 174199,
+      "sha256": "75781ad1a7995ba9f3cd5b40ce328e0fdefbac05706c3f359786b0fd8a6f141f"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-polymerBaseColor.png",
+      "bytes": 130150,
+      "sha256": "5beeab363ce83c357e81b78e7eaa627c35744c956e95a32179a60383b858769d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-polymerMetallic.png",
+      "bytes": 114283,
+      "sha256": "dfb2c46b7f7cd93e37460a78ca0ad6b7506ac417ff57022a4bd59cf7fe8f9c5f"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-polymerRoughness.png",
+      "bytes": 156275,
+      "sha256": "f5d2191d84ebec2ed2e8db7c0dd80dcfa716a41a3c0eca64e6df9221eaec8c79"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/machine-pistol/machine-pistol-roughness.png",
+      "bytes": 167735,
+      "sha256": "d39d5736ee54bbd69c88de32b68c4a53086a1035446fe7033cd7392b48c91518"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-baseColor.png",
+      "bytes": 250672,
+      "sha256": "fbbcb9bf60b229aef96d4f3a263bb2d05ba18070adc9ad0a5b5ab07242cd67fe"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-metallic.png",
+      "bytes": 178797,
+      "sha256": "5458b7da4b7fb30c7cab3e96151d28aca80bbd509134d944e0deb013e6d868d0"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-normal.png",
+      "bytes": 179569,
+      "sha256": "66b228e45caf0da627eca7b732c27d7a8ca9c3219cae91b8f44b8f4e72492aad"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-polymerBaseColor.png",
+      "bytes": 183914,
+      "sha256": "b234f077762130defc6ffce81d5b0dc89b9d6168e79424acfeb37d951b9f27c2"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-polymerMetallic.png",
+      "bytes": 141156,
+      "sha256": "c596943435e995b82c6dfb3d30000e2acbb9017f37b4ecbd31788ae5975a8462"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-polymerRoughness.png",
+      "bytes": 163808,
+      "sha256": "e09cc4d64cb32dee5d08110d8dbe823bf10b9a22c7928f93e9f5eb10842ffadd"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/magnum/magnum-roughness.png",
+      "bytes": 184923,
+      "sha256": "47267e427b945fcf2cb4bdbf420d4accea1a3d5d2085807625279f3aec782623"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-baseColor.png",
+      "bytes": 224851,
+      "sha256": "7c3bb05c72a82f2be5cca0d1e4a4411775da7c183386431b789354f214b506e0"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-metallic.png",
+      "bytes": 137891,
+      "sha256": "19def211c783a04896657e65b6deb62b73ea2c8dde21e2c9b295b52b4c129a43"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-normal.png",
+      "bytes": 171335,
+      "sha256": "f9bf514a3ea819f609fa4ce7881ea2607cb102b9bea246415b4307c0b6d99ab8"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-polymerBaseColor.png",
+      "bytes": 144023,
+      "sha256": "257d1241c8ab144b2b951ca09a09b10cf57b665282da80e43bee39b38bccd1c7"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-polymerMetallic.png",
+      "bytes": 118729,
+      "sha256": "98b670d0315ea89268bf1f84210290bd607e36443ab565dcf22ce448e9e2d30e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-polymerRoughness.png",
+      "bytes": 163225,
+      "sha256": "5b2ce952a0a9c53bad0cdbe6c317a2c8fa016fde2d832cabe9d5fc14411f0269"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mini-uzi/mini-uzi-roughness.png",
+      "bytes": 171399,
+      "sha256": "428b0a7a8d53eaa8ccf379657495b7ecfc59f9f15b3ad2d8fcef9b676cc8eea9"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-baseColor.png",
+      "bytes": 240247,
+      "sha256": "e5ed3c08fb6bde235b9f8182428468102545aa5789b52af839452d9ac292eced"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-metallic.png",
+      "bytes": 171903,
+      "sha256": "7cc0bb5aee3de627a884526683f40991477885671e290e61ff2551b9821c78bd"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-normal.png",
+      "bytes": 179351,
+      "sha256": "15143134dc1db7f189d9a0993b87d6ac14242b91423f5943c55a2cfa55cc6e52"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerBaseColor.png",
+      "bytes": 160028,
+      "sha256": "f3fe3cec5b723f70077fb6ca369ab36a9dd0dae98b804ac84168d91653c272fa"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerMetallic.png",
+      "bytes": 137077,
+      "sha256": "cc8a44c8ae4e72b5f7fd7fc7dbaab7baaa754271960ec37f6f8a3ddc8679469e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-polymerRoughness.png",
+      "bytes": 159943,
+      "sha256": "9e8f8ffee4eaa7bbb4b9c15c57ba9aec7d3873683203af15d55020136330a022"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/minigun/minigun-roughness.png",
+      "bytes": 180386,
+      "sha256": "fa4f3d9b7411864605b3dc23a20d86142a324d51679c2df8c5c1aae9a7e07ef5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-baseColor.png",
+      "bytes": 225377,
+      "sha256": "1206dffb590a1fa1de3fe8f84f0e33b097ca9215ac758f2884da7c4e7bc31b01"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-metallic.png",
+      "bytes": 164115,
+      "sha256": "e4699679f23d95c5619802fe670aa6f7e25db5f61158af5b60ffff91ac0e8968"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-normal.png",
+      "bytes": 178944,
+      "sha256": "42510684303f1cd55e57852bba49a3e3907d9964e216473f279125d441041058"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-polymerBaseColor.png",
+      "bytes": 165160,
+      "sha256": "2479a0b57c89e4686828adc5ce51f839cb2d5829c3a437eb1d4b237414e27b02"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-polymerMetallic.png",
+      "bytes": 141957,
+      "sha256": "a5c9e589399f97eab5455ab338a697d2ca23bbda2e3b0aa4758cbed7ddcb1117"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-polymerRoughness.png",
+      "bytes": 168886,
+      "sha256": "697a26ac0e1481de77029fc9643ad42da8308b73c8dff707522e0ce40a4fc88f"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/mp5/mp5-roughness.png",
+      "bytes": 184865,
+      "sha256": "db2e7c5824ed6e2724903b1075ae57f2c0ad47e739418e9ad1bf45cfa8601dbc"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-baseColor.png",
+      "bytes": 216265,
+      "sha256": "9e84373855f07f2204afeb14882f08793c84993f18007ebfbf71964ff1fa0036"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-metallic.png",
+      "bytes": 152662,
+      "sha256": "4178cdfbe826d444e7dbff5c3f98401331a913bd17b97dc316a6e0bf6c15c3b9"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-normal.png",
+      "bytes": 179405,
+      "sha256": "8f756cfef71ed8c2d161b1ee6e9b6b12ed51b91c54379bf9eb44919622364ee6"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-polymerBaseColor.png",
+      "bytes": 158749,
+      "sha256": "69a66387b8998b106be3505e291655695cadcf090e9c31604cbdda1e912e400b"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-polymerMetallic.png",
+      "bytes": 133732,
+      "sha256": "2966a0f0d161d284972cf5fb8ee072970b08a543ed24a94ca0da7c823e48afd1"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-polymerRoughness.png",
+      "bytes": 164266,
+      "sha256": "ac0ffc80f5f0bbef412d70ac1306b787550cb302f897d46eb4670732b0c15a06"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/pistol/pistol-roughness.png",
+      "bytes": 173765,
+      "sha256": "27d32d2afe635e003704b782005c66461e44a2adbf260537aee0b951780de183"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-baseColor.png",
+      "bytes": 241112,
+      "sha256": "7941ccdb6b85703097b4a7f5020da26d9dd6674fd0c16811b5f3d93788b121f2"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-metallic.png",
+      "bytes": 162044,
+      "sha256": "6cd34efc3cc93b009e7fa9851401e547ffbe5f9e1b78336c6c16ede31db747f5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-normal.png",
+      "bytes": 177160,
+      "sha256": "4c4fea17e1a7ae9e49eee842687d51057d4e523a998edaaad1b5d96b474beab2"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-polymerBaseColor.png",
+      "bytes": 183536,
+      "sha256": "387236d344afbfbe9f791979e8c8501f13da3f176ba0df7bee367e411a445190"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-polymerMetallic.png",
+      "bytes": 142051,
+      "sha256": "e9b0a28af4bf53e678d7e3cf0df0102269892b27d4175ae540bfc20e278e9229"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-polymerRoughness.png",
+      "bytes": 173473,
+      "sha256": "d1105c32b33293dee22834ac3b90e94702dc01338234459c7994b0c12cc09396"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/railgun/railgun-roughness.png",
+      "bytes": 187977,
+      "sha256": "065d6b028a79b55725cb4ef51396c499feca0bce3b210f32af5a09e7b983e5d5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-baseColor.png",
+      "bytes": 253631,
+      "sha256": "92e7c58093d7808074edb3fd2a8ec26443d7b2b1057e7050bb7c94273c09adc7"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-metallic.png",
+      "bytes": 156389,
+      "sha256": "546a730dad4de65eb2298139aa2c815a16794d17b6f5b2a86b25d382e5f6043d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-normal.png",
+      "bytes": 177420,
+      "sha256": "0a090f1efcab507d137e7e546be1602dad4fad618c2115439d78d4b5774b1fff"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-polymerBaseColor.png",
+      "bytes": 167681,
+      "sha256": "c66c4526f712064cd87d65eab86dd1cf0b4891919abe42a668d8129de533d583"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-polymerMetallic.png",
+      "bytes": 136487,
+      "sha256": "f364bc315c27392a203ff4b3f966ebb55ddfc8b4f24ab5ff9a543cfb56edee44"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-polymerRoughness.png",
+      "bytes": 174975,
+      "sha256": "768d0f1ec3c7cf10f3d6201b0d5323beda41e14e79a283f1c70a7b70df450fc3"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/scattergun/scattergun-roughness.png",
+      "bytes": 186063,
+      "sha256": "808cf18b570ada09be4ca150b4e29dd19a1433b2d590f095c23765a399c756c5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-baseColor.png",
+      "bytes": 228786,
+      "sha256": "5ae7ba1b5a07fb3534706cbcf8f5d5e15b2ea544e0c973cadaadc2e0f85cd66e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-metallic.png",
+      "bytes": 154258,
+      "sha256": "ae280a6309b16639e90220c65ace8caa55c3cbecabea431025fbc88981f781c5"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-normal.png",
+      "bytes": 176106,
+      "sha256": "46b8dcb29bc424ad11be7c13a41908eea627955e9ece97b98cfb5025efea1677"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-polymerBaseColor.png",
+      "bytes": 162321,
+      "sha256": "0ed1bdc781b071787812b21bf17ca835f97dee6e056e2c6c3c8faaf8e023d365"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-polymerMetallic.png",
+      "bytes": 129923,
+      "sha256": "7730d7ffbaa7a2e39a4930ef10eadcc9ef7a450372f8f88c0496d637a55fb857"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-polymerRoughness.png",
+      "bytes": 158619,
+      "sha256": "be6039e14069ddd2c115d5ffb949ee7ef84779497f0ad9bc9efc80de5ffbf30c"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/slug-shotgun/slug-shotgun-roughness.png",
+      "bytes": 178265,
+      "sha256": "51ef51eeb8bbf4bd488cad55f2d654ba25c9870d7c836fdefca6b970657bfeec"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-baseColor.png",
+      "bytes": 246756,
+      "sha256": "9a8df4af907d7946be009d073d132d6e7f05fef12f5bd8676f83eec9891ad5bf"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-metallic.png",
+      "bytes": 171772,
+      "sha256": "2a30d9126b7629c5dfc9520de958a88a73f868b570907ef4069c6d8b9d61126d"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-normal.png",
+      "bytes": 179221,
+      "sha256": "f984fd8d05a28329a6651dc3c0ceef4ea85ae6eb20b194ab4f645038656c6052"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-polymerBaseColor.png",
+      "bytes": 180270,
+      "sha256": "b2e34c693322e4d76b3d7f47089cd72e0e5b72821eb615e889b11aedc0f34a25"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-polymerMetallic.png",
+      "bytes": 135988,
+      "sha256": "b4f77139187d519daddb32890e88fab83f81f1c0214cd9fa9ebf39b6334f1d7e"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-polymerRoughness.png",
+      "bytes": 164608,
+      "sha256": "ab3d5a31e1a9a54b854dbad99dce38395aef4d738d9ac80f6b4e0a5dd34e2332"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/smg/smg-roughness.png",
+      "bytes": 182119,
+      "sha256": "50b0a21400b11847720c5a6ca5b79fb31db26127f24539e908e7dae394ff5063"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-baseColor.png",
+      "bytes": 248040,
+      "sha256": "fca225247118e67a2f2cf8b7f9e149aa59c26cb7afba23c5a1db89c16b2473de"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-metallic.png",
+      "bytes": 161351,
+      "sha256": "1a997c5558b2cd70da9e288127f758fe389ef32cdfaee7e194872c70f1ce1991"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-normal.png",
+      "bytes": 177045,
+      "sha256": "73982d8d07389d69131c63e0021df2ec45b2573b49a59ef1601bef501f9c74c7"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-polymerBaseColor.png",
+      "bytes": 143210,
+      "sha256": "6c831af215954fe1206e2cc588e73a566d5172350b40147291653ecd99f7dfd7"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-polymerMetallic.png",
+      "bytes": 130555,
+      "sha256": "53467a7fae71bd55e07ae48005608a54ed9503a52618d8ee5d49bf4fb84b14d4"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-polymerRoughness.png",
+      "bytes": 176865,
+      "sha256": "804d5f077bfe66277f518a9c382c4a59e9bb9fa351995df188ad1f07fadf93a4"
+    },
+    {
+      "path": "assets/original/textures/weapons/pass65-firearms/sniper/sniper-roughness.png",
+      "bytes": 181574,
+      "sha256": "676624bbbeec3777b3427bf4f56e619f0ce07518da98f900f2ff967fb98bb2b1"
+    },
+    {
+      "path": "assets/original/textures/wood-deck-normal.png",
+      "bytes": 272197,
+      "sha256": "93b5364ee0a07b3014ba51a18c73766d081e907c5b2789bf0640b31bba3134a9"
+    },
+    {
+      "path": "assets/original/textures/wood-deck-roughness.png",
+      "bytes": 57134,
+      "sha256": "821c1b929d22d0f576941c56b0fb2831a50e9856c20b52d0976f4894f16f1c05"
+    },
+    {
+      "path": "assets/original/textures/wood-deck.png",
+      "bytes": 1062390,
+      "sha256": "85b10dbc1d5e45050e593e9ae8c139ceaa27dcb28d1dc24d515131133c77cca1"
+    },
+    {
+      "path": "assets/original/ui/pass65-crossbow-hero-quarter.webp",
+      "bytes": 21934,
+      "sha256": "db8ff19b28ba48a38cc990fa0ee88d35ea88b51ff62192ddedf4aabfcbb518e9"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/ak-47-hero-quarter.webp",
+      "bytes": 7844,
+      "sha256": "431527849811152bd9bd102f085db1af78c19eacdb4f4c9fff7dc9ed52ec05f0"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/carbine-hero-quarter.webp",
+      "bytes": 9064,
+      "sha256": "304d775b7ec3a85d0f74becb182cfbab77bf232e704e6640ff47ee7c6880c2ce"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/crimson-flamethrower-hero-quarter.webp",
+      "bytes": 10628,
+      "sha256": "440900ef35a67be671026b146b68154d98e9decd4895f8718e70a3d71a651039"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/flamethrower-hero-quarter.webp",
+      "bytes": 9556,
+      "sha256": "94cbd8362edc79ab369e300a2bb3ca03f3c1d9ff341d4e5d7dd1284dccef50c8"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/flare-gun-hero-quarter.webp",
+      "bytes": 7696,
+      "sha256": "ca1982aa4df7b3a5d4c2bba0465ce56f2602a145a9db4132bf1012c1dd309c83"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/flashlight-pistol-hero-quarter.webp",
+      "bytes": 10350,
+      "sha256": "7de6356e9f3ef135b2a6bb07294cf849edfc272894cb1476791ef164d12a95de"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/lmg-hero-quarter.webp",
+      "bytes": 10288,
+      "sha256": "b64cd26b70ccc979d092bde9a98dd4454bac605c27355ce920b6ebbe2b2c398d"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/m14-ebr-hero-quarter.webp",
+      "bytes": 10078,
+      "sha256": "0e2b5e6b8dc44e5afd01ee3d554ddaec138abed5bbcb8f32a9c30fda8a6979cf"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/m4a1-hero-quarter.webp",
+      "bytes": 9514,
+      "sha256": "989a0e20f59cff4ae328e50ab00747fb91b42dc26c3aca2c4f12b5c4bc61c57f"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/machine-pistol-hero-quarter.webp",
+      "bytes": 9298,
+      "sha256": "6c34b8aa0eeb6dcdd6d739daf0f8b6c603a60f36a6f022a077f6e72de54729cd"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/magnum-hero-quarter.webp",
+      "bytes": 12198,
+      "sha256": "3a34bb2c65b73c27ca3b2e1edea35192a3384da4eb7f1233d8387f43b86d0e07"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/mini-uzi-hero-quarter.webp",
+      "bytes": 8104,
+      "sha256": "b2a45b4c2d0655767a6f32d2d1b1f682e38987bc9bc310f8c32915ea98be1edf"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/minigun-hero-quarter.webp",
+      "bytes": 10794,
+      "sha256": "2fc905a219755b5741d658a402f56527e41e36c008325425bafd404c3dc43a47"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/mp5-hero-quarter.webp",
+      "bytes": 7872,
+      "sha256": "d97b40a8bccb0a9f41ea81343c9347b79c18c4d0fb545e9bbe1f7df86814c5cd"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/pistol-hero-quarter.webp",
+      "bytes": 8246,
+      "sha256": "3c8c16ea043242328140ca9d77596febe9626a624f055760ca8db9d44dd19650"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/railgun-hero-quarter.webp",
+      "bytes": 12824,
+      "sha256": "cbed6566d4e11b976a7d733d5793b3b1af36eb33dc20dc0ac1a3f441580155f2"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/scattergun-hero-quarter.webp",
+      "bytes": 8340,
+      "sha256": "0d7c9f1e78774f566d60bc69d5d2a9d1b4332aa02a4e1b0f8bdc1179ead66e56"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/slug-shotgun-hero-quarter.webp",
+      "bytes": 8972,
+      "sha256": "457cc1c022d1944d8da84570928af01811210cd0f996e0f833ce99a579d0d927"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/smg-hero-quarter.webp",
+      "bytes": 9274,
+      "sha256": "a57c4ac7a7e7d25b1e3e9f98fcd03c4a6874148cda3da9988fb2b29aae78a6c4"
+    },
+    {
+      "path": "assets/original/ui/pass65-firearms/sniper-hero-quarter.webp",
+      "bytes": 9464,
+      "sha256": "1d34d027fad5c5c2c03968308f2edb9ae8da5c4b738fc528e587ead8101c95e1"
+    },
+    {
+      "path": "assets/preload-helper-DYl5dUZ5.js",
+      "bytes": 1271,
+      "sha256": "750ae5469b6848943dc41b3e0d0005176e197422e5dc65aef4bb54ce97b4d279"
+    },
+    {
+      "path": "assets/raid2-arena-BzYwfwus.js",
+      "bytes": 10889,
+      "sha256": "5c1f41bb4c659963b9ea9a06448faddcd5ff55247834dcc94881f302f638d507"
+    },
+    {
+      "path": "assets/raid2-C7LaVzoy.js",
+      "bytes": 1706,
+      "sha256": "04ae3494c998c6bd31296f403e4478826dc658632b7e559b4975b24149fc10dc"
+    },
+    {
+      "path": "assets/rapier-USIc5Cek.js",
+      "bytes": 2236655,
+      "sha256": "80b32aef239d59a21bd0501988ecb101a3ac33d321460e1691163146e996de04"
+    },
+    {
+      "path": "assets/release-identity-Vh8SHw1V.js",
+      "bytes": 518,
+      "sha256": "29622de4c92c58335ff1b295e4dfd11a5ece7e32483e734f8f7d571948d98cb3"
+    },
+    {
+      "path": "assets/retry-load-DIpB1FEH.js",
+      "bytes": 255,
+      "sha256": "1fd924c1318799cb5db09c7c4181880947939f130704240d821c227e7a5c112b"
+    },
+    {
+      "path": "assets/rolldown-runtime-QTnfLwEv.js",
+      "bytes": 694,
+      "sha256": "5db5ba82eef00d1dee7e86e663098c9427d01183a88d357437daff295aec3e75"
+    },
+    {
+      "path": "assets/rustworks-1v1-lPlorWe3.js",
+      "bytes": 2837,
+      "sha256": "76c2ff24fb6b5b7841491ecf4dad80dfc0b287d64d1bb5fedd972744cdba71ee"
+    },
+    {
+      "path": "assets/shared-BtULp7wH.js",
+      "bytes": 6512,
+      "sha256": "8bd499fdf9c21320614575cff999e8541cce06bcdeaefd11514579a2f7036e8c"
+    },
+    {
+      "path": "assets/sky-backdrop-DuGw-k_A.js",
+      "bytes": 10168,
+      "sha256": "fa5d2f538b589895ff430cb3cbb29304d75091b258479b36eded5829ac52f697"
+    },
+    {
+      "path": "assets/skyline-terminal-CWv1vzWg.js",
+      "bytes": 1743,
+      "sha256": "8f7d7b14191382151217f173669a0944bbc0656266d861b3e91440f54eb34c7b"
+    },
+    {
+      "path": "assets/style-Cz5sWwCB.css",
+      "bytes": 165780,
+      "sha256": "be7771a44e1b1230fa00144aaa19b88fff280ab2f2b4f7f87ca646a2adf29550"
+    },
+    {
+      "path": "assets/test-maps-LorXczd-.js",
+      "bytes": 53081,
+      "sha256": "b2c716f34eb52b125e3bd85caee0c5820c25810332eddbe766b9ae9e6fa22500"
+    },
+    {
+      "path": "assets/test1-FsiL1U7f.js",
+      "bytes": 1209,
+      "sha256": "2ded8b6c49d01aa25cbd85f87db6e3ebe5863622b1c7a6305ca2f67aa229c43f"
+    },
+    {
+      "path": "assets/test2-BwmNH95W.js",
+      "bytes": 1301,
+      "sha256": "f6c888580a416db4f27a34a4f42b0dcaba858eb0ec7e4d50b1ba1df161faa9e9"
+    },
+    {
+      "path": "assets/third-party/djmaesen/fps-arms/LICENSE.txt",
+      "bytes": 652,
+      "sha256": "0a3a79ee4fcd16538ee0760c29217c6306035f1609414bfe386a4847876de50b"
+    },
+    {
+      "path": "assets/third-party/djmaesen/fps-arms/README.md",
+      "bytes": 1164,
+      "sha256": "d9a7aac54160c46ab60c54279b3903332c4d25a55cd466c3e80bde5e44108b0e"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/LICENSE.txt",
+      "bytes": 431,
+      "sha256": "2b239ddcf1d40297e9b95d42ec98808a210494cf79f163770107abab50c8c43a"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/P90.glb",
+      "bytes": 88428,
+      "sha256": "8085a36074803026ec2b8bc58b1fc938c5c5c76c909ac5ce9a0703c69cdaf7b0"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/Pistol.glb",
+      "bytes": 132900,
+      "sha256": "2263a601a95e584bd9069f74f90b6418ee0f319f6b2800949dcc2e94902e5d4a"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/README.md",
+      "bytes": 1099,
+      "sha256": "2642ce0942a83ce7c26d2be5c40c1dc39de4fd8d597d784d023a6eef610baa6b"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/Rifle.glb",
+      "bytes": 179700,
+      "sha256": "fdc22ccbb4b6dd167538a45d13e06effd8bd8556533e68850ad4b05f6da5343d"
+    },
+    {
+      "path": "assets/third-party/quaternius/animated-guns/Shotgun.glb",
+      "bytes": 101528,
+      "sha256": "116f8e4e124f67e539e5e7784cfa373f0c886d04a17c99835a7a8e3827aa6844"
+    },
+    {
+      "path": "assets/third-party/quaternius/ultimate-modular-males/LICENSE.txt",
+      "bytes": 358,
+      "sha256": "93a19344d02398d937e22a922c97967c42ea61cfd7e8a0454d0589735720f828"
+    },
+    {
+      "path": "assets/third-party/quaternius/ultimate-modular-males/README.md",
+      "bytes": 1206,
+      "sha256": "ad892fe9f10736999e164eb2d477180b7c704e690928ecf079eb61e6c41b3c4f"
+    },
+    {
+      "path": "assets/third-party/quaternius/ultimate-modular-males/Swat.gltf",
+      "bytes": 3368868,
+      "sha256": "622b3f36fcac90539ef8f7121ec1f11b5e1ae603a085019b3fa96eba20dddfd3"
+    },
+    {
+      "path": "assets/third-party/quaternius/ultimate-modular-males/Swat_FirstPersonArms.glb",
+      "bytes": 279344,
+      "sha256": "f5ea36848878cc3d94a661716879f1cc56d04cdeaf00ca826eacacca9f5332a8"
+    },
+    {
+      "path": "assets/three.webgpu-BW6445qq.js",
+      "bytes": 19218,
+      "sha256": "640b01258fcae3977c2219b15dd49c0bc0dbf0b7489d270a14fd64790c501afc"
+    },
+    {
+      "path": "assets/vendor-peer-DW-fpQKQ.js",
+      "bytes": 86871,
+      "sha256": "fa18a065a2326109aa88ebe9d1f4a90521ac2280ac9b24342baf8b707ba95952"
+    },
+    {
+      "path": "assets/vendor-three-DbmgPT6h.js",
+      "bytes": 1574476,
+      "sha256": "630dcfa60d80f50ef3d87c0e3eb22c8571b6a577302c8253db5b739a6c949155"
+    },
+    {
+      "path": "assets/vendor-three-loaders-C8_8Ni56.js",
+      "bytes": 42897,
+      "sha256": "a9de4f6bf74c57822f7fc71082511414455786dbb5f400bb42bb91c1ffb68d85"
+    },
+    {
+      "path": "assets/viewmodel-body-fit-BomOnoks.js",
+      "bytes": 224,
+      "sha256": "09181204871f398ef6bedae6fe0c0bdac7ee27e5e166d09ad47ccc8ccb8329a6"
+    },
+    {
+      "path": "assets/webgpu-adapter-diagnostics-BK_qrMAJ.js",
+      "bytes": 7750,
+      "sha256": "846bc21388fb28cfd53d3fae4fa87a60024030f9c98f569ffc5664e250e6eb03"
+    },
+    {
+      "path": "assets/webgpu-adapter-diagnostics-BNE2ATWW.js",
+      "bytes": 349,
+      "sha256": "1b7d53060cb7df38242d94f317fecfb627391beef52d6a4451f60341ec40b771"
+    },
+    {
+      "path": "assets/webgpu-diagnostics-screen-BO3QB7N0.js",
+      "bytes": 3451,
+      "sha256": "163e4e7e7be1c6e4e58bb3e17bbbfaecda09cca29e36b35c90074e3fa8cf3d23"
+    },
+    {
+      "path": "assets/webgpu-tint-swizzle-shim-Bn2yF8yy.js",
+      "bytes": 1244,
+      "sha256": "a3673946fb672584ea3bae8269e8cab60a5abe1ffa04f3fcf5930ff5c0d8cf3c"
+    },
+    {
+      "path": "forge-facade.html",
+      "bytes": 1550,
+      "sha256": "a016b153d052468570ca51636c861e242c0065e0a3f1544fdb908a1f14a70899"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1206,
+      "sha256": "c8b411e936bac2ef286254bc201c2c7a68643a3d9a5c58a6abbdde9f1e881183"
+    },
+    {
+      "path": "map3.html",
+      "bytes": 1922,
+      "sha256": "c6c5abc9521b556278f6df4b248774c49b98dd0bb30a649506d7df402053a665"
+    },
+    {
+      "path": "qa-webgpu-fence-probe.html",
+      "bytes": 2715,
+      "sha256": "01d2b85feb7ad9420bba39536665db8040d47d5cc1d7dff5d16074f290e305ab"
+    }
+  ]
+}

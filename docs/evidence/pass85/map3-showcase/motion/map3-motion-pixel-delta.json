@@ -1,0 +1,10 @@
+{
+  "frame": "1280x720",
+  "meanAbsChannelDelta": 8.904,
+  "maxAbsChannelDelta": 237,
+  "pixelsDifferingByMoreThan8": 103308,
+  "pixelsDifferingByMoreThan8Pct": 11.21,
+  "meanDeltaTopThird": 12.876,
+  "meanDeltaBottomThird": 6.919,
+  "note": "both frames captured with every DOM overlay hidden, so no clock or FPS counter is in the compared pixels"
+}

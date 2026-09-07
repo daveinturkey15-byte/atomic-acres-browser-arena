@@ -63,52 +63,6 @@ Before implementation, declare one mechanically conservative impact class:
 | `release-shell` | chooser, changelog, root HTML, favicon/manifest, release-channel config | focused `release-shell` Chromium smoke on Windows and Linux |
 | `runtime` | gameplay, networking, rendering, assets, dependencies, unknown paths | full representative Windows/Linux browser groups plus affected focused evidence |
 
-### Release-line reconciliation (HF-536, added 2026-09-06)
-
-A line whose ancestry was severed from `origin/main` is restored by exactly one merge commit
-whose tree is byte-identical to the contribution head's tree and whose second parent is
-`origin/main`. That shape changes no shipped byte, so it cannot be evaluated by
-`--phase ci`: it necessarily touches every enforced pass manifest at once and
-`selectCiAcceptanceManifest` correctly throws `found 6`.
-
-`scripts/release/acceptance-gate.mjs --phase reconciliation` is the narrow, fail-closed
-exception. It accepts a head only when **all** of these hold, and throws on every other
-shape:
-
-1. the head has exactly two parents;
-2. `git rev-parse head^{tree}` equals `git rev-parse head^1^{tree}`;
-3. `head^2` equals the pull-request base SHA;
-4. `head^1` is not itself a root commit, and every root reachable from `head^1` is listed in
-   `.github/ancestry-roots.json`;
-5. the newest enforced acceptance manifest reachable from `head^1` exists, parses, and — if
-   it claims `status: accepted` — passes full manifest validation.
-
-The receipt records `reconciliation: true`, `treeIdenticalTo: <head^1>`, the bound manifest
-path and sha256, and `grantsAcceptance: false`. **A reconciliation receipt is never owner
-approval.** The merge introduces no byte to approve; acceptance of the bytes it carries
-across stays owed on the contribution line, and a manifest still marked `candidate` is
-reported honestly as unapproved rather than upgraded.
-
-`verify.yml` enters the phase only when a repository writer has applied the
-`reconciliation` label to the pull request. It is never inferred from the commit shape, so
-an accidental two-parent head still takes the normal `--phase ci` path and still fails
-there. Assertion 2 is what makes the ordering safe: if the guard change merged to `main` but
-was not replayed onto the contribution line, a tree-identical merge would silently revert
-it, and only a tree comparison detects that — a parent count would not.
-
-A reconciliation PR classifies as `runtime` and runs the full Windows + Linux browser
-matrix. Do not add a reconciliation short-circuit to `change-impact.mjs`: for a line that
-bypassed CI, this is the first time the tree faces the required checks, and that is the
-point of doing it.
-
-### Bounded divergence
-
-An `integration/*` or gauntlet line is cut from exact `origin/main` and merges back to
-`main` by pull request **within one pass** (one publish cycle). A line that has published a
-pass and has not merged to `main` is a release-blocking condition for the next pass, not a
-background chore. `release/<passN>` branches carry `docs/evidence/**` and acceptance
-receipts only; a runtime commit on one is how a fix ships without `main` ever seeing it.
-
 The impact table controls browser cost, not post-preview approval parity. `.github/workflows/release-production.yml` and `scripts/release/stage-release-topology.mjs` directly determine published bytes or topology; changing either after an immutable preview invalidates its authorization and requires a new preview even though the path classifies as process-only.
 
 `scripts/release/change-impact.mjs` is the executable classifier. It fails safe: an empty, unknown, or mixed runtime diff selects `runtime`. The two required browser job names always complete; for `process-only` changes they record the skip decision and succeed without installing Chromium.
@@ -136,7 +90,27 @@ One integrator owns the queue at a time.
 
 ## Release-owner flow
 
-Only the `release-production` GitHub Actions workflow may publish production.
+Only `scripts/orchestration/publish_pass<N>.py`, run from the canonical checkout, may publish production. The `release-production` workflow verifies a candidate and cannot publish.
+
+### Pass 95 cut ritual — REQUIRED
+
+Before any Pass 95 publish, the release owner must run the real multiplayer soak gate
+from the candidate checkout:
+
+```powershell
+$env:PASS73_NATIVE_WEBGPU = '1'
+npm run qa:mp-soak
+```
+
+This gate is release-blocking. It starts the built candidate on ports 4227-4228, uses
+three headless installed-Chrome peers with stock flags and muted audio, runs three
+minutes of scripted play through the HF-504 audit scenario engine, and applies a
+seeded 120 ms RTT / 1% loss impairment. The required table must pass position
+replication for every directed peer pair within 1.5 m, guest-B leave/rejoin plus
+damage within one RTT, reload-after-death, respawn loadout/ammo reset, stair firing,
+zero page/console errors, and final scoreboard agreement. A failed row remains a
+finding and stops the cut; the verifier must not be loosened. Retain the JSON bundle
+and table under `artifacts/qa/mp-soak-gate/` with the release evidence.
 
 1. Wait for the merge commit's five required checks to succeed, including `requirements-acceptance`.
 2. Confirm the player-facing changelog is truthful. A new top entry may use `PENDING_PRODUCTION` through `resolveProductionReleasedAt`; the protected workflow injects one immutable production-build timestamp and records the same value in its receipt. A publicly selectable fallback may never retain that sentinel: if its pinned historical Pages bytes predate timestamp injection, rebuild its exact approved source with the immutable timestamp of the pinned Pages publication, record `rebuiltFromSource: true`, and verify every live channel shows a real UK-local day/date/time. At the start of the next substantive pass, freeze the previous entry from that receipt. Do not create a post-release metadata PR or second deployment solely to learn a timestamp.
@@ -144,7 +118,7 @@ Only the `release-production` GitHub Actions workflow may publish production.
    ```ts
    releasedAt: resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE)
    ```
-3. Dispatch `release-production` with the exact full `main` SHA and release pass.
+3. Dispatch `release-production` with the exact full `main` SHA and release pass to produce the verification receipt, then publish with `python scripts/orchestration/publish_pass<N>.py` (dry-run first).
 4. The workflow refuses a non-tip SHA, requires successful checks, builds from a clean checkout, serializes Pages publication, preserves the historical review tree, and records source/Pages identities.
 5. The workflow revalidates the accepted manifest against the exact source SHA. Pass 62 and later cannot publish without approval parity; older rollback passes are marked legacy-exempt.
 6. Wait for the workflow receipt and exact Pages build to succeed.

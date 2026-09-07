@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  coerceHostedBotCountForArena,
   hostedBotIds,
   hostedBotReplicationActive,
   hostedBotSnapshotContinuity,
@@ -16,6 +17,18 @@ describe('hosted lobby bots', () => {
     expect(hostedBotIds(2)).toEqual(['host-bot-0', 'host-bot-1']);
     expect(hostedBotIds(4)).toEqual(['host-bot-0', 'host-bot-1', 'host-bot-2', 'host-bot-3']);
   });
+  it('pins Nuke Town hosts to exactly two bots when bots are enabled', () => {
+    expect(coerceHostedBotCountForArena('nuketown2', 2)).toBe(2);
+    expect(coerceHostedBotCountForArena('nuketown2', 4)).toBe(2);
+    // Disabled stays disabled; invalid keeps the existing fallback to 0.
+    expect(coerceHostedBotCountForArena('nuketown2', 0)).toBe(0);
+    expect(coerceHostedBotCountForArena('nuketown2', 3)).toBe(0);
+    expect(coerceHostedBotCountForArena('nuketown2', '2')).toBe(0);
+    // Every other arena passes through unchanged.
+    expect(coerceHostedBotCountForArena('skyline-terminal', 4)).toBe(4);
+    expect(coerceHostedBotCountForArena('skyline-terminal', 2)).toBe(2);
+    expect(coerceHostedBotCountForArena('atomic-acres', 4)).toBe(4);
+  });
 
   it('keeps host-authoritative bot replication active independently of host life', () => {
     expect(hostedBotReplicationActive('host', true, 'active', 2)).toBe(true);
@@ -29,7 +42,7 @@ describe('hosted lobby bots', () => {
   it('validates bounded authoritative replicated state', () => {
     const bot = {
       id: 'host-bot-0', name: 'RIVET', team: 1, weapon: 'lmg', x: 1, y: 0, z: 2,
-      yaw: 0.4, hp: 70, kills: 2, deaths: 1, alive: true, seq: 9,
+      yaw: 0.4, stance: 'stand', hp: 70, kills: 2, deaths: 1, alive: true, seq: 9,
     } as const;
     expect(isHostedBotSnapshot(bot)).toBe(true);
     expect(isHostedBotSnapshot({ ...bot, weapon: 'mp5' })).toBe(true);
@@ -44,7 +57,7 @@ describe('hosted lobby bots', () => {
   it('interpolates only presentation pose and treats death/respawn as discontinuities', () => {
     const before = {
       id: 'host-bot-0', name: 'RIVET', team: 1, weapon: 'lmg', x: 0, y: 0, z: 0,
-      yaw: Math.PI - 0.1, hp: 100, kills: 1, deaths: 0, alive: true, seq: 10,
+      yaw: Math.PI - 0.1, stance: 'stand', hp: 100, kills: 1, deaths: 0, alive: true, seq: 10,
     } as const;
     const after = {
       ...before,

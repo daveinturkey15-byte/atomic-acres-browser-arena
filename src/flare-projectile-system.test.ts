@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { FLARE_PRESENTATION_SCHEMA_VERSION, type FlarePresentationStateMessage } from './flare-presentation-protocol';
 import { FLARE_PROJECTILE_EFFECT } from './special-weapon-effects';
-import { FlareProjectileSystem, flareSegmentSphereFraction, type FlareProjectileCallbacks } from './flare-projectile-system';
+import {
+  FlareProjectileSystem,
+  flareSegmentSphereFraction,
+  flareSegmentVerticalCapsuleFraction,
+  type FlareProjectileCallbacks,
+} from './flare-projectile-system';
 
 function callbacks(overrides: Partial<FlareProjectileCallbacks> = {}): FlareProjectileCallbacks {
   return {
@@ -40,6 +45,143 @@ describe('flare projectile system', () => {
       new THREE.Vector3(5, 4, 0),
       1,
     )).toBeNull();
+  });
+
+  // HF-321: "flare gun needs a much better hitbox, wider and higher when as a
+  // projectile" - direct-hit admission is a vertical capsule.
+  it('resolves bounded segment/vertical-capsule intersections on side, caps and containment', () => {
+    // Cylindrical side entry inside the vertical band.
+    expect(flareSegmentVerticalCapsuleFraction(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(10, 0, 0),
+      new THREE.Vector3(5, 0.5, 0),
+      1,
+      1,
+    )).toBeCloseTo(0.4, 8);
+    // Head-height pass that the legacy sphere admission misses entirely.
+    expect(flareSegmentSphereFraction(
+      new THREE.Vector3(0, 1.5, 0),
+      new THREE.Vector3(10, 0, 0),
+      new THREE.Vector3(5, 0, 0),
+      1,
+    )).toBeNull();
+    expect(flareSegmentVerticalCapsuleFraction(
+      new THREE.Vector3(0, 1.5, 0),
+      new THREE.Vector3(10, 0, 0),
+      new THREE.Vector3(5, 0, 0),
+      1,
+      1,
+    )).toBeCloseTo((5 - Math.sqrt(0.75)) / 10, 8);
+    // Above the capsule top: no admission.
+    expect(flareSegmentVerticalCapsuleFraction(
+      new THREE.Vector3(0, 2.2, 0),
+      new THREE.Vector3(10, 0, 0),
+      new THREE.Vector3(5, 0, 0),
+      1,
+      1,
+    )).toBeNull();
+    // Vertical drop onto the top cap (no XZ motion).
+    expect(flareSegmentVerticalCapsuleFraction(
+      new THREE.Vector3(5.2, 3, 0),
+      new THREE.Vector3(0, -3, 0),
+      new THREE.Vector3(5, 0, 0),
+      1,
+      1,
+    )).toBeCloseTo((2 - Math.sqrt(1 - 0.04)) / 3, 8);
+    // Start inside the capsule admits immediately, matching the sphere path.
+    expect(flareSegmentVerticalCapsuleFraction(
+      new THREE.Vector3(5, 1.4, 0),
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(5, 0, 0),
+      1,
+      1,
+    )).toBe(0);
+  });
+
+  it('degenerates to the exact legacy sphere admission at zero or invalid half-height', () => {
+    const cases: ReadonlyArray<readonly [THREE.Vector3, THREE.Vector3, THREE.Vector3, number]> = [
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 0, 0), new THREE.Vector3(5, 0, 0), 1],
+      [new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 0, 0), new THREE.Vector3(5, 4, 0), 1],
+      [new THREE.Vector3(5, 0.2, 0), new THREE.Vector3(1, 1, 0), new THREE.Vector3(5, 0, 0), 1],
+      [new THREE.Vector3(0, 1.5, 0), new THREE.Vector3(10, 0, 0), new THREE.Vector3(5, 0, 0), 1],
+    ];
+    for (const [start, delta, centre, radius] of cases) {
+      const sphere = flareSegmentSphereFraction(start, delta, centre, radius);
+      expect(flareSegmentVerticalCapsuleFraction(start, delta, centre, radius, 0)).toBe(sphere);
+      expect(flareSegmentVerticalCapsuleFraction(start, delta, centre, radius, -1)).toBe(sphere);
+      expect(flareSegmentVerticalCapsuleFraction(start, delta, centre, radius, Number.NaN)).toBe(sphere);
+    }
+  });
+
+  it('admits head-height direct hits on standing capsule targets that the sphere admission missed', () => {
+    // A killstreak-test-bay training dummy per the HF-321 snapshot design:
+    // centre at root + 1.05m, radius 0.6m, half-height 1.0m.
+    const dummy = {
+      id: 'test-dummy-alpha', lifeId: 1, kind: 'practice-target' as const,
+      position: new THREE.Vector3(3, 1.05, 0), radiusM: 0.6, halfHeightM: 1.0,
+    };
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const directHit = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(0, 2, 0),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 41, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ directHitTargets: () => [dummy], onDirectHit: directHit }));
+    expect(directHit).toHaveBeenCalledTimes(1);
+    expect(directHit.mock.calls[0]![0]).toMatchObject({
+      ownerId: 'player-a',
+      target: { id: 'test-dummy-alpha' },
+      directDamage: FLARE_PROJECTILE_EFFECT.directDamage,
+    });
+    // The same head-height segment misses the legacy expanded sphere: this is
+    // exactly the owner-reported "flare does not damage test-bay bots" defect.
+    expect(flareSegmentSphereFraction(
+      new THREE.Vector3(0, 2, 0),
+      new THREE.Vector3(2.6, 0, 0),
+      dummy.position,
+      dummy.radiusM + FLARE_PROJECTILE_EFFECT.collisionRadiusM,
+    )).toBeNull();
+  });
+
+  it('keeps the through-wall guard intact for capsule targets', () => {
+    const dummy = {
+      id: 'test-dummy-beta', lifeId: 1, kind: 'practice-target' as const,
+      position: new THREE.Vector3(3, 1.05, 0), radiusM: 0.6, halfHeightM: 1.0,
+    };
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const directHit = vi.fn();
+    const impact = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(0, 2, 0),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 42, now: 0,
+    })).toBe(true);
+    // A wall at fraction 0.5 sits in front of the capsule entry (~0.83): the
+    // flare must burn on the wall and never admit the occluded target.
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => 0.5,
+      directHitTargets: () => [dummy],
+      onDirectHit: directHit,
+      onImpact: impact,
+    }));
+    expect(directHit).not.toHaveBeenCalled();
+    expect(impact).toHaveBeenCalledTimes(1);
+    expect(impact.mock.calls[0]![0]).toMatchObject({ target: null, directDamage: 0 });
+    expect(impact.mock.calls[0]![0].point.x).toBeCloseTo(1.3, 6);
+  });
+
+  it('keeps sphere-only targets (no half-height) on exact legacy admission behaviour', () => {
+    const sphereTarget = {
+      id: 'legacy-sphere', lifeId: 1, kind: 'practice-target' as const,
+      position: new THREE.Vector3(3, 1.05, 0), radiusM: 0.6,
+    };
+    const system = new FlareProjectileSystem(new THREE.Scene(), true);
+    const directHit = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(0, 2, 0),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 43, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ directHitTargets: () => [sphereTarget], onDirectHit: directHit }));
+    expect(directHit).not.toHaveBeenCalled();
   });
 
   it('keeps WebGL compatibility flares emissive without changing the live point-light shader topology', async () => {
@@ -187,6 +329,74 @@ describe('flare projectile system', () => {
     expect(pulse.mock.calls[0][0]).not.toHaveProperty('explosiveSource');
     system.update(0.05, 5_550, callbacks({ burnTargets: () => [target], onBurnPulse: pulse }));
     expect(pulse).toHaveBeenCalledTimes(10);
+  });
+
+  /**
+   * HF-321 splash safety. The direct-hit through-wall guard was already
+   * pinned, but nothing exercised the OTHER half of "no through-wall hits":
+   * the burn that follows an impact. Every existing test stubbed
+   * `burnLineOfSight` to true, so a regression that dropped the occlusion
+   * check would have gone green.
+   */
+  it('refuses a burn pulse on an occluded target and resumes when it is exposed', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false);
+    const nearTarget = {
+      id: 'bot-behind-wall', lifeId: 1, kind: 'bot' as const,
+      position: new THREE.Vector3(1.2, 0, 0), radiusM: 0.5,
+    };
+    const lineOfSight = vi.fn(() => false);
+    const pulse = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(1, 0, 0), authority: true, actionNonce: 91, now: 0,
+    })).toBe(true);
+    // Impact on the near side of the wall; the target is well inside the burn
+    // radius, so ONLY the line-of-sight check can keep it safe.
+    system.update(0.05, 50, callbacks({
+      worldCollisionFraction: () => 0.5,
+      burnTargets: () => [nearTarget],
+      burnLineOfSight: lineOfSight,
+      onBurnPulse: pulse,
+    }));
+    for (let now = 550; now <= 2_050; now += 500) {
+      system.update(0.05, now, callbacks({
+        burnTargets: () => [nearTarget], burnLineOfSight: lineOfSight, onBurnPulse: pulse,
+      }));
+    }
+    expect(lineOfSight).toHaveBeenCalled();
+    expect(pulse, 'an occluded target must never take flare burn damage').not.toHaveBeenCalled();
+    // Same flare, same distance, wall gone: damage resumes, so the refusal
+    // above is the occlusion check and not the flare having expired.
+    system.update(0.05, 2_550, callbacks({
+      burnTargets: () => [nearTarget], burnLineOfSight: () => true, onBurnPulse: pulse,
+    }));
+    expect(pulse).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the burn splash bounded by burnRadiusM, unchanged by the capsule admission', () => {
+    const system = new FlareProjectileSystem(new THREE.Scene(), false);
+    const at = (distance: number, halfHeightM?: number) => ({
+      id: `bot-${distance}`, lifeId: 1, kind: 'bot' as const,
+      position: new THREE.Vector3(distance, 0, 0), radiusM: 0.5, halfHeightM,
+    });
+    // The direct-hit capsule (HF-321) widened target admission in FLIGHT. It
+    // must not have widened the burn: a tall capsule target just outside
+    // burnRadiusM stays out, exactly like a sphere target does.
+    const inside = at(FLARE_PROJECTILE_EFFECT.burnRadiusM - 0.2);
+    const outsideSphere = at(FLARE_PROJECTILE_EFFECT.burnRadiusM + 0.2);
+    const outsideCapsule = at(FLARE_PROJECTILE_EFFECT.burnRadiusM + 0.2, 1.0);
+    const pulse = vi.fn();
+    expect(system.spawn({
+      ownerId: 'player-a', ownerTeam: 0, origin: new THREE.Vector3(),
+      direction: new THREE.Vector3(0, -1, 0), authority: true, actionNonce: 92, now: 0,
+    })).toBe(true);
+    system.update(0.05, 50, callbacks({ worldCollisionFraction: () => 0 }));
+    system.update(0.05, 550, callbacks({
+      burnTargets: () => [inside, outsideSphere, outsideCapsule],
+      onBurnPulse: pulse,
+    }));
+    expect(pulse.mock.calls.map(([event]) => event.target.id)).toEqual([inside.id]);
+    expect(FLARE_PROJECTILE_EFFECT.burnRadiusM).toBe(3.4);
   });
 
   it('admits at most one current-occupancy burn pulse after a long frame stall', () => {

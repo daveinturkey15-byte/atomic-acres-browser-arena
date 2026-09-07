@@ -1,0 +1,29 @@
+nuketown2 street-vehicle budget
+  street vehicles   54 draw calls, 43720 triangles
+  rest of the arena 259 draw calls, 9685 triangles
+  arena total       313 draw calls, 53405 triangles
+  colliders 226, physics colliders 228, shot surfaces 238
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan paint  4532 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan paint  4532 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan paint  4532 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach paint  4314 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-cab/vehicle-forge nuketown2-truck-cab paint  2418 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach tyre  1760 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-bogie/vehicle-forge nuketown2-truck-bogie tyre  1760 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan tyre  1760 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan tyre  1760 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan tyre  1760 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach chrome  1456 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan chrome  1456 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan chrome  1456 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan chrome  1456 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-cab/vehicle-forge nuketown2-truck-cab tyre  880 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach lining  840 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-bogie/vehicle-forge nuketown2-truck-bogie chrome  800 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-cab/vehicle-forge nuketown2-truck-cab chrome  680 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach glass  626 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan lining  432 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan lining  432 tris
+    Nuketown2 arena/vehicle-forge nuketown2-sedan/vehicle-forge nuketown2-sedan lining  432 tris
+    Nuketown2 arena/vehicle-forge nuketown2-coach/vehicle-forge nuketown2-coach accent  404 tris
+    Nuketown2 arena/vehicle-forge nuketown2-truck-cab/vehicle-forge nuketown2-truck-cab lining  360 tris

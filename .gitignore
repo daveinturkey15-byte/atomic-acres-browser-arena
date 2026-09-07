@@ -19,3 +19,40 @@ artifacts/
 docs/assets/pass65-weapons/firearms/pass65-weapon-family-preview-contact-sheet.png
 .wrangler/
 .dev.vars*
+
+# Build outputs from verification and hand-off builds. Only `dist/` was ignored, so every
+# dist-<name>/ a verify tier or an agent produced was untracked-but-addable - and the round
+# commit uses `git add -A`. Two of them (518 MB) were one commit away from the history on
+# 2026-08-25. This does NOT untrack the ~22.6k dist files already in the index; that is a
+# separate, deliberate cleanup.
+dist-*/
+.gauntlet-tmp/
+
+# Transient publish worktree created by scripts/orchestration/publish_pass80.py.
+# It was committed as a stray gitlink by a round `git add -A`; it is not a submodule.
+.gh-pages-publish/
+
+# Full duplicate repo checkouts left by a viewpoint-regression run and a bisect. Nothing
+# references either; they were committed by a round `git add -A`. Tracking them made every
+# repo-wide search return three copies of every source file.
+.vp-regression-src/
+.bisect-yesterday/
+
+# Agent scratch: critic frame captures, a GLB before/after comparison, and a backup copy
+# of three farcrysis sources whose originals live in src/. Committed by a round `git add -A`.
+.critic-iw/
+.tower-cmp-tmp/
+.tmp-tree-mat-backup/
+
+# Agent wave briefs handed to this worktree by the orchestrator. Repo content they
+# are not: they are task instructions for an agent, and a round `git add -A` in an
+# earlier attempt tracked them onto the shared branch.
+local-claude-task-*.md
+
+# Scratch checkouts the eye-clearance contract test writes into the repo root on
+# purpose (scripts/qa/eye-clearance-sweep-contract.test.mjs: ES resolution walks
+# up from the probe FILE, so a probe in os.tmpdir() cannot see node_modules and
+# the bare `three` specifier the arena builders import fails). The test removes
+# them in a finally block, but a killed or timed-out run leaves one behind - and
+# on this machine other agents commit under you with `git add -A`.
+.eye-clearance-probe-*/

@@ -19,11 +19,47 @@ describe('Pass 65 setting inventory', () => {
     expect(graphics.map(({ key }) => key)).toEqual([
       'graphics.preset', ...ADVANCED_GRAPHICS_CONTROLS.map(({ key }) => `graphics.${key}`),
     ]);
-    expect(graphics.filter(({ key }) => key !== 'graphics.antiAliasing' && key !== 'graphics.geometryDetail' && key !== 'graphics.ambientOcclusion')
-      .every(({ applyMode }) => applyMode === 'live')).toBe(true);
+    // Every graphics apply mode is the registry's, not a copy that can rot:
+    // the old hard-coded exclusion list silently reclassified any new
+    // topology-changing control as a live apply the moment one was added.
+    const registryApplyMode = new Map(ADVANCED_GRAPHICS_CONTROLS.map(({ key, applyMode }) => [`graphics.${key}`, applyMode]));
+    for (const definition of graphics.slice(1)) {
+      expect(definition.applyMode, definition.key).toBe(registryApplyMode.get(definition.key));
+    }
+    expect(graphics.find(({ key }) => key === 'graphics.preset')?.applyMode).toBe('live');
     expect(graphics.find(({ key }) => key === 'graphics.antiAliasing')?.applyMode).toBe('pipeline-rebuild');
     expect(graphics.find(({ key }) => key === 'graphics.geometryDetail')?.applyMode).toBe('arena-reload');
     expect(graphics.find(({ key }) => key === 'graphics.ambientOcclusion')?.applyMode).toBe('pipeline-rebuild');
+    // HF-364: adding or removing a screen-space raymarch changes MRT
+    // attachments and render targets, so none of these may claim a live apply.
+    // HF-398 joins them: the trace is a pass that exists or does not, and its
+    // ray count and recursion depth are baked into the compiled graph, so
+    // switching a tier is a rebuild and never a live uniform write.
+    // HF-418 joins them for a third reason: the baked layer allocates three 3D
+    // textures and a composite stage when it is switched on, and needs the
+    // normal MRT attachment to evaluate the SH lobe. Turning it on and off is a
+    // graph change even though changing its TIER between low and high is not.
+    for (const key of [
+      'graphics.bakedIndirect',
+      'graphics.clusteredLighting',
+      'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.rayTracing',
+      'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
+    ]) {
+      expect(graphics.find((definition) => definition.key === key)?.applyMode, key).toBe('pipeline-rebuild');
+    }
+    // Everything that is NOT one of the declared topology owners must still be
+    // a live apply, which is what the original exclusion list was protecting.
+    const topologyOwners = new Set([
+      'graphics.antiAliasing', 'graphics.geometryDetail', 'graphics.ambientOcclusion',
+      'graphics.bakedIndirect',
+      'graphics.clusteredLighting',
+      'graphics.volumetricLightShafts', 'graphics.screenSpaceReflections', 'graphics.screenSpaceGi',
+      'graphics.rayTracing',
+      'graphics.depthOfField', 'graphics.motionBlur', 'graphics.spatialUpscaling',
+    ]);
+    expect(graphics.filter(({ key }) => !topologyOwners.has(key))
+      .every(({ applyMode }) => applyMode === 'live')).toBe(true);
     expect(graphics.slice(1).every(({ runtimeConsumer }) => typeof runtimeConsumer === 'string' && runtimeConsumer.length > 0)).toBe(true);
     expect(graphics.every(({ runtimeEvidence }) => (runtimeEvidence?.length ?? 0) > 0)).toBe(true);
     expect(accessibility).toHaveLength(5);

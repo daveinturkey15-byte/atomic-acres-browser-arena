@@ -171,6 +171,26 @@ export function browserOwnsForegroundPresentation(): boolean {
 }
 
 /**
+ * Weaker sibling of {@link browserOwnsForegroundPresentation}: the document is
+ * VISIBLE, but may not hold keyboard focus.
+ *
+ * The hidden-tab contract forbids authoring GPU work while a tab is HIDDEN.
+ * Focus is a different question, and conflating the two turned a bounded wait
+ * into an unbounded one: the cold-prewarm submission loop retried until it
+ * owned focus, so a visible-but-unfocused window - a user who alt-tabs while
+ * the map loads, a window the OS never reports focus for (RDP, occluded, some
+ * window managers) - never finished loading at all. It sat on the streaming
+ * screen forever.
+ *
+ * Prewarm may fall back to this after it has waited politely for real focus.
+ * A visible window is a legitimate place to present; an invisible one is not,
+ * and this still refuses that.
+ */
+export function browserPresentationIsVisible(): boolean {
+  return !documentIsBackgrounded();
+}
+
+/**
  * Yields preparation to a real presentation frame while one is available, but
  * never makes asset/decode work depend on requestAnimationFrame. Browsers may
  * suspend a previously requested frame when the page becomes hidden.

@@ -53,7 +53,12 @@ describe('spatial audio contracts', () => {
 
   it('covers all arenas with distinct original beds inside continuous budgets', () => {
     expect(validateArenaAudioDefinitions()).toEqual([]);
-    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size).toBe(4);
+    // owner 2026-08-30: Test1/Test2 arenas added; owner 2026-09-02 (HF-405)
+    // Map 3. Written against the registry rather than a literal so the
+    // property under test stays "every arena's bed is distinct" - which is the
+    // thing that matters - instead of a number that has now gone stale twice.
+    expect(new Set(Object.values(ARENA_AUDIO_DEFINITIONS).map((definition) => definition.identity)).size)
+      .toBe(Object.keys(ARENA_AUDIO_DEFINITIONS).length);
     expect(Object.values(ARENA_AUDIO_DEFINITIONS).every((definition) => definition.continuousVoices <= 2)).toBe(true);
     expect(AUDIO_RUNTIME_BUDGET.continuousVoices).toBeGreaterThanOrEqual(8);
   });
@@ -85,6 +90,12 @@ describe('spatial audio contracts', () => {
     expect(arenaFootstepSurface('rustworks-1v1', 'soil')).toBe('metal');
     expect(arenaFootstepSurface('gun-range', 'wood')).toBe('concrete');
     expect(arenaFootstepSurface('skyline-terminal', 'soil')).toBe('concrete');
+    expect(arenaFootstepSurface('high-seas', 'soil')).toBe('wood');
+    expect(ARENA_AUDIO_DEFINITIONS['high-seas']).toMatchObject({
+      identity: 'diesel-engine-thrum-and-open-sea-wind',
+      bedPosition: { x: 0, y: 0, z: 24 },
+      airPosition: { x: 0, y: 8.92, z: -28 },
+    });
   });
 
   it('hard-caps occlusion work per frame and resets only at a new frame', () => {

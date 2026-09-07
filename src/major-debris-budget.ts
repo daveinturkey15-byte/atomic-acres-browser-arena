@@ -1,4 +1,5 @@
 export const MAX_MAJOR_DEBRIS_BODIES = 18;
+export const MAX_PREWARMED_MAJOR_DEBRIS_BODIES = 64;
 
 export type MajorDebrisSource = 'shed' | 'house' | 'window';
 

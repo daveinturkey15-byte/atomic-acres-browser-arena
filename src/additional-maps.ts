@@ -25,13 +25,15 @@ import { createRustworksWelshFlag } from './rustworks-flag';
 import { makeEmissiveOnly } from './rendering/light-occlusion';
 import { applyBotEmissiveBrightness } from './operator-model';
 
-type Builder = {
+export type Builder = {
   root: THREE.Group;
   colliders: Box2[];
   physicsColliders: Box2[];
   raycastMeshes: THREE.Object3D[];
   shotSurfaces: BallisticSurface[];
   ballisticSurfaceSequence: number;
+  /** Optional dynamic panes owned by the arena's existing glass authority. */
+  breakableWindows?: BreakableWindow[];
 };
 
 export const GUN_RANGE_FIRING_LINE_Z = 1.2;
@@ -44,7 +46,7 @@ export const GUN_RANGE_FIRING_LINE_BARRIER: Readonly<Box2> = Object.freeze({
   maxY: 8,
 });
 
-const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
+export const standard = (color: number, roughness = 0.86, metalness = 0.08): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, metalness });
 
 type RustSurfaceKind = 'deck' | 'oxidised' | 'painted-steel';
@@ -87,7 +89,7 @@ function applyRustSurface(material: THREE.MeshStandardMaterial, kind: RustSurfac
   return material;
 }
 
-function box(
+export function box(
   builder: Builder,
   name: string,
   position: [number, number, number],
@@ -144,6 +146,15 @@ function box(
     builder.shotSurfaces.push(surface);
     mesh.userData.ballisticSurfaceId = surface.id;
     mesh.userData.ballisticMaterial = surface.material;
+    if (options.breakableWindowId) {
+      mesh.userData.breakableWindowId = options.breakableWindowId;
+      mesh.userData.dynamic = true;
+      builder.breakableWindows?.push({
+        id: options.breakableWindowId,
+        mesh,
+        broken: false,
+      });
+    }
   }
   if (solid) {
     builder.colliders.push(bounds);
@@ -286,7 +297,7 @@ function skylineOpeningParityAudit(
  * are deliberately excluded: only non-solid, non-raycast presentation detail
  * enters these static batches.
  */
-function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
+export function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentation'): PresentationBatchTelemetry {
   const groups = new Map<string, {
     material: THREE.Material;
     castShadow: boolean;
@@ -353,7 +364,7 @@ function batchPresentationOnlyBoxes(root: THREE.Group, batchPrefix = 'presentati
   };
 }
 
-function emptyTelemetry(): ArenaMap['houseTelemetry'] {
+export function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   return {
     houses: 0,
     groundRooms: 0,
@@ -366,7 +377,7 @@ function emptyTelemetry(): ArenaMap['houseTelemetry'] {
   };
 }
 
-function spawnRecord(team0: readonly [number, number][], team1: readonly [number, number][]): Record<Team, THREE.Vector3[]> {
+export function spawnRecord(team0: readonly [number, number][], team1: readonly [number, number][]): Record<Team, THREE.Vector3[]> {
   return {
     0: team0.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
     1: team1.map(([x, z]) => new THREE.Vector3(x, 1.7, z)),
@@ -695,8 +706,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     }
   }
 
-  box(builder, 'rustworks-lower-deck', [0, lowerDeckCenterY, 0], [lowerDeckSize, deckThickness, lowerDeckSize], grate);
-  box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust);
+  // HF-390: Rustworks is a steel derrick. `deck`/`ramp`/`landing` are wood-rule
+  // words, so every walking surface here was rated as timber (0.38 entry) until
+  // these explicit families landed. Authored material beats the name rule.
+  box(builder, 'rustworks-lower-deck', [0, lowerDeckCenterY, 0], [lowerDeckSize, deckThickness, lowerDeckSize], grate, { ballisticMaterial: 'structural-metal' });
+  box(builder, 'rustworks-upper-deck', [0, upperDeckCenterY, 0], [upperDeckSize, deckThickness, upperDeckSize], rust, { ballisticMaterial: 'structural-metal' });
   // Keep the upper deck walkable: corner utility only, open centre circulation ring.
   // Corner utilities stay small so the upper deck centre stays a clean fight space.
   // Keep the compact crown clear. The former hut/manifold blocks narrowed
@@ -807,14 +821,14 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     - Math.sin(lowerRampAngle) * (lowerRampLength / 2)
     - Math.cos(lowerRampAngle) * (lowerRampThickness / 2);
 
-  box(builder, 'rustworks-lower-ramp-foot-pad', [0, 0.08, lowerRampCenterZ - Math.cos(lowerRampAngle) * (lowerRampLength / 2) - 0.55], [lowerRampWidth + 0.8, 0.16, 1.6], concrete);
+  box(builder, 'rustworks-lower-ramp-foot-pad', [0, 0.08, lowerRampCenterZ - Math.cos(lowerRampAngle) * (lowerRampLength / 2) - 0.55], [lowerRampWidth + 0.8, 0.16, 1.6], concrete, { ballisticMaterial: 'concrete' });
   box(
     builder,
     'rustworks-lower-ramp',
     [0, lowerRampPosY, lowerRampCenterZ],
     [lowerRampWidth, lowerRampThickness, lowerRampLength],
     steelBright,
-    { rotation: [-lowerRampAngle, 0, 0] },
+    { rotation: [-lowerRampAngle, 0, 0], ballisticMaterial: 'structural-metal' },
   );
   box(
     builder,
@@ -822,6 +836,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [0, lowerDeckCenterY, lowerLandingCenterZ],
     [lowerRampWidth + 0.45, deckThickness, lowerLandingDepth],
     grate,
+    { ballisticMaterial: 'structural-metal' },
   );
   // Ship-ladder on +X rim: continuous climb, wider bridge, open upper landing.
   const shipAngle = (shipLadderAngleDegrees * Math.PI) / 180;
@@ -852,6 +867,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipX, lowerDeckCenterY, shipLowerLandingCenterZ],
     [shipWidth + 0.55, deckThickness, lowerShipLandingDepth],
     grate,
+    { ballisticMaterial: 'structural-metal' },
   );
   const shipLadderAuthority = box(
     builder,
@@ -872,6 +888,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     [shipX, upperDeckCenterY, upperOutboardCenterZ],
     [shipWidth + 0.45, deckThickness, upperOutboardLandingDepth],
     rust,
+    { ballisticMaterial: 'structural-metal' },
   );
   box(
     builder,
@@ -976,7 +993,11 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
   box(builder, 'rustworks-service-trench-floor', [trenchX, 0.045, 0], [3.4, 0.05, 34], grate, { solid: false, cast: false, shots: false });
   for (const x of trenchWallXs) {
     for (const z of trenchSegments) {
-      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark);
+      // HF-390 lane (2026-08-28): authored in concreteDark and read as poured
+      // concrete trench cover, but the 'wall' name rule rated it interior-wall
+      // (0.42 entry - drywall) so the 1v1 trench lane was casually wallbanged
+      // through what looks like concrete. Authored to the family it visually is.
+      const wall = box(builder, 'rustworks-service-trench-wall', [x, 0.65, z], [0.32, 1.3, 7], concreteDark, { ballisticMaterial: 'concrete' });
       wall.userData.rustworksRouteRole = 'west-service-trench-cover';
       box(builder, 'rustworks-service-trench-coping', [x, 1.34, z], [0.46, 0.08, 7.05], hazard, {
         solid: false,
@@ -1062,12 +1083,18 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
           { suffix: 'roof', position: [placement.x, containerSize[1] - thickness / 2, placement.z], size: [containerSize[0], thickness, containerSize[2]] },
         ];
       for (const part of shellParts) {
+        // HF-390: these are the skin of the same shipping container the closed
+        // placements rate as `container`. Left to the name rules, `wall-a`/`wall-b`
+        // landed on `interior-wall` (drywall) and `roof` on `concrete` - three
+        // different penetration ratings for one asset. Per-metre traversal still
+        // prices a 0.14 m shell far below the solid 2.5 m box.
         const shell = box(
           builder,
           `rustworks-open-container-${part.suffix}`,
           part.position as [number, number, number],
           part.size as [number, number, number],
           material,
+          { ballisticMaterial: 'container' },
         );
         shell.userData.rustworksContainerSide = placement.side;
         shell.userData.rustworksContainerSlot = placement.slot;
@@ -1106,7 +1133,7 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
         const endSize: [number, number, number] = alongX
           ? [endThickness, containerSize[1], containerSize[2]]
           : [containerSize[0], containerSize[1], endThickness];
-        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material);
+        const end = box(builder, 'rustworks-open-one-container-closed-end', endPosition, endSize, material, { ballisticMaterial: 'container' });
         end.userData.rustworksContainerSide = placement.side;
         end.userData.rustworksContainerSlot = placement.slot;
       } else {
@@ -1259,10 +1286,10 @@ export function buildRustworks1v1(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [0, 19], [-13, 19], [13, 19], [-19, 11], [-19, 0], [-13, 14],
+        [0, 19], [-13, 19], [13, 19], [-19, 14], [-19, 0], [-13, 14], [23, 24], [-25, 23],
       ],
       [
-        [0, -19], [13, -19], [-13, -19], [19, -11], [19, 0], [13, -14],
+        [0, -19], [13, -19], [-13, -19], [19, -14], [19, 0], [13, -14], [23, -24], [-23, -24],
       ],
     ),
     patrolPoints: [
@@ -2229,7 +2256,10 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   root.userData.gunRangeNeonLights = neonLights;
 
   box(builder, 'gun-range-control-room', [-16.5, 2.1, 15.5], [6.2, 4.2, 6.2], wall, { ballisticMaterial: 'interior-wall' });
-  box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: false });
+  // HF-390 lane (2026-08-28): the control-room glazing was shots:false - a
+  // ghost pane bullets crossed silently. It is glass for gunfire (impact
+  // material + 0.1 toll); movement stays non-solid exactly as before.
+  box(builder, 'gun-range-control-window', [-13.34, 2.5, 15.2], [0.08, 2, 3.6], new THREE.MeshStandardMaterial({ color: 0x76b8c5, emissive: 0x0a2730, emissiveIntensity: 0.5, roughness: 0.18, metalness: 0.1, transparent: true, opacity: 0.52 }), { solid: false, shots: true, ballisticMaterial: 'glass' });
   box(builder, 'gun-range-ready-bench', [16.2, 0.62, 15.4], [6.4, 1.05, 2.1], timber);
   box(builder, 'gun-range-ready-lockers', [18.5, 2.35, 8.4], [2.8, 4.6, 5.8], acoustic, { ballisticMaterial: 'structural-metal' });
 
@@ -2262,25 +2292,51 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
   lateralRangeTarget(builder, targets, 'lateral-cyan', -6.2, -29, 0, 0x56e7df);
   lateralRangeTarget(builder, targets, 'lateral-amber', 6.2, -29, Math.PI, 0xffb347);
 
-  // Subtle live wall-penetration lab: four isolated lanes use explicit material
-  // and thickness contracts, with a scored plate behind every panel.
+  // Subtle live wall-penetration lab: isolated lanes with explicit material and
+  // thickness contracts, and a scored plate behind every panel.
+  //
+  // HF-467, owner after PASS 93: "metal and glass should be shot through ...
+  // thin metal (the shed) should get a hole with no collision after". The lab
+  // shipped four lanes - glass, wood, plaster, brick - and no METAL of either
+  // kind, so the two families the owner named could not be compared here at
+  // all: the only sheet metal in the game was on a destructible shed in a back
+  // yard, and the only structural steel was the lab's own side walls. The two
+  // new lanes make the range the one place a human, or a headless probe, can
+  // shoot every material class side by side at a known thickness.
+  //
+  // Lane x positions are DERIVED from the lane count so a seventh lane cannot
+  // be added on top of a sixth: the row is centred on the lab and the panels
+  // narrowed from 2.05 m to 1.50 m so six fit between the lab's side walls
+  // (inner faces -18.36 and -8.64) instead of four.
   const wallbangGlass = new THREE.MeshStandardMaterial({ color: 0x8ccbd2, transparent: true, opacity: 0.34, roughness: 0.16, metalness: 0.04 });
+  const WALLBANG_LAB_CENTRE_X = -13.5;
+  const WALLBANG_LANE_SPACING = 1.6;
+  const WALLBANG_PANEL_WIDTH = 1.5;
+  // Ordered by BALLISTIC_MATERIAL_CLASS: shatter, perforate, then the three
+  // penetrate families, then stop. Shooting left to right walks the owner's
+  // sentence in order.
   const wallbangPanels = [
-    { x: -17.1, label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
-    { x: -14.7, label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
-    { x: -12.3, label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
-    { x: -9.9, label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
+    { label: 'GLASS 8 CM', material: 'glass' as const, thickness: 0.08, render: wallbangGlass },
+    { label: 'THIN METAL 6 CM', material: 'thin-metal' as const, thickness: 0.06, render: standard(0x9aa4ad, 0.42, 0.78) },
+    { label: 'WOOD 24 CM', material: 'wood' as const, thickness: 0.24, render: timber },
+    { label: 'PLASTER 42 CM', material: 'interior-wall' as const, thickness: 0.42, render: wall },
+    { label: 'STEEL 18 CM', material: 'structural-metal' as const, thickness: 0.18, render: standard(0x5c646b, 0.55, 0.86) },
+    { label: 'BRICK 70 CM', material: 'brick' as const, thickness: 0.7, render: standard(0x744838, 0.93, 0.04) },
   ];
+  const wallbangLaneX = (index: number) => (
+    WALLBANG_LAB_CENTRE_X + (index - (wallbangPanels.length - 1) / 2) * WALLBANG_LANE_SPACING
+  );
   for (const [index, panel] of wallbangPanels.entries()) {
-    box(builder, `gun-range-wallbang-panel-${panel.material}`, [panel.x, 1.45, -7.6], [2.05, 2.9, panel.thickness], panel.render, {
+    const x = wallbangLaneX(index);
+    box(builder, `gun-range-wallbang-panel-${panel.material}`, [x, 1.45, -7.6], [WALLBANG_PANEL_WIDTH, 2.9, panel.thickness], panel.render, {
       solid: false,
       shots: true,
       ballisticMaterial: panel.material,
     });
-    rangeTarget(builder, targets, `wallbang-${panel.material}`, panel.x, -12.4, 50, 'near');
-    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [2.05, 0.55]);
+    rangeTarget(builder, targets, `wallbang-${panel.material}`, x, -12.4, 50, 'near');
+    const label = rangeSign(panel.label, index === 0 ? 0x79dce6 : 0xe0aa37, `gun-range-wallbang-label-${panel.material}`, [WALLBANG_PANEL_WIDTH, 0.55]);
     if (label) {
-      label.position.set(panel.x, 3.35, -7.5);
+      label.position.set(x, 3.35, -7.5);
       root.add(label);
     }
   }
@@ -2360,8 +2416,14 @@ export function buildGunRange(scene: THREE.Scene): ArenaMap {
     raycastMeshes: builder.raycastMeshes,
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
-      [[0, 16.5], [-8, 16.5], [8, 16.5]],
-      [[0, 16.5], [-8, 16.5], [8, 16.5]],
+      // Owner 2026-08-31: "make player and bot spawns nicely spread and
+      // balanced everywhere". Both team lists here were BYTE-IDENTICAL - three
+      // points on one line, cross-team minimum separation 0.00 m - so in a
+      // six-player FFA every player drew from the same three spots and could
+      // spawn on top of each other. Widened to six points across the firing
+      // line's full width, and the second list offset so the two never collide.
+      [[0, 16.5], [-8, 16.5], [8, 16.5], [-12, 16.5], [12, 16.5], [0, 12.5], [-4, 16.5], [4, 16.5]],
+      [[-4, 12.5], [4, 12.5], [-8, 12.5], [8, 12.5], [-12, 12.5], [12, 12.5], [-4, 8.5], [4, 8.5]],
     ),
     patrolPoints: [],
     targets,
@@ -2874,17 +2936,152 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   addPalletStack('west', -25, 9, true);
   addPalletStack('east', 24, 22, false);
 
+  // HF-346: polygonOffset tiering for co-planar / near-coplanar decals on the exterior apron.
+  // Preserves low profile without requiring 18mm vertical separation between overlapping markings.
+  const apronSeamXMat = stainMat.clone();
+  apronSeamXMat.name = 'skyline-apron-seam-x-material';
+  apronSeamXMat.polygonOffset = true;
+  apronSeamXMat.polygonOffsetFactor = -1;
+  apronSeamXMat.polygonOffsetUnits = -1;
+
+  const apronEngineStainMat = stainMat.clone();
+  apronEngineStainMat.name = 'skyline-engine-stain-material';
+  apronEngineStainMat.polygonOffset = true;
+  apronEngineStainMat.polygonOffsetFactor = -1.5;
+  apronEngineStainMat.polygonOffsetUnits = -1.5;
+
+  const apronSeamZMat = stainMat.clone();
+  apronSeamZMat.name = 'skyline-apron-seam-z-material';
+  apronSeamZMat.polygonOffset = true;
+  apronSeamZMat.polygonOffsetFactor = -2;
+  apronSeamZMat.polygonOffsetUnits = -2;
+
+  const apronLeadInDarkMat = floorBorderMat.clone();
+  apronLeadInDarkMat.name = 'skyline-apron-lead-in-dark-material';
+  apronLeadInDarkMat.polygonOffset = true;
+  apronLeadInDarkMat.polygonOffsetFactor = -2.5;
+  apronLeadInDarkMat.polygonOffsetUnits = -2.5;
+
+  const tarmacStripeMat = hazardMat.clone();
+  tarmacStripeMat.name = 'skyline-tarmac-stripe-material';
+  tarmacStripeMat.polygonOffset = true;
+  tarmacStripeMat.polygonOffsetFactor = -3;
+  tarmacStripeMat.polygonOffsetUnits = -3;
+
+  const apronLeadInAmberMat = hazardMat.clone();
+  apronLeadInAmberMat.name = 'skyline-apron-lead-in-amber-material';
+  apronLeadInAmberMat.polygonOffset = true;
+  apronLeadInAmberMat.polygonOffsetFactor = -3.5;
+  apronLeadInAmberMat.polygonOffsetUnits = -3.5;
+
+  const aircraftStandNSMat = hazardMat.clone();
+  aircraftStandNSMat.name = 'skyline-aircraft-stand-ns-material';
+  aircraftStandNSMat.polygonOffset = true;
+  aircraftStandNSMat.polygonOffsetFactor = -4;
+  aircraftStandNSMat.polygonOffsetUnits = -4;
+
+  const apronGuidanceCyanMat = practicalMat.clone();
+  apronGuidanceCyanMat.name = 'skyline-apron-guidance-cyan-material';
+  apronGuidanceCyanMat.polygonOffset = true;
+  apronGuidanceCyanMat.polygonOffsetFactor = -4.5;
+  apronGuidanceCyanMat.polygonOffsetUnits = -4.5;
+
+  const apronGuidanceMagentaMat = magentaPracticalMat.clone();
+  apronGuidanceMagentaMat.name = 'skyline-apron-guidance-magenta-material';
+  apronGuidanceMagentaMat.polygonOffset = true;
+  apronGuidanceMagentaMat.polygonOffsetFactor = -4.5;
+  apronGuidanceMagentaMat.polygonOffsetUnits = -4.5;
+
+  const aircraftStandEWMat = hazardMat.clone();
+  aircraftStandEWMat.name = 'skyline-aircraft-stand-ew-material';
+  aircraftStandEWMat.polygonOffset = true;
+  aircraftStandEWMat.polygonOffsetFactor = -5;
+  aircraftStandEWMat.polygonOffsetUnits = -5;
+
+  const apronChevronMat = practicalMat.clone();
+  apronChevronMat.name = 'skyline-apron-chevron-material';
+  apronChevronMat.polygonOffset = true;
+  apronChevronMat.polygonOffsetFactor = -5.5;
+  apronChevronMat.polygonOffsetUnits = -5.5;
+
+  const apronChevronMagentaMat = magentaPracticalMat.clone();
+  apronChevronMagentaMat.name = 'skyline-apron-chevron-magenta-material';
+  apronChevronMagentaMat.polygonOffset = true;
+  apronChevronMagentaMat.polygonOffsetFactor = -5.5;
+  apronChevronMagentaMat.polygonOffsetUnits = -5.5;
+
+  // HF-346: polygonOffset tiering for concourse floor decals and joints.
+  const floorJointXMat = floorBorderMat.clone();
+  floorJointXMat.name = 'skyline-floor-joint-x-material';
+  floorJointXMat.polygonOffset = true;
+  floorJointXMat.polygonOffsetFactor = -1;
+  floorJointXMat.polygonOffsetUnits = -1;
+
+  const floorJointZMat = floorBorderMat.clone();
+  floorJointZMat.name = 'skyline-floor-joint-z-material';
+  // HF-346 direction rule: joint-z sits ABOVE skyline-floor-dark-runner (topY 0.093 vs
+  // 0.0855 after the Pass 75 lift; 0.086 vs 0.0855 before it), so it must carry the MORE
+  // NEGATIVE effective bias to win the WebGPU depth test. -2/-2 lost to the runner's
+  // -2.5/-2.5 despite being higher, which is what reported the inverted pairs. Keep -3/-3:
+  // the Pass 75 lift widens the gap past the 4mm threshold but does not replace the tier.
+  floorJointZMat.polygonOffset = true;
+  floorJointZMat.polygonOffsetFactor = -3;
+  floorJointZMat.polygonOffsetUnits = -3;
+
+  const floorDarkRunnerMat = floorInsetMat.clone();
+  floorDarkRunnerMat.name = 'skyline-floor-dark-runner-material';
+  floorDarkRunnerMat.polygonOffset = true;
+  floorDarkRunnerMat.polygonOffsetFactor = -2.5;
+  floorDarkRunnerMat.polygonOffsetUnits = -2.5;
+
+  const floorBorderDecalMat = floorBorderMat.clone();
+  floorBorderDecalMat.name = 'skyline-floor-border-decal-material';
+  floorBorderDecalMat.polygonOffset = true;
+  floorBorderDecalMat.polygonOffsetFactor = -3;
+  floorBorderDecalMat.polygonOffsetUnits = -3;
+
+  const floorCyanRunnerMat = practicalMat.clone();
+  floorCyanRunnerMat.name = 'skyline-floor-cyan-runner-material';
+  floorCyanRunnerMat.polygonOffset = true;
+  floorCyanRunnerMat.polygonOffsetFactor = -4;
+  floorCyanRunnerMat.polygonOffsetUnits = -4;
+
+  const floorMagentaCrossingMat = magentaPracticalMat.clone();
+  floorMagentaCrossingMat.name = 'skyline-floor-magenta-crossing-material';
+  floorMagentaCrossingMat.polygonOffset = true;
+  floorMagentaCrossingMat.polygonOffsetFactor = -5;
+  floorMagentaCrossingMat.polygonOffsetUnits = -5;
+
+  // HF-346: polygonOffset tiering for mezzanine underside coffers and underlights.
+  const mezzanineCofferMat = ivoryPanelMat.clone();
+  mezzanineCofferMat.name = 'skyline-mezzanine-coffer-material';
+  mezzanineCofferMat.polygonOffset = true;
+  mezzanineCofferMat.polygonOffsetFactor = -1;
+  mezzanineCofferMat.polygonOffsetUnits = -1;
+
+  const mezzanineUnderlightMat = practicalMat.clone();
+  mezzanineUnderlightMat.name = 'skyline-mezzanine-underlight-material';
+  mezzanineUnderlightMat.polygonOffset = true;
+  mezzanineUnderlightMat.polygonOffsetFactor = -2;
+  mezzanineUnderlightMat.polygonOffsetUnits = -2;
+
+  const mezzanineUnderlightMagentaMat = magentaPracticalMat.clone();
+  mezzanineUnderlightMagentaMat.name = 'skyline-mezzanine-underlight-magenta-material';
+  mezzanineUnderlightMagentaMat.polygonOffset = true;
+  mezzanineUnderlightMagentaMat.polygonOffsetFactor = -2;
+  mezzanineUnderlightMagentaMat.polygonOffsetUnits = -2;
+
   for (let z = -10; z <= 30; z += 10) {
-    box(builder, 'skyline-tarmac-stripe', [0, 0.02, z], [1.2, 0.03, 4.0], hazardMat, { solid: false, shots: false });
+    box(builder, 'skyline-tarmac-stripe', [0, 0.027, z], [1.2, 0.03, 4.0], tarmacStripeMat, { solid: false, shots: false });
   }
 
   // A repeated apron grid and stand envelope give the large exterior plane
   // authored scale while remaining one static batch per shared material.
   for (let seamX = -28; seamX <= 28; seamX += 7) {
-    detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], stainMat);
+    detailBox('apron-marking', `skyline-apron-seam-x-${seamX}`, [seamX, 0.023, 8], [0.035, 0.018, 54], apronSeamXMat);
   }
   for (let seamZ = -16; seamZ <= 32; seamZ += 8) {
-    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.024, seamZ], [68, 0.018, 0.035], stainMat);
+    detailBox('apron-marking', `skyline-apron-seam-z-${seamZ}`, [0, 0.028, seamZ], [68, 0.018, 0.035], apronSeamZMat);
   }
   for (const [name, x, z, width, depth] of [
     ['north', 0, -0.15, 43, 0.16],
@@ -2892,41 +3089,51 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     ['west', -21.4, 2, 0.16, 4.45],
     ['east', 21.4, 2, 0.16, 4.45],
   ] as const) {
-    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, 0.036, z], [width, 0.025, depth], hazardMat);
+    // Pass 75 raises the E/W stands out of the N/S stands' depth range; Pass 74's
+    // per-axis polygonOffset tiers keep the pair resolved even where they still touch.
+    const markingY = (name === 'west' || name === 'east') ? 0.041 : 0.036;
+    const standMat = (name === 'north' || name === 'south') ? aircraftStandNSMat : aircraftStandEWMat;
+    detailBox('apron-marking', `skyline-aircraft-stand-${name}`, [x, markingY, z], [width, 0.025, depth], standMat);
   }
-  detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], floorBorderMat);
-  detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], hazardMat);
-  detailBox('apron-marking', 'skyline-apron-cyan-guidance-west', [-6.5, 0.051, 11], [0.11, 0.024, 46], practicalMat);
-  detailBox('apron-marking', 'skyline-apron-magenta-guidance-east', [6.5, 0.051, 11], [0.11, 0.024, 46], magentaPracticalMat);
+  detailBox('apron-marking', 'skyline-apron-lead-in-dark', [0, 0.034, 20], [0.35, 0.025, 28], apronLeadInDarkMat);
+  detailBox('apron-marking', 'skyline-apron-lead-in-amber', [0, 0.049, 20], [0.12, 0.02, 28], apronLeadInAmberMat);
+  detailBox('apron-marking', 'skyline-apron-cyan-guidance-west', [-6.5, 0.051, 11], [0.11, 0.024, 46], apronGuidanceCyanMat);
+  detailBox('apron-marking', 'skyline-apron-magenta-guidance-east', [6.5, 0.051, 11], [0.11, 0.024, 46], apronGuidanceMagentaMat);
   for (const z of [-8, 2, 12, 22, 32]) {
-    detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? magentaPracticalMat : practicalMat);
+    detailBox('apron-marking', `skyline-apron-gate-chevron-${z}`, [0, 0.054, z], [8.6, 0.022, 0.12], z === 12 ? apronChevronMagentaMat : apronChevronMat);
   }
   for (const [z, rotationY] of [[12, 0.08], [-8, -0.08]] as const) {
-    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.031, z], [3.4, 0.022, 5.2], stainMat, 'performance', [0, rotationY, 0]);
+    detailBox('apron-marking', `skyline-engine-stain-${z}`, [0, 0.041, z], [3.4, 0.022, 5.2], apronEngineStainMat, 'performance', [0, rotationY, 0]);
   }
 
   box(builder, 'skyline-concourse-floor', [0, 0.02, -23], [60, 0.08, 22], floorMat, { solid: false });
-  detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorInsetMat);
+  detailBox('floor-language', 'skyline-floor-dark-runner', [0, 0.073, -22.5], [5.2, 0.025, 20.5], floorDarkRunnerMat);
   // A real roof and luminous ceiling make the terminal read as an interior,
   // not an outdoor grey blockout. It is above every route but remains
   // collision and shot authoritative for debug/fly-camera probes.
-  box(builder, 'skyline-terminal-silver-ceiling', [0, 7.05, -23], [62, 0.24, 22.6], ivoryPanelMat);
+  // HF-346 (depth pass): the ceiling slab used to end at z = -34.3, the back
+  // wall's outer plane, putting a 0.07 m x 62 m same-facing band on that plane
+  // - a hairline flicker running the full width of the rear elevation. It now
+  // terminates BURIED inside the back wall (z = -34.1), so its rear face is
+  // enclosed by solid geometry instead of sharing a visible plane, and no gap
+  // opens at the ceiling/wall junction.
+  box(builder, 'skyline-terminal-silver-ceiling', [0, 7.05, -22.9], [62, 0.24, 22.4], ivoryPanelMat);
   for (const z of [-31.5, -28.5, -25.5, -22.5, -19.5, -16.5, -13.5]) {
     detailBox('wall-structure', `skyline-ceiling-white-baffle-${z}`, [0, 6.86, z], [60.2, 0.13, 0.72], ivoryPanelMat, 'performance', undefined, true);
     detailBox('terminal-story', `skyline-ceiling-cyan-spine-${z}`, [0, 6.76, z], [38, 0.055, 0.12], practicalMat);
   }
   // The long runner is repeated in inset cyan and magenta so it is legible
   // from either spawn and through the glass facade.
-  detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
-  detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], practicalMat);
-  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.093, -20.4], [24, 0.024, 0.16], magentaPracticalMat);
-  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.074, -12.55], [59.2, 0.028, 0.52], floorBorderMat);
-  detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderMat);
+  detailBox('floor-language', 'skyline-floor-cyan-runner-west', [-2.3, 0.091, -22.5], [0.16, 0.022, 20.2], floorCyanRunnerMat);
+  detailBox('floor-language', 'skyline-floor-cyan-runner-east', [2.3, 0.091, -22.5], [0.16, 0.022, 20.2], floorCyanRunnerMat);
+  detailBox('floor-language', 'skyline-floor-magenta-crossing', [0, 0.095, -20.4], [24, 0.024, 0.16], floorMagentaCrossingMat);
+  detailBox('floor-language', 'skyline-floor-window-border', [0, 0.080, -12.55], [59.2, 0.028, 0.52], floorBorderDecalMat);
+  detailBox('floor-language', 'skyline-floor-backwall-border', [0, 0.074, -33.4], [59.2, 0.028, 0.52], floorBorderDecalMat);
   for (let tileX = -27; tileX <= 27; tileX += 6) {
-    detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorBorderMat);
+    detailBox('floor-language', `skyline-floor-joint-x-${tileX}`, [tileX, 0.076, -23], [0.025, 0.018, 20.2], floorJointXMat);
   }
   for (let tileZ = -31; tileZ <= -15; tileZ += 4) {
-    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.077, tileZ], [58.5, 0.018, 0.025], floorBorderMat);
+    detailBox('floor-language', `skyline-floor-joint-z-${tileZ}`, [0, 0.084, tileZ], [58.5, 0.018, 0.025], floorJointZMat);
   }
   // Split the mezzanine around both escalators. A monolithic slab creates a
   // low underside above each ramp and physically stops the character halfway.
@@ -2943,16 +3150,16 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   // Overlay the formerly monolithic grey underside with a coffered silver
   // ceiling. These shallow panels do not alter the mezzanine collider.
   for (const x of [-21, -14, -7, 0, 7, 14, 21]) {
-    detailBox('wall-structure', `skyline-mezzanine-coffer-${x}`, [x, 3.002, -30.3], [5.65, 0.025, 3.9], ivoryPanelMat);
-    detailBox('terminal-story', `skyline-mezzanine-coffer-light-${x}`, [x, 2.982, -30.25], [3.8, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+    detailBox('wall-structure', `skyline-mezzanine-coffer-${x}`, [x, 3.002, -30.3], [5.65, 0.025, 3.9], mezzanineCofferMat);
+    detailBox('terminal-story', `skyline-mezzanine-coffer-light-${x}`, [x, 2.982, -30.25], [3.8, 0.022, 0.13], x === 0 ? mezzanineUnderlightMagentaMat : mezzanineUnderlightMat);
   }
   for (const x of [-16, -8, 0, 8, 16]) {
-    detailBox('wall-structure', `skyline-mezzanine-front-coffer-${x}`, [x, 3.001, -25.3], [6.5, 0.024, 4.9], ivoryPanelMat);
-    detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? magentaPracticalMat : practicalMat);
+    detailBox('wall-structure', `skyline-mezzanine-front-coffer-${x}`, [x, 3.001, -25.3], [6.5, 0.024, 4.9], mezzanineCofferMat);
+    detailBox('terminal-story', `skyline-mezzanine-front-coffer-light-${x}`, [x, 2.981, -25.2], [4.6, 0.022, 0.13], x === 0 ? mezzanineUnderlightMagentaMat : mezzanineUnderlightMat);
   }
   for (const lightX of [-18, -10, 0, 10, 18]) {
-    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.005, -29.8], [5.4, 0.025, 0.11], practicalMat);
-    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.005, -24.3], [5.4, 0.025, 0.11], practicalMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-${lightX}`, [lightX, 3.007, -29.8], [5.4, 0.025, 0.11], mezzanineUnderlightMat);
+    detailBox('terminal-story', `skyline-mezzanine-underlight-front-${lightX}`, [lightX, 3.007, -24.3], [5.4, 0.025, 0.11], mezzanineUnderlightMat);
   }
   detailBox('floor-language', 'skyline-mezzanine-front-edge', [0, 3.36, -22.12], [52, 0.12, 0.34], floorBorderMat);
   for (const x of [-23.5, -16, -8, 0, 8, 16, 23.5]) {
@@ -3044,9 +3251,17 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('escalator-detail', `skyline-escalator-underlight-${sideX}`, [sideX, 1.38, -24.5], [2.3, 0.06, rampLen - 0.45], practicalMat, 'performance', [rampAngle, 0, 0]);
   }
 
-  box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62, 7.0, 0.4], wallMat);
-  box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
-  box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -23], [0.4, 7.0, 22.6], wallMat);
+  // HF-346 (depth pass): the side walls used to run all the way to z = -34.3,
+  // the SAME plane as the back wall's outer face, so at each rear corner a
+  // 0.10 m x 7.0 m strip had two same-facing surfaces on one plane - a
+  // full-height flickering seam, and the largest z-fight left in this arena.
+  // The side walls now stop at the back wall's INNER face (z = -33.9) and the
+  // back wall widens by the side-wall thickness so it still seals the corner
+  // in collision. Nothing is removed from the playable envelope: the interior
+  // faces (x = -+30.9, z = -33.9) are exactly where they were.
+  box(builder, 'skyline-terminal-backwall', [0, 3.5, -34.1], [62.6, 7.0, 0.4], wallMat);
+  box(builder, 'skyline-terminal-leftwall', [-31.1, 3.5, -22.8], [0.4, 7.0, 22.2], wallMat);
+  box(builder, 'skyline-terminal-rightwall', [31.1, 3.5, -22.8], [0.4, 7.0, 22.2], wallMat);
   detailBox('wall-structure', 'skyline-backwall-wainscot', [0, 1.05, -33.84], [60.8, 2.1, 0.14], wallLowerMat);
   detailBox('terminal-story', 'skyline-backwall-luminous-crown-cyan', [-15.5, 6.72, -33.68], [30.4, 0.16, 0.14], practicalMat);
   detailBox('terminal-story', 'skyline-backwall-luminous-crown-magenta', [15.5, 6.72, -33.68], [30.4, 0.16, 0.14], magentaPracticalMat);
@@ -3419,8 +3634,52 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   };
   addWingAuthority('port', 3.6, 16.8, 'skyline-quality-wing-port');
   addWingAuthority('starboard', 0.4, -16.8, 'skyline-quality-wing-starboard');
-  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, 1.6, 12.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
-  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, 1.6, -8.0], [1.9, 1.9, 4.1], engineMat, 'jetliner-engine-nacelles');
+  /**
+   * Engine nacelle seat height. Lane J, 2026-09-02 (eye-clearance triage).
+   *
+   * The nacelles used to sit at y = 1.6, so their 1.9 m body spanned
+   * 0.65 .. 2.55 m. Two consequences, both measured:
+   *  - the wing above them is authored at 2.68 .. 2.96 (visual AND authority,
+   *    `addWingAuthority`), so the engines hung 0.13 m clear of the wing they
+   *    are bolted to - floating geometry under the forging review;
+   *  - the 0.65 m belly left a prone crawl space over a 0.61 m prone eye. The
+   *    eye-clearance sweep flagged all six of skyline-terminal's red rows there
+   *    (d = 0.067 m, prone, both nacelles), and stage 3 was worse than the
+   *    analytic number: `resolveEyeClearance` had nowhere lateral to go, pushed
+   *    the camera UP into the nacelle to its 0.34 m cap (seat y 1.66, i.e.
+   *    inside the engine) and still measured 0.035 m - a metre above the
+   *    player's real eye, looking through the engine's interior.
+   *
+   * Seating the nacelle against the wing underside fixes both at once: the top
+   * lands exactly on 2.68 and the belly rises to 0.78 m, which clears the prone
+   * eye by 0.17 m - past the sweep's 0.15 m probe radius (= the camera's 0.08 m
+   * near plane plus bob margin), so the runtime resolve never engages here at
+   * all. It is a translation only: no size, footprint or material changes, and
+   * the instanced Quality visual below moves with it so authority and mesh stay
+   * coincident.
+   */
+  const NACELLE_CENTRE_Y = 1.73;
+  /**
+   * Nacelle collision authority. Lane J found this transposed against its own
+   * visual and PASS 87 Lane AR (item 12) landed the repair.
+   *
+   * The visual is `engineNacelles` below: a CylinderGeometry of length 4.1 and
+   * radius 0.95, rotated +90 degrees about Z, so its axis lies along X and its
+   * world extent is 4.1 x 1.9 x 1.9 (x, y, z). The authority box was authored
+   * 1.9 x 1.9 x 4.1 - the same three numbers with x and z swapped, i.e. the
+   * engine turned across the aircraft instead of along it. Consequences,
+   * measured from the built arena: 1.10 m of solid stuck out fore and aft of a
+   * pod that visibly ends there (an invisible wall), and 1.10 m of visible pod
+   * on each side had no collision or shot authority at all (shooting through a
+   * jet engine). Both profiles, since the pod was authored.
+   *
+   * Derived-not-copied is asserted in src/additional-maps.test.ts: the size pin
+   * that used to hardcode 1.9/1.9/4.1 now reads the instanced visual's own
+   * world bounds, so the next person to re-orient the pod cannot re-transpose
+   * the collider silently.
+   */
+  qualityPlaceholderBox('skyline-jetliner-engine-1', [0, NACELLE_CENTRE_Y, 12.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
+  qualityPlaceholderBox('skyline-jetliner-engine-2', [0, NACELLE_CENTRE_Y, -8.0], [4.1, 1.9, 1.9], engineMat, 'jetliner-engine-nacelles');
   const portWing = detailMesh(
     'quality-aircraft',
     'skyline-quality-wing-port',
@@ -3456,7 +3715,8 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
   const nacelleMatrix = new THREE.Matrix4();
   const nacelleRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
   for (const [index, z] of [12, -8].entries()) {
-    nacelleMatrix.compose(new THREE.Vector3(0, 1.6, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
+    // Same seat height as the collision authority above - see NACELLE_CENTRE_Y.
+    nacelleMatrix.compose(new THREE.Vector3(0, NACELLE_CENTRE_Y, z), nacelleRotation, new THREE.Vector3(1, 1, 1));
     engineNacelles.setMatrixAt(index, nacelleMatrix);
   }
   engineNacelles.instanceMatrix.needsUpdate = true;
@@ -3552,13 +3812,25 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     detailBox('terminal-story', `skyline-fuel-tank-band-${bandX}`, [bandX, 1.5, 18], [0.12, 2.3, 2.72], structureMat);
   }
 
+  // HF-346 (depth pass): all four perimeter fences ran the full 72 m, so every
+  // corner stacked two same-facing 0.40 m x 3.0 m faces on one plane - eight
+  // coplanar pairs ringing the map. The east/west runs now butt BETWEEN the
+  // north/south runs instead of crossing them. Containment is unchanged: the
+  // corner cells stay filled by the north/south colliders, which still span
+  // the full x range, and the inner faces stay at -+35.6.
   box(builder, 'skyline-fence-north', [0, 1.5, -35.8], [72, 3.0, 0.4], jetbridgeMat);
   box(builder, 'skyline-fence-south', [0, 1.5, 35.8], [72, 3.0, 0.4], jetbridgeMat);
-  box(builder, 'skyline-fence-west', [-35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
-  box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 72], jetbridgeMat);
+  box(builder, 'skyline-fence-west', [-35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
+  box(builder, 'skyline-fence-east', [35.8, 1.5, 0], [0.4, 3.0, 71.2], jetbridgeMat);
 
   const physicalCover: ArenaMap['physicalCover'] = [
-    { id: 'jetliner-engine-south', bounds: { minX: -1.1, maxX: 1.1, minZ: 9.75, maxZ: 14.25 }, blocksMovement: true, blocksShots: true },
+    // Lane AR item 12: these two follow the repaired nacelle authority above
+    // (4.1 along x, 1.9 across z, plus the same 0.2 m cover margin the other
+    // rows carry). The south row was the transposed footprint; the north
+    // engine at z = -8 had no physicalCover row at all, so half the aircraft's
+    // hard cover was missing from bot cover selection and the minimap.
+    { id: 'jetliner-engine-south', bounds: { minX: -2.25, maxX: 2.25, minZ: 10.85, maxZ: 13.15 }, blocksMovement: true, blocksShots: true },
+    { id: 'jetliner-engine-north', bounds: { minX: -2.25, maxX: 2.25, minZ: -9.15, maxZ: -6.85 }, blocksMovement: true, blocksShots: true },
     { id: 'terminal-backwall', bounds: { minX: -31, maxX: 31, minZ: -34.3, maxZ: -33.9 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-west', bounds: { minX: -12.6, maxX: -7.4, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
     { id: 'concourse-seating-east', bounds: { minX: 7.4, maxX: 12.6, minZ: -16.95, maxZ: -16.45 }, blocksMovement: true, blocksShots: true },
@@ -3707,10 +3979,19 @@ export function buildSkylineTerminal(scene: THREE.Scene): ArenaMap {
     shotSurfaces: builder.shotSurfaces,
     spawns: spawnRecord(
       [
-        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14],
+        [-27, -14], [-18, -14], [-6, -14], [6, -14], [18, -14], [27, -14], [-12, -14], [12, -14],
       ],
+      // PASS 94 integration: the spawn-distribution lane (HF-456) added the
+      // seventh and eighth point at x = -12 and 12, which sat 4.00 m from the
+      // authored -18/-6 and 6/18 - inside src/additional-maps.test.ts' 6 m
+      // Skyline separation floor, which is stricter than the 3 m repo-wide one.
+      // The eight points are RE-SPACED along the same line rather than the
+      // floor being lowered: -24/-16/-10/-4/4/10/16/24 gives gaps of
+      // 8/6/6/8/6/6/8 m, every one at or over 6, with the same span and the
+      // same eight points the lane asked for. Team 0's line already cleared it
+      // (9/6/6/12/6/6/9) and is untouched.
       [
-        [-24, 30], [-16, 30], [-8, 30], [8, 30], [16, 30], [24, 30],
+        [-24, 30], [-16, 30], [-10, 30], [-4, 30], [4, 30], [10, 30], [16, 30], [24, 30],
       ],
     ),
     patrolPoints: [

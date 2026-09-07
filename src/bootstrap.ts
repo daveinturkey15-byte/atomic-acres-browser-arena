@@ -4,6 +4,20 @@ import './style.css';
 import './ui/tactical-ui.css';
 import './ui/pass66-readability.css';
 import './ui/pass66-overhaul.css';
+import './ui/pass74-killstreak-selector.css';
+// HF-362: intentionally LAST and unlayered so it can override
+// pass66-readability.css, which is itself unlayered and outranks every @layer.
+import './ui/pass74-visual-refresh.css';
+// Pass 75 HUD stylisation redesign - after the Pass 74 sheet, same unlayered
+// reason: pass66-readability.css is unlayered and outranks every @layer.
+import './ui/pass75-hud-redesign.css';
+import './ui/pass75-menu-redesign.css';
+// HF-370: Pass 77 material + diegetic-motion reskin. Last and unlayered, same
+// documented reason as every sheet above it - pass66-readability.css is
+// unlayered and outranks every @layer, so a layered sheet could not land.
+import './ui/pass77-instrument-hud.css';
+import './ui/pass77-command-shell.css';
+import './ui/pass94-hud-chat.css';
 import {
   releaseChannelDecision,
   stableReleaseUrl,
@@ -11,19 +25,70 @@ import {
 } from './release-channel';
 
 const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
-const stableFallback = releaseChannels.rollback ?? releaseChannels.stable;
+// Owner 2026-08-31: "i dont want pass 63, stable webgl, i want the previous 1/2
+// versions we had". This chooser - the one a DIRECT LINK or bookmark lands on,
+// distinct from the root release shell - offered `rollback`, which is
+// channels/pass63-rollback. That tree is not on gh-pages and 404s live, so the
+// second card was a dead link.
+//
+// HF-400, owner 2026-09-02: "pin this version and remove all past versions, this
+// can be the safe backup". After the pass94 publish the ONLY trees on gh-pages
+// are channels/pass94 and channels/pass93, so the second card must be the PASS 93
+// safe backup; `stable` (recent-stable) is retired by that publish and stays here
+// only as a last resort the publish guard will refuse. `rollback` is deliberately
+// not consulted; it stays in release-channels.json because project-map.ts
+// documents it, but it must not be offered to a player until its tree exists.
+// scripts/orchestration/publish_pass94.py parses this line and refuses to publish
+// unless it resolves to channels/pass93.
+const stableFallback = releaseChannels.pass93Backup ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
+// The pass name used to be hand-written into both of these strings, and had been stale for
+// ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
+// and told the owner publication was disabled while he was reading it on a published URL.
+// Every other field in this chooser already comes from release-channels.json; this one now
+// does too, so the description cannot drift from the build it describes.
 const latestDescription = newestBuildIsPublished
-  ? 'The approved Pass 70 gameplay and presentation build.'
-  : 'The local Pass 70 HITL candidate. Publication remains disabled until owner approval.';
+  ? releaseChannels.latest.description
+  : `${releaseChannels.latest.description} Release candidate - not yet published.`;
 const appElement = document.querySelector<HTMLDivElement>('#app');
 if (!appElement) throw new Error('Missing #app root');
 const app = appElement;
 
+
+/**
+ * Failure path only. The renderer fails closed with a friendly sentence the
+ * player cannot act on ("This game needs WebGPU ... no GPU adapter was
+ * available at all"), and from outside the browser nobody can see WHY the
+ * adapter was refused. When the failure carries a diagnostics report, put the
+ * observations on screen underneath that sentence; when it carries none - any
+ * other crash - leave the screen exactly as it was rather than inventing a
+ * graphics diagnosis for an unrelated bug.
+ */
+async function presentRendererFailureDiagnostics(error: unknown): Promise<void> {
+  try {
+    const [{ webGpuDiagnosticsFromError }, { presentWebGpuDiagnostics }] = await Promise.all([
+      import('./rendering/webgpu-adapter-diagnostics'),
+      import('./rendering/webgpu-diagnostics-screen'),
+    ]);
+    const report = webGpuDiagnosticsFromError(error);
+    if (report) presentWebGpuDiagnostics(report, document);
+  } catch {
+    // The screen already shows the real failure; never let the explanation of
+    // it become a second failure.
+  }
+}
+
 async function loadLatestBuild(): Promise<void> {
   document.title = 'Nuke Town — Browser Arena FPS';
   app.replaceChildren();
-  await import('./main');
+  try {
+    await import('./main');
+  } catch (error) {
+    await presentRendererFailureDiagnostics(error);
+    // Rethrown unchanged: the existing failure reporting, logging and QA
+    // signals all key off this rejection.
+    throw error;
+  }
 }
 
 function openStableBuild(): void {
@@ -45,7 +110,7 @@ function showReleaseChooser(): void {
             <span>${latestDescription}</span>
           </button>
           <button type="button" class="release-channel-option" data-release-choice="stable">
-            <small>${stableFallback.pass} · STABLE WEBGL</small>
+            <small>${stableFallback.pass} · SAFE BACKUP</small>
             <strong>${stableFallback.label}</strong>
             <span>${stableFallback.description}</span>
           </button>

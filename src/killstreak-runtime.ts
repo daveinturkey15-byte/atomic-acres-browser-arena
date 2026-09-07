@@ -1,6 +1,5 @@
 import {
   PASS65_KILLSTREAK_CATALOG,
-  rewardForCarePackageUnit,
   type KillstreakCatalog,
   type Pass65KillstreakId,
 } from './killstreak-catalog';
@@ -26,6 +25,23 @@ import {
   supportAircraftRootClearance,
   type SupportAircraftCollisionEnvelope,
 } from './support-aircraft-collision';
+import {
+  CHOPPER_AUTOPILOT_MISSILE_ARM_DELAY_MS,
+  CHOPPER_AUTOPILOT_MISSILE_BUDGET,
+  CHOPPER_AUTOPILOT_MISSILE_CADENCE_MS,
+  CHOPPER_AUTOPILOT_MISSILE_RANGE_M,
+  CHOPPER_MISSILE_CAPACITY_AFTER,
+  PILOTED_DRONE_TASER_CHARGES,
+  PILOTED_DRONE_TASER_RANGE_M,
+  TASER_STUN_DURATION_MS,
+} from './killstreak-tuning';
+import { admitTaserShot, selectAutoTaserTarget, type TaserChargeState } from './taser-stun';
+import {
+  rollCarePackageReward,
+  downgradeCarePackageWeaponReward,
+  type CarePackageReward,
+  type CarePackageWeaponRewardId,
+} from './care-package-weapon-reward';
 
 export const ADRENALINE_DURATION_MS = 15_000;
 export const ADRENALINE_DAMAGE_MULTIPLIER = 1.1;
@@ -33,12 +49,31 @@ export const ADRENALINE_MOVEMENT_MULTIPLIER = 1.1;
 export const ADRENALINE_RELOAD_DURATION_MULTIPLIER = 0.9;
 export const CHOPPER_DURATION_MS = 30_000;
 export const CHOPPER_HEALTH = 800;
-/** One finite operator payload per Chopper activation; the 30 mm cannon remains belt-fed. */
-export const CHOPPER_MISSILE_CAPACITY = 6;
+/**
+ * One finite operator payload per Chopper activation; the 30 mm cannon remains
+ * belt-fed. HF-458 doubled it 6 -> 12 and split it: the autopilot may spend at
+ * most CHOPPER_AUTOPILOT_MISSILE_BUDGET of the twelve, so a human who takes
+ * the gun always has the remainder (all twelve, if they take it immediately).
+ */
+export const CHOPPER_MISSILE_CAPACITY = CHOPPER_MISSILE_CAPACITY_AFTER;
+export { CHOPPER_AUTOPILOT_MISSILE_BUDGET } from './killstreak-tuning';
 export const CHOPPER_MISSILE_CADENCE_MS = 1_000;
 export const CHOPPER_MISSILE_FLIGHT_MS = 780;
+// HF-335: alternating wing sockets the missiles launch from, in the chopper's
+// local YXZ frame. Presentation-only; the authoritative impact point is and
+// remains the ground-target vector.
+export const CHOPPER_MISSILE_SOCKET_LOCAL_M: SupportVec3 = [-1.15, -0.45, -0.6];
 export const CHOPPER_MISSILE_MAX_RANGE_M = 120;
 export const CHOPPER_MISSILE_BLAST_RADIUS_M = 4.5;
+/**
+ * Owner 2026-08-30 ("the normal gun previously had splash damage and a good
+ * radius so you could actually hit people"): possessed autocannon shells now
+ * BURST where they land. A clean centre-ray hit still deals the full profile
+ * damage; a near-miss chips everyone inside the burst radius instead of
+ * evaporating. AI-controlled choppers keep their target-locked fire.
+ */
+export const CHOPPER_GUN_SPLASH_RADIUS_M = 2.6;
+export const CHOPPER_GUN_SPLASH_MAX_DAMAGE = 16;
 export const CHOPPER_MISSILE_MAX_DAMAGE = 240;
 export const PILOTED_DRONE_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.piloted.lifetimeMs;
 export const DRONE_SWARM_DURATION_MS = DRONE_SUPPORT_DEFINITIONS.swarm.lifetimeMs;
@@ -57,6 +92,17 @@ export const CARPET_BOMBER_PREVIOUS_MAX_DAMAGE = 80;
 export const CARPET_BOMBER_DAMAGE_MULTIPLIER = 3;
 export const CARPET_BOMBER_MAX_DAMAGE = CARPET_BOMBER_PREVIOUS_MAX_DAMAGE * CARPET_BOMBER_DAMAGE_MULTIPLIER;
 export const CARPET_BOMBER_RESIDUAL_FIRE_DURATION_MS = 5_000;
+/**
+ * HF-317 (owner: "carpet bomb is still like carepackage not tri pass as
+ * requested? fix it" — reaffirmed twice): the run length now follows the
+ * owner's two-point tactical-map corridor. A facing magnitude at or below the
+ * hint threshold keeps the historical fixed-length run for legacy peers.
+ */
+export const CARPET_BOMBER_DEFAULT_RUN_LENGTH_M = 34;
+export const CARPET_BOMBER_MIN_RUN_LENGTH_M = 20;
+export const CARPET_BOMBER_MAX_RUN_LENGTH_M = 60;
+/** Facing vectors at or below this magnitude remain heading-only hints. */
+export const CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE = 1.5;
 export const CARPET_BOMBER_ROUTE_CLEARANCE_M = 0.05;
 const CARPET_BOMBER_ROUTE_ADMISSION_EPSILON_M = 0.002;
 const CARPET_BOMBER_ROUTE_HEADING_OFFSETS = Object.freeze([
@@ -197,6 +243,9 @@ export type KillstreakImpactEvent = Readonly<{
   position: SupportVec3;
   impactAtMs: number;
   atMs: number;
+  // HF-335: optional 3D launch origin for the drop-phase presentation. Older
+  // peers omit it and fall back to the vertical-drop behaviour.
+  launchPosition?: SupportVec3;
 }>;
 
 type ActorAuthorityState = {
@@ -257,12 +306,19 @@ type ChopperEntity = EntityBase & {
   pendingPlayerFire: boolean;
   pendingPlayerMissile: Readonly<{ aimYaw: number; aimPitch: number }> | null;
   missilesRemaining: number;
+  /** HF-458: how many of the shared payload the AUTOPILOT has spent. */
+  aiMissilesFired: number;
+  /** HF-458: the autopilot's own launch clock, independent of the pilot's. */
+  nextAiMissileAtMs: number;
   nextMissileAtMs: number;
   nextMissileOrdinal: number;
   pendingMissiles: Array<Readonly<{
     ordinal: number;
     position: SupportVec3;
     impactAtMs: number;
+    // HF-335: presentation-only 3D launch origin, forwarded on drop/impact
+    // events for the true-vector flight replay.
+    launchPosition: SupportVec3;
   }>>;
 };
 
@@ -283,6 +339,10 @@ type DroneEntity = EntityBase & {
   strafe: number;
   vertical: number;
   pendingPlayerFire: boolean;
+  /** HF-458 item 3: right-click taser request from the pilot (edge, not held). */
+  pendingPlayerTaser: boolean;
+  /** HF-458 item 3: three charges per drone, shared by pilot and autopilot. */
+  taser: TaserChargeState;
   gunProfileId: DroneGunProfileId;
   nextSensorRefreshAtMs: number;
   sensorContacts: DroneSensorContact[];
@@ -303,10 +363,18 @@ type CareCrateEntity = EntityBase & {
   descentStartPosition: [number, number, number];
   descentStartsAtMs: number;
   aircraftId: string;
-  reward: Pass65KillstreakId;
+  /** HF-334: killstreak from the pool, or the layered 10% flamethrower band. */
+  reward: CarePackageReward<Pass65KillstreakId>;
   rollUnit: number;
   captureActorId: string | null;
   captureStartedAtMs: number | null;
+  /**
+   * Hold duration decided ONCE at capture start from mode-aware hostility.
+   * Raw team equality was used before, which in FFA - where lobby teams still
+   * exist but everyone is hostile - gave other players the friendly 1250 ms
+   * tap/steal tier on crates they should have had to fight for.
+   */
+  captureRequiredMs: number | null;
 };
 
 export type HostSupportEntity = AircraftEntity | ChopperEntity | DroneEntity | CareCrateEntity;
@@ -373,7 +441,15 @@ export type KillstreakActivationIntent = Readonly<{
   activationId: string;
   expectedId: Pass65KillstreakId;
   anchor?: SupportVec3;
-  /** Horizontal owner-facing hint used only for bounded support ingress choreography. */
+  /**
+   * Horizontal direction hint for bounded support ingress choreography. For
+   * Carpet Bomber (HF-317) the vector is corridor-native: its direction is the
+   * requested run heading and a magnitude above
+   * CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE is the requested run length in
+   * metres, host-clamped to [CARPET_BOMBER_MIN_RUN_LENGTH_M,
+   * CARPET_BOMBER_MAX_RUN_LENGTH_M]. Magnitudes at or below the threshold stay
+   * heading-only hints with the CARPET_BOMBER_DEFAULT_RUN_LENGTH_M run.
+   */
   facing?: SupportVec3;
 }>;
 
@@ -392,6 +468,8 @@ export type KillstreakControlIntent = Readonly<{
   fire?: boolean;
   /** Edge-triggered RMB request. It is never interpreted as a held fire state. */
   missileFire?: boolean;
+  /** HF-458 item 3: Piloted Drone right-click taser (edge request). */
+  taserFire?: boolean;
 }>;
 
 export type KillstreakAdmission = Readonly<{
@@ -423,11 +501,61 @@ export type CareCaptureAdmissionReason =
   | 'actor-already-capturing'
   | 'capture-admission-failed';
 
+/**
+ * HF-334: host-only outcome of a completed care capture whose crate carried
+ * the layered flamethrower band. The grant deliberately bypasses careRewards
+ * (and the killstreak recipient protocol, which validates catalog ids only) —
+ * the host applies it through the timed-map-weapon authority channel instead.
+ */
+export type CareWeaponGrantEvent = Readonly<{
+  activationId: string;
+  crateId: string;
+  actorId: string;
+  /** Capturing actor's life at grant time; the host drops stale grants. */
+  lifeId: number;
+  weaponId: CarePackageWeaponRewardId;
+  atMs: number;
+}>;
+
+/**
+ * HF-334: narrow host-injected admissibility port. The flamethrower band is
+ * only open while the host can actually honor a grant (authority not held, no
+ * other pending grant). Absent port = fail-closed: the roll reproduces the
+ * original pool distribution exactly, so no capture can strand a reward.
+ */
+export type CarePackageWeaponGrantPort = Readonly<{
+  isFlamethrowerGrantAdmissible: () => boolean;
+}>;
+
 export type KillstreakAdvanceResult = Readonly<{
   damageEvents: readonly KillstreakDamageEvent[];
   shotEvents: readonly KillstreakSupportShotEvent[];
   impactEvents: readonly KillstreakImpactEvent[];
   expiredEntityIds: readonly string[];
+  /** HF-334: weapon grants completed by enemy-hold captures this host step. */
+  careWeaponGrantEvents: readonly CareWeaponGrantEvent[];
+  /** HF-458: Piloted Drone taser hits the host admitted this step. */
+  taserStunEvents: readonly KillstreakTaserStunEvent[];
+}>;
+
+/**
+ * HF-458: one admitted taser hit. The host turns each of these into a
+ * `TaserHostAuthority` result and replicates it exactly like a flashbang, so
+ * the stun a victim sees is always host-authored.
+ */
+export type KillstreakTaserStunEvent = Readonly<{
+  activationId: string;
+  entityId: string;
+  ownerId: string;
+  targetId: string;
+  targetKind: 'player' | 'bot';
+  targetLifeId: number;
+  position: SupportVec3;
+  durationMs: number;
+  /** False when the drone fired it on autopilot. */
+  pilotFired: boolean;
+  chargesRemaining: number;
+  atMs: number;
 }>;
 
 export type KillstreakActorSnapshot = Readonly<{
@@ -463,6 +591,8 @@ export type KillstreakEntitySnapshot = Readonly<{
   gunController: 'ai' | 'owner-player' | null;
   missileAmmo: number | null;
   missileCooldownMs: number | null;
+  /** HF-458: remaining taser charges; null for every non-piloted-drone entity. */
+  taserCharges: number | null;
   captureActorId: string | null;
   captureProgress: number | null;
   revealedReward: Pass65KillstreakId | null;
@@ -560,7 +690,7 @@ function isKillstreakActorCheckpoint(value: unknown): value is KillstreakActorCh
   const earned = value.earned as unknown[];
   if (earned.length > loadout.slots.length || !earned.every(isCheckpointKillstreakId)
     || new Set(earned).size !== earned.length
-    || earned.some((id) => !loadout.slots.includes(id as Pass65KillstreakId))) return false;
+    || earned.some((id) => !(loadout.slots as readonly string[]).includes(String(id)))) return false;
   const expectedEarned = loadout.slots.filter((id) => (
     (exactDefinition(id, PASS65_KILLSTREAK_CATALOG)?.cost ?? Number.POSITIVE_INFINITY) <= Number(value.cycleProgress)
   ));
@@ -570,7 +700,7 @@ function isKillstreakActorCheckpoint(value: unknown): value is KillstreakActorCh
   const chargeIds: Pass65KillstreakId[] = [];
   for (const charge of charges) {
     if (!isCheckpointRecord(charge) || !hasCheckpointKeys(charge, ['id', 'count'])
-      || !isCheckpointKillstreakId(charge.id) || !loadout.slots.includes(charge.id)
+      || !isCheckpointKillstreakId(charge.id) || !(loadout.slots as readonly string[]).includes(String(charge.id))
       || !isCheckpointInteger(charge.count, 1, MAX_RETAINED_KILLSTREAK_CHARGES_PER_REWARD)) return false;
     chargeIds.push(charge.id);
   }
@@ -629,6 +759,21 @@ function unit(seed: number, salt: number): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
+}
+
+/**
+ * HF-404: yaw is periodic; pitch is not. Aim yaw arrives from a first-person
+ * camera whose yaw is an unbounded accumulator, so clamping it to [-pi, pi]
+ * pinned the turret at the clamp boundary the moment the gunner swept past a
+ * half turn of accumulated yaw — the damage ray stopped following the
+ * crosshair entirely while the cockpit camera kept rotating. Wrapping is the
+ * only correct normalisation: 7.5 rad and 7.5 - 2*pi are the same heading.
+ * Pitch stays clamped because its limits are a real mechanical stop.
+ */
+function wrapAngle(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const wrapped = value - Math.PI * 2 * Math.floor((value + Math.PI) / (Math.PI * 2));
+  return wrapped <= -Math.PI ? wrapped + Math.PI * 2 : wrapped;
 }
 
 function finiteTuple(value: SupportVec3 | undefined): value is SupportVec3 {
@@ -1085,11 +1230,31 @@ export class HostKillstreakRuntime {
   private lastAdvancedAtMs = 0;
   private readonly hostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
   private readonly sortedHostileTargetCache = new Map<string, readonly KillstreakTarget[]>();
+  /** HF-334: host-injected grant-admissibility port; null = band closed. */
+  private readonly carePackageWeaponGrantPort: CarePackageWeaponGrantPort | null;
 
-  constructor(matchEpoch: number, catalog: KillstreakCatalog<string> = PASS65_KILLSTREAK_CATALOG) {
+  constructor(
+    matchEpoch: number,
+    catalog: KillstreakCatalog<string> = PASS65_KILLSTREAK_CATALOG,
+    carePackageWeaponGrantPort: CarePackageWeaponGrantPort | null = null,
+  ) {
     if (!Number.isSafeInteger(matchEpoch) || matchEpoch < 0) throw new Error('match epoch must be a non-negative safe integer');
     this.matchEpoch = matchEpoch;
     this.catalog = catalog;
+    this.carePackageWeaponGrantPort = carePackageWeaponGrantPort;
+  }
+
+  /**
+   * HF-334: the flamethrower band is open only while the injected host port
+   * reports the grant honorable AND no already-rolled crate is still carrying
+   * one (prevents two flamethrowers under the single-instance authority).
+   */
+  private isFlamethrowerRollAdmissible(): boolean {
+    if (this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() !== true) return false;
+    for (const entity of this.entities.values()) {
+      if (entity.kind === 'care-crate' && entity.reward.kind === 'timed-map-weapon') return false;
+    }
+    return true;
   }
 
   registerActor(actorId: string, team: 0 | 1, lifeId: number, loadout: KillstreakLoadoutV1): void {
@@ -1498,8 +1663,14 @@ export class HostKillstreakRuntime {
       actor.adrenalineUntilMs = nowMs + ADRENALINE_DURATION_MS;
       this.timedActivations.set(activationId, { activationId, ownerId: actor.actorId, id: actualId, expiresAtMs: actor.adrenalineUntilMs });
     } else if (actualId === 'care-package') {
-      const rollUnit = seed % this.catalog.carePackagePool.totalWeightUnits;
-      const reward = rewardForCarePackageUnit(this.catalog, rollUnit) as Pass65KillstreakId;
+      // HF-334: the layered roll opens a fixed 10% flamethrower band over the
+      // pool when the host grant path is admissible; otherwise it reproduces
+      // the original pool distribution exactly (fail-closed, no new authority).
+      const roll = rollCarePackageReward(this.catalog, seed, {
+        flamethrowerAdmissible: this.isFlamethrowerRollAdmissible(),
+      });
+      const reward = roll.reward as CarePackageReward<Pass65KillstreakId>;
+      const rollUnit = roll.rollUnit;
       const id = this.nextEntityId('care');
       const aircraftId = this.nextEntityId('care-aircraft');
       const top = Math.min(world.bounds.ceilingY - 1, Math.max(world.bounds.floorY + 12, world.bounds.floorY + 24));
@@ -1535,7 +1706,7 @@ export class HostKillstreakRuntime {
         position: [...routeStart], velocity: [0, 0, 0], attitude: [0, 0, 0], health: 100, revision: 0,
         kind: 'care-crate', phase: 'inbound', dropPosition: [anchor[0], anchor[1] + 0.45, anchor[2]],
         descentStartPosition, descentStartsAtMs: nowMs + CARE_AIRCRAFT_DROP_DELAY_MS, aircraftId,
-        reward, rollUnit, captureActorId: null, captureStartedAtMs: null,
+        reward, rollUnit, captureActorId: null, captureStartedAtMs: null, captureRequiredMs: null,
       });
       entityIds.push(id, aircraftId);
     } else if (actualId === 'carpet-bomber') {
@@ -1573,6 +1744,12 @@ export class HostKillstreakRuntime {
         kind: 'chopper', phase: 'inbound', seed, routeCentre: centre, gunController: 'ai',
         nextShotAtMs: nowMs + 600, nextShotOrdinal: 0, aimYaw: 0, aimPitch: 0, pendingPlayerFire: false,
         pendingPlayerMissile: null, missilesRemaining: CHOPPER_MISSILE_CAPACITY,
+        aiMissilesFired: 0,
+        // The autopilot arms only once the airframe is on station; a launch
+        // from the inbound phase reads as a scripted cutscene, not support.
+        // It is a SEPARATE clock from nextMissileAtMs so a human who takes the
+        // gun on frame one is not made to wait out the autopilot's arm delay.
+        nextAiMissileAtMs: nowMs + CHOPPER_AUTOPILOT_MISSILE_ARM_DELAY_MS,
         nextMissileAtMs: nowMs, nextMissileOrdinal: 0, pendingMissiles: [],
       };
       const pose = chopperRoutePose(seed, nowMs, nowMs, centre, world.bounds);
@@ -1592,6 +1769,8 @@ export class HostKillstreakRuntime {
         magazine: DRONE_MAGAZINE_SIZE, reserveClips: PILOTED_DRONE_RESERVE_CLIPS,
         reloadCompletesAtMs: null, nextShotAtMs: nowMs, nextShotOrdinal: 0, targetId: null,
         yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
+        pendingPlayerTaser: false,
+        taser: Object.freeze({ charges: PILOTED_DRONE_TASER_CHARGES, nextTaserAtMs: nowMs }),
         gunProfileId: DRONE_SUPPORT_DEFINITIONS.piloted.gunProfileId,
         nextSensorRefreshAtMs: nowMs,
         sensorContacts: [],
@@ -1636,6 +1815,10 @@ export class HostKillstreakRuntime {
           magazine: DRONE_MAGAZINE_SIZE, reserveClips: null,
           reloadCompletesAtMs: null, nextShotAtMs: nowMs + 500 + index * 35, nextShotOrdinal: 0, targetId: null,
           yaw: 0, pitch: 0, thrust: 0, strafe: 0, vertical: 0, pendingPlayerFire: false,
+          // HF-458 gave the taser to the Piloted Drone only; a 24-unit swarm
+          // with 72 stun charges is a different feature nobody asked for.
+          pendingPlayerTaser: false,
+          taser: Object.freeze({ charges: 0, nextTaserAtMs: nowMs }),
           gunProfileId: DRONE_SUPPORT_DEFINITIONS.swarm.gunProfileId,
           nextSensorRefreshAtMs: Number.POSITIVE_INFINITY,
           sensorContacts: [],
@@ -1726,8 +1909,16 @@ export class HostKillstreakRuntime {
       anchor[1],
       clamp(anchor[2], impactMinZ, impactMaxZ),
     ] as const);
+    // HF-317: a corridor-native intent encodes the requested run length as the
+    // facing magnitude (end - start, unnormalized). The host clamps it so no
+    // peer can force a degenerate or overlong corridor; hint-only magnitudes
+    // keep the historical fixed-length run.
+    const runLengthM = Number.isFinite(requestedLength)
+      && requestedLength > CARPET_BOMBER_CORRIDOR_INTENT_MIN_MAGNITUDE
+      ? clamp(requestedLength, CARPET_BOMBER_MIN_RUN_LENGTH_M, CARPET_BOMBER_MAX_RUN_LENGTH_M)
+      : CARPET_BOMBER_DEFAULT_RUN_LENGTH_M;
     const impacts = Object.freeze(Array.from({ length: CARPET_BOMBER_IMPACT_COUNT }, (_, index) => {
-      const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * 34;
+      const along = (index / (CARPET_BOMBER_IMPACT_COUNT - 1) - 0.5) * runLengthM;
       const zigzag = (index % 2 === 0 ? -1 : 1) * (3.4 + unit(seed, index + 2) * 2.2);
       const deltaX = forward[0] * along + side[0] * zigzag;
       const deltaZ = forward[1] * along + side[1] * zigzag;
@@ -1862,6 +2053,7 @@ export class HostKillstreakRuntime {
       if (entity.kind !== 'drone' || entity.mode !== 'piloted') return reject('wrong-entity-kind');
       if (actor.possession?.kind === 'piloted-drone' && actor.possession.entityId === entity.id) {
         entity.pendingPlayerFire = false;
+        entity.pendingPlayerTaser = false;
         entity.thrust = 0;
         entity.strafe = 0;
         entity.vertical = 0;
@@ -1883,6 +2075,7 @@ export class HostKillstreakRuntime {
     } else if (intent.action === 'exit-piloted-drone') {
       if (entity.kind !== 'drone' || entity.mode !== 'piloted') return reject('wrong-entity-kind');
       entity.pendingPlayerFire = false;
+      entity.pendingPlayerTaser = false;
       entity.thrust = 0;
       entity.strafe = 0;
       entity.vertical = 0;
@@ -1892,12 +2085,14 @@ export class HostKillstreakRuntime {
       this.restoreActorControl(actor, false);
     } else {
       if (![intent.yawQ, intent.pitchQ, intent.thrustQ, intent.strafeQ, intent.verticalQ].every((value) => value === undefined || Number.isFinite(value))
-        || (intent.missileFire !== undefined && typeof intent.missileFire !== 'boolean')) {
+        || (intent.missileFire !== undefined && typeof intent.missileFire !== 'boolean')
+        || (intent.taserFire !== undefined && typeof intent.taserFire !== 'boolean')) {
         return reject('invalid-control-value');
       }
       if (entity.kind === 'chopper') {
         if (entity.gunController === 'ai' || entity.gunController.actorId !== actor.actorId || entity.gunController.lifeId !== actor.lifeId) return reject('not-gun-controller');
-        entity.aimYaw = clamp(intent.yawQ ?? entity.aimYaw, -Math.PI, Math.PI);
+        if (intent.taserFire === true) return reject('taser-unavailable');
+        entity.aimYaw = wrapAngle(intent.yawQ ?? entity.aimYaw);
         entity.aimPitch = clamp(intent.pitchQ ?? entity.aimPitch, -1.2, 0.5);
         // Fire is a held-state intent. Assignment (rather than OR-latching)
         // makes release authoritative and lets the host apply the slow cadence.
@@ -1915,12 +2110,18 @@ export class HostKillstreakRuntime {
       } else if (entity.kind === 'drone' && entity.mode === 'piloted') {
         if (intent.missileFire === true) return reject('missile-unavailable');
         if (actor.possession?.kind !== 'piloted-drone' || actor.possession.entityId !== entity.id) return reject('not-drone-controller');
-        entity.yaw = clamp(intent.yawQ ?? entity.yaw, -Math.PI, Math.PI);
+        entity.yaw = wrapAngle(intent.yawQ ?? entity.yaw);
         entity.pitch = clamp(intent.pitchQ ?? entity.pitch, -1.2, 1.2);
         entity.thrust = clamp(intent.thrustQ ?? entity.thrust, -1, 1);
         entity.strafe = clamp(intent.strafeQ ?? entity.strafe, -1, 1);
         entity.vertical = clamp(intent.verticalQ ?? entity.vertical, -1, 1);
         entity.pendingPlayerFire = intent.fire === true;
+        // HF-458: an edge request, never a held latch - repeated RMB packets
+        // during the taser cooldown are accepted as control updates but never
+        // queued for a later automatic discharge (same rule as chopper RMB).
+        if (intent.taserFire === true
+          && entity.taser.charges > 0
+          && nowMs >= entity.taser.nextTaserAtMs) entity.pendingPlayerTaser = true;
         entity.nextSensorRefreshAtMs = Math.min(entity.nextSensorRefreshAtMs, nowMs);
       } else return reject('wrong-entity-kind');
       entity.revision += 1;
@@ -1943,6 +2144,7 @@ export class HostKillstreakRuntime {
       const drone = this.entities.get(possession.entityId);
       if (drone?.kind === 'drone') {
         drone.pendingPlayerFire = false;
+        drone.pendingPlayerTaser = false;
         drone.thrust = 0;
         drone.strafe = 0;
         drone.vertical = 0;
@@ -1957,12 +2159,20 @@ export class HostKillstreakRuntime {
   beginCareCapture(actorId: string, lifeId: number, crateId: string, nowMs: number, world: KillstreakWorld): Readonly<{
     accepted: boolean;
     reason: CareCaptureAdmissionReason;
+    /** HF-334: present only when a tap capture transferred a weapon grant. */
+    weaponGrant?: CareWeaponGrantEvent;
   }> {
     const actor = this.actors.get(actorId);
     const entity = this.entities.get(crateId);
     if (!actor || actor.lifeId !== lifeId) return Object.freeze({ accepted: false, reason: 'identity-mismatch' });
     if (!Number.isFinite(nowMs)) return Object.freeze({ accepted: false, reason: 'invalid-time' });
-    if (actor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
+    // HF-334: a weapon grant bypasses careRewards entirely, so its capacity
+    // gate only applies when the transfer would actually enter that queue
+    // (killstreak reward, or a weapon reward downgrading on a closed port).
+    const grantPortOpen = this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() === true;
+    const entersCareRewards = !(entity?.kind === 'care-crate'
+      && entity.reward.kind === 'timed-map-weapon' && grantPortOpen);
+    if (entersCareRewards && actor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
       return Object.freeze({ accepted: false, reason: 'reward-capacity' });
     }
     if (!entity || entity.kind !== 'care-crate' || entity.phase !== 'landed') return Object.freeze({ accepted: false, reason: 'crate-unavailable' });
@@ -1977,9 +2187,43 @@ export class HostKillstreakRuntime {
     // Owner/team pickup is a tap interaction: once the host has admitted the
     // prompt's range and LOS contract, the reward transfers immediately and
     // exactly once. Enemy theft retains the longer continuous-hold lifecycle
-    // below.
-    if (actor.team === entity.team) {
-      actor.careRewards.push(entity.reward);
+    // below. "Team" here must be MODE-AWARE: in FFA every other actor is
+    // hostile no matter what lobby team they carry, so friendliness defers to
+    // the same world.areHostile the targeting paths already use, falling back
+    // to raw team equality only when the world does not supply one.
+    const friendlyToCrate = world.areHostile
+      ? !world.areHostile(entity.ownerId, entity.team, {
+        id: actor.actorId,
+        kind: 'player',
+        team: actor.team,
+        lifeId: actor.lifeId,
+        alive: true,
+        // Hostility is an identity/team decision; position is unused by every
+        // installed areHostile and supplied only to satisfy the target shape.
+        position: [0, 0, 0],
+      })
+      : actor.team === entity.team;
+    if (friendlyToCrate) {
+      if (entity.reward.kind === 'timed-map-weapon' && grantPortOpen) {
+        // HF-334: the weapon grant surfaces on the admission result; the host
+        // applies it through the timed-map-weapon authority, never careRewards.
+        const weaponGrant: CareWeaponGrantEvent = Object.freeze({
+          activationId: entity.activationId,
+          crateId: entity.id,
+          actorId: actor.actorId,
+          lifeId: actor.lifeId,
+          weaponId: entity.reward.weaponId,
+          atMs: nowMs,
+        });
+        this.entities.delete(entity.id);
+        this.revision += 1;
+        return Object.freeze({ accepted: true, reason: 'accepted', weaponGrant });
+      }
+      // HF-334: a weapon reward whose grant became inadmissible between roll
+      // and capture downgrades deterministically so no capture drops a reward.
+      actor.careRewards.push(entity.reward.kind === 'killstreak'
+        ? entity.reward.id
+        : downgradeCarePackageWeaponReward(this.catalog, entity.rollUnit) as Pass65KillstreakId);
       this.entities.delete(entity.id);
       this.revision += 1;
       return Object.freeze({ accepted: true, reason: 'accepted' });
@@ -1987,6 +2231,7 @@ export class HostKillstreakRuntime {
     entity.phase = 'capturing';
     entity.captureActorId = actorId;
     entity.captureStartedAtMs = nowMs;
+    entity.captureRequiredMs = friendlyToCrate ? 1_250 : 2_500;
     entity.revision += 1;
     this.revision += 1;
     return Object.freeze({ accepted: true, reason: 'accepted' });
@@ -2028,9 +2273,11 @@ export class HostKillstreakRuntime {
   advance(nowMs: number, world: KillstreakWorld): KillstreakAdvanceResult {
     if (!Number.isFinite(nowMs)) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]), taserStunEvents: Object.freeze([]),
     });
     if (this.lastAdvancedAtMs !== 0 && nowMs < this.lastAdvancedAtMs) return Object.freeze({
       damageEvents: Object.freeze([]), shotEvents: Object.freeze([]), impactEvents: Object.freeze([]), expiredEntityIds: Object.freeze([]),
+      careWeaponGrantEvents: Object.freeze([]), taserStunEvents: Object.freeze([]),
     });
     const canonicalNowMs = Math.max(this.lastAdvancedAtMs, nowMs);
     const previousAt = this.lastAdvancedAtMs === 0 ? canonicalNowMs : this.lastAdvancedAtMs;
@@ -2041,6 +2288,8 @@ export class HostKillstreakRuntime {
     const shotEvents: KillstreakSupportShotEvent[] = [];
     const impactEvents: KillstreakImpactEvent[] = [];
     const expiredEntityIds: string[] = [];
+    const careWeaponGrantEvents: CareWeaponGrantEvent[] = [];
+    const taserStunEvents: KillstreakTaserStunEvent[] = [];
     // One host step may advance all 24 swarm drones for the same owner. Build
     // and sort that owner's hostile set once instead of allocating it again
     // for every target lookup, sensor scan and area-damage query.
@@ -2143,9 +2392,9 @@ export class HostKillstreakRuntime {
       }
       if (entity.kind === 'aircraft') {
         if (entity.variant !== 'carpet') this.advanceAircraft(entity, canonicalNowMs, dt, world);
-      } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world);
+      } else if (entity.kind === 'care-crate') this.advanceCareCrate(entity, canonicalNowMs, dt, world, careWeaponGrantEvents);
       else if (entity.kind === 'chopper') this.advanceChopper(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, impactEvents);
-      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents);
+      else this.advanceDrone(entity, canonicalNowMs, dt, world, damageEvents, shotEvents, taserStunEvents);
     }
     this.enforceSwarmSeparation(dt, world);
     // Recipient admission is keyed by this aggregate revision. Every mutable
@@ -2157,6 +2406,8 @@ export class HostKillstreakRuntime {
       shotEvents: Object.freeze(shotEvents),
       impactEvents: Object.freeze(impactEvents),
       expiredEntityIds: Object.freeze(expiredEntityIds),
+      careWeaponGrantEvents: Object.freeze(careWeaponGrantEvents),
+      taserStunEvents: Object.freeze(taserStunEvents),
     });
   }
 
@@ -2190,7 +2441,13 @@ export class HostKillstreakRuntime {
     entity.revision += 1;
   }
 
-  private advanceCareCrate(entity: CareCrateEntity, nowMs: number, dt: number, world: KillstreakWorld): void {
+  private advanceCareCrate(
+    entity: CareCrateEntity,
+    nowMs: number,
+    dt: number,
+    world: KillstreakWorld,
+    careWeaponGrantEvents: CareWeaponGrantEvent[],
+  ): void {
     const previous: SupportVec3 = [...entity.position];
     if (nowMs < entity.descentStartsAtMs) {
       entity.phase = 'inbound';
@@ -2230,8 +2487,24 @@ export class HostKillstreakRuntime {
       this.revision += 1;
       return;
     }
-    const requiredMs = captureActor.team === entity.team ? 1_250 : 2_500;
+    const requiredMs = entity.captureRequiredMs ?? (captureActor.team === entity.team ? 1_250 : 2_500);
     if (nowMs - entity.captureStartedAtMs < requiredMs) return;
+    if (entity.reward.kind === 'timed-map-weapon'
+      && this.carePackageWeaponGrantPort?.isFlamethrowerGrantAdmissible() === true) {
+      // HF-334: a completed hold on a weapon crate surfaces a grant event this
+      // host step; it bypasses careRewards and its capacity gate entirely.
+      careWeaponGrantEvents.push(Object.freeze({
+        activationId: entity.activationId,
+        crateId: entity.id,
+        actorId: captureActor.actorId,
+        lifeId: captureActor.lifeId,
+        weaponId: entity.reward.weaponId,
+        atMs: nowMs,
+      }));
+      this.entities.delete(entity.id);
+      this.revision += 1;
+      return;
+    }
     if (captureActor.careRewards.length >= MAX_RETAINED_CARE_REWARDS) {
       entity.phase = 'landed';
       entity.captureActorId = null;
@@ -2240,7 +2513,11 @@ export class HostKillstreakRuntime {
       this.revision += 1;
       return;
     }
-    captureActor.careRewards.push(entity.reward);
+    // HF-334: weapon rewards reaching this line downgrade deterministically
+    // (grant became inadmissible mid-hold) so the capture never drops a reward.
+    captureActor.careRewards.push(entity.reward.kind === 'killstreak'
+      ? entity.reward.id
+      : downgradeCarePackageWeaponReward(this.catalog, entity.rollUnit) as Pass65KillstreakId);
     this.entities.delete(entity.id);
     this.revision += 1;
   }
@@ -2291,6 +2568,9 @@ export class HostKillstreakRuntime {
           ordinal: missile.ordinal,
           phase: 'impact',
           position: missile.position,
+          // HF-335: forward the launch origin so guests can replay the true
+          // 3D flight vector. Absent on older peers (fail-open vertical drop).
+          launchPosition: missile.launchPosition,
           impactAtMs: missile.impactAtMs,
           atMs: missile.impactAtMs,
         }));
@@ -2307,6 +2587,57 @@ export class HostKillstreakRuntime {
         );
       }
       entity.pendingMissiles = pending;
+    }
+
+    // HF-458 item 1, owner: "ensure it is also using those rockets". Before
+    // this the autopilot NEVER launched - `pendingPlayerMissile` is only ever
+    // set by a possessing human - so the whole payload was dead weight on an
+    // unpossessed Chopper. The autopilot now spends up to
+    // CHOPPER_AUTOPILOT_MISSILE_BUDGET of the twelve at a slow cadence and only
+    // against a hostile it can actually see, leaving the remainder for a human.
+    if (entity.gunController === 'ai'
+      && entity.missilesRemaining > 0
+      && entity.aiMissilesFired < CHOPPER_AUTOPILOT_MISSILE_BUDGET
+      && nowMs >= entity.nextAiMissileAtMs
+      && impactEvents.length < MAX_SUPPORT_IMPACT_EVENTS_PER_STEP) {
+      const missileTarget = this.nearestVisibleTarget(firingPosition, owner.actorId, owner.team, world);
+      const targetRange = missileTarget ? distance(firingPosition, missileTarget.position) : Number.POSITIVE_INFINITY;
+      if (missileTarget && targetRange <= CHOPPER_AUTOPILOT_MISSILE_RANGE_M) {
+        entity.missilesRemaining -= 1;
+        entity.aiMissilesFired += 1;
+        entity.nextAiMissileAtMs = nowMs + CHOPPER_AUTOPILOT_MISSILE_CADENCE_MS;
+        const ordinal = entity.nextMissileOrdinal;
+        entity.nextMissileOrdinal += 1;
+        // The autopilot aims at the ground under its target rather than at a
+        // camera ray it does not have; the blast radius does the rest.
+        const position: SupportVec3 = [
+          missileTarget.position[0],
+          supportGroundHeight(world, missileTarget.position[0], missileTarget.position[2]),
+          missileTarget.position[2],
+        ];
+        const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
+        const socketSide = ordinal % 2 === 0 ? 1 : -1;
+        const launchPosition = translatedSupportOffset(firingPosition, firingAttitude, [
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[0] * socketSide,
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[1],
+          CHOPPER_MISSILE_SOCKET_LOCAL_M[2],
+        ]);
+        entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs, launchPosition }));
+        impactEvents.push(Object.freeze({
+          activationId: entity.activationId,
+          source: 'chopper',
+          ordinal,
+          phase: 'drop',
+          position,
+          launchPosition,
+          impactAtMs,
+          atMs: nowMs,
+        }));
+        entity.revision += 1;
+      } else {
+        // Re-probe soon rather than burning the full cadence on an empty sky.
+        entity.nextAiMissileAtMs = nowMs + 250;
+      }
     }
 
     if (entity.pendingPlayerMissile !== null
@@ -2326,13 +2657,23 @@ export class HostKillstreakRuntime {
         world,
       );
       const impactAtMs = nowMs + CHOPPER_MISSILE_FLIGHT_MS;
-      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs }));
+      // HF-335: alternate between the two wing sockets so launches read as
+      // rail-fired rather than dropped from a single belly point.
+      const socketSide = ordinal % 2 === 0 ? 1 : -1;
+      const launchSocket: SupportVec3 = [
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[0] * socketSide,
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[1],
+        CHOPPER_MISSILE_SOCKET_LOCAL_M[2],
+      ];
+      const launchPosition = translatedSupportOffset(firingPosition, firingAttitude, launchSocket);
+      entity.pendingMissiles.push(Object.freeze({ ordinal, position, impactAtMs, launchPosition }));
       impactEvents.push(Object.freeze({
         activationId: entity.activationId,
         source: 'chopper',
         ordinal,
         phase: 'drop',
         position,
+        launchPosition,
         impactAtMs,
         atMs: nowMs,
       }));
@@ -2386,6 +2727,21 @@ export class HostKillstreakRuntime {
           hit.endpoint,
           ray.tracerOrigin,
         ));
+      } else {
+        // Owner 2026-08-30: shell burst on the surface the ray strikes - a
+        // near-miss suppresses and chips instead of doing nothing at all.
+        const burst = chopperMissileGroundTarget(firingPosition, firingAttitude, entity.aimYaw, entity.aimPitch, world);
+        this.damageAround(
+          owner,
+          entity.activationId,
+          'chopper',
+          burst,
+          CHOPPER_GUN_SPLASH_RADIUS_M,
+          CHOPPER_GUN_SPLASH_MAX_DAMAGE,
+          nowMs,
+          world,
+          damageEvents,
+        );
       }
     }
     entity.nextShotAtMs = nowMs + CHOPPER_GUN_PROFILE.cadenceMs;
@@ -2399,6 +2755,7 @@ export class HostKillstreakRuntime {
     world: KillstreakWorld,
     damageEvents: KillstreakDamageEvent[],
     shotEvents: KillstreakSupportShotEvent[],
+    taserStunEvents: KillstreakTaserStunEvent[],
   ): void {
     const owner = this.actors.get(entity.ownerId);
     if (!owner) return;
@@ -2408,6 +2765,7 @@ export class HostKillstreakRuntime {
       && owner.possession?.kind === 'piloted-drone'
       && owner.possession.entityId === entity.id;
     if (playerControlled) this.updatePilotedDroneSensor(entity, owner, nowMs, world);
+    this.resolveDroneTaser(entity, owner, playerControlled, nowMs, world, taserStunEvents);
     if (entity.phase === 'reloading') {
       if (entity.reloadCompletesAtMs !== null && nowMs >= entity.reloadCompletesAtMs) {
         if (entity.reserveClips === null || entity.reserveClips > 0) {
@@ -2527,7 +2885,7 @@ export class HostKillstreakRuntime {
             this.moveDroneToward(
               entity,
               [engagementPoint[0], Math.max(engagementPoint[1], minimumY), engagementPoint[2]],
-              8,
+              DRONE_DEPLOYMENT_POLICY.swarmEngagementApproachSpeedMps,
               1,
               dt,
               world,
@@ -2624,6 +2982,64 @@ export class HostKillstreakRuntime {
       }
     }
     entity.revision += 1;
+  }
+
+  /**
+   * HF-458 item 3. One admission for both firing modes: the pilot's right-click
+   * and the autopilot's automatic shot go through the same `admitTaserShot`
+   * charge/cooldown gate, so "3 charges per drone" cannot become three per
+   * mode. The swarm carries zero charges, so this returns immediately for it.
+   *
+   * Piloted: the pilot's own aim decides the victim (the same aimed cone the
+   * gun uses), because a stun that fires itself while a human is aiming is not
+   * a right-click weapon. Unpiloted: nearest hostile in taser range with LOS.
+   */
+  private resolveDroneTaser(
+    entity: DroneEntity,
+    owner: ActorAuthorityState,
+    playerControlled: boolean,
+    nowMs: number,
+    world: KillstreakWorld,
+    taserStunEvents: KillstreakTaserStunEvent[],
+  ): void {
+    if (entity.mode !== 'piloted') return;
+    const requested = playerControlled ? entity.pendingPlayerTaser : true;
+    entity.pendingPlayerTaser = false;
+    if (!requested || entity.taser.charges <= 0 || nowMs < entity.taser.nextTaserAtMs) return;
+    const target = playerControlled
+      ? this.aimedVisibleTarget(
+        entity.position,
+        entity.yaw,
+        entity.pitch,
+        owner.actorId,
+        owner.team,
+        world,
+        PILOTED_DRONE_TASER_RANGE_M,
+      )
+      : (selectAutoTaserTarget({
+        piloted: false,
+        origin: entity.position,
+        candidates: this.sortedHostileTargets(world, owner.actorId, owner.team),
+        hasLineOfSight: (from, to) => lineOfSight(world, from as SupportVec3, to as SupportVec3),
+        rangeM: PILOTED_DRONE_TASER_RANGE_M,
+      }) as KillstreakTarget | null);
+    const admission = admitTaserShot({ state: entity.taser, nowMs, hasTarget: target !== null });
+    if (!admission.accepted || !target) return;
+    entity.taser = admission.state;
+    entity.revision += 1;
+    taserStunEvents.push(Object.freeze({
+      activationId: entity.activationId,
+      entityId: entity.id,
+      ownerId: owner.actorId,
+      targetId: target.id,
+      targetKind: target.kind === 'bot' ? 'bot' : 'player',
+      targetLifeId: target.lifeId,
+      position: [target.position[0], target.position[1], target.position[2]] as SupportVec3,
+      durationMs: TASER_STUN_DURATION_MS,
+      pilotFired: playerControlled,
+      chargesRemaining: admission.state.charges,
+      atMs: nowMs,
+    }));
   }
 
   private moveDroneToward(
@@ -3009,7 +3425,8 @@ export class HostKillstreakRuntime {
     }));
     const entities = [...this.entities.values()].sort((left, right) => left.id.localeCompare(right.id)).map((entity): KillstreakEntitySnapshot => {
       const captureProgress = entity.kind === 'care-crate' && entity.captureStartedAtMs !== null && entity.captureActorId
-        ? clamp((nowMs - entity.captureStartedAtMs) / ((this.actors.get(entity.captureActorId)?.team === entity.team) ? 1_250 : 2_500), 0, 1)
+        ? clamp((nowMs - entity.captureStartedAtMs) / (entity.captureRequiredMs
+          ?? ((this.actors.get(entity.captureActorId)?.team === entity.team) ? 1_250 : 2_500)), 0, 1)
         : null;
       return Object.freeze({
         id: entity.id,
@@ -3029,6 +3446,7 @@ export class HostKillstreakRuntime {
         gunProfileId: entity.kind === 'drone' ? entity.gunProfileId : null,
         gunController: entity.kind === 'chopper' ? entity.gunController === 'ai' ? 'ai' : 'owner-player' : null,
         missileAmmo: entity.kind === 'chopper' ? entity.missilesRemaining : null,
+        taserCharges: entity.kind === 'drone' && entity.mode === 'piloted' ? entity.taser.charges : null,
         missileCooldownMs: entity.kind === 'chopper'
           ? Math.min(CHOPPER_MISSILE_CADENCE_MS, Math.max(0, entity.nextMissileAtMs - nowMs))
           : null,

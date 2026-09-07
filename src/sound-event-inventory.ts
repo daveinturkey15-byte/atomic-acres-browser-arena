@@ -80,9 +80,16 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'support.care-capture',
   'support.chopper-rotor',
   'support.chopper-gun',
+  // HF-337: positional variants so teammates and enemies can locate support fire.
+  'support.chopper-gun.positional',
+  // Owner 2026-08-30: possessed chopper missile launch whoosh.
+  'match.domination-cue',
+  'support.missile-launch.positional',
+  'support.killstreak-announce',
   'support.chopper-damage',
   'support.carpet-aircraft',
   'support.carpet-bomb',
+  'support.drone-gun.positional',
   'support.drone-rotor',
   'support.drone-gun',
   'support.drone-damage',
@@ -97,6 +104,7 @@ export const REQUIRED_SOUND_EVENT_IDS = Object.freeze([
   'announcement.match',
   'announcement.killstreak',
   'ambience.arena-bed',
+  'ambience.arena-events',
   'ambience.menu-helicopter',
   'music.menu',
   'music.game',
@@ -245,7 +253,32 @@ type PlannedEventInput = Readonly<{
 }>;
 
 export const RUNTIME_AUDIO_NON_EVENT_METHODS = Object.freeze([
-  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects', 'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  'configure', 'dispose', 'prepareCombat', 'prepareGlassImpact', 'prepareGrenadeEffects',
+  // HF-350: restores the ambience bus gain after an explosion duck. It emits no
+  // sound of its own, so it is a lifecycle call like the rest of this list rather
+  // than a semantic sound event.
+  'recoverAmbienceDuck',
+  // Background chiptune lifecycle. The music is a continuous bed on the
+  // game-music bus, not a semantic sound event fired by a gameplay outcome,
+  // so like recoverAmbienceDuck these are lifecycle calls rather than emitters.
+  'startGameMusic', 'stopGameMusic',
+  // Pass 75: per-frame driver for the intermittent ambience layer. It decides
+  // WHETHER a sparse ambient one-shot is due; it emits nothing itself, so like
+  // recoverAmbienceDuck it is a lifecycle call rather than a semantic event.
+  'updateArenaAmbience',
+  // HF-366 immersion configuration. Neither emits: setAcousticSpace swaps the
+  // reverb/tail parameter when the runtime knows the listener stepped inside,
+  // and setOcclusionSampler installs the hook the runtime feeds its own budgeted
+  // raycast results through. They change how a LATER semantic event sounds, the
+  // same way configure() changes how every event sounds, so they belong here
+  // rather than in the callsite contract.
+  'setAcousticSpace', 'setOcclusionSampler',
+  'resume', 'suspend', 'telemetry', 'unlock', 'updateListener',
+  // 2026-08-29 audio QA hooks: pure diagnostics for the harnesses that
+  // finally proved the chiptune's three stacked silences (staging, runtime
+  // coefficient revert, one-blip scheduler). The tone probe emits a bounded
+  // half-second sine only when a debug caller asks; neither is gameplay.
+  'debugMusicState', 'debugProbeTone',
 ] as const);
 
 export type RuntimeSoundCallsiteContractEntry = Readonly<{
@@ -310,7 +343,9 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('hit', "zone === 'head'", 1, ['combat.hit-confirm']),
   runtimeCallsite('hunterLaunch', 'index', 1, ['support.hunter-launch']),
   runtimeCallsite('impact', "'glass',point.distanceTo(camera.position)", 1, ['world.window-break']),
-  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 3, ['world.projectile-impact']),
+  // HF-386: +1 — the possessed chopper gunner's presentation-only world
+  // impact now plays the same per-surface world projectile impact.
+  runtimeCallsite('impact', 'surface,point.distanceTo(camera.position)', 4, ['world.projectile-impact']),
   runtimeCallsite('impact', 'surface,point.distanceTo(player.position)', 1, ['world.projectile-impact']),
   runtimeCallsite('kill', '', 2, ['combat.kill-confirm']),
   runtimeCallsite('land', 'impactSpeed', 1, ['movement.land.local']),
@@ -322,13 +357,13 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('nearMiss', 'nearMissStrength(player.position, origin, visibleEnd)', 2, ['combat.near-miss']),
   runtimeCallsite('nukeDetonation', '', 1, ['support.nuke-detonation']),
   runtimeCallsite('nukeWarning', '', 1, ['support.nuke-warning']),
-  runtimeCallsite('overdriveAvailable', '', 1, ['pickup.overdrive-available']),
+  runtimeCallsite('overdriveAvailable', '', 2, ['pickup.overdrive-available']),
   runtimeCallsite('overdriveExpire', '', 1, ['pickup.overdrive-expired']),
   runtimeCallsite('overdrivePickup', '', 1, ['pickup.overdrive-claimed']),
   runtimeCallsite('railgunReport', '!local,railgunReportEmitter(message.beam, local)', 1, ['weapon.report.local', 'weapon.report.world']),
   runtimeCallsite('reload', '', 1, ['weapon.reload-handling']),
   runtimeCallsite('scoutSweep', '', 1, ['support.scout-sweep']),
-  runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed']),
+  runtimeCallsite('setArena', 'selectedArena.id', 3, ['ambience.arena-bed', 'ambience.arena-events']),
   runtimeCallsite('setArenaZone', 'arenaZone', 1, ['ambience.zone-transition']),
   runtimeCallsite('setLowHealthFeedback', '{ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 }', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
   runtimeCallsite('setLowHealthFeedback', 'lowHealth.presentation', 1, ['player.low-health-breathing', 'player.low-health-heartbeat']),
@@ -339,7 +374,18 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('shot', "'flare-gun',true,origin.distanceTo(camera.position)", 1, ['weapon.report.world']),
   runtimeCallsite('shot', 'message.weapon,true,origin.distanceTo(camera.position)', 3, ['weapon.report.world']),
   runtimeCallsite('shot', 'player.weapon', 1, ['weapon.report.local']),
-  runtimeCallsite('supportGun', 'kind', 2, ['support.chopper-gun', 'support.drone-gun']),
+  runtimeCallsite('supportGunPositional', 'kind,emitter,isEnemy', 2, ['support.chopper-gun.positional', 'support.drone-gun.positional']),
+  // Owner 2026-08-30: chopper missile launch whoosh, host and guest impact loops.
+  // HF-509: one shared drop-cue helper plays the missile or the bomb release
+  // on host and guests alike, so both callsites collapsed into it.
+  runtimeCallsite('missileLaunch', 'drop.emitter', 1, ['support.missile-launch.positional']),
+  runtimeCallsite('bombRelease', 'drop.emitter', 1, ['support.carpet-bomb']),
+  runtimeCallsite('killstreakAnnounce', 'banner.tone', 1, ['support.killstreak-announce']),
+  runtimeCallsite('syncSupportFlightLoops', '[]', 2, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
+  runtimeCallsite('syncSupportFlightLoops', 'supportFlightAudioCollector.collect(killstreakSnapshot.entities, camera.position, killstreakActivity, now)', 1, ['support.care-aircraft', 'support.carpet-aircraft', 'support.drone-rotor']),
+  // Owner 2026-08-30: Domination zone ownership cues (friendly rise / loss fall).
+  runtimeCallsite('dominationCue', 'false', 1, ['match.domination-cue']),
+  runtimeCallsite('dominationCue', 'zone.owner === player.team', 1, ['match.domination-cue']),
   runtimeCallsite('supportInbound', "'tri-pass'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', "'yardhawk'", 1, ['support.inbound']),
   runtimeCallsite('supportInbound', 'message.source', 1, ['support.inbound']),
@@ -347,7 +393,7 @@ export const CURRENT_RUNTIME_SOUND_CALLSITE_CONTRACT: readonly RuntimeSoundCalls
   runtimeCallsite('syncChopperRotors', 'activeSupportRotorAudioSources', 1, ['support.chopper-rotor']),
   runtimeCallsite('testBayDoorThump', 'player.position.distanceTo(new THREE.Vector3(trigger.x, trigger.y, trigger.z))', 1, ['test-bay.door-thump']),
   runtimeCallsite('weaponAction', 'player.weapon,event', 1, ['weapon.reload-mechanic']),
-  runtimeCallsite('weaponSwitch', '', 6, ['weapon.switch', 'interaction.weapon-pickup']),
+  runtimeCallsite('weaponSwitch', '', 7, ['weapon.switch', 'interaction.weapon-pickup']),
   runtimeCallsite('worldFootstep', 'footstep.position,footstep.surface,footstep.movement,isFootstepOccluded(footstep.position)', 3, ['movement.footstep.world']),
 ]);
 
@@ -832,11 +878,12 @@ const events: SoundEventInventoryEntry[] = [
     concurrency: LOCAL_CRITICAL, lifecycleOwner: 'player-life',
     coverageDetail: 'Adrenaline state cues must track the frozen modifier lifecycle without becoming the only state indication.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'support.care-aircraft', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['inbound', 'drop', 'outbound'],
+    emitterSymbols: ['syncSupportFlightLoops'],
     contractRefs: ['R500', 'R502', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'The aircraft voice is owned by its host-spawned support entity and ends on outbound/expiry/disposal.',
+    coverageDetail: 'HF-509: one HRTF flight loop per replicated care aircraft on every peer (syncSupportFlightLoops), gain from the shared killstreakAudioGain distance+altitude curve, phase from the replicated entity phase; stopped on expiry, match end or disposal.',
   }),
   plannedEvent({
     id: 'support.care-crate-descent', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -852,17 +899,43 @@ const events: SoundEventInventoryEntry[] = [
   }),
   existingEvent({
     id: 'support.chopper-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'orbit-loop', 'depart'],
+    spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'orbit-loop', 'depart', 'blade-slap'],
     emitterSymbols: ['syncChopperRotors'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'One quiet HRTF rotor loop follows each replicated chopper pose and is stopped on entity retirement, match end, or audio disposal.',
+    coverageDetail: 'One quiet HRTF rotor loop follows each replicated chopper pose and is stopped on entity retirement, match end, or audio disposal. HF-337: raised base gain with altitude-aware attenuation and low-rate blade-slap noise layer for unmistakable rotor presence.',
   }),
-  existingEvent({
+  plannedEvent({
     id: 'support.chopper-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
-    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Gun bursts are position-bound, compressor-limited, and capped independently from player reports.',
+  }),
+  existingEvent({
+    id: 'support.chopper-gun.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['burst-near', 'burst-far'],
+    emitterSymbols: ['supportGunPositional'],
+    contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-337: positional chopper gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
+  }),
+  existingEvent({
+    id: 'match.domination-cue', family: 'announcements', bus: 'ui', delivery: 'listener-local',
+    variants: ['friendly-capture', 'loss'],
+    emitterSymbols: ['dominationCue'],
+    contractRefs: ['R500'], concurrency: LOCAL_FEEDBACK, lifecycleOwner: 'match-epoch',
+    coverageDetail: 'Owner 2026-08-30: Domination zone ownership change cue on the UI bus - bright two-note rise when your squad captures, low pair on a loss or neutralization. Fired from the replica-side HUD diff so host, solo and guests all hear it exactly once per ownership change.',
+  }),
+  existingEvent({
+    id: 'support.missile-launch.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['launch'],
+    emitterSymbols: ['missileLaunch'],
+    contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'Owner 2026-08-30: possessed Chopper Gunner missile leaving the wing rail - ignition thump + rising rocket-motor whoosh, spatial at the launch socket via the railgun spatial-chain pattern, flat weapons bus when the origin is unknown (older peers). Fires on drop-phase impacts for host and guests alike.',
+  }),
+  existingEvent({
+    id: 'support.killstreak-announce', family: 'support', bus: 'announcements', delivery: 'global-nonspatial',
+    variants: ['own', 'friendly', 'hostile'], emitterSymbols: ['killstreakAnnounce'],
+    contractRefs: ['R500', 'R506', 'R508', 'R308'], concurrency: GLOBAL_CUE, lifecycleOwner: 'support-activation',
+    coverageDetail: 'HF-509: host broadcasts one killstreak-announce per admitted activation; every peer plays the sting once (de-duplicated by activation id) with a hostile klaxon or a friendly rise.',
   }),
   plannedEvent({
     id: 'support.chopper-damage', family: 'support', bus: 'sfx', delivery: 'world-spatial',
@@ -870,28 +943,37 @@ const events: SoundEventInventoryEntry[] = [
     contractRefs: ['R500', 'R504', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Damage and destruction variants follow host-owned health transitions.',
   }),
-  plannedEvent({
+  existingEvent({
     id: 'support.carpet-aircraft', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-aircraft-world-v1', variants: ['approach', 'drop-run', 'depart'],
+    emitterSymbols: ['syncSupportFlightLoops'],
     contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'The aircraft loop follows the seeded host route and is disposed after the run.',
-  }),
-  plannedEvent({
-    id: 'support.carpet-bomb', family: 'support', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'explosion-world-v1', variants: ['release', 'fall', 'impact'],
-    contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
-    coverageDetail: 'Twenty-bomb presentation uses capped/coalesced voices without altering host-authored impact order.',
-  }),
-  plannedEvent({
-    id: 'support.drone-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
-    spatialProfileId: 'support-drone-world-v1', variants: ['piloted', 'hunter', 'swarm'],
-    contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
-    coverageDetail: 'Every active drone owns at most one pooled positional rotor voice and releases it on death/expiry/rematch.',
+    coverageDetail: 'HF-509: the Carpet Bomber is heard coming on every peer - one HRTF flight loop follows the replicated route (syncSupportFlightLoops), louder on the drop run (public drop reports), thinner on departure; disposed after the run.',
   }),
   existingEvent({
+    id: 'support.carpet-bomb', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'explosion-world-v1', variants: ['release', 'fall', 'impact'],
+    emitterSymbols: ['bombRelease'],
+    contractRefs: ['R500', 'R505', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-509: Carpet Bomber bay release (clunk + falling whistle) at the drop point on host and guests alike, via the public drop-phase impact report (bombRelease).',
+  }),
+  existingEvent({
+    id: 'support.drone-gun.positional', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst'],
+    emitterSymbols: ['supportGunPositional'],
+    contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-337: positional piloted-drone/swarm gunfire at firing entity world position. Audible to ALL players (owner, teammates, enemies) at reduced volume for enemies (gain 0.35). Distance-culled beyond 180m. Spatial chain hold shortened to 180ms (below 280ms/300ms cadence) to prevent voice starvation. Reuses railgun spatial-chain pattern with refDistance=8, maxDistance=180, rolloffFactor=0.18.',
+  }),
+  existingEvent({
+    id: 'support.drone-rotor', family: 'support', bus: 'sfx', delivery: 'world-spatial',
+    spatialProfileId: 'support-drone-world-v1', variants: ['piloted', 'hunter', 'swarm'],
+    emitterSymbols: ['syncSupportFlightLoops'],
+    contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'support-entity',
+    coverageDetail: 'HF-509: every replicated Piloted Drone / Drone Swarm entity owns at most one pooled positional rotor voice on every peer (nearest six admitted by syncSupportFlightLoops), louder while its public shot reports say it is firing; released on death/expiry/rematch.',
+  }),
+  plannedEvent({
     id: 'support.drone-gun', family: 'support', bus: 'sfx', delivery: 'world-spatial',
     spatialProfileId: 'support-weapon-world-v1', variants: ['single', 'burst', 'dry-fire', 'reload'],
-    emitterSymbols: ['supportGun'],
     contractRefs: ['R500', 'R506-R508', 'R511', 'R308'], concurrency: WORLD_DENSE_TRANSIENT, lifecycleOwner: 'support-entity',
     coverageDetail: 'Drone-gun audio follows admitted magazine/fire state and shares a hard support-weapon cap.',
   }),
@@ -975,9 +1057,44 @@ const events: SoundEventInventoryEntry[] = [
       'skyline-terminal.hvac', 'skyline-terminal.engine-wash',
       'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
       'gun-range.ventilation', 'gun-range.ballast-buzz',
+      'farcrysis.jungle-insect', 'farcrysis.breeze',
+      'high-seas.diesel-engine', 'high-seas.open-sea-wind',
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1.range-wind', 'test1.flag-canvas',
+      'test2.garden-breeze', 'test2.pool-water',
+      // MAP3 (owner 2026-09-02, HF-405). Two sources, matching
+      // ARENA_AUDIO_DEFINITIONS.map3's bed and air placements.
+      'map3.gallery-wind', 'map3.open-scrub',
+      // NUKETOWN2 (owner 2026-09-02, HF-407). Two sources, matching
+      // ARENA_AUDIO_DEFINITIONS.nuketown2's bed and air placements: the
+      // transformer hum at the west cul-de-sac and the fence-line wind at the
+      // east yard, one at each end of the street.
+      'nuketown2.street-hum', 'nuketown2.fence-wind',
+      // RAID2 (owner 2026-09-02, HF-408). Two sources, matching
+      // ARENA_AUDIO_DEFINITIONS.raid2's bed and air placements: the bed over the
+      // circular drive, the air over the pool terrace.
+      'raid2.terrace-breeze', 'raid2.pool-water',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Every arena owns two distinct repository-procedural continuous sources, replaced atomically at arena generation changes.',
+  }),
+  existingEvent({
+    id: 'ambience.arena-events', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
+    spatialProfileId: 'arena-ambience-bed-v1',
+    variants: [
+      'atomic-acres.yard-life', 'skyline-terminal.apron', 'rustworks-1v1.rig-metal',
+      'gun-range.range-plant', 'farcrysis.jungle', 'high-seas.open-water',
+      // owner 2026-08-30: Test1/Test2 arenas added.
+      'test1.open-air-range', 'test2.garden-estate',
+      // MAP3 (owner 2026-09-02, HF-405).
+      'map3.stone-gallery',
+      // NUKETOWN2 (owner 2026-09-02, HF-407).
+      'nuketown2.test-town',
+      // RAID2 (owner 2026-09-02, HF-408).
+      'raid2.open-terrace',
+    ],
+    emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
+    coverageDetail: 'Pass 75: sparse intermittent one-shots layered above the two continuous beds, giving each arena a sense of place rather than a drone. Every event is a repository-procedural recipe (oscillator sweep, or the shared noise buffer through a band-pass) - no sampled audio. Placed on a random bearing at an authored distance around the live listener, scheduled on a randomised per-arena gap so the layer never develops an audible period, and skipped entirely when the shared spatial-voice budget is full so ambience can never crowd out combat.',
   }),
   plannedEvent({
     id: 'ambience.menu-helicopter', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
@@ -992,7 +1109,11 @@ const events: SoundEventInventoryEntry[] = [
   }),
   plannedEvent({
     id: 'music.game', family: 'music', bus: 'game-music', delivery: 'global-nonspatial',
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'],
+    // owner 2026-08-30: Test1/Test2 arenas added.
+    // owner 2026-09-02 (HF-405): Map 3 added.
+    // owner 2026-09-02 (HF-407): Nuke Town Rebuild added.
+    // owner 2026-09-03 (HF-408): the Raid rebuild added.
+    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1003,7 +1124,14 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
   schemaVersion: SOUND_EVENT_INVENTORY_SCHEMA_VERSION,
   events: SOUND_EVENT_INVENTORY,
 });
-export const SOUND_EVENT_INVENTORY_SHA256 = '1e33f1b8b8ab4a334d63bcca8731f4b98e9222f772f4733210e653bbb09c3a55';
+// Recomputed over the Pass 74 positional-support plus Pass 75 High Seas union,
+// including the HF-337 isEnemy callsite and refined chopper/drone coverage rows.
+// owner 2026-08-30: recomputed again for the Test1/Test2 arena variants
+// (arena-bed, arena-events and game-music rows).
+// owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
+// neither branch's pin is correct once both the Nuke Town Rebuild's and the
+// Raid Rebuild's bed, event and music rows are present.
+export const SOUND_EVENT_INVENTORY_SHA256 = '8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

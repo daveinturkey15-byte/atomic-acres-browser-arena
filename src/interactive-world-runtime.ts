@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import type { BallisticApertureQuery, BallisticSurface } from './ballistics';
 import { canonicalSha256 } from './canonical-state';
-import type { Box2, Point3 } from './collision';
+import { isBlocked, type Box2, type Point3 } from './collision';
 import {
   SHED_ANGLE_Q,
+  SHED_DEBRIS_IMPULSE_MAX_Q,
   SHED_PANEL_COORD_Q,
   admitShedDoorInteraction,
   advanceShedDoor,
@@ -31,6 +32,7 @@ import {
   type QuantizedVector,
 } from './destructible-world';
 import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
+import { isArenaId } from './arena-identity';
 import { DestructibleShedPresentation } from './destructible-shed-presentation';
 import {
   FIELD_SHED_BALLISTIC_MATERIAL_ID,
@@ -119,8 +121,6 @@ export type InteractiveWorldStateEnvelope = Readonly<{
   hash: string;
 }>;
 
-const SHED_ARENA_IDS = Object.freeze(['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range'] as const);
-
 function interactiveWorldEnvelopeHash(value: Omit<InteractiveWorldStateEnvelope, 'hashAlgorithm' | 'hash'>): string {
   return canonicalSha256(value);
 }
@@ -132,7 +132,7 @@ export function isInteractiveWorldStateEnvelope(value: unknown): value is Intera
     'arenaId', 'matchEpoch', 'revision', 'schemaVersion', 'sheds', 'houseDestruction', 'hashAlgorithm', 'hash',
   ].sort().join('|')
     || envelope.schemaVersion !== 1
-    || !SHED_ARENA_IDS.includes(envelope.arenaId as typeof SHED_ARENA_IDS[number])
+    || !isArenaId(envelope.arenaId)
     || !Number.isSafeInteger(envelope.matchEpoch) || Number(envelope.matchEpoch) < 1
     || !Number.isSafeInteger(envelope.revision) || Number(envelope.revision) < 0
     || envelope.hashAlgorithm !== 'sha256'
@@ -322,6 +322,113 @@ function majorDebrisBounds(shed: RuntimeShed, body: ShedState['majorDebris'][num
     minZ: centre.z - extents.halfThickness,
     maxZ: centre.z + extents.halfThickness,
     rotation: [euler.x, euler.y, euler.z] as [number, number, number],
+  });
+}
+
+/** Movement capsule radius the host already uses for shed door blockers. */
+const PLAYER_CONTACT_RADIUS = 0.42;
+/** Share of the walker's speed one contact tick hands to a panel. */
+const PLAYER_CONTACT_TRANSFER = 0.55;
+/** Assumed walk speed when the caller resolves contact without a velocity. */
+const PLAYER_CONTACT_NOMINAL_SPEED = 2.4;
+/** A boosted or teleporting actor must not fling wreckage across the arena. */
+const PLAYER_CONTACT_MAX_SPEED = 6;
+/** Below this the shove would be invisible; skipping it stops idle contact spending a revision per tick. */
+const PLAYER_CONTACT_MIN_DELTA = 0.05;
+/** Share of a bullet's knock kept as lift once the rest follows the round. */
+const BULLET_DEBRIS_LIFT_FRACTION = 0.25;
+
+function boundsCentre(bounds: Box2): Point3 {
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: ((bounds.minY ?? 0) + (bounds.maxY ?? 0)) / 2,
+    z: (bounds.minZ + bounds.maxZ) / 2,
+  };
+}
+
+function clampImpulseComponentQ(value: number): number {
+  const clamped = Math.max(-SHED_DEBRIS_IMPULSE_MAX_Q, Math.min(SHED_DEBRIS_IMPULSE_MAX_Q, Math.round(value)));
+  // Never hand -0 to canonical state; JSON round-trips it to 0.
+  return clamped === 0 ? 0 : clamped;
+}
+
+/**
+ * Debris velocity is stored in shed-local space - majorDebrisPhysicsBodies
+ * rotates it back out by the placement yaw - but every gameplay impulse arrives
+ * in world space. Every authored placement is yawed +/-PI/2, so passing a world
+ * impulse straight through knocked debris ninety degrees off the shot. Owner
+ * 2026-08-30: "its physics to destruction and push need some help".
+ */
+function shedLocalImpulseQ(impulseQ: QuantizedVector, placement: ShedPlacement): QuantizedVector {
+  const local = rotateY({ x: impulseQ.xQ, y: impulseQ.yQ, z: impulseQ.zQ }, -placement.yaw);
+  return Object.freeze({
+    xQ: clampImpulseComponentQ(local.x),
+    yQ: clampImpulseComponentQ(local.y),
+    zQ: clampImpulseComponentQ(local.z),
+  });
+}
+
+/**
+ * Default world-space knock for a bullet that hits loose debris. It used to be
+ * purely vertical, so a shot panel hopped straight up instead of being driven
+ * away from the shooter. The round's travel direction is used when the caller
+ * has it; otherwise the panel centre out through the impact point is the
+ * incoming ray's outward normal, so its negation is the way the round was
+ * going. Only a small share stays as lift.
+ */
+function bulletDebrisImpulseQ(
+  bounds: Box2,
+  point: Point3,
+  penetrationEnergyQ: number,
+  direction?: Point3,
+): QuantizedVector {
+  const magnitudeQ = Math.max(0, Math.min(SHED_DEBRIS_IMPULSE_MAX_Q, Math.round(penetrationEnergyQ * 20)));
+  const liftQ = Math.round(magnitudeQ * BULLET_DEBRIS_LIFT_FRACTION);
+  const centre = boundsCentre(bounds);
+  const travel = direction ?? { x: centre.x - point.x, y: 0, z: centre.z - point.z };
+  const horizontal = Math.hypot(travel.x, travel.z);
+  if (!(horizontal > 1e-6)) return Object.freeze({ xQ: 0, yQ: liftQ, zQ: 0 });
+  return Object.freeze({
+    xQ: Math.round(travel.x / horizontal * magnitudeQ),
+    yQ: liftQ,
+    zQ: Math.round(travel.z / horizontal * magnitudeQ),
+  });
+}
+
+/**
+ * World-space shove for one contact tick. The shove tops the panel up to a
+ * fraction of the walker's speed instead of adding a fixed impulse every tick,
+ * so sustained contact converges rather than accelerating wreckage across the
+ * arena, and a panel already leaving faster than the walker is left alone.
+ */
+function playerContactImpulseQ(
+  body: ShedState['majorDebris'][number],
+  bodyCentre: Point3,
+  placement: ShedPlacement,
+  actorPosition: Point3,
+  actorVelocity?: Point3,
+): QuantizedVector | null {
+  const walkSpeed = actorVelocity ? Math.hypot(actorVelocity.x, actorVelocity.z) : PLAYER_CONTACT_NOMINAL_SPEED;
+  if (!Number.isFinite(walkSpeed) || walkSpeed <= PLAYER_CONTACT_MIN_DELTA) return null;
+  const towards = actorVelocity && Math.hypot(actorVelocity.x, actorVelocity.z) > PLAYER_CONTACT_MIN_DELTA
+    ? { x: actorVelocity.x, z: actorVelocity.z }
+    : { x: bodyCentre.x - actorPosition.x, z: bodyCentre.z - actorPosition.z };
+  const length = Math.hypot(towards.x, towards.z);
+  if (!(length > 1e-4)) return null;
+  const unitX = towards.x / length;
+  const unitZ = towards.z / length;
+  const worldVelocity = rotateY({
+    x: body.velocityQ.xQ / 1_000,
+    y: body.velocityQ.yQ / 1_000,
+    z: body.velocityQ.zQ / 1_000,
+  }, placement.yaw);
+  const alreadyLeaving = worldVelocity.x * unitX + worldVelocity.z * unitZ;
+  const delta = Math.min(walkSpeed, PLAYER_CONTACT_MAX_SPEED) * PLAYER_CONTACT_TRANSFER - alreadyLeaving;
+  if (delta <= PLAYER_CONTACT_MIN_DELTA) return null;
+  return Object.freeze({
+    xQ: Math.round(unitX * delta * 1_000),
+    yQ: 0,
+    zQ: Math.round(unitZ * delta * 1_000),
   });
 }
 
@@ -724,6 +831,54 @@ export class InteractiveWorldRuntime {
     }));
   }
 
+  /**
+   * Host-only contact shove for loose shed debris. impulseMajorShedDebris has
+   * carried source 'player-contact' since it was written but nothing ever
+   * called it, so walking into a fallen panel did nothing at all (owner
+   * 2026-08-30: "push need some help"). Contact resolves against the very
+   * bounds rebuildCollisionView publishes as each debris dynamic collider, so
+   * what a player can bump is exactly what movement collides with, and the
+   * mutation stays behind the same host/revision gate as every other one.
+   * Returns the number of bodies actually pushed.
+   */
+  pushDebrisFromPlayerContact(request: Readonly<{
+    actorPosition: Point3;
+    actorVelocity?: Point3;
+    actorRadius?: number;
+  }>): number {
+    if (!this.hostAuthority) return 0;
+    const radius = request.actorRadius ?? PLAYER_CONTACT_RADIUS;
+    if (![request.actorPosition.x, request.actorPosition.y, request.actorPosition.z, radius].every(Number.isFinite)
+      || radius <= 0) return 0;
+    let pushes = 0;
+    for (const shed of this.sheds) {
+      for (const body of shed.state.majorDebris) {
+        // Settled wreckage is rejected by the canonical mutation anyway; skip
+        // the bounds maths rather than spend it on a guaranteed refusal.
+        if (body.flat) continue;
+        const bounds = majorDebrisBounds(shed, body);
+        if (!isBlocked(request.actorPosition, [bounds], radius)) continue;
+        const worldImpulseQ = playerContactImpulseQ(
+          body,
+          boundsCentre(bounds),
+          shed.placement,
+          request.actorPosition,
+          request.actorVelocity,
+        );
+        if (!worldImpulseQ) continue;
+        const result = this.commit(shed, impulseMajorShedDebris(shed.state, {
+          isHost: this.hostAuthority,
+          expectedRevision: shed.state.revision,
+          chunkId: body.chunkId,
+          source: 'player-contact',
+          impulseQ: shedLocalImpulseQ(worldImpulseQ, shed.placement),
+        }));
+        if (result.accepted) pushes += 1;
+      }
+    }
+    return pushes;
+  }
+
   blockDoor(request: Readonly<{
     placementId: string;
     tick: number;
@@ -790,17 +945,26 @@ export class InteractiveWorldRuntime {
     penetrationEnergyQ: number;
     radiusUQ: number;
     radiusVQ: number;
+    /** World-space impulse, quantised in mm/s. Converted to the shed's local frame here. */
     impulseQ?: QuantizedVector;
+    /** World-space travel direction of the round, used to knock loose debris the way it was going. */
+    direction?: Point3;
   }>): ShedMutationResult | null {
     if (request.surface.majorDebris) {
       const shed = this.sheds.find((candidate) => candidate.placement.id === request.surface.majorDebris?.placementId);
       if (!shed) return null;
+      const worldImpulseQ = request.impulseQ ?? bulletDebrisImpulseQ(
+        request.surface.bounds,
+        request.point,
+        request.penetrationEnergyQ,
+        request.direction,
+      );
       return this.commit(shed, impulseMajorShedDebris(shed.state, {
         isHost: this.hostAuthority,
         expectedRevision: shed.state.revision,
         chunkId: request.surface.majorDebris.chunkId,
         source: 'bullet',
-        impulseQ: request.impulseQ ?? { xQ: 0, yQ: Math.min(50_000, request.penetrationEnergyQ * 20), zQ: 0 },
+        impulseQ: shedLocalImpulseQ(worldImpulseQ, shed.placement),
       }));
     }
     const identity = request.surface.destructibleSurface;

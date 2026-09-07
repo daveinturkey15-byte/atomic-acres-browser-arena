@@ -1,4 +1,5 @@
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS, SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4173/';
 const peerQaPort = Number(process.env.QA_PEER_PORT ?? 0);
@@ -7,6 +8,7 @@ const errors = [];
 const browser = await chromium.launch({
   headless: process.env.QA_HEADFUL !== '1',
   args: [
+    ...OFFSCREEN_ARGS,...SILENT_ARGS,
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',

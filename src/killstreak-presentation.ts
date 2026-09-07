@@ -16,14 +16,37 @@ import {
 import { DRONE_PRESENTATION_FAMILY_ID, DRONE_SUPPORT_DEFINITIONS } from './killstreak-support-catalog';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
 import { SUPPORT_WEAPON_FEEDBACK_CONTRACT } from './support-vehicle-presentation-contract';
+import {
+  deepFreezeSubtreeMatrices,
+  deepUnfreezeSubtreeMatrices,
+  freezeMatrixWorldWalk,
+} from './static-matrix-freeze';
 import { yieldBrowserCpuTask, yieldBrowserPreparationFrame } from './browser-preparation-scheduler';
 import { GPU_SHARED_GEOMETRY_KEY } from './gpu-resource-ownership';
 import { attachPass70DroneSwarmBodyMarks } from './pass70-drone-swarm-logo';
 
+/** Owner 2026-08-29: camera-space lift (metres) applied to the possessed
+ * first-person cockpit viewmodel so the canopy glass frame sits high on the
+ * screen and the gunsight looks through open canopy. Regression guard for the
+ * "glass in the middle of the view" issue fixed weeks ago and lost. */
+export const FIRST_PERSON_COCKPIT_VIEW_LIFT_M = 0.08;
+/** Companion to the lift: pulls the cockpit viewmodel TOWARD the camera
+ * along the view axis. Because the canopy parts sit at different depths,
+ * the pull magnifies them unevenly - the frame spreads radially out of the
+ * sight picture (apex up, console off the bottom, rails to the edges),
+ * opening the glass pane around the reticle. (A uniform scale about the eye
+ * is a perspective no-op and cannot do this.) */
+export const FIRST_PERSON_COCKPIT_VIEW_PULL_M = 0.28;
 const MAX_PRESENTED_ENTITIES = 32;
 const MAX_IMPACT_FLASHES = 20;
 const MAX_BOMB_SHELLS = 20;
 const EMBERS_PER_CARPET_IMPACT = 6;
+/** Owner 2026-08-30: chopper missiles burst embers too (tighter than carpet). */
+const EMBERS_PER_MISSILE_IMPACT = 6;
+const MISSILE_IMPACT_FLASH_RADIUS_M = 1.9;
+const MISSILE_TRAIL_PUFF_INTERVAL_MS = 34;
+const MISSILE_NOSE_AXIS = new THREE.Vector3(0, 1, 0);
+const MISSILE_FLIGHT_DIRECTION_SCRATCH = new THREE.Vector3();
 const MAX_EMBER_PARTICLES = MAX_BOMB_SHELLS * EMBERS_PER_CARPET_IMPACT;
 const BOMB_SHELL_DROP_DURATION_MS = 420;
 export const CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M = 20;
@@ -117,7 +140,11 @@ const SUPPORT_VEHICLE_TARGET_DIMENSIONS: Readonly<Record<SupportVehicleAssetFami
   carpet: 17,
   crate: 3.2,
 });
-export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 95, 190] as const);
+// HF-336: the old [0, 95, 190] bands forced LOD0 (87 meshes / 59.9k tris) at
+// every practical gameplay range. A chopper operates at 25-35m altitude, so
+// these bands select LOD1 (84 meshes / 49.9k tris) or LOD2 (63 meshes /
+// 29.3k tris) for ground observers while keeping full detail in close passes.
+export const SUPPORT_VEHICLE_LOD_DISTANCES = Object.freeze([0, 36, 75] as const);
 
 export function deriveSupportVehiclePrewarmDistances(
   lodDistances: readonly [number, number, number] = SUPPORT_VEHICLE_LOD_DISTANCES,
@@ -425,6 +452,7 @@ export function authoredSupportMaterialCastsShadow(
 function applyAuthoredSupportShadowBudget(
   root: THREE.Object3D,
   family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+  options: Readonly<{ castShadows?: boolean }> = {},
 ): void {
   root.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
@@ -433,8 +461,231 @@ function applyAuthoredSupportShadowBudget(
     // colour pass. Shadow maps only need the major opaque silhouette; making
     // every instrument, emissive chip, line and transparent rotor disc a
     // caster multiplied support-streak submissions without a visible benefit.
-    node.castShadow = materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
+    // HF-336: the possessing player hides the whole exterior, so every other
+    // player is the only one paying for the airframe's casters. Passing
+    // castShadows:false retires the authored mesh set from the shadow map
+    // entirely; one merged silhouette proxy casts in its place. Receiving
+    // shadows stays unconditional.
+    node.castShadow = (options.castShadows ?? true)
+      && materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name));
   });
+}
+
+/**
+ * Coarsest authored vehicle LOD level baked into the single shadow-map caster
+ * silhouette (HF-336). Shadow maps only need a believable airframe outline;
+ * casting from LOD0's full mesh set made every observer pay for detail the
+ * possessor never renders. Families with fewer levels collapse to level 0.
+ */
+export const SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL = 2;
+
+/** HF-336: node name of the merged low-detail shadow caster proxy. */
+export const SUPPORT_SHADOW_SILHOUETTE_NODE_NAME = 'pass74-support-shadow-silhouette';
+
+/**
+ * HF-336: index of the authored LOD level the shadow silhouette is baked from.
+ * Returns -1 when there is no level to bake.
+ */
+export function authoredSupportShadowSilhouetteLevel(levelCount: number): number {
+  if (levelCount <= 0) return -1;
+  return Math.min(SUPPORT_VEHICLE_SHADOW_SILHOUETTE_LEVEL, levelCount - 1);
+}
+
+/**
+ * Subtrees kept out of the baked silhouette (HF-336). The proxy is rigid, so
+ * animated rotors would freeze mid-sweep; at 18-30m operating altitude a blade
+ * shadow is sub-texel anyway. First-person and transient muzzle/tracer/impact
+ * subtrees never belonged in an exterior shadow at all.
+ */
+const SUPPORT_SHADOW_SILHOUETTE_EXCLUDED_SUBTREES = Object.freeze(new Set([
+  'chopper-main-rotor',
+  'chopper-tail-rotor',
+  'chopper-first-person-cockpit',
+  'chopper-gunner-sightline',
+  'chopper-gunner-weapon-view',
+  'chopper-muzzle-flash',
+  'chopper-tracer-action',
+  'chopper-impact-action',
+]));
+
+function isShadowSilhouetteSourceNode(source: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== source) {
+    if (SUPPORT_SHADOW_SILHOUETTE_EXCLUDED_SUBTREES.has(cursor.name)
+      || cursor.userData.firstPersonOnly === true
+      || cursor.userData.gunnerSightline === true) return false;
+    cursor = cursor.parent;
+  }
+  return true;
+}
+
+/**
+ * HF-336: bake one position-only silhouette out of the coarsest authored LOD
+ * level. Only materials already admitted by the shadow budget contribute, every
+ * qualifying mesh is flattened into the level's own space, and the result is a
+ * single non-indexed triangle soup - one draw call in the shadow pass instead
+ * of the authored airframe's whole caster set, per shadow-casting light, for
+ * every player who is not the one flying it.
+ */
+export function mergeAuthoredSupportShadowSilhouette(
+  source: THREE.Object3D,
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+): THREE.BufferGeometry | null {
+  source.updateWorldMatrix(true, true);
+  // Bake into the source level's own parent space (the LOD group, which the
+  // builder never transforms), so the proxy can hang off the vehicle root with
+  // an identity transform and still carry the level's authored scale.
+  const bakeBase = new THREE.Matrix4().multiplyMatrices(
+    source.matrix,
+    new THREE.Matrix4().copy(source.matrixWorld).invert(),
+  );
+  const relative = new THREE.Matrix4();
+  const vertex = new THREE.Vector3();
+  const positions: number[] = [];
+  source.traverse((node) => {
+    if (!(node instanceof THREE.Mesh) || !isShadowSilhouetteSourceNode(source, node)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((entry) => authoredSupportMaterialCastsShadow(family, entry.name))) return;
+    if (!node.geometry.hasAttribute('position')) return;
+    const attribute = node.geometry.getAttribute('position');
+    relative.multiplyMatrices(bakeBase, node.matrixWorld);
+    const append = (vertexIndex: number): void => {
+      vertex.fromBufferAttribute(attribute, vertexIndex).applyMatrix4(relative);
+      positions.push(vertex.x, vertex.y, vertex.z);
+    };
+    const index = node.geometry.getIndex();
+    if (index) for (let cursor = 0; cursor < index.count; cursor += 1) append(index.getX(cursor));
+    else for (let cursor = 0; cursor < attribute.count; cursor += 1) append(cursor);
+  });
+  if (positions.length === 0) return null;
+  const decimated = decimateSupportShadowSilhouetteTriangles(positions);
+  const merged = new THREE.BufferGeometry();
+  merged.name = `${family}-shadow-silhouette`;
+  merged.setAttribute('position', new THREE.BufferAttribute(new Float32Array(decimated), 3));
+  merged.computeBoundingBox();
+  merged.computeBoundingSphere();
+  // One geometry per family is shared by every presented instance, so the
+  // pooled retirement path must never dispose it out from under a live root.
+  merged.userData[GPU_SHARED_GEOMETRY_KEY] = `${family}-shadow-silhouette`;
+  return merged;
+}
+
+/**
+ * HF-336: a 2048x2048 dynamic shadow map does not resolve airframe detail -
+ * only the OUTLINE reads. Uniform-grid vertex clustering (one cell per axis,
+ * cell size = 1.5% of the silhouette's longest bounds extent) welds interior
+ * detail triangles away while preserving the outer hull, rotor disc and tail
+ * boom profile, deterministically (stable quantisation, first-triangle-wins
+ * dedupe) so the baked result is identical on every client. Applied once at
+ * bake time inside mergeAuthoredSupportShadowSilhouette; the decimated result
+ * is what enters supportShadowSilhouetteGeometries, so per-frame cost stays
+ * one draw call over the reduced soup and there are still zero allocations
+ * per frame. Small fixtures pass through unchanged (they already fit the
+ * budget).
+ */
+const SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET = 1_200;
+
+function decimateSupportShadowSilhouetteTriangles(positions: number[]): number[] {
+  const sourceTriangles = positions.length / 3 / 3;
+  if (sourceTriangles <= SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET) return positions;
+  let min = { x: Infinity, y: Infinity, z: Infinity };
+  let max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (let cursor = 0; cursor < positions.length; cursor += 3) {
+    min.x = Math.min(min.x, positions[cursor]);
+    min.y = Math.min(min.y, positions[cursor + 1]);
+    min.z = Math.min(min.z, positions[cursor + 2]);
+    max.x = Math.max(max.x, positions[cursor]);
+    max.y = Math.max(max.y, positions[cursor + 1]);
+    max.z = Math.max(max.z, positions[cursor + 2]);
+  }
+  const extent = Math.max(max.x - min.x, max.y - min.y, max.z - min.z, 1e-6);
+  // Start from a fine cluster grid and coarsen until the welded soup fits the
+  // outline budget - guarantees the upper bound for any authored level while
+  // keeping as much interior structure as the budget allows.
+  let cellRatio = 0.015;
+  for (let round = 0; round < 8; round += 1) {
+    const cell = extent * cellRatio;
+    const cellKey = (x: number, y: number, z: number): string =>
+      `${Math.floor((x - min.x) / cell)},${Math.floor((y - min.y) / cell)},${Math.floor((z - min.z) / cell)}`;
+    // Snap each triangle's vertices to their cluster representatives; drop
+    // degenerate triangles whose vertices collapse onto one another.
+    const snapped: number[] = [];
+    const representatives = new Map<string, [number, number, number]>();
+    for (let cursor = 0; cursor < positions.length; cursor += 3) {
+      const x = positions[cursor];
+      const y = positions[cursor + 1];
+      const z = positions[cursor + 2];
+      const key = cellKey(x, y, z);
+      let representative = representatives.get(key);
+      if (!representative) {
+        representative = [x, y, z];
+        representatives.set(key, representative);
+      }
+      snapped.push(representative[0], representative[1], representative[2]);
+    }
+    const output: number[] = [];
+    const seen = new Set<string>();
+    for (let cursor = 0; cursor < snapped.length; cursor += 9) {
+      const ax = snapped[cursor];
+      const ay = snapped[cursor + 1];
+      const az = snapped[cursor + 2];
+      const bx = snapped[cursor + 3];
+      const by = snapped[cursor + 4];
+      const bz = snapped[cursor + 5];
+      const cx = snapped[cursor + 6];
+      const cy = snapped[cursor + 7];
+      const cz = snapped[cursor + 8];
+      if (ax === bx && ay === by && az === bz) continue;
+      if (ax === cx && ay === cy && az === cz) continue;
+      if (bx === cx && by === cy && bz === cz) continue;
+      const key = `${ax},${ay},${az}|${bx},${by},${bz}|${cx},${cy},${cz}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      output.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    }
+    if (output.length / 9 <= SUPPORT_SHADOW_SILHOUETTE_TRIANGLE_BUDGET || round === 7) return output;
+    cellRatio *= 2;
+  }
+  return positions;
+}
+
+/**
+ * Colour-pass no-op: the proxy must stay visible so three.js submits it to the
+ * shadow map (WebGLShadowMap skips `visible === false`), but it writes neither
+ * colour nor depth, so the beauty pass sees nothing.
+ */
+const supportShadowSilhouetteMaterial = new THREE.MeshBasicMaterial({
+  name: SUPPORT_SHADOW_SILHOUETTE_NODE_NAME,
+  colorWrite: false,
+  depthWrite: false,
+  toneMapped: false,
+  fog: false,
+});
+
+const supportShadowSilhouetteGeometries = new Map<string, THREE.BufferGeometry | null>();
+
+function buildAuthoredSupportShadowSilhouette(
+  family: keyof typeof AUTHORED_SUPPORT_SHADOW_MATERIALS,
+  source: THREE.Object3D | null,
+): THREE.Mesh | null {
+  let geometry = supportShadowSilhouetteGeometries.get(family);
+  if (geometry === undefined) {
+    geometry = source ? mergeAuthoredSupportShadowSilhouette(source, family) : null;
+    if (source) supportShadowSilhouetteGeometries.set(family, geometry);
+  }
+  if (!geometry) return null;
+  const silhouette = new THREE.Mesh(geometry, supportShadowSilhouetteMaterial);
+  silhouette.name = SUPPORT_SHADOW_SILHOUETTE_NODE_NAME;
+  silhouette.castShadow = true;
+  silhouette.receiveShadow = false;
+  silhouette.raycast = () => undefined;
+  silhouette.userData.presentationOnly = true;
+  silhouette.userData.authoredSharedAsset = true;
+  silhouette.userData.shadowSilhouette = true;
+  // Never fold the proxy into a colour-pass static batch: it owns a distinct
+  // caster-only material and must keep its own castShadow flag.
+  silhouette.userData.supportStaticBatchBoundary = true;
+  return silhouette;
 }
 
 const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
@@ -445,11 +696,47 @@ const CHOPPER_DISPLAY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   ['MAT_Pass65Chopper_GreenDisplay', Object.freeze({ color: 0x020a05, emissive: 0x003b17 })],
 ]));
 
+/**
+ * Owner 2026-08-31, "ensure chopper gunner HUD is better". The DOM gunner HUD
+ * was retuned on 2026-08-30 onto a warm deck - bone values, muted telemetry,
+ * burnt orange for "act on me", green reserved for state - in
+ * src/ui/pass65-hud.css under `#gunner-cockpit-hud[data-support-kind=
+ * "chopper-gunner"]`. The 3D cockpit never got that pass. Its instrument and
+ * HUD materials still shipped the authored mint/cyan emissive at full
+ * strength and unmapped, which on screen is a row of white-hot slabs that
+ * outshines every readout a gunner acts on - the "mint cockpit" split that
+ * CSS comment names. Same language, same hierarchy, in the viewmodel:
+ * chrome is quiet and warm, state keeps the green, and nothing in here is
+ * allowed to compete with the DOM readouts for attention.
+ */
+const CHOPPER_COCKPIT_INSTRUMENT_MATERIALS = Object.freeze(new Map<string, Readonly<{
+  color: number;
+  emissive: number;
+  intensity: number;
+  roughness?: number;
+  metalness?: number;
+}>>([
+  // MFD readouts and the gunner weapon status plate: the values you read.
+  ['MAT_Pass65Chopper_HUDGreen', Object.freeze({ color: 0x0f0b07, emissive: 0xe8d6c1, intensity: 0.4 })],
+  // MFD labels and HUD frame ticks name things; they are one tier quieter.
+  ['MAT_Pass65Chopper_HUDCyan', Object.freeze({ color: 0x0c0a07, emissive: 0xb39d86, intensity: 0.22 })],
+  // Combiner glass is a surface, not a light source.
+  ['MAT_Pass65Chopper_HUDGlass', Object.freeze({ color: 0x05100f, emissive: 0x1c2a25, intensity: 0.16 })],
+  // Panel lamps, ammo bars, radar blips: chrome on the burnt-orange deck.
+  ['MAT_Pass65Chopper_CyanInstrument', Object.freeze({ color: 0x120a04, emissive: 0xb4531c, intensity: 0.24 })],
+  // Annunciators and switch lamps are STATE. Green lives here, and only here.
+  ['MAT_Pass65Chopper_GreenInstrument', Object.freeze({ color: 0x050d07, emissive: 0x7dffa6, intensity: 0.26 })],
+  // Trigger and armed marks: the act-on-me accent.
+  ['MAT_Pass65Chopper_Muzzle', Object.freeze({ color: 0x150a03, emissive: 0xff9d3f, intensity: 0.34 })],
+]));
+
 const CHOPPER_READABILITY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   emissive: number;
   intensity: number;
   minimumRoughness?: number;
   maximumMetalness?: number;
+  /** Optional albedo override, for deck surfaces the fill would wash out. */
+  color?: number;
 }>>([
   ['MAT_Pass65Chopper_Armor_PBR', Object.freeze({ emissive: 0x4d8a68, intensity: 0.7 })],
   ['MAT_Pass65Chopper_RearTailArmor_PBR', Object.freeze({
@@ -460,11 +747,27 @@ const CHOPPER_READABILITY_MATERIALS = Object.freeze(new Map<string, Readonly<{
   })],
   ['MAT_Pass65Chopper_DarkArmor', Object.freeze({ emissive: 0x263f36, intensity: 0.45 })],
   ['MAT_Pass65Chopper_Gunmetal', Object.freeze({ emissive: 0x3f5054, intensity: 0.4 })],
-  ['MAT_Pass65Chopper_CockpitFrame', Object.freeze({ emissive: 0x2f6653, intensity: 0.55 })],
-  ['MAT_Pass65Chopper_CockpitInterior', Object.freeze({ emissive: 0x28513a, intensity: 0.45 })],
-  ['MAT_Pass65Chopper_PanelWear', Object.freeze({ emissive: 0x6b5723, intensity: 0.45 })],
+  // Owner 2026-08-31: the deck surfaces carried a green self-fill that, under
+  // a bright sky, washed the whole console to pale mint - the one colour the
+  // gunner HUD language explicitly reserves for nothing. Warm, dark and
+  // rough, so the retuned instrument marks are the brightest thing on it.
+  ['MAT_Pass65Chopper_CockpitFrame', Object.freeze({
+    emissive: 0x3b3025, intensity: 0.3, color: 0x211d17, minimumRoughness: 0.52, maximumMetalness: 0.42,
+  })],
+  ['MAT_Pass65Chopper_CockpitInterior', Object.freeze({
+    emissive: 0x342a1f, intensity: 0.26, color: 0x1a1712, minimumRoughness: 0.62, maximumMetalness: 0.26,
+  })],
+  ['MAT_Pass65Chopper_PanelWear', Object.freeze({
+    emissive: 0x4a3d28, intensity: 0.3, color: 0x2b261d, minimumRoughness: 0.5, maximumMetalness: 0.5,
+  })],
   ['MAT_Pass65Chopper_RescueAccent', Object.freeze({ emissive: 0xa63b0a, intensity: 0.6 })],
   ['MAT_Pass65Chopper_RotorBlade', Object.freeze({ emissive: 0x172424, intensity: 0.3 })],
+  ['MAT_Pass65Chopper_PanelSeam', Object.freeze({
+    emissive: 0x2c2318, intensity: 0.28, color: 0x14120e, minimumRoughness: 0.6, maximumMetalness: 0.42,
+  })],
+  ['MAT_Pass65Chopper_Seat', Object.freeze({
+    emissive: 0x241a12, intensity: 0.3, color: 0x171310, minimumRoughness: 0.72, maximumMetalness: 0.1,
+  })],
 ]));
 
 const CHOPPER_REAR_TAIL_SEMANTIC_NODES = Object.freeze([
@@ -521,6 +824,20 @@ export function applyAuthoredChopperReadability(root: THREE.Object3D): void {
       if (visited.has(entry) || !(entry instanceof THREE.MeshStandardMaterial)) continue;
       visited.add(entry);
       if (entry.userData.pass70ChopperReadabilityApplied === true) continue;
+      const instrument = CHOPPER_COCKPIT_INSTRUMENT_MATERIALS.get(entry.name);
+      if (instrument) {
+        entry.color.setHex(instrument.color);
+        entry.emissive.setHex(instrument.emissive);
+        entry.emissiveIntensity = instrument.intensity;
+        // The glare was unmapped emissive: it skipped tone mapping entirely,
+        // so every panel lamp clipped to white before the bloom pass saw it.
+        entry.toneMapped = true;
+        entry.roughness = Math.max(entry.roughness, instrument.roughness ?? 0.6);
+        entry.metalness = Math.min(entry.metalness, instrument.metalness ?? 0.1);
+        entry.userData.pass70ChopperReadabilityApplied = true;
+        entry.needsUpdate = true;
+        continue;
+      }
       const display = CHOPPER_DISPLAY_MATERIALS.get(entry.name);
       if (display) {
         entry.color.setHex(display.color);
@@ -541,6 +858,7 @@ export function applyAuthoredChopperReadability(root: THREE.Object3D): void {
       // Retaining it multiplies the bounded fill back to zero in WebGPU.
       if (entry.name === 'MAT_Pass65Chopper_Armor_PBR'
         || entry.name === CHOPPER_REAR_TAIL_MATERIAL_NAME) entry.emissiveMap = null;
+      if (readability.color !== undefined) entry.color.setHex(readability.color);
       entry.emissive.setHex(readability.emissive);
       entry.emissiveIntensity = readability.intensity;
       if (readability.minimumRoughness !== undefined) {
@@ -829,6 +1147,8 @@ type PresentedEntity = Readonly<{
   authored: boolean;
   cameraSocket: THREE.Object3D | null;
   cockpit: THREE.Object3D | null;
+  /** HF-336: authored LOD graph whose selected level drives mixer advancement. */
+  authoredLod: THREE.LOD | null;
 }>;
 
 function presentedEntity(
@@ -837,6 +1157,7 @@ function presentedEntity(
   mixers: readonly THREE.AnimationMixer[],
   authored: boolean,
   oneShotActions: ReadonlyMap<string, readonly THREE.AnimationAction[]> = new Map(),
+  authoredLod: THREE.LOD | null = null,
 ): PresentedEntity {
   return Object.freeze({
     root,
@@ -851,6 +1172,7 @@ function presentedEntity(
       ?? root.getObjectByName('chopper-first-person-camera-socket')
       ?? null,
     cockpit: root.getObjectByName('chopper-first-person-cockpit') ?? null,
+    authoredLod,
   });
 }
 
@@ -1143,6 +1465,7 @@ export async function optimizeAuthoredSupportLevel(
     ? await batchAuthoredSupportStaticMeshes(gunnerSightline, family, 'gunner-sightline')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
   await yieldPresentationCpuTask();
+  if (cockpit) markChopperCanopyFrameMembers(cockpit);
   const cockpitStats = cockpit
     ? await batchAuthoredSupportStaticMeshes(cockpit, family, 'cockpit')
     : Object.freeze({ sourceMeshes: 0, batches: 0 });
@@ -1222,8 +1545,18 @@ type PooledBombShell = {
   impactPosition: THREE.Vector3;
   active: boolean;
   startY: number;
+  // HF-335: true 3D flight for chopper missiles. Null = legacy vertical drop.
+  startOrigin: THREE.Vector3 | null;
+} & PooledBombShellExtras & {
   createdAtMs: number;
   impactAtMs: number;
+};
+
+type PooledBombShellExtras = {
+  /** Owner 2026-08-30: rocket exhaust flame, visible only on chopper missiles. */
+  exhaust: THREE.Mesh<THREE.ConeGeometry, THREE.MeshBasicMaterial>;
+  lastTrailPuffAtMs: number;
+  trailPuffOrdinal: number;
 };
 
 type PooledEmber = {
@@ -1279,7 +1612,73 @@ type FirstPersonCockpitAlignmentTelemetry = Readonly<{
   dashboardCameraSpacePosition: readonly number[] | null;
   hudCameraSpacePosition: readonly number[] | null;
   weaponCameraSpacePosition: readonly number[] | null;
+  /** Canopy members withheld because they would end inside the viewport. */
+  framingSuppressedMembers: readonly string[];
+  framing: FirstPersonCockpitFramingTelemetry | null;
 }>;
+
+/**
+ * Owner 2026-08-31 ("the cockpit not stopping midscreen"): the possessed
+ * cockpit has to be measured as FRAMING, in angles the eye actually sees,
+ * not as viewmodel metres. Every value here is degrees off the view axis, so
+ * it can be compared directly against the camera's half-FOV at any aspect:
+ * the vertical half-FOV is aspect-independent, and the horizontal half-FOV
+ * widens with the aspect ratio. Structure whose angle is SMALLER than the
+ * half-FOV ends inside the viewport - that is the hard mid-screen cut.
+ */
+type FirstPersonCockpitFramingTelemetry = Readonly<{
+  /** Visible cockpit meshes measured (excludes the off-centre gun viewmodel). */
+  measuredMeshes: number;
+  /** Meshes wholly behind the eye plane: geometry the pull has thrown away. */
+  meshesBehindEye: number;
+  nearestDepthM: number | null;
+  farthestDepthM: number | null;
+  /** Signed angular silhouette, degrees, over every corner in front of the eye. */
+  leftEdgeDeg: number | null;
+  rightEdgeDeg: number | null;
+  topEdgeDeg: number | null;
+  bottomEdgeDeg: number | null;
+  /**
+   * Ray-sampled aperture along the centre column and centre row. These are
+   * the numbers that decide the complaint: `apertureTopDeg` is the elevation
+   * where cockpit structure first appears straight ahead going UP, and
+   * `structureClearsAboveDeg` is the elevation above which it is gone again.
+   * When the second is smaller than the camera's vertical half-FOV, sky
+   * reappears above the canopy - the hard mid-screen cut.
+   */
+  apertureTopDeg: number | null;
+  structureClearsAboveDeg: number | null;
+  apertureLeftDeg: number | null;
+  apertureRightDeg: number | null;
+  structureClearsLeftOfDeg: number | null;
+  structureClearsRightOfDeg: number | null;
+  /** Wall time of the one-shot sample, so its cost stays visible. */
+  sampleMs: number;
+}>;
+
+const COCKPIT_FRAMING_MINIMUM_DEPTH_M = 0.01;
+/**
+ * The camera's `fov` is the VERTICAL field of view, and three.js keeps it
+ * fixed while the aspect widens - so a viewmodel member measured against the
+ * vertical half-FOV is measured against every aspect at once. The game's
+ * preferred FOV is 76 degrees (src/legacy-main.ts PerspectiveCamera), so the
+ * top of the viewport sits 38 degrees above the sight line. Cockpit framing
+ * that tops out BELOW this ends inside the viewport with sky above it: that
+ * is the hard mid-screen cut, and it is a cut at 16:9, at 21:9 and at every
+ * aspect in between.
+ */
+export const POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG = 38;
+/** Authored inner-windscreen members of the possessed cockpit viewmodel. */
+const CHOPPER_CANOPY_FRAME_NODE_PREFIX = 'Chopper_InnerWindscreen';
+/**
+ * Angular ladder for the aperture sample. One degree out to 45 keeps the
+ * one-shot cost in single-digit milliseconds on the frame the possession
+ * camera cuts, while still covering the whole vertical half-FOV (38 deg) and
+ * enough of the horizontal one to see whether the aperture is clear.
+ */
+const COCKPIT_FRAMING_SAMPLE_STEP_DEG = 1;
+const COCKPIT_FRAMING_SAMPLE_LIMIT_DEG = 45;
+const COCKPIT_FRAMING_RAY_RANGE_M = 4;
 
 export type KillstreakPresentationTelemetry = Readonly<{
   entities: number;
@@ -1412,6 +1811,263 @@ function isGunnerCockpitNode(root: THREE.Object3D, node: THREE.Object3D): boolea
   return false;
 }
 
+const COCKPIT_FRAMING_CORNER_SCRATCH = new THREE.Vector3();
+
+/**
+ * Tag the authored canopy frame so the possessed view can decide about it
+ * per member. Without the batch boundary these merge into the shared
+ * `MAT_Pass65Chopper_CockpitFrame` / `CyanInstrument` batches alongside the
+ * MFD bezels and panel lamps, and no framing decision could reach the
+ * windscreen without taking the dashboard with it.
+ */
+function markChopperCanopyFrameMembers(cockpit: THREE.Object3D): void {
+  cockpit.traverse((node) => {
+    if (!node.name.startsWith(CHOPPER_CANOPY_FRAME_NODE_PREFIX)) return;
+    node.userData.chopperCanopyFrameMember = true;
+    node.userData.supportStaticBatchBoundary = true;
+  });
+}
+
+type CockpitMeshFootprint = Readonly<{
+  minAzimuthDeg: number;
+  maxAzimuthDeg: number;
+  minElevationDeg: number;
+  maxElevationDeg: number;
+  nearestDepthM: number;
+}>;
+
+/** Angular footprint of one mesh, in degrees off the view axis. */
+function cockpitMeshAngularFootprint(
+  node: THREE.Mesh,
+  cameraWorldPosition: THREE.Vector3,
+  inverseCameraQuaternion: THREE.Quaternion,
+): CockpitMeshFootprint | null {
+  const geometry = node.geometry;
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  if (!bounds) return null;
+  let minAzimuthDeg = Number.POSITIVE_INFINITY;
+  let maxAzimuthDeg = Number.NEGATIVE_INFINITY;
+  let minElevationDeg = Number.POSITIVE_INFINITY;
+  let maxElevationDeg = Number.NEGATIVE_INFINITY;
+  let nearestDepthM = Number.POSITIVE_INFINITY;
+  for (let corner = 0; corner < 8; corner += 1) {
+    COCKPIT_FRAMING_CORNER_SCRATCH.set(
+      (corner & 1) === 0 ? bounds.min.x : bounds.max.x,
+      (corner & 2) === 0 ? bounds.min.y : bounds.max.y,
+      (corner & 4) === 0 ? bounds.min.z : bounds.max.z,
+    ).applyMatrix4(node.matrixWorld).sub(cameraWorldPosition).applyQuaternion(inverseCameraQuaternion);
+    const depth = -COCKPIT_FRAMING_CORNER_SCRATCH.z;
+    if (!(depth > COCKPIT_FRAMING_MINIMUM_DEPTH_M)) continue;
+    const azimuthDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.x, depth));
+    const elevationDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.y, depth));
+    minAzimuthDeg = Math.min(minAzimuthDeg, azimuthDeg);
+    maxAzimuthDeg = Math.max(maxAzimuthDeg, azimuthDeg);
+    minElevationDeg = Math.min(minElevationDeg, elevationDeg);
+    maxElevationDeg = Math.max(maxElevationDeg, elevationDeg);
+    nearestDepthM = Math.min(nearestDepthM, depth);
+  }
+  if (nearestDepthM === Number.POSITIVE_INFINITY) return null;
+  return Object.freeze({
+    minAzimuthDeg, maxAzimuthDeg, minElevationDeg, maxElevationDeg, nearestDepthM,
+  });
+}
+
+/**
+ * Owner 2026-08-31: "the cockpit not stopping midscreen". Measured on the
+ * live build at 2560x1440, the authored inner windscreen drew a header bar
+ * 9-12 degrees above the sight line and two pillars crossing eye level at
+ * +/-27-30 degrees, inside a viewport that reaches 38 degrees up and 54
+ * degrees out (62 at 21:9). The frame therefore ENDED inside the picture,
+ * with open sky above the header and open world outside the pillars: a
+ * glowing chevron floating mid-screen rather than a cockpit.
+ *
+ * It cannot be fixed by moving the viewmodel. The frame sits 0.76 m from the
+ * eye and the console 0.23 m; the pull that would swing the header out past
+ * 38 degrees is about 0.4 m, which puts the whole console behind the eye. A
+ * uniform scale about the eye is a perspective no-op, so that lever does not
+ * exist either. So the rule is stated as framing and enforced per member:
+ * a canopy member may frame the view - run past the top of the viewport -
+ * or it may not be drawn at all. Nothing is allowed to stop mid-screen.
+ * Anything the rule keeps is genuinely off-screen framing at every aspect,
+ * because the vertical half-FOV does not move with the aspect ratio.
+ */
+function suppressCockpitFramingThatEndsOnScreen(
+  cockpit: THREE.Object3D,
+  cameraWorldPosition: THREE.Vector3,
+  inverseCameraQuaternion: THREE.Quaternion,
+): readonly string[] {
+  const suppressed: string[] = [];
+  cockpit.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    if (node.userData.chopperCanopyFrameMember !== true) return;
+    const footprint = cockpitMeshAngularFootprint(node, cameraWorldPosition, inverseCameraQuaternion);
+    const framesTheViewport = footprint !== null
+      && footprint.maxElevationDeg >= POSSESSED_COCKPIT_DESIGN_VERTICAL_HALF_FOV_DEG;
+    node.userData.cockpitFramingSuppressed = !framesTheViewport;
+    if (framesTheViewport) return;
+    node.visible = false;
+    suppressed.push(node.name);
+  });
+  return Object.freeze(suppressed.sort());
+}
+const COCKPIT_FRAMING_HIT_SCRATCH: THREE.Intersection[] = [];
+
+function performanceNowMs(): number {
+  return typeof performance === 'object' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
+
+function cockpitSubtreeVisible(cockpit: THREE.Object3D, node: THREE.Object3D): boolean {
+  let cursor: THREE.Object3D | null = node;
+  while (cursor) {
+    if (!cursor.visible) return false;
+    if (cursor === cockpit) return true;
+    cursor = cursor.parent;
+  }
+  return false;
+}
+
+/**
+ * Measure the possessed cockpit as the eye sees it: every visible cockpit
+ * mesh corner is taken into camera space and reported as an angle off the
+ * view axis. Compare the result with the camera half-FOV to answer the only
+ * question the owner asked - does the cockpit end inside the viewport?
+ */
+function measureFirstPersonCockpitFraming(
+  cockpit: THREE.Object3D,
+  cameraWorldPosition: THREE.Vector3,
+  cameraWorldQuaternion: THREE.Quaternion,
+  inverseCameraQuaternion: THREE.Quaternion,
+): FirstPersonCockpitFramingTelemetry {
+  const sampleStartedAtMs = performanceNowMs();
+  const targets: THREE.Mesh[] = [];
+  let meshesBehindEye = 0;
+  let nearestDepthM = Number.POSITIVE_INFINITY;
+  let farthestDepthM = 0;
+  let leftEdgeDeg = Number.POSITIVE_INFINITY;
+  let rightEdgeDeg = Number.NEGATIVE_INFINITY;
+  let topEdgeDeg = Number.NEGATIVE_INFINITY;
+  let bottomEdgeDeg = Number.POSITIVE_INFINITY;
+  cockpit.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    // The gun viewmodel is deliberately off-centre furniture, not framing.
+    if (isGunnerWeaponViewNode(cockpit, node)) return;
+    if (!cockpitSubtreeVisible(cockpit, node)) return;
+    const geometry = node.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const bounds = geometry.boundingBox;
+    if (!bounds) return;
+    targets.push(node);
+    let anyCornerAhead = false;
+    for (let corner = 0; corner < 8; corner += 1) {
+      COCKPIT_FRAMING_CORNER_SCRATCH.set(
+        (corner & 1) === 0 ? bounds.min.x : bounds.max.x,
+        (corner & 2) === 0 ? bounds.min.y : bounds.max.y,
+        (corner & 4) === 0 ? bounds.min.z : bounds.max.z,
+      ).applyMatrix4(node.matrixWorld).sub(cameraWorldPosition).applyQuaternion(inverseCameraQuaternion);
+      const depth = -COCKPIT_FRAMING_CORNER_SCRATCH.z;
+      if (!(depth > COCKPIT_FRAMING_MINIMUM_DEPTH_M)) continue;
+      anyCornerAhead = true;
+      nearestDepthM = Math.min(nearestDepthM, depth);
+      farthestDepthM = Math.max(farthestDepthM, depth);
+      const azimuthDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.x, depth));
+      const elevationDeg = THREE.MathUtils.radToDeg(Math.atan2(COCKPIT_FRAMING_CORNER_SCRATCH.y, depth));
+      leftEdgeDeg = Math.min(leftEdgeDeg, azimuthDeg);
+      rightEdgeDeg = Math.max(rightEdgeDeg, azimuthDeg);
+      topEdgeDeg = Math.max(topEdgeDeg, elevationDeg);
+      bottomEdgeDeg = Math.min(bottomEdgeDeg, elevationDeg);
+    }
+    if (!anyCornerAhead) meshesBehindEye += 1;
+  });
+  // Sample the aperture with real rays. Bounding-box corners cannot answer
+  // "does the canopy header cross the centre of the screen" - a bar spanning
+  // the view has its corners far off-axis - so walk an angular ladder out
+  // from the sight line and record where structure starts and stops.
+  const raycaster = new THREE.Raycaster();
+  raycaster.far = COCKPIT_FRAMING_RAY_RANGE_M;
+  raycaster.near = 0;
+  const direction = new THREE.Vector3();
+  const hitDistanceAt = (azimuthDeg: number, elevationDeg: number): number | null => {
+    if (targets.length === 0) return null;
+    const azimuth = THREE.MathUtils.degToRad(azimuthDeg);
+    const elevation = THREE.MathUtils.degToRad(elevationDeg);
+    direction.set(
+      Math.sin(azimuth) * Math.cos(elevation),
+      Math.sin(elevation),
+      -Math.cos(azimuth) * Math.cos(elevation),
+    ).applyQuaternion(cameraWorldQuaternion).normalize();
+    raycaster.set(cameraWorldPosition, direction);
+    // Presentation meshes deliberately null their own `raycast` (shared-asset
+    // and static-batch policy), so `intersectObjects` reports nothing. Call
+    // the prototype directly: this is a measurement, not a gameplay pick.
+    let nearest: number | null = null;
+    for (const target of targets) {
+      COCKPIT_FRAMING_HIT_SCRATCH.length = 0;
+      THREE.Mesh.prototype.raycast.call(target, raycaster, COCKPIT_FRAMING_HIT_SCRATCH);
+      for (const hit of COCKPIT_FRAMING_HIT_SCRATCH) {
+        if (nearest === null || hit.distance < nearest) nearest = hit.distance;
+      }
+    }
+    return nearest;
+  };
+  const hitsAt = (azimuthDeg: number, elevationDeg: number): boolean => (
+    hitDistanceAt(azimuthDeg, elevationDeg) !== null
+  );
+
+  const ladder = (
+    axis: 'elevation' | 'azimuth',
+    sign: 1 | -1,
+  ): Readonly<{ firstHitDeg: number | null; clearsBeyondDeg: number | null }> => {
+    let firstHitDeg: number | null = null;
+    let lastHitDeg: number | null = null;
+    for (
+      let offset = COCKPIT_FRAMING_SAMPLE_STEP_DEG;
+      offset <= COCKPIT_FRAMING_SAMPLE_LIMIT_DEG;
+      offset += COCKPIT_FRAMING_SAMPLE_STEP_DEG
+    ) {
+      const angle = sign * offset;
+      const hit = axis === 'elevation' ? hitsAt(0, angle) : hitsAt(angle, 0);
+      if (!hit) continue;
+      if (firstHitDeg === null) firstHitDeg = angle;
+      lastHitDeg = angle;
+    }
+    return Object.freeze({
+      firstHitDeg,
+      // Null means structure reaches the sample limit: it never runs out
+      // inside any plausible frustum, which is the framed state we want.
+      clearsBeyondDeg: lastHitDeg === null
+        || Math.abs(lastHitDeg) >= COCKPIT_FRAMING_SAMPLE_LIMIT_DEG - COCKPIT_FRAMING_SAMPLE_STEP_DEG
+        ? null
+        : lastHitDeg,
+    });
+  };
+  const above = ladder('elevation', 1);
+  const left = ladder('azimuth', -1);
+  const right = ladder('azimuth', 1);
+  const finite = (value: number | null): number | null => (
+    value !== null && Number.isFinite(value) ? Number(value.toFixed(3)) : null
+  );
+  return Object.freeze({
+    measuredMeshes: targets.length,
+    meshesBehindEye,
+    nearestDepthM: finite(nearestDepthM),
+    farthestDepthM: farthestDepthM === 0 ? null : finite(farthestDepthM),
+    leftEdgeDeg: finite(leftEdgeDeg),
+    rightEdgeDeg: finite(rightEdgeDeg),
+    topEdgeDeg: finite(topEdgeDeg),
+    bottomEdgeDeg: finite(bottomEdgeDeg),
+    apertureTopDeg: finite(above.firstHitDeg),
+    structureClearsAboveDeg: finite(above.clearsBeyondDeg),
+    apertureLeftDeg: finite(left.firstHitDeg),
+    apertureRightDeg: finite(right.firstHitDeg),
+    structureClearsLeftOfDeg: finite(left.clearsBeyondDeg),
+    structureClearsRightOfDeg: finite(right.clearsBeyondDeg),
+    sampleMs: Number((performanceNowMs() - sampleStartedAtMs).toFixed(2)),
+  });
+}
+
 function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): boolean {
   let cursor: THREE.Object3D | null = node;
   while (cursor && cursor !== root) {
@@ -1422,6 +2078,9 @@ function isFirstPersonOnlyNode(root: THREE.Object3D, node: THREE.Object3D): bool
 }
 
 const SUPPORT_STABLE_AIRFRAME_EXCLUDED_SUBTREES = Object.freeze(new Set([
+  // HF-336: the shadow-caster proxy is colour-pass inert; exterior review
+  // evidence must keep measuring the authored airframe, not the proxy.
+  SUPPORT_SHADOW_SILHOUETTE_NODE_NAME,
   'chopper-first-person-cockpit',
   'chopper-gunner-sightline',
   'chopper-gunner-weapon-view',
@@ -1626,7 +2285,8 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
       // centre. Retire the GLB combiner-glass/reticle subtree during
       // possession while retaining the off-centre gun receiver and authored
       // lower cockpit; two overlapping HUD lanes created the opaque block.
-      node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource;
+      node.visible = gunnerCockpitNode && !gunnerSightBlocker && !retiredStaticSource
+        && node.userData.cockpitFramingSuppressed !== true;
       if (gunnerCockpitNode) {
         // The complete cockpit is a first-person viewmodel. Keep optional
         // effects layers, but remove the ordinary world layer so both renderer
@@ -1640,6 +2300,9 @@ function setSupportFirstPersonVisibility(root: THREE.Group, possessed: boolean):
         node.layers.mask = node.userData.supportBaseLayerMask;
       }
       node.userData.supportFirstPersonOverrideActive = false;
+      // The framing decision is per possession: re-derive it on the next one
+      // rather than carrying a stale suppression across entities.
+      node.userData.cockpitFramingSuppressed = false;
     } else if (firstPersonOnlyNode) {
       node.visible = false;
     }
@@ -1675,6 +2338,8 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
   lod.name = `${runtimeName}-authored-lods`;
   const mixers: THREE.AnimationMixer[] = [];
   const oneShotActions = new Map<string, THREE.AnimationAction[]>();
+  /** HF-336: coarsest authored level, baked into the shadow-caster proxy. */
+  let shadowSilhouetteSource: THREE.Object3D | null = null;
   for (const [index, source] of template.lods.entries()) {
     const level = source.scene.clone(true);
     level.name = `${runtimeName}-authored-lod${index}`;
@@ -1691,7 +2356,12 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
       gunnerSightline.userData.firstPersonOnly = true;
     }
     markSharedPresentationAsset(level);
-    if (family === 'chopper') applyAuthoredSupportShadowBudget(level, 'chopper');
+    // HF-336: the shadow budget is applied once to the finished root below.
+    // Applying it here was dead work - the closing markSharedPresentationAsset
+    // pass re-enabled castShadow on every mesh it had just retired.
+    if (family === 'chopper' && index === authoredSupportShadowSilhouetteLevel(template.lods.length)) {
+      shadowSilhouetteSource = level;
+    }
     // Support vehicles operate 18-30m above the arena, so the old 34m/68m
     // switches meant players almost never saw LOD0's full detailing - the
     // authored craft read as low-poly slabs. One or two active vehicles can
@@ -1738,7 +2408,19 @@ function buildAuthoredSupportVehicle(family: SupportVehicleAssetFamily): Present
     }
   }
   markSharedPresentationAsset(root);
-  return presentedEntity(root, null, mixers, true, oneShotActions);
+  if (family === 'chopper') {
+    // HF-336: retire the whole authored mesh set from the shadow map and let a
+    // single merged low-detail silhouette cast in its place. This runs after
+    // markSharedPresentationAsset because that pass sets castShadow = true on
+    // every mesh it touches, which is what silently reinstated LOD0's full
+    // caster set for every player who was not the one flying the chopper.
+    applyAuthoredSupportShadowBudget(root, 'chopper', { castShadows: false });
+    const silhouette = buildAuthoredSupportShadowSilhouette('chopper', shadowSilhouetteSource);
+    if (silhouette) root.add(silhouette);
+  }
+  // HF-336: expose the authored LOD graph so per-frame mixer advancement can
+  // follow the level the renderer actually displays.
+  return presentedEntity(root, null, mixers, true, oneShotActions, lod);
 }
 
 function buildProceduralChopperFallback(): PresentedEntity {
@@ -1817,6 +2499,11 @@ function buildProceduralChopperFallback(): PresentedEntity {
   cockpitRailRight.name = 'chopper-cockpit-rail-right';
   cockpitRailRight.position.x = 0.47;
   cockpitRailRight.rotation.z = 0.18;
+  // Same framing contract as the authored inner windscreen: these rails may
+  // run past the top of the viewport or they are not drawn in the possessed
+  // view. See suppressCockpitFramingThatEndsOnScreen.
+  cockpitRailLeft.userData.chopperCanopyFrameMember = true;
+  cockpitRailRight.userData.chopperCanopyFrameMember = true;
   const displayMaterial = (colour: number) => new THREE.MeshStandardMaterial({
     color: colour,
     emissive: colour,
@@ -2186,14 +2873,40 @@ function createPooledBombShell(index: number): PooledBombShell {
   root.rotation.x = Math.PI / 2;
   root.userData.presentationOnly = true;
   root.userData.poolSlot = index;
+  // Owner 2026-08-30 ("look cooler like they're actually firing a missile
+  // with like a rocket trail"): additive exhaust flame at the tail. The
+  // shell's +Y axis is its nose for missile flights, so the cone apex points
+  // backwards along -Y.
+  const exhaust = new THREE.Mesh(
+    new THREE.ConeGeometry(0.26, 1.05, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xffa63c,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  exhaust.name = 'chopper-missile-exhaust';
+  exhaust.rotation.x = Math.PI;
+  exhaust.position.y = -0.75;
+  exhaust.visible = false;
+  exhaust.userData.presentationOnly = true;
+  exhaust.raycast = () => undefined;
+  root.add(exhaust);
   return {
     root,
     inactiveName,
     impactPosition: new THREE.Vector3(),
     active: false,
     startY: 0,
+    startOrigin: null, // HF-335
     createdAtMs: 0,
     impactAtMs: 0,
+    exhaust,
+    lastTrailPuffAtMs: 0,
+    trailPuffOrdinal: 0,
   };
 }
 
@@ -2258,9 +2971,11 @@ export class KillstreakPresentation {
   private readonly firstPersonSocketQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonRootQuaternionScratch = new THREE.Quaternion();
   private readonly firstPersonCockpitCameraPivot = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private readonly firstPersonCockpitUpScratch = new THREE.Vector3();
   private readonly firstPersonCockpitSocketWorldScratch = new THREE.Vector3();
   private readonly firstPersonCockpitDesiredParentScratch = new THREE.Vector3();
   private readonly firstPersonCockpitPivotOffsetScratch = new THREE.Vector3();
+  private readonly firstPersonCockpitInverseCameraQuaternionScratch = new THREE.Quaternion();
   private readonly sensorRoot = new THREE.Group();
   private readonly sensorSilhouettes: THREE.Group[];
   private visibleSensorContacts = 0;
@@ -2306,6 +3021,10 @@ export class KillstreakPresentation {
     this.sensorSilhouettes = Array.from({ length: MAX_SENSOR_CONTACTS }, (_, index) => buildDroneSensorSilhouette(index));
     this.sensorRoot.add(...this.sensorSilhouettes);
     this.root.add(this.sensorRoot);
+    // The pool is a permanent scene child, but its 4.2k dormant nodes must
+    // not be descended by every renderer matrix walk. Live entity/effect
+    // roots are refreshed explicitly after sync mutates them.
+    freezeMatrixWorldWalk(this.root);
   }
 
   private static readonly PREWARMED_CAPACITIES: readonly [PresentedEntityPoolKey, number][] = Object.freeze([
@@ -2325,6 +3044,10 @@ export class KillstreakPresentation {
     entry.root.userData.presentationPoolInUse = false;
     entry.root.name = `prewarmed-${key}-${index + 1}`;
     entry.root.visible = false;
+    // Perf (2026-08-29): idle pool entries are ~4.2k scene nodes whose
+    // matrices three would recompose EVERY frame. Deep-freeze while pooled;
+    // checkout restores full dynamics and refreshes the world matrices once.
+    deepFreezeSubtreeMatrices(entry.root);
     this.prewarmed.push(entry);
     this.root.add(entry.root);
     return entry;
@@ -2556,6 +3279,51 @@ export class KillstreakPresentation {
     this.swarmInstanceBatches.length = 0;
   }
 
+  /**
+   * HF-336: advance only the animation mixer of the LOD level the renderer
+   * displays. Non-controlling observers previously evaluated every authored
+   * clip per level per entity every frame (three chopper levels of full-body
+   * and rotor work) while the possessor rendered none of it. The renderer's
+   * own LOD.update() already selected a level this frame, so its index is the
+   * authority; when no selection is known yet (first frame, hidden root,
+   * tests without a camera) all mixers still receive an exact absolute time so
+   * behaviour is unchanged until a level is actually displayed.
+   */
+  /**
+   * HF-336: index of the LOD level the renderer actually selected this frame, or
+   * -1 when no selection can be trusted. Returning -1 is the safe answer — the
+   * caller then advances every mixer, preserving the historic behaviour rather
+   * than silently freezing an animation on a level that is really on screen.
+   */
+  private static authoredActiveLodMixerIndex(
+    authoredLod: THREE.LOD | null,
+    mixerCount: number,
+  ): number {
+    if (!authoredLod || mixerCount <= 0) return -1;
+    // getCurrentLevel() reflects the last LOD.update(camera); before the first
+    // render (or in tests with no camera) it reads 0, which is indistinguishable
+    // from a genuine level-0 selection, so require a populated level list too.
+    const levels = authoredLod.levels;
+    if (!Array.isArray(levels) || levels.length === 0) return -1;
+    const level = typeof authoredLod.getCurrentLevel === 'function'
+      ? authoredLod.getCurrentLevel()
+      : -1;
+    if (!Number.isInteger(level) || level < 0 || level >= mixerCount) return -1;
+    return level;
+  }
+
+  private advanceActiveLevelMixers(presented: PresentedEntity, nowMs: number): void {
+    // HF-336: one mixer update per frame for authored vehicles; the fallback
+    // branch keeps the historic all-mixers behaviour for the frames before the
+    // renderer has selected a level (and for procedural entities with no LOD).
+    const activeIndex = KillstreakPresentation.authoredActiveLodMixerIndex(presented.authoredLod, presented.mixers.length);
+    if (activeIndex < 0) {
+      for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
+      return;
+    }
+    presented.mixers[activeIndex]!.setTime(nowMs / 1_000);
+  }
+
   private syncSwarmInstancing(): void {
     if (this.swarmInstanceBatches.length === 0) return;
     const active = this.activeSwarmEntries;
@@ -2616,6 +3384,9 @@ export class KillstreakPresentation {
     if (this.gpuPrewarmGeneration === sceneGeneration) return;
     if (this.gpuPrewarmPromise) return this.gpuPrewarmPromise;
     this.gpuPrewarmActive = true;
+    // The staged compile passes move, animate and render the pooled
+    // vocabulary, so the idle-pool matrix freeze must lift for the rehearsal.
+    for (const entry of this.prewarmed) deepUnfreezeSubtreeMatrices(entry.root);
     const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
     this.gpuPrewarmPromise = operation;
     try {
@@ -2623,6 +3394,12 @@ export class KillstreakPresentation {
     } finally {
       if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
       this.gpuPrewarmActive = false;
+      for (const entry of this.prewarmed) {
+        if (entry.root.userData.presentationPoolInUse !== true) {
+          deepFreezeSubtreeMatrices(entry.root);
+          entry.root.updateMatrixWorld(true);
+        }
+      }
     }
   }
 
@@ -2779,7 +3556,10 @@ export class KillstreakPresentation {
       for (let batchIndex = 0; batchIndex < stagedBatches.length; batchIndex += 1) {
         const batch = stagedBatches[batchIndex]!;
         stageBatchInView(batch, 30 + batchIndex * 4, batchIndex === 0 ? 2.5 : 0.9);
-        for (const stagedRoot of batch) stagedRoot.visible = true;
+        for (const stagedRoot of batch) {
+          stagedRoot.visible = true;
+          stagedRoot.updateWorldMatrix(true, true);
+        }
         await runtime.compileAndRender(this.root, camera, parentScene);
         for (const stagedRoot of batch) stagedRoot.visible = false;
         if (typeof document !== 'undefined' && batchIndex + 1 < stagedBatches.length) {
@@ -2836,6 +3616,7 @@ export class KillstreakPresentation {
               if (node instanceof THREE.LOD) node.update(camera);
             });
           }
+          for (const liveRoot of liveActivationRoots) liveRoot.updateWorldMatrix(true, true);
           await runtime.compileAndRender(this.root, camera, parentScene);
         }
       } finally {
@@ -2906,6 +3687,8 @@ export class KillstreakPresentation {
     const presented = this.entityPools.get(key)?.find((entry) => entry.root.userData.presentationPoolInUse !== true);
     if (!presented) return createPresentedEntity(entity);
     presented.root.userData.presentationPoolInUse = true;
+    deepUnfreezeSubtreeMatrices(presented.root);
+    presented.root.updateMatrixWorld(true);
     presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
     // Swarm source trees drive the animated instance matrices but must never
     // enter renderer traversal themselves. Their 24 authored hierarchies are
@@ -2927,6 +3710,8 @@ export class KillstreakPresentation {
     presented.target.set(0, 0, 0);
     presented.attitudeTarget.identity();
     presented.attitudeEuler.set(0, 0, 0, 'YXZ');
+    deepFreezeSubtreeMatrices(presented.root);
+    presented.root.updateMatrixWorld(true);
     delete presented.root.userData.supportSnapshotPhase;
   }
 
@@ -3012,7 +3797,7 @@ export class KillstreakPresentation {
         presented.root.quaternion.slerp(presented.attitudeTarget, blend);
       }
       presented.root.userData.supportSnapshotPhase = entity.phase;
-      for (const mixer of presented.mixers) mixer.setTime(nowMs / 1_000);
+      this.advanceActiveLevelMixers(presented, nowMs);
       if (!presented.authored) {
         if (presented.rotor) presented.rotor.rotation.y += entity.kind === 'chopper' ? 0.72 : 1.1;
         const tailRotor = presented.root.getObjectByName('chopper-tail-rotor');
@@ -3061,9 +3846,40 @@ export class KillstreakPresentation {
       if (!shell.active) continue;
       const dropDurationMs = Math.max(1, shell.impactAtMs - shell.createdAtMs);
       const progress = THREE.MathUtils.clamp((nowMs - shell.createdAtMs) / dropDurationMs, 0, 1);
-      shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      if (shell.startOrigin) {
+        // HF-335: true 3D flight along the launch→impact vector.
+        shell.root.position.lerpVectors(shell.startOrigin, shell.impactPosition, progress);
+        // Owner 2026-08-30: rocket trail - shed a glowing puff every few
+        // frames along the flight path (pooled embers, no allocation).
+        if (shell.exhaust.visible && nowMs - shell.lastTrailPuffAtMs >= MISSILE_TRAIL_PUFF_INTERVAL_MS) {
+          shell.lastTrailPuffAtMs = nowMs;
+          const puff = firstInactive(this.emberPool);
+          if (puff) {
+            const lane = shell.trailPuffOrdinal * 3;
+            const seed = (shell.root.userData.poolSlot as number) * 977 + 131;
+            shell.trailPuffOrdinal += 1;
+            puff.active = true;
+            puff.radius = 0.22 + deterministicUnit(seed, lane) * 0.18;
+            puff.createdAtMs = nowMs;
+            puff.expiresAtMs = nowMs + 560;
+            puff.origin.copy(shell.root.position);
+            puff.origin.x += (deterministicUnit(seed, lane + 1) - 0.5) * 0.3;
+            puff.origin.z += (deterministicUnit(seed, lane + 2) - 0.5) * 0.3;
+            puff.velocity.set(0, 2.6, 0);
+            puff.root.name = 'chopper-missile-trail-puff';
+            puff.root.position.copy(puff.origin);
+            puff.root.scale.setScalar(puff.radius);
+            puff.root.material.color.setHex(shell.trailPuffOrdinal % 3 === 0 ? 0x8d8d8d : 0xffb03a);
+            puff.root.material.opacity = 0.8;
+            puff.root.visible = true;
+          }
+        }
+      } else {
+        shell.root.position.y = THREE.MathUtils.lerp(shell.startY, shell.impactPosition.y, progress);
+      }
       if (progress >= 1) this.deactivateBombShell(shell);
     }
+    this.updateLiveWorldMatrices();
   }
 
   private syncSensorContacts(contacts: readonly DroneSensorContact[]): void {
@@ -3079,6 +3895,26 @@ export class KillstreakPresentation {
       silhouette.userData.contactLifeId = contact.lifeId;
       silhouette.userData.relation = contact.relation;
       silhouette.userData.throughWall = contact.throughWall;
+    }
+  }
+
+  /** Refresh only roots whose transforms were touched during this sync. */
+  private updateLiveWorldMatrices(): void {
+    for (const presented of this.entities.values()) {
+      presented.root.updateWorldMatrix(true, true);
+    }
+    for (const flash of this.impactFlashPool) {
+      if (flash.active) flash.root.updateWorldMatrix(true, true);
+    }
+    for (const shell of this.bombShellPool) {
+      if (shell.active) shell.root.updateWorldMatrix(true, true);
+    }
+    for (const ember of this.emberPool) {
+      if (ember.active) ember.root.updateWorldMatrix(true, true);
+    }
+    if (this.visibleSensorContacts > 0) this.sensorRoot.updateWorldMatrix(true, true);
+    for (const marker of this.placementMarkers.values()) {
+      if (marker.root.visible) marker.root.updateWorldMatrix(true, true);
     }
   }
 
@@ -3164,16 +4000,43 @@ export class KillstreakPresentation {
         shell.startY = impact.position[1] + (isChopperMissile
           ? CHOPPER_MISSILE_PRESENTATION_ALTITUDE_M
           : CARPET_BOMB_SHELL_PRESENTATION_ALTITUDE_M);
+        // HF-335: when the host supplies the true 3D launch origin, fly the
+        // missile along it with lookAt orientation; otherwise keep the legacy
+        // vertical drop (fail-open for older peers).
+        shell.startOrigin = isChopperMissile && impact.launchPosition
+          ? new THREE.Vector3(impact.launchPosition[0], impact.launchPosition[1], impact.launchPosition[2])
+          : null;
         shell.impactPosition.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
         shell.root.name = isChopperMissile ? 'pass70-chopper-missile-shell' : 'pass65-carpet-bomb-shell';
-        shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
-        shell.root.scale.set(
-          isChopperMissile ? 1.6 : 1,
-          isChopperMissile ? 3.5 : 1,
-          isChopperMissile ? 1.6 : 1,
-        );
+        if (shell.startOrigin) {
+          shell.root.rotation.set(0, 0, 0);
+          // Owner 2026-08-30: a longer missile body reads as a rocket, not a
+          // dropped bomb shell.
+          shell.root.scale.set(1.15, 2.3, 1.15);
+        } else {
+          shell.root.rotation.x = isChopperMissile ? 0 : Math.PI / 2;
+          shell.root.scale.set(
+            isChopperMissile ? 1.6 : 1,
+            isChopperMissile ? 3.5 : 1,
+            isChopperMissile ? 1.6 : 1,
+          );
+        }
         shell.root.material.color.setHex(isChopperMissile ? 0xb09a58 : 0x2a2a2a);
-        shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        if (shell.startOrigin) {
+          shell.root.position.copy(shell.startOrigin);
+          // Owner 2026-08-30: the shell geometry's length axis is +Y, so
+          // lookAt (which aims +Z) flew the missile sideways. Align the nose
+          // axis to the true flight vector instead, and light the exhaust.
+          MISSILE_FLIGHT_DIRECTION_SCRATCH
+            .subVectors(shell.impactPosition, shell.startOrigin)
+            .normalize();
+          shell.root.quaternion.setFromUnitVectors(MISSILE_NOSE_AXIS, MISSILE_FLIGHT_DIRECTION_SCRATCH);
+        } else {
+          shell.root.position.set(impact.position[0], shell.startY, impact.position[2]);
+        }
+        shell.exhaust.visible = isChopperMissile && shell.startOrigin !== null;
+        shell.lastTrailPuffAtMs = nowMs;
+        shell.trailPuffOrdinal = 0;
         shell.root.visible = true;
         continue;
       }
@@ -3182,9 +4045,11 @@ export class KillstreakPresentation {
       if (!flash) break;
       flash.active = true;
       flash.createdAtMs = nowMs;
-      flash.expiresAtMs = nowMs + (isCarpet ? 600 : 420);
-      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : 0.55;
-      flash.maximumOpacity = isCarpet ? 0.9 : 0.8;
+      // Owner 2026-08-30: chopper missile impacts were a 0.55 m blink -
+      // invisible next to their 4.5 m blast authority. Sized to be seen.
+      flash.expiresAtMs = nowMs + (isCarpet ? 600 : 640);
+      flash.baseRadius = isCarpet ? CARPET_BOMBER_IMPACT_FLASH_BASE_RADIUS_M : MISSILE_IMPACT_FLASH_RADIUS_M;
+      flash.maximumOpacity = isCarpet ? 0.9 : 0.85;
       flash.root.name = isCarpet ? 'pass65-carpet-impact-flash-large' : 'pass70-chopper-missile-impact-flash';
       flash.root.position.set(impact.position[0], impact.position[1] + 0.35, impact.position[2]);
       flash.root.scale.setScalar(flash.baseRadius);
@@ -3192,9 +4057,10 @@ export class KillstreakPresentation {
       flash.root.material.opacity = flash.maximumOpacity;
       flash.root.visible = true;
 
-      if (isCarpet) {
+      if (isCarpet || isChopperMissile) {
         const seed = impactSeed(impact);
-        for (let particle = 0; particle < EMBERS_PER_CARPET_IMPACT; particle += 1) {
+        const emberCount = isCarpet ? EMBERS_PER_CARPET_IMPACT : EMBERS_PER_MISSILE_IMPACT;
+        for (let particle = 0; particle < emberCount; particle += 1) {
           const ember = firstInactive(this.emberPool);
           if (!ember) break;
           const lane = particle * 5;
@@ -3220,6 +4086,12 @@ export class KillstreakPresentation {
         }
       }
     }
+    // Muse F1 (HF-491): the pool ROOT is a static traversal boundary
+    // (`freezeMatrixWorldWalk`), so the renderer's walk no longer descends
+    // into these newly activated shells/flashes/embers. `presentImpacts` is
+    // the one activation site outside `sync()`, so it must refresh the live
+    // roots itself or the effect draws one frame at its pooled rest pose.
+    this.updateLiveWorldMatrices();
   }
 
   entityRoot(id: string): THREE.Group | null {
@@ -3323,8 +4195,18 @@ export class KillstreakPresentation {
     }
     const inverseParent = parent.getWorldQuaternion(this.firstPersonRootQuaternionScratch).invert();
     cockpit.quaternion.copy(inverseParent.multiply(cameraWorldQuaternion));
+    // Owner 2026-08-29: the canopy glass frame must sit HIGH in the possessed
+    // view so the gunsight looks through OPEN canopy, not through the frame.
+    // This was right weeks ago and regressed; anchoring it here (rather than
+    // in the authored GLB) covers the authored cockpit and the procedural
+    // fallback alike. Raising the viewmodel in camera space moves the whole
+    // glass structure up the screen.
+    const cameraUp = this.firstPersonCockpitUpScratch.set(0, 1, 0).applyQuaternion(cameraWorldQuaternion);
+    const cameraForward = this.firstPersonForwardScratch.set(0, 0, -1).applyQuaternion(cameraWorldQuaternion);
     const desiredParentPosition = parent.worldToLocal(
-      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition),
+      this.firstPersonCockpitDesiredParentScratch.copy(cameraWorldPosition)
+        .addScaledVector(cameraUp, FIRST_PERSON_COCKPIT_VIEW_LIFT_M)
+        .addScaledVector(cameraForward, -FIRST_PERSON_COCKPIT_VIEW_PULL_M),
     );
     const pivotOffset = this.firstPersonCockpitPivotOffsetScratch.copy(authoredCameraPivot)
       .multiply(cockpit.scale)
@@ -3332,6 +4214,17 @@ export class KillstreakPresentation {
     cockpit.position.copy(desiredParentPosition).sub(pivotOffset);
     cockpit.updateMatrixWorld(true);
     if (this.firstPersonCockpitAlignment) return;
+    const framingSuppressedMembers = suppressCockpitFramingThatEndsOnScreen(
+      cockpit,
+      cameraWorldPosition,
+      this.firstPersonCockpitInverseCameraQuaternionScratch.copy(cameraWorldQuaternion).invert(),
+    );
+    cockpit.updateMatrixWorld(true);
+    // Telemetry measures against the LIFTED target so the deliberate view
+    // lift never reads as pivot error.
+    const liftedCameraWorldPosition = cameraWorldPosition.clone()
+      .addScaledVector(cameraUp, FIRST_PERSON_COCKPIT_VIEW_LIFT_M)
+      .addScaledVector(cameraForward, -FIRST_PERSON_COCKPIT_VIEW_PULL_M);
     const cameraPivotWorldPosition = cockpit.localToWorld(authoredCameraPivot.clone());
     const inverseCameraQuaternion = cameraWorldQuaternion.clone().invert();
     const cameraSpacePosition = (name: string): readonly number[] | null => {
@@ -3348,10 +4241,17 @@ export class KillstreakPresentation {
       cockpitWorldPosition: Object.freeze(cockpit.getWorldPosition(new THREE.Vector3()).toArray()),
       parentName: parent.name,
       parentWorldScale: Object.freeze(parent.getWorldScale(new THREE.Vector3()).toArray()),
-      pivotErrorM: cameraPivotWorldPosition.distanceTo(cameraWorldPosition),
+      pivotErrorM: cameraPivotWorldPosition.distanceTo(liftedCameraWorldPosition),
       dashboardCameraSpacePosition: cameraSpacePosition('chopper-cockpit-dashboard-3d'),
       hudCameraSpacePosition: cameraSpacePosition('chopper-cockpit-hud-glass'),
       weaponCameraSpacePosition: cameraSpacePosition('chopper-gunner-weapon-view'),
+      framingSuppressedMembers,
+      framing: measureFirstPersonCockpitFraming(
+        cockpit,
+        cameraWorldPosition,
+        cameraWorldQuaternion,
+        inverseCameraQuaternion,
+      ),
     });
   }
 
@@ -3666,4 +4566,14 @@ export class KillstreakPresentation {
     this.retireRoot(this.emberPoolRoot);
     this.root.removeFromParent();
   }
+}
+
+const authoredSupportAssetsByPresentation = new WeakMap<KillstreakPresentation, Promise<void>>();
+export function ensureAuthoredSupportPresentationAssets(presentation: KillstreakPresentation): Promise<void> {
+  const existing = authoredSupportAssetsByPresentation.get(presentation);
+  if (existing) return existing;
+  const operation = Promise.all([loadHunterDronePresentation(), loadSupportVehiclePresentations()])
+    .then(() => presentation.prewarmAuthoredAssets());
+  authoredSupportAssetsByPresentation.set(presentation, operation);
+  return operation;
 }
