@@ -64,8 +64,11 @@ import * as THREE from 'three';
  * The boundary fence corner sits at hypot(31.3, 31.8) = 44.6 m; the envelope
  * starts well beyond it so the backdrop can never enter gameplay space. */
 export const NUKETOWN_BACKDROP_MIN_RADIAL_M = 58;
-/** Radial ceiling (metres): max radial + arena camera corner (44.3 m) stays
- * inside the atomic-acres 180 m camera far plane with margin. */
+/** Radial ceiling (metres): max radial + arena camera corner stays inside the
+ * camera far plane with margin. SHIPPED map: 132 + 44.3 against its 180 m far
+ * plane (atomic-acres takes the `180` branch at src/legacy-main.ts:29767).
+ * NUKETOWN2 runs at far = 900 on every session (NUKE_EVENT_CAMERA_FAR_M), so
+ * height is not far-plane constrained there — see NUKETOWN2_BACKDROP_MAX_*. */
 export const NUKETOWN_BACKDROP_MAX_RADIAL_M = 132;
 /** Crest ceiling (metres). */
 export const NUKETOWN_BACKDROP_MAX_HEIGHT_M = 34;
@@ -89,6 +92,34 @@ export const NUKETOWN_BACKDROP_SKIRT_Y_M = -0.42;
  * past this envelope's outer radius, so a second ground layer there would only
  * z-fight the first.
  */
+/**
+ * HF-556: per-ring tuning for the nuketown2 massif. Every field is optional
+ * and defaults to the shipped map's authored value, so the default envelope
+ * (which sets none of them) builds byte-identical geometry and its pinned
+ * tests pass untouched.
+ */
+export type NuketownBackdropRingTuning = Readonly<{
+  /** Inner radius override. Defaults: foothills minRadialM+6, ridge +38, far +58. */
+  innerM?: number;
+  /** Outer radius override. Defaults: foothills minRadialM+34, silhouette rings maxRadialM. */
+  outerM?: number;
+  /** Crest height band [min, max] override. Defaults: foothills [4,12], ridge [10,maxH-2], far [20,maxH]. */
+  height?: readonly [number, number];
+  /** Segment count override. Defaults: foothills 108, ridge 200, far 152. */
+  segments?: number;
+  /** Palette overrides. Defaults are the shipped ring colours. */
+  footColor?: number;
+  crestColor?: number;
+  /** Surface-machinery overrides. Defaults: ridge all true, other rings unset. */
+  strata?: boolean;
+  fissures?: boolean;
+  facetJitter?: boolean;
+  /** Baked-sun swing override. Defaults: foothills 0.68, ridge 0.95, far 0.36. */
+  shadeStrength?: number;
+  /** Direct haze-mix override (undefined = radial haze path). Default: far 0.52, others undefined. */
+  aerialHazeMix?: number;
+}>;
+
 export type NuketownBackdropEnvelope = Readonly<{
   /** Nothing in the massif comes closer to the origin than this. */
   minRadialM: number;
@@ -98,8 +129,19 @@ export type NuketownBackdropEnvelope = Readonly<{
   maxHeightM: number;
   /** Build the rolling beyond-fence ground disc under the rings. */
   skirt: boolean;
+  /** Vertex-row count per ring cross-section. Default 5: inner foot, inner
+   * shoulder, crest, outer shoulder, outer foot. Higher counts resample the
+   * same five keyframes so flanks carry spurs instead of a tent profile. */
+  ringRows?: number;
+  /** Crest sharpening exponent over the ridged-FBM relief. Default 1.4. */
+  sharpenExponent?: number;
+  /** Add two higher ridged octaves (x37, x61) to the crest function. Default false. */
+  extraCrestOctaves?: boolean;
+  /** Per-ring tuning. Absent = shipped values, byte for byte. */
+  foothills?: NuketownBackdropRingTuning;
+  ridge?: NuketownBackdropRingTuning;
+  farRange?: NuketownBackdropRingTuning;
 }>;
-
 /** The shipped map's envelope: exactly the constants above, unchanged. */
 export const NUKETOWN_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.freeze({
   minRadialM: NUKETOWN_BACKDROP_MIN_RADIAL_M,
@@ -107,21 +149,66 @@ export const NUKETOWN_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.freez
   maxHeightM: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
   skirt: true,
 });
+/** The rebuild's own radial ceiling: the same 132 m the 270 m ground slab is
+ * fitted to, spelled NUKETOWN2_ so this lane never retunes the shipped map by
+ * accident. FROZEN alongside the shared constants (see the hard pins). */
+export const NUKETOWN2_BACKDROP_MAX_RADIAL_M = 132;
+/** The rebuild's own crest ceiling. ~2x shipped: nuketown2 runs at far = 900
+ * (NUKE_EVENT_CAMERA_FAR_M, src/legacy-main.ts:29767), so height is not
+ * far-plane constrained — the binding constraint is the 135 m plain edge,
+ * which radii (not heights) answer to. FROZEN once measured. */
+export const NUKETOWN2_BACKDROP_MAX_HEIGHT_M = 66;
 
 /**
  * The rebuild's envelope. 66 m of clearance against a 45.7 m map corner is
  * 20 m past the long fence and 48 m past the short one — the same read the
- * shipped map gets from 58 against its own 44.6 m corner. The outer radius and
- * crest ceiling are unchanged: they are set by the 180 m camera far plane, not
- * by the map (132 + 45.7 = 177.7).
+ * shipped map gets from 58 against its own 44.6 m corner.
+ *
+ * HF-556: heights are the lane's own business (nuketown2 runs at far = 900 on
+ * every session, so the 180 m ceiling the shipped map answers to does not
+ * apply); radii stay married to the 270 m plain whose edge is at 135 m —
+ * every outer radius exactly 132, every inner at or above 72. The ceilings
+ * live in NUKETOWN2_-prefixed constants above: the shared NUKETOWN_BACKDROP_
+ * MAX_* constants are the shipped map's and are frozen.
  */
 export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.freeze({
   minRadialM: 66,
-  maxRadialM: NUKETOWN_BACKDROP_MAX_RADIAL_M,
-  maxHeightM: NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+  maxRadialM: NUKETOWN2_BACKDROP_MAX_RADIAL_M,
+  maxHeightM: NUKETOWN2_BACKDROP_MAX_HEIGHT_M,
   skirt: false,
+  ringRows: 9,
+  sharpenExponent: 1.75,
+  extraCrestOctaves: true,
+  foothills: Object.freeze({
+    innerM: 72,
+    outerM: 132,
+    height: Object.freeze([8, 20]) as readonly [number, number],
+    footColor: 0x3d4436,
+    crestColor: 0x585f4c,
+    strata: true,
+    fissures: true,
+    facetJitter: true,
+  }),
+  ridge: Object.freeze({
+    innerM: 96,
+    height: Object.freeze([24, 46]) as readonly [number, number],
+    segments: 600,
+    strata: true,
+    fissures: true,
+    facetJitter: true,
+  }),
+  farRange: Object.freeze({
+    innerM: 104,
+    height: Object.freeze([40, 64]) as readonly [number, number],
+    segments: 450,
+    footColor: 0x8a7a63,
+    crestColor: 0xb59a76,
+    strata: true,
+    fissures: true,
+    facetJitter: true,
+    aerialHazeMix: 0.38,
+  }),
 });
-
 /**
  * DAY-VISUAL-A (HF-535): layered haze per ring, nearest to farthest.
  *
@@ -284,6 +371,16 @@ const SUN_DIRECTION = new THREE.Vector3(-48, 42, 30).normalize();
 /** Measurement switch — see the v4 note in the file header. */
 const RIDGE_FOG = false;
 
+/**
+ * HF-556 build options, threaded from the envelope. Every field defaults to
+ * the shipped path, so the default envelope builds bit-identical geometry.
+ */
+export type NuketownRidgeRingBuildOpts = Readonly<{
+  rows?: number;
+  sharpenExponent?: number;
+  extraCrestOctaves?: boolean;
+}>;
+
 export interface NuketownBackdropStats {
   meshes: number;
   triangles: number;
@@ -355,7 +452,7 @@ type RidgeRingSpec = Readonly<{
  * flat plate per segment); segment density rises only on the two far rings
  * whose crests form the visible silhouette (see buildNuketownMountainBackdrop).
  */
-function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
+function buildRidgeRing(spec: RidgeRingSpec, opts: NuketownRidgeRingBuildOpts = {}): THREE.BufferGeometry {
   const foot = new THREE.Color(spec.footColor);
   const mid = new THREE.Color(spec.footColor).lerp(new THREE.Color(spec.crestColor), 0.55);
   const crest = new THREE.Color(spec.crestColor);
@@ -367,15 +464,22 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
   const sandstone = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_SANDSTONE);
   const coolGrey = new THREE.Color(NUKETOWN_MOUNTAIN_STRATA_COOL_GREY);
 
+  const extraOctaves = opts.extraCrestOctaves === true;
   const ridged = (angle: number, phase: number): number => {
     const o1 = 1 - Math.abs(Math.sin(angle * 3 + phase));
     const o2 = 1 - Math.abs(Math.sin(angle * 7 + phase * 2.3));
     const o3 = 1 - Math.abs(Math.sin(angle * 13 + phase * 4.1));
     const o4 = 1 - Math.abs(Math.sin(angle * 23 + phase * 7.9));
-    return (o1 * 0.35 + o2 * 0.30 + o3 * 0.22 + o4 * 0.13);
+    if (!extraOctaves) return (o1 * 0.35 + o2 * 0.30 + o3 * 0.22 + o4 * 0.13);
+    // HF-556: two higher octaves sharpen peaks to a point on the tall
+    // nuketown2 crests. Weights rescaled so the stack still sums to 1.
+    const o5 = 1 - Math.abs(Math.sin(angle * 37 + phase * 11.3));
+    const o6 = 1 - Math.abs(Math.sin(angle * 61 + phase * 17.7));
+    return (o1 * 0.2975 + o2 * 0.255 + o3 * 0.187 + o4 * 0.1105 + o5 * 0.09 + o6 * 0.06);
   };
 
-  const rows = 5;
+  const rows = opts.rows ?? 5;
+  const sharpenExponent = opts.sharpenExponent ?? 1.4;
   const gridPositions: THREE.Vector3[][] = [];
   const gridMeta: Array<Array<{ alt: number; depthFactor: number; height: number; baseHeight: number; angle: number; isWarm: boolean }>> = [];
   const crestHeights: number[] = [];
@@ -410,7 +514,7 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
     const varC = smoothVar(angle, 4, spec.phase + 1.1) * 0.5 + 0.5;
 
     const relief = ridged(angle, spec.phase);
-    const rSharp = Math.pow(relief, 1.4);
+    const rSharp = Math.pow(relief, sharpenExponent);
     const heightT = Math.min(1, Math.max(0.04, rSharp * 1.25 + (varA - 0.5) * 0.2));
     const baseHeight = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
     const band = spec.outerRadius - spec.innerRadius;
@@ -462,13 +566,39 @@ function buildRidgeRing(spec: RidgeRingSpec): THREE.BufferGeometry {
       crestColors.push([cr, cg, cb]);
     }
 
-    const ringRows: Array<readonly [number, number, number]> = [
+    const keyRows: Array<readonly [number, number, number]> = [
       [spec.innerRadius, -0.2, 0],
       [Math.max(spec.innerRadius, innerShoulderR), adjInnerY, 0.45],
       [crestRadius, height, 1],
       [Math.min(spec.outerRadius, outerShoulderR), adjOuterY, 0.5],
       [spec.outerRadius, -2.5, 0],
     ];
+    // HF-556: rows > 5 resample the same five keyframes, so the default
+    // five-row path below is untouched bit for bit. Interpolated flank rows
+    // take a small deterministic spur/gully offset so a tall flank reads as
+    // spurs running down the slope instead of a tent profile. Keyframe rows
+    // (crest included) land exactly: t is integral there, so f is 0.
+    const ringRows: Array<readonly [number, number, number]> = [];
+    if (rows <= keyRows.length) {
+      for (let row = 0; row < rows; row += 1) ringRows.push(keyRows[row]);
+    } else {
+      const flank = Math.max(1e-3, spec.outerRadius - spec.innerRadius);
+      for (let row = 0; row < rows; row += 1) {
+        const t = (row * (keyRows.length - 1)) / (rows - 1);
+        const i0 = Math.min(keyRows.length - 2, Math.floor(t));
+        const f = t - i0;
+        const a = keyRows[i0];
+        const b = keyRows[i0 + 1];
+        let r = a[0] + (b[0] - a[0]) * f;
+        let y = a[1] + (b[1] - a[1]) * f;
+        const alt = a[2] + (b[2] - a[2]) * f;
+        if (f > 1e-6 && f < 1 - 1e-6) {
+          r += Math.sin(angle * 17 + row * 2.1 + spec.phase) * flank * 0.012;
+          y += Math.sin(angle * 23 + row * 1.3 + spec.phase * 2.0) * Math.max(1, height) * 0.02;
+        }
+        ringRows.push([r, y, alt]);
+      }
+    }
 
     const colPos: THREE.Vector3[] = [];
     const colMeta: Array<{ alt: number; depthFactor: number; height: number; baseHeight: number; angle: number; isWarm: boolean }> = [];
@@ -680,10 +810,19 @@ export function buildNuketownMountainBackdrop(
   // Ring radii as OFFSETS from the envelope's inner edge, so the shipped map's
   // authored 64 / 92 / 96 / 132 / 116 fall out of `minRadialM = 58` unchanged
   // and any other footprint gets the same massif, fitted.
-  const foothillsInner = envelope.minRadialM + 6;
-  const foothillsOuter = envelope.minRadialM + 34;
-  const ridgeInner = envelope.minRadialM + 38;
-  const farRangeInner = envelope.minRadialM + 58;
+  const foothillsInner = envelope.foothills?.innerM ?? envelope.minRadialM + 6;
+  const foothillsOuter = envelope.foothills?.outerM ?? envelope.minRadialM + 34;
+  const ridgeInner = envelope.ridge?.innerM ?? envelope.minRadialM + 38;
+  const ridgeOuter = envelope.ridge?.outerM ?? envelope.maxRadialM;
+  const farRangeInner = envelope.farRange?.innerM ?? envelope.minRadialM + 58;
+  const farRangeOuter = envelope.farRange?.outerM ?? envelope.maxRadialM;
+  // HF-556: defaults reproduce the shipped path exactly; the nuketown2
+  // envelope carries its own values (see NUKETOWN2_BACKDROP_ENVELOPE).
+  const ringOpts: NuketownRidgeRingBuildOpts = {
+    rows: envelope.ringRows ?? 5,
+    sharpenExponent: envelope.sharpenExponent ?? 1.4,
+    extraCrestOctaves: envelope.extraCrestOctaves ?? false,
+  };
   const group = new THREE.Group();
   group.name = 'nuketown-mountain-backdrop';
   group.userData.presentationOnly = true;
@@ -714,57 +853,68 @@ export function buildNuketownMountainBackdrop(
   });
 
   // Scrubby foothill band: low, close enough to be readable over the fence.
+  // HF-556: every knob resolves tuning-first with the shipped literal as the
+  // default, so the default envelope reproduces its geometry bit for bit.
+  const foothillHeight = envelope.foothills?.height ?? ([4, 12] as const);
   const foothills = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-foothills',
-      segments: 108,
+      segments: envelope.foothills?.segments ?? 108,
       innerRadius: foothillsInner,
       outerRadius: foothillsOuter,
-      heightMin: 4,
-      heightMax: 12,
-      footColor: 0x222a20,
-      crestColor: 0x2c3426,
+      heightMin: foothillHeight[0],
+      heightMax: foothillHeight[1],
+      footColor: envelope.foothills?.footColor ?? 0x222a20,
+      crestColor: envelope.foothills?.crestColor ?? 0x2c3426,
       phase: 1.9,
       haze: NUKETOWN_MOUNTAIN_HAZE_NEAR,
-      shadeStrength: 0.68,
-    }),
+      shadeStrength: envelope.foothills?.shadeStrength ?? 0.68,
+      facetJitter: envelope.foothills?.facetJitter,
+      strata: envelope.foothills?.strata,
+      fissures: envelope.foothills?.fissures,
+    }, ringOpts),
     ridgeMaterial,
   );
   // Main ridge: taller, further, mostly fog-graded silhouette.
+  const ridgeHeight = envelope.ridge?.height;
   const ridge = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-ridge',
-      segments: 200,
+      segments: envelope.ridge?.segments ?? 200,
       innerRadius: ridgeInner,
-      outerRadius: envelope.maxRadialM,
-      heightMin: 10,
-      heightMax: envelope.maxHeightM - 2,
-      footColor: 0x78787e,
-      crestColor: 0xa2a2a8,
+      outerRadius: ridgeOuter,
+      heightMin: ridgeHeight?.[0] ?? 10,
+      heightMax: ridgeHeight?.[1] ?? envelope.maxHeightM - 2,
+      footColor: envelope.ridge?.footColor ?? 0x78787e,
+      crestColor: envelope.ridge?.crestColor ?? 0xa2a2a8,
       phase: 4.7,
       haze: NUKETOWN_MOUNTAIN_HAZE_MID,
-      shadeStrength: 0.95,
-      facetJitter: true,
-      strata: true,
-      fissures: true,
-    }),
+      shadeStrength: envelope.ridge?.shadeStrength ?? 0.95,
+      facetJitter: envelope.ridge?.facetJitter ?? true,
+      strata: envelope.ridge?.strata ?? true,
+      fissures: envelope.ridge?.fissures ?? true,
+    }, ringOpts),
     ridgeMaterial,
   );
+  const farHeight = envelope.farRange?.height;
   const farRange = new THREE.Mesh(
     buildRidgeRing({
       name: 'nuketown-mountain-far-range',
-      segments: 152,
+      segments: envelope.farRange?.segments ?? 152,
       innerRadius: farRangeInner,
-      outerRadius: envelope.maxRadialM,
-      heightMin: 20,
-      heightMax: envelope.maxHeightM,
-      footColor: 0xd0d8e4,
-      crestColor: 0xe4ecfa,
+      outerRadius: farRangeOuter,
+      heightMin: farHeight?.[0] ?? 20,
+      heightMax: farHeight?.[1] ?? envelope.maxHeightM,
+      footColor: envelope.farRange?.footColor ?? 0xd0d8e4,
+      crestColor: envelope.farRange?.crestColor ?? 0xe4ecfa,
       phase: 8.3,
       haze: NUKETOWN_MOUNTAIN_HAZE_FAR,
-      aerialHazeMix: 0.52,
-      shadeStrength: 0.36,
-    }),
+      aerialHazeMix: envelope.farRange?.aerialHazeMix ?? 0.52,
+      shadeStrength: envelope.farRange?.shadeStrength ?? 0.36,
+      facetJitter: envelope.farRange?.facetJitter,
+      strata: envelope.farRange?.strata,
+      fissures: envelope.farRange?.fissures,
+    }, ringOpts),
     ridgeMaterial,
   );
   // The skirt is the arena's beyond-fence GROUND. An arena that authors its own
