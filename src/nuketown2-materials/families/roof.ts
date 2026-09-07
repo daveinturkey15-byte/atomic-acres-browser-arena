@@ -142,7 +142,7 @@ export function createRoofMaterial(
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
-  attachNuketown2TextureBridge(mat, textureBridge);
+  attachNuketown2TextureBridge(mat, textureBridge, ['shingle']);
   return mat;
 }
 
