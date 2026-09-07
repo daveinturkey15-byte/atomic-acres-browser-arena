@@ -1,0 +1,50 @@
+{
+  "family": "concrete",
+  "candidate": "candidate-01",
+  "input": "docs/forge/textures/concrete/candidate-01-source.png",
+  "route": "codex-built-in-image-generation",
+  "licence": "owner-authorised AI texture 2026-09-07",
+  "allowedUse": "shipped",
+  "resolutions": [
+    {
+      "size": 512,
+      "family": "concrete",
+      "metresPerTile": 3,
+      "mmPerPixel": 5.859375,
+      "normalStrength": 0.9,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.9956016540527344,
+      "roughnessBand": [
+        0.78,
+        1
+      ],
+      "detail": {
+        "albedoStddev": 0.07152488691678698,
+        "albedoLaplace": 0.12106486966138164,
+        "normalSlopeMean": 0.12137962216765175,
+        "normalZMean": 0.9951795244285222,
+        "roughnessStddev": 0.0066905284457613266
+      }
+    },
+    {
+      "size": 1024,
+      "family": "concrete",
+      "metresPerTile": 3,
+      "mmPerPixel": 2.9296875,
+      "normalStrength": 0.9,
+      "wrapDelta": 0,
+      "fractionMostlyZ": 0.8221902847290039,
+      "roughnessBand": [
+        0.78,
+        1
+      ],
+      "detail": {
+        "albedoStddev": 0.08124265193866298,
+        "albedoLaplace": 0.110657406636534,
+        "normalSlopeMean": 0.2552649627456045,
+        "normalZMean": 0.9778383717002157,
+        "roughnessStddev": 0.006276461052519053
+      }
+    }
+  ]
+}

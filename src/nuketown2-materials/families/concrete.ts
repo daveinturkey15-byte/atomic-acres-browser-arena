@@ -251,7 +251,7 @@ export function createConcreteMaterial(
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
-  attachNuketown2TextureBridge(mat, textureBridge);
+  attachNuketown2TextureBridge(mat, textureBridge, variant === 'block' ? ['concrete', 'brick'] : ['concrete']);
   return mat;
 }
 
