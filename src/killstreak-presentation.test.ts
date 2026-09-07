@@ -626,6 +626,13 @@ describe('killstreak presentation', () => {
     }
   });
 
+  it('does not repeat the pooled checkout world-matrix update', () => {
+    const presentation = new KillstreakPresentation(new THREE.Scene());
+    presentation.sync(snapshot(4), 1_000);
+    expect(presentation.telemetry().redundantCheckoutNodeUpdates).toBe(0);
+    presentation.dispose();
+  });
+
   it('binds the runtime presentation loader to the gated authored Hunter Drone LOD0', () => {
     expect(HUNTER_DRONE_ASSET).toBe('./assets/original/models/support/hunter-drone-lod0.glb');
     expect(hunterDronePresentationTelemetry()).toMatchObject({ state: 'idle', asset: HUNTER_DRONE_ASSET });

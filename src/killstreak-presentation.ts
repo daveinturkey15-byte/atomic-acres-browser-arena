@@ -3719,8 +3719,6 @@ export class KillstreakPresentation {
     if (!presented) return createPresentedEntity(entity);
     presented.root.userData.presentationPoolInUse = true;
     deepUnfreezeSubtreeMatrices(presented.root);
-    this.matrixDiagnostics.redundantCheckoutNodeUpdates += 1;
-    presented.root.updateMatrixWorld(true);
     presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
     // Swarm source trees drive the animated instance matrices but must never
     // enter renderer traversal themselves. Their 24 authored hierarchies are
