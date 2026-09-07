@@ -1,6 +1,6 @@
 {
   "contract": "pass95-frame-hitch-attributor-v1",
-  "measuredAt": "2026-09-06T16:35:25.977Z",
+  "measuredAt": "2026-09-06T23:46:36.478Z",
   "label": "forge-final",
   "arena": "nuketown2",
   "base": "http://127.0.0.1:4298/",
@@ -20,125 +20,644 @@
     "effective": "EFFECTIVE: HIGH",
     "hardwareConcurrency": 16
   },
-  "deployMs": 49781,
-  "consoleErrors": [],
+  "deployMs": 60226,
+  "consoleErrors": [
+    "THREE.BufferGeometryUtils: .mergeGeometries() failed with geometry at index 9. All geometries must have compatible attributes; make sure \"forgeVehicleAnchor\" attribute exists among all geometries, or in none of them."
+  ],
   "matchState": {
     "matchPhase": "active",
     "bots": 2,
     "alive": true
   },
   "traceAligned": true,
-  "traceEventsKept": 33161,
-  "frameCount": 9033,
+  "traceEventsKept": 30389,
+  "frameCount": 7263,
   "sampledSeconds": 90,
-  "fps": 100.4,
+  "fps": 80.7,
   "frameMs": {
-    "p50": 9.6,
-    "p95": 14.6,
-    "p99": 19,
-    "p999": 27.5,
-    "max": 50.2
+    "p50": 11.6,
+    "p95": 18.3,
+    "p99": 23.3,
+    "p999": 80.3,
+    "max": 104.2
   },
   "hitches": {
     "thresholdMs": 50,
-    "count": 1,
-    "totalMs": 50.2,
-    "worstMs": 50.2,
-    "over100": 0,
-    "over33": 4
+    "count": 15,
+    "totalMs": 1206.3,
+    "worstMs": 104.2,
+    "over100": 3,
+    "over33": 21
   },
   "causeTable": [
     {
-      "cause": "gc-major",
-      "count": 1,
-      "totalMs": 29.5,
-      "worstMs": 29.5,
-      "worstFrame": 4620
+      "cause": "unattributed-residual",
+      "count": 15,
+      "totalMs": 1043.5,
+      "worstMs": 96.2,
+      "worstFrame": 6437
     },
     {
       "cause": "gpu-task",
-      "count": 1,
-      "totalMs": 3.2,
-      "worstMs": 3.2,
-      "worstFrame": 4620
+      "count": 15,
+      "totalMs": 86.8,
+      "worstMs": 12.3,
+      "worstFrame": 4647
+    },
+    {
+      "cause": "gc-major",
+      "count": 4,
+      "totalMs": 49.3,
+      "worstMs": 15.7,
+      "worstFrame": 3168
     },
     {
       "cause": "style-recalculation",
-      "count": 1,
-      "totalMs": 2,
-      "worstMs": 2,
-      "worstFrame": 4620
+      "count": 11,
+      "totalMs": 26.6,
+      "worstMs": 6.8,
+      "worstFrame": 5008
     }
   ],
   "hitchFrames": [
     {
-      "i": 4620,
-      "atMs": 97443.9,
-      "frameMs": 50.2,
-      "jsMs": 4.8,
-      "heapDeltaMb": -49.47,
+      "i": 669,
+      "atMs": 73123.7,
+      "frameMs": 68.1,
+      "jsMs": 2.1,
+      "heapDeltaMb": 5.749,
       "causes": [
         {
           "id": "style-recalculation",
-          "ms": 2.04,
+          "ms": 2.29,
           "count": 1
         },
         {
           "id": "gpu-task",
-          "ms": 3.18,
+          "ms": 8.98,
           "count": 1
         },
         {
-          "id": "gc-major",
-          "ms": 29.52,
+          "id": "unattributed-residual",
+          "ms": 56.83,
           "count": 1
         }
       ],
       "counters": {
-        "writeBuffer": 177,
-        "writeBufferBytes": 456980,
+        "writeBuffer": 686,
+        "writeBufferBytes": 636706,
+        "writeBufferMs": 0.6,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 163,
+        "triangles": 360081,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 798,
+      "atMs": 75168,
+      "frameMs": 88.3,
+      "jsMs": 4,
+      "heapDeltaMb": 2.611,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 2.29,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 4.28,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 81.73,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 584,
+        "writeBufferBytes": 605650,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 138,
+        "triangles": 356468,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 1626,
+      "atMs": 84162.2,
+      "frameMs": 104.2,
+      "jsMs": 2.1,
+      "heapDeltaMb": -25.245,
+      "causes": [
+        {
+          "id": "gc-major",
+          "ms": 13.89,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 7.38,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 82.93,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 175,
+        "writeBufferBytes": 619926,
+        "writeBufferMs": 0.6,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 155,
+        "triangles": 350639,
+        "submits": 25,
+        "passes": 24
+      }
+    },
+    {
+      "i": 1698,
+      "atMs": 85168.2,
+      "frameMs": 97.9,
+      "jsMs": 2.7,
+      "heapDeltaMb": -28.078,
+      "causes": [
+        {
+          "id": "gpu-task",
+          "ms": 4.19,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 93.71,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 161,
+        "writeBufferBytes": 617989,
+        "writeBufferMs": 0.5,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 154,
+        "triangles": 349655,
+        "submits": 25,
+        "passes": 24
+      }
+    },
+    {
+      "i": 1773,
+      "atMs": 86146.1,
+      "frameMs": 81.3,
+      "jsMs": 2.7,
+      "heapDeltaMb": -25.67,
+      "causes": [
+        {
+          "id": "gpu-task",
+          "ms": 3.12,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 78.18,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 118,
+        "writeBufferBytes": 590851,
+        "writeBufferMs": 0.7,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 146,
+        "triangles": 415943,
+        "submits": 25,
+        "passes": 24
+      }
+    },
+    {
+      "i": 1854,
+      "atMs": 87154.2,
+      "frameMs": 80.3,
+      "jsMs": 4.3,
+      "heapDeltaMb": 5.092,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 1.9,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 4.52,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 73.88,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 123,
+        "writeBufferBytes": 605130,
+        "writeBufferMs": 0.3,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 149,
+        "triangles": 360503,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 10,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 3168,
+      "atMs": 103154.9,
+      "frameMs": 75.4,
+      "jsMs": 1.4,
+      "heapDeltaMb": -31.505,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 1.73,
+          "count": 1
+        },
+        {
+          "id": "gc-major",
+          "ms": 15.69,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 7.79,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 50.19,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 175,
+        "writeBufferBytes": 623780,
+        "writeBufferMs": 0.1,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 134,
+        "triangles": 348901,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11
+      }
+    },
+    {
+      "i": 3258,
+      "atMs": 104157.9,
+      "frameMs": 95.2,
+      "jsMs": 3.5,
+      "heapDeltaMb": 4.967,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 2.19,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 3.38,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 89.63,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 167,
+        "writeBufferBytes": 624407,
+        "writeBufferMs": 0.5,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 139,
+        "triangles": 363459,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 4133,
+      "atMs": 114702.8,
+      "frameMs": 52.8,
+      "jsMs": 3,
+      "heapDeltaMb": 2.854,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 2.65,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 4.62,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 45.53,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 763,
+        "writeBufferBytes": 660683,
+        "writeBufferMs": 0.7,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 181,
+        "triangles": 391720,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 10,
+        "canvas2dMs": 0.1
+      }
+    },
+    {
+      "i": 4159,
+      "atMs": 115168.8,
+      "frameMs": 61.7,
+      "jsMs": 2.1,
+      "heapDeltaMb": 2.75,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 1.37,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 3.43,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 56.9,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 190,
+        "writeBufferBytes": 655272,
+        "writeBufferMs": 0.1,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 181,
+        "triangles": 391720,
+        "submits": 25,
+        "passes": 24
+      }
+    },
+    {
+      "i": 4647,
+      "atMs": 120750.2,
+      "frameMs": 57.2,
+      "jsMs": 1.9,
+      "heapDeltaMb": -22.083,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 2.43,
+          "count": 1
+        },
+        {
+          "id": "gc-major",
+          "ms": 8.24,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 12.31,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 34.22,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 160,
+        "writeBufferBytes": 627464,
+        "writeBufferMs": 0.4,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 145,
+        "triangles": 343308,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11
+      }
+    },
+    {
+      "i": 4767,
+      "atMs": 122147.1,
+      "frameMs": 64.3,
+      "jsMs": 1.8,
+      "heapDeltaMb": 2.218,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 1.79,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 2.68,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 59.83,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 165,
+        "writeBufferBytes": 625926,
+        "writeBufferMs": 0.4,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 148,
+        "triangles": 348255,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11
+      }
+    },
+    {
+      "i": 5008,
+      "atMs": 125174.6,
+      "frameMs": 101.3,
+      "jsMs": 3.1,
+      "heapDeltaMb": 3.228,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 6.76,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 5.08,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 89.46,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 136,
+        "writeBufferBytes": 623315,
+        "writeBufferMs": 0.1,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "writeTextureMs": 0.1,
+        "draws": 172,
+        "triangles": 438578,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11
+      }
+    },
+    {
+      "i": 6295,
+      "atMs": 141163.9,
+      "frameMs": 78,
+      "jsMs": 3.2,
+      "heapDeltaMb": -29.874,
+      "causes": [
+        {
+          "id": "style-recalculation",
+          "ms": 1.22,
+          "count": 1
+        },
+        {
+          "id": "gc-major",
+          "ms": 11.51,
+          "count": 1
+        },
+        {
+          "id": "gpu-task",
+          "ms": 11.01,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 54.26,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 200,
+        "writeBufferBytes": 626945,
         "writeBufferMs": 0.2,
         "writeTexture": 2,
         "writeTextureBytes": 1920,
-        "draws": 147,
-        "triangles": 294145,
+        "draws": 176,
+        "triangles": 388670,
+        "submits": 25,
+        "passes": 24,
+        "canvas2d": 11,
+        "canvas2dMs": 0.1,
+        "audioStarts": 1
+      }
+    },
+    {
+      "i": 6437,
+      "atMs": 143165.3,
+      "frameMs": 100.3,
+      "jsMs": 4.2,
+      "heapDeltaMb": 2.219,
+      "causes": [
+        {
+          "id": "gpu-task",
+          "ms": 4.06,
+          "count": 1
+        },
+        {
+          "id": "unattributed-residual",
+          "ms": 96.24,
+          "count": 1
+        }
+      ],
+      "counters": {
+        "writeBuffer": 217,
+        "writeBufferBytes": 657616,
+        "writeBufferMs": 0.8,
+        "writeTexture": 2,
+        "writeTextureBytes": 1920,
+        "draws": 188,
+        "triangles": 386698,
         "submits": 25,
         "passes": 24
       }
     }
   ],
   "totals": {
-    "pipelines": 277,
-    "pipelineMs": 6.8999998569488525,
-    "shaderModules": 383,
-    "shaderMs": 14.09999966621399,
-    "gpuBuffers": 3169,
-    "gpuBufferBytes": 30736252,
-    "gpuBufferMs": 17.6999990940094,
-    "gpuTextures": 179,
+    "pipelines": 318,
+    "pipelineMs": 9.699999570846558,
+    "shaderModules": 435,
+    "shaderMs": 12.299999594688416,
+    "gpuBuffers": 3432,
+    "gpuBufferBytes": 35148600,
+    "gpuBufferMs": 20.299999833106995,
+    "gpuTextures": 180,
     "gpuTextureBytes": 0,
-    "gpuTextureMs": 2.499999761581421,
-    "writeBuffer": 1920591,
-    "writeBufferBytes": 3994776609,
-    "writeBufferMs": 2159.1999896764755,
-    "writeTexture": 21046,
-    "writeTextureBytes": 313364452,
-    "writeTextureMs": 148.59999918937683,
+    "gpuTextureMs": 1.3000000715255737,
+    "writeBuffer": 1678940,
+    "writeBufferBytes": 4693896520,
+    "writeBufferMs": 2332.0999990701675,
+    "writeTexture": 17617,
+    "writeTextureBytes": 319013732,
+    "writeTextureMs": 131.299999833107,
     "externalImage": 123,
-    "externalImageMs": 12.899999380111694,
-    "draws": 1308079,
-    "triangles": 2769056375.333332,
-    "submits": 229728,
-    "passes": 221546,
-    "canvas2d": 31081,
-    "canvas2dMs": 133.69999837875366,
+    "externalImageMs": 12.09999966621399,
+    "draws": 1219508,
+    "triangles": 2870190355.3333263,
+    "submits": 185952,
+    "passes": 179529,
+    "canvas2d": 31124,
+    "canvas2dMs": 139.8000009059906,
     "styleReads": 0,
     "styleReadMs": 0,
-    "layoutReads": 2200,
-    "layoutReadMs": 167.8999980688095,
+    "layoutReads": 2440,
+    "layoutReadMs": 158.20000064373016,
     "audioDecode": 0,
     "audioDecodeMs": 0,
-    "audioStarts": 405,
+    "audioStarts": 805,
     "geometryBuilds": 0,
     "geometryBuildMs": 0
   },
@@ -148,8 +667,8 @@
     "worstMs": 0
   },
   "attributionCoverage": {
-    "attributedMs": 34.7,
-    "hitchTotalMs": 50.2,
-    "pct": 69.1
+    "attributedMs": 1206.2,
+    "hitchTotalMs": 1206.3,
+    "pct": 100
   }
 }
