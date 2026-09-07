@@ -1695,6 +1695,12 @@ export type KillstreakPresentationTelemetry = Readonly<{
   swarmVisibleRenderBatches: number;
   swarmMinimumRenderedInstances: number;
   swarmMaximumRenderedInstances: number;
+  swarmInstanceMatrixSignatures: readonly number[];
+  swarmAnimatedInstanceMatrixSignatures: readonly number[];
+  liveWorldMatrixWalks: number;
+  nodesWalked: number;
+  redundantCheckoutNodeUpdates: number;
+  autoUpdatingNodes: number;
   prewarmedAuthoredSupportFamilies: readonly string[];
   entityDetails: readonly Readonly<{
     entityId: string;
@@ -2949,6 +2955,26 @@ function firstInactive<T extends { active: boolean }>(pool: readonly T[]): T | n
   return null;
 }
 
+const PRESENTATION_NODE_COUNT_KEY = 'killstreakPresentationNodeCount';
+
+function presentationSubtreeNodeCount(root: THREE.Object3D): number {
+  const cached = root.userData[PRESENTATION_NODE_COUNT_KEY];
+  if (typeof cached === 'number') return cached;
+  let count = 0;
+  root.traverse(() => { count += 1; });
+  root.userData[PRESENTATION_NODE_COUNT_KEY] = count;
+  return count;
+}
+
+function roundedMatrixSignature(values: ArrayLike<number>): number {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < values.length; index += 1) {
+    const rounded = Math.round((values[index] ?? 0) * 10_000);
+    hash = Math.imul(hash ^ rounded, 16_777_619);
+  }
+  return hash >>> 0;
+}
+
 export class KillstreakPresentation {
   readonly root = new THREE.Group();
   private readonly entities = new Map<string, PresentedEntity>();
@@ -2993,6 +3019,11 @@ export class KillstreakPresentation {
   private gpuPrewarmPromise: Promise<void> | null = null;
   private gpuPrewarmActive = false;
   private disposalFinalized = false;
+  private readonly matrixDiagnostics = {
+    liveWorldMatrixWalks: 0,
+    nodesWalked: 0,
+    redundantCheckoutNodeUpdates: 0,
+  };
 
   constructor(
     private readonly submittedScene: THREE.Scene,
@@ -3688,6 +3719,7 @@ export class KillstreakPresentation {
     if (!presented) return createPresentedEntity(entity);
     presented.root.userData.presentationPoolInUse = true;
     deepUnfreezeSubtreeMatrices(presented.root);
+    this.matrixDiagnostics.redundantCheckoutNodeUpdates += 1;
     presented.root.updateMatrixWorld(true);
     presented.root.name = String(presented.root.userData.poolActiveName ?? presented.root.name);
     // Swarm source trees drive the animated instance matrices but must never
@@ -3900,21 +3932,26 @@ export class KillstreakPresentation {
 
   /** Refresh only roots whose transforms were touched during this sync. */
   private updateLiveWorldMatrices(): void {
+    this.matrixDiagnostics.liveWorldMatrixWalks += 1;
+    const updateRoot = (root: THREE.Object3D): void => {
+      this.matrixDiagnostics.nodesWalked += presentationSubtreeNodeCount(root);
+      root.updateWorldMatrix(true, true);
+    };
     for (const presented of this.entities.values()) {
-      presented.root.updateWorldMatrix(true, true);
+      updateRoot(presented.root);
     }
     for (const flash of this.impactFlashPool) {
-      if (flash.active) flash.root.updateWorldMatrix(true, true);
+      if (flash.active) updateRoot(flash.root);
     }
     for (const shell of this.bombShellPool) {
-      if (shell.active) shell.root.updateWorldMatrix(true, true);
+      if (shell.active) updateRoot(shell.root);
     }
     for (const ember of this.emberPool) {
-      if (ember.active) ember.root.updateWorldMatrix(true, true);
+      if (ember.active) updateRoot(ember.root);
     }
-    if (this.visibleSensorContacts > 0) this.sensorRoot.updateWorldMatrix(true, true);
+    if (this.visibleSensorContacts > 0) updateRoot(this.sensorRoot);
     for (const marker of this.placementMarkers.values()) {
-      if (marker.root.visible) marker.root.updateWorldMatrix(true, true);
+      if (marker.root.visible) updateRoot(marker.root);
     }
   }
 
@@ -4438,6 +4475,16 @@ export class KillstreakPresentation {
     const emberParticles = countActive(this.emberPool);
     const visibleSwarmBatches = this.swarmInstanceBatches.filter((batch) => batch.root.visible && batch.root.count > 0);
     const visibleSwarmCounts = visibleSwarmBatches.map((batch) => batch.root.count);
+    const swarmInstanceMatrixSignatures = Object.freeze(this.swarmInstanceBatches.map((batch) => (
+      roundedMatrixSignature(batch.root.instanceMatrix.array)
+    )));
+    const swarmAnimatedInstanceMatrixSignatures = Object.freeze(this.swarmInstanceBatches
+      .filter((batch) => batch.staticLocalMatrices === null)
+      .map((batch) => roundedMatrixSignature(batch.root.instanceMatrix.array)));
+    let autoUpdatingNodes = 0;
+    this.root.traverse((node) => {
+      if (node.matrixAutoUpdate || node.matrixWorldAutoUpdate) autoUpdatingNodes += 1;
+    });
     const firstPersonRoot = this.firstPersonEntityId ? this.entities.get(this.firstPersonEntityId)?.root ?? null : null;
     const firstPersonSightline = firstPersonRoot && this.firstPersonEntityId
       && firstPersonRoot.getObjectByName('chopper-gunner-sightline')
@@ -4496,6 +4543,12 @@ export class KillstreakPresentation {
       swarmVisibleRenderBatches: visibleSwarmBatches.length,
       swarmMinimumRenderedInstances: visibleSwarmCounts.length > 0 ? Math.min(...visibleSwarmCounts) : 0,
       swarmMaximumRenderedInstances: visibleSwarmCounts.length > 0 ? Math.max(...visibleSwarmCounts) : 0,
+      swarmInstanceMatrixSignatures,
+      swarmAnimatedInstanceMatrixSignatures,
+      liveWorldMatrixWalks: this.matrixDiagnostics.liveWorldMatrixWalks,
+      nodesWalked: this.matrixDiagnostics.nodesWalked,
+      redundantCheckoutNodeUpdates: this.matrixDiagnostics.redundantCheckoutNodeUpdates,
+      autoUpdatingNodes,
       prewarmedAuthoredSupportFamilies: Object.freeze([...new Set(this.prewarmed
         .filter((entry) => entry.root.userData.presentationSource === 'project-original-blender-glb')
         .map((entry) => String(entry.root.userData.presentationFamily)))].sort()),
