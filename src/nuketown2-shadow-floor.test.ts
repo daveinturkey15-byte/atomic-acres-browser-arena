@@ -1,5 +1,5 @@
 /**
- * HF-535. The Nuke Town shadow floor.
+ * HF-536. The Nuke Town residual shadow fill after baked bounce owns the room.
  *
  * Dave's report was "the middle street is a black slab". It was: under the
  * arena's own authored golden-hour sky the coach/building shadow footprint on
@@ -21,7 +21,7 @@ import {
 
 describe('HF-535 Nuke Town shadow floor', () => {
   it('pins the applied fill intensity at or above the measured floor', () => {
-    expect(NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY).toBe(1.4);
+    expect(NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY).toBe(0.16);
     expect(NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY)
       .toBeGreaterThanOrEqual(NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY);
   });
@@ -35,12 +35,14 @@ describe('HF-535 Nuke Town shadow floor', () => {
     }
   });
 
-  it('is a real lift over the shared profile the arena used to inherit', () => {
+  it('is a restrained residual fill below the shared profile the arena used to inherit', () => {
     const shared = arenaLightingProfile('blender');
     const arena = arenaLightingProfile('blender', 'nuketown2');
     expect(shared.fillIntensity).toBe(0.22);
-    // The whole defect: 0.22 leaves the shaded road inside the ACES toe.
-    expect(arena.fillIntensity / shared.fillIntensity).toBeGreaterThanOrEqual(6);
+    // The baked two-bounce volume owns the room fill; this residual keeps the
+    // authored directional light from flattening the map.
+    expect(arena.fillIntensity).toBeLessThan(shared.fillIntensity);
+    expect(arena.fillIntensity / shared.fillIntensity).toBeCloseTo(0.8181818, 6);
   });
 
   it('keeps the sun the key light, so the street still reads as golden hour', () => {
@@ -50,13 +52,14 @@ describe('HF-535 Nuke Town shadow floor', () => {
     expect(arena.fillIntensity / arena.sunIntensity).toBeLessThanOrEqual(0.55);
   });
 
-  it('changes nothing but the fill on nuketown2', () => {
+  it('reduces the broad ambient terms while preserving key-light identity', () => {
     const shared = arenaLightingProfile('blender');
     const arena = arenaLightingProfile('blender', 'nuketown2');
-    for (const key of Object.keys(shared) as (keyof typeof shared)[]) {
-      if (key === 'fillIntensity') continue;
-      expect({ key, value: arena[key] }).toEqual({ key, value: shared[key] });
-    }
+    expect(arena.ambientIntensity).toBeLessThan(shared.ambientIntensity);
+    expect(arena.hemisphereIntensity).toBeLessThan(shared.hemisphereIntensity);
+    expect(arena.fillIntensity).toBeLessThan(shared.fillIntensity);
+    expect(arena.sunIntensity).toBe(shared.sunIntensity);
+    expect(arena.sunColor).toBe(shared.sunColor);
   });
 
   it('leaves every other arena and the compatibility route alone', () => {

@@ -250,6 +250,8 @@ type MeshLike = {
   geometry?: { boundingBox?: unknown; computeBoundingBox?: () => void };
   matrixWorld?: unknown;
   material?: unknown;
+  userData?: Record<string, unknown>;
+  parent?: MeshLike | null;
 };
 
 type BoxLike = { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } };
@@ -282,6 +284,14 @@ export type ProxyExtractionOptions = Readonly<{
     /** Matches the SOURCE MESH name; first match wins. */
     namePattern: RegExp;
   }>[];
+  /** Optional arena-specific inclusion gate, evaluated before bounds work. */
+  includeMesh?: (mesh: Readonly<{ name: string; userData: Record<string, unknown> }>) => boolean;
+  /** Skip a mesh and every descendant of a dynamic presentation group. */
+  excludeDynamic?: boolean;
+  /** Admit hidden authored meshes retained as the source of a static render batch. */
+  includeStaticBatchSources?: boolean;
+  /** Optional world-space crop used by a bounded static-massing bake. */
+  clipBounds?: Readonly<{ min: Vec3; max: Vec3 }>;
 }>;
 
 export const DEFAULT_PROXY_EXTRACTION: ProxyExtractionOptions = Object.freeze({
@@ -333,19 +343,34 @@ export function extractProxyScene(
   let reflectiveFootprintM2 = 0;
   root.traverse((node) => {
     const mesh = node as unknown as MeshLike;
-    if (!mesh.isMesh || !mesh.visible) return;
+    const userData = mesh.userData ?? {};
+    if (!mesh.isMesh || (!mesh.visible && !(options.includeStaticBatchSources && userData.staticBatchRendered === true))) return;
+    if (options.includeMesh && !options.includeMesh({ name: mesh.name, userData })) return;
+    if (options.excludeDynamic) {
+      for (let owner: MeshLike | null | undefined = mesh; owner; owner = owner.parent) {
+        if (owner.userData?.dynamic === true) return;
+      }
+    }
     const box = boundsOf(mesh, three);
     if (!box) return;
-    const sizeX = box.max.x - box.min.x;
-    const sizeY = box.max.y - box.min.y;
-    const sizeZ = box.max.z - box.min.z;
     const name = mesh.name || '(unnamed)';
+    const registeredWater = options.waterSurfaces?.some(({ namePattern }) => namePattern.test(name)) ?? false;
+    const clip = options.clipBounds;
+    const minX = clip ? Math.max(box.min.x, clip.min[0]) : box.min.x;
+    const minY = clip ? Math.max(box.min.y, clip.min[1]) : box.min.y;
+    const minZ = clip ? Math.max(box.min.z, clip.min[2]) : box.min.z;
+    const maxX = clip ? Math.min(box.max.x, clip.max[0]) : box.max.x;
+    const maxY = clip ? Math.min(box.max.y, clip.max[1]) : box.max.y;
+    const maxZ = clip ? Math.min(box.max.z, clip.max[2]) : box.max.z;
+    if (!(maxX > minX) || maxY < minY || !(maxZ > minZ)) return;
+    const sizeX = maxX - minX;
+    const sizeY = maxY - minY;
+    const sizeZ = maxZ - minZ;
     // Registered water becomes an analytic PLANE proxy, counted as reflective
     // whatever its authored raster roughness says — see the option's contract.
     // Only a Y-thin surface can take the plane path: the packed uniform layout
     // reconstructs planes as +Y horizontal (unpackProxyShape), so anything
     // else keeps the ordinary box fit rather than lying about its orientation.
-    const registeredWater = options.waterSurfaces?.some(({ namePattern }) => namePattern.test(name)) ?? false;
     // Degeneracy guard. A proxy needs a surface for a slab test to describe, so
     // two positive axes is the real floor and the third is required only for
     // the box path.
@@ -368,7 +393,7 @@ export function extractProxyScene(
     const area = Math.max(sizeX * sizeZ, sizeX * sizeY, sizeZ * sizeY);
     if (area < options.minimumFootprintM2) return;
     const sample = materialSample(mesh.material);
-    const centre = vec3((box.min.x + box.max.x) / 2, (box.min.y + box.max.y) / 2, (box.min.z + box.max.z) / 2);
+    const centre = vec3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
     const halfExtents = vec3(sizeX / 2, sizeY / 2, sizeZ / 2);
     if (flatWater) {
       reflectiveMeshCount += 1;

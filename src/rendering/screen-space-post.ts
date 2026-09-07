@@ -227,6 +227,8 @@ export type ScreenSpacePostSources = Readonly<{
   sceneMaterial: ScenePassTextureNode | null;
   sceneVelocity: ScenePassTextureNode | null;
   camera: THREE.Camera;
+  /** Authoritative scene root for streamed static-massing extraction. */
+  scene?: THREE.Object3D;
   /** Shadow-casting light the shafts are raymarched for. */
   volumetricLight: THREE.DirectionalLight | THREE.PointLight | null;
 }>;
@@ -367,6 +369,7 @@ export function buildScreenSpacePostGraph(
       sceneViewZ: sources.sceneViewZ as unknown as Node<'float'>,
       camera: sources.camera,
       sun: sources.volumetricLight,
+      scene: sources.scene,
     }, runtime.bakedIndirect);
     bounceLight = bakedIndirectRuntime.graph.light;
     stages.push(BAKED_INDIRECT_STAGE);

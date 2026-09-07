@@ -6,7 +6,7 @@ import {
   WATER_PROXY_MAXIMUM_METALNESS,
   DEFAULT_PROXY_EXTRACTION,
 } from './analytic-proxy-scene';
-import { ARENA_PROXY_EXTRACTION } from './arena-proxy-registration';
+import { ARENA_PROXY_EXTRACTION, NUKETOWN2_BAKED_INDIRECT_EXTRACTION } from './arena-proxy-registration';
 
 /**
  * Extractor contract, with the flat-surface case that made the whole water
@@ -130,6 +130,18 @@ describe('analytic proxy extraction', () => {
     card.updateMatrixWorld(true);
     const proxy = extractProxyScene(sceneOf(card, box('arena-wall', 0.9)), THREE, ARENA_PROXY_EXTRACTION);
     expect(proxy.shapes.map(({ name }) => name)).toEqual(['arena-wall']);
+  });
+
+  it('can admit hidden authored sources retained by a static render batch', () => {
+    const source = box('nuketown2 static wall source', 0.9);
+    source.visible = false;
+    source.userData.staticBatchRendered = true;
+    const scene = sceneOf(source);
+
+    expect(extractProxyScene(scene, THREE, ARENA_PROXY_EXTRACTION).shapes).toEqual([]);
+    const proxy = extractProxyScene(scene, THREE, NUKETOWN2_BAKED_INDIRECT_EXTRACTION);
+    expect(proxy.shapes).toHaveLength(1);
+    expect(proxy.shapes[0].name).toBe('nuketown2 static wall source');
   });
 
   it('rejects geometry degenerate on two axes even when it is registered water', () => {

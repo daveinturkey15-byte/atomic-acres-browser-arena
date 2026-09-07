@@ -173,16 +173,17 @@ describe('HF-536 nuketown2 bloom — emitters only, threshold further above whit
 
 describe('HF-536 GTAO gather radius is an exterior-scale length', () => {
   it('pins the metre radii', () => {
-    expect(GTAO_RADIUS_METRES.low).toBe(0.42);
-    expect(GTAO_RADIUS_METRES.high).toBe(0.6);
-    expect(GTAO_RADIUS_METRES.ultra).toBe(0.8);
+    expect(GTAO_RADIUS_METRES.low).toBe(1.2);
+    expect(GTAO_RADIUS_METRES.high).toBe(1.4);
+    expect(GTAO_RADIUS_METRES.ultra).toBe(1.6);
   });
 
   it('is monotonic in tier and covers the arena contact separations', () => {
     expect(GTAO_RADIUS_METRES.low).toBeLessThan(GTAO_RADIUS_METRES.high);
     expect(GTAO_RADIUS_METRES.high).toBeLessThan(GTAO_RADIUS_METRES.ultra);
     // Kerb-to-asphalt, house-base-to-lawn, vehicle-to-road: 0.4-0.9 m.
-    expect(GTAO_RADIUS_METRES.high).toBeGreaterThanOrEqual(0.4);
+    // The exterior gather deliberately clears that separation with margin.
+    expect(GTAO_RADIUS_METRES.low).toBeGreaterThanOrEqual(1.2);
   });
 
   it('base 64738e1e behaviour: the shipped high radius was an interior prop radius', () => {

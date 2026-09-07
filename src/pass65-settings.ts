@@ -214,9 +214,9 @@ function bool(value: unknown, fallback: boolean): boolean {
  * would be a second, separate claim.
  */
 export const GTAO_RADIUS_METRES = Object.freeze({
-  low: 0.42,
-  high: 0.6,
-  ultra: 0.8,
+  low: 1.2,
+  high: 1.4,
+  ultra: 1.6,
 });
 
 function presetGraphics(preset: Exclude<GraphicsPreset, 'custom'>): GraphicsSettings {

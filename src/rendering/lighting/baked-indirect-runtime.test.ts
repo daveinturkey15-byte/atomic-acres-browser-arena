@@ -369,7 +369,7 @@ describe('buildBakedIndirectRuntime', () => {
     runtime.beforeRender();
     const target = { dataset: {} as Record<string, string | undefined> };
     publishBakedIndirectReceipt(target, runtime.graph);
-    expect(target.dataset.bakedIndirect).toMatch(/^24x12x24:[0-9a-f]{8}:\d+:0\.380$/);
+    expect(target.dataset.bakedIndirect).toMatch(/^24x8x48:[0-9a-f]{8}:\d+:0\.550$/);
     runtime.dispose();
   });
 });

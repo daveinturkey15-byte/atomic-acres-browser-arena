@@ -68,12 +68,24 @@ const browser = await chromium.launch({
 });
 const context = await browser.newContext({ viewport: { width: 2560, height: 1440 } });
 const page = await context.newPage();
+// A headless tab is not necessarily the foreground owner. The live frame loop
+// correctly refuses submission without focus, so a proxy extraction that does
+// not emulate focus can report an active match while never running the bake
+// runtime's beforeRender hook. This is the same CDP foreground contract used by
+// the viewpoint capture gate.
+const session = await context.newCDPSession(page);
+await session.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error).slice(0, 300)));
 
 let exitCode = 0;
 try {
-  await page.goto(`${BASE}/?release=latest&renderer=webgpu&seed=lightq&previewTime=0`, {
+  // The default menu arena is allowed to be the target, but the selection
+  // guard intentionally no-ops when that arena is already the prepared one.
+  // Start on a different menu-only arena so selectArena() always performs the
+  // real fenced deployment this extraction needs.
+  const initialMap = ARENA === 'nuketown2' ? 'atomic-acres' : 'nuketown2';
+  await page.goto(`${BASE}/?map=${initialMap}&release=latest&renderer=webgpu&seed=lightq&previewTime=0&tod=authored`, {
     waitUntil: 'domcontentloaded',
   });
   await page.waitForFunction(() => Boolean(window.__ATOMIC_ACRES_DEBUG__), undefined, { timeout: TIMEOUT });

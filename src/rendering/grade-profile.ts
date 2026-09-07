@@ -55,8 +55,8 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
  * correct and where it cannot invalidate a later stage.
  * - Motion blur smears the raw scene colour, so it runs before anything reads
  *   neighbouring pixels for a different purpose.
- * - Screen-space GI adds bounce light before the contact-occlusion multiply,
- *   so GTAO darkens the bounced light exactly as it darkens direct light.
+ * - Screen-space GI and baked probes add ambient bounce through the
+ *   contact-occlusion projection, while the direct scene colour is preserved.
  * - Screen-space reflections are added after occlusion (a reflection is not
  *   occluded by the surface reflecting it) but before bloom, so a wet highlight
  *   can bloom like any other bright pixel.
@@ -71,9 +71,9 @@ export const LINEAR_SOURCE_STAGE_ORDER: readonly string[] = Object.freeze([
   'scene-pass-linear-hdr',
   'motion-blur-velocity-smear',
   // HF-418 - baked indirect light. It sits with SSGI, immediately BEFORE the
-  // contact-occlusion multiply, for the reason the comment above gives for
-  // SSGI: bounced light must be darkened by ambient occlusion exactly as
-  // direct light is, or a corner that GTAO darkens fills straight back in.
+  // contact-occlusion projection. GTAO attenuates this ambient bounce only;
+  // the direct scene colour stays intact so an exterior gather radius cannot
+  // crush the lit side of a wall.
   // Before SSGI rather than after because it is the lower-frequency term and
   // the two are additive, so the order between them is a convention, not a
   // result - it is fixed here so the receipt is stable.

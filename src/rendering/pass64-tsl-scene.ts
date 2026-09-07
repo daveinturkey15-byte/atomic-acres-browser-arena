@@ -991,6 +991,7 @@ function configureHdrPipeline(
     sceneMaterial: screenSpaceMrt.material ? scenePass.getTextureNode('material') : null,
     sceneVelocity: screenSpaceMrt.velocity ? scenePass.getTextureNode('velocity') : null,
     camera,
+    scene,
     volumetricLight,
   }, screenSpaceRuntime);
   const gtaoPass = graphics.ambientOcclusion.enabled && sceneNormal ? ao(sceneDepth, sceneNormal, camera) : null;
@@ -1059,15 +1060,18 @@ function configureHdrPipeline(
   const contactOcclusion = occlusionSample
       ? mix(float(1), occlusionSample, contactOcclusionStrength)
       : float(1);
-    // HF-364 linear composite order, matching LINEAR_SOURCE_STAGE_ORDER:
-    //   [motion blur] -> [+SSGI bounce] -> *contact occlusion
-    //   -> +bloom -> [+godray shafts] -> [depth of field]
-    // GI is added BEFORE the occlusion multiply so GTAO darkens bounced light
-    // exactly as it darkens direct light; reflections and shafts are added
-    // after it because a reflection is not occluded by the surface reflecting
-    // it, and a shaft is volume in front of the surface, not on it.
-    const withBounce = screenSpace.bounceLight ? contrasted.add(screenSpace.bounceLight) : contrasted;
-    const occluded = withBounce.mul(contactOcclusion);
+    // HF-364/HF-536 linear composite order, matching
+    // LINEAR_SOURCE_STAGE_ORDER:
+    //   [motion blur] -> [+ambient bounce * contact occlusion]
+    //   -> [direct scene colour] -> +bloom -> [+godray shafts] -> [depth of field]
+    // GTAO is an ambient/contact projection here: it attenuates only the
+    // additive baked/SSGI bounce and leaves the direct sun and authored scene
+    // colour untouched. This keeps a wide exterior gather radius from
+    // crushing a lit wall while grounding the indirect fill at contacts.
+    const ambientBounce = screenSpace.bounceLight
+      ? nodeObject(screenSpace.bounceLight).mul(contactOcclusion)
+      : null;
+    const occluded = ambientBounce ? contrasted.add(ambientBounce) : contrasted;
     const withReflections = screenSpace.reflectionLight
       ? occluded.add(screenSpace.reflectionLight)
       : occluded;

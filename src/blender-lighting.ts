@@ -256,7 +256,7 @@ const RUSTWORKS_BRIGHTENING: Readonly<Partial<ArenaLightingProfile>> = Object.fr
  * and the program set are untouched. It is arena-scoped exactly the way
  * `RUSTWORKS_BRIGHTENING` already is, so no other arena moves.
  */
-export const NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY = 1.5;
+export const NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY = 0.18;
 
 /**
  * The floor this arena's shadow side must not fall below again. The applied
@@ -264,9 +264,11 @@ export const NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY = 1.5;
  * `src/nuketown2-shadow-floor.test.ts` rather than silently re-blacking the
  * street.
  */
-export const NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY = 1.4;
+export const NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY = 0.16;
 
 const NUKETOWN2_SHADOW_FLOOR: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
+  ambientIntensity: 0.12,
+  hemisphereIntensity: 0.18,
   fillIntensity: NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY,
 });
 

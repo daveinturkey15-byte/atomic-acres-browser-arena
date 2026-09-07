@@ -183,7 +183,7 @@ describe('bakeIrradianceVolume', () => {
     });
     expect(volume.bake.occluderShapes).toBe(1);
     expect(volume.bake.raysPerProbe).toBe(48);
-    expect(volume.bake.bounces).toBe(1);
+    expect(volume.bake.bounces).toBe(2);
   });
 
   it('fills probes buried inside geometry rather than leaving a black band through the wall', () => {
@@ -486,7 +486,8 @@ describe('combat safety and parity', () => {
     // knob is ever added to this tuning, this test is where it has to be argued.
     expect(Object.keys(low)).toEqual(Object.keys(high));
     expect(low.raysPerProbe).toBeLessThan(high.raysPerProbe);
-    expect(low.bounces).toBeLessThan(high.bounces);
+    expect(low.bounces).toBe(high.bounces);
+    expect(low.bounces).toBe(2);
     expect(low.probeSpacingM).toBeGreaterThan(high.probeSpacingM);
   });
 

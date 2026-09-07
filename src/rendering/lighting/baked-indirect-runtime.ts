@@ -50,16 +50,19 @@ import * as THREE from 'three';
 
 import {
   ARENA_PROXY_EXTRACTION,
+  NUKETOWN2_BAKED_INDIRECT_EXTRACTION,
 } from '../raytracing/arena-proxy-registration';
 import { extractProxyScene, vec3, type ProxyScene } from '../raytracing/analytic-proxy-scene';
 import {
   BAKED_INDIRECT_RUNTIME_GRID,
   beginIrradianceBake,
   computeBakeDigest,
+  deserialiseIrradianceVolume,
   type BakeLighting,
   type BakedIndirectTuning,
   type IrradianceBakeSession,
   type IrradianceProbeVolume,
+  type SerialisedIrradianceVolume,
 } from './baked-indirect';
 import {
   buildBakedIndirectLightNode,
@@ -101,6 +104,8 @@ export const REDERIVE_MAXIMUM_WAIT_MS = 6_000;
 export type BakedIndirectRuntimeSources = BakedIndirectSources & Readonly<{
   /** The arena sun, for the bake's lighting AND for the scene-root fallback. */
   sun: THREE.DirectionalLight | THREE.PointLight | null;
+  /** The authoritative scene, supplied explicitly while the camera is detached during admission. */
+  scene?: THREE.Object3D | null;
 }>;
 
 /**
@@ -114,6 +119,33 @@ export type BakedIndirectRuntimeSources = BakedIndirectSources & Readonly<{
  * is a feature that is silently off on the newest map.
  */
 export type BakedIndirectVolumeCache = (digest: string, arenaId: string) => IrradianceProbeVolume | null;
+
+/**
+ * Build-time volumes are bundled beside this module. The glob is deliberately
+ * eager: cache admission must be a synchronous decision before the first
+ * texture upload, and the generated JSON is already a compact base64 payload.
+ * An empty glob is valid for arenas that have not received an offline bake yet;
+ * those arenas retain the bounded loading-screen fallback.
+ */
+const SHIPPED_BAKED_VOLUMES = Object.freeze(Object.values(
+  import.meta.glob('./baked/*.json', { eager: true, import: 'default' }) as Record<string, SerialisedIrradianceVolume>,
+));
+
+const shippedBakedVolumeCache = (): BakedIndirectVolumeCache => {
+  const decoded = new Map<string, IrradianceProbeVolume>();
+  return (digest, arenaId) => {
+    const key = `${arenaId}:${digest}`;
+    const existing = decoded.get(key);
+    if (existing) return existing;
+    const payload = SHIPPED_BAKED_VOLUMES.find((candidate) => (
+      candidate.arenaId === arenaId && candidate.digest === digest
+    ));
+    if (!payload) return null;
+    const volume = deserialiseIrradianceVolume(payload);
+    decoded.set(key, volume);
+    return volume;
+  };
+};
 
 export type BakedIndirectRuntime = Readonly<{
   graph: BakedIndirectGraph;
@@ -197,7 +229,7 @@ export function readPublishedArenaId(): string | null {
 export function buildBakedIndirectRuntime(
   sources: BakedIndirectRuntimeSources,
   tuning: BakedIndirectTuning,
-  cache: BakedIndirectVolumeCache = () => null,
+  cache: BakedIndirectVolumeCache = shippedBakedVolumeCache(),
   now: () => number = () => (typeof performance === 'undefined' ? Date.now() : performance.now()),
   arenaId: () => string | null = readPublishedArenaId,
 ): BakedIndirectRuntime {
@@ -229,6 +261,7 @@ export function buildBakedIndirectRuntime(
   // the camera is parented into the scene. Walking up beats changing an
   // assembler owned by another lane. Same derivation as the ray-traced layer.
   const sceneRoot = (): THREE.Object3D | null => {
+    if (sources.scene) return sources.scene;
     let node: THREE.Object3D | null = sources.camera as THREE.Object3D;
     while (node?.parent) node = node.parent;
     if (node && node !== (sources.camera as THREE.Object3D)) return node;
@@ -281,6 +314,22 @@ export function buildBakedIndirectRuntime(
    */
   const currentArenaKey = (root: THREE.Object3D): string => arenaId() ?? root.name ?? '';
 
+  const staticBakeRoot = (root: THREE.Object3D, key: string): THREE.Object3D => {
+    if (key !== 'nuketown2') return root;
+    // The arena root is tagged at the authority commit. Walking this child,
+    // rather than the whole scene, excludes operators, weapons, support
+    // presentations and the shared sky from the static-light bake.
+    return root.children.find((child) => child.userData.authoritativeArenaId === key) ?? root;
+  };
+
+  const extractionForArena = (root: THREE.Object3D, key: string): ProxyScene => (
+    extractProxyScene(
+      staticBakeRoot(root, key),
+      THREE,
+      key === 'nuketown2' ? NUKETOWN2_BAKED_INDIRECT_EXTRACTION : ARENA_PROXY_EXTRACTION,
+    )
+  );
+
   const maybeStartBake = (): void => {
     const root = sceneRoot();
     if (!root) return;
@@ -314,7 +363,7 @@ export function buildBakedIndirectRuntime(
     const waitedLongEnough = at - pendingSince >= REDERIVE_MAXIMUM_WAIT_MS;
     if (!settled && !waitedLongEnough) return;
 
-    const proxy = extractProxyScene(root, THREE, ARENA_PROXY_EXTRACTION);
+    const proxy = extractionForArena(root, arenaKey);
     if (proxy.shapes.length === 0) {
       // RULE 2. A sky-only volume is a CORRECT image of nothing, and binding one
       // would look healthy in every receipt. Wait and try again instead.

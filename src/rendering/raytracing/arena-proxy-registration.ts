@@ -30,7 +30,7 @@
  * authoritative shader-cost budget and nothing here can widen it.
  */
 
-import { DEFAULT_PROXY_EXTRACTION, type ProxyExtractionOptions } from './analytic-proxy-scene';
+import { DEFAULT_PROXY_EXTRACTION, type ProxyExtractionOptions, vec3 } from './analytic-proxy-scene';
 
 /**
  * The registered water surfaces, by SOURCE MESH name. The list is explicit —
@@ -94,4 +94,27 @@ export const ARENA_PROXY_EXTRACTION: ProxyExtractionOptions = Object.freeze({
   maximumShapes: DEFAULT_PROXY_EXTRACTION.maximumShapes,
   minimumFootprintM2: DEFAULT_PROXY_EXTRACTION.minimumFootprintM2,
   waterSurfaces: ARENA_WATER_SURFACES.map(({ namePattern }) => ({ namePattern })),
+});
+
+/**
+ * The baked bounce has a different cost budget from the screen-space reflection
+ * proxy. It needs the town's real static massing, but not the mountain ring,
+ * wind groups, lamp cones or the presentation batches whose merged AABBs can
+ * cover half the map. Cropping to the playable rectangle keeps the volume's
+ * world-space bounds honest, so the probe spacing is 1.5-2 m where a player can
+ * actually stand rather than several metres across the backdrop.
+ */
+export const NUKETOWN2_BAKED_INDIRECT_EXTRACTION: ProxyExtractionOptions = Object.freeze({
+  maximumShapes: 384,
+    minimumFootprintM2: 1,
+    excludeDynamic: true,
+    includeStaticBatchSources: true,
+  clipBounds: Object.freeze({
+    min: vec3(-24, -1, -48),
+    max: vec3(24, 16, 48),
+  }),
+  includeMesh: ({ name }) => (
+    /^nuketown2(?: |$)/.test(name)
+    && !/^nuketown2-presentation|^nuketown2 ground skirt|^nuketown2 lamp|^nuketown2 power|^nuketown2 beyond-bounds/i.test(name)
+  ),
 });

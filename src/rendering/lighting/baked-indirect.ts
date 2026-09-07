@@ -107,7 +107,7 @@ export const BAKED_INDIRECT_MAXIMUM_ADDITIVE = 0.18;
  * bake at the HIGH tier. The cap exists so an arena with a large bounding box
  * cannot silently turn a 200 ms bake into a 40 s one.
  */
-export const BAKED_INDIRECT_MAXIMUM_PROBES = 8192;
+export const BAKED_INDIRECT_MAXIMUM_PROBES = 12_288;
 
 /** Coefficients per channel (L1), and floats per probe (3 channels x 4). */
 export const SH_L1_COEFFICIENTS = 4;
@@ -134,9 +134,9 @@ const BAKED_INDIRECT_OFF: BakedIndirectTuning = Object.freeze({
 });
 
 /**
- * LOW is the BALANCED-profile tier: a 3 m grid, one bounce, 48 rays. It is
+ * LOW is the BALANCED-profile tier: a 3 m grid, two bounces, 48 rays. It is
  * "on lightly" in the owner's phrase — the room reads as coloured rather than
- * grey, without the second bounce that mostly refines a signal trilinear
+ * grey, with the same second-bounce transport as HIGH while trilinear
  * interpolation is about to blur anyway.
  *
  * HIGH is QUALITY and above: 2 m, two bounces, 128 rays. Both bake offline, so
@@ -152,8 +152,8 @@ export function resolveBakedIndirectTuning(tier: BakedIndirectTier): BakedIndire
     enabled: true,
     probeSpacingM: high ? 2 : 3,
     raysPerProbe: high ? 128 : 48,
-    bounces: high ? 2 : 1,
-    composite: Math.min(high ? 0.5 : 0.38, BAKED_INDIRECT_MAXIMUM_GAIN),
+    bounces: 2,
+    composite: Math.min(0.55, BAKED_INDIRECT_MAXIMUM_GAIN),
   });
 }
 
@@ -246,13 +246,12 @@ export type BakeOptions = Readonly<{
 }>;
 
 /**
- * The probe grid the RUNTIME allocates, once, for every arena. 24 x 12 x 24 is
- * 6912 probes: 331 KB across the three RGBA float 3D textures, and on the
- * largest authored arena (~120 m across) it lands the probes about 5 m apart
- * horizontally and 2 m vertically, which is the right anisotropy for arenas
- * that are wide and low rather than cubic.
+ * The probe grid the RUNTIME allocates, once, for every arena. 24 x 8 x 48 is
+ * 9216 probes: 442 KB across the three RGBA float 3D textures. Nuke Town's
+ * clipped play box measures about 1.6 m across X and 1.8 m down Z at this
+ * grid, giving static walls and the street the required 1.5-2 m spacing.
  */
-export const BAKED_INDIRECT_RUNTIME_GRID: readonly [number, number, number] = Object.freeze([24, 12, 24]) as unknown as readonly [number, number, number];
+export const BAKED_INDIRECT_RUNTIME_GRID: readonly [number, number, number] = Object.freeze([24, 8, 48]) as unknown as readonly [number, number, number];
 
 // ---------------------------------------------------------------------------
 // Spherical harmonics (L1), in the one convention this file uses everywhere
