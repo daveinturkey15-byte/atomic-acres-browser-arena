@@ -222,6 +222,38 @@ test('capture takes multi-sample persistence evidence per viewpoint', () => {
   assert.match(source, /samples: SAMPLES/);
 });
 
+test('capture FAILS the arena when a station delivers a flat frame', async () => {
+  const source = readFileSync(resolve(ROOT, 'scripts/qa/capture-arena-viewpoints.mjs'), 'utf8');
+  // HF-541. nuketown2-perimeter-wall-end-close aimed 36 degrees into the
+  // perimeter end wall, so one shaded face filled 64.6% of the frame and the
+  // capture delivered 13,025 distinct RGB values against a 29-station median of
+  // 92,715. A low-variance frame averaged into a station-set aggregate pulls
+  // that aggregate toward whatever it is compared with - measured on
+  // interim-11, excluding it moved the midtone delta +20.90 -> +23.86 and the
+  // highlight delta -4.66 -> +1.00. So the CAPTURE has to refuse it: by the
+  // time a diff, a score or a report exists, they are all already wrong.
+  assert.match(source, /assessFrameVariety/);
+  assert.match(source, /record\.frameVariety/);
+  // The gate must actually fail the record, not merely annotate it.
+  assert.match(source, /record\.frameVariety\.status === 'fail'[\s\S]{0,80}record\.ok = false/);
+  // ...and it must name the offender, or the next reader cannot act on it.
+  assert.match(source, /FLAT FRAME \$\{offender\.reason\}/);
+
+  const { VARIETY_FLOOR_RATIO, VARIETY_ORDER_OF_MAGNITUDE, VARIETY_MIN_STATIONS, assessFrameVariety } =
+    await import('./capture-frame-variety.mjs');
+  // Loosening any of these is weakening a verifier. The floor is the one that
+  // bites: the fault sat at 0.140x of the median, INSIDE a 10x band.
+  assert.equal(VARIETY_FLOOR_RATIO, 0.25);
+  assert.equal(VARIETY_ORDER_OF_MAGNITUDE, 10);
+  assert.equal(VARIETY_MIN_STATIONS, 8);
+  // End to end on the shape the driver hands it: the shipped fault is rejected.
+  const rows = [{ station: 'flat', distinct: 13025 }, ...Array.from({ length: 28 },
+    (_, i) => ({ station: `s${i}`, distinct: 92715 }))];
+  const result = assessFrameVariety(rows);
+  assert.equal(result.status, 'fail');
+  assert.deepEqual(result.offenders.map((o) => o.station), ['flat']);
+});
+
 test('diff gates verdicts on cross-sample persistence at unchanged strictness', async () => {
   const source = readFileSync(resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'), 'utf8');
   // Verdict thresholds are applied to the pixel-wise MINIMUM delta across
