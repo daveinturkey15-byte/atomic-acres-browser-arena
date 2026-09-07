@@ -87,19 +87,16 @@ const stationsFor = (arena) => CAMERAS
   : VIEWPOINT_CATALOG[arena];
 
 // shell:true wraps the server in cmd.exe; killing the wrapper alone orphans
-// the vite child and leaves :41931 occupied for the next run. Kill the tree.
+// the vite child and leaves the port occupied for the next run. Kill the tree.
 let SERVE_CHILD = null;
 const killServeChild = () => {
   if (!SERVE_CHILD || SERVE_CHILD.pid == null) return;
   if (process.platform === 'win32') {
     // HF-535: the fire-and-forget taskkill raced process exit and the vite
-    // process under npx survived, squatting :41931 for the next run. Kill the
-    // tree synchronously, then sweep whatever still listens on OUR port - we
-    // refused to start if anyone else held it, so any listener here is ours.
+    // process under npx survived, squatting the next run's port. Kill only
+    // the process tree we spawned; never sweep a port that could be owned by
+    // another lane or a user's process.
     spawnSync('taskkill', ['/pid', String(SERVE_CHILD.pid), '/T', '/F'], { stdio: 'ignore' });
-    spawnSync('powershell', ['-NoProfile', '-Command',
-      'Get-NetTCPConnection -State Listen -LocalPort 41931 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }'],
-      { stdio: 'ignore' });
   } else {
     SERVE_CHILD.kill('SIGTERM');
   }
@@ -112,9 +109,9 @@ const serveDist = arg('--serve-dist', null);
 const extraQuery = (arg('--query', '') || '').replace(/^[?&]+/, '');
 if (serveDist) {
   // Short-lived server, spawned here and reaped via killServeChild() in
-  // `finally`. Port chosen away from 41900/41901 (owner builds) and
-  // 41910/41911 (shared gauntlet preview).
-  const PORT = 41931;
+  // `finally`. The lane supplies an isolated port; the historical default is
+  // retained for callers that do not pass one.
+  const PORT = Number(arg('--port', '41931'));
   console.error(`[viewpoint-capture] serving ${serveDist} on :${PORT}`);
   // Node >=20 blocks .cmd/.bat spawns without a shell (CVE-2024-27980).
   const server = spawn('npx', ['vite', 'preview', '--outDir', serveDist,
@@ -136,7 +133,7 @@ if (serveDist) {
   }
   // HF-535 (2026-09-06): `--strictPort` makes the spawned preview die silently
   // on EADDRINUSE (stdio is ignored), and the readiness probe above accepts
-  // ANY server on :41931. A stale `vite preview` for another worktree squatted
+  // ANY server on the requested port. A stale `vite preview` for another worktree squatted
   // the port and fourteen consecutive captures measured a Pass-93 bundle while
   // reporting the b5b06e0f sha. Refuse to measure a server that does not serve
   // THIS dist byte-for-byte at index.html, and say so when the child is dead.
