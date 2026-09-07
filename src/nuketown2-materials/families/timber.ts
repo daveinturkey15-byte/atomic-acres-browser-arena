@@ -23,6 +23,12 @@ import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
+import {
+  attachNuketown2TextureBridge,
+  createNuketown2TextureBridge,
+  textureSetSamples,
+  type Nuketown2TextureBridge,
+} from '../texture-bridge';
 
 const { abs, clamp, float, floor, fract, mix, positionWorld, smoothstep, vec2 } =
   TSL as unknown as Record<string, any>;
@@ -81,10 +87,12 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
   });
 }
 
-let timberGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
+type TimberGraph = { colorNode: any; roughnessNode: any; normalNode: any };
+const timberGraphs = new WeakMap<object, TimberGraph>();
 
-function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
-  if (timberGraph) return timberGraph;
+function sharedTimberGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): TimberGraph {
+  const cached = timberGraphs.get(textureBridge);
+  if (cached) return cached;
   const spec = timberSpec('nuketown2-timber-shared', 0x673b24, 'fence');
   const p = positionWorld;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
@@ -129,18 +137,25 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
       .mul(detailFalloff(GRAIN_RELIEF_NEAR_M, GRAIN_RELIEF_FAR_M)))
     .add(knot.mul(painted.select(float(KNOT_RELIEF_M * 0.3), float(KNOT_RELIEF_M))))
     .add(boardTone.mul(float(0.004)));
-  timberGraph = {
-    colorNode: mix(footed, linearSwatch(0x1a120c), gap),
-    roughnessNode: clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0)),
-    normalNode: reliefNormal(height),
-  };
-  return timberGraph;
+  const proceduralColor = mix(footed, linearSwatch(0x1a120c), gap);
+  const proceduralRoughness = clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0));
+  const relief = reliefNormal(height);
+  const textureSamples = textureSetSamples(textureBridge, 'timber', boxUv());
+  timberGraphs.set(textureBridge, {
+    colorNode: textureSamples ? proceduralColor.mul(textureSamples.albedo) : proceduralColor,
+    roughnessNode: textureSamples
+      ? clamp(proceduralRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.25), float(1.0))
+      : proceduralRoughness,
+    normalNode: textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief,
+  });
+  return timberGraphs.get(textureBridge)!;
 }
 
 export function createTimberMaterial(
   name: string,
   baseSrgb: number,
   variant: TimberVariant = 'fence',
+  textureBridge: Nuketown2TextureBridge = createNuketown2TextureBridge(),
 ): MeshStandardNodeMaterial {
   const spec = timberSpec(name, baseSrgb, variant);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
@@ -150,10 +165,11 @@ export function createTimberMaterial(
 
   const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'timberVariant', variant === 'fence' ? 0 : variant === 'deck' ? 1 : 2);
-  const shared = sharedTimberGraph(uniforms);
+  const shared = sharedTimberGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge, ['timber']);
   return mat;
 }
 
