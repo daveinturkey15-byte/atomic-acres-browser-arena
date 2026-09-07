@@ -1,22 +1,22 @@
 {
-  "capturedAt": "2026-09-06T23:31:44.590670+00:00",
-  "sourceSha": "4cddcb56470afb63b26a2d31fc6fdac1f7b197ae",
+  "capturedAt": "2026-09-07T00:06:24.527184+00:00",
+  "sourceSha": "4e807e60e6959ed1b7d0e2de660d04f2c08714be",
   "preview": "http://127.0.0.1:4285/?release=latest&renderer=webgpu&render=quality",
-  "bundle": "legacy-main-Bm-FW6-2.js",
+  "bundle": "legacy-main-B0LVRpfC.js",
   "servedBundleMatchesDisk": true,
-  "bundleSha256": "8ca9f52b649a7a0e9b58cac3c00412b126a0a9a48f97be2c5efd558d689e7995",
+  "bundleSha256": "8fc3a2001b740bdfa216bfc53bff509e0a13bbc32ddd2a14d71effc1bd6827f8",
   "distFileCount": 609,
-  "distTreeSha256": "bd0c82c96af32287ec5b18cbbfdc94b2c1b59dbced0581d1ad86f0634d0e7cbb",
+  "distTreeSha256": "eb3257f937bba82a08c8208c55f28834132c71dbf4d42e1e35e33c72fe19f5f6",
   "files": [
     {
-      "path": "assets/additional-maps-BeN5z9I0.js",
+      "path": "assets/additional-maps-6CF2WzHl.js",
       "bytes": 111535,
-      "sha256": "7426f29dffb4c1e777c291ce372b3a429fb65960622d82a57b1e21e78083e701"
+      "sha256": "1cffa1fe41ca9ab2d1e90bf0947efeafbf7532be6a9ca933856b5e49153d4745"
     },
     {
-      "path": "assets/atomic-acres-CXm6rokI.js",
+      "path": "assets/atomic-acres-CKr-mhaI.js",
       "bytes": 1708,
-      "sha256": "ebc7aa07759e486b54a9f2cfd2340b250d6adc6469546f9a9df18e06feefd197"
+      "sha256": "b67d78f40fcf85d00a1805ff449feb07afc23ac0696ed6121806e562b92626bc"
     },
     {
       "path": "assets/changelog-CasHtdVI.js",
@@ -59,19 +59,19 @@
       "sha256": "257e273741291b6120cfcbec488108fce2470fcb63bdc86f4847db7470c2a007"
     },
     {
-      "path": "assets/gameplay-DgEmuzhh.js",
-      "bytes": 541768,
-      "sha256": "fcb04b1e5b19da67019a0361faf248b50df6d7688713f7202ffe03aa25770d41"
+      "path": "assets/gameplay-CZQg3zki.js",
+      "bytes": 541837,
+      "sha256": "54602e61eafdfa7edf0741670f0f91d33310cc070d532154cb22682425012754"
     },
     {
-      "path": "assets/gun-range-CYRtIg0A.js",
+      "path": "assets/gun-range-C_6iw0B-.js",
       "bytes": 5048,
-      "sha256": "ce6b49fa6d3cc277d5013e69fd0005bb1192f9d8800be61129a612aac42673f3"
+      "sha256": "546cbd67df2c4b292c7bc61b0d332d453ccb0bebd58debe84236390a7f9e3505"
     },
     {
-      "path": "assets/gun-range-rack-presentation-BEhW2NAF.js",
+      "path": "assets/gun-range-rack-presentation-BEqratxl.js",
       "bytes": 3577,
-      "sha256": "25a91ba3e7a724fa2812b4a49f88e02e10413198339307ea80c33347f1081e96"
+      "sha256": "04df0265fd934650025b36f41b6c8c101d72e59da055457af4a24f29ce2388a4"
     },
     {
       "path": "assets/high-seas-BbhJRmbN.js",
@@ -84,9 +84,9 @@
       "sha256": "b1644dda5ce835230d897fe4d79626eb4bd1f13ea420da5618dc0a92cdfa773d"
     },
     {
-      "path": "assets/index-DRwylB6V.js",
+      "path": "assets/index-B5cf4iKQ.js",
       "bytes": 4244,
-      "sha256": "861aaa26b5ede0f6164d1fd22c2d359a5261a0d700acfcf685199e28069423c1"
+      "sha256": "a426e7e531fcd501b5984a0694bf9c42f37e7b149fc9ce5144e5c74ff0562464"
     },
     {
       "path": "assets/index-DuippQot.css",
@@ -94,9 +94,9 @@
       "sha256": "c235d2a4f7f758f10ef5e29b90f3ac36190886bfe06d3c814402ec52ff3e52b4"
     },
     {
-      "path": "assets/legacy-main-Bm-FW6-2.js",
+      "path": "assets/legacy-main-B0LVRpfC.js",
       "bytes": 1986899,
-      "sha256": "8ca9f52b649a7a0e9b58cac3c00412b126a0a9a48f97be2c5efd558d689e7995"
+      "sha256": "8fc3a2001b740bdfa216bfc53bff509e0a13bbc32ddd2a14d71effc1bd6827f8"
     },
     {
       "path": "assets/legacy-main-BSThLq4n.css",
@@ -104,29 +104,29 @@
       "sha256": "f4ebe7c28937bbfb6499f41ce5d9f3b50f5b3c2dd0e5f9bfdd8e28403e648590"
     },
     {
-      "path": "assets/main-BxZLO9km.js",
+      "path": "assets/main-By57FMAU.js",
       "bytes": 1702,
-      "sha256": "8e2bfe745c448f00272365a40a351ab0dbce826baa09642fdb9b8e3a82fc05bd"
+      "sha256": "730f58ff5f7242ec3f4cfc35557622ed17f5bb385231d9f3757e41a7837297bf"
     },
     {
-      "path": "assets/map-B88cvcz9.js",
+      "path": "assets/map-RfF39jwa.js",
       "bytes": 44501,
-      "sha256": "09d17078dc7aa681de3d83d4de7933f8b5eb11df97923abfc8f4767acdaee98e"
+      "sha256": "da163b7cbec5e9209b6fc6457bf9b9bd694dbdb10e4889e7c61e25f2e9bc3917"
     },
     {
-      "path": "assets/map3-arena-DTkhJFJK.js",
+      "path": "assets/map3-arena-DBrBj6ij.js",
       "bytes": 250,
-      "sha256": "bf18b10e3f09680e27051ceddba51b20fcd775dba243e012e158cf0b2d3a5c62"
+      "sha256": "ba931167967609fd5da683fcfb58806a697eade455bb82fe54e5d4930e4c7e42"
     },
     {
-      "path": "assets/map3-arena-oRHUx661.js",
+      "path": "assets/map3-arena-fwSucu0M.js",
       "bytes": 4311,
-      "sha256": "ff9d6f929c83c3998a784b65e08235767274da1d54d0304a40559993ea47b26f"
+      "sha256": "eea2784be3faaff863085e332031d1709c6a49662d40b3bb1e9ddc40d530ae26"
     },
     {
-      "path": "assets/map3-CgnK7Nog.js",
+      "path": "assets/map3-BnXWM60R.js",
       "bytes": 1186,
-      "sha256": "e11be9ad21c187f126ee8bef90da38d29811b0d33a17a92b3cc63759f42519ed"
+      "sha256": "6cb7090d06e3b4e7bec5a6b12f184cdd6165a78f74c0b4a9cf98806959a95a5b"
     },
     {
       "path": "assets/map3-CHH1rFnm.js",
@@ -144,14 +144,14 @@
       "sha256": "52a33b1a6653653b97008b49f08bac9080f3d74a2d91f2f102a9571be6c1dbd3"
     },
     {
-      "path": "assets/nuke-event-C2Bk1EPy.js",
+      "path": "assets/nuke-event-CGjWDhlW.js",
       "bytes": 251521,
-      "sha256": "b51bc4c0efeecbcfe6eb2f9b447e341063cc99872f6db6025bdad87ee6ef970d"
+      "sha256": "a4dfb68e5ea73f9ceea1210ed627870a2456e3194f0e46fcbcebef8bbef4c42a"
     },
     {
-      "path": "assets/nuketown2-yjBNfLU8.js",
+      "path": "assets/nuketown2-BBHZPJNv.js",
       "bytes": 3829,
-      "sha256": "6a3647ffdffaa02ce28f1ef71491b9607a2f56656d4fcfe704120c475eb361fe"
+      "sha256": "ead51a39147a78ee0eab6681e50d93f1d65b2a6a3cb7995d44dbe5665ae7495c"
     },
     {
       "path": "assets/original/killstreak-demo/adrenaline.jpg",
@@ -2859,14 +2859,14 @@
       "sha256": "750ae5469b6848943dc41b3e0d0005176e197422e5dc65aef4bb54ce97b4d279"
     },
     {
-      "path": "assets/raid2-arena-BJZTkSeD.js",
+      "path": "assets/raid2-arena-BzYwfwus.js",
       "bytes": 10889,
-      "sha256": "ead48dd46ad4ddae5cb97f2fce8777e92ca7757fd586a572a8d105b09b67795c"
+      "sha256": "5c1f41bb4c659963b9ea9a06448faddcd5ff55247834dcc94881f302f638d507"
     },
     {
-      "path": "assets/raid2-D9bDq8bn.js",
+      "path": "assets/raid2-C7LaVzoy.js",
       "bytes": 1706,
-      "sha256": "58502c0510b92f72508d0ad0598b151d63e71039fc791154abd81538f9b56be1"
+      "sha256": "04ae3494c998c6bd31296f403e4478826dc658632b7e559b4975b24149fc10dc"
     },
     {
       "path": "assets/rapier-USIc5Cek.js",
@@ -2889,9 +2889,9 @@
       "sha256": "5db5ba82eef00d1dee7e86e663098c9427d01183a88d357437daff295aec3e75"
     },
     {
-      "path": "assets/rustworks-1v1-DkdX43eC.js",
+      "path": "assets/rustworks-1v1-lPlorWe3.js",
       "bytes": 2837,
-      "sha256": "b81010410970f086948e21f5f4c97f2545395b239e3cff959e3c8b6616fa739f"
+      "sha256": "76c2ff24fb6b5b7841491ecf4dad80dfc0b287d64d1bb5fedd972744cdba71ee"
     },
     {
       "path": "assets/shared-BtULp7wH.js",
@@ -2904,9 +2904,9 @@
       "sha256": "fa5d2f538b589895ff430cb3cbb29304d75091b258479b36eded5829ac52f697"
     },
     {
-      "path": "assets/skyline-terminal-CHrOoe8l.js",
+      "path": "assets/skyline-terminal-CWv1vzWg.js",
       "bytes": 1743,
-      "sha256": "c8f5b60846678beb2b00b979d9b5ccfcde3676919d9127ec014698befd4a0748"
+      "sha256": "8f7d7b14191382151217f173669a0944bbc0656266d861b3e91440f54eb34c7b"
     },
     {
       "path": "assets/style-Cz5sWwCB.css",
@@ -2914,19 +2914,19 @@
       "sha256": "be7771a44e1b1230fa00144aaa19b88fff280ab2f2b4f7f87ca646a2adf29550"
     },
     {
-      "path": "assets/test-maps-B5K8lynx.js",
+      "path": "assets/test-maps-LorXczd-.js",
       "bytes": 53081,
-      "sha256": "6ea32dfb2eab601aac1abdf863d5699fb0ba66ddc7c638a6bca25164442cf6fe"
+      "sha256": "b2c716f34eb52b125e3bd85caee0c5820c25810332eddbe766b9ae9e6fa22500"
     },
     {
-      "path": "assets/test1-DLEmaOgQ.js",
+      "path": "assets/test1-FsiL1U7f.js",
       "bytes": 1209,
-      "sha256": "e2f11d2f3ff91c981cf267c2f19314e92f89a36b53a65afbaba430de77478717"
+      "sha256": "2ded8b6c49d01aa25cbd85f87db6e3ebe5863622b1c7a6305ca2f67aa229c43f"
     },
     {
-      "path": "assets/test2-BD5xMte9.js",
+      "path": "assets/test2-BwmNH95W.js",
       "bytes": 1301,
-      "sha256": "0e7adafbe6a90603f7093276d18a39f8ef91d3bbd3b84448da4e05c62b88ce99"
+      "sha256": "f6c888580a416db4f27a34a4f42b0dcaba858eb0ec7e4d50b1ba1df161faa9e9"
     },
     {
       "path": "assets/third-party/djmaesen/fps-arms/LICENSE.txt",
@@ -3041,7 +3041,7 @@
     {
       "path": "index.html",
       "bytes": 1206,
-      "sha256": "a48ac431aab1bc7157bd771a20f645dc071b4ebf873df7e8d1aba239cea6955e"
+      "sha256": "c8b411e936bac2ef286254bc201c2c7a68643a3d9a5c58a6abbdde9f1e881183"
     },
     {
       "path": "map3.html",
