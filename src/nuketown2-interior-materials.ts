@@ -114,16 +114,16 @@ export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
   const cell = vec2(floor(u), floor(v));
   const toneOffset = hash2(cell).sub(float(0.5)).mul(float(0.09));
 
-  // Bevel joints between planks
+  // Bevel joints between planks, widened to read at room distance.
   const edgeU = abs(fract(u).sub(float(0.5))).mul(float(2.0));
   const edgeV = abs(fract(v).sub(float(0.5))).mul(float(2.0));
-  const seamU = smoothstep(float(0.88), float(0.97), edgeU);
-  const seamV = smoothstep(float(0.96), float(0.992), edgeV);
+  const seamU = smoothstep(float(0.82), float(0.96), edgeU);
+  const seamV = smoothstep(float(0.94), float(0.99), edgeV);
   const seam = max(seamU, seamV);
 
   // Base warm oak tone: sRGB approx #99734e -> linear ~ [0.32, 0.18, 0.08]
   const baseWood = vec3(0.32, 0.19, 0.09).add(toneOffset);
-  const seamColor = vec3(0.08, 0.05, 0.03);
+  const seamColor = vec3(0.06, 0.035, 0.02);
 
   mat.colorNode = mix(baseWood, seamColor, seam).mul(wear.albedoMul);
   mat.roughnessNode = clamp(
@@ -175,16 +175,20 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
   const jointColor = vec3(0.08, 0.08, 0.08);
 
   const colored = mix(baseConcrete, jointColor, joint).sub(oilStain.mul(vec3(0.14, 0.13, 0.12)));
-  mat.colorNode = colored.mul(wear.albedoMul);
-  // Wet oil sits at 0.37: the shipped wet-concrete reflection read lives here.
+  // Damp mottle: the board's floor is patchy-wet, not uniformly dry. The
+  // metre-scale soil field carries it (no new noise), darkening slightly and
+  // dropping to a sheen where damp, with the tooth flattened as under oil.
+  const damp = smoothstep(float(0.30), float(0.75), wear.soilMask);
+  const damped = colored.mul(float(1).sub(damp.mul(float(0.15))));
+  mat.colorNode = damped.mul(wear.albedoMul);
   mat.roughnessNode = clamp(
-    wear.roughness.sub(oilStain.mul(float(0.55))),
+    wear.roughness.sub(oilStain.mul(float(0.45))).sub(damp.mul(float(0.35))),
     float(0.05), float(1.0),
   );
-  // RELIEF. Sawn joint, float tooth and trowel swirl, in metres. Liquid oil
-  // fills the tooth, so the relief flattens where the stain sits — that is
+  // RELIEF. Sawn joint, float tooth and trowel swirl, in metres. Liquid
+  // fills the tooth, so the relief flattens where oil or damp sits — that is
   // what keeps the wet reflection read instead of breaking it into matte.
-  const dryTooth = float(1).sub(oilStain);
+  const dryTooth = float(1).sub(oilStain).mul(float(1).sub(damp));
   mat.normalNode = reliefNormal(
     joint.mul(float(GARAGE_JOINT_M))
       .add(wear.grain.mul(float(GARAGE_FLOAT_M)).mul(dryTooth))
@@ -220,8 +224,14 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   // The base colour is a per-material UNIFORM, not baked constants, so every
   // drywall tint shares one compiled pipeline (HF-477 pattern).
   const base = uniform(new THREE.Vector3(baseColor.r, baseColor.g, baseColor.b));
-  mat.colorNode = base.mul(wear.albedoMul);
-  mat.roughnessNode = clamp(wear.roughness, float(0.05), float(1.0));
+  // Rising damp: the board shows a scuffed grey band climbing the lower wall.
+  // A 1 m world-Y gradient gated by the metre-scale soil field, concrete.ts
+  // weather-band precedent. One-sided (dirt subtracts), tinted to soil.
+  const dampBand = float(1).sub(smoothstep(float(0.05), float(1.0), p.y));
+  const damp = dampBand.mul(wear.soilMask.mul(float(0.6)).add(float(0.4)));
+  const damped = base.mul(float(1).sub(damp.mul(float(0.18))));
+  mat.colorNode = damped.mul(wear.albedoMul);
+  mat.roughnessNode = clamp(wear.roughness.add(damp.mul(float(0.10))), float(0.05), float(1.0));
   // RELIEF. Joint crown plus the distance-faded orange-peel roll texture.
   mat.normalNode = reliefNormal(
     crown.mul(float(DRYWALL_JOINT_CROWN_M)).add(wear.grain.mul(float(DRYWALL_PEEL_M))),
