@@ -41,16 +41,16 @@ const {
 
 /** 1.2 mm plank bevel at the seam, metres. Positive is out of the surface. */
 const WOOD_BEVEL_M = -0.0012;
-/** 0.3 mm grain ridge along the plank, metres. */
-const WOOD_GRAIN_RIDGE_M = 0.0003;
+/** 0.06 mm grain ridge along the plank, metres: slope ~0.3 on its 1.1 mm period. */
+const WOOD_GRAIN_RIDGE_M = 0.00006;
 /** 4 mm sawn expansion joint, metres. */
 const GARAGE_JOINT_M = -0.004;
-/** 0.8 mm concrete float tooth, metres. */
-const GARAGE_FLOAT_M = 0.0008;
+/** 0.12 mm concrete float tooth, metres: slope ~0.5 on its 1.5 mm period. */
+const GARAGE_FLOAT_M = 0.00012;
 /** 0.15 mm trowel-swirl skim carried by the scuff field, metres. */
 const GARAGE_SWIRL_M = 0.00015;
-/** 0.4 mm drywall orange-peel roll texture, metres. */
-const DRYWALL_PEEL_M = 0.0004;
+/** 0.06 mm drywall orange-peel roll texture, metres: slope ~0.5 on 0.8 mm. */
+const DRYWALL_PEEL_M = 0.00006;
 /** 1.5 mm taped-joint crown every 1.2 m, metres. */
 const DRYWALL_JOINT_CROWN_M = 0.0015;
 
@@ -176,15 +176,19 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
 
   const colored = mix(baseConcrete, jointColor, joint).sub(oilStain.mul(vec3(0.14, 0.13, 0.12)));
   mat.colorNode = colored.mul(wear.albedoMul);
+  // Wet oil sits at 0.37: the shipped wet-concrete reflection read lives here.
   mat.roughnessNode = clamp(
-    wear.roughness.sub(oilStain.mul(float(0.35))),
+    wear.roughness.sub(oilStain.mul(float(0.55))),
     float(0.05), float(1.0),
   );
-  // RELIEF. Sawn joint, float tooth and trowel swirl, in metres.
+  // RELIEF. Sawn joint, float tooth and trowel swirl, in metres. Liquid oil
+  // fills the tooth, so the relief flattens where the stain sits — that is
+  // what keeps the wet reflection read instead of breaking it into matte.
+  const dryTooth = float(1).sub(oilStain);
   mat.normalNode = reliefNormal(
     joint.mul(float(GARAGE_JOINT_M))
-      .add(wear.grain.mul(float(GARAGE_FLOAT_M)))
-      .add(wear.scuff.mul(float(GARAGE_SWIRL_M))),
+      .add(wear.grain.mul(float(GARAGE_FLOAT_M)).mul(dryTooth))
+      .add(wear.scuff.mul(float(GARAGE_SWIRL_M)).mul(dryTooth)),
   );
 
   return mat;

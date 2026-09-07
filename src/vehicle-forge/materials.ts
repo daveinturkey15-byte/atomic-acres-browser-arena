@@ -67,10 +67,10 @@ const FORGE_ENAMEL_RELIEF_M = 0.0001;
 const FORGE_PIT_RELIEF_M = -0.0004;
 /** 3 mm forged-tyre tread groove, metres. */
 const FORGE_TREAD_GROOVE_M = -0.003;
-/** 0.4 mm forged-tyre moulding grain, metres. */
-const FORGE_TYRE_GRAIN_M = 0.0004;
-/** 0.2 mm cabin-lining tooth, metres. */
-const FORGE_LINING_TOOTH_M = 0.0002;
+/** 0.1 mm forged-tyre moulding grain, metres: slope ~0.4 on 1.5 mm. */
+const FORGE_TYRE_GRAIN_M = 0.0001;
+/** 0.06 mm cabin-lining tooth, metres: slope ~0.4 on 1.0 mm. */
+const FORGE_LINING_TOOTH_M = 0.00006;
 
 function forgePaintSpec(name: string, baseSrgb: number, roughness: number): Nuketown2MaterialSpec {
   return assertSpec({

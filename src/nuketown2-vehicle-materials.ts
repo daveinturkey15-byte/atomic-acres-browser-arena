@@ -39,8 +39,8 @@ const CHROME_EDGE_M = 0.0003;
 const CHROME_PIT_M = -0.0004;
 /** 6 mm tyre tread groove, metres. */
 const TYRE_GROOVE_M = -0.006;
-/** 0.4 mm tyre moulding grain, metres. */
-const TYRE_GRAIN_M = 0.0004;
+/** 0.1 mm tyre moulding grain, metres: slope ~0.4 on its 1.5 mm period. */
+const TYRE_GRAIN_M = 0.0001;
 /** 2 mm pressed truck-box rib relief, metres. */
 const RIB_RELIEF_M = 0.002;
 
