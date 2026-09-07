@@ -198,7 +198,7 @@ export function createSidingMaterial(
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
-  attachNuketown2TextureBridge(mat, textureBridge);
+  attachNuketown2TextureBridge(mat, textureBridge, ['lapSiding']);
   return mat;
 }
 
