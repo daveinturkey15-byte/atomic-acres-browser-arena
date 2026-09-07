@@ -267,37 +267,46 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-driveway-apron-close', [hx(10.8), 1.45, -10.7], [hx(6.75), 0.026, -12.1], 'geometry', 1.08),
     camera('nuketown2-border-path-close', [4.5, 1.35, -37.6], [0, 0.026, -39.0], 'geometry', 1.08),
     camera('nuketown2-perimeter-wall-long-close', [4.2, 1.45, -40.55], [0, 1.0, -41.588], 'geometry', 1.08),
-    // HF-541: this station could not judge what it was named for, and the
-    // reason was WHICH of the two mirrored end walls it stood at.
+    // HF-541: this station was blind, and the fix is WHICH of the two mirrored
+    // end walls it stands at - but not for the reason it first looked like.
     //
-    // It was never inside geometry: the eye sat 1.05 m off the end wall's
-    // inner face, clear of every physics collider (nearest 1.03 m), the same
-    // standoff perimeter-wall-long-close uses. Two things were wrong. The aim
-    // was 36 degrees INTO the face rather than 14 along it, so one surface
-    // covered 64.6 % of the frame with 4.0 % sky. And the face was the EAST
-    // end wall, whose inner normal is -x, pointing away from the key at
-    // [54, 20, -42]: luna5 measured it taking exactly zero from the fill
-    // (22.9 -> 22.9 on a +0.2 probe). The station was judging a timber
-    // material on a face that receives no key light.
+    // It was never inside geometry. The eye sat 1.05 m off the end wall's inner
+    // face, clear of every physics collider (nearest 1.03 m), the same standoff
+    // perimeter-wall-long-close uses. Two things were wrong. The aim was 36
+    // degrees INTO the face rather than 14 along it, so one surface covered
+    // 64.6 % of the frame with 4.0 % sky. And at the EAST end the rest of the
+    // frame is closed off by `field-shed-damageable-shell` 5 m away, which
+    // renders as a near-black plate, over shaded yard lawn.
     //
-    // Fixing only the aim was measured and was NOT enough: composition went to
+    // Fixing only the aim was measured and did nothing: composition went to
     // 50.0 % wall / 11.5 % sky / 67 bodies and mean luma 30.6 -> 41.5, and the
     // frame still delivered 12,972 distinct RGB values against 13,025 before.
     // An 11-pose sweep at review settings (artifacts/hf-viewpoint-end-close)
-    // separated the cause: the SAME wall pair, SAME material, SAME 1.05 m
-    // standoff and SAME 4.2 m along-wall run reads 45,311 at the west end and
-    // 12,918 at the east. Standing on the pale border path instead of the
-    // shaded yard lawn recovers part of it (28,245-33,517) but not the rest.
-    // It is a lighting-and-pose fault, not only a material one.
+    // then measured the west end at 45,311 against the east end's 12,918 with
+    // the same wall pair, material, standoff and along-wall run.
     //
-    // So the station moves to the west end wall - the same paired body and the
-    // same cloned `nuketown2-perimeter-wall-end` material (`pair()` builds
-    // both), at the same range and the same framing, on the side the sun
-    // actually reaches. TIMBER_SILVER_LIFT's own note describes this station
-    // showing silvering over "the sunlit (orange) fence runs", which the east
-    // face cannot show. Verified clear: 0 physics colliders contain the eye,
-    // nearest solid 1.05 m. scripts/qa/capture-frame-variety.mjs fails the
-    // capture if any station drifts back into the flat-frame class.
+    // WHAT ACTUALLY MOVED, split half by half, because the first reading of
+    // this was wrong and the wrong reading is the tempting one. The end wall
+    // is NOT better lit at the west end: its half of the frame carries 531
+    // (east, as authored), 1,240 (east, re-aimed) and 1,749 (west) distinct
+    // values at luma p50 20/20/21 - flat at every pose. The lift is entirely
+    // in the OTHER half, 12,825 -> 44,043 at p50 27 -> 160, because the west
+    // flank alley is open to the lit town where the east one is blocked by
+    // that shed. The station now samples the arena the way the other 28 do.
+    //
+    // So this pose makes the station a valid SAMPLE again; it does not make
+    // the end wall a good surface. That is still open and is a material and
+    // lighting question, not a camera one: the same fence family reads 28,146
+    // distinct at luma p50 43 on the LONG wall and 1,749 at p50 21 here, with
+    // green and blue pinned in single digits (mean rgb 68/11/9), which caps
+    // the achievable colour count whatever the grain does. The documented
+    // clone-NaN mechanism for this material is NOT the cause - its gate,
+    // src/nuketown2-materials/nuketown2-clone-uniform-degradation.test.ts,
+    // is green at this head.
+    //
+    // Verified clear of geometry: 0 physics colliders contain the eye, nearest
+    // solid 1.05 m. scripts/qa/capture-frame-variety.mjs fails the capture if
+    // any station drifts back into the flat-frame class.
     camera('nuketown2-perimeter-wall-end-close', [hx(16.5), 1.45, -30.5], [hx(17.588), 1.0, -26.3], 'geometry', 1.08),
   ],
   collisionIdentity: {
