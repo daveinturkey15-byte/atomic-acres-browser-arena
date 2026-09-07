@@ -32,13 +32,20 @@ import * as THREE from 'three';
 import { MeshBasicNodeMaterial, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { fbm2, hash2, valueNoise2 } from '../map3/noise';
+import { assertSpec, type Nuketown2MaterialSpec } from '../nuketown2-materials/spec';
+import { buildWear, boxUv } from '../nuketown2-materials/wear';
+import { reliefNormal } from '../nuketown2-materials/relief';
+import { createNuketown2Uniforms } from '../nuketown2-materials/material-uniforms';
 
 const {
+  abs,
   attribute,
   cameraPosition,
+  clamp,
   dot,
   floor,
   float,
+  fract,
   length,
   max,
   mix,
@@ -51,6 +58,62 @@ const {
   vec2,
   vec3,
 } = TSL as unknown as Record<string, any>;
+
+/** 0.5 mm shut-line-adjacent trim recess carried by the grime mask, metres. */
+const FORGE_TRIM_RECESS_M = -0.0005;
+/** 0.1 mm enamel micro-relief on the spatter field, metres. */
+const FORGE_ENAMEL_RELIEF_M = 0.0001;
+/** 0.4 mm chrome pit mouth, metres. */
+const FORGE_PIT_RELIEF_M = -0.0004;
+/** 3 mm forged-tyre tread groove, metres. */
+const FORGE_TREAD_GROOVE_M = -0.003;
+/** 0.4 mm forged-tyre moulding grain, metres. */
+const FORGE_TYRE_GRAIN_M = 0.0004;
+/** 0.2 mm cabin-lining tooth, metres. */
+const FORGE_LINING_TOOTH_M = 0.0002;
+
+function forgePaintSpec(name: string, baseSrgb: number, roughness: number): Nuketown2MaterialSpec {
+  return assertSpec({
+    name, family: 'painted-metal', baseSrgb, roughness, metalness: 0,
+    grain: { sizeM: 0.0014, albedo: 0.020, roughness: 0.04 },
+    scuff: { sizeM: 0.050, albedo: 0.045, roughness: 0.09 },
+    traffic: { sizeM: 1.5, albedo: 0.035, roughness: 0.06 },
+    soil: 0.055, readDistanceM: 1.0,
+  });
+}
+
+function forgeChromeSpec(): Nuketown2MaterialSpec {
+  return assertSpec({
+    name: 'vehicle-forge-chrome', family: 'painted-metal', baseSrgb: 0xc9d1d6,
+    roughness: 0.09, metalness: 1,
+    grain: { sizeM: 0.0015, albedo: 0.012, roughness: 0.03 },
+    scuff: { sizeM: 0.030, albedo: 0.030, roughness: 0.10 },
+    traffic: { sizeM: 1.5, albedo: 0.020, roughness: 0.05 },
+    soil: 0.055, readDistanceM: 1.0,
+  });
+}
+
+function forgeTyreSpec(): Nuketown2MaterialSpec {
+  return assertSpec({
+    name: 'vehicle-forge-tyre', family: 'painted-metal', baseSrgb: 0x2b2b2d,
+    roughness: 0.93, metalness: 0,
+    grain: { sizeM: 0.0015, albedo: 0.030, roughness: 0.07 },
+    scuff: { sizeM: 0.045, albedo: 0.060, roughness: 0.10 },
+    traffic: { sizeM: 1.8, albedo: 0.050, roughness: 0.08 },
+    soil: 0.085, readDistanceM: 1.0,
+  });
+}
+
+function forgeLiningSpec(): Nuketown2MaterialSpec {
+  return assertSpec({
+    name: 'vehicle-forge-lining', family: 'painted-metal', baseSrgb: 0x4a4a4c,
+    roughness: 0.94, metalness: 0,
+    grain: { sizeM: 0.0010, albedo: 0.020, roughness: 0.05 },
+    scuff: { sizeM: 0.040, albedo: 0.040, roughness: 0.08 },
+    traffic: { sizeM: 1.0, albedo: 0.030, roughness: 0.05 },
+    soil: 0.060, readDistanceM: 0.5,
+  });
+}
 
 /**
  * HF-536 weathering contract. These are deliberately scalar graph constants:
@@ -260,6 +323,10 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   material.userData.forgeRole = 'paint';
   material.userData.forgePaintSrgb = options.color;
   material.userData.forgePaintUniform = true;
+  // Declared wear triple for the surface-quality census (A3/A4). The relief
+  // below is built from the existing spatter/trim terms only: NO new uniform
+  // enters `colorNode`, so the N17 `uniformValues === 3` contract is untouched.
+  material.userData.nuketown2Spec = forgePaintSpec(options.name, options.color, baseRoughness);
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
   const dust = dustFilm();
@@ -333,6 +400,14 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   type TslNode = { mul(v: unknown): TslNode; add(v: unknown): TslNode };
   const paintNodes = material as unknown as { colorNode: TslNode; roughnessNode: TslNode; clearcoatRoughnessNode: TslNode };
   paintNodes.clearcoatRoughnessNode = mix(flankCoat, upperCoat, upperPanel);
+  // RELIEF. Trim recess plus enamel micro-relief, both distance-faded through
+  // the existing spatter/trim terms. `normalNode` is never visited by
+  // `uniformValues`, so N17 is unaffected; constants are identical for every
+  // livery, so the eight paints still share one graph (N16 analogue).
+  material.normalNode = reliefNormal(
+    trimGrime.mul(float(FORGE_TRIM_RECESS_M))
+      .add(spatter.sub(float(1)).mul(float(FORGE_ENAMEL_RELIEF_M).div(float(0.18)))),
+  );
   return material;
 }
 
@@ -375,13 +450,22 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
  * still reads as a dark interior and keeps a shading gradient.
  */
 export function createForgeLiningMaterial(): MeshStandardNodeMaterial {
+  const spec = forgeLiningSpec();
   const material = new MeshStandardNodeMaterial({
     color: linearOf(0x4a4a4c), // HF-536: lifted from 0x363636 so an underbody in its own shadow clears the exact-black band
-    roughness: 0.94,
-    metalness: 0,
+    roughness: spec.roughness,
+    metalness: spec.metalness,
   });
-  material.name = 'vehicle-forge-lining';
+  material.name = spec.name;
   tagCompatibility(material, 'MeshStandardMaterial');
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x141210, material);
+  material.userData.nuketown2Spec = spec;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const shade = linearOf(0x4a4a4c);
+  material.colorNode = vec3(shade.r, shade.g, shade.b).mul(wear.albedoMul);
+  material.roughnessNode = clamp(wear.roughness, float(0.05), float(1.0));
+  // RELIEF. Cabin-lining tooth from the faded grain field.
+  material.normalNode = reliefNormal(wear.grain.mul(float(FORGE_LINING_TOOTH_M)));
   return material;
 }
 
@@ -401,14 +485,18 @@ export function createForgeGrooveMaterial(): MeshBasicNodeMaterial {
 
 /** Bumpers, mouldings, wheel faces. Cool-tinted so it never reads as copper. */
 export function createForgeChromeMaterial(worn = false): MeshStandardNodeMaterial {
+  const spec = forgeChromeSpec();
   const material = new MeshStandardNodeMaterial({
     color: new THREE.Color(0.62, 0.65, 0.68),
-    roughness: worn ? 0.22 : 0.09,
-    metalness: 1,
+    roughness: worn ? 0.22 : spec.roughness,
+    metalness: spec.metalness,
   });
   material.name = worn ? 'vehicle-forge-chrome-worn' : 'vehicle-forge-chrome';
   material.userData.forgeRole = 'chrome';
   tagCompatibility(material, 'MeshStandardMaterial');
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x4a4238, material);
+  material.userData.nuketown2Spec = spec;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
 
   // Chrome pitting is a binary 3-8 mm hashed field, not a texture. The line
   // under each proud trim elevation is the same distance-faded grime contract
@@ -426,29 +514,48 @@ export function createForgeChromeMaterial(worn = false): MeshStandardNodeMateria
     vec3(0.62, 0.65, 0.68),
     vec3(0.18, 0.14, 0.1),
     trimGrime.mul(float(0.45)),
+  ).mul(wear.albedoMul);
+  material.roughnessNode = clamp(
+    mix(wear.roughness, float(VEHICLE_CHROME_PIT_ROUGHNESS_MAX), pitMask),
+    float(0.05), float(1.0),
   );
-  material.roughnessNode = mix(
-    float(worn ? 0.22 : VEHICLE_CHROME_PIT_ROUGHNESS_MIN),
-    float(VEHICLE_CHROME_PIT_ROUGHNESS_MAX),
-    pitMask,
+  // RELIEF. The pit field finally shades: pit mouths plus the trim recess.
+  material.normalNode = reliefNormal(
+    pitMask.mul(float(FORGE_PIT_RELIEF_M)).add(trimGrime.mul(float(FORGE_TRIM_RECESS_M))),
   );
   return material;
 }
 
 /** Tyre rubber: never pure black, with a tread band the lathe's v lands on. */
 export function createForgeTyreMaterial(): MeshStandardNodeMaterial {
+  const spec = forgeTyreSpec();
   const material = new MeshStandardNodeMaterial({
     color: linearOf(0x2b2b2d),
-    roughness: 0.93,
-    metalness: 0,
+    roughness: spec.roughness,
+    metalness: spec.metalness,
   });
-  material.name = 'vehicle-forge-tyre';
+  material.name = spec.name;
   tagCompatibility(material, 'MeshStandardMaterial');
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x0e0d0c, material);
+  material.userData.nuketown2Spec = spec;
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const fade = weatheringDetailFadeNode();
   const grain = valueNoise2(vec2(positionWorld.x.mul(70), positionWorld.y.mul(70)));
-  material.roughnessNode = float(0.88).add(grain.mul(float(0.09)));
+  // Tread grooves every 45 mm on the plan diagonal, faded before aliasing.
+  const treadG = abs(fract(positionWorld.x.add(positionWorld.z).div(float(0.045))).sub(float(0.5))).mul(float(2.0));
+  const groove = smoothstep(float(0.75), float(0.95), treadG).mul(fade);
+  const shade = linearOf(0x2b2b2d);
+  material.colorNode = vec3(shade.r, shade.g, shade.b).mul(wear.albedoMul);
+  material.roughnessNode = clamp(
+    wear.roughness.add(grain.mul(float(0.09))),
+    float(0.05), float(1.0),
+  );
+  // RELIEF. Tread groove plus moulding grain, in metres.
+  material.normalNode = reliefNormal(
+    groove.mul(float(FORGE_TREAD_GROOVE_M)).add(wear.grain.mul(float(FORGE_TYRE_GRAIN_M))),
+  );
   return material;
 }
-
 /** The inboard wheel disc and the bead-gap annulus. Matte, never a mirror. */
 export function createForgeWheelDarkMaterial(): MeshStandardNodeMaterial {
   const material = new MeshStandardNodeMaterial({
