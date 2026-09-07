@@ -79,6 +79,8 @@ export type NuketownForestDetailTuning = Readonly<{
   /** Authored tone sets. Defaults FOREST_CONIFER_TONES / the canopy tones. */
   coniferTones?: readonly number[];
   canopyTones?: readonly number[];
+  /** Understory scrub tones. Default the shipped grey-green set. */
+  scrubTones?: readonly number[];
   /** Radius splitting near (high-detail) from far (standard) prototypes.
    * Undefined = one prototype for the whole ring (shipped behaviour). */
   lodSplitM?: number;
@@ -214,6 +216,9 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
     understoryCount: 380,
     coniferTones: FOREST_CONIFER_TONES_HIGH_DETAIL,
     canopyTones: FOREST_BROADLEAF_CANOPY_TONES_HIGH_DETAIL,
+    // HF-556 rev3: the grey-green scrub dilutes the belt box; vivid set for
+    // the rebuild only (shipped keeps the literals in the builder).
+    scrubTones: Object.freeze([0x5a7a3a, 0x6b8a44, 0x7d9350, 0x4f7034]),
     lodSplitM: 58,
   }),
 });
@@ -1009,9 +1014,9 @@ export function buildNuketownForestSurround(
   const scrubMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, metalness: 0, flatShading: true });
   disposables.push(scrubGeometry, scrubMaterial);
   const scrubSlots = ringSlots(envelope, envelope.detail?.understoryCount ?? 260, understoryBand[0], understoryBand[1], envelope.seed ^ 0x5a5a_9c9c, 1.9);
+  const scrubTones = envelope.detail?.scrubTones ?? [0x55663d, 0x64744a, 0x707c52, 0x4a5c38];
   const scrub = new THREE.InstancedMesh(scrubGeometry, scrubMaterial, scrubSlots.length);
   scrub.name = 'forest-understory';
-  const scrubTones = [0x55663d, 0x64744a, 0x707c52, 0x4a5c38];
   scrubSlots.forEach((slot, index) => {
     // Understory scrub is ground cover: unlike a trunk it DOES lean with the
     // slope (environment-kit's `tiltToSlope`), which is what stops a rolling

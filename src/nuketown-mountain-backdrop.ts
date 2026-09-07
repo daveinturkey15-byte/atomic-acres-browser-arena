@@ -141,6 +141,9 @@ export type NuketownBackdropEnvelope = Readonly<{
   sharpenExponent?: number;
   /** Add two higher ridged octaves (x37, x61) to the crest function. Default false. */
   extraCrestOctaves?: boolean;
+  /** Height-mapping gain over the sharpened relief. Default 1.25: peaks
+   * clamp to the ceiling while saddles stay floored (contrast, not lift). */
+  heightGain?: number;
   /** Per-ring tuning. Absent = shipped values, byte for byte. */
   foothills?: NuketownBackdropRingTuning;
   ridge?: NuketownBackdropRingTuning;
@@ -183,6 +186,7 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
   ringRows: 9,
   sharpenExponent: 1.75,
   extraCrestOctaves: true,
+  heightGain: 1.5,
   foothills: Object.freeze({
     innerM: 72,
     outerM: 132,
@@ -208,12 +212,17 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
   // the shipped brightness family; the warm/cool two-tone facet split and
   // the fissures carry the structure. Shade swing widened 0.36 -> 0.55 so
   // the split survives the haze wash.
+  // HF-556 rev3: heightMin 40 -> 24. The rev2 ring stood 42 m+ on every
+  // bearing (hidden 3/120) and filled every fixed box edge to edge, so the
+  // boxes lost their peak/sky alternation (the board's stddev comes from
+  // separated peaks, not a continuous wall). Saddles now fall to ~10 deg,
+  // at the treeline, while peaks still clear 24 deg (probe-gated).
   farRange: Object.freeze({
     innerM: 104,
-    height: Object.freeze([40, 64]) as readonly [number, number],
+    height: Object.freeze([24, 64]) as readonly [number, number],
     segments: 450,
-    footColor: 0xb59a78,
-    crestColor: 0xe0d0b4,
+    footColor: 0xa08a68,
+    crestColor: 0xd0b894,
     fissures: true,
     facetJitter: true,
     aerialHazeMix: 0.52,
@@ -391,6 +400,8 @@ export type NuketownRidgeRingBuildOpts = Readonly<{
   rows?: number;
   sharpenExponent?: number;
   extraCrestOctaves?: boolean;
+  /** Height-mapping gain over the sharpened relief. Default 1.25. */
+  heightGain?: number;
 }>;
 
 export interface NuketownBackdropStats {
@@ -529,7 +540,7 @@ function buildRidgeRing(spec: RidgeRingSpec, opts: NuketownRidgeRingBuildOpts = 
 
     const relief = ridged(angle, spec.phase);
     const rSharp = Math.pow(relief, sharpenExponent);
-    const heightT = Math.min(1, Math.max(0.04, rSharp * 1.25 + (varA - 0.5) * 0.2));
+    const heightT = Math.min(1, Math.max(0.04, rSharp * (opts.heightGain ?? 1.25) + (varA - 0.5) * 0.2));
     const baseHeight = spec.heightMin + (spec.heightMax - spec.heightMin) * heightT;
     const band = spec.outerRadius - spec.innerRadius;
     const baseCrestRadius = spec.innerRadius
@@ -848,6 +859,7 @@ export function buildNuketownMountainBackdrop(
     rows: envelope.ringRows ?? 5,
     sharpenExponent: envelope.sharpenExponent ?? 1.4,
     extraCrestOctaves: envelope.extraCrestOctaves ?? false,
+    heightGain: envelope.heightGain ?? 1.25,
   };
   const group = new THREE.Group();
   group.name = 'nuketown-mountain-backdrop';
