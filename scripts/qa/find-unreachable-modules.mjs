@@ -12,6 +12,9 @@
 // tests is code that exists to be tested and nothing else, which is its own
 // smell.
 //
+// Fixed 2026-09-07 (NIGHT-STREAMLINE): entry-point enumeration scans all root
+// *.html files, preventing live pages (forge-facade, map3) from being flagged dead.
+//
 // Usage: node scripts/qa/find-unreachable-modules.mjs [--json]
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { resolve, dirname, join, relative } from 'node:path';
@@ -34,17 +37,19 @@ export const ALLOWLISTED_TEST_ONLY_MODULES = new Set([
   'src/pass66-pass63-multiplayer-comparator-contract.ts',
 ]);
 
-// Entry points come from index.html, because that is what the browser actually
-// starts from. Guessing at filenames instead once reported src/bootstrap.ts -
+// Entry points come from every root *.html file, because that is what the browser
+// actually starts from. Guessing at filenames instead once reported src/bootstrap.ts -
 // the real entry - as dead code.
 function htmlEntryPoints(root = process.cwd()) {
   const found = [];
-  const full = resolve(root, 'index.html');
-  if (!existsSync(full)) return found;
-  const html = readFileSync(full, 'utf8');
-  for (const match of html.matchAll(/<script[^>]*\ssrc=["']([^"']+)["']/g)) {
-    const candidate = resolve(root, match[1].replace(/^\//, ''));
-    if (existsSync(candidate)) found.push(candidate);
+  const htmlFiles = readdirSync(root).filter((name) => name.endsWith('.html') && statSync(join(root, name)).isFile());
+  for (const name of htmlFiles) {
+    const full = resolve(root, name);
+    const html = readFileSync(full, 'utf8');
+    for (const match of html.matchAll(/<script[^>]*\ssrc=["']([^"']+)["']/g)) {
+      const candidate = resolve(root, match[1].replace(/^\//, ''));
+      if (existsSync(candidate) && !found.includes(candidate)) found.push(candidate);
+    }
   }
   return found;
 }
