@@ -150,11 +150,14 @@ export const FOREST_BROADLEAF_MAX_TRIANGLES_HIGH_DETAIL = 400;
  * is untouched; the lightness floor still applies through coniferInstanceColour.
  */
 export const FOREST_CONIFER_TONES_HIGH_DETAIL: readonly number[] = Object.freeze([
-  0x2f5c33, 0x42703c, 0x2b552e, 0x527c42,
+  // HF-556 rev2: first pass barely moved the rendered belt (+0.015 — the fog
+  // wall is thin here, the instance albedo was just timid). Board belt is
+  // 0.538 at the same luma; these step clearly toward it.
+  0x2a7a33, 0x4da047, 0x256b2a, 0x63a24b,
 ]);
 /** HF-556: nuketown2 canopy tones, same indexing discipline as above. */
 export const FOREST_BROADLEAF_CANOPY_TONES_HIGH_DETAIL: readonly number[] = Object.freeze([
-  0x557f3e, 0x66924a, 0x7a9a4d, 0x4d7038,
+  0x5a9a3f, 0x70aa4a, 0x86a852, 0x4f8a38,
 ]);
 export type NuketownForestEnvelope = Readonly<{
   bounds: Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;

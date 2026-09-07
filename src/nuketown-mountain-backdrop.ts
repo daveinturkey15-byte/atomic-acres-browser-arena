@@ -118,6 +118,10 @@ export type NuketownBackdropRingTuning = Readonly<{
   shadeStrength?: number;
   /** Direct haze-mix override (undefined = radial haze path). Default: far 0.52, others undefined. */
   aerialHazeMix?: number;
+  /** Large-scale azimuthal albedo variation (0 = off). Multiplies albedo by
+   * 1 + v * sectorNoise(angle) for view-independent contrast — baked-lambert
+   * facets collapse when foreshortened (overhead), sectors do not. */
+  sectorVariation?: number;
 }>;
 
 export type NuketownBackdropEnvelope = Readonly<{
@@ -188,6 +192,7 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
     strata: true,
     fissures: true,
     facetJitter: true,
+    sectorVariation: 0.18,
   }),
   ridge: Object.freeze({
     innerM: 96,
@@ -196,17 +201,24 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
     strata: true,
     fissures: true,
     facetJitter: true,
+    sectorVariation: 0.18,
   }),
+  // HF-556 rev2: back to the altitude-lerp path (strata bases pulled the
+  // rendered mean ~50 levels under the board's pale tan). Pale-warm pair in
+  // the shipped brightness family; the warm/cool two-tone facet split and
+  // the fissures carry the structure. Shade swing widened 0.36 -> 0.55 so
+  // the split survives the haze wash.
   farRange: Object.freeze({
     innerM: 104,
     height: Object.freeze([40, 64]) as readonly [number, number],
     segments: 450,
-    footColor: 0x8a7a63,
-    crestColor: 0xb59a76,
-    strata: true,
+    footColor: 0xb59a78,
+    crestColor: 0xe0d0b4,
     fissures: true,
     facetJitter: true,
-    aerialHazeMix: 0.38,
+    aerialHazeMix: 0.52,
+    shadeStrength: 0.55,
+    sectorVariation: 0.18,
   }),
 });
 /**
@@ -436,6 +448,8 @@ type RidgeRingSpec = Readonly<{
   strata?: boolean;
   /** Vertical shadow fissures on crest columns. */
   fissures?: boolean;
+  /** Large-scale azimuthal albedo variation amplitude (0 = off, shipped path). */
+  sectorVariation?: number;
 }>;
 
 /**
@@ -689,6 +703,18 @@ function buildRidgeRing(spec: RidgeRingSpec, opts: NuketownRidgeRingBuildOpts = 
           let rOut = toneRgb[0] * albedoJitter;
           let gOut = toneRgb[1] * albedoJitter;
           let bOut = toneRgb[2] * albedoJitter;
+          // HF-556: view-independent large-scale contrast. Baked-lambert
+          // facets collapse when foreshortened (steep/overhead views see one
+          // normal family); azimuthal sectors read from every viewpoint.
+          // smoothVar uses integer frequencies: exactly 2π-periodic, no seam.
+          // Off (0) on the shipped path.
+          const sectorAmp = spec.sectorVariation ?? 0;
+          if (sectorAmp !== 0) {
+            const sectorShade = 1 + sectorAmp * smoothVar(md.angle, 1, spec.phase * 1.3);
+            rOut *= sectorShade;
+            gOut *= sectorShade;
+            bOut *= sectorShade;
+          }
 
           const radius = Math.hypot(pt.x, pt.z);
           const radialT = THREE.MathUtils.clamp(
@@ -872,6 +898,7 @@ export function buildNuketownMountainBackdrop(
       facetJitter: envelope.foothills?.facetJitter,
       strata: envelope.foothills?.strata,
       fissures: envelope.foothills?.fissures,
+      sectorVariation: envelope.foothills?.sectorVariation ?? 0,
     }, ringOpts),
     ridgeMaterial,
   );
@@ -893,6 +920,7 @@ export function buildNuketownMountainBackdrop(
       facetJitter: envelope.ridge?.facetJitter ?? true,
       strata: envelope.ridge?.strata ?? true,
       fissures: envelope.ridge?.fissures ?? true,
+      sectorVariation: envelope.ridge?.sectorVariation ?? 0,
     }, ringOpts),
     ridgeMaterial,
   );
@@ -912,8 +940,8 @@ export function buildNuketownMountainBackdrop(
       aerialHazeMix: envelope.farRange?.aerialHazeMix ?? 0.52,
       shadeStrength: envelope.farRange?.shadeStrength ?? 0.36,
       facetJitter: envelope.farRange?.facetJitter,
-      strata: envelope.farRange?.strata,
       fissures: envelope.farRange?.fissures,
+      sectorVariation: envelope.farRange?.sectorVariation ?? 0,
     }, ringOpts),
     ridgeMaterial,
   );
