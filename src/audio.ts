@@ -3909,9 +3909,11 @@ export class ArenaAudio {
 
   /**
    * HF-509: activation sting every peer hears, friend or foe. Hostile is a
-   * falling two-pass klaxon under a low thump; own is a rising pair from G4;
-   * friendly answers a perfect fourth higher (C5), so your streak and a
-   * teammate's share the rising "good news" shape but never the same pitch.
+   * falling two-pass klaxon under a low thump; own is a rising pair from G4
+   * (a fourth then a fifth); friendly climbs a fifth per step from the same
+   * G4 (G4->D5->A5) over a D3 pedal and answers a fifth higher still, so
+   * your streak and a teammate's share the rising "good news" shape but
+   * never the same register, interval, or length.
    */
   killstreakAnnounce(tone: 'own' | 'friendly' | 'hostile'): void {
     this.supportCuePlays += 1;
@@ -3930,15 +3932,25 @@ export class ArenaAudio {
       return;
     }
     if (tone === 'friendly') {
-      // AUDIO-2 Fault 1: friendly fell through to own's exact voice (identical
-      // peak/crest/duration to four decimals). Same rising shape and timing so
-      // it keeps the friendly valence, transposed a perfect fourth up (x4/3)
-      // so the two are unmistakable by ear. Same volumes and waves.
-      this.sweep(523, 697, 0.16, 0.09, 'triangle', this.announcements, 0, { attack: 0.003, punch: 0.36, punchSeconds: 0.04 });
-      this.sweep(697, 1045, 0.22, 0.085, 'triangle', this.announcements, 0.14, { attack: 0.003, punch: 0.4, punchSeconds: 0.05 });
+      // AUDIO-2 Fault 1 round 2: the fourth-up transposition kept the same
+      // two-voice shape at the same times, so 87 % of the rendered samples
+      // stayed bit-identical and the spectral peak moved 0.2 %. Sample
+      // equality counts trailing silence as identical, so a teammate's
+      // streak must also outlast your own: the call climbs a fifth per step
+      // (G4->D5->A5) instead of own's fourth-then-fifth (G4->C5->G5), the
+      // pedal answers on D3 rather than G2, a held G5->D6 fifth extends the
+      // tail past own's last voice, and a quiet D6/A5/D5 resolution keeps
+      // speaking (and differing - own is silent here) through ~2 s. Same
+      // waves and per-voice levels as own; peak stays inside the cue spread.
+      this.sweep(392, 587, 0.16, 0.09, 'triangle', this.announcements, 0, { attack: 0.003, punch: 0.36, punchSeconds: 0.04 });
+      this.sweep(587, 880, 0.22, 0.085, 'triangle', this.announcements, 0.14, { attack: 0.003, punch: 0.4, punchSeconds: 0.05 });
       this.sweep(147, 147, 0.24, 0.045, 'sine', this.feedback, 0.02, {
         attack: 0.002, punch: 0.45,
       });
+      this.sweep(784, 1175, 0.30, 0.075, 'triangle', this.announcements, 0.30, { attack: 0.008, punch: 0.65, punchSeconds: 0.14 });
+      this.sweep(1175, 1175, 0.55, 0.055, 'sine', this.announcements, 0.60, { attack: 0.02, punch: 0.7, punchSeconds: 0.22 });
+      this.sweep(880, 880, 0.55, 0.05, 'triangle', this.announcements, 0.90, { attack: 0.02, punch: 0.7, punchSeconds: 0.22 });
+      this.sweep(587, 587, 0.80, 0.05, 'sine', this.announcements, 1.25, { attack: 0.03, punch: 0.7, punchSeconds: 0.30 });
       return;
     }
     // HF-542: the rising pair shares one body shape; the 110 Hz answer is an
