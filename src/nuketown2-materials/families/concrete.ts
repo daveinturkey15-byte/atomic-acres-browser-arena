@@ -209,11 +209,12 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketow
       float(1.0),
     );
   const concreteSamples = textureSetSamples(textureBridge, 'concrete', uv);
+  const brickSamples = textureSetSamples(textureBridge, 'brick', uv);
   const white = vec3(float(1), float(1), float(1));
-  const mapAlbedo = concreteSamples?.albedo ?? white;
-  const mapRoughness = concreteSamples?.roughness ?? float(0.5);
-  const mapNormal = concreteSamples?.normal ?? reliefNormal(height);
-  const hasTexture = concreteSamples !== null;
+  const mapAlbedo = isBlock.select(brickSamples?.albedo ?? concreteSamples?.albedo ?? white, concreteSamples?.albedo ?? white);
+  const mapRoughness = isBlock.select(brickSamples?.roughness ?? concreteSamples?.roughness ?? float(0.5), concreteSamples?.roughness ?? float(0.5));
+  const mapNormal = isBlock.select(brickSamples?.normal ?? concreteSamples?.normal ?? reliefNormal(height), concreteSamples?.normal ?? reliefNormal(height));
+  const hasTexture = concreteSamples !== null || brickSamples !== null;
   const reliefNormalNode = reliefNormal(height);
   concreteGraphs.set(textureBridge, {
     colorNode: weathered.mul(mapAlbedo),
