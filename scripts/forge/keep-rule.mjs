@@ -4,7 +4,8 @@
 // Usage:
 //   node scripts/forge/keep-rule.mjs --prev <score.json> --candidate <score.json> \
 //     [--critic <critic.json> --target-axis <axis> --judged <station,station>] \
-//     [--newly-black-fail 0.005] [--declared-moves station::box,station::box]
+//     [--newly-black-fail 0.005] [--declared-moves station::box,station::box] \
+//     [--hitches <candidate-hitches.json> --baseline-hitches <baseline-hitches.json>]
 //
 //   --declared-moves waives the protected-box gate for the named boxes ONLY,
 //   because the pass brief declares them as its targets (e.g. every sky box for
@@ -15,7 +16,8 @@
 //          the pinned diff threshold (default 0.005, the exact
 //          newlyBlackFraction in scripts/qa/diff-arena-viewpoints.mjs), or a
 //          protected box moved p50 by > 8 (THRESHOLDS.deltaSoft) or stddev by
-//          > 25 % relative (noise floor, R33).
+//          > 25 % relative (noise floor, R33), or (with --hitches inputs) mean
+//          fps dropped > 3 or hitches >= 50 ms increased > 2 vs baseline.
 //   HOLD - gates green but the pass is not proven: a critic axis regressed by
 //          >= 0.5 on any station, or no critic evidence proves the targeted
 //          gain (or the gain is below bar).
@@ -38,6 +40,48 @@ const arg = (name, fallback = null) => {
 export const P50_TOLERANCE = 8;
 export const STDDEV_REL_TOLERANCE = 0.25;
 export const CRITIC_STEP = 0.5;
+
+// Owner ruling 20 (day-2 loop tooling): fps and hitch gates join the keep rule.
+// A candidate FAILS when mean fps drops more than 3 or hitches >= 50 ms
+// increase by more than 2 versus the baseline hitch json.
+export const FPS_MAX_DROP = 3;
+export const HITCH_MAX_INCREASE = 2;
+
+// Hitch json shape: the frame-hitch attributor output
+// ({ fps, hitches: { thresholdMs: 50, count } }).
+export function parseHitchSummary(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  const fps = typeof doc.fps === 'number' ? doc.fps : null;
+  let hitches = null;
+  if (doc.hitches && typeof doc.hitches.count === 'number') {
+    hitches = doc.hitches.count;
+  } else if (Array.isArray(doc.hitches)) {
+    hitches = doc.hitches.length;
+  } else if (Array.isArray(doc.hitchFrames)) {
+    hitches = doc.hitchFrames.length;
+  }
+  if (fps === null || hitches === null) return null;
+  return { fps, hitches };
+}
+
+export function fpsHitchRow(baselineDoc, candDoc) {
+  if (!baselineDoc || !candDoc) return null;
+  const base = parseHitchSummary(baselineDoc);
+  const cand = parseHitchSummary(candDoc);
+  if (!base || !cand) return null;
+  const fpsDelta = cand.fps - base.fps;
+  const hitchDelta = cand.hitches - base.hitches;
+  const row = `FPS ${base.fps} -> ${cand.fps} (${fpsDelta >= 0 ? '+' : ''}${fpsDelta.toFixed(1)})`
+    + ` | hitches>=50ms ${base.hitches} -> ${cand.hitches} (${hitchDelta >= 0 ? '+' : ''}${hitchDelta})`;
+  const failures = [];
+  if (base.fps - cand.fps > FPS_MAX_DROP) {
+    failures.push(`FAIL mean fps dropped ${FPS_MAX_DROP} past budget: ${base.fps} -> ${cand.fps} (Δ${fpsDelta.toFixed(1)})`);
+  }
+  if (cand.hitches - base.hitches > HITCH_MAX_INCREASE) {
+    failures.push(`FAIL hitches>=50ms increased past budget (+${HITCH_MAX_INCREASE}): ${base.hitches} -> ${cand.hitches} (+${hitchDelta})`);
+  }
+  return { row, failures };
+}
 
 export function decide(prev, cand, options = {}) {
   const reasons = [];
@@ -89,6 +133,13 @@ export function decide(prev, cand, options = {}) {
         failReasons.push(`FAIL protected box ${station}::${name}: stddev ${pb.stddev} -> ${box.stddev} (rel ${(rel * 100).toFixed(1)}% > 25%)`);
       }
     }
+  }
+
+  // Hard gate 3: fps / hitch budget (owner ruling 20, day-2 loop tooling).
+  const hitchRow = fpsHitchRow(options.baselineHitches, options.hitches);
+  if (hitchRow) {
+    reasons.push(hitchRow.row);
+    failReasons.push(...hitchRow.failures);
   }
 
   if (failReasons.length > 0) return { verdict: 'FAIL', reasons: [...failReasons, ...reasons] };
@@ -149,12 +200,16 @@ async function main() {
   const critic = criticPath ? read(criticPath) : null;
   const judged = (arg('--judged', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   const declaredMoves = (arg('--declared-moves', '') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const hitchesPath = arg('--hitches');
+  const baselineHitchesPath = arg('--baseline-hitches');
   const { verdict, reasons } = decide(prev, cand, {
     critic,
     targetAxis: arg('--target-axis'),
     judged,
     declaredMoves,
     newlyBlackFail: Number(arg('--newly-black-fail', '0.005')),
+    hitches: hitchesPath ? read(hitchesPath) : null,
+    baselineHitches: baselineHitchesPath ? read(baselineHitchesPath) : null,
   });
   process.stdout.write(`VERDICT: ${verdict}\n${reasons.map((r) => `- ${r}\n`).join('')}`);
   process.exit(verdict === 'KEEP' ? 0 : verdict === 'HOLD' ? 1 : 2);

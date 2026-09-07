@@ -104,4 +104,61 @@ describe('keep-rule', () => {
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /VERDICT: KEEP/);
   });
+
+  it('FAILs a mean fps drop of more than 3 vs baseline hitches', () => {
+    const prev = scoreWith();
+    const cand = scoreWith();
+    const base = { fps: 77.6, hitches: { thresholdMs: 50, count: 4 } };
+    const drop = { fps: 72.6, hitches: { thresholdMs: 50, count: 4 } };
+    const { verdict, reasons } = decide(prev, cand, {
+      critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'],
+      baselineHitches: base, hitches: drop,
+    });
+    assert.equal(verdict, 'FAIL');
+    assert.ok(reasons.some((r) => r.includes('fps')));
+  });
+
+  it('FAILs a hitch increase of more than 2 vs baseline hitches', () => {
+    const prev = scoreWith();
+    const cand = scoreWith();
+    const base = { fps: 77.6, hitches: { thresholdMs: 50, count: 4 } };
+    const hitchy = { fps: 77.0, hitches: { thresholdMs: 50, count: 7 } };
+    const { verdict, reasons } = decide(prev, cand, {
+      critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'],
+      baselineHitches: base, hitches: hitchy,
+    });
+    assert.equal(verdict, 'FAIL');
+    assert.ok(reasons.some((r) => r.includes('hitches>=50ms')));
+  });
+
+  it('passes the fps/hitch gate inside the budget and prints the FPS row', () => {
+    const prev = scoreWith();
+    const cand = scoreWith();
+    const base = { fps: 77.6, hitches: { thresholdMs: 50, count: 4 } };
+    const inside = { fps: 74.6, hitches: { thresholdMs: 50, count: 6 } };
+    const { verdict, reasons } = decide(prev, cand, {
+      critic: criticKeep, targetAxis: 'lighting', judged: ['st1', 'st2'],
+      baselineHitches: base, hitches: inside,
+    });
+    assert.equal(verdict, 'KEEP');
+    assert.ok(reasons.some((r) => r.startsWith('FPS 77.6 -> 74.6')));
+  });
+
+  it('CLI reads --hitches fixtures and exits 2 on FAIL', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'forge-keep-'));
+    const prevPath = join(tmp, 'prev.json');
+    const candPath = join(tmp, 'cand.json');
+    const criticPath = join(tmp, 'critic.json');
+    writeFileSync(prevPath, JSON.stringify(scoreWith()));
+    writeFileSync(candPath, JSON.stringify(scoreWith()));
+    writeFileSync(criticPath, JSON.stringify(criticKeep));
+    const dir = fileURLToPath(new URL('./test-fixtures/', import.meta.url));
+    const run = spawnSync(process.execPath, [KEEP_RULE, '--prev', prevPath, '--candidate', candPath,
+      '--critic', criticPath, '--target-axis', 'lighting', '--judged', 'st1,st2',
+      '--hitches', join(dir, 'hitches-candidate.json'),
+      '--baseline-hitches', join(dir, 'hitches-base.json')], { encoding: 'utf8' });
+    assert.equal(run.status, 2, run.stderr);
+    assert.match(run.stdout, /VERDICT: FAIL/);
+    assert.match(run.stdout, /FPS 77.6 -> 72.6/);
+  });
 });
