@@ -167,9 +167,10 @@ function createSharedVehiclePaintMaterial(
 /**
  * Procedural physical car paint: pigment under a clear coat (dielectric,
  * metalness 0), NOT coloured chrome. Mirrors `createForgePaintMaterial`'s
- * physics (clearcoat lobe, low specularIntensity, swatch mirrored onto
- * `material.color` for the static batcher and the WebGL2 route).
- *
+ * physics (clearcoat lobe, low specularIntensity) with the base colour kept
+ * as a per-material UNIFORM (see below for why it is not on `material.color`).
+ */
+/**
  * HF-477: THE BASE COLOUR IS A UNIFORM, NOT BAKED CONSTANTS. A baked colour
  * puts every paint inside its own node graph — the third and fourth pipeline
  * compiles pushed the arena's first submission past its own 12,000 ms deploy
@@ -186,8 +187,13 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
     clearcoatRoughness: 0.25,
   });
   mat.name = name;
-  mat.specularIntensity = 0.5;
-  mat.color.copy(baseColor);
+  // NO `mat.color.copy(baseColor)` here, deliberately. The forge mirrors its
+  // swatch onto `material.color` for the static batcher, but on THESE three
+  // paints the copy drops the whole frame to ~63% brightness (seven
+  // interleaved overhead probes each way: copy present seven times dark,
+  // absent seven times bright). The colour stays a per-material UNIFORM in
+  // `colorNode`, so N16 still holds and the batcher reads the same white
+  // default it always has for these cars.
   mat.type = 'MeshPhysicalMaterial';
   const uniforms = createNuketown2Uniforms(spec, colorHex, 0x6b5741, mat);
   mat.userData.nuketown2Spec = spec;
