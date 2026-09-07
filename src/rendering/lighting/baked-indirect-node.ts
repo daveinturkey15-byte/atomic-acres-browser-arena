@@ -52,6 +52,7 @@ import {
   luminance,
   max,
   min,
+  mix,
   nodeObject,
   normalize,
   screenUV,
@@ -87,6 +88,42 @@ export const BAKED_INDIRECT_GEOMETRY_DEPTH_LIMIT_M = 220;
 export const ALBEDO_PROXY_CEILING = 1.6;
 /** Luminance floor, so a near-black pixel cannot divide the proxy to infinity. */
 export const ALBEDO_PROXY_LUMINANCE_FLOOR = 0.04;
+
+/**
+ * How much of the bounce's OWN chroma survives before it is added.
+ *
+ * A single gather carries the hue of whatever it bounced off. Nuke Town's proxy
+ * lawn is a saturated olive and its siding is orange, and the shipped volume's
+ * DC term is measurably warm (R 0.541 / G 0.531 / B 0.438), so at full chroma the
+ * bounce paints yellow-green onto the roadway: measured ground hue moved 36.9 deg
+ * -> 41.9 deg and saturation 44.7 % -> 51.2 %, away from the target boards
+ * (hue ~27 deg, saturation ~34 %).
+ *
+ * The win and the fault separate cleanly by channel. The bounce's contribution to
+ * shadow-side READABILITY is a luma effect and is kept in full; the cast is a
+ * chroma effect and is mostly dropped here. This is a desaturation toward the
+ * bounce's own luminance, so total energy is unchanged and the additive ceiling
+ * below still bounds the result.
+ */
+export const BOUNCE_CHROMA_RETENTION = 0.35;
+
+/**
+ * CPU mirror of the desaturation the node applies to the gathered bounce.
+ * The GPU path builds this with TSL `mix`; this is the same arithmetic in
+ * plain numbers so the behaviour is unit-testable off-device. Rec.709 luma,
+ * matching TSL's `luminance`.
+ */
+export function desaturateBounce(
+  rgb: readonly [number, number, number],
+  retention: number = BOUNCE_CHROMA_RETENTION,
+): [number, number, number] {
+  const luma = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  return [
+    luma + (rgb[0] - luma) * retention,
+    luma + (rgb[1] - luma) * retention,
+    luma + (rgb[2] - luma) * retention,
+  ];
+}
 
 export type BakedIndirectSources = Readonly<{
   sceneColor: Node<'vec4'>;
@@ -282,9 +319,19 @@ export function buildBakedIndirectLightNode(
     const brightness = max(luminance(sceneColour.rgb), float(ALBEDO_PROXY_LUMINANCE_FLOOR));
     const albedoProxy = clamp(sceneColour.rgb.div(brightness), 0, ALBEDO_PROXY_CEILING);
 
+    // The bounce keeps its luma and sheds most of its chroma. See
+    // BOUNCE_CHROMA_RETENTION for why the cast and the readability win separate here.
+    const bounce = albedoProxy.mul(irradiance);
+    const bounceLuma = luminance(bounce);
+    const neutralised = mix(
+      vec3(bounceLuma, bounceLuma, bounceLuma),
+      bounce,
+      float(BOUNCE_CHROMA_RETENTION),
+    );
+
     // Clamped last, per channel, so no bake value and no gain edit can push a
     // wash across a sightline. This is a clamp, not advice.
-    return min(albedoProxy.mul(irradiance).mul(gain).mul(geometryGate), vec3(1, 1, 1).mul(maximumAdditive));
+    return min(neutralised.mul(gain).mul(geometryGate), vec3(1, 1, 1).mul(maximumAdditive));
   })();
 
   return Object.freeze({
