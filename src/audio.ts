@@ -3425,15 +3425,18 @@ export class ArenaAudio {
     }
     // Drone: a narrow propeller whine over a small electric motor body. The
     // sine/triangle pairing keeps it airborne and avoids the square-wave beep
-    // that made every support call read like UI.
-    this.sweep(420, 185, 0.16, 0.095, 'sawtooth', this.weapons, 0, {
+    // that made every support call read like UI. AUDIO-2 Fault 3: layers were
+    // ~2.4x too quiet to cross the audibility threshold (drone 0.0058 vs
+    // chopper 0.0168 peak); timing, waves and shaping kept, mirror below moves
+    // in lockstep.
+    this.sweep(420, 185, 0.16, 0.23, 'sawtooth', this.weapons, 0, {
       attack: 0.001, punch: 0.28, punchSeconds: 0.018, drive: 0.28,
     });
-    this.tone(1_260, 0.12, 0.045, 'triangle', this.weapons, 0.012, {
+    this.tone(1_260, 0.12, 0.11, 'triangle', this.weapons, 0.012, {
       attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
     });
     this.noise({
-      duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15,
+      duration: 0.14, volume: 0.23, filter: 'bandpass', frequency: 2_800, q: 1.15,
       texture: 'pink', attack: 0.002, punch: 0.45,
     }, this.weapons);
   }
@@ -3464,14 +3467,14 @@ export class ArenaAudio {
       }, weaponDestination);
       return;
     }
-    this.sweep(420, 185, 0.16, 0.095, 'sawtooth', weaponDestination, 0, {
+    this.sweep(420, 185, 0.16, 0.23, 'sawtooth', weaponDestination, 0, {
       attack: 0.001, punch: 0.28, punchSeconds: 0.018, drive: 0.28,
     });
-    this.tone(1_260, 0.12, 0.045, 'triangle', weaponDestination, 0.012, {
+    this.tone(1_260, 0.12, 0.11, 'triangle', weaponDestination, 0.012, {
       attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
     });
     this.noise({
-      duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15,
+      duration: 0.14, volume: 0.23, filter: 'bandpass', frequency: 2_800, q: 1.15,
       texture: 'pink', attack: 0.002, punch: 0.45,
     }, weaponDestination);
   }
@@ -3770,14 +3773,18 @@ export class ArenaAudio {
     }
   }
 
+  // AUDIO-2 Fault 3: pulses peaked at 0.0088 and never crossed the audibility
+  // threshold. Volumes gain ~2.4x with a held punch-0.65 body; the five-pulse
+  // 2.4 s cadence (a 12 s sweep matching the visual pulse train) and both
+  // waves are untouched.
   scoutSweep(): void {
     this.supportCuePlays += 1;
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
-      startFrequency: 420, endFrequency: 1_080, duration: 0.18, volume: 0.045, delay: pulse * 2.4,
-    })), 'triangle', this.announcements);
+      startFrequency: 420, endFrequency: 1_080, duration: 0.18, volume: 0.12, delay: pulse * 2.4,
+    })), 'triangle', this.announcements, { punch: 0.65 });
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
-      startFrequency: 1_320, endFrequency: 1_320, duration: 0.07, volume: 0.028, delay: pulse * 2.4 + 0.12,
-    })), 'sine', this.announcements);
+      startFrequency: 1_320, endFrequency: 1_320, duration: 0.07, volume: 0.06, delay: pulse * 2.4 + 0.12,
+    })), 'sine', this.announcements, { punch: 0.65 });
   }
 
   matchCountdown(step: 1 | 2 | 3 | 'engage'): void {
@@ -3800,11 +3807,16 @@ export class ArenaAudio {
   /** Short authored match bookends; no asset or long-lived voice required. */
   matchStinger(kind: 'start' | 'end-win' | 'end-loss' | 'end-draw'): void {
     if (kind === 'start') {
-      this.sweep(220, 440, 0.22, 0.085, 'triangle', this.announcements, 0, {
-        attack: 0.003, punch: 0.35, punchSeconds: 0.04,
+      // AUDIO-2 Fault 2: the pair peaked at 0.0103 for 1.6 ms (a click, not a
+      // cue) - the fast-collapse transient never held a body above threshold.
+      // Lengths +280/+320 ms, attack 8 ms so the low voices speak, punch 0.8
+      // so the body holds; volumes set so the peak stays inside the cue spread.
+      // Waves, intervals and the 90 ms second-voice delay are untouched.
+      this.sweep(220, 440, 0.54, 0.11, 'triangle', this.announcements, 0, {
+        attack: 0.008, punch: 0.8, punchSeconds: 0.14,
       });
-      this.sweep(330, 660, 0.28, 0.07, 'sine', this.ui, 0.09, {
-        attack: 0.004, punch: 0.42, punchSeconds: 0.05,
+      this.sweep(330, 660, 0.70, 0.10, 'sine', this.ui, 0.09, {
+        attack: 0.008, punch: 0.8, punchSeconds: 0.15,
       });
       return;
     }
@@ -3897,7 +3909,9 @@ export class ArenaAudio {
 
   /**
    * HF-509: activation sting every peer hears, friend or foe. Hostile is a
-   * falling two-pass klaxon under a low thump; own/friendly is a rising pair.
+   * falling two-pass klaxon under a low thump; own is a rising pair from G4;
+   * friendly answers a perfect fourth higher (C5), so your streak and a
+   * teammate's share the rising "good news" shape but never the same pitch.
    */
   killstreakAnnounce(tone: 'own' | 'friendly' | 'hostile'): void {
     this.supportCuePlays += 1;
@@ -3913,6 +3927,18 @@ export class ArenaAudio {
         duration: 0.32, volume: 0.05, filter: 'highpass', frequency: 1_700, q: 0.7,
         texture: 'pink', attack: 0.002, punch: 0.4,
       }, this.ui);
+      return;
+    }
+    if (tone === 'friendly') {
+      // AUDIO-2 Fault 1: friendly fell through to own's exact voice (identical
+      // peak/crest/duration to four decimals). Same rising shape and timing so
+      // it keeps the friendly valence, transposed a perfect fourth up (x4/3)
+      // so the two are unmistakable by ear. Same volumes and waves.
+      this.sweep(523, 697, 0.16, 0.09, 'triangle', this.announcements, 0, { attack: 0.003, punch: 0.36, punchSeconds: 0.04 });
+      this.sweep(697, 1045, 0.22, 0.085, 'triangle', this.announcements, 0.14, { attack: 0.003, punch: 0.4, punchSeconds: 0.05 });
+      this.sweep(147, 147, 0.24, 0.045, 'sine', this.feedback, 0.02, {
+        attack: 0.002, punch: 0.45,
+      });
       return;
     }
     // HF-542: the rising pair shares one body shape; the 110 Hz answer is an
@@ -4857,6 +4883,10 @@ export class ArenaAudio {
     }>[],
     wave: OscillatorType,
     destination: AudioNode | null,
+    // AUDIO-2: scout pulses need a held body (punch 0.65) to stay above the
+    // audibility threshold; the default fast-collapse transient stays for
+    // every other caller that passes nothing.
+    shaping?: Readonly<{ attack?: number; punch?: number; punchSeconds?: number }>,
   ): void {
     // HF-376 completion: this was the last voice in the game still built on
     // the old shape - one shared oscillator whose every cue was an exponential
@@ -4878,9 +4908,9 @@ export class ArenaAudio {
         destination,
         Math.max(0, cue.delay),
         {
-          attack: Math.min(0.008, cue.duration * 0.25),
-          punch: 0.35,
-          punchSeconds: Math.max(0.004, cue.duration * 0.22),
+          attack: shaping?.attack ?? Math.min(0.008, cue.duration * 0.25),
+          punch: shaping?.punch ?? 0.35,
+          punchSeconds: shaping?.punchSeconds ?? Math.max(0.004, cue.duration * 0.22),
           detuneCents: roundRobinDetune(index, 40),
         },
       );
