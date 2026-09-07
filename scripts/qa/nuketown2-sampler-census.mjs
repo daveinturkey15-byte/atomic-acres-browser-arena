@@ -13,6 +13,7 @@ const arg = (name, fallback) => {
 
 const base = arg('--url', 'http://127.0.0.1:4323');
 const profiles = arg('--profiles', 'quality,performance').split(',').map((value) => value.trim()).filter(Boolean);
+const PIPELINE_SAMPLER_LIMIT = 14;
 const browser = await chromium.launch({
   headless: true,
   channel: 'chrome',
@@ -133,7 +134,18 @@ for (const profile of profiles) {
         pipelines,
       };
     });
-    census.push({ profile, booted: true, backend: await page.evaluate(() => document.documentElement.dataset.renderBackend ?? null), adapter, errors: [...new Set(errors)], ...measured });
+    const maxPipelineSamplers = Math.max(0, ...measured.pipelines.map((pipeline) => pipeline.boundSamplers));
+    census.push({
+      profile,
+      booted: true,
+      backend: await page.evaluate(() => document.documentElement.dataset.renderBackend ?? null),
+      adapter,
+      errors: [...new Set(errors)],
+      maxPipelineSamplers,
+      samplerBudgetLimit: PIPELINE_SAMPLER_LIMIT,
+      samplerBudgetPass: maxPipelineSamplers <= PIPELINE_SAMPLER_LIMIT,
+      ...measured,
+    });
   } catch (error) {
     census.push({ profile, booted: false, error: String(error).slice(0, 300), errors: [...new Set(errors)] });
   } finally {
@@ -141,4 +153,18 @@ for (const profile of profiles) {
   }
 }
 await browser.close();
-console.log(JSON.stringify({ lane: 'night-luna2', arena: 'nuketown2', profiles, census }, null, 2));
+const verdict = census.length === profiles.length && census.every((entry) => (
+  entry.booted === true
+  && entry.backend === 'webgpu'
+  && entry.errors.length === 0
+  && entry.samplerBudgetPass === true
+));
+console.log(JSON.stringify({
+  lane: 'day2-luna13',
+  arena: 'nuketown2',
+  profiles,
+  samplerBudgetLimit: PIPELINE_SAMPLER_LIMIT,
+  verdict: verdict ? 'PASS' : 'FAIL',
+  census,
+}, null, 2));
+if (!verdict) process.exitCode = 1;

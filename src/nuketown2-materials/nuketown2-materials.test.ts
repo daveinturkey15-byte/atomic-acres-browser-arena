@@ -245,6 +245,12 @@ describe('nuketown2 material registry', () => {
       expect(resource!.albedo.anisotropy).toBe(8);
       expect(resource!.normal.generateMipmaps).toBe(true);
       expect(resource!.roughness.generateMipmaps).toBe(true);
+      expect(resource!.set.albedo, `${family} embedded albedo bytes`).toBeInstanceOf(Uint8ClampedArray);
+      expect(resource!.set.normal, `${family} embedded normal bytes`).toBeInstanceOf(Uint8ClampedArray);
+      expect(resource!.set.roughness, `${family} embedded roughness bytes`).toBeInstanceOf(Uint8ClampedArray);
+      expect(resource!.set.albedo.length).toBe(resource!.set.size * resource!.set.size * 4);
+      expect(resource!.set.normal.length).toBe(resource!.set.size * resource!.set.size * 4);
+      expect(resource!.set.roughness.length).toBe(resource!.set.size * resource!.set.size);
     }
   });
 
