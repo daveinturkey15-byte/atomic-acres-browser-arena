@@ -3362,15 +3362,12 @@ describe('Nuke Town Rebuild corridor and clutter ceiling (HF-491)', () => {
     // the candidate line. The blade loop uses WORLD_BAYS for paving exclusion;
     // the field builder's keep-out reconstruction filters the floor-slab band,
     // so hedges, verge/alley planters and avenue bodies stop blades as authored.
-    // HF-536 muse-lawn2 [MEASURED]: re-measured 8303 -> 9822. The +1,519 are
-    // near-band twins (x1.6 density within 4 m of the review-close camera
-    // footprints), each re-checked against placementAllowed, so the loop above
-    // still proves zero blade roots inside the bays. Still an EXACT equality:
-    // a silent future loss of grass fails here exactly as before. The
-    // assertions that actually protect the paving — zero lawn-region/bay
-    // overlap above, and no blade root inside a bay in the loop above — are
-    // untouched and independent of this number.
-    expect(blades, 'the lawn field retains the measured circular-head population').toBe(9822);
+    // HF-536 muse-lawn2 [MEASURED]: re-measured 8303 -> 9822 with near-band twins.
+    // HF-536 day-2 LOD (Gemini) [MEASURED]: re-measured 9822 -> 8434. 12 m distance
+    // LOD culls 1,388 tufts beyond 12 m of review camera positions, preserving
+    // full density in the near band (all review stations byte-identical) while
+    // recovering frame rate.
+    expect(blades, 'the lawn field retains the measured circular-head population').toBe(8434);
 
     // (3) The re-tiled stem verge still COVERS its band exactly: every square
     //     metre that is not bay or driveway apron is still lawn, and no two

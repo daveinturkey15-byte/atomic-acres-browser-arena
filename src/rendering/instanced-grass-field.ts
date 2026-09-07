@@ -36,6 +36,7 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial, type Node } from 'three/webgpu';
 import {
+  cameraPosition,
   float,
   fract,
   instanceIndex,
@@ -458,7 +459,13 @@ function makeFieldMaterial(
   const tb = sin(t.mul(4.3 * speed).add(phase.mul(2.7))).mul(0.38);
   const swayX = g.add(tb).mul(gust).mul(bend).mul(opts.swayAmount);
   const swayZ = g2.sub(tb.mul(0.7)).mul(gust).mul(bend).mul(opts.swayAmount);
-  mat.positionNode = positionLocal.add(vec3(swayX, float(0), swayZ)) as unknown as Node<'vec3'>;
+  const sway = vec3(swayX, float(0), swayZ);
+  // HF-536 Day-2 GEMINI-LOD: GPU-side distance culling in vertex stage (< 0.001 ms CPU).
+  // Beyond 32 m from the active camera, collapse blade vertices to (0, 0, 0), creating
+  // degenerate triangles that the GPU rasterizer discards with zero fragment shading.
+  const camDist = positionWorld.distance(cameraPosition);
+  const visible = float(1.0).sub(step(float(32.0), camDist));
+  mat.positionNode = positionLocal.add(sway).mul(visible) as unknown as Node<'vec3'>;
 
   // ---- root-to-tip gradient + sun-catch tips + optional backlit translucency ----
   // HF-536 muse-lawn2: the tip carries the sun (TIP_TINT composes to

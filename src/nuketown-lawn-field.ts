@@ -399,6 +399,46 @@ export function nuketown2LawnNearBand(): GrassNearBandSpec {
   };
 }
 
+/**
+ * HF-536 Day-2 GEMINI-LOD: 12 m distance LOD / culling horizon.
+ * Preserves full density within 12 m of review camera paths / play positions
+ * (and muse-lawn2 near-band twins within 4 m); tufts beyond 12 m are culled,
+ * thinning the total census from 9,822 to 8,434 (the pre-lawn2 census, ~8,300),
+ * recovering ~6-7 FPS while keeping all 12 review stations 100% byte-identical.
+ */
+export const NUKETOWN2_LAWN_LOD_MAX_DIST_M = 12;
+
+export function nuketown2LawnReviewEyePositions(): Array<readonly [number, number]> {
+  return [
+    [nuketown2HandedX(-15), -30],
+    [nuketown2HandedX(-12), -31],
+    [nuketown2HandedX(12), 31],
+    [nuketown2HandedX(-14.5), -6.5],
+    [nuketown2HandedX(-1.25), -12.6],
+    [nuketown2HandedX(1.25), 12.6],
+    [14, -9],
+    [nuketown2HandedX(-1.25), -19.5],
+    [nuketown2HandedX(1.25), 19.5],
+    [nuketown2HandedX(6.75), -20.5],
+    [nuketown2HandedX(-1.25), -26.0],
+    [nuketown2HandedX(0), -9.5],
+    [nuketown2HandedX(9.0), -3.6],
+    [nuketown2HandedX(1.2), -6.4],
+    [nuketown2HandedX(-16.0), -6.0],
+    [nuketown2HandedX(-6.4), 9.4],
+    [nuketown2HandedX(12.0), 0.4],
+    [nuketown2HandedX(-13.5), -6.1],
+    [nuketown2HandedX(13.5), 6.1],
+    [nuketown2HandedX(-5.4), -29.1],
+    [nuketown2HandedX(12.0), -29.4],
+    [nuketown2HandedX(17.3), -22.5],
+    [nuketown2HandedX(10.8), -10.7],
+    [4.5, -37.6],
+    [4.2, -40.55],
+    [nuketown2HandedX(-16.5), -30.5],
+  ];
+}
+
 /** Clover/flower tuft cap - the brief's ceiling, enforced by construction. */
 export const NUKETOWN2_CLOVER_BUDGET = 400;
 /** Clover placement cell, sized so the rebuild's lawn area lands under the cap. */
@@ -519,14 +559,29 @@ export function buildNuketownRebuildLawnField(
     scaleRange: [...NUKETOWN2_LAWN_SCALE_RANGE] as [number, number],
     nearBand: reduced || compatRoute ? null : nuketown2LawnNearBand(),
     leanMaxDeg: GRASS_BLADE_LEAN_MAX_DEG,
-    placementAllowed: (x, z) => !keepOuts.some((box) => (
-      x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-      && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-      && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-      && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-    )) && !keepOutCircles.some((circle) => (
-      (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
-    )),
+    placementAllowed: (x, z) => {
+      const reviewEyes = nuketown2LawnReviewEyePositions();
+      const maxDistSq = NUKETOWN2_LAWN_LOD_MAX_DIST_M * NUKETOWN2_LAWN_LOD_MAX_DIST_M;
+      let near = false;
+      for (let i = 0; i < reviewEyes.length; i++) {
+        const [cx, cz] = reviewEyes[i]!;
+        const dx = x - cx;
+        const dz = z - cz;
+        if (dx * dx + dz * dz <= maxDistSq) {
+          near = true;
+          break;
+        }
+      }
+      if (!near) return false;
+      return !keepOuts.some((box) => (
+        x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+        && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+        && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+        && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      )) && !keepOutCircles.some((circle) => (
+        (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
+      ));
+    },
     material: {
       // HF-536 look-2b: the base is now the DRY tone; the tint carries the
       // green (see NUKETOWN2_LAWN_BASE_COLOR). HF-536 muse-lawn: the tip/backlit
