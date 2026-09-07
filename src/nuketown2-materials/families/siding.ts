@@ -30,6 +30,12 @@ import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
+import {
+  attachNuketown2TextureBridge,
+  createNuketown2TextureBridge,
+  textureSetSamples,
+  type Nuketown2TextureBridge,
+} from '../texture-bridge';
 
 const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2, vec3 } =
   TSL as unknown as Record<string, any>;
@@ -66,6 +72,7 @@ export interface SidingOptions {
   readonly wainscotSrgb?: number;
   /** World Y at which the wainscot gives way to the upper paint. Snapped to a course. */
   readonly wainscotTopY?: number;
+  readonly textureBridge?: Nuketown2TextureBridge;
 }
 
 export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
@@ -82,10 +89,12 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
   });
 }
 
-let sidingGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
+type SidingGraph = { colorNode: any; roughnessNode: any; normalNode: any };
+const sidingGraphs = new WeakMap<object, SidingGraph>();
 
-function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
-  if (sidingGraph) return sidingGraph;
+function sharedSidingGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): SidingGraph {
+  const cached = sidingGraphs.get(textureBridge);
+  if (cached) return cached;
   const spec = sidingSpec('nuketown2-siding-shared', 0x46809f);
   const p = positionWorld;
   const uv = wallUv();
@@ -137,9 +146,8 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
     .add(joint.mul(float(SIDING_JOINT_RELIEF_M)))
     .add(nail.mul(float(SIDING_NAIL_RELIEF_M)))
     .add(buttFailure.mul(float(-0.0006)));
-  sidingGraph = {
-    colorNode: mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5))),
-    roughnessNode: clamp(
+  const proceduralColor = mix(lit, lit.mul(float(0.82)), nail.mul(float(0.5)));
+  const proceduralRoughness = clamp(
       wear.roughness
         .add(dripShadow.mul(float(0.06)))
         .add(splash.mul(float(0.10)))
@@ -147,10 +155,17 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rough
         .sub(sunFade.mul(float(0.30))),
       float(0.20),
       float(1.0),
-    ),
-    normalNode: reliefNormal(height),
-  };
-  return sidingGraph;
+    );
+  const textureSamples = textureSetSamples(textureBridge, 'lapSiding', uv);
+  const relief = reliefNormal(height);
+  sidingGraphs.set(textureBridge, {
+    colorNode: textureSamples ? proceduralColor.mul(textureSamples.albedo) : proceduralColor,
+    roughnessNode: textureSamples
+      ? clamp(proceduralRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.20), float(1.0))
+      : proceduralRoughness,
+    normalNode: textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief,
+  });
+  return sidingGraphs.get(textureBridge)!;
 }
 
 /**
@@ -162,6 +177,7 @@ export function createSidingMaterial(
   name: string,
   options: SidingOptions = {},
 ): MeshStandardNodeMaterial {
+  const textureBridge = options.textureBridge ?? createNuketown2TextureBridge();
   const spec = sidingSpec(name, baseSrgb);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
@@ -178,10 +194,11 @@ export function createSidingMaterial(
   setNuketown2FamilyUniform(uniforms, 'sidingWainscot', sharedWainscotHex === undefined ? 0 : 1);
   setNuketown2FamilyUniform(uniforms, 'sidingWainscotColor', new THREE.Color().setHex(sharedWainscotHex ?? baseSrgb, THREE.SRGBColorSpace));
   setNuketown2FamilyUniform(uniforms, 'sidingWainscotTop', snapped);
-  const shared = sharedSidingGraph(uniforms);
+  const shared = sharedSidingGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge);
   return mat;
 }
 
