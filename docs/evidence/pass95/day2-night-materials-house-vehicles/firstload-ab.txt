@@ -1,0 +1,18 @@
+
+## nuketown2 — base vs candidate (n=1 each, measured back to back)
+
+  base      rivals 0, 14952 MiB free
+  candidate rivals 0, 14937 MiB free
+
+metric                          base      cand     delta   ratio
+first load total               52422     53471      1049   x1.02
+  transition                   19444     18576      -868   x0.96
+  deploy (admission)           31862     33819      1957   x1.06
+CONTROL (7 untouched)              0         0         0       —
+  visual-definition            10892     10146      -746   x0.93
+  coverage-submit-fence         5630      5532       -98   x0.98
+  prewarm-batched-effects          0         0         0       —
+  weapon-catalog-prewarm        1955      1891       -64   x0.97
+
+  Read every ratio against CONTROL. A total that moved with the control moved with the machine.
+
