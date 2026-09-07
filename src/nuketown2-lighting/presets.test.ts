@@ -97,11 +97,10 @@ describe('Nuke Town Rebuild physical exposure derivation', () => {
     expect(cloud.rawKeyScale).toBeLessThan(1);
   });
 
-  it('states the readability floor as the arena authored composed shade', () => {
-    expect(NUKETOWN2_SHADE_READABILITY_FLOOR).toBeCloseTo(0.4536, 6);
-    expect(NUKETOWN2_SHADE_READABILITY_FLOOR).toBe(
-      nuketown2Definition.lighting.ambientIntensity * nuketown2Definition.colorPipeline.exposure,
-    );
+  it('states the readability floor as the measured display ground p10', () => {
+    expect(NUKETOWN2_SHADE_READABILITY_FLOOR).toBeCloseTo(10.8 / 255, 12);
+    expect(nuketown2Definition.lighting.ambientIntensity * nuketown2Definition.colorPipeline.exposure)
+      .toBeGreaterThan(NUKETOWN2_SHADE_READABILITY_FLOOR);
   });
 });
 

@@ -173,9 +173,9 @@ describe('Nuke Town Rebuild lighting: the competitive readability floor', () => 
     }
   });
 
-  it('touches the floor exactly at the anchor, so the floor is the shipped arena', () => {
+  it('keeps the anchor above the measured display floor', () => {
     expect(nuketown2ComposedShadeResponse(atCapture('golden-hour')))
-      .toBeCloseTo(NUKETOWN2_SHADE_READABILITY_FLOOR, 12);
+      .toBeGreaterThanOrEqual(NUKETOWN2_SHADE_READABILITY_FLOOR);
   });
 
   // The reason the physical exposure is not applied verbatim, stated as a test.

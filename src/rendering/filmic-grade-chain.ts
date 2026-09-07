@@ -11,7 +11,7 @@
  *   linear HDR:  scene pass -> contact occlusion -> depth-guarded bloom
  *                -> ASC CDL -> channel crosstalk -> highlight transfer
  *   display xf:  ACES tone map + linear->sRGB, applied EXPLICITLY here
- *   display:     toe lift -> midtone contrast -> split tone -> vignette
+ *   display:     tonal transfer -> toe lift -> midtone contrast -> split tone -> vignette
  *                -> per-frame luminance grain
  *
  * The first three stages are produced upstream by the scene-pass assembler and
@@ -59,6 +59,7 @@ import {
   screenSize,
   screenUV,
   sin,
+  step,
   smoothstep,
   uniform,
   vec2,
@@ -83,6 +84,12 @@ import {
   composeArtDirectedVignette,
   type ArenaArtDirection,
 } from './art-direction';
+import {
+  applyDisplayTonalTransfer,
+  DISPLAY_TRANSFER_LUMA,
+  NUKETOWN2_DISPLAY_TRANSFER_INPUT_8BIT,
+  NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT,
+} from './nuketown2-display-tonal-transfer';
 
 /**
  * Stages produced by the scene-pass assembler before this chain takes over.
@@ -100,6 +107,7 @@ export const FILMIC_GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
   'subtle-channel-crosstalk',
   'highlight-transfer-shoulder',
   'tone-map-aces-plus-srgb-output',
+  'display-tonal-transfer',
   'display-toe-lift',
   'display-midtone-contrast',
   'display-split-tone',
@@ -351,7 +359,10 @@ export function evaluateLinearReferenceStages(rgb: Rgb, profile: FrozenFilmicGra
 
 /** Every display-referred stage, in order, excluding vignette and grain. */
 export function evaluateDisplayReferenceStages(rgb: Rgb, profile: FrozenFilmicGradeProfile): Rgb {
-  return applySplitTone(applyMidtoneContrast(applyDisplayToe(rgb, profile), profile), profile);
+  const transferred = profile.displayTransfer === null
+    ? rgb
+    : applyDisplayTonalTransfer(rgb, profile.displayTransfer);
+  return applySplitTone(applyMidtoneContrast(applyDisplayToe(transferred, profile), profile), profile);
 }
 
 function smoothstepScalar(edge0: number, edge1: number, value: number): number {
@@ -377,6 +388,7 @@ export function createFilmicGradeUniforms() {
     shoulderEnd: uniform(6),
     shoulderPower: uniform(1),
     shoulderDesaturation: uniform(0),
+    displayTransferStrength: uniform(0),
     toeCeiling: uniform(0.3),
     toeFloor: uniform(0),
     toeStrength: uniform(0),
@@ -414,6 +426,7 @@ export function applyGradeProfileToUniforms(
   uniforms.shoulderEnd.value = profile.transfer.shoulderEnd;
   uniforms.shoulderPower.value = profile.transfer.shoulderPower;
   uniforms.shoulderDesaturation.value = profile.transfer.shoulderDesaturation;
+  uniforms.displayTransferStrength.value = profile.displayTransfer === null ? 0 : 1;
   uniforms.toeCeiling.value = profile.display.toeCeiling;
   uniforms.toeFloor.value = profile.display.toeFloor;
   uniforms.toeStrength.value = profile.display.toeStrength;
@@ -489,13 +502,39 @@ export function buildFilmicGradeChain(
   const display = renderOutput(vec4(transferred, source.a));
   stages.push('tone-map-aces-plus-srgb-output');
 
-  // --- stage 8: display toe lift (adds only, never subtracts) -------------
-  const displayLuma = dot(display.rgb, luma);
-  const toeMask = smoothstep(float(0), uniforms.toeCeiling, displayLuma).oneMinus();
-  const toed = display.rgb.add(uniforms.toeFloor.mul(uniforms.toeStrength).mul(toeMask));
+  // --- stage 8: hue-preserving monotone display transfer ------------------
+  const displayLuma = min(max(dot(display.rgb, vec3(
+    DISPLAY_TRANSFER_LUMA[0], DISPLAY_TRANSFER_LUMA[1], DISPLAY_TRANSFER_LUMA[2],
+  )), float(0)), float(1));
+  let mappedDisplayLuma: Node<'float'> = float(
+    NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT[NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT.length - 1] / 255,
+  );
+  for (let index = 0; index < NUKETOWN2_DISPLAY_TRANSFER_INPUT_8BIT.length - 1; index += 1) {
+    const inputLow = NUKETOWN2_DISPLAY_TRANSFER_INPUT_8BIT[index] / 255;
+    const inputHigh = NUKETOWN2_DISPLAY_TRANSFER_INPUT_8BIT[index + 1] / 255;
+    const slope = (NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT[index + 1]
+      - NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT[index]) / 255 / (inputHigh - inputLow);
+    const segment = float(NUKETOWN2_DISPLAY_TRANSFER_OUTPUT_8BIT[index] / 255)
+      .add(displayLuma.sub(inputLow).mul(slope));
+    const inSegment = step(inputLow, displayLuma).mul(step(displayLuma, inputHigh));
+    mappedDisplayLuma = mix(mappedDisplayLuma, segment, inSegment);
+  }
+  const chromaPreserving = display.rgb.mul(mappedDisplayLuma.div(max(displayLuma, float(1e-5))));
+  const zeroLumaFallback = vec3(mappedDisplayLuma, mappedDisplayLuma, mappedDisplayLuma);
+  const transferredDisplay = mix(
+    display.rgb,
+    mix(zeroLumaFallback, chromaPreserving, step(float(1e-5), displayLuma)),
+    uniforms.displayTransferStrength,
+  );
+  stages.push('display-tonal-transfer');
+
+  // --- stage 9: display toe lift (adds only, never subtracts) -------------
+  const transferredDisplayLuma = dot(transferredDisplay, luma);
+  const toeMask = smoothstep(float(0), uniforms.toeCeiling, transferredDisplayLuma).oneMinus();
+  const toed = transferredDisplay.add(uniforms.toeFloor.mul(uniforms.toeStrength).mul(toeMask));
   stages.push('display-toe-lift');
 
-  // --- stage 9: display midtone contrast (Gaussian window) ----------------
+  // --- stage 10: display midtone contrast (Gaussian window) ---------------
   const toedLuma = dot(toed, luma);
   const midtoneDelta = toedLuma.sub(uniforms.midtonePivot);
   const midtoneWidth = max(uniforms.midtoneWidth, float(1e-4));
@@ -507,7 +546,7 @@ export function buildFilmicGradeChain(
   );
   stages.push('display-midtone-contrast');
 
-  // --- stage 10: display split tone (exactly luminance preserving) --------
+  // --- stage 11: display split tone (exactly luminance preserving) --------
   const splitLuma = dot(contrasted, luma);
   const shadowMask = smoothstep(float(0), uniforms.shadowBalance, splitLuma).oneMinus();
   const highlightMask = smoothstep(uniforms.highlightBalance, float(1), splitLuma);
@@ -519,7 +558,7 @@ export function buildFilmicGradeChain(
   const splitToned = tinted.mul(splitLuma.div(max(dot(tinted, luma), float(1e-5))));
   stages.push('display-split-tone');
 
-  // --- stage 11: display vignette falloff ---------------------------------
+  // --- stage 12: display vignette falloff ---------------------------------
   // THE one vignette owner. The legacy linear-side vignette in the scene-pass
   // assembler was retired (its stage held the setting while this one idled at
   // zero); stacking two vignettes would darken exactly the screen periphery
@@ -532,7 +571,7 @@ export function buildFilmicGradeChain(
   const vignetted = splitToned.mul(float(1).sub(vignetteFalloff));
   stages.push('display-vignette-falloff');
 
-  // --- stage 12: per-frame luminance grain (achromatic, clamped) ----------
+  // --- stage 13: per-frame luminance grain (achromatic, clamped) ----------
   const grainCoordinate = screenUV.mul(screenSize).add(uniforms.grainSeed);
   const grainHash = fract(sin(dot(grainCoordinate, vec2(12.9898, 78.233))).mul(43758.5453));
   const grained = max(vignetted.add(grainHash.sub(0.5).mul(2).mul(uniforms.grainAmplitude)), float(0));

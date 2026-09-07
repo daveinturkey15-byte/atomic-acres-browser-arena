@@ -188,6 +188,7 @@ describe('HF-362 filmic grade chain order', () => {
     // Display-side uniforms are NOT reachable from the tone map, i.e. they run
     // after it. This is the structural proof of the ordering contract.
     for (const displayUniform of [
+      uniforms.displayTransferStrength,
       uniforms.toeStrength,
       uniforms.toeFloor,
       uniforms.midtoneContrast,

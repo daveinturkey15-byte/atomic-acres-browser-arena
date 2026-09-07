@@ -44,6 +44,7 @@
 
 import { ARENA_IDS, type ArenaId } from '../arena-identity';
 import type { FrozenFilmicGradeProfile } from './grade-profile';
+import { NUKETOWN2_DISPLAY_TONAL_TRANSFER } from './nuketown2-display-tonal-transfer';
 
 export type Rgb3 = readonly [number, number, number];
 
@@ -1006,6 +1007,9 @@ export function composeArtDirectedProfile(
       shadowBalance: direction.splitTone.shadowBalance,
       highlightBalance: direction.splitTone.highlightBalance,
     }),
+    displayTransfer: direction.id === 'nuketown2'
+      ? NUKETOWN2_DISPLAY_TONAL_TRANSFER
+      : profile.displayTransfer,
     grain: profile.grain,
   });
 }

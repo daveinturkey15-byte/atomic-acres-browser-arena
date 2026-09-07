@@ -39,9 +39,9 @@
  * shipped `LIGHTING_CONDITION_BOUNDS.exposureScale` envelope.
  *
  * THE COMPETITIVE-FPS CLAMP, STATED AS A NUMBER. A prettier sky must never be a
- * place to hide. The floor is the arena's own AUTHORED composed shade response
- * — authored ambient intensity x authored exposure, 0.42 x 1.08 = 0.4536 — and
- * every preset, in every weather, must compose a shade response at or above it.
+ * place to hide. The floor is the measured display-referred ground p10 from the
+ * frozen 29-station board set: 10.8/255. Every preset, in every weather, must
+ * compose a shade response at or above it.
  * That is `NUKETOWN2_SHADE_READABILITY_FLOOR`, it is swept at import time by
  * `assertNuketown2LightingSafety()` in `writes.ts`, and it is the reason the
  * physical exposure ratio for `late-morning` (0.199 — a real camera stopping
@@ -114,12 +114,12 @@ export const NUKETOWN2_LONGEST_SIGHTLINE_M = 91.4;
 export const NUKETOWN2_LONGEST_RUN_HAZE_BOUNDS = Object.freeze({ minimum: 0.12, maximum: 0.48 });
 
 /**
- * THE COMPETITIVE-FPS CLAMP. Authored ambient intensity x authored exposure.
- * Composed shade response may rise above this at any time; it may never fall
- * below it, in any preset, at any weather rung.
+ * THE COMPETITIVE-FPS CLAMP. This is the measured display floor, not a physical
+ * lighting proxy. Composed shade response may rise above it at any time; it may
+ * never fall below it, in any preset, at any weather rung.
  */
 export const NUKETOWN2_SHADE_READABILITY_FLOOR
-  = NUKETOWN2_AUTHORED.ambientIntensity * NUKETOWN2_AUTHORED.exposure;
+  = 10.8 / 255;
 
 /** Incident-metering constant: EV100 = log2(lux / 2.5) at C = 250, ISO 100. */
 export const INCIDENT_METER_CONSTANT = 2.5;

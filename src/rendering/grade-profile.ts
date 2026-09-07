@@ -22,6 +22,8 @@
 
 export type GradeProfileId = 'performance' | 'quality' | 'max';
 
+import type { DisplayTonalTransfer } from './nuketown2-display-tonal-transfer';
+
 /**
  * The one authoritative processing order. Indices matter and are asserted:
  * linear-HDR operations happen strictly before the tone map, display-side
@@ -38,6 +40,7 @@ export const GRADE_CHAIN_STAGES: readonly string[] = Object.freeze([
   // --- display boundary: ACES tone map + linear->sRGB, applied explicitly ---
   'tone-map-aces-plus-srgb-output',
   // --- display-referred shaping ---
+  'display-tonal-transfer',
   'display-toe-lift',
   'display-midtone-contrast',
   'display-split-tone',
@@ -200,6 +203,8 @@ export type FrozenFilmicGradeProfile = Readonly<{
     shadowBalance: number;
     highlightBalance: number;
   }>;
+  /** Optional display-referred luma transfer, enabled only by an arena direction. */
+  displayTransfer: DisplayTonalTransfer | null;
   /** Stage 12 — per-frame luminance grain, scaled over the authored 8-bit strength. */
   grain: Readonly<{
     amplitudeScale: number;
@@ -242,6 +247,7 @@ const PERFORMANCE_PROFILE: FrozenFilmicGradeProfile = Object.freeze({
     shadowBalance: 0.5,
     highlightBalance: 0.55,
   }),
+  displayTransfer: null,
   grain: Object.freeze({
     amplitudeScale: 0.8,
     animationHz: 24,
@@ -283,6 +289,7 @@ const QUALITY_PROFILE: FrozenFilmicGradeProfile = Object.freeze({
     shadowBalance: 0.48,
     highlightBalance: 0.56,
   }),
+  displayTransfer: null,
   grain: Object.freeze({
     amplitudeScale: 1.0,
     animationHz: 24,
@@ -324,6 +331,7 @@ const MAX_PROFILE: FrozenFilmicGradeProfile = Object.freeze({
     shadowBalance: 0.45,
     highlightBalance: 0.58,
   }),
+  displayTransfer: null,
   grain: Object.freeze({
     amplitudeScale: 1.2,
     animationHz: 24,
