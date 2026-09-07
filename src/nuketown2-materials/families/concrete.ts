@@ -35,8 +35,14 @@ import { reliefNormal } from '../relief';
 import { assertSpec, type Nuketown2MaterialSpec } from '../spec';
 import { hash2 } from '../../map3/noise';
 import { createNuketown2Uniforms, type Nuketown2Uniforms, setNuketown2FamilyUniform } from '../material-uniforms';
+import {
+  attachNuketown2TextureBridge,
+  createNuketown2TextureBridge,
+  textureSetSamples,
+  type Nuketown2TextureBridge,
+} from '../texture-bridge';
 
-const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2 } =
+const { abs, clamp, float, floor, fract, max, mix, positionWorld, smoothstep, vec2, vec3 } =
   TSL as unknown as Record<string, any>;
 
 /** Control-joint spacing on a 100 mm slab, metres. */
@@ -123,15 +129,19 @@ export interface ConcreteOptions {
   readonly polygonOffset?: number;
   /** World Y of the surface the damp band wicks up from. */
   readonly dampFootY?: number;
+  readonly textureBridge?: Nuketown2TextureBridge;
 }
 
-let concreteGraph: { colorNode: any; roughnessNode: any; normalNode: any } | null = null;
+type ConcreteGraph = { colorNode: any; roughnessNode: any; normalNode: any };
+const concreteGraphs = new WeakMap<object, ConcreteGraph>();
 
-function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; roughnessNode: any; normalNode: any } {
-  if (concreteGraph) return concreteGraph;
+function sharedConcreteGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): ConcreteGraph {
+  const cached = concreteGraphs.get(textureBridge);
+  if (cached) return cached;
   const spec = concreteSpec('nuketown2-concrete-shared', KERB_CONCRETE_SRGB);
   const p = positionWorld;
-  const wear = buildWear(spec, boxUv(), undefined, uniforms);
+  const uv = boxUv();
+  const wear = buildWear(spec, uv, undefined, uniforms);
   const variant = uniforms.concreteVariant as any;
   const isBlock = variant.greaterThan(float(1.5));
   const isApron = variant.lessThan(float(0.5));
@@ -189,9 +199,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
     .add(relief.mul(float(BROOM_RELIEF_M)))
     .add(spall.mul(float(SPALL_RELIEF_M)))
     .add(unit.mul(float(0.004)));
-  concreteGraph = {
-    colorNode: weathered,
-    roughnessNode: clamp(
+  const proceduralRoughness = clamp(
       wear.roughness
         .add(joint.mul(float(0.05)))
         .add(weatherBand.mul(float(0.08)))
@@ -199,10 +207,22 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms): { colorNode: any; rou
         .add(relief.mul(float(0.05))),
       float(0.25),
       float(1.0),
-    ),
-    normalNode: reliefNormal(height),
-  };
-  return concreteGraph;
+    );
+  const concreteSamples = textureSetSamples(textureBridge, 'concrete', uv);
+  const white = vec3(float(1), float(1), float(1));
+  const mapAlbedo = concreteSamples?.albedo ?? white;
+  const mapRoughness = concreteSamples?.roughness ?? float(0.5);
+  const mapNormal = concreteSamples?.normal ?? reliefNormal(height);
+  const hasTexture = concreteSamples !== null;
+  const reliefNormalNode = reliefNormal(height);
+  concreteGraphs.set(textureBridge, {
+    colorNode: weathered.mul(mapAlbedo),
+    roughnessNode: hasTexture
+      ? clamp(proceduralRoughness.mul(float(0.72)).add(mapRoughness.mul(float(0.28))), float(0.25), float(1.0))
+      : proceduralRoughness,
+    normalNode: hasTexture ? mix(reliefNormalNode, mapNormal, float(0.68)).normalize() : reliefNormalNode,
+  });
+  return concreteGraphs.get(textureBridge)!;
 }
 
 export function createConcreteMaterial(
@@ -210,6 +230,7 @@ export function createConcreteMaterial(
   baseSrgb: number,
   options: ConcreteOptions = {},
 ): MeshStandardNodeMaterial {
+  const textureBridge = options.textureBridge ?? createNuketown2TextureBridge();
   const variant = options.variant ?? 'apron';
   const spec = concreteSpec(name, baseSrgb, options.polygonOffset);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
@@ -225,10 +246,11 @@ export function createConcreteMaterial(
   const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'concreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
   setNuketown2FamilyUniform(uniforms, 'concreteFootY', options.dampFootY ?? 0.0);
-  const shared = sharedConcreteGraph(uniforms);
+  const shared = sharedConcreteGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;
+  attachNuketown2TextureBridge(mat, textureBridge);
   return mat;
 }
 
