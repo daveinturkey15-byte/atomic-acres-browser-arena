@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import { runPooledGpuPrewarm } from './presentation-gpu-prewarm';
 
 export const GRENADE_EXPLOSION_POOL_CAPACITY = 4;
 /** HF-349: extended from 280ms so a single frame hitch cannot swallow the blast. */
@@ -60,8 +61,8 @@ export class GrenadeExplosionPresentation {
   readonly root = new THREE.Group();
   private readonly slots: ExplosionSlot[] = [];
   private cursor = 0;
-  private gpuPrewarmGeneration: number | null = null;
-  private gpuPrewarmPromise: Promise<void> | null = null;
+  gpuPrewarmGeneration: number | null = null;
+  gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(scene: THREE.Scene) {
     this.root.name = 'grenade-explosion-pool';
@@ -143,23 +144,7 @@ export class GrenadeExplosionPresentation {
     camera: THREE.Camera,
     sceneGeneration = 0,
   ): Promise<void> {
-    if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    while (this.gpuPrewarmPromise) {
-      const pending = this.gpuPrewarmPromise;
-      try {
-        await pending;
-      } catch {
-        if (this.gpuPrewarmPromise === pending) this.gpuPrewarmPromise = null;
-      }
-      if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    }
-    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
-    this.gpuPrewarmPromise = operation;
-    try {
-      await operation;
-    } finally {
-      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
-    }
+    await runPooledGpuPrewarm(this, sceneGeneration, () => this.performGpuPrewarm(runtime, camera, sceneGeneration));
   }
 
   private async performGpuPrewarm(

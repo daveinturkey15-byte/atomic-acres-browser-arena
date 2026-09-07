@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import { runPooledGpuPrewarm } from './presentation-gpu-prewarm';
 import {
   HOUSE_POSITION_Q,
   HOUSE_ROTATION_Q,
@@ -84,8 +85,8 @@ export class HouseDestructionPresentation {
   private externalProfileOwnsStaticFragments = false;
   private disposed = false;
   // HF-332: Per-group prewarm generation and promise for interactive-destruction / collapse-debris
-  private gpuPrewarmGeneration: number | null = null;
-  private gpuPrewarmPromise: Promise<void> | null = null;
+  gpuPrewarmGeneration: number | null = null;
+  gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(
     private readonly definitions: readonly HouseFragmentDefinition[],
@@ -163,23 +164,7 @@ export class HouseDestructionPresentation {
     camera: THREE.Camera,
     sceneGeneration = 0,
   ): Promise<void> {
-    if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    while (this.gpuPrewarmPromise) {
-      const pending = this.gpuPrewarmPromise;
-      try {
-        await pending;
-      } catch {
-        if (this.gpuPrewarmPromise === pending) this.gpuPrewarmPromise = null;
-      }
-      if (this.gpuPrewarmGeneration === sceneGeneration) return;
-    }
-    const operation = this.performGpuPrewarm(runtime, camera, sceneGeneration);
-    this.gpuPrewarmPromise = operation;
-    try {
-      await operation;
-    } finally {
-      if (this.gpuPrewarmPromise === operation) this.gpuPrewarmPromise = null;
-    }
+    await runPooledGpuPrewarm(this, sceneGeneration, () => this.performGpuPrewarm(runtime, camera, sceneGeneration));
   }
 
   private async performGpuPrewarm(
