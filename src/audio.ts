@@ -3406,9 +3406,21 @@ export class ArenaAudio {
 
   supportGun(kind: 'chopper' | 'drone'): void {
     if (kind === 'chopper') {
-      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', this.weapons);
-      this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, this.weapons);
-      this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, this.weapons);
+      // HF-542: autocannon thump, blast body and crack keep their levels and
+      // timing; they gain attack/punch/saturation/texture like the drone
+      // branch above already had. Mirrored in supportGunPositional.
+      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', this.weapons, 0, {
+        attack: 0.0008, punch: 0.28, punchSeconds: 0.02, drive: 0.45,
+      });
+      this.noise({
+        duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7,
+        texture: 'brown', frequencyEndHz: 1_200, attack: 0.0006, punch: 0.3, drive: 0.5,
+        resonanceHz: 220,
+      }, this.weapons);
+      this.noise({
+        duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45,
+        texture: 'crackle', attack: 0.0003, punch: 0.2, punchSeconds: 0.005, drive: 0.5,
+      }, this.weapons);
       return;
     }
     // Drone: a narrow propeller whine over a small electric motor body. The
@@ -3420,7 +3432,10 @@ export class ArenaAudio {
     this.tone(1_260, 0.12, 0.045, 'triangle', this.weapons, 0.012, {
       attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
     });
-    this.noise({ duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15, texture: 'pink' }, this.weapons);
+    this.noise({
+      duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15,
+      texture: 'pink', attack: 0.002, punch: 0.45,
+    }, this.weapons);
   }
 
   /** HF-337: positional support gunfire at the firing chopper/drone world position. Reuses the railgun spatial-chain pattern. */
@@ -3433,9 +3448,20 @@ export class ArenaAudio {
     );
     const weaponDestination = this.createSupportGunSpatialDestination(position, distance, isEnemy) ?? this.weapons;
     if (kind === 'chopper') {
-      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', weaponDestination);
-      this.noise({ duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7 }, weaponDestination);
-      this.noise({ duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45 }, weaponDestination);
+      // HF-542: mirror of supportGun('chopper') above at the spatial
+      // destination. Same levels, timing, shaping and textures.
+      this.sweep(104, 38, 0.16, 0.21, 'sawtooth', weaponDestination, 0, {
+        attack: 0.0008, punch: 0.28, punchSeconds: 0.02, drive: 0.45,
+      });
+      this.noise({
+        duration: 0.19, volume: 0.28, filter: 'lowpass', frequency: 2_500, q: 0.7,
+        texture: 'brown', frequencyEndHz: 1_200, attack: 0.0006, punch: 0.3, drive: 0.5,
+        resonanceHz: 220,
+      }, weaponDestination);
+      this.noise({
+        duration: 0.035, volume: 0.11, filter: 'highpass', frequency: 2_100, q: 0.45,
+        texture: 'crackle', attack: 0.0003, punch: 0.2, punchSeconds: 0.005, drive: 0.5,
+      }, weaponDestination);
       return;
     }
     this.sweep(420, 185, 0.16, 0.095, 'sawtooth', weaponDestination, 0, {
@@ -3444,7 +3470,10 @@ export class ArenaAudio {
     this.tone(1_260, 0.12, 0.045, 'triangle', weaponDestination, 0.012, {
       attack: 0.001, punch: 0.3, detuneCents: roundRobinDetune(this.reportVariant, 28),
     });
-    this.noise({ duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15, texture: 'pink' }, weaponDestination);
+    this.noise({
+      duration: 0.14, volume: 0.095, filter: 'bandpass', frequency: 2_800, q: 1.15,
+      texture: 'pink', attack: 0.002, punch: 0.45,
+    }, weaponDestination);
   }
 
   /**
@@ -3452,13 +3481,23 @@ export class ArenaAudio {
    * your squad taking a zone, a flat low pair for losses/neutralizations.
    */
   dominationCue(friendly: boolean): void {
+    // HF-542: the authored rises/falls ARE the intervals, so the glides stay;
+    // each note gains a body. Levels and timing untouched.
     if (friendly) {
-      this.sweep(520, 660, 0.11, 0.16, 'triangle', this.ui);
-      this.sweep(660, 880, 0.14, 0.16, 'triangle', this.ui);
+      this.sweep(520, 660, 0.11, 0.16, 'triangle', this.ui, 0, {
+        attack: 0.002, punch: 0.45,
+      });
+      this.sweep(660, 880, 0.14, 0.16, 'triangle', this.ui, 0, {
+        attack: 0.002, punch: 0.45,
+      });
       return;
     }
-    this.sweep(320, 250, 0.12, 0.15, 'triangle', this.ui);
-    this.sweep(250, 190, 0.15, 0.14, 'triangle', this.ui);
+    this.sweep(320, 250, 0.12, 0.15, 'triangle', this.ui, 0, {
+      attack: 0.002, punch: 0.45,
+    });
+    this.sweep(250, 190, 0.15, 0.14, 'triangle', this.ui, 0, {
+      attack: 0.002, punch: 0.45,
+    });
   }
 
   /**
@@ -3477,9 +3516,20 @@ export class ArenaAudio {
       destination = this.createSupportGunSpatialDestination(emitter, distance) ?? this.weapons;
     }
     if (!destination) return;
-    this.sweep(150, 42, 0.24, 0.3, 'sine', destination);
-    this.noise({ duration: 0.55, volume: 0.32, filter: 'bandpass', frequency: 950, q: 0.55 }, destination);
-    this.noise({ duration: 0.38, volume: 0.18, filter: 'highpass', frequency: 2_600, q: 0.5 }, destination);
+    // HF-542: ignition thump gets a body and clip; the motor band rises and
+    // gains a hull resonance; the crack gains grit. Volumes/durations kept.
+    this.sweep(150, 42, 0.24, 0.3, 'sine', destination, 0, {
+      attack: 0.001, punch: 0.3, punchSeconds: 0.04, drive: 0.5,
+    });
+    this.noise({
+      duration: 0.55, volume: 0.32, filter: 'bandpass', frequency: 950, q: 0.55,
+      texture: 'grit', frequencyEndHz: 2_200, attack: 0.006, punch: 0.45, drive: 0.35,
+      resonanceHz: 300,
+    }, destination);
+    this.noise({
+      duration: 0.38, volume: 0.18, filter: 'highpass', frequency: 2_600, q: 0.5,
+      texture: 'crackle', attack: 0.0005, punch: 0.25, drive: 0.4,
+    }, destination);
   }
 
   private createSupportGunSpatialDestination(
@@ -3782,22 +3832,46 @@ export class ArenaAudio {
   adrenalineState(active: boolean): void {
     this.supportCuePlays += 1;
     if (active) {
-      this.sweep(110, 760, 0.38, 0.07, 'sawtooth', this.announcements);
-      this.tone(92, 0.16, 0.055, 'sine', this.feedback, 0.05);
-      this.tone(118, 0.2, 0.05, 'sine', this.feedback, 0.23);
-      this.noise({ duration: 0.3, volume: 0.035, filter: 'highpass', frequency: 1_600, q: 0.8 }, this.ui);
+      // HF-542: the rush keeps its rise; the two low thumps keep tone()'s
+      // percussive glide and gain bodies. Volumes/durations/delays untouched.
+      this.sweep(110, 760, 0.38, 0.07, 'sawtooth', this.announcements, 0, {
+        attack: 0.004, punch: 0.3, punchSeconds: 0.06, drive: 0.4,
+      });
+      this.tone(92, 0.16, 0.055, 'sine', this.feedback, 0.05, {
+        attack: 0.0008, punch: 0.35, drive: 0.4,
+      });
+      this.tone(118, 0.2, 0.05, 'sine', this.feedback, 0.23, {
+        attack: 0.001, punch: 0.4,
+      });
+      this.noise({
+        duration: 0.3, volume: 0.035, filter: 'highpass', frequency: 1_600, q: 0.8,
+        texture: 'grit', frequencyEndHz: 3_200, attack: 0.004, punch: 0.5, drive: 0.3,
+      }, this.ui);
       return;
     }
-    this.sweep(420, 105, 0.25, 0.035, 'triangle', this.ui);
+    // HF-542: the comedown keeps its fall and gains a body. Level kept.
+    this.sweep(420, 105, 0.25, 0.035, 'triangle', this.ui, 0, {
+      attack: 0.004, punch: 0.4, punchSeconds: 0.05,
+    });
   }
 
   supportInbound(source: 'yardhawk' | 'tri-pass' | 'hunter-swarm'): void {
     this.supportCuePlays += 1;
     if (source === 'tri-pass') {
+      // HF-542: three directly-fired flyover whooshes get per-pass detune
+      // (sweepSequence already does this for the swarm; these do not go
+      // through it) plus bodies and saturation. Volumes/durations/delays
+      // untouched.
       for (let index = 0; index < 3; index += 1) {
-        this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.announcements, index * 0.12);
+        this.sweep(1_450 + index * 90, 180, 0.72, 0.055, 'sawtooth', this.announcements, index * 0.12, {
+          attack: 0.008, punch: 0.35, punchSeconds: 0.12, drive: 0.35,
+          detuneCents: roundRobinDetune(index, 40),
+        });
       }
-      this.noise({ duration: 0.62, volume: 0.055, filter: 'bandpass', frequency: 2_100, q: 1.1 }, this.ambience);
+      this.noise({
+        duration: 0.62, volume: 0.055, filter: 'bandpass', frequency: 2_100, q: 1.1,
+        texture: 'pink', frequencyEndHz: 900, attack: 0.01, punch: 0.5, resonanceHz: 400,
+      }, this.ambience);
       return;
     }
     if (source === 'hunter-swarm') {
@@ -3811,8 +3885,14 @@ export class ArenaAudio {
       })), 'square', this.announcements);
       return;
     }
-    this.tone(1_180, 0.09, 0.055, 'square', this.announcements);
-    this.sweep(1_600, 240, 0.5, 0.065, 'sawtooth', this.ambience, 0.08);
+    // HF-542: the contact ping keeps tone()'s percussive glide and gains a
+    // body; the flyby keeps its fall and gains saturation. Untouched volumes.
+    this.tone(1_180, 0.09, 0.055, 'square', this.announcements, 0, {
+      attack: 0.0008, punch: 0.35, drive: 0.3,
+    });
+    this.sweep(1_600, 240, 0.5, 0.065, 'sawtooth', this.ambience, 0.08, {
+      attack: 0.008, punch: 0.35, punchSeconds: 0.1, drive: 0.3,
+    });
   }
 
   /**
@@ -3822,15 +3902,27 @@ export class ArenaAudio {
   killstreakAnnounce(tone: 'own' | 'friendly' | 'hostile'): void {
     this.supportCuePlays += 1;
     if (tone === 'hostile') {
-      this.sweep(720, 205, 0.44, 0.11, 'sawtooth', this.announcements, 0, { attack: 0.004, punch: 0.42, punchSeconds: 0.05 });
-      this.sweep(720, 205, 0.44, 0.09, 'sawtooth', this.announcements, 0.26);
-      this.tone(88, 0.42, 0.075, 'sine', this.feedback, 0.02);
-      this.noise({ duration: 0.32, volume: 0.05, filter: 'highpass', frequency: 1_700, q: 0.7, texture: 'pink' }, this.ui);
+      // HF-542: the second pass mirrors the first's body; the low thump
+      // keeps tone()'s percussive glide; the wash gains a body. Levels kept.
+      this.sweep(720, 205, 0.44, 0.11, 'sawtooth', this.announcements, 0, { attack: 0.004, punch: 0.42, punchSeconds: 0.05, drive: 0.3 });
+      this.sweep(720, 205, 0.44, 0.09, 'sawtooth', this.announcements, 0.26, { attack: 0.004, punch: 0.42, punchSeconds: 0.05, drive: 0.3 });
+      this.tone(88, 0.42, 0.075, 'sine', this.feedback, 0.02, {
+        attack: 0.001, punch: 0.35, drive: 0.4,
+      });
+      this.noise({
+        duration: 0.32, volume: 0.05, filter: 'highpass', frequency: 1_700, q: 0.7,
+        texture: 'pink', attack: 0.002, punch: 0.4,
+      }, this.ui);
       return;
     }
+    // HF-542: the rising pair shares one body shape; the 110 Hz answer is an
+    // authored interval tone, so it becomes a degenerate sweep instead of
+    // sagging 163 cents. Levels kept.
     this.sweep(392, 523, 0.16, 0.09, 'triangle', this.announcements, 0, { attack: 0.003, punch: 0.36, punchSeconds: 0.04 });
-    this.sweep(523, 784, 0.22, 0.085, 'triangle', this.announcements, 0.14);
-    this.tone(110, 0.24, 0.045, 'sine', this.feedback, 0.02);
+    this.sweep(523, 784, 0.22, 0.085, 'triangle', this.announcements, 0.14, { attack: 0.003, punch: 0.4, punchSeconds: 0.05 });
+    this.sweep(110, 110, 0.24, 0.045, 'sine', this.feedback, 0.02, {
+      attack: 0.002, punch: 0.45,
+    });
   }
 
   /**
@@ -3850,8 +3942,16 @@ export class ArenaAudio {
     }
     if (!destination) return;
     this.tone(140, 0.09, 0.16, 'square', destination, 0, { attack: 0.001, punch: 0.5, punchSeconds: 0.02 });
-    this.sweep(1_650, 420, 0.7, 0.11, 'sine', destination, 0.04);
-    this.noise({ duration: 0.62, volume: 0.14, filter: 'bandpass', frequency: 1_300, q: 0.9, delay: 0.04 }, destination);
+    // HF-542: the falling whistle keeps its glide and gains a body; the bay
+    // wash gains air absorption and a bay resonance. Levels/timing kept.
+    this.sweep(1_650, 420, 0.7, 0.11, 'sine', destination, 0.04, {
+      attack: 0.006, punch: 0.4, punchSeconds: 0.12,
+    });
+    this.noise({
+      duration: 0.62, volume: 0.14, filter: 'bandpass', frequency: 1_300, q: 0.9, delay: 0.04,
+      texture: 'pink', frequencyEndHz: 700, attack: 0.008, punch: 0.5, drive: 0.3,
+      resonanceHz: 900,
+    }, destination);
   }
 
   /**
@@ -3934,24 +4034,54 @@ export class ArenaAudio {
   }
 
   hunterLaunch(index: number): void {
-    const offset = Math.max(0, Math.min(4, Math.floor(index))) * 0.045;
-    this.sweep(1_180 + index * 45, 230, 0.42, 0.052, 'sawtooth', this.feedback, offset);
-    this.noise({ duration: 0.24, volume: 0.044, filter: 'bandpass', frequency: 1_600, q: 0.85, delay: offset }, this.ambience);
+    // HF-542: five directly-fired launch voices get per-drone detune (the
+    // repeated-similar-voice tell) plus bodies. Levels/timing untouched.
+    const slot = Math.max(0, Math.min(4, Math.floor(index)));
+    const offset = slot * 0.045;
+    this.sweep(1_180 + index * 45, 230, 0.42, 0.052, 'sawtooth', this.feedback, offset, {
+      attack: 0.004, punch: 0.35, punchSeconds: 0.07, drive: 0.35,
+      detuneCents: roundRobinDetune(slot, 40),
+    });
+    this.noise({
+      duration: 0.24, volume: 0.044, filter: 'bandpass', frequency: 1_600, q: 0.85, delay: offset,
+      texture: 'pink', frequencyEndHz: 800, attack: 0.004, punch: 0.45,
+    }, this.ambience);
   }
 
   overdrivePickup(): void {
-    this.sweep(180, 920, 0.42, 0.095, 'sawtooth', this.ui);
-    this.tone(440, 0.2, 0.055, 'square', this.ui, 0.08);
-    this.tone(660, 0.28, 0.05, 'triangle', this.ui, 0.18);
-    this.tone(880, 0.34, 0.042, 'sine', this.ambience, 0.26);
+    // HF-542: the 440/660/880 triad is authored as clean intervals, so the
+    // tones become degenerate sweeps (pitchFallStages short-circuits on an
+    // equal-endpoint interval) instead of sagging 163 cents each. Volumes,
+    // durations, delays, destinations and waves untouched.
+    this.sweep(180, 920, 0.42, 0.095, 'sawtooth', this.ui, 0, {
+      attack: 0.002, punch: 0.3, punchSeconds: 0.06, drive: 0.3,
+    });
+    this.sweep(440, 440, 0.2, 0.055, 'square', this.ui, 0.08, {
+      attack: 0.001, punch: 0.4, drive: 0.25,
+    });
+    this.sweep(660, 660, 0.28, 0.05, 'triangle', this.ui, 0.18, {
+      attack: 0.001, punch: 0.45, drive: 0.2,
+    });
+    this.sweep(880, 880, 0.34, 0.042, 'sine', this.ambience, 0.26, {
+      attack: 0.002, punch: 0.5,
+    });
   }
 
   overdriveAvailable(): void {
+    // HF-542: shaping only. Frequencies, durations, volumes, waves and the
+    // zero-noise-layer contract stay exactly as OVERDRIVE_AVAILABLE_CUE_PROFILE
+    // pins them; the tones become degenerate sweeps so the authored 330/495
+    // and 660 Hz partials stop sagging 163 cents. The transient keeps its
+    // rising glide and gains a body.
     for (const tone of OVERDRIVE_AVAILABLE_CUE_PROFILE.announcementTones) {
-      this.tone(tone.frequencyHz, tone.durationSeconds, tone.volume, tone.wave, this.announcements, tone.delaySeconds);
+      this.sweep(tone.frequencyHz, tone.frequencyHz, tone.durationSeconds, tone.volume, tone.wave, this.announcements, tone.delaySeconds, {
+        attack: 0.002, punch: 0.5,
+      });
     }
     const ambience = OVERDRIVE_AVAILABLE_CUE_PROFILE.ambienceTone;
-    this.tone(ambience.frequencyHz, ambience.durationSeconds, ambience.volume, ambience.wave, this.ambience, ambience.delaySeconds);
+    this.sweep(ambience.frequencyHz, ambience.frequencyHz, ambience.durationSeconds, ambience.volume, ambience.wave, this.ambience, ambience.delaySeconds, {
+      attack: 0.003, punch: 0.55,
+    });
     const transient = OVERDRIVE_AVAILABLE_CUE_PROFILE.transient;
     this.sweep(
       transient.startFrequencyHz,
@@ -3961,12 +4091,19 @@ export class ArenaAudio {
       transient.wave,
       this.announcements,
       transient.delaySeconds,
+      { attack: 0.001, punch: 0.4, punchSeconds: 0.02, drive: 0.3 },
     );
   }
 
   overdriveExpire(): void {
-    this.sweep(720, 140, 0.34, 0.055, 'triangle', this.ui);
-    this.tone(110, 0.22, 0.035, 'sine', this.ambience, 0.12);
+    // HF-542: the falling sweep keeps its glide; the 110 Hz answer is an
+    // authored interval tone, so it becomes a degenerate sweep. Levels kept.
+    this.sweep(720, 140, 0.34, 0.055, 'triangle', this.ui, 0, {
+      attack: 0.003, punch: 0.4, punchSeconds: 0.06, drive: 0.25,
+    });
+    this.sweep(110, 110, 0.22, 0.035, 'sine', this.ambience, 0.12, {
+      attack: 0.003, punch: 0.5,
+    });
   }
 
   nukeWarning(): void {
@@ -3976,17 +4113,43 @@ export class ArenaAudio {
     this.sweepSequence(Array.from({ length: 5 }, (_, pulse) => ({
       startFrequency: 680 + pulse * 90, endFrequency: 680 + pulse * 90, duration: 0.12, volume: 0.045, delay: pulse + 0.68,
     })), 'square', this.announcements);
-    this.sweep(42, 148, 4.85, 0.055, 'triangle', this.ambience, 0.05);
+    // HF-542: the low pressure rise keeps its swell and gains a body. Level kept.
+    this.sweep(42, 148, 4.85, 0.055, 'triangle', this.ambience, 0.05, {
+      attack: 0.02, punch: 0.5, punchSeconds: 0.5,
+    });
   }
 
   nukeDetonation(): void {
-    this.sweep(72, 14, 1.15, 0.36, 'sawtooth', this.weapons);
-    this.sweep(34, 9, 2.6, 0.27, 'triangle', this.ambience, 0.04);
-    this.noise({ duration: 1.05, volume: 0.46, filter: 'lowpass', frequency: 1_250, q: 0.45 }, this.weapons);
-    this.noise({ duration: 0.34, volume: 0.2, filter: 'highpass', frequency: 3_600, q: 0.35, delay: 0.028 }, this.feedback);
-    this.noise({ duration: 1.05, volume: 0.16, filter: 'bandpass', frequency: 280, q: 0.52, delay: 0.9 }, this.ambience);
-    this.noise({ duration: 2.4, volume: 0.22, filter: 'lowpass', frequency: 520, q: 0.7, delay: 0.18 }, this.weapons);
-    this.sweep(160, 18, 3.4, 0.18, 'sawtooth', this.ambience, 0.32);
+    // HF-542: every layer gets its body back. Volumes, durations, delays,
+    // destinations and waves are untouched, so the scheduled peak sum (1.85)
+    // is bit-identical; only attack/punch/saturation/texture are added.
+    this.sweep(72, 14, 1.15, 0.36, 'sawtooth', this.weapons, 0, {
+      attack: 0.0008, punch: 0.3, punchSeconds: 0.15, drive: 0.6,
+    });
+    this.sweep(34, 9, 2.6, 0.27, 'triangle', this.ambience, 0.04, {
+      attack: 0.004, punch: 0.4, punchSeconds: 0.4, drive: 0.5,
+    });
+    this.noise({
+      duration: 1.05, volume: 0.46, filter: 'lowpass', frequency: 1_250, q: 0.45,
+      texture: 'brown', frequencyEndHz: 400, attack: 0.008, punch: 0.45, punchSeconds: 0.2,
+      drive: 0.5, resonanceHz: 90,
+    }, this.weapons);
+    this.noise({
+      duration: 0.34, volume: 0.2, filter: 'highpass', frequency: 3_600, q: 0.35, delay: 0.028,
+      texture: 'crackle', attack: 0.0004, punch: 0.2, punchSeconds: 0.02, drive: 0.4,
+    }, this.feedback);
+    this.noise({
+      duration: 1.05, volume: 0.16, filter: 'bandpass', frequency: 280, q: 0.52, delay: 0.9,
+      texture: 'crackle', frequencyEndHz: 140, attack: 0.02, punch: 0.5,
+    }, this.ambience);
+    this.noise({
+      duration: 2.4, volume: 0.22, filter: 'lowpass', frequency: 520, q: 0.7, delay: 0.18,
+      texture: 'brown', frequencyEndHz: 180, attack: 0.01, punch: 0.5, punchSeconds: 0.4,
+      drive: 0.4, resonanceHz: 55,
+    }, this.weapons);
+    this.sweep(160, 18, 3.4, 0.18, 'sawtooth', this.ambience, 0.32, {
+      attack: 0.006, punch: 0.35, punchSeconds: 0.5, drive: 0.5,
+    });
   }
 
   telemetry(): {
