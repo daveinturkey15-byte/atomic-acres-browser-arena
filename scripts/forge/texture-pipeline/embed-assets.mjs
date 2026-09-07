@@ -1,27 +1,58 @@
 #!/usr/bin/env node
 /**
- * Convert the measured 512² derived PNGs into a deterministic source module.
+ * Materialise the measured 512^2 maps as runtime assets.
  *
- * Runtime arena construction is synchronous, so the bridge cannot wait on a
- * browser ImageBitmap loader. Keeping the already-derived RGBA/R8 bytes in a
- * generated module gives the WebGPU graph the real image-generated maps at
- * construction time while the source PNGs remain available for inspection.
+ * Runtime graph construction is synchronous, but the image payload is not.
+ * This step copies the PNG albedo/normal maps, packs AO + roughness + a zero
+ * metalness channel into one ORM PNG, and writes only a small metadata module.
+ * The bridge creates neutral 1x1 placeholders and TextureLoader swaps the
+ * real images in after the first frame; no map bytes enter the JS bundle.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const output = path.join(root, 'src/nuketown2-materials/generated-texture-assets.ts');
+const output = path.join(root, 'src/nuketown2-materials/runtime-texture-assets.ts');
+const publicRoot = path.join(root, 'public/textures/nuketown2');
 const families = ['asphalt', 'lapSiding', 'brick', 'concrete', 'shingle', 'timber'];
 
-async function readRaw(file, size, channels) {
-  const image = sharp(file).resize({ width: size, height: size, fit: 'fill' });
-  if (channels === 1) image.greyscale();
-  const buffer = await image.raw().toBuffer();
-  if (buffer.length !== size * size * channels) throw new Error(`${file} raw channel count mismatch`);
-  return buffer.toString('base64');
+function srgbToLinear(value) {
+  return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+async function albedoMeanLinear(file, size) {
+  const { data, info } = await sharp(file)
+    .resize({ width: size, height: size, fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  const pixels = info.width * info.height;
+  for (let index = 0; index < data.length; index += info.channels) {
+    r += srgbToLinear(data[index] / 255);
+    g += srgbToLinear(data[index + 1] / 255);
+    b += srgbToLinear(data[index + 2] / 255);
+  }
+  return [r / pixels, g / pixels, b / pixels].map((value) => Math.max(value, 0.001));
+}
+
+async function writeOrm(mapRoot, outputPath, size) {
+  const [ao, roughness] = await Promise.all([
+    sharp(path.join(mapRoot, 'ao.png')).resize({ width: size, height: size, fit: 'fill' }).greyscale().raw().toBuffer(),
+    sharp(path.join(mapRoot, 'roughness.png')).resize({ width: size, height: size, fit: 'fill' }).greyscale().raw().toBuffer(),
+  ]);
+  if (ao.length !== size * size || roughness.length !== size * size) throw new Error(`ORM input mismatch for ${mapRoot}`);
+  const orm = Buffer.alloc(size * size * 3);
+  for (let index = 0; index < size * size; index += 1) {
+    orm[index * 3] = ao[index];
+    orm[index * 3 + 1] = roughness[index];
+    orm[index * 3 + 2] = 0;
+  }
+  await sharp(orm, { raw: { width: size, height: size, channels: 3 } }).png().toFile(outputPath);
 }
 
 const records = [];
@@ -31,6 +62,11 @@ for (const family of families) {
   const measured = report.resolutions.find((entry) => entry.size === 512);
   if (!measured || measured.wrapDelta > 1) throw new Error(`${family} has no passing 512 report`);
   const mapRoot = path.join(familyRoot, '512');
+  const runtimeRoot = path.join(publicRoot, family);
+  await mkdir(runtimeRoot, { recursive: true });
+  await copyFile(path.join(mapRoot, 'albedo.png'), path.join(runtimeRoot, 'albedo.png'));
+  await copyFile(path.join(mapRoot, 'normal.png'), path.join(runtimeRoot, 'normal.png'));
+  await writeOrm(mapRoot, path.join(runtimeRoot, 'orm.png'), 512);
   records.push({
     family,
     size: 512,
@@ -38,9 +74,12 @@ for (const family of families) {
     source: report.input,
     fractionMostlyZ: measured.fractionMostlyZ,
     detail: measured.detail,
-    albedo: await readRaw(path.join(mapRoot, 'albedo.png'), 512, 4),
-    normal: await readRaw(path.join(mapRoot, 'normal.png'), 512, 4),
-    roughness: await readRaw(path.join(mapRoot, 'roughness.png'), 512, 1),
+    meanLinear: await albedoMeanLinear(path.join(mapRoot, 'albedo.png'), 512),
+    urls: {
+      albedo: `./textures/nuketown2/${family}/albedo.png`,
+      normal: `./textures/nuketown2/${family}/normal.png`,
+      orm: `./textures/nuketown2/${family}/orm.png`,
+    },
   });
 }
 
@@ -52,16 +91,18 @@ const lines = [
   '  readonly source: string;',
   '  readonly fractionMostlyZ: number;',
   '  readonly detail: Readonly<Record<string, number>>;',
-  '  readonly albedo: string;',
-  '  readonly normal: string;',
-  '  readonly roughness: string;',
+  '  readonly meanLinear: readonly number[];',
+  '  readonly urls: Readonly<{ albedo: string; normal: string; orm: string }>;',
   '}>;',
   'export const NUKETOWN2_IMAGE_TEXTURE_ASSETS = {',
 ];
-for (const record of records) {
-  lines.push(`  ${record.family}: Object.freeze(${JSON.stringify(record)}),`);
-}
+for (const record of records) lines.push(`  ${record.family}: Object.freeze(${JSON.stringify(record)}),`);
 lines.push('} as const satisfies Readonly<Record<string, Nuketown2ImageTextureAsset>>;');
 lines.push('');
 await writeFile(output, `${lines.join('\n')}\n`, 'utf8');
+await writeFile(
+  path.join(publicRoot, 'manifest.json'),
+  `${JSON.stringify({ version: 1, size: 512, maps: ['albedo', 'normal', 'orm'], families: records }, null, 2)}\n`,
+  'utf8',
+);
 console.log(JSON.stringify({ output: path.relative(root, output).replaceAll('\\', '/'), families, bytes: (await readFile(output)).length }, null, 2));

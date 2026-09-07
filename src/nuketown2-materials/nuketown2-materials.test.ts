@@ -19,6 +19,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   MAX_ALBEDO_DARKENING,
@@ -207,10 +209,9 @@ describe('nuketown2 material registry', () => {
     }
   });
 
-  it('loads no texture: every surface is generated', () => {
-    // GENERATED is the property, not "textureless". The classic map slots
-    // stay empty: the TSL bridge below owns generated DataTextures so WebGPU
-    // and the compatibility backend share one authored graph.
+  it('keeps classic map slots empty while the TSL bridge owns runtime assets', () => {
+    // The classic map slots stay empty: the TSL bridge owns the runtime
+    // textures so WebGPU and the compatibility backend share one authored graph.
     const registry = createNuketown2MaterialRegistry() as unknown as Record<string, Record<string, unknown>>;
     const mapSlots = [
       'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap',
@@ -226,7 +227,7 @@ describe('nuketown2 material registry', () => {
     expect((lut.image as { src?: string }).src ?? null, 'the noise tile has no URL').toBeNull();
   });
 
-  it('binds generated PBR maps with the authored colour spaces and metre tile sizes', () => {
+  it('binds runtime PBR assets with the authored colour spaces and metre tile sizes', () => {
     const registry = createNuketown2MaterialRegistry();
     const bridge = registry.asphalt.userData.nuketown2TextureBridge as ReturnType<typeof createNuketown2TextureBridge>;
     expect(bridge.useTextureSet).toBe(true);
@@ -238,39 +239,40 @@ describe('nuketown2 material registry', () => {
       expect(resource!.set.metresPerTile).toBeGreaterThan(0);
       expect(resource!.albedo.colorSpace, `${family} albedo is sRGB`).toBe(THREE.SRGBColorSpace);
       expect(resource!.normal.colorSpace, `${family} normal is linear`).toBe(THREE.NoColorSpace);
-      expect(resource!.roughness.colorSpace, `${family} roughness is linear`).toBe(THREE.NoColorSpace);
+      expect(resource!.orm.colorSpace, `${family} ORM is linear`).toBe(THREE.NoColorSpace);
+      expect((resource!.albedo as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} albedo uses the regular image upload path`).toBe(false);
+      expect((resource!.normal as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} normal uses the regular image upload path`).toBe(false);
+      expect((resource!.orm as THREE.Texture & { isDataTexture?: boolean }).isDataTexture ?? false, `${family} ORM uses the regular image upload path`).toBe(false);
       expect(resource!.albedo.wrapS).toBe(THREE.RepeatWrapping);
       expect(resource!.albedo.wrapT).toBe(THREE.RepeatWrapping);
       expect(resource!.albedo.generateMipmaps).toBe(true);
       expect(resource!.albedo.anisotropy).toBe(8);
       expect(resource!.normal.generateMipmaps).toBe(true);
-      expect(resource!.roughness.generateMipmaps).toBe(true);
-      expect(resource!.set.albedo, `${family} embedded albedo bytes`).toBeInstanceOf(Uint8ClampedArray);
-      expect(resource!.set.normal, `${family} embedded normal bytes`).toBeInstanceOf(Uint8ClampedArray);
-      expect(resource!.set.roughness, `${family} embedded roughness bytes`).toBeInstanceOf(Uint8ClampedArray);
-      expect(resource!.set.albedo.length).toBe(resource!.set.size * resource!.set.size * 4);
-      expect(resource!.set.normal.length).toBe(resource!.set.size * resource!.set.size * 4);
-      expect(resource!.set.roughness.length).toBe(resource!.set.size * resource!.set.size);
+      expect(resource!.orm.generateMipmaps).toBe(true);
+      expect(resource!.orm.name).toBe(`nuketown2-${family}-orm`);
+      expect((resource!.albedo.image as { width: number }).width).toBe(1);
+      expect((resource!.normal.image as { width: number }).width).toBe(1);
+      expect((resource!.orm.image as { width: number }).width).toBe(1);
     }
   });
 
-  it('samples the generated maps in the shared family graphs', () => {
+  it('samples the runtime maps in the shared family graphs', () => {
     const registry = createNuketown2MaterialRegistry();
     expect(graphTextureNames(registry.asphalt)).toEqual(expect.arrayContaining([
-      'nuketown2-asphalt-albedo', 'nuketown2-asphalt-normal', 'nuketown2-asphalt-roughness',
+      'nuketown2-asphalt-albedo', 'nuketown2-asphalt-normal', 'nuketown2-asphalt-orm',
     ]));
     expect(graphTextureNames(registry.sidingA)).toEqual(expect.arrayContaining([
-      'nuketown2-lapSiding-albedo', 'nuketown2-lapSiding-normal', 'nuketown2-lapSiding-roughness',
+      'nuketown2-lapSiding-albedo', 'nuketown2-lapSiding-normal', 'nuketown2-lapSiding-orm',
     ]));
     expect(graphTextureNames(registry.roof)).toEqual(expect.arrayContaining([
-      'nuketown2-shingle-albedo', 'nuketown2-shingle-normal', 'nuketown2-shingle-roughness',
+      'nuketown2-shingle-albedo', 'nuketown2-shingle-normal', 'nuketown2-shingle-orm',
     ]));
     expect(graphTextureNames(registry.block)).toEqual(expect.arrayContaining([
-      'nuketown2-concrete-albedo', 'nuketown2-concrete-normal', 'nuketown2-concrete-roughness',
-      'nuketown2-brick-albedo', 'nuketown2-brick-normal', 'nuketown2-brick-roughness',
+      'nuketown2-concrete-albedo', 'nuketown2-concrete-normal', 'nuketown2-concrete-orm',
+      'nuketown2-brick-albedo', 'nuketown2-brick-normal', 'nuketown2-brick-orm',
     ]));
     expect(graphTextureNames(registry.fence)).toEqual(expect.arrayContaining([
-      'nuketown2-timber-albedo', 'nuketown2-timber-normal', 'nuketown2-timber-roughness',
+      'nuketown2-timber-albedo', 'nuketown2-timber-normal', 'nuketown2-timber-orm',
     ]));
   });
 
@@ -282,17 +284,53 @@ describe('nuketown2 material registry', () => {
     expect(bridge.resource('asphalt')).toBeNull();
   });
 
-  it('disposes every generated DataTexture once per arena bridge', () => {
+  it('disposes every runtime texture once per arena bridge', () => {
     const bridge = createNuketown2TextureBridge({ deviceSampledTextureLimit: 16 });
     const resource = bridge.resource('asphalt')!;
     let disposed = 0;
-    for (const texture of [resource.albedo, resource.normal, resource.roughness]) {
+    for (const texture of [resource.albedo, resource.normal, resource.orm]) {
       texture.addEventListener('dispose', () => { disposed += 1; });
     }
     bridge.dispose();
     bridge.dispose();
     expect(disposed).toBe(3);
     expect(bridge.resource('asphalt')).toBeNull();
+  });
+
+  it('ships every runtime map and keeps texture bytes out of built JS chunks', () => {
+    const families = ['asphalt', 'lapSiding', 'brick', 'concrete', 'shingle', 'timber'];
+    const publicRoot = join(process.cwd(), 'public', 'textures', 'nuketown2');
+    for (const family of families) {
+      for (const map of ['albedo', 'normal', 'orm']) {
+        const file = join(publicRoot, family, `${map}.png`);
+        expect(existsSync(file), `${family}/${map}.png exists`).toBe(true);
+        expect(readFileSync(file).subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      }
+    }
+    const distRoot = join(process.cwd(), process.env.NUKETOWN2_DIST ?? 'dist-luna13b', 'assets');
+    // Three's vendor chunk carries a pre-existing example PNG data URI. The
+    // lane gate covers every application-owned chunk; vendor provenance is
+    // unrelated to the Nuke Town asset module and is recorded in REPORT.md.
+    const chunks = existsSync(distRoot)
+      ? readdirSync(distRoot)
+        .filter((name) => name.endsWith('.js'))
+        .map((name) => join(distRoot, name))
+      : [];
+    expect(chunks.length, 'build dist-luna13b before running the runtime-asset gate').toBeGreaterThan(0);
+    for (const chunk of chunks) {
+      const source = readFileSync(chunk, 'utf8');
+      const pngSignatures = source.match(/iVBORw0KGgo/g) ?? [];
+      const dataUris = source.match(/data:image\/png;base64/g) ?? [];
+      if (pngSignatures.length > 0 || dataUris.length > 0) {
+        // Three's vendor chunk contains two pre-existing SMAA lookup images;
+        // those are not Nuke Town assets and are outside this lane's source
+        // graph. Keep this explicit allow-list so a new application chunk or
+        // an extra embedded PNG fails instead of being silently filtered.
+        expect(chunk, `${chunk} contains an application-owned embedded PNG`).toMatch(/vendor-three-/);
+        expect(pngSignatures.length, `${chunk} changed its pre-existing PNG count`).toBe(2);
+        expect(dataUris.length, `${chunk} changed its pre-existing data-URI count`).toBe(2);
+      }
+    }
   });
 
   it('builds no light object', () => {
