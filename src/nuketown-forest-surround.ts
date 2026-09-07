@@ -48,6 +48,114 @@ const SEED = 0x7d31_44b9;
  * plants against the mountain backdrop's rolling skirt; the rebuild authors its
  * own flat 270 m ground slab and takes no skirt, so it plants against that.
  */
+/**
+ * HF-556: per-prototype detail selectors. The build resolves every field to
+ * the shipped value when absent, so the default envelope (which sets nothing)
+ * builds byte-identical prototypes, slots and colours.
+ */
+export type ForestConiferDetail = Readonly<{
+  tiers: number;
+  /** Tier-0 rim radius (standard 2.5). */
+  baseRadiusM: number;
+  /** Visible trunk length (standard 1.4, centred at half). */
+  trunkLenM: number;
+  tierSegments: readonly number[];
+  tierCards: readonly number[];
+  trunkRadialSegs: number;
+  trunkHeightSegs: number;
+  tierHeightM: number;
+  tierPitchM: number;
+  rimMinRadiusM: number;
+}>;
+export type NuketownForestDetailTuning = Readonly<{
+  /** Conifer prototype detail. Default FOREST_CONIFER_DETAIL_STANDARD. */
+  conifer?: ForestConiferDetail;
+  /** Build the 8-lobe high-detail broadleaf canopy. Default false. */
+  canopyHighDetail?: boolean;
+  /** Requested slot counts. Defaults 340 / 180 / 260. */
+  coniferCount?: number;
+  broadleafCount?: number;
+  understoryCount?: number;
+  /** Authored tone sets. Defaults FOREST_CONIFER_TONES / the canopy tones. */
+  coniferTones?: readonly number[];
+  canopyTones?: readonly number[];
+  /** Radius splitting near (high-detail) from far (standard) prototypes.
+   * Undefined = one prototype for the whole ring (shipped behaviour). */
+  lodSplitM?: number;
+}>;
+
+/** World-space height of the conifer prototype, trunk base to leader tip. */
+export const FOREST_CONIFER_HEIGHT_M = 10.3;
+
+/** HF-536: Conifer prefab constants */
+export const FOREST_CONIFER_TIER_COUNT = 5;
+export const FOREST_CONIFER_TIER_HEIGHT_FRACTION = 0.22;
+export const FOREST_CONIFER_TIER_OVERLAP_FRACTION = 0.30;
+export const FOREST_CONIFER_TIER_HEIGHT_M = Number((FOREST_CONIFER_HEIGHT_M * FOREST_CONIFER_TIER_HEIGHT_FRACTION).toFixed(4));
+export const FOREST_CONIFER_TIER_OVERLAP_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * FOREST_CONIFER_TIER_OVERLAP_FRACTION).toFixed(4));
+export const FOREST_CONIFER_TIER_PITCH_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * (1 - FOREST_CONIFER_TIER_OVERLAP_FRACTION)).toFixed(4));
+export const FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M = 1.2;
+export const FOREST_CONIFER_TRUNK_DIAMETER_BASE_M = 0.35;
+export const FOREST_CONIFER_MAX_TRIANGLES = 220;
+/** HF-556: shipped conifer detail, spelled out so the default call path reads
+ * it from one place. Geometry: trunk 16 + tiers 58 + cards 26 = 100 tris. */
+export const FOREST_CONIFER_DETAIL_STANDARD: ForestConiferDetail = Object.freeze({
+  tiers: 5,
+  baseRadiusM: 2.5,
+  trunkLenM: 1.4,
+  tierSegments: Object.freeze([8, 6, 6, 6, 6]),
+  tierCards: Object.freeze([4, 4, 3, 2, 0]),
+  trunkRadialSegs: 8,
+  trunkHeightSegs: 1,
+  tierHeightM: FOREST_CONIFER_TIER_HEIGHT_M,
+  tierPitchM: FOREST_CONIFER_TIER_PITCH_M,
+  rimMinRadiusM: 2.0,
+});
+/**
+ * HF-556: nuketown2 high-detail conifer. 8 tiers at 8-12 segments, a tapered
+ * 2-segment trunk, a tapering leader cone, ragged skirt cards on every tier
+ * but the apex. Geometry: trunk 40 + tiers 156 + cards 52 = 248 tris.
+ */
+export const FOREST_CONIFER_DETAIL_HIGH: ForestConiferDetail = Object.freeze({
+  tiers: 8,
+  baseRadiusM: 2.6,
+  trunkLenM: 1.6,
+  tierSegments: Object.freeze([12, 12, 12, 10, 10, 10, 8, 8]),
+  tierCards: Object.freeze([5, 5, 4, 4, 3, 3, 2, 0]),
+  trunkRadialSegs: 10,
+  trunkHeightSegs: 2,
+  tierHeightM: 1.5424,
+  tierPitchM: 1.0797,
+  rimMinRadiusM: 2.2,
+});
+/** Shipped conifer budget ratchet — frozen (see the hard pins). */
+export const FOREST_CONIFER_MAX_TRIANGLES_HIGH_DETAIL = 280;
+/** Alpha-tested card-quad budget: 3x today's 13 x 340 = 4420 conifer cards. */
+export const FOREST_CONIFER_CARD_QUADS_BUDGET = 13260;
+/** Card quads carried by one conifer prototype of the given detail. */
+export function coniferDetailCardQuads(detail: ForestConiferDetail): number {
+  return detail.tierCards.reduce((a, b) => a + b, 0);
+}
+
+/** HF-536: Broadleaf prefab constants */
+export const FOREST_BROADLEAF_CANOPY_LOBES = 5;
+export const FOREST_BROADLEAF_MAX_TRIANGLES = 320;
+/** HF-556: nuketown2 broadleaf budget (standard trunk 64 + 8-lobe high canopy 288 = 352). */
+export const FOREST_BROADLEAF_MAX_TRIANGLES_HIGH_DETAIL = 400;
+/**
+ * HF-556: nuketown2 conifer tones. Same four slots as FOREST_CONIFER_TONES so
+ * the tone stream indexes them identically, authored a step more saturated:
+ * the arena fog (near 58, far 148) washes everything past 58 m toward grey,
+ * so the measurable chroma has to be authored, not hoped for. The shipped set
+ * is untouched; the lightness floor still applies through coniferInstanceColour.
+ */
+export const FOREST_CONIFER_TONES_HIGH_DETAIL: readonly number[] = Object.freeze([
+  0x2f5c33, 0x42703c, 0x2b552e, 0x527c42,
+]);
+/** HF-556: nuketown2 canopy tones, same indexing discipline as above. */
+export const FOREST_BROADLEAF_CANOPY_TONES_HIGH_DETAIL: readonly number[] = Object.freeze([
+  0x557f3e, 0x66924a, 0x7a9a4d, 0x4d7038,
+]);
 export type NuketownForestEnvelope = Readonly<{
   bounds: Readonly<{ minX: number; maxX: number; minZ: number; maxZ: number }>;
   /** Rectangle inflation - nothing is planted inside the arena plus this. */
@@ -59,6 +167,8 @@ export type NuketownForestEnvelope = Readonly<{
   seed: number;
   groundY: (x: number, z: number) => number;
   groundNormal: (x: number, z: number, target: THREE.Vector3) => THREE.Vector3;
+  /** Prototype detail + density. Absent = shipped prototypes and counts. */
+  detail?: NuketownForestDetailTuning;
 }>;
 
 /** The shipped map's band: exactly the radii it has always been planted on. */
@@ -90,24 +200,20 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
   seed: SEED ^ 0x0002_6426,
   groundY: () => NUKETOWN2_FOREST_GROUND_Y,
   groundNormal: (_x: number, _z: number, target: THREE.Vector3) => target.set(0, 1, 0),
+  // HF-556: high-detail prototypes in front of the fog wall (44.5-58 m),
+  // shipped-cheap ones behind it (58-70 m). Counts rise modestly; the LOD
+  // split keeps the ring inside the 8-draw / 200k-tri budget (7 / ~180k).
+  detail: Object.freeze({
+    conifer: FOREST_CONIFER_DETAIL_HIGH,
+    canopyHighDetail: true,
+    coniferCount: 460,
+    broadleafCount: 240,
+    understoryCount: 380,
+    coniferTones: FOREST_CONIFER_TONES_HIGH_DETAIL,
+    canopyTones: FOREST_BROADLEAF_CANOPY_TONES_HIGH_DETAIL,
+    lodSplitM: 58,
+  }),
 });
-/** World-space height of the conifer prototype, trunk base to leader tip. */
-export const FOREST_CONIFER_HEIGHT_M = 10.3;
-
-/** HF-536: Conifer prefab constants */
-export const FOREST_CONIFER_TIER_COUNT = 5;
-export const FOREST_CONIFER_TIER_HEIGHT_FRACTION = 0.22;
-export const FOREST_CONIFER_TIER_OVERLAP_FRACTION = 0.30;
-export const FOREST_CONIFER_TIER_HEIGHT_M = Number((FOREST_CONIFER_HEIGHT_M * FOREST_CONIFER_TIER_HEIGHT_FRACTION).toFixed(4));
-export const FOREST_CONIFER_TIER_OVERLAP_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * FOREST_CONIFER_TIER_OVERLAP_FRACTION).toFixed(4));
-export const FOREST_CONIFER_TIER_PITCH_M = Number((FOREST_CONIFER_TIER_HEIGHT_M * (1 - FOREST_CONIFER_TIER_OVERLAP_FRACTION)).toFixed(4));
-export const FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M = 1.2;
-export const FOREST_CONIFER_TRUNK_DIAMETER_BASE_M = 0.35;
-export const FOREST_CONIFER_MAX_TRIANGLES = 220;
-
-/** HF-536: Broadleaf prefab constants */
-export const FOREST_BROADLEAF_CANOPY_LOBES = 5;
-export const FOREST_BROADLEAF_MAX_TRIANGLES = 320;
 
 /**
  * HF-536: Deterministic per-instance yaw and scale jitter from a hash of the
@@ -211,9 +317,12 @@ export function coniferInstanceColour(
   sunSide: number,
   target: THREE.Color,
   minLightness: number = FOREST_CONIFER_MIN_LINEAR_LIGHTNESS,
+  // HF-556: per-envelope tone set. Same slot count as FOREST_CONIFER_TONES so
+  // the tone stream indexes it identically; the floor logic is unchanged.
+  tones: readonly number[] = FOREST_CONIFER_TONES,
 ): THREE.Color {
-  target.setHex(FOREST_CONIFER_TONES[
-    Math.floor(tone * FOREST_CONIFER_TONES.length) % FOREST_CONIFER_TONES.length
+  target.setHex(tones[
+    Math.floor(tone * tones.length) % tones.length
   ]);
   // DAY-VISUAL-B: warm sun on the lit flank, cool shadow on the far flank.
   if (sunSide > 0) target.offsetHSL(0.012 * sunSide, 0.06 * sunSide, 0.028 * sunSide);
@@ -389,9 +498,17 @@ function mergeParts(parts: MergePart[], name: string): THREE.BufferGeometry {
       } else {
         uvs.push(-1, -1);
       }
+      // HF-556: a part may carry BOTH a tint and a value ramp; the ramp then
+      // multiplies the tint. Parts with only one behave exactly as before,
+      // so every existing prototype merges bit-identically.
       if (part.color) {
         shaded = true;
-        colors.push(part.color[0], part.color[1], part.color[2]);
+        let ramp = 1;
+        if (part.shade) {
+          const t = (attribute.getY(i) - minY) / span;
+          ramp = part.shade.underside + (part.shade.top - part.shade.underside) * t;
+        }
+        colors.push(part.color[0] * ramp, part.color[1] * ramp, part.color[2] * ramp);
       } else if (part.shade) {
         shaded = true;
         const t = (attribute.getY(i) - minY) / span;
@@ -446,34 +563,37 @@ function buildSkirtCardRing(radius: number, y: number, count = 4, tierIndex = 0)
   return merged;
 }
 
-export function buildConiferPrototype(seed: number = SEED ^ 0x0000_7e11): THREE.BufferGeometry {
+export function buildConiferPrototype(
+  seed: number = SEED ^ 0x0000_7e11,
+  detail: ForestConiferDetail = FOREST_CONIFER_DETAIL_STANDARD,
+): THREE.BufferGeometry {
   const parts: MergePart[] = [];
-  // 1. Dark 8-gon trunk (0.35 m dia at base, visible 1.2 m below tier 0)
-  const trunkGeometry = new THREE.CylinderGeometry(0.13, FOREST_CONIFER_TRUNK_DIAMETER_BASE_M / 2, 1.4, 8, 1, true);
+  // 1. Dark trunk (0.35 m dia at base, visible trunkLenM below tier 0).
+  // HF-556: radial/height segments come from the detail; standard is 8x1.
+  const trunkGeometry = new THREE.CylinderGeometry(0.13, FOREST_CONIFER_TRUNK_DIAMETER_BASE_M / 2, detail.trunkLenM, detail.trunkRadialSegs, detail.trunkHeightSegs, true);
   parts.push({
     geometry: trunkGeometry,
-    matrix: new THREE.Matrix4().makeTranslation(0, 0.7, 0),
+    matrix: new THREE.Matrix4().makeTranslation(0, detail.trunkLenM / 2, 0),
     shade: { underside: 0.22, top: 0.28 },
   });
 
-  const R0 = 2.5;
-  const tierHeight = FOREST_CONIFER_TIER_HEIGHT_M;
-  const pitch = FOREST_CONIFER_TIER_PITCH_M;
+  const R0 = detail.baseRadiusM;
+  const tierHeight = detail.tierHeightM;
+  const pitch = detail.tierPitchM;
   const y0 = FOREST_CONIFER_TRUNK_VISIBLE_HEIGHT_M;
 
-  // Segment counts per tier: tier 0 uses 8 segments (rim radius >= 2.0 for jitterRim);
-  // tiers 1..3 use 6 segments, tier 4 (apex) uses 6 segments cone.
-  // Cards per tier: tier 0: 4, tier 1: 4, tier 2: 3, tier 3: 2, tier 4: 0.
-  const tierSegments = [8, 6, 6, 6, 6];
-  const tierCardCounts = [4, 4, 3, 2, 0];
+  // HF-556: per-tier segments and skirt-card counts come from the detail.
+  // Standard is 5 tiers ([8,6,6,6,6] / [4,4,3,2,0]); high is 8 tiers.
+  const tierSegments = detail.tierSegments;
+  const tierCardCounts = detail.tierCards;
 
   const createdGeometries: THREE.BufferGeometry[] = [trunkGeometry];
-  for (let i = 0; i < FOREST_CONIFER_TIER_COUNT; i += 1) {
-    const rFrac = 1.0 - (i / (FOREST_CONIFER_TIER_COUNT - 1)) * (1.0 - 0.25);
+  for (let i = 0; i < detail.tiers; i += 1) {
+    const rFrac = 1.0 - (i / (detail.tiers - 1)) * (1.0 - 0.25);
     const rBottom = R0 * rFrac;
     const tierBottomY = y0 + i * pitch;
     const segments = tierSegments[i];
-    if (i < FOREST_CONIFER_TIER_COUNT - 1) {
+    if (i < detail.tiers - 1) {
       const rTop = rBottom * 0.38;
       const frustum = new THREE.CylinderGeometry(rTop, rBottom, tierHeight, segments, 1, true);
       createdGeometries.push(frustum);
@@ -505,7 +625,7 @@ export function buildConiferPrototype(seed: number = SEED ^ 0x0000_7e11): THREE.
   }
 
   const merged = mergeParts(parts, 'forest-conifer');
-  jitterRim(merged, (seed ^ 0x0000_7e11) >>> 0, 2.0);
+  jitterRim(merged, (seed ^ 0x0000_7e11) >>> 0, detail.rimMinRadiusM);
   for (const g of createdGeometries) g.dispose();
   return merged;
 }
@@ -531,7 +651,19 @@ export function buildBroadleafTrunkPrototype(): THREE.BufferGeometry {
   return merged;
 }
 
-export function buildBroadleafCanopyPrototype(): THREE.BufferGeometry {
+/**
+ * HF-556: extra lobes for the high-detail canopy. Same unit (icosahedron
+ * detail 0 = 20 tris) and same compact habit as the shipped four, so the
+ * crown reads as one clustered faceted mass, not a new species.
+ */
+const HIGH_DETAIL_LOBE_DEFS = [
+  { radius: 1.6, sx: 1.0, sy: 0.8, sz: 1.05, x: 0.3, y: -0.5, z: 1.0 },
+  { radius: 1.5, sx: 1.05, sy: 0.8, sz: 1.0, x: -0.9, y: 0.4, z: -0.9 },
+  { radius: 1.3, sx: 1.0, sy: 0.85, sz: 1.0, x: 1.2, y: 0.5, z: -0.7 },
+  { radius: 1.25, sx: 0.95, sy: 0.8, sz: 1.05, x: 0.1, y: 1.1, z: 0.6 },
+] as const;
+
+export function buildBroadleafCanopyPrototype(highDetail = false): THREE.BufferGeometry {
   const parts: MergePart[] = [];
   // 4 overlapping ellipsoid lobes (low-poly icosphere detail 0: 20 tris each = 80 tris)
   const lobeDefs = [
@@ -539,18 +671,33 @@ export function buildBroadleafCanopyPrototype(): THREE.BufferGeometry {
     { radius: 1.45, detail: 0, sx: 1.05, sy: 0.8, sz: 1.0, x: 1.1, y: -0.2, z: 0.4 },
     { radius: 1.4, detail: 0, sx: 0.95, sy: 0.8, sz: 1.1, x: -1.0, y: -0.1, z: 0.5 },
     { radius: 1.35, detail: 0, sx: 1.0, sy: 0.85, sz: 0.95, x: -0.2, y: 0.7, z: -0.3 },
+    ...(highDetail
+      ? HIGH_DETAIL_LOBE_DEFS.map((d) => ({ ...d, detail: 0 }))
+      : []),
   ];
   for (let l = 0; l < lobeDefs.length; l += 1) {
     const d = lobeDefs[l];
     const lobeGeom = new THREE.IcosahedronGeometry(d.radius, d.detail);
     lobeGeom.scale(d.sx, d.sy, d.sz);
+    // HF-556: per-lobe tint on the high-detail crown so the canopy reads as
+    // clustered faceted masses instead of one flat tone. Near-white warm-green
+    // multipliers (the instance colour carries the real albedo; a saturated
+    // vertex tint would double-multiply it dark). Standard lobes keep the
+    // bare ramp, bit for bit.
+    const lobeTint: readonly [number, number, number] | undefined = highDetail
+      ? (() => {
+        const h = (l * 0.61803398875) % 1;
+        const v = 0.86 + 0.14 * h;
+        return [v, Math.min(1, v + 0.04), v * 0.94] as const;
+      })()
+      : undefined;
     parts.push({
       geometry: lobeGeom,
       matrix: new THREE.Matrix4().makeTranslation(d.x, d.y, d.z),
       shade: { underside: FOREST_CONIFER_UNDERSIDE_SHADE, top: 1.0 },
+      ...(lobeTint ? { color: lobeTint } : {}),
     });
-
-    // 8 leaf-edge cards per lobe using the SAME atlas sampler (8 * 4 * 2 = 64 tris)
+    // 8 leaf-edge cards per lobe using the SAME atlas sampler (one sampler total)
     const cardsPerLobe = 8;
     const rx = d.radius * d.sx;
     const ry = d.radius * d.sy;
@@ -714,65 +861,117 @@ export function buildNuketownForestSurround(
     stats.triangles += triCount(mesh.geometry) * mesh.count;
   };
 
-  // ---- conifers: merged 8-gon trunk + 5 cone frustum tiers + skirt cards ---
+  // ---- conifers: merged trunk + cone-frustum tiers + skirt cards -----------
   // HF-536: 5 stacked cone frustums, radii 1.0 -> 0.25, 22 % tier height, 30 %
   // overlap, each tier broken by alpha-tested ragged skirt cards, dark 8-gon trunk
   // visible >= 1.2 m below tier 0. Exactly one atlas sampler on the material.
-  const coniferGeometry = buildConiferPrototype(envelope.seed);
+  // HF-556: prototype detail, tones and counts resolve from envelope.detail;
+  // absent (shipped) they are the literals above, and the single-mesh path
+  // below is the old loop untouched. With lodSplitM the ring splits into a
+  // near high-detail mesh (keeps the 'forest-conifers' name) and a far
+  // standard mesh; both share one material (one sampler).
+  const coniferDetail = envelope.detail?.conifer ?? FOREST_CONIFER_DETAIL_STANDARD;
+  const coniferTones = envelope.detail?.coniferTones ?? FOREST_CONIFER_TONES;
+  const coniferLodSplitM = envelope.detail?.lodSplitM;
+  const coniferGeometry = buildConiferPrototype(envelope.seed, coniferDetail);
+  const coniferFarGeometry = coniferLodSplitM !== undefined
+    ? buildConiferPrototype(envelope.seed, FOREST_CONIFER_DETAIL_STANDARD)
+    : null;
   const coniferMaterial = createForestFoliageMaterial('forest-conifers-material', 0.94);
   disposables.push(coniferGeometry, coniferMaterial);
+  if (coniferFarGeometry) disposables.push(coniferFarGeometry);
 
-  const coniferSlots = ringSlots(envelope, 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
-  const conifers = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, coniferSlots.length);
-  conifers.name = 'forest-conifers';
-  coniferSlots.forEach((slot, index) => {
-    // HF-536: deterministic yaw and 0.85-1.15 scale jitter from index hash
-    const { yawJitter, scaleJitter } = coniferInstanceJitter(index);
-    euler.set(0, slot.yaw + yawJitter, 0);
-    quaternion.setFromEuler(euler);
-    position.set(slot.x, groundY(slot.x, slot.z) - TRUNK_SINK_M, slot.z);
-    // DAY-VISUAL-B: every FOREST_STANDOUT_EVERY-th tree grows above the line,
-    // so the treeline has varied heights with a few standouts, deterministically.
-    const standout = index % FOREST_STANDOUT_EVERY === 0 ? FOREST_STANDOUT_BOOST : 1;
-    // HF-536 forge-nature PASS 1 (R22 "heights vary"): an extra deterministic
-    // height jitter on top of the tone-driven band, so the treeline's apex
-    // line is a saw rather than four repeated steps. `slot.yaw` is the slot's
-    // own placement stream, already decorrelated from `slot.tone`.
-    const heightHash = (Math.sin(slot.yaw * 91.7 + index * 0.618) * 0.5 + 0.5);
-    const heightJitter = 0.89 + FOREST_HEIGHT_JITTER * heightHash;
-    scaleVec.set(
-      slot.scale * scaleJitter,
-      slot.scale * scaleJitter * (0.9 + slot.tone * 0.45) * standout * heightJitter,
-      slot.scale * scaleJitter,
-    );
-    matrix.compose(position, quaternion, scaleVec);
-    conifers.setMatrixAt(index, matrix);
-    // DAY-VISUAL-B warm/cool flank bias, then the HF-536 measured lightness
-    // floor. Both now live in coniferInstanceColour() so the floor is a
-    // testable pure function rather than a line buried in a 340-slot loop.
-    const radius = Math.hypot(slot.x, slot.z) || 1;
-    const sunSide = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / radius);
-    coniferInstanceColour(slot.tone, sunSide, color);
-    conifers.setColorAt(index, color);
-  });
-  register(conifers);
+  const coniferSlots = ringSlots(envelope, envelope.detail?.coniferCount ?? 340, coniferBand[0], coniferBand[1], envelope.seed, 3.4);
+  const paintConifers = (mesh: THREE.InstancedMesh, slots: TreeSlot[]): void => {
+    slots.forEach((slot, index) => {
+      // HF-536: deterministic yaw and 0.85-1.15 scale jitter from index hash
+      const { yawJitter, scaleJitter } = coniferInstanceJitter(index);
+      euler.set(0, slot.yaw + yawJitter, 0);
+      quaternion.setFromEuler(euler);
+      position.set(slot.x, groundY(slot.x, slot.z) - TRUNK_SINK_M, slot.z);
+      // DAY-VISUAL-B: every FOREST_STANDOUT_EVERY-th tree grows above the line,
+      // so the treeline has varied heights with a few standouts, deterministically.
+      const standout = index % FOREST_STANDOUT_EVERY === 0 ? FOREST_STANDOUT_BOOST : 1;
+      // HF-536 forge-nature PASS 1 (R22 "heights vary"): an extra deterministic
+      // height jitter on top of the tone-driven band, so the treeline's apex
+      // line is a saw rather than four repeated steps. `slot.yaw` is the slot's
+      // own placement stream, already decorrelated from `slot.tone`.
+      const heightHash = (Math.sin(slot.yaw * 91.7 + index * 0.618) * 0.5 + 0.5);
+      const heightJitter = 0.89 + FOREST_HEIGHT_JITTER * heightHash;
+      scaleVec.set(
+        slot.scale * scaleJitter,
+        slot.scale * scaleJitter * (0.9 + slot.tone * 0.45) * standout * heightJitter,
+        slot.scale * scaleJitter,
+      );
+      matrix.compose(position, quaternion, scaleVec);
+      mesh.setMatrixAt(index, matrix);
+      // DAY-VISUAL-B warm/cool flank bias, then the HF-536 measured lightness
+      // floor. Both now live in coniferInstanceColour() so the floor is a
+      // testable pure function rather than a line buried in a 340-slot loop.
+      const radius = Math.hypot(slot.x, slot.z) || 1;
+      const sunSide = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / radius);
+      coniferInstanceColour(slot.tone, sunSide, color, FOREST_CONIFER_MIN_LINEAR_LIGHTNESS, coniferTones);
+      mesh.setColorAt(index, color);
+    });
+  };
+  if (coniferLodSplitM === undefined || coniferFarGeometry === null) {
+    const conifers = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, coniferSlots.length);
+    conifers.name = 'forest-conifers';
+    paintConifers(conifers, coniferSlots);
+    register(conifers);
+  } else {
+    const nearSlots = coniferSlots.filter((slot) => Math.hypot(slot.x, slot.z) < coniferLodSplitM);
+    const farSlots = coniferSlots.filter((slot) => Math.hypot(slot.x, slot.z) >= coniferLodSplitM);
+    const nearMesh = new THREE.InstancedMesh(coniferGeometry, coniferMaterial, nearSlots.length);
+    nearMesh.name = 'forest-conifers';
+    paintConifers(nearMesh, nearSlots);
+    register(nearMesh);
+    const farMesh = new THREE.InstancedMesh(coniferFarGeometry, coniferMaterial, farSlots.length);
+    farMesh.name = 'forest-conifers-far';
+    paintConifers(farMesh, farSlots);
+    register(farMesh);
+  }
   stats.conifers = coniferSlots.length;
 
   // ---- broadleafs: trunk + 3 primary limbs, 5-lobe canopy + card shell -----
   // HF-536: 8-gon tapered trunk + 3 primary limbs (64 tris) and 5 overlapping
   // ellipsoid lobes with an alpha-tested leaf card shell (240 tris), budget <= 320.
+  // HF-556: the canopy resolves to the 8-lobe high-detail crown on envelopes
+  // that ask for it, with the same near/far LOD split as the conifers (the
+  // trunk stays the shipped 64-tri part everywhere).
+  const canopyHighDetail = envelope.detail?.canopyHighDetail === true;
   const broadTrunkGeometry = buildBroadleafTrunkPrototype();
-  const canopyGeometry = buildBroadleafCanopyPrototype();
+  const canopyGeometry = buildBroadleafCanopyPrototype(canopyHighDetail);
+  const canopyFarGeometry = coniferLodSplitM !== undefined
+    ? buildBroadleafCanopyPrototype(false)
+    : null;
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.96, metalness: 0 });
   const canopyMaterial = createForestFoliageMaterial('forest-broadleaf-canopies-material', 0.92);
   disposables.push(broadTrunkGeometry, canopyGeometry, trunkMaterial, canopyMaterial);
+  if (canopyFarGeometry) disposables.push(canopyFarGeometry);
 
-  const broadleafSlots = ringSlots(envelope, 180, broadleafBand[0], broadleafBand[1], envelope.seed ^ 0x00ff_1234, 4.2);
+  const broadleafSlots = ringSlots(envelope, envelope.detail?.broadleafCount ?? 180, broadleafBand[0], broadleafBand[1], envelope.seed ^ 0x00ff_1234, 4.2);
   const broadTrunks = new THREE.InstancedMesh(broadTrunkGeometry, trunkMaterial, broadleafSlots.length);
-  const canopies = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, broadleafSlots.length);
   broadTrunks.name = 'forest-broadleaf-trunks';
-  canopies.name = 'forest-broadleaf-canopies';
-  const canopyTones = [0x4d6b3a, 0x5d7a42, 0x6b8549, 0x455f35];
+  const canopyTones = envelope.detail?.canopyTones ?? [0x4d6b3a, 0x5d7a42, 0x6b8549, 0x455f35];
+  const paintCanopy = (mesh: THREE.InstancedMesh, slots: TreeSlot[]): void => {
+    slots.forEach((slot, index) => {
+      euler.set(0, slot.yaw, 0);
+      quaternion.setFromEuler(euler);
+      const floor = groundY(slot.x, slot.z);
+      scaleVec.set(slot.scale, slot.scale, slot.scale);
+      position.set(slot.x, floor + 4.3 * slot.scale, slot.z);
+      matrix.compose(position, quaternion, scaleVec);
+      mesh.setMatrixAt(index, matrix);
+      // DAY-VISUAL-B: same warm/cool flank bias as the conifers.
+      const canopyRadius = Math.hypot(slot.x, slot.z) || 1;
+      const canopySun = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / canopyRadius);
+      color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]);
+      if (canopySun > 0) color.offsetHSL(0.012 * canopySun, 0.06 * canopySun, 0.028 * canopySun);
+      else color.offsetHSL(0.008 * canopySun, 0, 0.03 * canopySun);
+      mesh.setColorAt(index, color);
+    });
+  };
   broadleafSlots.forEach((slot, index) => {
     euler.set(0, slot.yaw, 0);
     quaternion.setFromEuler(euler);
@@ -781,26 +980,32 @@ export function buildNuketownForestSurround(
     scaleVec.set(slot.scale, slot.scale, slot.scale);
     matrix.compose(position, quaternion, scaleVec);
     broadTrunks.setMatrixAt(index, matrix);
-    position.set(slot.x, floor + 4.3 * slot.scale, slot.z);
-    matrix.compose(position, quaternion, scaleVec);
-    canopies.setMatrixAt(index, matrix);
-    // DAY-VISUAL-B: same warm/cool flank bias as the conifers.
-    const canopyRadius = Math.hypot(slot.x, slot.z) || 1;
-    const canopySun = -((slot.x * FOREST_SUN_AZIMUTH.x + slot.z * FOREST_SUN_AZIMUTH.z) / canopyRadius);
-    color.setHex(canopyTones[Math.floor(slot.tone * canopyTones.length) % canopyTones.length]);
-    if (canopySun > 0) color.offsetHSL(0.012 * canopySun, 0.06 * canopySun, 0.028 * canopySun);
-    else color.offsetHSL(0.008 * canopySun, 0, 0.03 * canopySun);
-    canopies.setColorAt(index, color);
   });
   register(broadTrunks);
-  register(canopies);
+  if (coniferLodSplitM === undefined || canopyFarGeometry === null) {
+    const canopies = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, broadleafSlots.length);
+    canopies.name = 'forest-broadleaf-canopies';
+    paintCanopy(canopies, broadleafSlots);
+    register(canopies);
+  } else {
+    const canopyNearSlots = broadleafSlots.filter((slot) => Math.hypot(slot.x, slot.z) < coniferLodSplitM);
+    const canopyFarSlots = broadleafSlots.filter((slot) => Math.hypot(slot.x, slot.z) >= coniferLodSplitM);
+    const canopiesNear = new THREE.InstancedMesh(canopyGeometry, canopyMaterial, canopyNearSlots.length);
+    canopiesNear.name = 'forest-broadleaf-canopies';
+    paintCanopy(canopiesNear, canopyNearSlots);
+    register(canopiesNear);
+    const canopiesFar = new THREE.InstancedMesh(canopyFarGeometry, canopyMaterial, canopyFarSlots.length);
+    canopiesFar.name = 'forest-broadleaf-canopies-far';
+    paintCanopy(canopiesFar, canopyFarSlots);
+    register(canopiesFar);
+  }
   stats.broadleafs = broadleafSlots.length;
 
   // ---- understory scrub between the trunks --------------------------------
   const scrubGeometry = new THREE.IcosahedronGeometry(0.9, 0);
   const scrubMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, metalness: 0, flatShading: true });
   disposables.push(scrubGeometry, scrubMaterial);
-  const scrubSlots = ringSlots(envelope, 260, understoryBand[0], understoryBand[1], envelope.seed ^ 0x5a5a_9c9c, 1.9);
+  const scrubSlots = ringSlots(envelope, envelope.detail?.understoryCount ?? 260, understoryBand[0], understoryBand[1], envelope.seed ^ 0x5a5a_9c9c, 1.9);
   const scrub = new THREE.InstancedMesh(scrubGeometry, scrubMaterial, scrubSlots.length);
   scrub.name = 'forest-understory';
   const scrubTones = [0x55663d, 0x64744a, 0x707c52, 0x4a5c38];

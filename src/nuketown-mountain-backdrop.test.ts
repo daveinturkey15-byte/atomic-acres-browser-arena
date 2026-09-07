@@ -22,6 +22,9 @@ import {
   NUKETOWN_MOUNTAIN_SUN_WARM,
   NUKETOWN_MOUNTAIN_TWO_TONE_FLOOR,
   NUKETOWN_BACKDROP_MAX_HEIGHT_M,
+  NUKETOWN2_BACKDROP_ENVELOPE,
+  NUKETOWN2_BACKDROP_MAX_HEIGHT_M,
+  NUKETOWN2_BACKDROP_MAX_RADIAL_M,
   NUKETOWN_BACKDROP_MAX_RADIAL_M,
   NUKETOWN_BACKDROP_MIN_RADIAL_M,
   NUKETOWN_BACKDROP_SKIRT_Y_M,
@@ -493,5 +496,79 @@ describe('Nuke Town mountain backdrop (Pass 82)', () => {
 
     backdrop1.dispose();
     backdrop2.dispose();
+  });
+});
+
+describe('Nuke Town mountain backdrop nuketown2 envelope (HF-556)', () => {
+  it('freezes the shared ceilings and pins every nuketown2 outer radius at exactly 132 m', () => {
+    // The shared constants are the shipped map's; this lane must not move them.
+    expect(NUKETOWN_BACKDROP_MAX_RADIAL_M).toBe(132);
+    expect(NUKETOWN_BACKDROP_MAX_HEIGHT_M).toBe(34);
+    // The rebuild carries its own literals.
+    expect(NUKETOWN2_BACKDROP_MAX_RADIAL_M).toBe(132);
+    expect(NUKETOWN2_BACKDROP_MAX_HEIGHT_M).toBeGreaterThanOrEqual(64);
+    expect(NUKETOWN2_BACKDROP_ENVELOPE.maxRadialM).toBe(132);
+    expect(NUKETOWN2_BACKDROP_ENVELOPE.minRadialM).toBe(66);
+
+    // HARD RULE 1: the 270 m plain ends at 135 m, so every ring's outer foot
+    // sits exactly on 132 — never short (bare plain edge) or long (feet off
+    // the plain). HARD RULE 2: no inner radius below 72 m (the forest ends
+    // at 70 m with foothill feet at 72 m).
+    const backdrop = buildNuketownMountainBackdrop(new THREE.Group(), NUKETOWN2_BACKDROP_ENVELOPE);
+    expect(backdrop.group.children.length).toBe(3);
+    for (const child of backdrop.group.children) {
+      const mesh = child as THREE.Mesh;
+      const pos = mesh.geometry.getAttribute('position');
+      let minR = Infinity;
+      let maxR = 0;
+      for (let i = 0; i < pos.count; i += 1) {
+        const r = Math.hypot(pos.getX(i), pos.getZ(i));
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+      }
+      expect(maxR, `${mesh.name} outer foot`).toBeGreaterThanOrEqual(131.99);
+      expect(maxR, `${mesh.name} outer foot`).toBeLessThanOrEqual(132.01);
+      expect(minR, `${mesh.name} inner foot`).toBeGreaterThanOrEqual(71.99);
+      // Art-only guarantee against the 45.69 m map corner.
+      expect(minR, `${mesh.name} vertex radial`).toBeGreaterThanOrEqual(65.99);
+    }
+    backdrop.dispose();
+  });
+
+  it('stays inside the nuketown2 far plane from every bounds corner', () => {
+    const backdrop = buildNuketownMountainBackdrop(new THREE.Group(), NUKETOWN2_BACKDROP_ENVELOPE);
+    let worst = 0;
+    for (const corner of [[18, 42], [18, -42], [-18, 42], [-18, -42]] as const) {
+      for (const child of backdrop.group.children) {
+        const pos = (child as THREE.Mesh).geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          const d = Math.hypot(pos.getX(i) - corner[0], pos.getY(i) - 7.5, pos.getZ(i) - corner[1]);
+          if (d > worst) worst = d;
+        }
+      }
+    }
+    // Far plane for nuketown2 is 900 (src/legacy-main.ts:29767).
+    expect(worst).toBeLessThanOrEqual(890.0);
+    backdrop.dispose();
+  });
+
+  it('is deterministic and stays inside the massif budget on the nuketown2 envelope', () => {
+    const first = buildNuketownMountainBackdrop(new THREE.Group(), NUKETOWN2_BACKDROP_ENVELOPE);
+    const second = buildNuketownMountainBackdrop(new THREE.Group(), NUKETOWN2_BACKDROP_ENVELOPE);
+    expect(first.stats).toEqual(second.stats);
+    expect(first.stats.meshes).toBe(3);
+    expect(first.stats.triangles).toBeLessThanOrEqual(60_000);
+    for (let m = 0; m < first.group.children.length; m += 1) {
+      const a = (first.group.children[m] as THREE.Mesh).geometry;
+      const b = (second.group.children[m] as THREE.Mesh).geometry;
+      expect(Array.from(a.getAttribute('position').array)).toEqual(Array.from(b.getAttribute('position').array));
+      expect(Array.from(a.getAttribute('color').array)).toEqual(Array.from(b.getAttribute('color').array));
+      // Painted, not lit and not fogged; no image-backed maps anywhere.
+      const material = (first.group.children[m] as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      expect(material.fog).toBe(false);
+      expect((material as unknown as { map?: unknown }).map ?? null).toBeNull();
+    }
+    first.dispose();
+    second.dispose();
   });
 });

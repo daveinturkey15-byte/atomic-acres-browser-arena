@@ -1,3 +1,12 @@
+import {
+  FOREST_BROADLEAF_MAX_TRIANGLES_HIGH_DETAIL,
+  FOREST_CONIFER_CARD_QUADS_BUDGET,
+  FOREST_CONIFER_DETAIL_HIGH,
+  FOREST_CONIFER_DETAIL_STANDARD,
+  FOREST_CONIFER_MAX_TRIANGLES_HIGH_DETAIL,
+  NUKETOWN2_FOREST_ENVELOPE,
+  coniferDetailCardQuads,
+} from './nuketown-forest-surround';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
@@ -337,6 +346,108 @@ describe('Nuke Town forest surround', () => {
 
       expect(first.yawJitter).toBeGreaterThanOrEqual(0);
       expect(first.yawJitter).toBeLessThan(Math.PI * 2);
+    }
+  });
+});
+
+describe('Nuke Town forest surround nuketown2 detail (HF-556)', () => {
+  const protoTris = (mesh: THREE.InstancedMesh): number => mesh.geometry.getAttribute('position').count / 3;
+  const byName = (forest: { group: THREE.Group }, name: string): THREE.InstancedMesh => forest.group.children.find(
+    (child) => (child as THREE.InstancedMesh).name === name,
+  ) as THREE.InstancedMesh;
+
+  it('freezes the shipped budget ratchets while the nuketown2 prototypes step up', () => {
+    // The shipped caps are the shipped map's budget ratchet — frozen.
+    expect(FOREST_CONIFER_MAX_TRIANGLES).toBe(220);
+    expect(FOREST_BROADLEAF_MAX_TRIANGLES).toBe(320);
+    const forest = buildNuketownForestSurround(new THREE.Group(), NUKETOWN2_FOREST_ENVELOPE);
+    try {
+      const nearConifers = byName(forest, 'forest-conifers');
+      const nearCanopies = byName(forest, 'forest-broadleaf-canopies');
+      const trunks = byName(forest, 'forest-broadleaf-trunks');
+      expect(protoTris(nearConifers)).toBeGreaterThanOrEqual(240);
+      expect(protoTris(nearConifers)).toBeLessThanOrEqual(FOREST_CONIFER_MAX_TRIANGLES_HIGH_DETAIL);
+      expect(protoTris(nearCanopies)).toBeGreaterThanOrEqual(260);
+      expect(protoTris(nearCanopies) + protoTris(trunks))
+        .toBeLessThanOrEqual(FOREST_BROADLEAF_MAX_TRIANGLES_HIGH_DETAIL);
+      // The far LOD band keeps the shipped-cheap prototypes.
+      const farConifers = byName(forest, 'forest-conifers-far');
+      const farCanopies = byName(forest, 'forest-broadleaf-canopies-far');
+      expect(protoTris(farConifers)).toBeLessThanOrEqual(FOREST_CONIFER_MAX_TRIANGLES);
+      expect(protoTris(farCanopies) + protoTris(trunks)).toBeLessThanOrEqual(FOREST_BROADLEAF_MAX_TRIANGLES);
+    } finally {
+      forest.dispose();
+    }
+  });
+
+  it('holds the alpha-card, draw and triangle budgets', () => {
+    const forest = buildNuketownForestSurround(new THREE.Group(), NUKETOWN2_FOREST_ENVELOPE);
+    try {
+      // Card budget (brief: at or below 3x today's 13 x 340 = 4420 quads).
+      expect(coniferDetailCardQuads(FOREST_CONIFER_DETAIL_STANDARD)).toBe(13);
+      const cards = byName(forest, 'forest-conifers').count * coniferDetailCardQuads(FOREST_CONIFER_DETAIL_HIGH)
+        + byName(forest, 'forest-conifers-far').count * coniferDetailCardQuads(FOREST_CONIFER_DETAIL_STANDARD);
+      expect(cards).toBeLessThanOrEqual(FOREST_CONIFER_CARD_QUADS_BUDGET);
+      // The LOD split costs exactly two draws over the shipped five.
+      expect(forest.group.children.length).toBe(7);
+      expect(forest.stats.meshes).toBeLessThanOrEqual(8);
+      expect(forest.stats.triangles).toBeLessThanOrEqual(200_000);
+    } finally {
+      forest.dispose();
+    }
+  });
+
+  it('keeps the treeline above the anti-gaming floor and builds deterministically', () => {
+    // Treeline elevation p50 from the street eye must not drop below 10.5
+    // degrees: the lane may not win exposure by shrinking the forest.
+    const treelineP50 = (): number => {
+      const forest = buildNuketownForestSurround(new THREE.Group(), NUKETOWN2_FOREST_ENVELOPE);
+      try {
+        const tops: Array<{ x: number; y: number; z: number }> = [];
+        const mat = new THREE.Matrix4();
+        const p = new THREE.Vector3();
+        const q = new THREE.Quaternion();
+        const s = new THREE.Vector3();
+        for (const child of forest.group.children) {
+          const mesh = child as THREE.InstancedMesh;
+          if (!mesh.isInstancedMesh || !/conifer|canop/i.test(mesh.name)) continue;
+          mesh.geometry.computeBoundingBox();
+          const topLocal = mesh.geometry.boundingBox!.max.y;
+          for (let i = 0; i < mesh.count; i += 1) {
+            mesh.getMatrixAt(i, mat);
+            mat.decompose(p, q, s);
+            tops.push({ x: p.x, y: p.y + topLocal * s.y, z: p.z });
+          }
+        }
+        const bins = new Float64Array(120).fill(-90);
+        for (const v of tops) {
+          const d = Math.hypot(v.x, v.z);
+          if (d < 1) continue;
+          const bin = Math.min(119, Math.floor((((Math.atan2(v.z, v.x) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2)) * 120));
+          const elev = (Math.atan2(v.y - 1.7, d) * 180) / Math.PI;
+          if (elev > bins[bin]) bins[bin] = elev;
+        }
+        return [...bins].sort((a, b) => a - b)[Math.floor(0.5 * bins.length)];
+      } finally {
+        forest.dispose();
+      }
+    };
+    expect(treelineP50()).toBeGreaterThanOrEqual(10.5);
+
+    const first = buildNuketownForestSurround(new THREE.Group(), NUKETOWN2_FOREST_ENVELOPE);
+    const second = buildNuketownForestSurround(new THREE.Group(), NUKETOWN2_FOREST_ENVELOPE);
+    try {
+      expect(first.stats).toEqual(second.stats);
+      expect(first.group.children.length).toBe(second.group.children.length);
+      for (let m = 0; m < first.group.children.length; m += 1) {
+        const a = first.group.children[m] as THREE.InstancedMesh;
+        const b = second.group.children[m] as THREE.InstancedMesh;
+        expect(a.name).toBe(b.name);
+        expect(Array.from(a.instanceMatrix.array)).toEqual(Array.from(b.instanceMatrix.array));
+      }
+    } finally {
+      first.dispose();
+      second.dispose();
     }
   });
 });
