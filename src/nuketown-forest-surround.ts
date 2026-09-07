@@ -211,9 +211,11 @@ export const NUKETOWN2_FOREST_ENVELOPE: NuketownForestEnvelope = Object.freeze({
   detail: Object.freeze({
     conifer: FOREST_CONIFER_DETAIL_HIGH,
     canopyHighDetail: true,
-    coniferCount: 460,
-    broadleafCount: 240,
-    understoryCount: 380,
+    // HF-556 rev4: box distributions show tree pixels vivid (p90 0.526) but
+    // outnumbered — the belt mean needs tree cover, not stronger albedo.
+    coniferCount: 520,
+    broadleafCount: 260,
+    understoryCount: 420,
     coniferTones: FOREST_CONIFER_TONES_HIGH_DETAIL,
     canopyTones: FOREST_BROADLEAF_CANOPY_TONES_HIGH_DETAIL,
     // HF-556 rev3: the grey-green scrub dilutes the belt box; vivid set for

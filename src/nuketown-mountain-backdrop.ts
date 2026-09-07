@@ -196,7 +196,7 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
     strata: true,
     fissures: true,
     facetJitter: true,
-    sectorVariation: 0.18,
+    sectorVariation: 0.38,
   }),
   ridge: Object.freeze({
     innerM: 96,
@@ -205,7 +205,7 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
     strata: true,
     fissures: true,
     facetJitter: true,
-    sectorVariation: 0.18,
+    sectorVariation: 0.38,
   }),
   // HF-556 rev2: back to the altitude-lerp path (strata bases pulled the
   // rendered mean ~50 levels under the board's pale tan). Pale-warm pair in
@@ -227,7 +227,7 @@ export const NUKETOWN2_BACKDROP_ENVELOPE: NuketownBackdropEnvelope = Object.free
     facetJitter: true,
     aerialHazeMix: 0.52,
     shadeStrength: 0.55,
-    sectorVariation: 0.18,
+    sectorVariation: 0.38,
   }),
 });
 /**
