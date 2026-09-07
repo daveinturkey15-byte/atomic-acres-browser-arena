@@ -155,11 +155,21 @@ export function batchStaticMeshes(
     // batch that can only be drawn at a single order, so one of the two
     // composites wrong. Keying on it keeps each pass in its own batch.
     const orderKey = `ro${node.renderOrder}`;
+    // HF-536 night: in `preserve` mode nothing is stripped, so two geometries
+    // that share a material but not an attribute set (the vehicle-forge merged
+    // buckets carry `forgeVehicleAnchor`; the kit boxes on the same shared
+    // chrome/lining material do not) cannot be merged - three's
+    // mergeGeometries logs "make sure ... attribute exists among all
+    // geometries", returns null, and the whole group is left unbatched. The
+    // attribute signature is part of a geometry's identity for batching, so
+    // it is part of the key. The simplify modes strip to a fixed set below and
+    // keep a single group per material.
+    const attributeSignature = simplifyMaterials ? '' : `:${Object.keys(node.geometry.attributes).sort().join(',')}`;
     const key = vertexPalette
       ? `vertex:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
       : simplifyMaterials && !preserveMappedMaterial
       ? `${displayColor.getHexString()}:${opacityKey}:${orderKey}:${firstPersonSemanticKey}:${classification}`
-      : `${materialBatchKey(node.material)}:${orderKey}:${firstPersonSemanticKey}:${classification}`;
+      : `${materialBatchKey(node.material)}:${orderKey}:${firstPersonSemanticKey}:${classification}${attributeSignature}`;
     let entry = groups.get(key);
     if (!entry) {
       const material = preserveMappedMaterial
