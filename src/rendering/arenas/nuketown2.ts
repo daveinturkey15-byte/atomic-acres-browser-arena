@@ -275,8 +275,12 @@ export const definition = createProceduralArenaVisualDefinition({
     // perimeter-wall-long-close uses. Two things were wrong. The aim was 36
     // degrees INTO the face rather than 14 along it, so one surface covered
     // 64.6 % of the frame with 4.0 % sky. And at the EAST end the rest of the
-    // frame is closed off by `field-shed-damageable-shell` 5 m away, which
-    // renders as a near-black plate, over shaded yard lawn.
+    // frame is closed off 5 m away by the shaded face of
+    // `field-shed-damageable-shell`, over shaded yard lawn. That face is not a
+    // black-body defect: the SAME shed reads rgb 237/222/197 at luma p50 225
+    // from nuketown2-sand-pit-north-close and rgb 19/20/20 at p50 19 here, a
+    // 12:1 lit-to-shade ratio on one body, neutral grey rather than an exact
+    // zero. It is this arena's shade level, which is the standing tonal gap.
     //
     // Fixing only the aim was measured and did nothing: composition went to
     // 50.0 % wall / 11.5 % sky / 67 bodies and mean luma 30.6 -> 41.5, and the
@@ -292,7 +296,8 @@ export const definition = createProceduralArenaVisualDefinition({
     // values at luma p50 20/20/21 - flat at every pose. The lift is entirely
     // in the OTHER half, 12,825 -> 44,043 at p50 27 -> 160, because the west
     // flank alley is open to the lit town where the east one is blocked by
-    // that shed. The station now samples the arena the way the other 28 do.
+    // that shed. The station was standing in the darkest place in the arena;
+    // it now samples it the way the other 28 stations do.
     //
     // So this pose makes the station a valid SAMPLE again; it does not make
     // the end wall a good surface. That is still open and is a material and
