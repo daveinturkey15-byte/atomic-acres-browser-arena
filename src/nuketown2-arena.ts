@@ -1565,7 +1565,7 @@ function nuketown2Materials(): Nuketown2Materials {
   const windowGlass = createNuketown2GlassMaterial();
   const interiorFloor = createNuketown2WoodFloorMaterial();
   const garageFloor = createNuketown2GarageFloorMaterial();
-  const interior = createNuketown2DrywallMaterial(0xdbd1ba);
+  const interior = createNuketown2DrywallMaterial(0xd6d3cc);
   const warmLight = createNuketown2CeilingLightMaterial(true);
   const coldLight = createNuketown2CeilingLightMaterial(false);
   return Object.freeze({

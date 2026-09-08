@@ -66,7 +66,7 @@ function drywallSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
 
 function woodFloorSpec(): Nuketown2MaterialSpec {
   return assertSpec({
-    name: 'nuketown2-house-wood-floor', family: 'timber', baseSrgb: 0x99734e,
+    name: 'nuketown2-house-wood-floor', family: 'timber', baseSrgb: 0xb26a24,
     roughness: 0.54, metalness: 0.04,
     grain: { sizeM: 0.0011, albedo: 0.035, roughness: 0.07 },
     scuff: { sizeM: 0.060, albedo: 0.070, roughness: 0.10 },
