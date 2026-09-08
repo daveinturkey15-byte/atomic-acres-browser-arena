@@ -66,7 +66,7 @@ function drywallSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
 
 function woodFloorSpec(): Nuketown2MaterialSpec {
   return assertSpec({
-    name: 'nuketown2-house-wood-floor', family: 'timber', baseSrgb: 0x99734e,
+    name: 'nuketown2-house-wood-floor', family: 'timber', baseSrgb: 0xb26a24,
     roughness: 0.54, metalness: 0.04,
     grain: { sizeM: 0.0011, albedo: 0.035, roughness: 0.07 },
     scuff: { sizeM: 0.060, albedo: 0.070, roughness: 0.10 },
@@ -121,8 +121,9 @@ export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
   const seamV = smoothstep(float(0.94), float(0.99), edgeV);
   const seam = max(seamU, seamV);
 
-  // Base warm oak tone: sRGB approx #99734e -> linear ~ [0.32, 0.18, 0.08]
-  const baseWood = vec3(0.32, 0.19, 0.09).add(toneOffset);
+  // Base vivid orange floor: the authored spec baseSrgb carried as a uniform
+  // (HF-477 pattern), so the accent tint is data, not a literal.
+  const baseWood = uniforms.baseColor.add(toneOffset);
   const seamColor = vec3(0.06, 0.035, 0.02);
 
   mat.colorNode = mix(baseWood, seamColor, seam).mul(wear.albedoMul);
@@ -232,11 +233,10 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   const damped = base.mul(float(1).sub(damp.mul(float(0.18))));
   mat.colorNode = damped.mul(wear.albedoMul);
   mat.roughnessNode = clamp(wear.roughness.add(damp.mul(float(0.10))), float(0.05), float(1.0));
-  // RELIEF. Joint crown plus the distance-faded orange-peel roll texture.
-  mat.normalNode = reliefNormal(
-    crown.mul(float(DRYWALL_JOINT_CROWN_M)).add(wear.grain.mul(float(DRYWALL_PEEL_M))),
-  );
-
+  // RELIEF (diagnostic C3b, flattened to zero): joint crown plus the
+  // distance-faded orange-peel roll texture. Revert once measured.
+  void crown; void DRYWALL_PEEL_M; void DRYWALL_JOINT_CROWN_M;
+  mat.normalNode = reliefNormal(float(0));
   return mat;
 }
 

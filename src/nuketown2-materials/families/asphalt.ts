@@ -152,7 +152,7 @@ export const ASPHALT_COLD_PATCH_SRGB = 0x2b221a;
 export const ASPHALT_AGGREGATE_SRGB = 0x584a3b;
 
 /** Normalized linear lift tint for aggregate stone chip in the asphalt matrix. */
-export const ASPHALT_AGGREGATE_TINT = Object.freeze([1.29, 1.00, 0.65] as const);
+export const ASPHALT_AGGREGATE_TINT = Object.freeze([1.18, 1.00, 0.82] as const);
 
 /** Wheel-path polish tint: warm tyre sheen and road dust lift (replaces scalar 0.17). */
 export const ASPHALT_POLISH_TINT = Object.freeze([0.25, 0.20, 0.12] as const);
