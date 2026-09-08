@@ -225,9 +225,14 @@ describe('forge-kit interior prefabs (HF-536 night-muse-interiors)', () => {
     expect(GARAGE_INTERIOR_TRIANGLES, 'garage budget 4,000').toBeLessThanOrEqual(4000);
   });
 
-  it('emits both houses and both garages through pair(), as 12-tri boxes', () => {
+  it('emits garage dressing through pair() as 12-tri boxes; house kit removed (R040)', () => {
     const map = buildOnce();
-    for (const group of ALL_GROUPS) {
+    // Owner R040 removed the house decorative kit from the arena. The prefab
+    // constants above still pin the kit module; the arena emits none of it.
+    for (const group of [...HOUSE_GROUPS, ...NEW_HOUSE_GROUPS]) {
+      expect(kitMeshes(map, group.id), `${group.id} removed from the arena`).toHaveLength(0);
+    }
+    for (const group of GARAGE_GROUPS) {
       const meshes = kitMeshes(map, group.id);
       expect(meshes.length, `${group.id} emits both halves`).toBe(group.parts.length * 2);
       let tris = 0;
@@ -272,11 +277,15 @@ describe('forge-kit interior prefabs (HF-536 night-muse-interiors)', () => {
     }
   });
 
-  it('keeps every prefab inside its interior volume and above its floor', () => {
+  it('keeps every emitted prefab inside its interior volume and above its floor; house kit absent (R040)', () => {
     const map = buildOnce();
     const volumesBySide = volumes();
     // Pass-1 groups only: the strict 0.01 m inset gate below owns the new groups.
-    for (const group of [...HOUSE_GROUPS, ...GARAGE_GROUPS]) {
+    // Owner R040: the arena emits no house kit; absence is asserted, not assumed.
+    for (const group of [...HOUSE_GROUPS, ...NEW_HOUSE_GROUPS]) {
+      expect(kitMeshes(map, group.id), `${group.id} removed from the arena`).toHaveLength(0);
+    }
+    for (const group of GARAGE_GROUPS) {
       for (const side of ['north', 'south'] as const) {
         const meshes = kitMeshes(map, group.id)
           .filter((mesh) => mesh.name.startsWith(`nuketown2 ${side} `));
@@ -339,13 +348,13 @@ describe('forge-kit interior prefabs (HF-536 night-muse-interiors)', () => {
     }
   });
 
-  it('emits identical north/south counts for every interiors-2 group (pair)', () => {
+  it('emits zero interiors-2 meshes per side: removed from the arena (R040)', () => {
     const map = buildOnce();
     for (const group of NEW_HOUSE_GROUPS) {
       for (const side of ['north', 'south'] as const) {
         const count = kitMeshes(map, group.id)
           .filter((mesh) => mesh.name.startsWith(`nuketown2 ${side} `)).length;
-        expect(count, `${side} ${group.id} count`).toBe(group.parts.length);
+        expect(count, `${side} ${group.id} removed`).toBe(0);
       }
     }
   });

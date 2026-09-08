@@ -49,7 +49,6 @@ import {
 
 const STANDING_RADIUS_M = 0.38;
 const STANDING_CAPSULE_M = 1.82;
-const CROUCH_CAPSULE_M = 1.16;
 
 type Solid = Readonly<{
   minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number;
@@ -92,7 +91,6 @@ const FURNITURE = Object.freeze([
   Object.freeze({ authored: 'house upper bed', material: 'wood' as const, room: 'upper back' }),
   Object.freeze({ authored: 'garage bench', material: 'wood' as const, room: 'garage' }),
   Object.freeze({ authored: 'garage shelving rack', material: 'thin-metal' as const, room: 'garage' }),
-  Object.freeze({ authored: 'garage car body', material: 'vehicle' as const, room: 'garage' }),
 ]);
 
 describe('Nuke Town Rebuild interiors (HF-478)', () => {
@@ -235,9 +233,19 @@ describe('Nuke Town Rebuild interiors (HF-478)', () => {
     }
   });
 
-  it('leaves the garage a route: a standing lane past the car to the link door', () => {
+  it('leaves the garage a route: a standing lane past bench and shelving to the link door; car removed (R041)', () => {
     const map = buildOnce();
-    const car = boxOf(northMesh(map, 'garage car body'));
+    // Owner R041 removed both garage cars WITH their authority: no presentation
+    // part, no movement collider, no shot surface survives under that name.
+    for (const side of ['north', 'south'] as const) {
+      for (const suffix of ['garage car body', 'garage car cabin', 'garage car glass',
+        'garage car wheel 0', 'garage car wheel 1', 'garage car wheel 2', 'garage car wheel 3']) {
+        expect(map.root.getObjectByName(`nuketown2 ${side} ${suffix}`), `${side} ${suffix} removed`)
+          .toBeUndefined();
+      }
+    }
+    expect(map.shotSurfaces.some((surface) => surface.name.includes('garage car')),
+      'no garage-car shot surface survives').toBe(false);
     const bench = boxOf(northMesh(map, 'garage bench'));
     const shelf = boxOf(northMesh(map, 'garage shelving rack'));
     const [gx0, gx1] = [NUKETOWN2_GARAGE_SPAN.x0, NUKETOWN2_GARAGE_SPAN.x1]
@@ -250,16 +258,16 @@ describe('Nuke Town Rebuild interiors (HF-478)', () => {
     const linkWallX = hx(link.at);
     const inner = linkWallX < (gx0 + gx1) / 2 ? gx0 + wall : gx1 - wall;
     const laneWidth = Math.min(
-      ...[car, bench, shelf].map((body) => (
+      ...[bench, shelf].map((body) => (
         inner < (gx0 + gx1) / 2 ? body.minX - inner : inner - body.maxX
       )),
     );
     expect(laneWidth, `garage link-door lane (${laneWidth.toFixed(2)} m) fits a standing capsule`)
       .toBeGreaterThan(STANDING_RADIUS_M * 2);
     // ...and the lane runs the whole depth, so it is a route and not a pocket.
-    const [gz0, gz1] = [Math.min(car.minZ, bench.minZ, shelf.minZ),
-      Math.max(car.maxZ, bench.maxZ, shelf.maxZ)];
-    expect(gz1 - gz0, 'the three garage bodies span the bay the lane runs beside')
+    const [gz0, gz1] = [Math.min(bench.minZ, shelf.minZ),
+      Math.max(bench.maxZ, shelf.maxZ)];
+    expect(gz1 - gz0, 'the two garage bodies span the bay the lane runs beside')
       .toBeGreaterThan(4.0);
 
     // HF-432 item 4's invariant, now asserted rather than remembered: the
@@ -271,19 +279,27 @@ describe('Nuke Town Rebuild interiors (HF-478)', () => {
     const clear = bench.minX >= rearRun[1] || bench.maxX <= rearRun[0];
     expect(clear, 'the workbench is clear of the rear doorway run (HF-432 item 4)').toBe(true);
 
-    // The car has no walk-under gap: its solid body starts on the slab and the
-    // cabin above it is presentation. A second solid over an open sill is what
-    // the ground crouch sweep would report as a crouch-only cell in both bays.
-    expect(car.minY, 'the car body rests on the garage slab')
-      .toBeCloseTo(NUKETOWN2_GROUND_FLOOR_TOP, 6);
-    expect(car.maxY - car.minY, 'the car is one solid body, taller than a crouch')
-      .toBeGreaterThan(CROUCH_CAPSULE_M);
-    const cabin = map.root.getObjectByName('nuketown2 north garage car cabin') as THREE.Mesh;
-    expect(cabin, 'the cabin is built').toBeDefined();
-    const cabinSolid = map.colliders.some((bounds) => (
-      Math.abs(bounds.minX - boxOf(cabin).minX) < 1e-6
-      && Math.abs(bounds.minZ - boxOf(cabin).minZ) < 1e-6
-    ));
-    expect(cabinSolid, 'the cabin is presentation, not a second solid').toBe(false);
+    // The vacated bay holds no orphan authority: every above-slab collider in
+    // the garage floor region still matches a standing visible mesh, so the
+    // removed car left no invisible blocker where a player now walks. Read off
+    // the built arena; nothing here repeats builder literals.
+    const floor = northMesh(map, 'garage floor');
+    floor.updateMatrixWorld(true);
+    const region = new THREE.Box3().setFromObject(floor);
+    const meshBoxes: THREE.Box3[] = [];
+    map.root.traverse((node) => {
+      if (!('isMesh' in node) || node.isMesh !== true) return;
+      meshBoxes.push(new THREE.Box3().setFromObject(node));
+    });
+    const orphans = map.colliders.filter((bounds) => {
+      if ((bounds.maxY ?? -Infinity) <= NUKETOWN2_GROUND_FLOOR_TOP + 0.06) return false;
+      if (!(bounds.maxX > region.min.x && bounds.minX < region.max.x
+        && bounds.maxZ > region.min.z && bounds.minZ < region.max.z)) return false;
+      return !meshBoxes.some((box) => (
+        Math.abs(bounds.minX - box.min.x) < 1e-6 && Math.abs(bounds.maxX - box.max.x) < 1e-6
+        && Math.abs(bounds.minZ - box.min.z) < 1e-6 && Math.abs(bounds.maxZ - box.max.z) < 1e-6
+      ));
+    });
+    expect(orphans, 'no orphan collider survives the car removal').toEqual([]);
   });
 });

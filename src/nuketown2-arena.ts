@@ -183,27 +183,8 @@ import { createNuketown2PoolWaterMaterial } from './nuketown2-pool-water';
 import {
   type InteriorPart,
   type InteriorRole,
-  armchairParts,
-  chairParts,
-  coffeeTableParts,
-  diningTableParts,
-  floorLampParts,
-  fridgeParts,
-  kettlePairParts,
-  kitchenRunParts,
   oilStainParts,
-  pendantParts,
-  pictureParts,
   rackingBoxesParts,
-  rugParts,
-  shelfUnitParts,
-  skirtingParts,
-  sofaParts,
-  switchParts,
-  tvUnitParts,
-  upperBackBedroomParts,
-  upperFrontBedroomParts,
-  wallArtParts,
   workbenchDressingParts,
 } from './forge-kit/interior/prefabs';
 // HF-536 PASS 2: the shared presentation prefab kit (ruleset sec. 1.2).
@@ -457,13 +438,6 @@ const GARAGE_SHELF_DEPTH = 2.8;
 const GARAGE_SHELF_Z = -18.6;
 /** Over the 1.82 m standing capsule, so it is hard cover and not a hurdle. */
 const GARAGE_SHELF_H = 1.9;
-/** The parked car: nose to the vehicle door, 1.35 m of lane on the house side. */
-const GARAGE_CAR_X = 6.8;
-const GARAGE_CAR_Z = -18.25;
-const GARAGE_CAR_WIDTH = 1.8;
-const GARAGE_CAR_LENGTH = 3.7;
-/** Body only. The cabin above it is presentation, so there is no walk-under gap. */
-const GARAGE_CAR_BODY_H = 1.45;
 
 /** Garage wall height, metres. Shared by `garage()` and the house's east elevation. */
 const GARAGE_H = 3.4;
@@ -1258,42 +1232,6 @@ function houseWindowDressing(builder: Builder, m: Nuketown2Materials): void {
   }
 }
 
-/**
- * HF-536 NIGHT-MUSE-INTERIORS — dress both houses' ground floors.
- * Anchors are AUTHORED frame; `pair()` mirrors them into both houses.
- * Kitchen run sits on the front-room counter slab (top 0.995); the sofa
- * dresses the living-couch solid (top 0.62); the shelf hutch stands on the
- * living bench-top slab (top 0.995); everything else stands on the floor slab
- * (top 0.08) or on the rug the kit lays (top 0.125).
- */
-function houseInteriorDressing(builder: Builder, m: Nuketown2Materials): void {
-  const resolve = (role: InteriorRole): THREE.Material => interiorRoleMaterial(m, role);
-  pairKit(builder, 'house interior kitchen run', [-4.8, 0.995, -13.34], kitchenRunParts(), resolve);
-  pairKit(builder, 'house interior sofa', [-2.0, 0.62, -18.75], sofaParts(), resolve);
-  pairKit(builder, 'house interior armchair', [0.9, 0.125, -18.7], armchairParts(), resolve);
-  pairKit(builder, 'house interior coffee table', [-0.2, 0.125, -18.75], coffeeTableParts(), resolve);
-  pairKit(builder, 'house interior rug', [-0.6, 0.075, -18.75], rugParts(), resolve);
-  pairKit(builder, 'house interior floor lamp', [1.7, 0.075, -19.3], floorLampParts(), resolve);
-  pairKit(builder, 'house interior shelf hutch', [1.5, 0.99, -20.6], shelfUnitParts(), resolve);
-  pairKit(builder, 'house interior wall art', [1.6, 1.5, -16.35], wallArtParts(), resolve);
-  pairKit(builder, 'house interior dining table', [1.75, 0.075, -17.35], diningTableParts(), resolve);
-  pairKit(builder, 'house interior dining chair north 0', [1.4, 0.075, -16.6], chairParts(true), resolve);
-  pairKit(builder, 'house interior dining chair north 1', [2.1, 0.075, -16.6], chairParts(true), resolve);
-  pairKit(builder, 'house interior dining chair south 0', [1.4, 0.125, -18.1], chairParts(false), resolve);
-  pairKit(builder, 'house interior dining chair south 1', [2.1, 0.125, -18.1], chairParts(false), resolve);
-  // ---- HF-536 NIGHT-MUSE-INTERIORS-2: upper bedrooms, wall dressing, ground gaps.
-  // Absolute-authored placements (anchor origin); pair() mirrors both houses.
-  const origin = [0, 0, 0] as const;
-  pairKit(builder, 'house interior upper bedroom back', origin, upperBackBedroomParts(), resolve);
-  pairKit(builder, 'house interior upper bedroom front', origin, upperFrontBedroomParts(), resolve);
-  pairKit(builder, 'house interior skirting', origin, skirtingParts(), resolve);
-  pairKit(builder, 'house interior pictures', origin, pictureParts(), resolve);
-  pairKit(builder, 'house interior pendants', origin, pendantParts(), resolve);
-  pairKit(builder, 'house interior switches', origin, switchParts(), resolve);
-  pairKit(builder, 'house interior tv unit', origin, tvUnitParts(), resolve);
-  pairKit(builder, 'house interior fridge', origin, fridgeParts(), resolve);
-  pairKit(builder, 'house interior kettle pair', origin, kettlePairParts(), resolve);
-}
 
 /**
  * HF-536 NIGHT-MUSE-INTERIORS — dress both garages. Tools/tin sit on the
@@ -2701,8 +2639,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house stair rail mid bar', [STAIR_X1 + 0.04, UPPER_Y0 + 0.48, (-16.5 + STAIRWELL_Z0) / 2], [0.04, 0.04, -16.5 - STAIRWELL_Z0], m.trim,
     { solid: false, shots: false, cast: true });
-  // ---- HF-536 NIGHT-MUSE-INTERIORS: ground-floor + dining dressing ---------
-  houseInteriorDressing(builder, m);
   // ---- HF-536 NIGHT-MUSE-WINDOWS: frames, mullions, sills, curtains, blinds -
   houseWindowDressing(builder, m);
 }
@@ -2786,11 +2722,10 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   // from the top (course [3.0, 3.2], centre 3.1), each 0.45 x 0.25 m in the
   // house window-glass role for 0.45 m2 of door glazing per house (<= 0.6).
   // The leaf carried no glazing before this (boards + reveals only), so there
-  // is no oversized pane to remove here; the in-frame cyan mass is the aqua
-  // garage car seen through the open bay, a SOLID vehicle collider that stays
-  // exactly as authored (re-skinning it would cost the ray-traced preset its
-  // only roughness <= 0.22 surface over 6 m2 - see the carA comment). Every
-  // part is presentation-only through pair(): no collider, no shot surface,
+  // is no oversized pane to remove here. The bay behind it is empty: owner
+  // R041 removed both garage cars with their movement/shot authority, and no
+  // replacement vehicle was authored. Every pane/frame part below is
+  // presentation-only through pair(): no collider, no shot surface,
   // no ballistic row, both houses identical by construction. Trim frames
   // stand 0.01 m proud of the pane faces; nothing is coplanar with the leaf.
   for (const [index, dx] of ([-1.3125, -0.4375, 0.4375, 1.3125] as const).entries()) {
@@ -2914,47 +2849,6 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
       { solid: false, shots: false, cast: true });
   }
 
-  // ---- HF-478: THE CAR IN THE BAY ------------------------------------------
-  // A garage with a vehicle door and no vehicle reads as a room that happens
-  // to have a wide opening. This is the body that makes the bay a bay.
-  //
-  // ONE SOLID BODY to 1.45 m, with the cabin, glass and wheels above and
-  // beside it as presentation. Authoring the cabin as a second solid over an
-  // open sill is the exact shape the ground crouch sweep in
-  // `nuketown2-fidelity.test.ts` exists to catch - a gap a crouch clears and a
-  // stand does not - and it would put a crouch-only cell inside both garages.
-  //
-  // Rated `vehicle` EXPLICITLY, like the street cars: `car` is not a token in
-  // any classifier rule, so the name would fall through to `/garage/` and this
-  // would stop bullets like a plasterboard wall.
-  //
-  // Paint comes from the shared `carA` node graph, whose colour is a UNIFORM
-  // (HF-477 made it one after per-colour graphs compiled a pipeline each and
-  // pushed the arena's first submission past the 12,000 ms deploy fence), so
-  // the two garage cars add no pipeline and no in-combat compile.
-  const carY = GROUND_FLOOR_TOP;
-  pair(builder, 'garage car body', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H / 2, GARAGE_CAR_Z],
-    [GARAGE_CAR_WIDTH, GARAGE_CAR_BODY_H, GARAGE_CAR_LENGTH], m.carA,
-    { ballisticMaterial: 'vehicle' });
-  pair(builder, 'garage car cabin', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H + 0.12, GARAGE_CAR_Z + 0.2],
-    [GARAGE_CAR_WIDTH - 0.24, 0.24, GARAGE_CAR_LENGTH - 1.9], m.carA,
-    { solid: false, shots: false, cast: true });
-  // The glass is the CABIN's window band, not a strip laid on the body's own
-  // top face. Authored the second way its top sat 0.01 m over the body's, with
-  // 3.1 m2 of overlap - two different materials one depth quantum apart, which
-  // is the exact HOUSE-INTERIOR z-fight HF-448 was raised for, and the coplanar
-  // instrument reported it on both cars. It now sits inside the cabin, 0.20 m
-  // over the body top and 0.04 m under the cabin roof.
-  pair(builder, 'garage car glass', [GARAGE_CAR_X, carY + GARAGE_CAR_BODY_H + 0.09, GARAGE_CAR_Z + 0.2],
-    [GARAGE_CAR_WIDTH - 0.18, 0.22, GARAGE_CAR_LENGTH - 1.8], m.carGlass,
-    { solid: false, shots: false, cast: false });
-  for (const [index, offset] of ([[-1, -1], [-1, 1], [1, -1], [1, 1]] as const).entries()) {
-    pair(builder, `garage car wheel ${index}`,
-      [GARAGE_CAR_X + offset[0] * (GARAGE_CAR_WIDTH / 2 - 0.06),
-        carY + 0.32, GARAGE_CAR_Z + offset[1] * (GARAGE_CAR_LENGTH / 2 - 0.75)],
-      [0.16, 0.64, 0.64], m.rubber,
-      { solid: false, shots: false, cast: true });
-  }
   // ---- HF-536 NIGHT-MUSE-INTERIORS: bench/racking/oil dressing --------------
   garageInteriorDressing(builder, m);
 }
