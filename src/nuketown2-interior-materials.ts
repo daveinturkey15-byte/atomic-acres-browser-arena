@@ -121,8 +121,9 @@ export function createNuketown2WoodFloorMaterial(): MeshStandardNodeMaterial {
   const seamV = smoothstep(float(0.94), float(0.99), edgeV);
   const seam = max(seamU, seamV);
 
-  // Base warm oak tone: sRGB approx #99734e -> linear ~ [0.32, 0.18, 0.08]
-  const baseWood = vec3(0.32, 0.19, 0.09).add(toneOffset);
+  // Base vivid orange floor: the authored spec baseSrgb carried as a uniform
+  // (HF-477 pattern), so the accent tint is data, not a literal.
+  const baseWood = uniforms.baseColor.add(toneOffset);
   const seamColor = vec3(0.06, 0.035, 0.02);
 
   mat.colorNode = mix(baseWood, seamColor, seam).mul(wear.albedoMul);
