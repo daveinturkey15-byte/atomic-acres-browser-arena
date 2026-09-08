@@ -4,8 +4,11 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+// @ts-expect-error - QA instrument, plain ESM with no type declarations.
 import { VIEWPOINT_CATALOG } from '../scripts/qa/viewpoint-catalog.mjs';
+// @ts-expect-error - QA instrument, plain ESM with no type declarations.
 import { checkArena, isTreeEquivalent } from '../scripts/check-loading-art-freshness.mjs';
+// @ts-expect-error - QA instrument, plain ESM with no type declarations.
 import { REPRESENTATIVE_CAMERA, representativeCamera } from '../scripts/generate-loading-poster.mjs';
 
 /**
