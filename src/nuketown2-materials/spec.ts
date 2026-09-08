@@ -90,6 +90,16 @@ export interface Nuketown2MaterialSpec {
    */
   readonly soil: number;
   /**
+   * Opt-in COLOURED grime, 0..1, default 0 (off).
+   *
+   * At 0 the wear shader reduces to the scalar soil darkening exactly and the
+   * family's `soilColor` uniform stays dead data, as before. Above 0 the
+   * soiled patch rotates toward the soil hue AT MATCHED LUMA (unit-luma
+   * chromaticity tint), so `albedoWearStep` and the `maxDarkening` combat
+   * bound are unchanged. Vehicle families must never set this above 0.
+   */
+  readonly soilChroma?: number;
+  /**
    * The distance, in metres, at which this surface is actually READ.
    *
    * WHY A MATERIAL HAS TO DECLARE THIS. Wear at a scale the frame cannot
@@ -215,6 +225,9 @@ export function assertSpec(spec: Nuketown2MaterialSpec): Nuketown2MaterialSpec {
   }
   if (!(spec.metalness >= 0 && spec.metalness <= 1)) {
     throw new Error(`${spec.name}: metalness ${spec.metalness} out of range`);
+  }
+  if (spec.soilChroma !== undefined && !(spec.soilChroma >= 0 && spec.soilChroma <= 1)) {
+    throw new Error(`${spec.name}: soilChroma ${spec.soilChroma} out of range 0..1`);
   }
   return spec;
 }

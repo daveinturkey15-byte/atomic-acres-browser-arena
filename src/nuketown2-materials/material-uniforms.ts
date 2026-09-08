@@ -24,6 +24,7 @@ export interface Nuketown2Uniforms {
   readonly scuffRoughness: any;
   readonly trafficRoughness: any;
   readonly soil: any;
+  readonly soilChroma: any;
   readonly baseRoughness: any;
   readonly concreteVariant: any;
   readonly concreteFootY: any;
@@ -55,6 +56,7 @@ const DEFAULTS: Record<string, UniformValue> = {
   scuffRoughness: 0,
   trafficRoughness: 0,
   soil: 0,
+  soilChroma: 0,
   baseRoughness: 0.5,
   concreteVariant: 0,
   concreteFootY: 0,
@@ -147,6 +149,7 @@ const SHARED_NODES = Object.freeze({
   scuffRoughness: materialUniform('scuffRoughness'),
   trafficRoughness: materialUniform('trafficRoughness'),
   soil: materialUniform('soil'),
+  soilChroma: materialUniform('soilChroma'),
   baseRoughness: materialUniform('baseRoughness'),
   concreteVariant: materialUniform('concreteVariant'),
   concreteFootY: materialUniform('concreteFootY'),
@@ -187,6 +190,7 @@ export function createNuketown2Uniforms(
     scuffRoughness: spec.scuff.roughness,
     trafficRoughness: spec.traffic.roughness,
     soil: spec.soil,
+    soilChroma: spec.soilChroma ?? 0,
     baseRoughness: spec.roughness,
     concreteVariant: 0,
     concreteFootY: 0,

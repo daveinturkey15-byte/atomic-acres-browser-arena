@@ -142,6 +142,8 @@ export const PAINT_LOSS_HI = 0.66;
  */
 export const ASPHALT_BASE_SRGB = 0x392f26;
 
+/** Soiling hue for the carriageway: near-neutral dark, not the shared warm brown. */
+export const ASPHALT_SOIL_SRGB = 0x2e2f2d;
 /** Bitumen tar-seam overband: warm near-black/charcoal seal (replaces cool 0x1f2021). */
 export const ASPHALT_TAR_SEAM_SRGB = 0x1d1611;
 
@@ -236,6 +238,7 @@ export function asphaltSpec(name = 'nuketown2-asphalt-road'): Nuketown2MaterialS
     scuff: { sizeM: 0.035, albedo: 0.050, roughness: 0.08 },
     traffic: { sizeM: 2.6, albedo: 0.060, roughness: 0.10 },
     soil: 0.080,
+    soilChroma: 0.7,
     polygonOffset: -1,
   });
 }
@@ -271,7 +274,7 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown
   // carriageway meeting a kerb on a drawn line.
   const edgeAbrasion = smoothstep(float(CARRIAGEWAY_HALF_M - EDGE_ABRASION_M), float(CARRIAGEWAY_HALF_M), abs(p.z));
 
-  const road = uniforms.baseColor.mul(wear.albedoMul);
+  const road = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint);
   // ONE-SIDED: stone lifts off the matrix, the matrix is the floor. See
   // AGGREGATE_ALBEDO for the measurement that forced this.
   const stone = max(aggregate, float(0));
@@ -300,7 +303,7 @@ function sharedAsphaltGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown
   const paintLoss = smoothstep(float(PAINT_LOSS_LO), float(PAINT_LOSS_HI), paintField)
     .mul(detailFalloff(PAINT_LOSS_NEAR_M, PAINT_LOSS_FAR_M).mul(float(0.45)).add(float(0.55)));
   const scrub = smoothstep(float(0.20), float(0.75), wear.scuff).mul(float(0.35));
-  const markingBase = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).sub(scrub.mul(float(0.30))));
+  const markingBase = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint).mul(float(1).sub(scrub.mul(float(0.30))));
   const markingColor = mix(
     markingBase,
     linearSwatch(ASPHALT_BASE_SRGB).mul(float(1).add(stone.mul(aggLift))),
@@ -379,7 +382,7 @@ export function createAsphaltMaterial(
   mat.polygonOffsetFactor = -1;
   mat.polygonOffsetUnits = -1;
 
-  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, ASPHALT_SOIL_SRGB, mat);
   setNuketown2FamilyUniform(uniforms, 'asphaltMarking', 0);
   const shared = sharedAsphaltGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;

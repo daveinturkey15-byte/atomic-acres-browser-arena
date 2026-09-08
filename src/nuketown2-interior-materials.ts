@@ -60,7 +60,7 @@ function drywallSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
     grain: { sizeM: 0.0008, albedo: 0.030, roughness: 0.06 },
     scuff: { sizeM: 0.045, albedo: 0.055, roughness: 0.09 },
     traffic: { sizeM: 1.2, albedo: 0.060, roughness: 0.07 },
-    soil: 0.075, readDistanceM: 0.5,
+    soil: 0.075, readDistanceM: 0.5, soilChroma: 0.7,
   });
 }
 
@@ -81,7 +81,7 @@ function garageFloorSpec(): Nuketown2MaterialSpec {
     grain: { sizeM: 0.0015, albedo: 0.030, roughness: 0.06 },
     scuff: { sizeM: 0.055, albedo: 0.065, roughness: 0.10 },
     traffic: { sizeM: 2.5, albedo: 0.060, roughness: 0.08 },
-    soil: 0.095, readDistanceM: 1.0,
+    soil: 0.095, readDistanceM: 1.0, soilChroma: 0.7,
   });
 }
 
@@ -180,7 +180,7 @@ export function createNuketown2GarageFloorMaterial(): MeshStandardNodeMaterial {
   // dropping to a sheen where damp, with the tooth flattened as under oil.
   const damp = smoothstep(float(0.30), float(0.75), wear.soilMask);
   const damped = colored.mul(float(1).sub(damp.mul(float(0.15))));
-  mat.colorNode = damped.mul(wear.albedoMul);
+  mat.colorNode = damped.mul(wear.albedoMul).mul(wear.soilTint);
   mat.roughnessNode = clamp(
     wear.roughness.sub(oilStain.mul(float(0.45))).sub(damp.mul(float(0.35))),
     float(0.05), float(1.0),
@@ -211,7 +211,7 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   mat.name = spec.name;
   mat.type = 'MeshStandardMaterial';
 
-  const uniforms = createNuketown2Uniforms(spec, colorHex, 0x6b5741, mat);
+  const uniforms = createNuketown2Uniforms(spec, colorHex, 0x6e7166, mat);
   mat.userData.nuketown2Spec = spec;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
   const p = positionWorld;
@@ -230,7 +230,7 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   const dampBand = float(1).sub(smoothstep(float(0.05), float(1.0), p.y));
   const damp = dampBand.mul(wear.soilMask.mul(float(0.6)).add(float(0.4)));
   const damped = base.mul(float(1).sub(damp.mul(float(0.18))));
-  mat.colorNode = damped.mul(wear.albedoMul);
+  mat.colorNode = damped.mul(wear.albedoMul).mul(wear.soilTint);
   mat.roughnessNode = clamp(wear.roughness.add(damp.mul(float(0.10))), float(0.05), float(1.0));
   // RELIEF. Joint crown plus the distance-faded orange-peel roll texture.
   mat.normalNode = reliefNormal(

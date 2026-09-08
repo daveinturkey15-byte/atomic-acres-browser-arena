@@ -57,13 +57,14 @@ export {
 } from './spec';
 export { buildWear, linearRgb, linearSwatch, uniformSwatch } from './wear';
 export { createSidingMaterial, sidingSpec } from './families/siding';
-export { createRoofMaterial, roofSpec } from './families/roof';
+export { createRoofMaterial, roofSpec, ROOF_SOIL_SRGB } from './families/roof';
 export {
   ASPHALT_BASE_SRGB,
   ASPHALT_TAR_SEAM_SRGB,
   ASPHALT_COLD_PATCH_SRGB,
   ASPHALT_AGGREGATE_SRGB,
   ASPHALT_AGGREGATE_TINT,
+  ASPHALT_SOIL_SRGB,
   ASPHALT_POLISH_TINT,
   MARKING_PAINT_SRGB,
   BOARD_TARGET_ROAD,
@@ -76,12 +77,13 @@ export {
 export {
   KERB_CONCRETE_SRGB,
   DRIVEWAY_APRON_SRGB,
+  CONCRETE_SOIL_SRGB,
   concreteSpec,
   createConcreteMaterial,
 } from './families/concrete';
-export { createTimberMaterial, timberSpec } from './families/timber';
+export { createTimberMaterial, timberSpec, TIMBER_SOIL_SRGB } from './families/timber';
 export { createGlassMaterial, glassSpec } from './families/glass';
-export { createPaintedMetalMaterial, paintedMetalSpec } from './families/painted-metal';
+export { createPaintedMetalMaterial, paintedMetalSpec, PAINTED_METAL_SOIL_SRGB } from './families/painted-metal';
 export { createLawnMaterial, lawnSpec } from './families/lawn';
 export {
   createNuketown2TextureBridge,

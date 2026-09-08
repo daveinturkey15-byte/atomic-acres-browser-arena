@@ -69,6 +69,8 @@ const KNOT_RELIEF_M = 0.0011;
  * under the low key. Painted trim keeps its own 0.25 in the graph.
  */
 export const TIMBER_SILVER_LIFT = 0.36;
+/** Soiling hue for timber: silvered grey, not the shared warm brown. */
+export const TIMBER_SOIL_SRGB = 0x7a736a;
 
 export type TimberVariant = 'fence' | 'deck' | 'painted-trim';
 
@@ -84,6 +86,7 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
     scuff: { sizeM: 0.055, albedo: painted ? 0.055 : 0.065, roughness: 0.10 },
     traffic: { sizeM: 1.8, albedo: painted ? 0.060 : 0.075, roughness: 0.08 },
     soil: painted ? 0.075 : 0.085,
+    soilChroma: 0.7,
   });
 }
 
@@ -122,7 +125,7 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2
   const knot = smoothstep(float(0.021), float(0.006), abs(along.sub(knotCentre)));
   const silver = smoothstep(float(0.4), float(1.9), p.y).mul(wear.soilMask.mul(float(0.5)).add(float(0.5)));
   const dampFoot = smoothstep(float(0.22), float(0.0), p.y);
-  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(boardTone));
+  const wood = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint).mul(float(1).add(boardTone));
   const grained = wood.mul(float(1).sub(latewoodAlbedo.mul(painted.select(float(0.03), float(0.11)))));
   const knotted = mix(grained, grained.mul(float(0.55)), knot.mul(painted.select(float(0.15), float(0.8))));
   const weathered = mix(knotted, knotted.mul(float(1.26)), silver.mul(painted.select(float(0.25), float(TIMBER_SILVER_LIFT))));
@@ -163,7 +166,7 @@ export function createTimberMaterial(
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(baseSrgb);
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, TIMBER_SOIL_SRGB, mat);
   setNuketown2FamilyUniform(uniforms, 'timberVariant', variant === 'fence' ? 0 : variant === 'deck' ? 1 : 2);
   const shared = sharedTimberGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
