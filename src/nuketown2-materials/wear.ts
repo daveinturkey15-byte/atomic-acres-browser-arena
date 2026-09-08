@@ -109,14 +109,6 @@ export interface WearNodes {
   readonly albedoMul: any;
   readonly roughness: any;
   readonly soilMask: any;
-  /**
-   * Unit-luma chromaticity tint of the soiled patch. A vec3 that is EXACTLY
-   * (1,1,1) wherever `soilChroma` is 0, so families that multiply it change
-   * nothing until they opt in. Above 0 it rotates the soiled patch toward the
-   * soil hue at matched luma: the tint is the soil colour divided by its own
-   * Rec.709 luma, mixed in by `soilMask * soilChroma`.
-   */
-  readonly soilTint: any;
   readonly grain: any;
   readonly scuff: any;
 }
@@ -134,21 +126,6 @@ export const BACKDROP_READ_DISTANCE_M = 30;
 /** Is this spec authored as a backdrop rather than as a surface you can approach? */
 export function isBackdrop(spec: Nuketown2MaterialSpec): boolean {
   return readDistance(spec) >= BACKDROP_READ_DISTANCE_M;
-}
-
-/**
- * The opt-in coloured-soil tint for one soiling field.
- *
- * Luminance-preserving BY CONSTRUCTION: `soil / luma(soil)` has luma 1, so
- * mixing it in changes the patch's hue, not how dark the soil gets. The
- * scalar `albedoMul` darkening (and the `albedoWearStep` budget behind it)
- * is untouched.
- */
-export function soilTintNode(uniforms: Nuketown2Uniforms, soilMask: any): any {
-  const soil = uniforms.soilColor;
-  const soilLuma = soil.x.mul(float(0.2126)).add(soil.y.mul(float(0.7152))).add(soil.z.mul(float(0.0722)));
-  const unitSoil = soil.div(max(soilLuma, float(0.001)));
-  return mix(vec3(float(1), float(1), float(1)), unitSoil, soilMask.mul(uniforms.soilChroma));
 }
 
 /**
@@ -181,7 +158,7 @@ export function backdropWear(spec: Nuketown2MaterialSpec, uniforms = createNuket
     float(0.03),
     float(1.0),
   );
-  return { albedoMul, roughness, soilMask, soilTint: soilTintNode(uniforms, soilMask), grain: float(0), scuff: float(0) };
+  return { albedoMul, roughness, soilMask, grain: float(0), scuff: float(0) };
 }
 
 /**
@@ -261,7 +238,6 @@ export function buildWear(
     albedoMul: useBackdrop.select(backdrop.albedoMul, albedoMul),
     roughness: useBackdrop.select(backdrop.roughness, roughness),
     soilMask: useBackdrop.select(backdrop.soilMask, soilMask),
-    soilTint: useBackdrop.select(backdrop.soilTint, soilTintNode(uniforms, soilMask)),
     grain: useBackdrop.select(backdrop.grain, grain),
     scuff: useBackdrop.select(backdrop.scuff, scuff),
   };

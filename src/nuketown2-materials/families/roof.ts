@@ -54,8 +54,6 @@ const KEYWAY_RECESS_M = -0.0035;
 const GRANULE_RELIEF_M = 0.0007;
 /** A granule-loss patch sits this far below the intact bed, metres. */
 const GRANULE_LOSS_RELIEF_M = -0.0009;
-/** Soiling hue for shingles: black-green algae, not the shared warm brown. */
-export const ROOF_SOIL_SRGB = 0x40483c;
 
 export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpec {
   return assertSpec({
@@ -68,7 +66,6 @@ export function roofSpec(name = 'nuketown2-roof-shingles'): Nuketown2MaterialSpe
     scuff: { sizeM: 0.060, albedo: 0.065, roughness: 0.10 },
     traffic: { sizeM: 2.2, albedo: 0.055, roughness: 0.05 },
     soil: 0.075,
-    soilChroma: 0.7,
   });
 }
 
@@ -99,7 +96,7 @@ function sharedRoofGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2Te
   const shingleTone = hash2(vec2(tabIdx, courseIdx)).sub(float(0.5)).mul(float(0.16));
   const granuleLoss = smoothstep(float(0.35), float(0.72), wear.scuff);
   const matAsphalt = linearSwatch(0x2a2b2b);
-  const base = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint).mul(float(1).add(shingleTone));
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(shingleTone));
   const withLoss = mix(base, matAsphalt, granuleLoss.mul(float(0.55)));
   const streakField = fract(p.x.mul(float(1.7)).add(wear.soilMask.mul(float(0.4))));
   const streak = smoothstep(float(0.58), float(0.86), streakField).mul(wear.soilMask);
@@ -140,7 +137,7 @@ export function createRoofMaterial(
   mat.type = 'MeshStandardMaterial';
   mat.color.setHex(spec.baseSrgb);
 
-  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, ROOF_SOIL_SRGB, mat);
+  const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x6b5741, mat);
   const shared = sharedRoofGraph(uniforms, textureBridge);
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;

@@ -108,8 +108,6 @@ export const KERB_CONCRETE_SRGB = 0x9e917d;
 
 /** Driveway apron concrete: warmer weathered apron tone (replaces 0x8b8879). */
 export const DRIVEWAY_APRON_SRGB = 0x8d806d;
-/** Soiling hue for concrete: cool grey-green mould, not the shared warm brown. */
-export const CONCRETE_SOIL_SRGB = 0x6e7166;
 
 export function concreteSpec(name: string, baseSrgb: number, polygonOffset?: number): Nuketown2MaterialSpec {
   return assertSpec({
@@ -122,7 +120,6 @@ export function concreteSpec(name: string, baseSrgb: number, polygonOffset?: num
     scuff: { sizeM: 0.040, albedo: 0.050, roughness: 0.09 },
     traffic: { sizeM: 2.0, albedo: 0.055, roughness: 0.07 },
     soil: 0.090,
-    soilChroma: 0.7,
     ...(polygonOffset === undefined ? {} : { polygonOffset }),
   });
 }
@@ -182,7 +179,7 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketow
   const blockSpall = smoothstep(float(0.55), float(0.86), wear.scuff)
     .mul(smoothstep(footY.add(float(0.10)), footY.add(float(0.16)), p.y));
   const spall = isApron.select(float(0), blockSpall);
-  const base = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint).mul(float(1).add(unit));
+  const base = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(unit));
   const damped = base.mul(float(1).sub(damp.mul(float(0.20))));
   const finished = damped.mul(float(1).sub(relief.mul(float(0.045))));
   const jointed = mix(finished, finished.mul(float(0.58)), joint);
@@ -247,7 +244,7 @@ export function createConcreteMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb, CONCRETE_SOIL_SRGB, mat);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'concreteVariant', variant === 'apron' ? 0 : variant === 'kerb' ? 1 : 2);
   setNuketown2FamilyUniform(uniforms, 'concreteFootY', options.dampFootY ?? 0.0);
   const shared = sharedConcreteGraph(uniforms, textureBridge);

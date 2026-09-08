@@ -41,8 +41,6 @@ const STAMP_RELIEF_M = 0.004;
 const CHIP_RELIEF_M = -0.00012;
 /** Orange peel: the 0.9 mm cell structure of a sprayed film, metres. It is the reason a real door is not a mirror. */
 const ORANGE_PEEL_M = 0.00006;
-/** Soiling hue for house painted metal: red-brown weep, not the shared warm brown. */
-export const PAINTED_METAL_SOIL_SRGB = 0x6a4a38;
 
 export function paintedMetalSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
   return assertSpec({
@@ -57,7 +55,6 @@ export function paintedMetalSpec(name: string, baseSrgb: number): Nuketown2Mater
     scuff: { sizeM: 0.050, albedo: 0.080, roughness: 0.12 },
     traffic: { sizeM: 1.5, albedo: 0.055, roughness: 0.10 },
     soil: 0.070,
-    soilChroma: 0.7,
   });
 }
 
@@ -89,7 +86,7 @@ function sharedPaintedMetalGraph(uniforms: Nuketown2Uniforms): { colorNode: any;
   const primer = linearSwatch(0x9c968c);
   const chalk = smoothstep(float(0.25), float(0.85), wear.soilMask);
   const weep = smoothstep(float(0.35), float(0.0), p.y).mul(smoothstep(float(0.45), float(0.9), wear.soilMask));
-  const paint = uniforms.baseColor.mul(wear.albedoMul).mul(wear.soilTint);
+  const paint = uniforms.baseColor.mul(wear.albedoMul);
   const chalked = mix(paint, paint.mul(float(1.24)), chalk.mul(float(0.45)));
   const chipped = mix(chalked, primer, chip.mul(float(0.8)));
   const rusted = mix(chipped, linearSwatch(0x7a4426), weep.mul(float(0.55)));
@@ -128,7 +125,7 @@ export function createPaintedMetalMaterial(
     mat.polygonOffsetUnits = options.polygonOffset;
   }
 
-  const uniforms = createNuketown2Uniforms(spec, baseSrgb, PAINTED_METAL_SOIL_SRGB, mat);
+  const uniforms = createNuketown2Uniforms(spec, baseSrgb, 0x6b5741, mat);
   setNuketown2FamilyUniform(uniforms, 'paintedPanelled', options.panelled === true ? 1 : 0);
   const shared = sharedPaintedMetalGraph(uniforms);
   mat.colorNode = shared.colorNode;
