@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 95",
-    "description": "Pass 95 gives Nuke Town image-generated PBR relief on house and vehicle surfaces, a taller textured massif with a LOD conifer belt, killstreak audio that no longer drops cues, a duplicate activation-frame walk removed, and a refactor that deletes 435 lines of re-export barrels."
+    "label": "PASS 96",
+    "description": "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint."
   },
   "experimental": {
-    "pass": "PASS 95",
-    "label": "PASS 95",
-    "description": "Pass 95 gives Nuke Town image-generated PBR relief on house and vehicle surfaces, a taller textured massif with a LOD conifer belt, killstreak audio that no longer drops cues, a duplicate activation-frame walk removed, and a refactor that deletes 435 lines of re-export barrels.",
-    "path": "channels/pass95"
+    "pass": "PASS 96",
+    "label": "PASS 96",
+    "description": "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint.",
+    "path": "channels/pass96"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass94Backup": {
-    "label": "PASS 94 · SAFE BACKUP",
+  "pass95Backup": {
+    "label": "PASS 95 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 94",
-    "path": "channels/pass94"
+    "pass": "PASS 95",
+    "path": "channels/pass95"
   }
 }

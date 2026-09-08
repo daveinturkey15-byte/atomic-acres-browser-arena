@@ -63,7 +63,18 @@ def roll_numbers(s: str, n: int) -> str:
             return f"{prefix}{a}"
         return m.group(0)
 
-    return re.sub(r"(PASS |Pass |pass|dist-pass|publish_pass)(\d{2})\b", sub, s)
+    # NOT every `pass<dd>` in the tree is a release number. Some are a permanent part of a
+    # FILENAME that shipped in that pass and keeps that name forever: src/ui/pass94-hud-chat.css,
+    # pass75-hud-redesign.css, pass66-overhaul.css. Rolling those points an import at a file that
+    # does not exist, and nothing fails loudly - the stylesheet just silently stops loading.
+    #
+    # This happened on the pass95 roll (import pass94-hud-chat.css was rewritten to pass95 and
+    # had to be reverted by hand) and then AGAIN on the pass96 roll, which is what earned the
+    # fix: a defect that recurs is a missing rule, not bad luck.
+    #
+    # A number followed by "-<lowercase>" is a filename slug, never a release number. Real
+    # release numbers are followed by / " . whitespace or end: pass95/, "pass95", dist-pass95.
+    return re.sub(r"(PASS |Pass |pass|dist-pass|publish_pass)(\d{2})\b(?!-[a-z])", sub, s)
 
 
 def main() -> None:

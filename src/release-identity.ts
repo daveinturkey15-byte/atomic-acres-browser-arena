@@ -2,7 +2,7 @@
  * What the running build calls ITSELF - the header badge, the session block and the
  * blocked-renderer notice all read this.
  *
- * Stamped to PASS 95 on 2026-09-02 (the pass95 cut). Stamping is part of CUTTING a
+ * Stamped to PASS 96 on 2026-09-02 (the pass96 cut). Stamping is part of CUTTING a
  * release, and the identity must always name the channel this source will publish to:
  * the pass82 publish shipped with the PASS 81 stamp still in place - the exact repeat of
  * the PASS 80/PASS 81 class of failure this file's rule exists to stop. The publish
@@ -14,15 +14,15 @@
  *
  * HF-400 (owner, 2026-09-02: "pin this version and remove all past versions, this can
  * be the safe backup"): once this pass publishes, gh-pages carries exactly
- * channels/pass95 (this build, live) and channels/pass94 (the pinned safe backup).
- * Every older tree is retired by scripts/orchestration/publish_pass95.py.
+ * channels/pass96 (this build, live) and channels/pass95 (the pinned safe backup).
+ * Every older tree is retired by scripts/orchestration/publish_pass96.py.
  */
 export const PASS66_RELEASE_IDENTITY = Object.freeze({
-  pass: 'PASS 95',
-  label: 'PASS 95',
+  pass: 'PASS 96',
+  label: 'PASS 96',
   state: 'RELEASE CANDIDATE',
-  route: 'channels/pass95',
-  runtimeLabel: 'PASS 95',
+  route: 'channels/pass96',
+  runtimeLabel: 'PASS 96',
 });
 
 export const PASS64_FAILED_REGRESSION_IDENTITY = Object.freeze({

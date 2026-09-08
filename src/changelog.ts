@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass95ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass96ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 95. */
+const pass95ReleasedAt = '2026-09-08T09:21:43+01:00';
 /** gh-pages publish receipt for PASS 94. */
 const pass94ReleasedAt = '2026-09-05T14:10:46+01:00';
 /** gh-pages publish receipt for PASS 93. */
@@ -148,6 +150,25 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass96',
+    pass: 'PASS 96',
+    title: 'Pass 96 — Nuketown light shafts, Map 3 weather and the see-through floor',
+    releasedAt: pass96ReleasedAt,
+    areas: Object.freeze(['rendering', 'atmosphere', 'map3', 'nuketown', 'vehicles', 'interiors']),
+    summary: "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint.",
+    highlights: Object.freeze([
+      'Nuketown gains analytic sun in-scatter and light shafts anchored to the house doorways, windows and garage mouth, so the frame has structure in its light rather than a uniform grey wash.',
+      "Map 3's seasonal storm, previously confined to one 14-metre corridor bay, is now a map-wide weather system publishing wind, wetness and precipitation, with roughness and reflectance responding on the street cells.",
+      'Map 3 gets a signature graded sky and shafted corridor lighting, so the walk between corridors reads as authored rather than as a test level.',
+      "The Map 3 see-through floor is fixed: the colosseum's cavity eraser was 63.9 units wide against a 61.5-unit apron hole, so it erased ground the hole never covered. Both now derive from one aperture.",
+      'The garage car and the house interior clutter are gone, removed with their collision and shot authority rather than just hidden, and the twelve solid cover bodies are asserted still present.',
+      'Pass 95 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -

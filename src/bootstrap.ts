@@ -32,15 +32,15 @@ const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
 // second card was a dead link.
 //
 // HF-400, owner 2026-09-02: "pin this version and remove all past versions, this
-// can be the safe backup". After the pass95 publish the ONLY trees on gh-pages
-// are channels/pass95 and channels/pass94, so the second card must be the PASS 94
+// can be the safe backup". After the pass96 publish the ONLY trees on gh-pages
+// are channels/pass96 and channels/pass95, so the second card must be the PASS 95
 // safe backup; `stable` (recent-stable) is retired by that publish and stays here
 // only as a last resort the publish guard will refuse. `rollback` is deliberately
 // not consulted; it stays in release-channels.json because project-map.ts
 // documents it, but it must not be offered to a player until its tree exists.
-// scripts/orchestration/publish_pass95.py parses this line and refuses to publish
-// unless it resolves to channels/pass94.
-const stableFallback = releaseChannels.pass94Backup ?? releaseChannels.stable;
+// scripts/orchestration/publish_pass96.py parses this line and refuses to publish
+// unless it resolves to channels/pass95.
+const stableFallback = releaseChannels.pass95Backup ?? releaseChannels.stable;
 const newestBuildIsPublished = CHANGELOG[0]?.releasedAt !== PENDING_PRODUCTION_RELEASE;
 // The pass name used to be hand-written into both of these strings, and had been stale for
 // ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
