@@ -24,6 +24,7 @@ import {
   FIELD_SHED_MATERIAL_IDS,
   FIELD_SHED_MATERIAL_POLICY_ID,
 } from './destructible-shed-definition';
+import { normaliseApertures } from './destructible-shed-panel-topology';
 
 export { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 
@@ -46,7 +47,10 @@ function ridgedMetalBumpTexture(): THREE.DataTexture {
   return texture;
 }
 
-function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
+function buildShedPanelShape(
+  surface: SheetSurfaceDefinition,
+  apertures: readonly BallisticAperture[],
+): THREE.Shape {
   const { halfU, halfV, outlineUVQ } = surface.frame;
   const shape = new THREE.Shape();
   if (outlineUVQ && outlineUVQ.length >= 3) {
@@ -71,7 +75,7 @@ function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfa
     shape.lineTo(-halfU, halfV);
     shape.closePath();
   }
-  for (const aperture of state.apertures) {
+  for (const aperture of apertures) {
     const hole = new THREE.Path();
     hole.absellipse(
       aperture.uQ / SHED_PANEL_COORD_Q * halfU,
@@ -87,7 +91,20 @@ function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfa
   return shape;
 }
 
-function panelBasis(surface: SheetSurfaceDefinition): THREE.Matrix4 {
+export function createShedPanelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
+  return buildShedPanelShape(surface, normaliseApertures(surface, state.apertures));
+}
+
+/** QA-only raw construction used to keep the historical r185 collapse falsifier alive. */
+export function createRawShedPanelShapeForQA(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
+  return buildShedPanelShape(surface, state.apertures);
+}
+
+// Named export retained for the CPU QA instruments; runtime callers use the
+// same function above so the instrument cannot drift into a second shape port.
+export const panelShape = createShedPanelShape;
+
+export function panelBasis(surface: SheetSurfaceDefinition): THREE.Matrix4 {
   const u = new THREE.Vector3(surface.frame.uAxis.x, surface.frame.uAxis.y, surface.frame.uAxis.z);
   const v = new THREE.Vector3(surface.frame.vAxis.x, surface.frame.vAxis.y, surface.frame.vAxis.z);
   const normal = new THREE.Vector3().crossVectors(u, v).normalize();
@@ -102,16 +119,20 @@ function transformedPanelGeometry(
   surface: SheetSurfaceDefinition,
   state: DamageableSheetSurfaceState,
 ): THREE.BufferGeometry {
-  const geometry = new THREE.ShapeGeometry(panelShape(surface, state), 18);
+  const geometry = new THREE.ShapeGeometry(createShedPanelShape(surface, state), 18);
   geometry.applyMatrix4(panelBasis(surface));
   geometry.computeVertexNormals();
   return geometry;
 }
 
 function localPanelGeometry(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.BufferGeometry {
-  const geometry = new THREE.ShapeGeometry(panelShape(surface, state), 18);
+  const geometry = new THREE.ShapeGeometry(createShedPanelShape(surface, state), 18);
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function indexedTriangleCount(geometry: THREE.BufferGeometry): number {
+  return Math.floor((geometry.index?.count ?? 0) / 3);
 }
 
 /**
@@ -503,6 +524,17 @@ export class DestructibleShedPresentation {
       const shellGeometry = staticGeometries.length > 0
         ? mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry()
         : new THREE.BufferGeometry();
+      const expectedTriangles = staticGeometries.reduce((sum, geometry) => sum + indexedTriangleCount(geometry), 0);
+      const mergedTriangles = indexedTriangleCount(shellGeometry);
+      if (mergedTriangles !== expectedTriangles) {
+        // A three.js triangulation/merge regression must not replace a valid
+        // shell with an empty or truncated one. Leave the previous mesh and
+        // its telemetry in place; the unchanged topology signature makes the
+        // next sync retry after the renderer has recovered.
+        shellGeometry.dispose();
+        staticGeometries.forEach((geometry) => geometry.dispose());
+        return;
+      }
       staticGeometries.forEach((geometry) => geometry.dispose());
       const oldShell = this.shell;
       const oldShellGeometry = oldShell.geometry;

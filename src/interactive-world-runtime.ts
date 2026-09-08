@@ -261,7 +261,7 @@ function surfaceBounds(frame: SurfaceFrame, thickness = 0.08): Box2 {
   });
 }
 
-function panelCoordinates(frame: SurfaceFrame, point: Point3): Readonly<{ uQ: number; vQ: number }> {
+export function panelCoordinates(frame: SurfaceFrame, point: Point3): Readonly<{ uQ: number; vQ: number }> {
   const offset = {
     x: point.x - frame.centre.x,
     y: point.y - frame.centre.y,

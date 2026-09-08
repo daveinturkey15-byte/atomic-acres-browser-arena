@@ -149,6 +149,8 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'nuketown2-nuke-street',
     'nuketown2-nuke-north-balcony',
     'nuketown2-nuke-south-balcony',
+    'nuketown2-shed-north-broadside',
+    'nuketown2-shed-north-door',
   ]),
   // RAID2 (Lane AQ, HF-408): the Raid layout rethink. Ten cameras rather than
   // the usual four because this arena's whole claim is about ten specific
