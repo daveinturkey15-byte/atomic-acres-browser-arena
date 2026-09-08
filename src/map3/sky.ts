@@ -63,7 +63,7 @@ const {
 
 import { rgb } from './foliage-material';
 import { hash11 } from './leaf-geometry';
-
+import { map3WeatherShared } from './weather-system';
 /* ================================================================== */
 /* Tunables                                                            */
 /* ================================================================== */
@@ -264,6 +264,88 @@ export function applySkyPalette(u: SkyUniforms, p: SkyPalette): void {
 }
 
 /* ================================================================== */
+/* M3.WEATHER.3a — storm response: a storm darkens and closes the world */
+/* in, clearing opens it back up. The ramp lives in the shared state, so */
+/* this only ever reads already-ramped values: transitions never cut.    */
+/* ================================================================== */
+
+/** Storm end of the sky blend. Clear end is whatever palette was applied. */
+const STORM_HORIZON = new THREE.Color(0x5a6672);
+const STORM_ZENITH = new THREE.Color(0x3a4550);
+const STORM_GROUND = new THREE.Color(0x2e3230);
+const STORM_CLOUD_LIGHT = new THREE.Color(0x8b95a1);
+const STORM_CLOUD_SHADOW = new THREE.Color(0x333b47);
+const SNOW_GROUND = new THREE.Color(0xdde6ee);
+
+/** Base look snapshotted at build, so the per-frame blend cannot compound. */
+export interface Map3SkyWeatherBase {
+  horizon: THREE.Color; zenith: THREE.Color; ground: THREE.Color;
+  cloudLight: THREE.Color; cloudShadow: THREE.Color;
+  haze: number; sunGlow: number; intensity: number; density: number;
+}
+
+/** Snapshot the current uniform set as the clear end of the weather blend. */
+export function snapshotSkyWeatherBase(u: SkyUniforms): Map3SkyWeatherBase {
+  const col = (n: ReturnType<typeof uniform>) => (n as unknown as { value: THREE.Color }).value;
+  const num = (n: ReturnType<typeof uniform>) => (n as unknown as { value: number }).value;
+  return {
+    horizon: col(u.horizonColor).clone(), zenith: col(u.zenithColor).clone(),
+    ground: col(u.groundColor).clone(), cloudLight: col(u.cloudLight).clone(),
+    cloudShadow: col(u.cloudShadow).clone(), haze: num(u.hazeStrength),
+    sunGlow: num(u.sunGlow), intensity: num(u.skyIntensity), density: num(u.cloudDensity),
+  };
+}
+
+/**
+ * Blend one sky toward storm/snow by the ramped shared amounts. Writes in
+ * place, allocates nothing — safe to call every frame.
+ */
+export function applyMap3SkyWeather(
+  u: SkyUniforms, base: Map3SkyWeatherBase, darken: number, snow: number,
+): void {
+  const col = (n: ReturnType<typeof uniform>) => (n as unknown as { value: THREE.Color }).value;
+  const num = (n: ReturnType<typeof uniform>) => n as unknown as { value: number };
+  const d = Math.min(1, Math.max(0, darken));
+  const s = Math.min(1, Math.max(0, snow));
+  col(u.horizonColor).copy(base.horizon).lerp(STORM_HORIZON, d);
+  col(u.zenithColor).copy(base.zenith).lerp(STORM_ZENITH, d);
+  col(u.groundColor).copy(base.ground).lerp(STORM_GROUND, d).lerp(SNOW_GROUND, s * 0.7);
+  col(u.cloudLight).copy(base.cloudLight).lerp(STORM_CLOUD_LIGHT, d);
+  col(u.cloudShadow).copy(base.cloudShadow).lerp(STORM_CLOUD_SHADOW, d);
+  num(u.hazeStrength).value = Math.min(1, base.haze + d * 0.35);
+  num(u.sunGlow).value = base.sunGlow * (1 - d * 0.8);
+  num(u.skyIntensity).value = base.intensity * (1 - d * 0.35);
+  num(u.cloudDensity).value = Math.min(0.95, base.density + d * 0.3);
+}
+
+/** Read the ramped shared amounts without importing the controller. */
+export interface Map3SkyWeatherAmounts { darken: number; snow: number; }
+export function readMap3SkyWeatherAmounts(out: Map3SkyWeatherAmounts): void {
+  const num = (n: unknown): number => (n as { value: number }).value;
+  out.darken = num(map3WeatherShared.skyDarken);
+  out.snow = num(map3WeatherShared.snowAmount);
+}
+
+/** Fog range + colour for the integrator's scene.fog. Base matches main.ts. */
+export const MAP3_FOG_CLEAR = new THREE.Color(0x9dc0d2);
+export const MAP3_FOG_STORM = new THREE.Color(0x6b7683);
+export const MAP3_FOG_BASE_NEAR = 55;
+export const MAP3_FOG_BASE_FAR = 320;
+
+/**
+ * Drive a THREE.Fog from the ramped shared fog scale. Mutates in place,
+ * allocates nothing. The integrator (main.ts / map3-arena owner) calls this
+ * once per frame — see REPORT.md ## CROSS-LANE REQUESTS.
+ */
+export function applyMap3WeatherToFog(fog: THREE.Fog, baseNear = MAP3_FOG_BASE_NEAR, baseFar = MAP3_FOG_BASE_FAR): void {
+  const num = (n: unknown): number => (n as { value: number }).value;
+  const scale = Math.max(1, num(map3WeatherShared.fogDensityScale));
+  fog.near = baseNear / scale;
+  fog.far = baseFar / scale;
+  fog.color.copy(MAP3_FOG_CLEAR).lerp(MAP3_FOG_STORM, Math.min(1, (scale - 1) / 1.1));
+}
+
+/* ================================================================== */
 /* Noise — sin/cos composition, no texture, no gradient table          */
 /* ================================================================== */
 
@@ -336,7 +418,12 @@ export function createSky(options: SkyOptions = {}): Sky {
 
   const uniforms = createSkyUniforms();
   if (options.palette) applySkyPalette(uniforms, options.palette);
-
+  // M3.WEATHER.3a: clear end of the storm blend. Snapshot AFTER the palette
+  // so a paletted sky still blends from its own look, not from DAY.
+  const weatherBase = snapshotSkyWeatherBase(uniforms);
+  // Scratch for the per-frame weather read: owned by the closure, so the
+  // frame update allocates nothing.
+  const skyWx: Map3SkyWeatherAmounts = { darken: 0, snow: 0 };
   // These ARE the uniform payloads, not copies of them. Mutating the vector
   // mutates what the shader reads on the next frame — the same trick the maths
   // corridor uses for its proxy centres.
@@ -842,8 +929,11 @@ export function createSky(options: SkyOptions = {}): Sky {
       sunCentre.copy(sunPosition);
       sunMesh.position.copy(sunPosition);
 
-      // Warm when low, white when high — the same ramp the dome's glow and the
-      // foliage transmission read, because it is the same object.
+      // M3.WEATHER.3a: storm darkens and closes the world in; clearing opens
+      // it back up. Amounts are already ramped in the shared state — never cut.
+      // Scratch owned by the closure: this update allocates nothing per frame.
+      readMap3SkyWeatherAmounts(skyWx);
+      applyMap3SkyWeather(uniforms, weatherBase, skyWx.darken, skyWx.snow);
       sunColor.copy(SUN_LOW).lerp(SUN_HIGH, THREE.MathUtils.smoothstep(el, 0.26, 0.8));
 
       const a2 = a + PLANET_PHASE;

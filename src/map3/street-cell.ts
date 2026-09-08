@@ -51,6 +51,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 
 import { fbm2, ridgedFbm2, valueNoise2, xz } from './noise';
+import { map3WeatherShared } from './weather-system';
 
 /** One cast boundary; see the note in foliage-material.ts. */
 const {
@@ -351,18 +352,30 @@ function createGroundMaterial(): MeshStandardNodeMaterial {
   const isPave = smoothstep(float(2.4), float(2.6), part).mul(smoothstep(float(3.6), float(3.4), part));
   const isSkirt = smoothstep(float(3.4), float(3.6), part);
 
-  mat.colorNode = road.mul(isRoad)
+  // M3.WEATHER.2a — wet surfaces. `wet` is the ramped shared weather state
+  // (weather-system.ts), so this tracks a storm in and out with no cut.
+  // Puddles pool in the lows: a low-frequency fBM thresholded hard, plus the
+  // channel and the damp band — non-uniform by construction, never a wash.
+  const wet = map3WeatherShared.wetness;
+  const pool = smoothstep(float(0.52), float(0.78), fbm2(xz(p, 0.33).add(vec2(4.7, 9.1)), 3));
+  const wetMask = clamp(pool.mul(0.75).add(channel.mul(0.5)).add(damp.mul(0.35)), float(0), float(1)).mul(wet);
+  const dryGround = road.mul(isRoad)
     .add(kerbFace.mul(isKerbFace))
     .add(kerbTop.mul(isKerbTop))
     .add(pavement.mul(isPave))
     .add(skirt.mul(isSkirt));
+  // Standing water reads at about half albedo and slightly cool; the mix cap
+  // keeps a hint of the dry surface so it never goes enamel-black.
+  mat.colorNode = mix(dryGround, dryGround.mul(vec3(0.50, 0.53, 0.58)), wetMask.mul(0.85));
 
   // Wet channel and polished kerb nose are the only roughness variation; a
   // uniformly rough street reads as felt.
-  mat.roughnessNode = float(0.97)
+  const dryRough = float(0.97)
     .sub(channel.mul(isRoad).mul(0.16))
     .sub(paint.mul(0.10))
     .sub(isKerbTop.mul(0.08));
+  // Puddles go near-mirror; damp-only areas just lose their tooth.
+  mat.roughnessNode = mix(dryRough, float(0.14), wetMask);
   return mat;
 }
 
@@ -540,8 +553,18 @@ function createFrontageMaterial(): MeshStandardNodeMaterial {
   const isTrim = smoothstep(float(1.4), float(1.6), part).mul(smoothstep(float(2.6), float(2.4), part));
   const isShop = smoothstep(float(2.4), float(2.6), part);
 
-  mat.colorNode = wall.mul(isWall).add(glass.mul(isGlass)).add(trim.mul(isTrim)).add(shop.mul(isShop));
-  mat.roughnessNode = float(0.92).sub(isGlass.mul(0.80)).sub(isTrim.mul(0.10));
+  // M3.WEATHER.2a — rain-washed base: the lower ~3 m of wall and trim darken
+  // with the ramped shared state. Glass is untouched: a wet shopfront is
+  // still a dark reveal, not a mirror.
+  const wetF = map3WeatherShared.wetness;
+  const wetLow = smoothstep(float(3.2), float(0.4), p.y).mul(wetF);
+  const dryFront = wall.mul(isWall).add(glass.mul(isGlass)).add(trim.mul(isTrim)).add(shop.mul(isShop));
+  const wetFront = wall.mul(0.62).mul(isWall).add(glass.mul(isGlass))
+    .add(trim.mul(0.70).mul(isTrim)).add(shop.mul(0.80).mul(isShop));
+  mat.colorNode = mix(dryFront, wetFront, wetLow.mul(0.8));
+  const dryRoughF = float(0.92).sub(isGlass.mul(0.80)).sub(isTrim.mul(0.10));
+  mat.roughnessNode = mix(dryRoughF, float(0.55),
+    clamp(wetLow.mul(isWall.add(isTrim)), float(0), float(1)));
   mat.metalnessNode = isGlass.mul(0.35);
   return mat;
 }

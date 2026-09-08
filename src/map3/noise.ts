@@ -155,3 +155,14 @@ export function xz(positionNode: any, scale = 1) {
 /** Unused import guard — `cos`/`sin` are used via Math above, keep the DSL live. */
 void cos;
 void sin;
+
+/**
+ * M3.WEATHER.1a — deterministic CPU hash in [0,1), the same formula
+ * leaf-geometry.ts uses. It lives here so owned files (corridor-weather,
+ * weather-system fills) never import the grass lane's module for one hash.
+ * Bit-identical outputs for identical inputs by construction.
+ */
+export function hash11(n: number): number {
+  const s = Math.sin(n * 127.1) * 43758.5453;
+  return s - Math.floor(s);
+}
