@@ -79,6 +79,7 @@ function materialBatchKey(material: THREE.Material): string {
     emissiveIntensity: candidate.emissiveIntensity,
     roughness: candidate.roughness,
     metalness: candidate.metalness,
+    nuketown2PaintKey: material.userData.nuketown2PaintKey,
     transmission: candidate.transmission,
     map: candidate.map?.uuid,
     transparent: material.transparent,
