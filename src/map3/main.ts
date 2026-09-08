@@ -32,6 +32,9 @@ import { installTintSwizzleShim, tintSwizzleShimTelemetry } from '../webgpu-tint
 import { createSky } from './sky';
 import { createPhysicsCorridor, type PhysicsCorridor } from './corridor-physics';
 import { createColosseumCorridor } from './corridor-colosseum';
+import {
+  THRESHOLD_COOL, THRESHOLD_GOLD, THRESHOLD_WARM, createSignatureThreshold,
+} from './signature-thresholds';
 import { setSun } from './foliage-material';
 
 /* ---------------------------------------------------------------- */
@@ -317,13 +320,18 @@ async function main(): Promise<void> {
   // Rapier's init() is async, so this one corridor has to be awaited before
   // the hub can lay the spokes out.
   const physics: PhysicsCorridor = await createPhysicsCorridor();
+  // M3.SIGNATURE.2a — the volume hall's shafts track the visible sky sun.
+  // Stored by reference: one call, no per-frame work, nothing allocated.
+  // The colosseum keeps its composed default sun (its overlook is frozen).
+  const volume = createVolumeCorridor();
+  volume.setSunDirection(sky.sunDirection);
   const corridors: Corridor[] = [
     createNatureCorridor(7),
     createMathsCorridor(),
     createGrammarCorridor(11),
     createWaterCorridor(),
     createWeatherCorridor(21),
-    createVolumeCorridor(),
+    volume,
     physics,
     createColosseumCorridor(),
   ];
@@ -354,6 +362,18 @@ async function main(): Promise<void> {
       far.position.set(0, 3.8, -HUB_R - c.length + 1);
       far.rotation.y = Math.PI;   // readable when walking back out
       pivot.add(far);
+    }
+    // M3.SIGNATURE.3a — arrival thresholds. Indices match the corridors array
+    // above: 3 water (cool), 5 shaft hall (warm), 7 overlook (pale gold). The
+    // group is corridor-local with the mouth at z = 0, so it inherits the
+    // spoke pivot. Presentation only: no solids derive from it.
+    const arrivalTint = i === 3 ? THRESHOLD_COOL
+      : i === 5 ? THRESHOLD_WARM
+      : i === 7 ? THRESHOLD_GOLD
+      : null;
+    if (arrivalTint !== null) {
+      const threshold = createSignatureThreshold(arrivalTint);
+      c.group.add(threshold.group);
     }
   });
 

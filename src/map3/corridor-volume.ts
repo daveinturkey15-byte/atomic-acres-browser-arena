@@ -59,6 +59,34 @@ const SLOT_W = 0.7;
 const ROOF_T = 0.5;
 /** Fraction of a bay (0 at a column, 0.5 at the bay centre) an aperture starts at. */
 const APERTURE_FRAC = 0.5 - SLIT_W / 2 / BAY_SPACING;
+/**
+ * M3.SIGNATURE.2a — world-space sun into corridor-local space.
+ *
+ * Pure so it unit-tests without a renderer: inverse corridor matrix in,
+ * clamped local sun out. The 0.12 elevation floor is the colosseum's own rule
+ * (corridor-colosseum.ts): below it the slits see nothing and the march
+ * wastes its steps on black air.
+ */
+export function worldSunToLocal(out: THREE.Vector3, world: THREE.Vector3, inv: THREE.Matrix4): THREE.Vector3 {
+  out.copy(world).transformDirection(inv);
+  if (out.y < 0.12) out.y = 0.12;
+  return out.normalize();
+}
+
+/**
+ * M3.SIGNATURE.2a — axial grade along the walk: mouth bright, end wall dark.
+ *
+ * z runs 0 at the mouth to -len at the end wall. Returns 1 at the mouth,
+ * 0.45 at the wall. A multiplier, never an exposure lift, so the highlight
+ * census cannot grow — the measured complaint is uniform brightness, not
+ * darkness. The TSL graphs below re-derive this same curve in nodes (a JS
+ * call cannot run per sample); this copy is the contract the tests pin.
+ */
+export function volumeAxialGrade(z: number, len = CORRIDOR_LEN): number {
+  const t = Math.min(1, Math.max(0, -z / len));
+  const s = t * t * (3 - 2 * t);
+  return 1 - 0.55 * s;
+}
 
 function mergeSimple(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const pos: number[] = [];
@@ -92,7 +120,19 @@ function box(w: number, h: number, d: number, x: number, y: number, z: number): 
   return g;
 }
 
-export function createVolumeCorridor(): Corridor {
+/**
+ * M3.SIGNATURE.2a options.
+ *
+ * sunDirection: live world-space sun direction from sky.sunDirection; pass it
+ *   once and the shafts track the visible sun forever (same pattern as the
+ *   colosseum).  Omitted: fixed low sun down the corridor axis.
+ */
+export interface VolumeCorridor extends Corridor {
+  /** Update sun direction from the live sky each frame. */
+  setSunDirection(d: THREE.Vector3): void;
+}
+
+export function createVolumeCorridor(): VolumeCorridor {
   const group = new THREE.Group();
   const disposables: Array<{ dispose(): void }> = [];
   const LEN = CORRIDOR_LEN;
@@ -100,6 +140,9 @@ export function createVolumeCorridor(): Corridor {
   const time = uniform(0);
   const invWorld = uniform(new THREE.Matrix4());
   const sunLocal = uniform(new THREE.Vector3(0.78, 0.58, -0.22).normalize());
+  // M3.SIGNATURE.2a — live world-space sun, stored by reference so the shafts
+  // track the visible sky sun with no per-frame allocation (colosseum pattern).
+  let sunWorld: THREE.Vector3 | null = null;
 
   // Physics bodies that cut the beams: two rolling stone spheres and the player.
   const bodyPos0 = uniform(new THREE.Vector3(0, 0.65, -16));
@@ -176,7 +219,13 @@ export function createVolumeCorridor(): Corridor {
     const joint = smoothstep(float(0.44), float(0.49), max(jx, jz));
     const baseStone = mix(rgb(0x3a3a3e), rgb(0x2a2a2d), joint);
     const litStone = rgb(0xa8916c);
-    return mix(baseStone, litStone, sunPatch.mul(0.92));
+    // M3.SIGNATURE.2a — axial grade: the mouth stays bright, the end wall
+    // falls to 0.45. Same smoothstep curve as volumeAxialGrade, re-derived in
+    // nodes (a JS call cannot run per sample). Multiplicative, so the
+    // highlight census cannot grow: structure and range, not exposure.
+    const axialT = clamp(pLocal.z.div(float(-LEN)), float(0), float(1));
+    const axial = float(1).sub(axialT.mul(axialT).mul(float(3).sub(axialT.mul(2))).mul(0.55));
+    return mix(baseStone, litStone, sunPatch.mul(0.92)).mul(axial);
   })();
   disposables.push(stoneMat);
 
@@ -196,7 +245,12 @@ export function createVolumeCorridor(): Corridor {
 
   const colMat = new MeshStandardNodeMaterial();
   colMat.roughness = 0.82;
-  colMat.colorNode = rgb(0x4a4a50);
+  // M3.SIGNATURE.2a — the hall shell carries the same axial grade in albedo,
+  // so columns at the far end sink into graded haze and the walk reads long.
+  colMat.colorNode = Fn(() => {
+    const t = clamp(positionLocal.z.div(float(-CORRIDOR_LEN)), float(0), float(1));
+    return rgb(0x4a4a50).mul(float(1).sub(t.mul(t).mul(float(3).sub(t.mul(2))).mul(0.45)));
+  })();
   disposables.push(colMat);
 
   const parts: THREE.BufferGeometry[] = [];
@@ -370,7 +424,12 @@ export function createVolumeCorridor(): Corridor {
         .add(swirl);
 
       const distFade = exp(t.mul(-0.03));
-      acc.addAssign(beamGate.mul(dens).mul(inBounds).mul(dust).mul(phase).mul(distFade).mul(stepLen));
+      // M3.SIGNATURE.2a — per-sample axial grade: far samples contribute half,
+      // so the bright end of the walk glows and the far end falls to graded
+      // haze. Same curve as volumeAxialGrade, in nodes.
+      const paT = clamp(p.z.div(float(-LEN)), float(0), float(1));
+      const paGrade = float(1).sub(paT.mul(paT).mul(float(3).sub(paT.mul(2))).mul(0.5));
+      acc.addAssign(beamGate.mul(dens).mul(inBounds).mul(dust).mul(phase).mul(distFade).mul(paGrade).mul(stepLen));
       t.addAssign(stepLen);
     });
 
@@ -462,8 +521,10 @@ export function createVolumeCorridor(): Corridor {
 
   const _inv = new THREE.Matrix4();
   const _localPlayer = new THREE.Vector3();
+  const _sunL = new THREE.Vector3();
 
   return {
+    setSunDirection(d: THREE.Vector3) { sunWorld = d; },
     group,
     length: LEN,
     solids,
@@ -476,6 +537,13 @@ export function createVolumeCorridor(): Corridor {
       group.updateWorldMatrix(true, false);
       _inv.copy(group.matrixWorld).invert();
       (invWorld as unknown as { value: THREE.Matrix4 }).value.copy(_inv);
+
+      // M3.SIGNATURE.2a — the shafts track the visible sky sun. Stored by
+      // reference, transformed to local once per frame, no allocation.
+      if (sunWorld) {
+        worldSunToLocal(_sunL, sunWorld, _inv);
+        (sunLocal as unknown as { value: THREE.Vector3 }).value.copy(_sunL);
+      }
 
       // Sphere 0 patrols the aisle end to end.
       s0.pos.z += s0.vel.z * delta;

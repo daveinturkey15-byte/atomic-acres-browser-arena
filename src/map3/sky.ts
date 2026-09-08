@@ -191,6 +191,12 @@ export interface SkyUniforms {
   skyIntensity: ReturnType<typeof uniform>;
   cloudDensity: ReturnType<typeof uniform>;
   plasmaStrength: ReturnType<typeof uniform>;
+  /**
+   * M3.SIGNATURE.1a — cirrus opacity multiplier. Storm response is derived,
+   * not stored: the cirrus graph scales this by (1 - shared skyDarken), so a
+   * storm thins the high veil with nothing extra to drive per frame.
+   */
+  cirrusDensity: ReturnType<typeof uniform>;
 }
 
 export function createSkyUniforms(): SkyUniforms {
@@ -212,6 +218,11 @@ export function createSkyUniforms(): SkyUniforms {
     skyIntensity: uniform(1.0),
     cloudDensity: uniform(0.42),
     plasmaStrength: uniform(0.14),
+    // M3.SIGNATURE.1a — the tint and fog-density inputs live in the shared
+    // weather state (map3WeatherShared.skyTint / .fogDensityScale), consumed
+    // directly by the dome graph below. Neutral defaults there (white / 1.0)
+    // are zero-effect, so nothing drives this file per weather state.
+    cirrusDensity: uniform(0.18),
   };
 }
 
@@ -227,24 +238,26 @@ export interface SkyPalette {
   intensity: number;
   density: number;
   plasma: number;
+  /** M3.SIGNATURE.1a — optional cirrus opacity; defaults to 0.18 if absent. */
+  cirrus?: number;
 }
 
 export const DAY_SKY: SkyPalette = {
   horizon: 0x9dc0d2, zenith: 0x2c66a8, ground: 0x4a5346,
   cloudLight: 0xf3f0ea, cloudShadow: 0x5c6f8c,
-  haze: 0.55, sunGlow: 1.0, intensity: 1.0, density: 0.42, plasma: 0.14,
+  haze: 0.55, sunGlow: 1.0, intensity: 1.0, density: 0.42, plasma: 0.14, cirrus: 0.18,
 };
 
 export const GOLDEN_SKY: SkyPalette = {
   horizon: 0xe8a464, zenith: 0x2a4c86, ground: 0x3d3a33,
   cloudLight: 0xffd7a8, cloudShadow: 0x6b5570,
-  haze: 0.78, sunGlow: 1.6, intensity: 0.92, density: 0.5, plasma: 0.22,
+  haze: 0.78, sunGlow: 1.6, intensity: 0.92, density: 0.5, plasma: 0.22, cirrus: 0.25,
 };
 
 export const OVERCAST_SKY: SkyPalette = {
   horizon: 0xa8b2ba, zenith: 0x77858f, ground: 0x454a45,
   cloudLight: 0xc9cdd2, cloudShadow: 0x596070,
-  haze: 0.9, sunGlow: 0.25, intensity: 0.78, density: 0.72, plasma: 0.05,
+  haze: 0.9, sunGlow: 0.25, intensity: 0.78, density: 0.72, plasma: 0.05, cirrus: 0.0,
 };
 
 /** Write a whole look into the uniform set. Safe to call every frame. */
@@ -261,6 +274,7 @@ export function applySkyPalette(u: SkyUniforms, p: SkyPalette): void {
   num(u.skyIntensity).value = p.intensity;
   num(u.cloudDensity).value = p.density;
   num(u.plasmaStrength).value = p.plasma;
+  if (p.cirrus !== undefined) num(u.cirrusDensity).value = p.cirrus;
 }
 
 /* ================================================================== */
@@ -458,15 +472,30 @@ export function createSky(options: SkyOptions = {}): Sky {
     const withGround = mix(sky, uniforms.groundColor, smoothstep(float(0), float(-0.22), up));
 
     // Haze: a pale band hugging the horizon in both directions. Power 7 keeps
-    // it a band rather than a wash over the whole lower sky.
-    const haze = pow(clamp(float(1).sub(abs(up)), float(0), float(1)), float(7))
-      .mul(uniforms.hazeStrength);
-    const hazed = mix(withGround, uniforms.horizonColor.mul(1.2).add(0.035), haze);
+    // it a band rather than a wash. M3.SIGNATURE.1a consumes the shared
+    // weather fog scale here: a storm (up to 2.1x) widens the band toward a
+    // closed-in horizon; clear (1.0) is unchanged. Clamped, so it never clips.
+    const hazeBase = pow(clamp(float(1).sub(abs(up)), float(0), float(1)), float(7));
+    const haze = hazeBase.mul(uniforms.hazeStrength).mul(map3WeatherShared.fogDensityScale);
+    const hazed = mix(withGround, uniforms.horizonColor.mul(1.2).add(0.035), clamp(haze, float(0), float(1)));
 
     // The sky warms around the real sun. This single term is most of what ties
     // the dome to the orbit: the bright quarter of the sky MOVES.
     const sd = clamp(dot(dir, uniforms.sunDirection), float(0), float(1));
     const glow = pow(sd, float(8)).mul(0.5).add(pow(sd, float(2.2)).mul(0.085));
+
+    // M3.SIGNATURE.1a — a wider, lower sun-side horizon blush.
+    // The colosseum already has a horizon glow behind the pyramids; this makes
+    // the whole dome agree with it: the horizon brightens and warms in the
+    // quarter facing the sun, so standing at the hub you always know which
+    // corridor the light is coming from.  The exponent 4.5 is much wider than
+    // the tight glow above (8), giving a broad warm quarter, not a halo.
+    // sd^2 is clamped against the near-horizon band so overhead sun doesn't
+    // blow the whole sky.  The warm amber is intentionally cooler than the sun
+    // disc so they read as the same source at different scales.
+    const horizonAlign = clamp(float(1).sub(abs(up).mul(3.0)), float(0), float(1));
+    const sideBlush = pow(sd, float(4.5)).mul(horizonAlign).mul(0.22);
+    const blushColor = mix(rgb(0xff7022), rgb(0xffd080), pow(sd, float(2)));
 
     // A sky gradient is the one place 8-bit banding is always visible. A few
     // thousandths of noise costs nothing and removes every ring.
@@ -474,7 +503,12 @@ export function createSky(options: SkyOptions = {}): Sky {
 
     domeMat.colorNode = hazed
       .add(uniforms.sunColor.mul(glow).mul(uniforms.sunGlow))
+      .add(blushColor.mul(sideBlush))
       .mul(uniforms.skyIntensity)
+      // M3.WEATHER seam, consumed not duplicated: multiplicative tint, white
+      // (clear) is the identity. Applied before the dither so the dither stays
+      // display-referred noise rather than tinted signal.
+      .mul(map3WeatherShared.skyTint)
       .add(dither);
   }
 
@@ -894,6 +928,120 @@ export function createSky(options: SkyOptions = {}): Sky {
     puffs.renderOrder = -800;
     group.add(puffs);
     disposables.push(quad, cloudMat);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* 5. CIRRUS — high-altitude streaks, one draw call                  */
+  /*                                                                    */
+  /* M3.SIGNATURE.1a. The colosseum's pyramids sit against a sky that   */
+  /* has cumulus at 44-96 m altitude. Real skies above an excavated     */
+  /* site also carry a high veil — the cirrus layer. At 160-240 m       */
+  /* altitude they are thin enough to transmit the sun-side blush,      */
+  /* read as a different scale of cloud structure, and give the sky the  */
+  /* stratification that makes an overcast look intentional.             */
+  /*                                                                    */
+  /* Technical: 240 billboards, much wider and flatter than cumulus     */
+  /* (aspect 8:1 horizontal). They drift faster (wind shear) and are    */
+  /* purely additive so they never occlude anything.                    */
+  /* ---------------------------------------------------------------- */
+  {
+    const CIRRUS_COUNT = 240;
+    const CIRRUS_Y_MID = 200;
+    const CIRRUS_Y_SPREAD = 36;
+    const CIRRUS_HALF = 190;
+    const CIRRUS_SPAN = CIRRUS_HALF * 2;
+    const CIRRUS_DRIFT = 2.1;  // faster than cumulus — wind shear
+
+    const cPos = new Float32Array(CIRRUS_COUNT * 3);
+    const cInfo = new Float32Array(CIRRUS_COUNT * 2);
+    for (let i = 0; i < CIRRUS_COUNT; i++) {
+      const h0 = hash11(i * 5.17 + 1.1);
+      const h1 = hash11(i * 8.93 + 3.7);
+      const h2 = hash11(i * 13.41 + 7.3);
+      const h3 = hash11(i * 2.61 + 11.9);
+      const ang = (i / CIRRUS_COUNT) * Math.PI * 2 + (h0 - 0.5) * 0.52;
+      const rad = 60 + h1 * 130;
+      cPos[i * 3] = Math.cos(ang) * rad;
+      cPos[i * 3 + 1] = CIRRUS_Y_MID + (h2 - 0.5) * CIRRUS_Y_SPREAD;
+      cPos[i * 3 + 2] = Math.sin(ang) * rad;
+      // Width 28-72 m, height 3-9 m — the wide flat shape is what reads as cirrus.
+      cInfo[i * 2] = 28 + h3 * 44;
+      cInfo[i * 2 + 1] = h0 * 83 + h1 * 37;   // seed
+    }
+
+    const cgeo = new THREE.InstancedBufferGeometry();
+    cgeo.setAttribute('position', new THREE.Float32BufferAttribute(
+      [-0.5, -0.5, 0, 0.5, -0.5, 0, -0.5, 0.5, 0, 0.5, 0.5, 0], 3,
+    ));
+    cgeo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 1, 1], 2));
+    cgeo.setIndex([0, 1, 2, 2, 1, 3]);
+    cgeo.setAttribute('aCPos', new THREE.InstancedBufferAttribute(cPos, 3));
+    cgeo.setAttribute('aCInfo', new THREE.InstancedBufferAttribute(cInfo, 2));
+    cgeo.instanceCount = CIRRUS_COUNT;
+
+    const cirrusMat = new MeshBasicNodeMaterial();
+    cirrusMat.transparent = true;
+    cirrusMat.depthWrite = false;
+    cirrusMat.side = THREE.DoubleSide;
+    cirrusMat.blending = THREE.AdditiveBlending;
+    cirrusMat.fog = false;
+
+    const cp = attribute('aCPos', 'vec3');
+    const ci = attribute('aCInfo', 'vec2');
+    const cseed = ci.y;
+    const ct = uniforms.time;
+
+    // Drift and wrap, cluster-level (same seam-tear prevention as cumulus).
+    const craw = cp.x.add(ct.mul(CIRRUS_DRIFT)).add(CIRRUS_HALF);
+    const cwrapped = craw.sub(craw.mul(1 / CIRRUS_SPAN).floor().mul(CIRRUS_SPAN)).sub(CIRRUS_HALF);
+    const ccentre = vec3(cwrapped, cp.y, cp.z);
+
+    // Billboard — cirrus is nearly horizontal so its up-axis is Y, not camera-up.
+    // A horizontal card needs the right vector to be in the X-Z plane; we build it
+    // from the camera azimuth direction rather than the full toCam so the card
+    // stays flat even when looking straight up.
+    const toCamXZ = normalize(vec3(
+      cameraPosition.x.sub(ccentre.x), float(0), cameraPosition.z.sub(ccentre.z),
+    ).add(vec3(0, 0.001, 0)));
+    const cright = normalize(vec3(toCamXZ.z.negate(), float(0), toCamXZ.x));
+    const cup = vec3(0, 1, 0);
+    const corner = uv().sub(0.5);
+    // aspect: 8 wide : 1 tall, matching the real cirrus silhouette ratio
+    cirrusMat.positionNode = ccentre
+      .add(cright.mul(corner.x.mul(ci.x.mul(8.0))))
+      .add(cup.mul(corner.y.mul(ci.x)));
+
+    // Shading: sun-side lit, faint shimmer from fBm.
+    const clam = clamp(dot(vec3(0, 1, 0), uniforms.sunDirection), float(0), float(1));
+    const cbase = uniforms.sunColor.mul(0.6).add(float(0.4));
+    const cstreak = fbm3(vec3(uv().x.mul(6.2), uv().y.mul(2.1), cseed.mul(0.03)
+      .add(ct.mul(0.05))), 2).mul(0.5).add(0.5);
+    cirrusMat.colorNode = cbase.mul(mix(float(0.3), float(1.0), cstreak)).mul(clam.mul(0.6).add(0.4));
+
+    // Wispy alpha: long horizontal streak shape, fading at both ends.
+    const cu = uv().x;
+    const cv = uv().y;
+    const cshape = smoothstep(float(0), float(0.18), cu)
+      .mul(smoothstep(float(1), float(0.82), cu))
+      .mul(smoothstep(float(0), float(0.3), cv))
+      .mul(smoothstep(float(1), float(0.7), cv));
+    const cwisped = cshape.mul(
+      fbm3(vec3(uv().x.mul(9.1), uv().y.mul(3.5), cseed.mul(0.04)), 2).mul(0.5).add(0.5),
+    );
+    const cseam = smoothstep(float(CIRRUS_HALF), float(CIRRUS_HALF - 50), abs(cwrapped));
+    // M3.SIGNATURE.1a — the high veil thins as the shared storm ramp rises.
+    // Derived from skyDarken, never stored: clear (0) keeps full cirrus.
+    const cstormThin = float(1).sub(clamp(map3WeatherShared.skyDarken, float(0), float(1)));
+    cirrusMat.opacityNode = clamp(
+      cwisped.mul(uniforms.cirrusDensity).mul(cseam).mul(cstormThin),
+      float(0), float(1),
+    );
+
+    const cirrusMesh = new THREE.Mesh(cgeo, cirrusMat);
+    cirrusMesh.frustumCulled = false;
+    cirrusMesh.renderOrder = -850;
+    group.add(cirrusMesh);
+    disposables.push(cgeo, cirrusMat);
   }
 
   /* ---------------------------------------------------------------- */
