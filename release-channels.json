@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 94",
-    "description": "Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish."
+    "label": "PASS 95",
+    "description": "Pass 95 gives Nuke Town image-generated PBR relief on house and vehicle surfaces, a taller textured massif with a LOD conifer belt, killstreak audio that no longer drops cues, a duplicate activation-frame walk removed, and a refactor that deletes 435 lines of re-export barrels."
   },
   "experimental": {
-    "pass": "PASS 94",
-    "label": "PASS 94",
-    "description": "Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish.",
-    "path": "channels/pass94"
+    "pass": "PASS 95",
+    "label": "PASS 95",
+    "description": "Pass 95 gives Nuke Town image-generated PBR relief on house and vehicle surfaces, a taller textured massif with a LOD conifer belt, killstreak audio that no longer drops cues, a duplicate activation-frame walk removed, and a refactor that deletes 435 lines of re-export barrels.",
+    "path": "channels/pass95"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -67,10 +67,10 @@
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
   },
-  "pass93Backup": {
-    "label": "PASS 93 · SAFE BACKUP",
+  "pass94Backup": {
+    "label": "PASS 94 · SAFE BACKUP",
     "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
-    "pass": "PASS 93",
-    "path": "channels/pass93"
+    "pass": "PASS 94",
+    "path": "channels/pass94"
   }
 }

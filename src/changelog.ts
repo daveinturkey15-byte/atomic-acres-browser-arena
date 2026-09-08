@@ -108,7 +108,9 @@ export function pass84ReleaseCopy(releasedAt: string): Readonly<{ summary: strin
  */
 const pass73ReleasedAt = '2026-08-21T20:27:27Z';
 const pass73Copy = pass73ReleaseCopy(pass73ReleasedAt);
-const pass94ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+const pass95ReleasedAt = resolveProductionReleasedAt(PENDING_PRODUCTION_RELEASE);
+/** gh-pages publish receipt for PASS 94. */
+const pass94ReleasedAt = '2026-09-05T14:10:46+01:00';
 /** gh-pages publish receipt for PASS 93. */
 const pass93ReleasedAt = '2026-09-04T08:08:44+01:00';
 /** gh-pages publish receipt for PASS 92. */
@@ -146,6 +148,24 @@ const pass70Copy = pass70ReleaseCopy(pass70ReleasedAt);
  * the pending sentinel until the production workflow injects its build time.
  */
 export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
+  Object.freeze({
+    // HF-406: the current entry. `pass` is read from the release stamp so the badge
+    // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
+    // the identity-surface test fails while the title still names the previous pass.
+    id: 'pass95',
+    pass: 'PASS 95',
+    title: 'Pass 95 · Nuke Town Night Pass — Materials, Backdrop, Audio & Lag',
+    releasedAt: pass95ReleasedAt,
+    areas: Object.freeze(['ARENAS', 'RENDERING', 'AUDIO', 'PERFORMANCE']),
+    summary: 'Pass 95 gives Nuke Town image-generated PBR relief on house and vehicle surfaces, a taller textured massif with a LOD conifer belt, killstreak audio that no longer drops cues, a duplicate activation-frame walk removed, and a refactor that deletes 435 lines of re-export barrels.',
+    highlights: Object.freeze([
+      'House and vehicle materials carry relief normals on 44 of 85 materials, up from 22, with dielectrics for glass and car paint',
+      'The background massif now rises a median 17 degrees with surface detail and a level-of-detail conifer belt, built entirely in code',
+      'Killstreak audio cues were being silently dropped by a voice budget; the nuke alone lost 8 of them, now 0',
+      'Match stinger fixed from 1.6 ms to 252 ms, and the drone and scout sweep are audible for the first time',
+      'Pass 94 stays published as the single safe backup; every older channel is retired',
+    ]),
+  }),
   Object.freeze({
     // HF-406: the current entry. `pass` is read from the release stamp so the badge
     // cannot drift from the build. When the next pass is stamped, ADD ITS ENTRY HERE -
