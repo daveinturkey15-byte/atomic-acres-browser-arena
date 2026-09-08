@@ -313,6 +313,8 @@ export const definition = createProceduralArenaVisualDefinition({
     // solid 1.05 m. scripts/qa/capture-frame-variety.mjs fails the capture if
     // any station drifts back into the flat-frame class.
     camera('nuketown2-perimeter-wall-end-close', [hx(16.5), 1.45, -30.5], [hx(17.588), 1.0, -26.3], 'geometry', 1.08),
+    camera('nuketown2-shed-north-broadside', [hx(-14), 1.7, -19.6], [hx(-14), 1.4, -22.7], 'geometry', 1.08),
+    camera('nuketown2-shed-north-door', [hx(-9.6), 1.7, -24.5], [hx(-11.9), 1.4, -24.5], 'geometry', 1.08),
   ],
   collisionIdentity: {
     authoritativeArenaId: 'nuketown2',
