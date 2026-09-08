@@ -200,10 +200,16 @@ describe('window dressing in the composed arena', () => {
   it('adds presentation only: solid/collider/shot counts identical, houses symmetric', () => {
     const arena = build();
     expect(arena.breakableWindows).toHaveLength(8);
-    expect(arena.colliders).toHaveLength(371);
-    expect(arena.physicsColliders).toHaveLength(375);
-    expect(arena.raycastMeshes).toHaveLength(387);
-    expect(arena.shotSurfaces).toHaveLength(387);
+    // Baseline updated 2026-09-08 (pass96): 371 -> 369 colliders, 387 -> 385 raycast/shot
+    // surfaces. The owner asked for the garage car to be removed; day3-house-clutter deleted
+    // both car bodies WITH their authority (2 colliders, 2 vehicle-rated shot surfaces) and
+    // its census proved the delta is exactly those bodies - floor slab, walls, doors, openings
+    // and all 12 solid cover meshes retain collider+ballistic and are asserted present.
+    // These stay exact equalities so the gate still catches an ADDED body, which is its job.
+    expect(arena.colliders).toHaveLength(369);
+    expect(arena.physicsColliders).toHaveLength(373);
+    expect(arena.raycastMeshes).toHaveLength(385);
+    expect(arena.shotSurfaces).toHaveLength(385);
     const north: string[] = [];
     const south: string[] = [];
     const raycast = new Set(arena.raycastMeshes.map((m) => (m as THREE.Mesh).name));

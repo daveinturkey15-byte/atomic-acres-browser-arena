@@ -85,9 +85,14 @@ describe('nuketown2 road edge: HF-536 night-gemini13 mechanical proof', () => {
   });
 
   it('keeps body and collider counts identical to baseline (zero solid bodies added)', () => {
-    // Verified baseline on clean tree: 371 colliders, 387 raycast meshes
-    expect(map.colliders.length).toBe(371);
-    expect(map.raycastMeshes.length).toBe(387);
+    // Baseline updated 2026-09-08 (pass96): 371 -> 369 colliders, 387 -> 385 raycast/shot
+    // surfaces. The owner asked for the garage car to be removed; day3-house-clutter deleted
+    // both car bodies WITH their authority (2 colliders, 2 vehicle-rated shot surfaces) and
+    // its census proved the delta is exactly those bodies - floor slab, walls, doors, openings
+    // and all 12 solid cover meshes retain collider+ballistic and are asserted present.
+    // These stay exact equalities so the gate still catches an ADDED body, which is its job.
+    expect(map.colliders.length).toBe(369);
+    expect(map.raycastMeshes.length).toBe(385);
 
     // Ensure no name contains ' verge ' so declutter / verge-furniture ratchets stay untouched
     const names: string[] = [];
