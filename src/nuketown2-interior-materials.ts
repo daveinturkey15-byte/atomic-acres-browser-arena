@@ -18,7 +18,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import * as TSL from 'three/tsl';
 import { hash2 } from './map3/noise';
 import { assertSpec, type Nuketown2MaterialSpec } from './nuketown2-materials';
-import { buildWear, boxUv, groundUv, wallUv } from './nuketown2-materials/wear';
+import { buildWear, boxUv } from './nuketown2-materials/wear';
 import { reliefNormal } from './nuketown2-materials/relief';
 import { createNuketown2Uniforms } from './nuketown2-materials/material-uniforms';
 import { lutFbm } from './nuketown2-materials/noise-lut';
@@ -32,7 +32,6 @@ const {
   fract,
   max,
   mix,
-  normalWorld,
   positionWorld,
   smoothstep,
   uniform,
@@ -215,12 +214,7 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
 
   const uniforms = createNuketown2Uniforms(spec, colorHex, 0x6b5741, mat);
   mat.userData.nuketown2Spec = spec;
-  // Orientation-correct wear coordinate: boxUv() shears with world Y, which
-  // turns isotropic wear into a diagonal stripe on large flat walls
-  // (coherence 0.713 vs the board's 0.040). Walls read wallUv() (exact for
-  // axis-aligned runs); the ceiling this same material covers reads groundUv().
-  const drywallUv = abs(normalWorld.y).greaterThan(float(0.5)).select(groundUv(), wallUv());
-  const wear = buildWear(spec, drywallUv, undefined, uniforms);
+  const wear = buildWear(spec, boxUv(), undefined, uniforms);
   const p = positionWorld;
 
   // Taped-joint crown every 1.2 m of wall run: peaks ON the joint line.
