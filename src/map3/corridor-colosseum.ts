@@ -177,6 +177,11 @@ const APRON_PROFILE: Array<[number, number]> = [
   [-105, 120], [-140, 158], [-180, 192], [-235, 218], [-302, 226],
 ];
 
+/** One aperture for both the depth eraser and the visible apron. */
+const APRON_HOLE_INSET = 0.5;
+const APRON_HOLE_A = RIM_A - APRON_HOLE_INSET;
+const APRON_HOLE_B = RIM_B - APRON_HOLE_INSET;
+
 /* ================================================================== */
 /* Geometry helpers                                                    */
 /* ================================================================== */
@@ -931,12 +936,12 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
   {
     const s = new Strip();
     const floorY = ARENA_Y - 2.5;
-    // A metre wider than the apron's hole and starting 10 cm BELOW the apron,
-    // so it is coplanar with nothing. Coplanar with the kerb it would stamp an
-    // equal depth there and the equality would fail the Less test, taking a
-    // band out of the near rim.
-    s.ring(96, RIM_A + 1.9, RIM_B + 1.9, -0.10, RIM_A + 1.9, RIM_B + 1.9, floorY);
-    s.cap(96, RIM_A + 1.9, RIM_B + 1.9, floorY);
+    // Use the exact same aperture as the apron. A wider eraser clears a ring
+    // of ground that is never repainted; a smaller one leaves the shared lid
+    // visible inside the intended mouth. The eraser is 16 cm below the apron
+    // at its top, so it is coplanar with nothing.
+    s.ring(96, APRON_HOLE_A, APRON_HOLE_B, -0.10, APRON_HOLE_A, APRON_HOLE_B, floorY);
+    s.cap(96, APRON_HOLE_A, APRON_HOLE_B, floorY);
     const eraserMat = new MeshBasicNodeMaterial();
     eraserMat.colorWrite = false;
     eraserMat.depthTest = false;
@@ -993,7 +998,7 @@ export function createColosseumCorridor(options: ColosseumOptions = {}): Corrido
     // plan and 6 cm apart in height, which is a hairline you can see the void
     // through from a shallow angle.
     const hole = new THREE.Path();
-    hole.absellipse(0, -CZ, RIM_A - 0.5, RIM_B - 0.5, 0, Math.PI * 2, true);
+    hole.absellipse(0, -CZ, APRON_HOLE_A, APRON_HOLE_B, 0, Math.PI * 2, true);
     shape.holes.push(hole);
     const geo = new THREE.ShapeGeometry(shape, 80);
     geo.rotateX(-Math.PI / 2);
