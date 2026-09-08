@@ -140,11 +140,19 @@ describe('HF-536 garage sectional door with a four-pane window strip', () => {
         expect(hitsCollider, `${name} not a movement collider`).toBe(false);
       }
     }
-    // The solid leaf and the aqua car collider it was reported against stand on.
+    // The solid leaf stands on; the aqua car it was reported against is gone with
+    // its collider (owner R041) while the floor slab it stood on remains.
     for (const side of ['north', 'south'] as const) {
       expect(map.root.getObjectByName(`nuketown2 ${side} garage door head`)).toBeInstanceOf(THREE.Mesh);
-      expect(map.root.getObjectByName(`nuketown2 ${side} garage car body`)).toBeInstanceOf(THREE.Mesh);
+      expect(map.root.getObjectByName(`nuketown2 ${side} garage floor`)).toBeInstanceOf(THREE.Mesh);
+      for (const suffix of ['garage car body', 'garage car cabin', 'garage car glass',
+        'garage car wheel 0', 'garage car wheel 1', 'garage car wheel 2', 'garage car wheel 3']) {
+        expect(map.root.getObjectByName(`nuketown2 ${side} ${suffix}`), `${side} ${suffix} removed`)
+          .toBeUndefined();
+      }
     }
+    expect(map.shotSurfaces.some((surface) => surface.name.includes('garage car')),
+      'no garage-car shot surface survives').toBe(false);
   });
 
   it('builds both houses as exact 180-degree partners', () => {
