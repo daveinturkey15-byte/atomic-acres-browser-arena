@@ -10,6 +10,7 @@ import {
   createNuketown2VehicleGlassMaterial,
 } from './nuketown2-vehicle-materials';
 import { assertSpec, WEAR_BANDS } from './nuketown2-materials/spec';
+import { createForgePaintMaterial } from './vehicle-forge/materials';
 
 const NON_SHADER_KEYS = new Set([
   'id', 'uuid', '_uuid', '_cacheKey', '_cacheKeyVersion', 'parents', '_beforeNodes', 'stackTrace',
@@ -98,6 +99,19 @@ describe('day2-night-materials-house-vehicles vehicle surfaces', () => {
       // Physical node material, tagged the way the forge tags its paints.
       expect(paint.isMeshPhysicalNodeMaterial, `${name} physical node`).toBe(true);
     }
+  });
+
+  it('keeps car and forge paint base-lobe specular intensity inside the R1 reflection budget', () => {
+    const paints = [
+      createNuketown2CarPaintMaterial(0x3d6f80, 'nuketown2-car-aqua'),
+      createNuketown2CarPaintMaterial(0x27394f, 'nuketown2-car-saloon-navy'),
+      createNuketown2CarPaintMaterial(0x2f8f77, 'nuketown2-car-classic-jade'),
+      createForgePaintMaterial({ color: 0xf3efe7, name: 'vehicle-forge-r1-paint', roughness: 0.2 }),
+    ];
+    for (const paint of paints) {
+      expect(paint.specularIntensity, `${paint.name} R1 specularIntensity`).toBeLessThanOrEqual(0.5);
+    }
+    expect(paints[0].specularIntensity).toBeCloseTo(0.08, 6);
   });
 
   it('keeps the three car paints on one uniform-carried graph (HF-477 deploy fence)', () => {
