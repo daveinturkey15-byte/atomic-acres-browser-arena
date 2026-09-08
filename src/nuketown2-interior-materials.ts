@@ -233,11 +233,10 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   const damped = base.mul(float(1).sub(damp.mul(float(0.18))));
   mat.colorNode = damped.mul(wear.albedoMul);
   mat.roughnessNode = clamp(wear.roughness.add(damp.mul(float(0.10))), float(0.05), float(1.0));
-  // RELIEF. Joint crown plus the distance-faded orange-peel roll texture.
-  mat.normalNode = reliefNormal(
-    crown.mul(float(DRYWALL_JOINT_CROWN_M)).add(wear.grain.mul(float(DRYWALL_PEEL_M))),
-  );
-
+  // RELIEF (diagnostic C3b, flattened to zero): joint crown plus the
+  // distance-faded orange-peel roll texture. Revert once measured.
+  void crown; void DRYWALL_PEEL_M; void DRYWALL_JOINT_CROWN_M;
+  mat.normalNode = reliefNormal(float(0));
   return mat;
 }
 
