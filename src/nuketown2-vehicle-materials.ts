@@ -188,6 +188,7 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
   });
   mat.name = name;
   mat.specularIntensity = 0.08;
+  mat.userData.nuketown2PaintKey = colorHex;
   // The base colour stays a per-material UNIFORM in `colorNode`, so N16 still
   // holds and the three car paints keep one compiled graph. The low base-lobe
   // specular intensity leaves the visible highlight to the clearcoat instead

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { applyRiggedCarbineFingerCurlToBone, batchStaticMeshes, buildWeaponModel, optimizeAttachedWeapon, texturedMaterial, waitForPendingArtTextures } from './art-kit';
+import { createNuketown2CarPaintMaterial } from './nuketown2-vehicle-materials';
 
 describe('rigged carbine finger wrap', () => {
   it('replays both hardware poses on the rendered Pinky2L bone and clears the retained bind threshold', () => {
@@ -103,6 +104,23 @@ describe('authored texture readiness', () => {
 });
 
 describe('palette static batching', () => {
+  it('keeps distinct Nuketown2 paint swatches as distinct preserve-mode batch keys', () => {
+    const root = new THREE.Group();
+    root.name = 'nuketown2-paint-key-test';
+    const swatches = [0x3d6f80, 0x27394f, 0x2f8f77] as const;
+    for (const [index, color] of swatches.entries()) {
+      root.add(new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        createNuketown2CarPaintMaterial(color, `nuketown2-test-paint-${index}`),
+      ));
+    }
+    const destination = new THREE.Group();
+
+    const stats = batchStaticMeshes(root, destination, () => '', 'preserve');
+
+    expect(stats).toEqual({ sourceMeshes: 3, batches: 3 });
+  });
+
   it('preserves ordinary material colours instead of blending the default black emissive channel', () => {
     const root = new THREE.Group();
     root.name = 'palette-test';
