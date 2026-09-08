@@ -7,7 +7,7 @@
   "arenas": {
     "nuketown2": {
       "kind": "helicopter",
-      "label": "HELO FLYOVER // NUKE TOWN REBUILD · PREVIEW",
+      "label": "HELO FLYOVER // NUKETOWN · PREVIEW",
       "presentationId": "menu-video-runtime-helo-nuketown2-v1",
       "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
       "seed": 85014001,

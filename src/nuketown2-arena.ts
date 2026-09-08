@@ -108,6 +108,7 @@ import {
   spawnRecord,
 } from './additional-maps';
 import type { ArenaMap } from './map';
+import { NUKETOWN_DISPLAY_NAME } from './map-selection';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface } from './ballistics';
 import {
@@ -5220,7 +5221,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
 
   return {
     id: 'nuketown2',
-    label: 'Nuke Town Rebuild',
+    label: NUKETOWN_DISPLAY_NAME,
     root: builder.root,
     colliders: builder.colliders,
     physicsColliders: builder.physicsColliders,

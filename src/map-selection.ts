@@ -118,6 +118,20 @@ export type ArenaSelection = Readonly<{
 }>;
 
 /**
+ * The one player-visible name of the nuketown2 arena.
+ *
+ * Owner 2026-09-08 (day3-identity-loading): "just call it nuketown now".
+ * Every surface that shows the name reads this constant — the map-chooser
+ * card below, the in-game ArenaMap label (src/nuketown2-arena.ts), the
+ * deployment-briefing title (via displayName), and the menu-preview label
+ * (src/ui/menu-preview-video.ts) — so the next rename is a one-line change.
+ * The stable arena id `nuketown2`, its route, and the historical
+ * src/changelog.ts entries deliberately do NOT follow it: ids are the
+ * network/storage/link boundary and the changelog is a dated record.
+ */
+export const NUKETOWN_DISPLAY_NAME = 'Nuketown' as const;
+
+/**
  * The one player-facing arena registry. Stable IDs remain the network,
  * replay, storage and asset boundary; route IDs and labels may evolve.
  */
@@ -131,11 +145,11 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
-    selectorLabel: 'NUKE TOWN REBUILD · PREVIEW',
-    displayName: 'Nuke Town Rebuild',
-    titleLead: 'NUKE TOWN',
-    titleAccent: 'REBUILD',
-    menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of the rebuilt Nuke Town.',
+    selectorLabel: `${NUKETOWN_DISPLAY_NAME.toUpperCase()} · PREVIEW`,
+    displayName: NUKETOWN_DISPLAY_NAME,
+    titleLead: NUKETOWN_DISPLAY_NAME.toUpperCase(),
+    titleAccent: '',
+    menuLede: 'Cross the road, not the corridor: two two-storey houses face each other over a 58 m street with a bus in the middle, garages onto the cul-de-sacs, and both teams spawning in their own back yard. Preview of rebuilt Nuketown.',
     summary: 'Rebuilt neighbourhood · back-yard spawns · preview',
     rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO · PREVIEW',
     soloBotCount: SOLO_BOT_COUNT,

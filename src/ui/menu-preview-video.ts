@@ -1,4 +1,4 @@
-import { ARENA_SELECTIONS, type ArenaId } from '../map-selection';
+import { ARENA_SELECTIONS, NUKETOWN_DISPLAY_NAME, type ArenaId } from '../map-selection';
 
 export type MenuPreviewFrame = 'helicopter' | 'cat';
 
@@ -220,7 +220,7 @@ export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
   'nuketown2': Object.freeze({
     arenaId: 'nuketown2',
     frame: 'helicopter',
-    label: 'PRERECORDED HELO // NUKE TOWN REBUILD',
+    label: `PRERECORDED HELO // ${NUKETOWN_DISPLAY_NAME.toUpperCase()}`,
     motionLabel: 'STREET AND BACK-YARD FLYOVER',
     reducedMotionLabel: 'STABILIZED PREVIEW FRAME',
     // The presentation id names the CHOREOGRAPHY RECIPE, not the bytes, and it

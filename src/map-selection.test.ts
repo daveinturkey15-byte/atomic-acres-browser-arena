@@ -40,7 +40,7 @@ describe('opening arena selection', () => {
     // 'Nuke Town'; HF-495 now puts the rebuild first while keeping the names
     // unambiguous when both are resolved from the catalog.
     // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town Rebuild', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
@@ -202,7 +202,7 @@ describe('opening arena selection', () => {
       // retained rows; the duration values remain bound to each row.
       .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
-      'Nuke Town Rebuild multiplayer arena',
+      'Nuketown multiplayer arena',
       'Raid Rebuild multiplayer arena',
       'Nuke Town multiplayer arena',
       'Terminal multiplayer arena',
