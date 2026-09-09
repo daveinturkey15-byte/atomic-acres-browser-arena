@@ -26,15 +26,11 @@ import {
   type OperatorAnimationOutput,
 } from './rigged-operator-animation-director';
 import {
-  advanceContactLoad,
   applyOperatorAnimationPose,
   applyOperatorMixerPlan,
-  createContactLoadState,
-  resetContactLoadState,
   directedGroundVelocity,
   localGroundVelocity,
   planOperatorMixer,
-  type ContactLoadState,
 } from './rigged-operator-animation-runtime';
 import { wrapAngleRadians } from './animation-additive-pose';
 import type { HitReactionZone } from './animation-hit-reaction';
@@ -404,14 +400,6 @@ type RiggedOperatorRuntime = {
   /** Previous root ground position, for measuring the real movement direction. */
   lastGroundX: number;
   lastGroundZ: number;
-  /**
-   * CT.LOAD overlay state (fix-animation lane): one per operator, mutated in
-   * place, never reallocated per frame. Weight 0 reproduces the pre-lane pose
-   * bit-for-bit. `contactLoadLastY` feeds the vertical-speed flight signal.
-   */
-  contactLoad: ContactLoadState;
-  contactLoadWeight: number;
-  contactLoadLastY: number;
   lastAnimation: OperatorAnimationOutput | null;
   /**
    * HF-382: the selected IDLE STANCE's authored clip plus its cross-fade state.
@@ -910,15 +898,7 @@ function applyStancePose(runtimeState: RiggedOperatorRuntime, dt: number): void 
   // while STANDING, where `pivotPitch` is 0, so this cannot fight the prone
   // pivot. Negative pitches the body forward, the same sign convention the
   // prone pose uses.
-  // CT.LOAD.4a budget fold: the overlay spine pitch borrows from the active
-  // sprint lean instead of stacking on top, so combined forward pitch never
-  // exceeds max(lean, effort) ≤ SPRINT_LEAN_RADIANS (0.17). Weight 0 ⇒ 0 ⇒
-  // today's lean exactly.
-  const contactSpine = runtimeState.contactLoadWeight > 0 && !runtimeState.dead
-    ? Math.max(0, Number.isFinite(runtimeState.contactLoad.spineEffortRad) ? runtimeState.contactLoad.spineEffortRad : 0)
-    : 0;
-  const sprintLean = -(runtimeState.lastPosture?.leanRadians ?? 0)
-    + Math.min(contactSpine, Math.max(0, runtimeState.lastPosture?.leanRadians ?? 0));
+  const sprintLean = -(runtimeState.lastPosture?.leanRadians ?? 0);
   runtimeState.stancePivot.rotation.x = THREE.MathUtils.lerp(
     runtimeState.stancePivot.rotation.x,
     (proneAdjustment ? target.pivotPitch * proneAdjustment.pitchScale : target.pivotPitch) + sprintLean,
@@ -2021,10 +2001,6 @@ function ensureAnimationRuntime(runtimeState: RiggedOperatorRuntime, root: THREE
   // supply only the older half.
   runtimeState.posture ??= createOperatorPostureLayer(runtimeState.stance ?? 'stand');
   runtimeState.lastPosture ??= null;
-  // CT.LOAD: hand-built runtimes (Gun Range dummies) predate these fields.
-  runtimeState.contactLoad ??= createContactLoadState();
-  runtimeState.contactLoadWeight ??= 1;
-  runtimeState.contactLoadLastY ??= root.position.y;
   if (runtimeState.director) return;
   runtimeState.director = createOperatorAnimationDirector(
     String(root.userData.operatorSkinId ?? 'default'),
@@ -2239,9 +2215,6 @@ export function createRiggedOperator(
     visualYawRadians: root.rotation.y,
     lastGroundX: root.position.x,
     lastGroundZ: root.position.z,
-    contactLoad: createContactLoadState(),
-    contactLoadWeight: 1,
-    contactLoadLastY: root.position.y,
     // HF-382: no stance published yet - the skin profile's idle decides until
     // a caller writes userData.operatorStanceId.
     stanceIdleFade: { clipName: null, fadeFrom: null, fadeSeconds: 0 },
@@ -2512,22 +2485,6 @@ export function updateRiggedOperator(
   // A corpse keeps the stance pivot and weapon socket exactly where death left
   // them, as it always has. Only the mixer runs, so the collapse can play out.
   if (runtimeState.dead) return true;
-  // CT.LOAD.1a/2a advance. Distance-driven phase (planar speed integrated over
-  // the frame), never elapsed time; vertical speed is the flight signal, read
-  // from the replicated root transform. Primitives only — nothing allocated.
-  // Weight 0 skips the solve and the apply below takes the 2-arg path, which
-  // is the pre-lane pose bit-for-bit (A8).
-  const contactWeight = runtimeState.contactLoadWeight > 0 ? runtimeState.contactLoadWeight : 0;
-  if (contactWeight > 0) {
-    const strideFreq = animation.locomotion.strideFrequencyHz;
-    const authoredSpeed = animation.locomotion.authoredGroundSpeedMps;
-    const strideLength = strideFreq > 1e-3 && authoredSpeed > 0 ? authoredSpeed / strideFreq : 1.62;
-    const planarSpeed = Math.hypot(velocity.forwardMps, velocity.strafeMps);
-    const verticalSpeed = dt > 1e-6 ? (root.position.y - runtimeState.contactLoadLastY) / dt : 0;
-    const airborne = dt > 0 && (verticalSpeed < -2 || verticalSpeed > 2.5);
-    advanceContactLoad(runtimeState.contactLoad, planarSpeed * Math.max(0, dt), strideLength, planarSpeed, animation.locomotion.footSlideMps, dt, airborne, contactWeight);
-  }
-  runtimeState.contactLoadLastY = root.position.y;
   runtimeState.poseBeforeStance = Object.values(runtimeState.poseBones)
     .filter((bone): bone is THREE.Bone => bone instanceof THREE.Bone)
     .map((bone) => ({
@@ -2537,11 +2494,7 @@ export function updateRiggedOperator(
     }));
   // Additive channels go on AFTER the clean pose is captured, so next frame's
   // restore wipes them and they can never accumulate across frames.
-  applyOperatorAnimationPose(
-    runtimeState.poseBones,
-    animation,
-    contactWeight > 0 ? runtimeState.contactLoad : null,
-  );
+  applyOperatorAnimationPose(runtimeState.poseBones, animation);
   // The stance pivot carries the visual yaw lag; the authoritative root yaw is
   // never written here, so hit registration, replication and bot aim are
   // untouched. Set before the stance solve, which world-matrixes the pivot to
@@ -2890,10 +2843,6 @@ export function deathRiggedOperator(root: THREE.Object3D): boolean {
   if (!runtimeState || !runtimeState.clips.has('Death')) return false;
   runtimeState.dead = true;
   runtimeState.currentBase = 'Death';
-  // CT.LOAD epoch rule: a corpse never runs a live contact solve
-  // (updateRiggedOperator returns early for the dead), and the accumulators
-  // are already exactly 0 when the next life starts.
-  if (runtimeState.contactLoad) resetContactLoadState(runtimeState.contactLoad);
   return true;
 }
 
@@ -2924,11 +2873,6 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   runtimeState.visualYawRadians = root.rotation.y;
   runtimeState.lastGroundX = root.position.x;
   runtimeState.lastGroundZ = root.position.z;
-  // CT.LOAD epoch rule: a respawn is a new epoch — every contact weight and
-  // load accumulator reads exactly 0 on its first presentation frame (A9).
-  if (runtimeState.contactLoad) resetContactLoadState(runtimeState.contactLoad);
-  runtimeState.contactLoadWeight = 1;
-  runtimeState.contactLoadLastY = root.position.y;
   runtimeState.stance = 'stand';
   // HF-412: a reset operator is already standing, not mid-transition.
   runtimeState.stanceBlendFrom = 'stand';
@@ -2941,23 +2885,6 @@ export function resetRiggedOperator(root: THREE.Object3D): boolean {
   runtimeState.weaponSocket.position.set(0, 1.31, -0.18);
   runtimeState.weaponSocket.rotation.set(0, 0, 0);
   runtimeState.lastUpdatedAt = performance.now();
-  return true;
-}
-
-/**
- * CT.LOAD overlay weight (fix-animation lane). 1 is the full bounded response,
- * 0 disables the solve and reproduces the pre-lane pose bit-for-bit (A8) and is
- * what the lowest tier uses beyond `CONTACT_LOAD_LOW_TIER_DISTANCE_M` — thread
- * `contactLoadWeightForTier(tier, distanceM)` from the graphics owner here via
- * this setter (see CROSS-LANE REQUESTS). Clamped to [0, 1]; unknown roots fail.
- */
-export function setContactLoadOverlayWeight(root: THREE.Object3D, weight: number): boolean {
-  const runtimeState = runtime(root);
-  if (!runtimeState) return false;
-  ensureAnimationRuntime(runtimeState, root);
-  const w = Number.isFinite(weight) ? weight : 1;
-  runtimeState.contactLoadWeight = w < 0 ? 0 : w > 1 ? 1 : w;
-  if (runtimeState.contactLoadWeight === 0 && runtimeState.contactLoad) resetContactLoadState(runtimeState.contactLoad);
   return true;
 }
 

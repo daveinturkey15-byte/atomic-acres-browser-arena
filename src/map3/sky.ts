@@ -76,7 +76,10 @@ import { map3WeatherShared } from './weather-system';
  * colour ramp — is derived from this one number, so retuning the pace is a
  * one-line change and nothing can fall out of step with anything else.
  */
-export const ORBIT_PERIOD_SECONDS = 40;
+// 40 s meant the sun crossed the entire sky every forty seconds - a time-lapse, not a sky, and
+// the first thing the owner would have asked about. 20 minutes reads as a moving sun during a
+// match without turning the arena into a stop-motion. The showcase page can still scrub time.
+export const ORBIT_PERIOD_SECONDS = 1200;
 
 /** Distance from the world origin to the sun body, in metres. */
 export const SUN_ORBIT_RADIUS = 190;
