@@ -49,6 +49,7 @@ const {
   length,
   max,
   mix,
+  normalView,
   normalWorld,
   positionViewDirection,
   positionWorld,
@@ -434,7 +435,10 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   material.ior = 1.52;
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
-  const cosine = saturate(normalWorld.dot(positionViewDirection));
+  // Both vectors must be view-space. Mixing normalWorld with view direction
+  // makes opacity depend on camera yaw rather than the physical grazing angle.
+  // Three0.185.1 normalView already handles DoubleSide back-face orientation.
+  const cosine = saturate(normalView.dot(positionViewDirection));
   const fresnel = pow(float(1).sub(cosine), float(5));
   const a0 = float(0.14);
   material.colorNode = vec3(tint.r, tint.g, tint.b);
