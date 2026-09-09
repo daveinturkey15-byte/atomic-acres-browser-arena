@@ -241,18 +241,13 @@ export function minimapLandmarkFootprint(
   width: number,
   height: number,
 ): MinimapLandmarkFootprint {
-  // R043 tidy-and-crisp: snap to the device pixel grid. A fractional origin on
-  // a 1 px rect renders as a 2 px grey smear, which is exactly the haze the
-  // owner called cluttered. Integer edges keep every fill on full pixels.
   const [left, top] = worldToMinimap(landmarkBounds.minX, landmarkBounds.maxZ, arenaBounds, width, height);
   const [right, bottom] = worldToMinimap(landmarkBounds.maxX, landmarkBounds.minZ, arenaBounds, width, height);
-  const x = Math.round(left);
-  const y = Math.round(top);
   return {
-    x,
-    y,
-    width: Math.max(1, Math.round(right) - x),
-    height: Math.max(1, Math.round(bottom) - y),
+    x: left,
+    y: top,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top),
   };
 }
 
