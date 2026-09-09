@@ -1965,3 +1965,21 @@ based on `nuketown2-handedness` @ `5f5ecc47` because the brief's named
   one daylight capture of the head); the bulb's 1.5 m inset, which FINDINGS open item 5
   records as unmeasured; and two review stations crowded by pre-existing yard dressing
   this lane does not own.
+
+## HF-563 — Smoke grenade ground coverage and perception parity
+
+CLAIMED owner request, relayed by root coordinator 2026-09-09: smoke grenades cover three times their CURRENT ground area, not three times their radius. Reserved by Codex in the isolated `nuketown-visual-hitl-20260909` run after a collision check; no production promotion implied.
+
+VERIFIED source baseline: `src/smoke-authority.ts` defines radius4.2m and deterministic lifetime5000–10000ms; `src/smoke-protocol.ts` admits radius up to8m. Required radius is `4.2 * Math.sqrt(3)` =7.274613m; squared radius must be three times the baseline squared radius. Preserve current lifetime and shot corridors (0.42m,900ms) unless separately approved.
+
+OPEN implementation and acceptance: one host-authoritative volume must drive the replicated radius/lifetime, rendered density, line-of-sight and bot perception. Verify `src/smoke-authority.ts`, `src/smoke-protocol.ts`, `src/combat/ordnance.ts`, `src/bot-perception-authority.ts`, `src/smoke-volume-presentation.ts`, and the actual `src/legacy-main.ts` spawn/snapshot/expiry consumers. Reject client-only concealment, particle-derived authority, mismatched host/replica expiry, altered damage, relaxed protocol limits, or unbounded volume/render cost. Require host/client gameplay, shot corridors, expiry/reentry/disposal, and fixed-route frame evidence before retaining a balance change.
+
+## HF-564 — Residual smoke after ordinary damaging combat explosions
+
+CLAIMED owner request, relayed by root coordinator 2026-09-09: ordinary damaging combat explosions leave residual smoke with half the CURRENT SMOKE GRENADE ground area. Reserved alongside HF-563; resource intake73 is a reference ID, not this feedback ID.
+
+VERIFIED calculation from the4.2m baseline: required radius is `4.2 * Math.sqrt(0.5)` =2.969848m, within the existing8m protocol cap. Do not use frag damage radius or half the newly enlarged smoke radius as the reference. Damage/blast radii remain unchanged.
+
+OPEN before implementation: explicitly enumerate eligible ordinary explosions and choose a bounded residual lifetime. Frag/Semtex inclusion must be stated, not inferred from a generic visual callback. Exclude utility smoke/flash projectiles, nuke-scale effects, support-only effects and recursive smoke callbacks. Each eligible explosion must create exactly one uniquely identified host-authoritative residual volume; replicas, visual density, LOS and bot perception must share its radius/lifetime/expiry. Reuse existing smoke authority and presentation, preserve shot-corridor behavior, and verify concurrent-volume/frame/draw/memory limits and lifecycle cleanup. No automatic inclusion in the19:30 visual candidate without these gates.
+
+CLAIMED visual technique reference: Nicolas Barradeau, [Ashtray Requiem](https://barradeau.com/2026/ashtray-requiem/), raymarched2Dfluid presented as volumetric smoke. Source licence is OPEN; independently implement any useful technique, copy no source. This reference neither proves a3Dfluid simulator nor authorizes unbounded simulation cost.
