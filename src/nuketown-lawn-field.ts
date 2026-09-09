@@ -50,11 +50,20 @@ import {
   type InstancedGrassField,
   type InstancedGrassFieldStats,
 } from './rendering/instanced-grass-field';
+import {
+  buildGrassContactLayer,
+} from './vegetation/grass-contact-layer';
 
 /** Suburban blade cap — kept lawn, under the 0.25 m art-only ceiling. */
 export const NUKETOWN_LAWN_BLADE_HEIGHT_M = GRASS_MAX_HEIGHT;
 /** Fixed placement seed — identical lawn on every peer. */
 export const NUKETOWN_LAWN_SEED = 0x1aa2_82f1;
+
+/** Plate reference the contact tier's ramp rises to (the shipped blade color). */
+export const NUKETOWN_LAWN_PLATE_COLOR = 0x5e9e41;
+/** Contact-tier placement streams, decorrelated from both blade fields. */
+export const NUKETOWN_LAWN_CONTACT_SEED = NUKETOWN_LAWN_SEED ^ 0x00c0_47ac;
+export const NUKETOWN2_LAWN_CONTACT_SEED = (NUKETOWN_LAWN_SEED ^ 0x0002_6426) ^ 0x00c0_47ac;
 /**
  * Keep-out inflation for the rebuild's collider-driven placement, in metres.
  * The same 0.34 m `COLLIDER_MARGIN` grass-placement.ts applies to the shipped
@@ -264,6 +273,22 @@ export function buildNuketownLawnField(parent: THREE.Object3D, reduced: boolean)
     tint: NUKETOWN_LAWN_TINT,
   });
   parent.add(field.group);
+
+  // DAY-3 GRASS-CONTACT (fix-grass): the ground-contact tier — thatch plus
+  // litter in the bottom 0-0.08 m under the blades. Same regions and the same
+  // keep-out truth as the blade field, so the two tiers agree by construction.
+  // Parented to the blade field's group, so the arena needs zero edits.
+  const contact = buildGrassContactLayer({
+    name: 'nuketown-lawn',
+    seed: NUKETOWN_LAWN_CONTACT_SEED,
+    regions: GRASS_GROUND_REGIONS,
+    placementAllowed: nuketownLawnPlacementAllowed,
+    plateColor: NUKETOWN_LAWN_PLATE_COLOR,
+    reduced,
+    nearBand: null,
+  });
+  field.group.add(contact.group);
+  field.group.userData.grassContactStats = contact.stats;
   buildNuketownVergeBloomField(parent, reduced);
   return field;
 }
@@ -534,6 +559,33 @@ export function buildNuketownRebuildLawnField(
   const compatRoute = typeof document !== 'undefined'
     && document.documentElement?.dataset.renderBackend === 'webgl2';
   const keepOuts = options.keepOuts;
+
+  // Shared keep-out truth for the rebuild lawn's two tiers: the blade field
+  // (below) and the contact tier (after it) take the same function, so the
+  // tiers agree by construction and neither carries a second table.
+  const isOpenRebuildLawn = (x: number, z: number): boolean => {
+    const reviewEyes = nuketown2LawnReviewEyePositions();
+    const maxDistSq = NUKETOWN2_LAWN_LOD_MAX_DIST_M * NUKETOWN2_LAWN_LOD_MAX_DIST_M;
+    let near = false;
+    for (let i = 0; i < reviewEyes.length; i++) {
+      const [cx, cz] = reviewEyes[i]!;
+      const dx = x - cx;
+      const dz = z - cz;
+      if (dx * dx + dz * dz <= maxDistSq) {
+        near = true;
+        break;
+      }
+    }
+    if (!near) return false;
+    return !keepOuts.some((box) => (
+      x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+      && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
+    )) && !keepOutCircles.some((circle) => (
+      (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
+    ));
+  };
   const keepOutCircles = options.keepOutCircles ?? [];
   const field = buildInstancedGrassField({
     name: 'nuketown2-lawn',
@@ -559,29 +611,7 @@ export function buildNuketownRebuildLawnField(
     scaleRange: [...NUKETOWN2_LAWN_SCALE_RANGE] as [number, number],
     nearBand: reduced || compatRoute ? null : nuketown2LawnNearBand(),
     leanMaxDeg: GRASS_BLADE_LEAN_MAX_DEG,
-    placementAllowed: (x, z) => {
-      const reviewEyes = nuketown2LawnReviewEyePositions();
-      const maxDistSq = NUKETOWN2_LAWN_LOD_MAX_DIST_M * NUKETOWN2_LAWN_LOD_MAX_DIST_M;
-      let near = false;
-      for (let i = 0; i < reviewEyes.length; i++) {
-        const [cx, cz] = reviewEyes[i]!;
-        const dx = x - cx;
-        const dz = z - cz;
-        if (dx * dx + dz * dz <= maxDistSq) {
-          near = true;
-          break;
-        }
-      }
-      if (!near) return false;
-      return !keepOuts.some((box) => (
-        x > box.minX - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-        && x < box.maxX + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-        && z > box.minZ - NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-        && z < box.maxZ + NUKETOWN_LAWN_KEEPOUT_MARGIN_M
-      )) && !keepOutCircles.some((circle) => (
-        (x - circle.centreX) ** 2 + (z - circle.centreZ) ** 2 < circle.radius ** 2
-      ));
-    },
+    placementAllowed: isOpenRebuildLawn,
     material: {
       // HF-536 look-2b: the base is now the DRY tone; the tint carries the
       // green (see NUKETOWN2_LAWN_BASE_COLOR). HF-536 muse-lawn: the tip/backlit
@@ -601,6 +631,22 @@ export function buildNuketownRebuildLawnField(
     tint: NUKETOWN2_LAWN_TINT,
   });
   parent.add(field.group);
+
+  // DAY-3 GRASS-CONTACT (fix-grass): the same tier on the rebuild's own
+  // rectangles and the arena's own collider-derived keep-outs — the shared
+  // filter above, on the same tick, so it cannot drift. Zero edits outside
+  // this file: the tier rides the blade field's group into builder.root.
+  const contact = buildGrassContactLayer({
+    name: 'nuketown2-lawn',
+    seed: NUKETOWN2_LAWN_CONTACT_SEED,
+    regions: nuketownRebuildLawnRegions(options.dressing),
+    placementAllowed: isOpenRebuildLawn,
+    plateColor: NUKETOWN2_LAWN_BASE_COLOR,
+    reduced,
+    nearBand: reduced || compatRoute ? null : nuketown2LawnNearBand(),
+  });
+  field.group.add(contact.group);
+  field.group.userData.grassContactStats = contact.stats;
   return field;
 }
 
