@@ -537,7 +537,9 @@ describe('vehicle-forge HF-536 detail pass', () => {
     [SEDAN_SPEC, saloonDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.saloon],
   ];
   const EXPECTED_TRIANGLES: Readonly<Record<string, number>> = {
-    'nuketown2-coach': 9964,
+    // Six coach-only planar mullions save 120 tris; twelve seat boxes add 144.
+    // The immutable 10,000 triangle fence below is unchanged.
+    'nuketown2-coach': 9988,
     'nuketown2-truck-cab': 5900,
     'nuketown2-sedan': 8288,
   };
@@ -588,6 +590,24 @@ describe('vehicle-forge HF-536 detail pass', () => {
     expect(built.partTriangles['detail.coach.luggage-door-frame']).toBe(96);
   });
 
+  it('gives the coach six joined seat assemblies visible above the belt with a clear centre aisle', () => {
+    const built = buildForgedVehicle(COACH_SPEC, coachDressing, createForgeMaterialSet(0xe7dec6, 'cabin-assembly'));
+    const backs = built.partBounds.filter(part => part.part === 'cabin.coach.seat-back');
+    const cushions = built.partBounds.filter(part => part.part === 'cabin.coach.seat-cushion');
+    expect(backs).toHaveLength(6);
+    expect(cushions).toHaveLength(6);
+    expect(built.partTriangles['cabin.coach.seat-back']).toBe(72);
+    expect(built.partTriangles['cabin.coach.seat-cushion']).toBe(72);
+    for (const cushion of cushions) {
+      const back = backs.find(part => Math.abs(part.min[0] - cushion.min[0]) < 1e-5
+        && Math.abs(part.min[2] - cushion.max[2]) < 1e-5);
+      expect(back, 'each cushion meets its own same-side seat back').toBeDefined();
+      expect(back!.min[1], 'no floating gap between seat back and cushion').toBeLessThanOrEqual(cushion.max[1] + 1e-5);
+      expect(back!.max[1]).toBeGreaterThan(COACH_SPEC.beltY + 0.15);
+      expect(Math.min(Math.abs(cushion.min[0]), Math.abs(cushion.max[0]))).toBeGreaterThanOrEqual(0.4 - 1e-5);
+    }
+  });
+
   it('keeps every fenced vehicle under its triangle fence', () => {
     for (const [spec, dressing, budget] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `fence-${spec.id}`));
@@ -600,7 +620,7 @@ describe('vehicle-forge HF-536 detail pass', () => {
 
   it('merges detail into the existing buckets: part counts per bucket, draws flat', () => {
     const expected: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-      'nuketown2-coach': { paint: 1, accent: 7, glass: 1, lining: 1, groove: 15, chrome: 30, tyre: 8, headLamp: 4, tailLamp: 4 },
+      'nuketown2-coach': { paint: 1, accent: 19, glass: 1, lining: 1, groove: 15, chrome: 30, tyre: 8, headLamp: 4, tailLamp: 4 },
       'nuketown2-truck-cab': { paint: 1, accent: 30, glass: 1, lining: 3, groove: 1, chrome: 36, tyre: 4, headLamp: 12, tailLamp: 2 },
       'nuketown2-sedan': { paint: 1, accent: 2, glass: 1, lining: 1, groove: 6, chrome: 28, tyre: 8, headLamp: 2, tailLamp: 2 },
     };
