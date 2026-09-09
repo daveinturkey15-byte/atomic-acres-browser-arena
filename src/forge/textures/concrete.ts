@@ -51,8 +51,21 @@ export function generateConcrete(options: TextureSetOptions = {}): TextureSet {
   const stain = tileableFbm(size, Math.max(2, Math.round(tileMm / 1100)), 3, seed * 23 + 12);
   const speckle = tileableSpeckle(size, seed * 31 + 14);
 
+  // NIGHT-LOAD (2026-09-08): the expansion-joint profile (joint depth and crumbled
+  // arris) is a function of the ROW alone and torus-invariant (JOINT_EVERY_MM
+  // divides the tile), so it is tabled at the wrapped row; the wrap probes at
+  // y+size see identical values. Values, expression shape and evaluation order
+  // unchanged; the byte-identity and neighbour-tile proofs pin that.
+  const rowJoint = new Float64Array(size);
+  const rowArris = new Float64Array(size);
+  for (let i = 0; i < size; i++) {
+    const yJoint = (i * mmPerPx) % JOINT_EVERY_MM;
+    const dJoint = Math.min(yJoint, JOINT_EVERY_MM - yJoint);
+    rowJoint[i] = 1 - smoothstep(JOINT_WIDTH_MM * 0.42, JOINT_WIDTH_MM * 0.75, dJoint);
+    rowArris[i] = 1 - smoothstep(JOINT_WIDTH_MM * 0.7, 14, dJoint);
+  }
+
   const shader: FamilyShader = (x, y, out) => {
-    const yMm = y * mmPerPx;
     const s = fieldAt(speckle, size, x, y);
     const mixV = fieldAt(blend, size, x, y);
     const floatMark =
@@ -80,9 +93,7 @@ export function generateConcrete(options: TextureSetOptions = {}): TextureSet {
     }
 
     // Expansion joints every 1.5 m: circular distance, so joints may sit on the seam.
-    const yJoint = yMm % JOINT_EVERY_MM;
-    const dJoint = Math.min(yJoint, JOINT_EVERY_MM - yJoint);
-    const joint = 1 - smoothstep(JOINT_WIDTH_MM * 0.42, JOINT_WIDTH_MM * 0.75, dJoint);
+    const joint = rowJoint[y & (size - 1)];
     if (joint > 0) {
       r *= 1 - 0.1 * joint;
       g *= 1 - 0.1 * joint;
@@ -90,8 +101,7 @@ export function generateConcrete(options: TextureSetOptions = {}): TextureSet {
       rough += 0.06 * joint;
       height = height * (1 - joint) - JOINT_DEPTH_MM * joint;
       // Slightly crumbled joint arris.
-      const arris = 1 - smoothstep(JOINT_WIDTH_MM * 0.7, 14, dJoint);
-      height += (s - 0.5) * 1.2 * arris;
+      height += (s - 0.5) * 1.2 * rowArris[y & (size - 1)];
     }
 
     out[0] = Math.min(0.9, Math.max(0.02, r));

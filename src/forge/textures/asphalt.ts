@@ -43,9 +43,35 @@ export function generateAsphalt(options: TextureSetOptions = {}): TextureSet {
   const seamUMm = tileMm * 0.075;
   const polishCentersMm = [tileMm * 0.25, tileMm * 0.75];
 
+  // NIGHT-LOAD (2026-09-08): wheel-path polish is a function of the ROW alone,
+  // tar seam and edge abrasion are functions of the COLUMN alone, and every one
+  // of them is torus-invariant (circularDistance over a period that divides the
+  // tile), so a value tabled at the wrapped index equals the value at any x or
+  // y - the wrap probes at x+size / y+size included. That takes three
+  // circularDistance calls and four smoothsteps per pixel out of the hot loop.
+  // Values, expression shape and evaluation order are unchanged; the
+  // byte-identity and neighbour-tile proofs in textures.test.ts pin that.
+  const rowPolish = new Float64Array(size);
+  for (let i = 0; i < size; i++) {
+    const vMm = i * mmPerPx;
+    const vToBand0 = circularDistanceMm(vMm, polishCentersMm[0], tileMm);
+    const vToBand1 = circularDistanceMm(vMm, polishCentersMm[1], tileMm);
+    const vNearest = Math.min(vToBand0, vToBand1);
+    rowPolish[i] = 1 - smoothstep(POLISH_BAND_MM * 0.46, POLISH_BAND_MM * 0.54, vNearest);
+  }
+  const colSeamCore = new Float64Array(size);
+  const colSeamEdge = new Float64Array(size);
+  const colAbrasion = new Float64Array(size);
+  for (let i = 0; i < size; i++) {
+    const uMm = i * mmPerPx;
+    const dSeam = circularDistanceMm(uMm, seamUMm, tileMm);
+    colSeamCore[i] = 1 - smoothstep(SEAM_WIDTH_MM * 0.32, SEAM_WIDTH_MM * 0.5, dSeam);
+    colSeamEdge[i] = 1 - smoothstep(SEAM_WIDTH_MM * 0.4, SEAM_WIDTH_MM * 0.8, dSeam);
+    const dEdge = circularDistanceMm(uMm, 0, tileMm);
+    colAbrasion[i] = 1 - smoothstep(ABRASION_WIDTH_MM * 0.63, ABRASION_WIDTH_MM, dEdge);
+  }
+
   const shader: FamilyShader = (x, y, out) => {
-    const uMm = x * mmPerPx;
-    const vMm = y * mmPerPx;
     const s = fieldAt(speckle, size, x, y);
     const m = fieldAt(mottle, size, x, y);
 
@@ -54,25 +80,20 @@ export function generateAsphalt(options: TextureSetOptions = {}): TextureSet {
     let grainAmp = 1;
 
     // Wheel-path polish: roughness -0.25 across two 0.5 m bands (traffic scale).
-    const vToBand0 = circularDistanceMm(vMm, polishCentersMm[0], tileMm);
-    const vToBand1 = circularDistanceMm(vMm, polishCentersMm[1], tileMm);
-    const vNearest = Math.min(vToBand0, vToBand1);
-    const polish = 1 - smoothstep(POLISH_BAND_MM * 0.46, POLISH_BAND_MM * 0.54, vNearest);
+    const polish = rowPolish[y & (size - 1)];
     rough -= 0.25 * polish;
     albedo *= 1 - 0.06 * polish;
     grainAmp -= 0.55 * polish;
 
     // Tar seam: -20% albedo, slightly glossier, trough in height, crumbled edges.
-    const dSeam = circularDistanceMm(uMm, seamUMm, tileMm);
-    const seamCore = 1 - smoothstep(SEAM_WIDTH_MM * 0.32, SEAM_WIDTH_MM * 0.5, dSeam);
-    const seamEdge = 1 - smoothstep(SEAM_WIDTH_MM * 0.4, SEAM_WIDTH_MM * 0.8, dSeam);
+    const seamCore = colSeamCore[x & (size - 1)];
+    const seamEdge = colSeamEdge[x & (size - 1)];
     albedo *= 1 - 0.2 * seamCore;
     rough -= 0.22 * seamCore;
     grainAmp += 1.2 * seamEdge * (1 - seamCore);
 
     // Edge abrasion near u = 0: raveled, lighter, rougher aggregate.
-    const dEdge = circularDistanceMm(uMm, 0, tileMm);
-    const abrasion = 1 - smoothstep(ABRASION_WIDTH_MM * 0.63, ABRASION_WIDTH_MM, dEdge);
+    const abrasion = colAbrasion[x & (size - 1)];
     albedo += 0.05 * abrasion * (s - 0.3);
     rough += 0.07 * abrasion;
     grainAmp += 1.4 * abrasion;

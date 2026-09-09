@@ -47,6 +47,23 @@ export function tileableValueNoise(size: number, cells: number, seed: number): F
       lattice[y * cells + x] = hash2u(x, y, seed);
     }
   }
+  // NIGHT-LOAD (2026-09-08): u, the wrapped lattice column pair and the quintic
+  // fade are functions of x ALONE, so they are tabled once per generation and the
+  // row loop reduces to four lattice loads and three mixes. The per-pixel
+  // arithmetic (values, expression shape and evaluation order) is unchanged, so
+  // output stays byte-identical; the determinism and wrap proofs in
+  // textures.test.ts pin that.
+  const colIx0 = new Int32Array(size);
+  const colIx1 = new Int32Array(size);
+  const colSx = new Float64Array(size);
+  for (let x = 0; x < size; x++) {
+    const u = (x * cells) / size;
+    const ix = Math.floor(u);
+    const fx = u - ix;
+    colIx0[x] = ix % cells;
+    colIx1[x] = (ix + 1) % cells;
+    colSx[x] = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+  }
   for (let y = 0; y < size; y++) {
     const v = (y * cells) / size;
     const iy = Math.floor(v);
@@ -56,14 +73,11 @@ export function tileableValueNoise(size: number, cells: number, seed: number): F
     const sy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
     const outRow = y * size;
     for (let x = 0; x < size; x++) {
-      const u = (x * cells) / size;
-      const ix = Math.floor(u);
-      const fx = u - ix;
-      const sx = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
-      const a = lattice[row0 + (ix % cells)];
-      const b = lattice[row0 + ((ix + 1) % cells)];
-      const c = lattice[row1 + (ix % cells)];
-      const d = lattice[row1 + ((ix + 1) % cells)];
+      const sx = colSx[x];
+      const a = lattice[row0 + colIx0[x]];
+      const b = lattice[row0 + colIx1[x]];
+      const c = lattice[row1 + colIx0[x]];
+      const d = lattice[row1 + colIx1[x]];
       out[outRow + x] = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
     }
   }
@@ -96,6 +110,19 @@ export function tileableValueNoiseAniso(
       lattice[y * cellsU + x] = hash2u(x, y, seed);
     }
   }
+  // NIGHT-LOAD (2026-09-08): same column-table hoisting as tileableValueNoise;
+  // per-pixel arithmetic unchanged, byte-identical output.
+  const colIx0 = new Int32Array(size);
+  const colIx1 = new Int32Array(size);
+  const colSx = new Float64Array(size);
+  for (let x = 0; x < size; x++) {
+    const u = (x * cellsU) / size;
+    const ix = Math.floor(u);
+    const fx = u - ix;
+    colIx0[x] = ix % cellsU;
+    colIx1[x] = (ix + 1) % cellsU;
+    colSx[x] = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
+  }
   for (let y = 0; y < size; y++) {
     const v = (y * cellsV) / size;
     const iy = Math.floor(v);
@@ -105,14 +132,11 @@ export function tileableValueNoiseAniso(
     const sy = fy * fy * fy * (fy * (fy * 6 - 15) + 10);
     const outRow = y * size;
     for (let x = 0; x < size; x++) {
-      const u = (x * cellsU) / size;
-      const ix = Math.floor(u);
-      const fx = u - ix;
-      const sx = fx * fx * fx * (fx * (fx * 6 - 15) + 10);
-      const a = lattice[row0 + (ix % cellsU)];
-      const b = lattice[row0 + ((ix + 1) % cellsU)];
-      const c = lattice[row1 + (ix % cellsU)];
-      const d = lattice[row1 + ((ix + 1) % cellsU)];
+      const sx = colSx[x];
+      const a = lattice[row0 + colIx0[x]];
+      const b = lattice[row0 + colIx1[x]];
+      const c = lattice[row1 + colIx0[x]];
+      const d = lattice[row1 + colIx1[x]];
       out[outRow + x] = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
     }
   }

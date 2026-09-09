@@ -46,11 +46,29 @@ export function generateShingle(options: TextureSetOptions = {}): TextureSet {
   const granules = tileableFbm(size, granCells, 2, seed * 7 + 4);
   const speckle = tileableSpeckle(size, seed * 13 + 6);
 
+  // NIGHT-LOAD (2026-09-08): the lifted-lip and shadow profile is a function of
+  // the ROW alone and torus-invariant (COURSE_PITCH_MM divides the tile), so it
+  // is tabled at the wrapped row; wrap probes at y+size see identical values.
+  // Values, expression shape and evaluation order unchanged; the byte-identity
+  // and neighbour-tile proofs pin that.
+  const rowLift = new Float64Array(size);
+  const rowLipShadow = new Float64Array(size);
+  const rowRevealShadow = new Float64Array(size);
+  for (let i = 0; i < size; i++) {
+    const yMm = i * mmPerPx;
+    const course = Math.floor(yMm / COURSE_PITCH_MM);
+    const yLocal = yMm - course * COURSE_PITCH_MM;
+    const dBottom = COURSE_PITCH_MM - yLocal;
+    rowLift[i] = smoothstep(26, 2, dBottom);
+    rowLipShadow[i] = smoothstep(16, 1, dBottom);
+    rowRevealShadow[i] = smoothstep(12, 0, yLocal);
+  }
+
   const shader: FamilyShader = (x, y, out) => {
+    const yi = y & (size - 1);
     const xMm = x * mmPerPx;
     const yMm = y * mmPerPx;
     const course = Math.floor(yMm / COURSE_PITCH_MM);
-    const yLocal = yMm - course * COURSE_PITCH_MM;
     const offset = (course * (SHINGLE_WIDTH_MM / 2)) % SHINGLE_WIDTH_MM;
     const xs = xMm - offset;
     const column = Math.floor(xs / SHINGLE_WIDTH_MM);
@@ -78,12 +96,10 @@ export function generateShingle(options: TextureSetOptions = {}): TextureSet {
     height -= 1.3 * slot;
 
     // Lifted bottom edge: the lip rises over the last ~26 mm of the course.
-    const dBottom = COURSE_PITCH_MM - yLocal;
-    const lift = smoothstep(26, 2, dBottom);
-    height += 1.7 * lift;
+    height += 1.7 * rowLift[yi];
     // Lifted-edge shadow: darkening at the lip and in the reveal just below it.
-    const lipShadow = smoothstep(16, 1, dBottom);
-    const revealShadow = smoothstep(12, 0, yLocal);
+    const lipShadow = rowLipShadow[yi];
+    const revealShadow = rowRevealShadow[yi];
     r *= 1 - 0.2 * lipShadow - 0.24 * revealShadow;
     gg *= 1 - 0.2 * lipShadow - 0.24 * revealShadow;
     b *= 1 - 0.19 * lipShadow - 0.22 * revealShadow;
