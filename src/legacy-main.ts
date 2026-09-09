@@ -2060,6 +2060,31 @@ async function flushWebGpuFrames(timeoutMs = 4_000): Promise<void> {
   if (renderRuntime.backend === 'webgpu') await renderRuntime.waitForSubmittedWork(timeoutMs);
 }
 
+const COLD_FENCE_TIMEOUT_PATTERN = /^WebGPU queue completion exceeded 12000 ms for submission/;
+
+// FIX-LOAD-FLIPBACK (2026-09-09, lane fix-load-flipback): a cold session's
+// first fenced submission realises the arena's whole pipeline vocabulary
+// inside the 12 s queue-completion fence, and under load Dawn's compile can
+// overrun the deadline by a couple of seconds. The rejection used to roll the
+// selection back to the menu - the owner's flip-back. The deadline is
+// self-imposed: the queue keeps draining and the completion probes keep
+// advancing (night-load-reliability measured the identical selection
+// committing right after a rejection, and tonight's baseline-boot-9 caught a
+// rejected submission's vocabulary committing on the very next attempt). So
+// on the exact cold-fence signature this re-arms the fence ONCE and waits out
+// the residual compile instead of failing the transition. Any other
+// rejection, a second rejection, and the timeout itself are untouched: a
+// wedged device still fails closed.
+async function flushWebGpuFramesColdTolerant(phase: string, timeoutMs = 12_000): Promise<void> {
+  try {
+    await flushWebGpuFrames(timeoutMs);
+  } catch (error) {
+    if (!COLD_FENCE_TIMEOUT_PATTERN.test(error instanceof Error ? error.message : String(error))) throw error;
+    console.warn(`[arena-transition] cold submission fence timeout at ${phase} - pipelines still compiling off the fence clock; re-arming the fence once`);
+    await flushWebGpuFrames(timeoutMs);
+  }
+}
+
 // Pass 79 streamline: the deferred GPU retirement scheduler lives in
 // `./gpu-retirement-scheduler`. Backend access and the frame fence are injected;
 // everything else (queues, WeakSets, counters, drain pacing) is owned there.
@@ -30200,7 +30225,7 @@ async function performArenaSelection(
         exactScenePassPrecompiled = true;
         assertAdmission();
       }
-      requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFrames(12_000); assertAdmission();
+      requestStaticShadowRefresh(true); await submitForegroundWebGpuFrame(true); await flushWebGpuFramesColdTolerant('visual-definition warm frame'); assertAdmission();
     }
     profileArenaTransition('quality-presentation');
     await ensureSelectedQualityPresentation(selectedArena.id);
@@ -30255,7 +30280,7 @@ async function performArenaSelection(
     profileArenaTransition('coverage-submit-fence');
     renderRuntime.resetRenderInfo();
     if (renderRuntime.backend === 'webgpu') {
-      await flushWebGpuFrames(12_000);
+      await flushWebGpuFramesColdTolerant('coverage pre-flush');
       assertAdmission();
       const exactScenePass = pass64TslSystems;
       if (!exactScenePass) {
@@ -30284,7 +30309,7 @@ async function performArenaSelection(
         assertAdmission();
         // This is an admitted cold-generation fence, not the live-frame stall
         // budget. Keep the longer allowance behind the menu/loading surface.
-        await flushWebGpuFrames(12_000);
+        await flushWebGpuFramesColdTolerant('coverage draw flush');
         assertAdmission();
       }));
       assertAdmission();
@@ -30349,10 +30374,13 @@ async function performArenaSelection(
     footstepEmitters.reset();
     hfParticleRuntime.setArena(selectedArena.id);
     document.documentElement.dataset.arenaId = selectedArena.id;
+    const retryColdFence = coldFenceRetryArmed
+      && COLD_FENCE_TIMEOUT_PATTERN.test(arenaTransitionFailure);
     if (!hadPreparedArena) {
       arenaVisualReceipt = null;
       nextArena?.root.removeFromParent();
       if (nextArena) nextArena.root.visible = false;
+      if (retryColdFence) throw new ColdFenceSelectionRetrySignal();
       arenaTransitionPhase = 'failed';
       setArenaMenuCamera();
       setStatus(`${nextSelection.displayName} deployment preparation failed. Choose a map and retry.`, 'warn');
@@ -30369,6 +30397,7 @@ async function performArenaSelection(
       lastBotSpawnAudit.clear();
       respawn(false);
       setArenaMenuCamera();
+      if (retryColdFence) throw new ColdFenceSelectionRetrySignal();
       // Say "deployment preparation failed" on BOTH rollback paths. A GPU that
       // rejects the requested arena (an over-limit bind group, a driver pipeline
       // failure) used to land here and report only that the OLD map "remains
@@ -30377,6 +30406,7 @@ async function performArenaSelection(
       // real player's menu click appeared to do nothing at all.
       setStatus(`${nextSelection.displayName} deployment preparation failed — ${selectedArena.displayName} remains selected.`, 'warn');
     } catch (rollbackError) {
+      if (rollbackError instanceof ColdFenceSelectionRetrySignal) throw rollbackError;
       arenaTransitionPhase = 'failed';
       arenaTransitionFailure = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
       showFatalError(new Error(`Map switch rollback failed: ${arenaTransitionFailure}`));
@@ -30435,42 +30465,44 @@ function activateArenaSelection(
   return queued;
 }
 
-const COLD_FENCE_TIMEOUT_PATTERN = /^WebGPU queue completion exceeded 12000 ms for submission/;
+let coldFenceRetryArmed = false;
 
-// NIGHT-LOAD (2026-09-08, lane night-load-reliability): a cold session's FIRST
-// fenced submission realises the arena's whole pipeline vocabulary inside the
-// 12 s queue-completion fence in the transition's visual-definition phase
-// (requestStaticShadowRefresh/submitForegroundWebGpuFrame/flushWebGpuFrames
-// block below). Measured on the pass 96 candidate
-// (lanes/night-load-reliability/REPORT.md): Nuke Town's cold visual-definition
-// phase ran 14.8-14.9 s - ~2.9 s of setup plus this fence rejecting - and the
-// selection rolled back with "deployment preparation failed", throwing the
-// owner back to map select. The identical selection retried immediately
-// afterwards COMMITTED both times (18.8 s / 21.5 s), because Dawn had already
-// compiled the doomed submission's pipelines off the fence-timer's clock.
-// cold-session-precompile-reach.ts documents the same fence losing for
-// farcrysis and the Nuke Town Rebuild arena on earlier passes; the pass 96
-// bundle re-arms it for nuketown2 on this machine.
-//
-// So: retry the WHOLE selection exactly once when an attempt failed on that
-// exact fence signature. The retry stays behind the loading surface - the
-// player never sees the menu flash - and the second attempt rides the warm
-// pipeline cache. A retry that fails again fails exactly as before (same
-// rollback, same status line); the fence itself is untouched, and a wedged
-// device is not masked: its second attempt fails the same fence again.
+// FIX-LOAD-FLIPBACK (2026-09-09, lane fix-load-flipback): NIGHT-LOAD's
+// (2026-09-08) post-rollback retry fired only AFTER performArenaSelection's
+// catch had already run setArenaMenuCamera() and posted the failure status -
+// the player watched the map-select screen flash back before the retry
+// silently recovered, and on tonight's tree the retried attempt lost the same
+// fence again (baseline-boot-9-nuketown2.jsonl: gen 1 visual-definition
+// 14.8 s, gen 2 14.0 s, both rejecting; the failure line was shown twice).
+// The catch block now consults coldFenceRetryArmed and, for the exact
+// cold-fence signature, throws ColdFenceSelectionRetrySignal INSTEAD of
+// showing that surface; this wrapper performs the single retry behind the
+// still-up loading surface, on the warm pipeline cache. A second failure
+// fails exactly as before (same rollback, same status line) - a wedged device
+// is not masked, and the fence itself is untouched.
+class ColdFenceSelectionRetrySignal extends Error {
+  constructor() { super('cold fence selection retry'); }
+}
+
 async function performArenaSelectionWithColdFenceRetry(
   id: ArenaId,
   allowWhilePreparing: boolean,
   admissionToken?: MatchAdmissionToken,
 ): Promise<void> {
-  await performArenaSelection(id, allowWhilePreparing, admissionToken);
-  const failure = arenaTransitionFailure;
-  if (!failure || !COLD_FENCE_TIMEOUT_PATTERN.test(failure)) return;
-  const failedGeneration = arenaTransitionGeneration;
-  console.warn(
-    `[arena-transition] cold submission fence timeout (gen ${failedGeneration}, ${id}) - retrying selection once on the warm pipeline cache`,
-  );
-  await performArenaSelection(id, allowWhilePreparing, admissionToken);
+  for (let attempt = 0; ; attempt += 1) {
+    coldFenceRetryArmed = attempt === 0;
+    try {
+      await performArenaSelection(id, allowWhilePreparing, admissionToken);
+      return;
+    } catch (error) {
+      if (!(error instanceof ColdFenceSelectionRetrySignal)) throw error;
+      console.warn(
+        `[arena-transition] cold submission fence timeout (gen ${arenaTransitionGeneration}, ${id}) - retrying selection once behind the loading surface`,
+      );
+    } finally {
+      coldFenceRetryArmed = false;
+    }
+  }
 }
 
 function stageMenuArenaSelection(id: ArenaId): void {

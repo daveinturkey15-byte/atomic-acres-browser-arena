@@ -680,7 +680,7 @@ describe('presentation prewarm startup contract', () => {
     for (const fencedStep of [
       'requestStaticShadowRefresh(true);',
       'await submitForegroundWebGpuFrame(true);',
-      'await flushWebGpuFrames(12_000);',
+      "await flushWebGpuFramesColdTolerant('visual-definition warm frame');",
     ]) {
       expect(coldWebGpuWarmFrame).toContain(fencedStep);
       expect(
@@ -689,9 +689,15 @@ describe('presentation prewarm startup contract', () => {
       ).toBeLessThan(coldWebGpuWarmFrame.indexOf(fencedStep));
     }
     // The relief must never become a fence change: the arena still has to pass
-    // the same 12 s bound every other arena passes.
+    // the same 12 s bound every other arena passes. Re-pinned 2026-09-09
+    // (fix-load-flipback): the transition's 12 s fences are now awaited through
+    // flushWebGpuFramesColdTolerant, which keeps the 12_000 bound as its
+    // default and re-arms ONCE on the measured cold-compile rejection instead
+    // of rolling the selection back to the menu; the re-arm bound and the
+    // call sites are pinned by arena-cold-fence-recovery-contract.test.ts.
     expect(coldWebGpuWarmFrame).not.toMatch(/flushWebGpuFrames\((?!12_000)/);
-    expect(source).toContain('await flushWebGpuFrames(12_000)');
+    expect(coldWebGpuWarmFrame).not.toMatch(/flushWebGpuFramesColdTolerant\('(?!visual-definition warm frame|coverage pre-flush|coverage draw flush)/);
+    expect(source).toContain("async function flushWebGpuFramesColdTolerant(phase: string, timeoutMs = 12_000): Promise<void> {");
     expect(source).toContain('for (let sample = 0; sample < 3; sample += 1)');
     expect(source).toContain('MATCH_ADMISSION_MAX_COMPLETION_LATENCY_MS = 4_000');
     expect(source).toContain('assertWebGpuAdmissionCompletionLatency(');

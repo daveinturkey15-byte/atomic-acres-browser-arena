@@ -320,6 +320,12 @@
     font: 900 12px/1 var(--ui-copy);
     letter-spacing: 0.14em;
   }
+  /* FIX-HUD-ARMS R1: the 0.72 line-height on the 66-84px ammo numerals lets
+     glyph ink overhang the line box by ~12px and paint over #weapon-name
+     (HK416 behind "30" at 1080p and 720p). Keep the tight stack, but clear it. */
+  .ammo-row {
+    margin-top: 14px;
+  }
 
   #weapon-block #ammo {
     color: var(--hud-text);
