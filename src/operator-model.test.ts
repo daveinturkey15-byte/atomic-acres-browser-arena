@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { operatorBodyColour, operatorSkinPalette } from './operator-skin-catalog';
+import { createContactLoadState } from './rigged-operator-animation-runtime';
 import {
   BOT_EMISSIVE_BRIGHTNESS_SCALE,
   FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY,
@@ -17,6 +19,9 @@ import {
   isEmbeddedWeaponObjectName,
   riggedStanceTarget,
   riggedOperatorRuntimeClips,
+  deathRiggedOperator,
+  resetRiggedOperator,
+  setContactLoadOverlayWeight,
   suppressEmbeddedWeaponObjects,
 } from './operator-model';
 
@@ -757,5 +762,87 @@ describe('HF-388 first-person arm surface detail contract', () => {
     applyFirstPersonArmSkinMaterial(material, SLEEVE_NAME, 'default');
     expect(material.normalMap).toBeNull();
     expect(material.normalScale.x).toBe(1);
+  });
+});
+
+describe('CT.LOAD overlay wiring in operator-model', () => {
+  function handBuiltRoot(): THREE.Group {
+    const root = new THREE.Group();
+    root.name = 'contact-test';
+    root.userData.riggedOperatorRuntime = { stance: 'stand', currentBase: 'Idle_Gun' };
+    return root;
+  }
+
+  function runtimeOf(root: THREE.Object3D): {
+    contactLoadWeight: number;
+    contactLoad: { pelvisDropM: number; weight: number };
+    contactLoadLastY: number;
+  } {
+    const state = (root.userData as Record<string, unknown>).riggedOperatorRuntime as {
+      contactLoadWeight: number;
+      contactLoad: { pelvisDropM: number; weight: number };
+      contactLoadLastY: number;
+    };
+    return state;
+  }
+
+  it('sets, clamps and zeroes the overlay weight on a hand-built runtime', () => {
+    const root = handBuiltRoot();
+    expect(setContactLoadOverlayWeight(root, 0.3)).toBe(true);
+    expect(runtimeOf(root).contactLoadWeight).toBeCloseTo(0.3, 9);
+    expect(setContactLoadOverlayWeight(root, 2)).toBe(true);
+    expect(runtimeOf(root).contactLoadWeight).toBe(1);
+    expect(setContactLoadOverlayWeight(root, -1)).toBe(true);
+    expect(runtimeOf(root).contactLoadWeight).toBe(0);
+    // Weight 0 zeroes the accumulators so the first weight-0 frame is exact.
+    runtimeOf(root).contactLoad.pelvisDropM = 0.04;
+    expect(setContactLoadOverlayWeight(root, 0)).toBe(true);
+    expect(runtimeOf(root).contactLoad.pelvisDropM).toBe(0);
+  });
+
+  it('fails cleanly on an unknown root', () => {
+    expect(setContactLoadOverlayWeight(new THREE.Group(), 1)).toBe(false);
+  });
+
+  it('A9: death and respawn leave exactly-0 accumulators for the next epoch', () => {
+    const root = new THREE.Group();
+    const dirty = createContactLoadState();
+    dirty.pelvisDropM = 0.04;
+    dirty.pelvisRollRad = 0.05;
+    dirty.contactEvents = 7;
+    root.userData.riggedOperatorRuntime = {
+      stance: 'stand',
+      currentBase: 'Run',
+      clips: new Map([['Death', {}]]),
+      actions: new Map(),
+      stancePivot: new THREE.Group(),
+      weaponSocket: new THREE.Group(),
+      contactLoad: dirty,
+      contactLoadWeight: 1,
+      contactLoadLastY: 0,
+    };
+    expect(deathRiggedOperator(root)).toBe(true);
+    expect(dirty.pelvisDropM).toBe(0);
+    expect(dirty.pelvisRollRad).toBe(0);
+    expect(dirty.contactEvents).toBe(0);
+    dirty.pelvisDropM = 0.04;
+    dirty.contactEvents = 3;
+    expect(resetRiggedOperator(root)).toBe(true);
+    expect(dirty.pelvisDropM).toBe(0);
+    expect(dirty.contactEvents).toBe(0);
+    const state = runtimeOf(root);
+    expect(state.contactLoadWeight).toBe(1);
+    expect(state.contactLoadLastY).toBe(root.position.y);
+  });
+
+  it('A7: no overlay line writes the authoritative root, capsule, eye or shot state', () => {
+    const source = readFileSync(new URL('./operator-model.ts', import.meta.url), 'utf8');
+    const overlayLines = source.split('\n').filter((line) => line.includes('contactLoad') || line.includes('contactWeight') || line.includes('contactSpine'));
+    expect(overlayLines.length).toBeGreaterThan(10);
+    for (const line of overlayLines) {
+      expect(/root\.(position|rotation)\s*=\s*[^=]/.test(line)).toBe(false);
+      expect(/root\.(position|rotation)\.[xyz]\s*=[^=]/.test(line)).toBe(false);
+      expect(/capsule|eyeHeight|shotRay|hitProxy|EyeHeight|ShotRay/i.test(line)).toBe(false);
+    }
   });
 });
