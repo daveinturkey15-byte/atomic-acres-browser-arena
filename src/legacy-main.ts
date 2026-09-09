@@ -9079,6 +9079,7 @@ function sendLobbyJoin(): void {
   clearClientWorldRepairTimeout();
   if (!localResumeToken) restoreRoomIdentity(network.roomCode);
   if (resumingVoluntaryActiveMatch || gameStarted || privateLobbySnapshot?.phase === 'active' || privateLobbySnapshot?.phase === 'countdown') {
+    cancelLocalRespawn();
     awaitingCanonicalGuestAuthority = true;
     pendingGuestResumeAuthority = null;
   } else {
@@ -9409,6 +9410,7 @@ function handleClientWorldRepairFailure(reason = 'admission-unacknowledged'): vo
 
 function handleGuestResumeTimeout(): void {
   if (network.role !== 'client' || !awaitingCanonicalGuestAuthority) return;
+  cancelLocalRespawn();
   clearGuestResumeTimeout();
   clearClientWorldRepairTimeout();
   clientWorldRepairAdmission = null;
@@ -9558,6 +9560,7 @@ function acceptGuestResumeFailure(message: GuestResumeFailureMessage): boolean {
     || message.forPlayerId !== player.id || message.connectionEpoch !== localConnectionEpoch
     || message.matchEpoch !== pending.matchEpoch || message.worldRevision !== pending.worldRevision
     || message.authorityNonce !== pending.nonce || message.attempt !== pending.attempt) return true;
+  cancelLocalRespawn();
   clearGuestResumeTimeout();
   clearClientWorldRepairTimeout();
   pendingGuestResumeAuthority = null;
@@ -9618,6 +9621,8 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
     return true;
   }
 
+  // Accepted authority replaces the old life's deadline; rejected packets do not.
+  cancelLocalRespawn();
   applyingLocalReloadAuthority = true;
   interruptReload(true);
   applyingLocalReloadAuthority = false;
@@ -9677,6 +9682,10 @@ function applyGuestResumeAuthority(message: GuestResumeAuthorityMessage): boolea
   weaponView.setWeapon(player.weapon, true);
   weaponView.setPresentationVisible(player.alive);
   if (!player.alive) scheduleLocalRespawn(performance.now(), projection.respawnRemainingMs);
+  else {
+    element<HTMLElement>('#respawn').hidden = true;
+    element<HTMLElement>('#death-fade').classList.remove('death-wash', 'respawn-flash');
+  }
   renderFieldKitSelection();
   updateFieldSupportHud();
   lastAppliedGuestResumeAuthority = Object.freeze({
@@ -15085,6 +15094,12 @@ function updateSensoryFeedback(now: number): void {
   audio.setLowHealthFeedback(lowHealth.presentation);
 }
 
+function cancelLocalRespawn(): void {
+  if (respawnTimer) clearTimeout(respawnTimer);
+  respawnTimer = null;
+  respawnEndsAt = 0;
+}
+
 function scheduleLocalRespawn(now = performance.now(), delayMs = 1_900): void {
   element<HTMLElement>('#respawn').hidden = false;
   // Wash the screen to black across the respawn wait instead of holding a
@@ -15095,10 +15110,16 @@ function scheduleLocalRespawn(now = performance.now(), delayMs = 1_900): void {
   fade.classList.add('death-wash');
   if (respawnTimer) return;
   const boundedDelayMs = THREE.MathUtils.clamp(delayMs, 0, 1_900);
+  const scheduledMatchEpoch = killstreakMatchEpoch;
+  const scheduledConnectionEpoch = localConnectionEpoch;
   respawnEndsAt = now + boundedDelayMs;
   respawnTimer = setTimeout(() => {
     respawnTimer = null;
-    if (gameStarted && !matchFinished) respawn();
+    respawnEndsAt = 0;
+    // A death event arriving during repair cannot bypass canonical admission.
+    if (gameStarted && !matchFinished && !player.alive
+      && scheduledMatchEpoch === killstreakMatchEpoch && scheduledConnectionEpoch === localConnectionEpoch
+      && !(network.role === 'client' && (awaitingCanonicalGuestAuthority || guestResumeTimedOutLocally || guestResumeHostDeclaredFailure))) respawn();
   }, boundedDelayMs);
 }
 
@@ -17285,8 +17306,7 @@ function respawn(
     resetFlashVictimLife();
     resetStickyVictimUrgentAlertLife(localContinuity);
   }
-  if (respawnTimer) clearTimeout(respawnTimer);
-  respawnTimer = null;
+  cancelLocalRespawn();
   interruptReload(true);
   if (startsNewLife) {
     clearExpiredLocalReloadAuthority();
@@ -17840,9 +17860,7 @@ async function startGame(
   element<HTMLElement>('#overdrive-hud').hidden = true;
   matchFinished = false;
   previousHudScores = [0, 0];
-  if (respawnTimer) clearTimeout(respawnTimer);
-  respawnTimer = null;
-  respawnEndsAt = 0;
+  cancelLocalRespawn();
   hudRoot.hidden = false;
   // MAP3 (HF-409 finisher 2): the matchbar is written from the arena's KIND.
   // This runs once, before the first frame, so an explore arena never shows a
@@ -30513,6 +30531,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('.map-card[dat
 
 function resetForMode(preserveAdmission = false): void {
   if (!preserveAdmission) invalidateMatchAdmission('Match state reset');
+  cancelLocalRespawn();
   matchDiagnosticUploader.abandonActiveMatch();
   clearGameplayInput();
   interruptReload(true);
