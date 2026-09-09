@@ -19,9 +19,12 @@ import {
 } from './signature-thresholds';
 
 describe('M3.SIGNATURE.2a axial grade', () => {
-  it('is bright at the mouth and dark at the end wall', () => {
+  // NIGHT-MAP3-LOOK: wall target softened 0.45 -> 0.65. The deeper grade was
+  // measured 19% below base on the floor band and read as murk (owner: floor
+  // still wrong); 0.65 keeps the mouth-to-wall falloff without crushing it.
+  it('is bright at the mouth and graded at the end wall', () => {
     expect(volumeAxialGrade(0)).toBe(1);
-    expect(volumeAxialGrade(-44)).toBeCloseTo(0.45, 10);
+    expect(volumeAxialGrade(-44)).toBeCloseTo(0.65, 10);
   });
 
   it('decreases monotonically along the walk', () => {
@@ -35,7 +38,7 @@ describe('M3.SIGNATURE.2a axial grade', () => {
 
   it('clamps outside the hall instead of extrapolating', () => {
     expect(volumeAxialGrade(5)).toBe(1);
-    expect(volumeAxialGrade(-100)).toBeCloseTo(0.45, 10);
+    expect(volumeAxialGrade(-100)).toBeCloseTo(0.65, 10);
   });
 
   it('is a multiplier below one everywhere past the mouth', () => {
