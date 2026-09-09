@@ -1006,10 +1006,14 @@ export function createSky(options: SkyOptions = {}): Sky {
     const cright = normalize(vec3(toCamXZ.z.negate(), float(0), toCamXZ.x));
     const cup = vec3(0, 1, 0);
     const corner = uv().sub(0.5);
-    // aspect: 8 wide : 1 tall, matching the real cirrus silhouette ratio
+    // NIGHT-MAP3-LOOK: ci.x is the full width in metres (28-72 per the table
+    // above), so the 8:1 silhouette is width ci.x by height ci.x/8 (3.5-9 m).
+    // The shipped revision multiplied the width by 8 as well (224-576 m
+    // cards, 64x the sky coverage), stacking dozens of additive veils over
+    // the sun and washing the disc out. Size is the spec; opacity untouched.
     cirrusMat.positionNode = ccentre
-      .add(cright.mul(corner.x.mul(ci.x.mul(8.0))))
-      .add(cup.mul(corner.y.mul(ci.x)));
+      .add(cright.mul(corner.x.mul(ci.x)))
+      .add(cup.mul(corner.y.mul(ci.x.mul(0.125))));
 
     // Shading: sun-side lit, faint shimmer from fBm.
     const clam = clamp(dot(vec3(0, 1, 0), uniforms.sunDirection), float(0), float(1));

@@ -77,7 +77,10 @@ export function worldSunToLocal(out: THREE.Vector3, world: THREE.Vector3, inv: T
  * M3.SIGNATURE.2a — axial grade along the walk: mouth bright, end wall dark.
  *
  * z runs 0 at the mouth to -len at the end wall. Returns 1 at the mouth,
- * 0.45 at the wall. A multiplier, never an exposure lift, so the highlight
+ * 0.65 at the wall (NIGHT-MAP3-LOOK: softened from 0.45 — the deeper grade
+ * overshot, dropping the measured floor band 19% below base and reading as
+ * murk rather than length; 0.65 keeps a visible falloff without crushing
+ * the far end). A multiplier, never an exposure lift, so the highlight
  * census cannot grow — the measured complaint is uniform brightness, not
  * darkness. The TSL graphs below re-derive this same curve in nodes (a JS
  * call cannot run per sample); this copy is the contract the tests pin.
@@ -85,7 +88,7 @@ export function worldSunToLocal(out: THREE.Vector3, world: THREE.Vector3, inv: T
 export function volumeAxialGrade(z: number, len = CORRIDOR_LEN): number {
   const t = Math.min(1, Math.max(0, -z / len));
   const s = t * t * (3 - 2 * t);
-  return 1 - 0.55 * s;
+  return 1 - 0.35 * s;
 }
 
 function mergeSimple(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
@@ -220,11 +223,12 @@ export function createVolumeCorridor(): VolumeCorridor {
     const baseStone = mix(rgb(0x3a3a3e), rgb(0x2a2a2d), joint);
     const litStone = rgb(0xa8916c);
     // M3.SIGNATURE.2a — axial grade: the mouth stays bright, the end wall
-    // falls to 0.45. Same smoothstep curve as volumeAxialGrade, re-derived in
-    // nodes (a JS call cannot run per sample). Multiplicative, so the
-    // highlight census cannot grow: structure and range, not exposure.
+    // falls to 0.65 (NIGHT-MAP3-LOOK: softened from 0.45, which overshot).
+    // Same smoothstep curve as volumeAxialGrade, re-derived in nodes (a JS
+    // call cannot run per sample). Multiplicative, so the highlight census
+    // cannot grow: structure and range, not exposure.
     const axialT = clamp(pLocal.z.div(float(-LEN)), float(0), float(1));
-    const axial = float(1).sub(axialT.mul(axialT).mul(float(3).sub(axialT.mul(2))).mul(0.55));
+    const axial = float(1).sub(axialT.mul(axialT).mul(float(3).sub(axialT.mul(2))).mul(0.35));
     return mix(baseStone, litStone, sunPatch.mul(0.92)).mul(axial);
   })();
   disposables.push(stoneMat);
@@ -247,9 +251,10 @@ export function createVolumeCorridor(): VolumeCorridor {
   colMat.roughness = 0.82;
   // M3.SIGNATURE.2a — the hall shell carries the same axial grade in albedo,
   // so columns at the far end sink into graded haze and the walk reads long.
+  // NIGHT-MAP3-LOOK: falls to 0.70, softened from 0.55 with the floor grade.
   colMat.colorNode = Fn(() => {
     const t = clamp(positionLocal.z.div(float(-CORRIDOR_LEN)), float(0), float(1));
-    return rgb(0x4a4a50).mul(float(1).sub(t.mul(t).mul(float(3).sub(t.mul(2))).mul(0.45)));
+    return rgb(0x4a4a50).mul(float(1).sub(t.mul(t).mul(float(3).sub(t.mul(2))).mul(0.30)));
   })();
   disposables.push(colMat);
 
@@ -424,11 +429,12 @@ export function createVolumeCorridor(): VolumeCorridor {
         .add(swirl);
 
       const distFade = exp(t.mul(-0.03));
-      // M3.SIGNATURE.2a — per-sample axial grade: far samples contribute half,
-      // so the bright end of the walk glows and the far end falls to graded
-      // haze. Same curve as volumeAxialGrade, in nodes.
+      // M3.SIGNATURE.2a — per-sample axial grade: far samples contribute 0.70
+      // (NIGHT-MAP3-LOOK: softened from half with the floor grade), so the
+      // bright end of the walk glows and the far end falls to graded haze.
+      // Same curve as volumeAxialGrade, in nodes.
       const paT = clamp(p.z.div(float(-LEN)), float(0), float(1));
-      const paGrade = float(1).sub(paT.mul(paT).mul(float(3).sub(paT.mul(2))).mul(0.5));
+      const paGrade = float(1).sub(paT.mul(paT).mul(float(3).sub(paT.mul(2))).mul(0.3));
       acc.addAssign(beamGate.mul(dens).mul(inBounds).mul(dust).mul(phase).mul(distFade).mul(paGrade).mul(stepLen));
       t.addAssign(stepLen);
     });
