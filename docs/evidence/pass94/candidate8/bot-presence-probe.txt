@@ -1,0 +1,268 @@
+[probe] nuketown2 ...
+[probe] nuketown2 -> {
+  "arenaId": "nuketown2",
+  "ok": true,
+  "deployMs": 43666,
+  "requestedBots": 4,
+  "targetBots": 4,
+  "activeBots": 4,
+  "dormantBots": 2,
+  "maximumBots": 6,
+  "nextReinforcementAt": 10,
+  "firstAliveAtMs": 112,
+  "aliveAtFirstSample": 4,
+  "spawnSelections": [
+    {
+      "actorId": "bot-0",
+      "team": 1,
+      "selectedIndex": 105,
+      "score": 71.99999999999999,
+      "reason": "no-immediate-los|nearest-threat-sq:72|recent-death-clear|recent-use-clear|engagement-band:8|repeat-avoided|team-side-preferred|nearest-occupant-sq:72|mode:solo|population:2",
+      "position": [
+        6,
+        1.7,
+        32
+      ]
+    },
+    {
+      "actorId": "bot-1",
+      "team": 1,
+      "selectedIndex": 106,
+      "score": 164.1187014557623,
+      "reason": "no-immediate-los|nearest-threat-sq:260|recent-death-clear|recent-use-clear|engagement-band:13|repeat-avoided|team-side-preferred|nearest-occupant-sq:71|mode:solo|population:3",
+      "position": [
+        14,
+        1.7,
+        34
+      ]
+    },
+    {
+      "actorId": "bot-2",
+      "team": 1,
+      "selectedIndex": 100,
+      "score": 164.1187014557623,
+      "reason": "no-immediate-los|nearest-threat-sq:260|recent-death-clear|recent-use-clear|engagement-band:13|repeat-avoided|team-side-preferred|nearest-occupant-sq:107|mode:solo|population:4",
+      "position": [
+        16,
+        1.7,
+        24
+      ]
+    },
+    {
+      "actorId": "bot-3",
+      "team": 1,
+      "selectedIndex": 1,
+      "score": -528.8367277752632,
+      "reason": "no-immediate-los|nearest-threat-sq:2536|recent-death-clear|recent-use-clear|engagement-band:13|repeat-avoided|team-side-preferred|nearest-occupant-sq:2536|mode:solo|population:5",
+      "position": [
+        -6,
+        1.7,
+        -24
+      ]
+    },
+    {
+      "actorId": "bot-4",
+      "team": 1,
+      "selectedIndex": 2,
+      "score": -815.8344452471604,
+      "reason": "no-immediate-los|nearest-threat-sq:2637|recent-death-clear|recent-use-clear|engagement-band:9|repeat-avoided|team-side-preferred|nearest-occupant-sq:148|mode:solo|population:6",
+      "position": [
+        6,
+        1.7,
+        -25
+      ]
+    },
+    {
+      "actorId": "bot-5",
+      "team": 1,
+      "selectedIndex": 3,
+      "score": -843.5,
+      "reason": "no-immediate-los|nearest-threat-sq:2704|recent-death-clear|recent-use-clear|engagement-band:9|repeat-avoided|team-side-preferred|nearest-occupant-sq:43|mode:solo|population:6",
+      "position": [
+        0,
+        1.7,
+        -26
+      ]
+    }
+  ],
+  "distinctSpawnIndices": [
+    null
+  ],
+  "perBot": [
+    {
+      "id": "bot-0",
+      "spawnedAt": [
+        5.946095603497821,
+        0,
+        31.712509885321712
+      ],
+      "travelledM": 9.9,
+      "states": [
+        "idle",
+        "navigating"
+      ],
+      "finalDistanceToPlayerM": 55.89,
+      "everEffectivelyVisible": true
+    },
+    {
+      "id": "bot-1",
+      "spawnedAt": [
+        13.965823935086537,
+        0,
+        33.70950344823556
+      ],
+      "travelledM": 23.08,
+      "states": [
+        "idle",
+        "navigating"
+      ],
+      "finalDistanceToPlayerM": 61,
+      "everEffectivelyVisible": true
+    },
+    {
+      "id": "bot-2",
+      "spawnedAt": [
+        15.78506999244646,
+        0,
+        23.801603069950577
+      ],
+      "travelledM": 7.56,
+      "states": [
+        "idle",
+        "navigating",
+        "stuck"
+      ],
+      "finalDistanceToPlayerM": 53.67,
+      "everEffectivelyVisible": true
+    },
+    {
+      "id": "bot-3",
+      "spawnedAt": [
+        -5.796706036672114,
+        0,
+        -23.789695900005636
+      ],
+      "travelledM": 5.32,
+      "states": [
+        "idle",
+        "navigating"
+      ],
+      "finalDistanceToPlayerM": 10.12,
+      "everEffectivelyVisible": true
+    }
+  ],
+  "warnings": 1,
+  "pageErrors": []
+}
+[probe] skyline-terminal ...
+[probe] skyline-terminal -> {
+  "arenaId": "skyline-terminal",
+  "ok": true,
+  "deployMs": 64726,
+  "requestedBots": 1,
+  "targetBots": 1,
+  "activeBots": 1,
+  "dormantBots": 5,
+  "maximumBots": 6,
+  "nextReinforcementAt": 10,
+  "firstAliveAtMs": 73,
+  "aliveAtFirstSample": 1,
+  "spawnSelections": [
+    {
+      "actorId": "bot-0",
+      "team": 1,
+      "selectedIndex": 101,
+      "score": 1012.6873420992107,
+      "reason": "no-immediate-los|nearest-threat-sq:2057|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:2057|mode:solo|population:2",
+      "position": [
+        -16,
+        1.7,
+        30
+      ]
+    },
+    {
+      "actorId": "bot-1",
+      "team": 1,
+      "selectedIndex": 102,
+      "score": 988.6068867893396,
+      "reason": "no-immediate-los|nearest-threat-sq:2225|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:39|mode:solo|population:3",
+      "position": [
+        -10,
+        1.7,
+        30
+      ]
+    },
+    {
+      "actorId": "bot-2",
+      "team": 1,
+      "selectedIndex": 103,
+      "score": 950.409289524446,
+      "reason": "no-immediate-los|nearest-threat-sq:2465|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:147|mode:solo|population:3",
+      "position": [
+        -4,
+        1.7,
+        30
+      ]
+    },
+    {
+      "actorId": "bot-3",
+      "team": 1,
+      "selectedIndex": 104,
+      "score": 872.1849565853215,
+      "reason": "no-immediate-los|nearest-threat-sq:2897|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:403|mode:solo|population:3",
+      "position": [
+        4,
+        1.7,
+        30
+      ]
+    },
+    {
+      "actorId": "bot-4",
+      "team": 1,
+      "selectedIndex": 105,
+      "score": 789.141270438235,
+      "reason": "no-immediate-los|nearest-threat-sq:3305|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:679|mode:solo|population:3",
+      "position": [
+        10,
+        1.7,
+        30
+      ]
+    },
+    {
+      "actorId": "bot-5",
+      "team": 1,
+      "selectedIndex": 106,
+      "score": 682.2376708159072,
+      "reason": "no-immediate-los|nearest-threat-sq:3785|recent-death-clear|recent-use-clear|engagement-band:33|repeat-avoided|team-side-preferred|nearest-occupant-sq:1027|mode:solo|population:3",
+      "position": [
+        16,
+        1.7,
+        30
+      ]
+    }
+  ],
+  "distinctSpawnIndices": [
+    null
+  ],
+  "perBot": [
+    {
+      "id": "bot-0",
+      "spawnedAt": [
+        -16.05965661932776,
+        0,
+        29.713648227226752
+      ],
+      "travelledM": 47.52,
+      "states": [
+        "idle",
+        "navigating",
+        "stuck"
+      ],
+      "finalDistanceToPlayerM": 17.96,
+      "everEffectivelyVisible": true
+    }
+  ],
+  "warnings": 1,
+  "pageErrors": []
+}
+[probe] wrote docs/evidence/pass94/bots-hitl5/probe-candidate8.json

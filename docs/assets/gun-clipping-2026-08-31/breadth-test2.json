@@ -1,0 +1,1435 @@
+[
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 0,
+    "yaw": 0,
+    "gapToSurfaceM": null,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36,
+        1.7310645961761475,
+        -21.55669593811035
+      ],
+      "yawRadians": 0,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.1400000000000001,
+    "rootRotX": 0,
+    "rootScale": 0.9289587570571032,
+    "muzzleFwd": 1.957985411076919,
+    "muzzleCam": [
+      0.19517602276508228,
+      -0.3300061071718794,
+      -1.957985411076919
+    ],
+    "weaponFwdMax": 1.9753688311488276
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 1,
+    "yaw": 0.7853981633974483,
+    "gapToSurfaceM": 0.5745620232903357,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.59372329711914,
+        1.7271595978736878,
+        -13.032734870910645
+      ],
+      "yawRadians": 0.7853981633974483,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.369
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.129
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.609
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.369
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.369
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.129
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.609
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.129
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.609
+        }
+      ],
+      "nearestForwardMeters": 0.129,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000004,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889604107484232,
+    "muzzleCam": [
+      0.29943493164845236,
+      -0.034153314842854776,
+      -1.2889604107484232
+    ],
+    "weaponFwdMax": 1.4668782504653706
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 2,
+    "yaw": 1.5707963267948966,
+    "gapToSurfaceM": 0.40509796142578125,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.59490203857422,
+        1.7018815064430237,
+        4.000221252441406
+      ],
+      "yawRadians": 1.5707963267948966,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000038,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.288971319762993,
+    "muzzleCam": [
+      0.31527314487343716,
+      -0.03150401048988383,
+      -1.288971319762993
+    ],
+    "weaponFwdMax": 1.4676431173749265
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 3,
+    "yaw": 2.356194490192345,
+    "gapToSurfaceM": 0.5726684496804382,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.595062255859375,
+        1.7248657727241516,
+        5.788224220275879
+      ],
+      "yawRadians": 2.356194490192345,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.127
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.127
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.127
+        }
+      ],
+      "nearestForwardMeters": 0.127,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000029,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889713204868514,
+    "muzzleCam": [
+      0.3167710042729226,
+      -0.05500853094078284,
+      -1.2889713204868514
+    ],
+    "weaponFwdMax": 1.4676431613610497
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 4,
+    "yaw": 3.141592653589793,
+    "gapToSurfaceM": 0.40510034561157227,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.00004959106445,
+        1.7267108941078186,
+        5.594899654388428
+      ],
+      "yawRadians": 3.141592653589793,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.26
+        }
+      ],
+      "nearestForwardMeters": 0.26,
+      "nearestColliderBounds": {
+        "minX": -37.25,
+        "maxX": -32.75,
+        "minZ": 6,
+        "maxZ": 12,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000038,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889713197629815,
+    "muzzleCam": [
+      0.3039816164493345,
+      -0.04670225948166529,
+      -1.2889713197629815
+    ],
+    "weaponFwdMax": 1.4676431173748945
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 5,
+    "yaw": 3.9269908169872414,
+    "gapToSurfaceM": null,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -19.61392593383789,
+        1.7252365732192994,
+        8.218531608581543
+      ],
+      "yawRadians": 3.9269908169872414,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.1399999999999995,
+    "rootRotX": 4.0172529840262e-28,
+    "rootScale": 0.9289587570571032,
+    "muzzleFwd": 1.957939999055288,
+    "muzzleCam": [
+      0.19834760256207318,
+      -0.3508443396487342,
+      -1.957939999055288
+    ],
+    "weaponFwdMax": 1.9755628941592773
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 6,
+    "yaw": 4.71238898038469,
+    "gapToSurfaceM": 0.4050987243652351,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -32.105098724365234,
+        1.699299671649933,
+        3.999983310699463
+      ],
+      "yawRadians": 4.71238898038469,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -31.7,
+        "maxX": -29.3,
+        "minZ": 2.4,
+        "maxZ": 7.6,
+        "minY": 0,
+        "maxY": 2.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000136,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.288971319761977,
+    "muzzleCam": [
+      0.3045985154471844,
+      -0.02806673115857361,
+      -1.288971319761977
+    ],
+    "weaponFwdMax": 1.4676431173695264
+  },
+  {
+    "arena": "test2",
+    "weapon": "carbine",
+    "stance": "stand",
+    "heading": 7,
+    "yaw": 5.497787143782138,
+    "gapToSurfaceM": null,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -25.708396911621094,
+        1.726473846435547,
+        -8.044892311096191
+      ],
+      "yawRadians": 5.497787143782138,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.1399999999982529,
+    "rootRotX": 1.6560032687756807e-14,
+    "rootScale": 0.9289587570571032,
+    "muzzleFwd": 1.958055808669796,
+    "muzzleCam": [
+      0.194960300120691,
+      -0.3386505539715863,
+      -1.958055808669796
+    ],
+    "weaponFwdMax": 1.9756089019170346
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 0,
+    "yaw": 0,
+    "gapToSurfaceM": null,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36,
+        1.7001000428199768,
+        -3
+      ],
+      "yawRadians": -1.6539375586833378,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.1399999999999995,
+    "rootRotX": 1.942283162015177e-37,
+    "rootScale": 0.9289587570571032,
+    "muzzleFwd": 1.9579855634057282,
+    "muzzleCam": [
+      0.19030489383653793,
+      -0.3399541715662151,
+      -1.9579855634057282
+    ],
+    "weaponFwdMax": 1.9753688804043747
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 1,
+    "yaw": 0.7853981633974483,
+    "gapToSurfaceM": 0.5955100185246143,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.57891082763672,
+        1.7250889921188355,
+        -13.162140846252441
+      ],
+      "yawRadians": 0.7853981633974483,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.39
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.15
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.63
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.39
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.39
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.15
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.63
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.15
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.63
+        }
+      ],
+      "nearestForwardMeters": 0.15,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000004,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889615027670942,
+    "muzzleCam": [
+      0.31410408411755597,
+      -0.04574637533743853,
+      -1.2889615027670942
+    ],
+    "weaponFwdMax": 1.4669664580336885
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 2,
+    "yaw": 1.5707963267948966,
+    "gapToSurfaceM": 0.40509796142578125,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.59490203857422,
+        1.7018815064430237,
+        4.000221252441406
+      ],
+      "yawRadians": 1.5707963267948966,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000038,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.288971319762993,
+    "muzzleCam": [
+      0.3025044905195684,
+      -0.04864511135316674,
+      -1.288971319762993
+    ],
+    "weaponFwdMax": 1.4676431173749265
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 3,
+    "yaw": 2.356194490192345,
+    "gapToSurfaceM": 0.5726684496804382,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -37.595062255859375,
+        1.7248657727241516,
+        5.788224220275879
+      ],
+      "yawRadians": 2.356194490192345,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.127
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.367
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.127
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.607
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.127
+        }
+      ],
+      "nearestForwardMeters": 0.127,
+      "nearestColliderBounds": {
+        "minX": -38.8,
+        "maxX": -38,
+        "minZ": -30,
+        "maxZ": 30,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000025,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889713204125925,
+    "muzzleCam": [
+      0.3171045607538723,
+      -0.033751313089913415,
+      -1.2889713204125925
+    ],
+    "weaponFwdMax": 1.4676431568452628
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 4,
+    "yaw": 3.141592653589793,
+    "gapToSurfaceM": 0.40510034561157227,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.00004959106445,
+        1.7267108941078186,
+        5.594899654388428
+      ],
+      "yawRadians": 3.141592653589793,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.26
+        }
+      ],
+      "nearestForwardMeters": 0.26,
+      "nearestColliderBounds": {
+        "minX": -37.25,
+        "maxX": -32.75,
+        "minZ": 6,
+        "maxZ": 12,
+        "minY": 0,
+        "maxY": 3.4
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000038,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889713197629815,
+    "muzzleCam": [
+      0.30835035370274255,
+      -0.03331198740965613,
+      -1.2889713197629815
+    ],
+    "weaponFwdMax": 1.4676431173748945
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 5,
+    "yaw": 3.9269908169872414,
+    "gapToSurfaceM": null,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -19.722644805908203,
+        1.7252365732192994,
+        8.132363319396973
+      ],
+      "yawRadians": 3.9269908169872414,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": null
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": null
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": null
+        }
+      ],
+      "nearestForwardMeters": null,
+      "nearestColliderBounds": null,
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 0,
+        "highReadyBlend": 0,
+        "fireBlocked": false,
+        "blockReason": "open-space",
+        "spreadPenaltyRadians": 0,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -1.1399999999999995,
+    "rootRotX": 6.9629158581002095e-28,
+    "rootScale": 0.9289587570571032,
+    "muzzleFwd": 1.9579281699762374,
+    "muzzleCam": [
+      0.20295528725544543,
+      -0.3285554306849445,
+      -1.9579281699762374
+    ],
+    "weaponFwdMax": 1.9756132701590197
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 6,
+    "yaw": 4.71238898038469,
+    "gapToSurfaceM": 0.4050987243652351,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -32.105098724365234,
+        1.699299671649933,
+        3.999983310699463
+      ],
+      "yawRadians": 4.71238898038469,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -31.7,
+        "maxX": -29.3,
+        "minZ": 2.4,
+        "maxZ": 7.6,
+        "minY": 0,
+        "maxY": 2.6
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000000000041,
+    "rootRotX": 0.8199999999999994,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": 1.2889713197629185,
+    "muzzleCam": [
+      0.3198326924287276,
+      -0.04920005072266287,
+      -1.2889713197629185
+    ],
+    "weaponFwdMax": 1.4676431173745712
+  },
+  {
+    "arena": "test2",
+    "weapon": "sniper",
+    "stance": "stand",
+    "heading": 7,
+    "yaw": 5.497787143782138,
+    "gapToSurfaceM": 0.569844813135079,
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -32.0029411315918,
+        1.725356855392456,
+        -4.255385398864746
+      ],
+      "yawRadians": 5.497787143782138,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.364
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.604
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.124
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.364
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.364
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.604
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.124
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.604
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.124
+        }
+      ],
+      "nearestForwardMeters": 0.124,
+      "nearestColliderBounds": {
+        "minX": -31.6,
+        "maxX": -30.4,
+        "minZ": -7.5,
+        "maxZ": 1.5,
+        "minY": 0,
+        "maxY": 1.9
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootZ": -0.8600000001216231,
+    "rootRotX": 0.8199999999840596,
+    "rootScale": 0.7338774180751115,
+    "muzzleFwd": null,
+    "muzzleCam": null,
+    "weaponFwdMax": null
+  }
+]

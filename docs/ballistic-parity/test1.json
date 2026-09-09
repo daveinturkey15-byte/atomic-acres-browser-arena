@@ -1,0 +1,859 @@
+{
+ "arena": "test1",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 85,
+  "ratedDirect": 85,
+  "ratedByFootprint": 0,
+  "dynamicTargets": 0,
+  "excludedByRule": 0,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 136,
+  "byMaterial": {
+   "reinforced": 58,
+   "fence": 4,
+   "structural-metal": 39,
+   "interior-wall": 4,
+   "wood": 3,
+   "earth": 5,
+   "concrete": 23
+  },
+  "byClassification": {
+   "fallback": 58,
+   "rule": 78
+  }
+ },
+ "excludedByRule": {},
+ "footprintExplained": [],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Test1 arena:0:test1 hardpan",
+   "name": "test1 hardpan",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:1:test1 fence north",
+   "name": "test1 fence north",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:2:test1 fence south",
+   "name": "test1 fence south",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:3:test1 fence west",
+   "name": "test1 fence west",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:4:test1 fence east",
+   "name": "test1 fence east",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:5:test1 tower sill -1",
+   "name": "test1 tower sill -1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:6:test1 tower sill 1",
+   "name": "test1 tower sill 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:7:test1 tower wall -1 -1",
+   "name": "test1 tower wall -1 -1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:8:test1 tower wall -1 1",
+   "name": "test1 tower wall -1 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:9:test1 tower wall 1 -1",
+   "name": "test1 tower wall 1 -1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:10:test1 tower wall 1 1",
+   "name": "test1 tower wall 1 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:11:test1 tower deck",
+   "name": "test1 tower deck",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:12:test1 tower parapet -1 west",
+   "name": "test1 tower parapet -1 west",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:13:test1 tower parapet -1 east",
+   "name": "test1 tower parapet -1 east",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:14:test1 tower parapet 1 west",
+   "name": "test1 tower parapet 1 west",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:15:test1 tower parapet 1 east",
+   "name": "test1 tower parapet 1 east",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:16:test1 tower parapet side -1 -1",
+   "name": "test1 tower parapet side -1 -1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:17:test1 tower parapet side -1 1",
+   "name": "test1 tower parapet side -1 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:18:test1 tower glazing -1",
+   "name": "test1 tower glazing -1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:19:test1 tower parapet side 1 -1",
+   "name": "test1 tower parapet side 1 -1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:20:test1 tower parapet side 1 1",
+   "name": "test1 tower parapet side 1 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:21:test1 tower glazing 1",
+   "name": "test1 tower glazing 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:22:test1 tower stair -1 0",
+   "name": "test1 tower stair -1 0",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:23:test1 tower stair -1 1",
+   "name": "test1 tower stair -1 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:24:test1 tower stair -1 2",
+   "name": "test1 tower stair -1 2",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:25:test1 tower stair -1 3",
+   "name": "test1 tower stair -1 3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:26:test1 tower stair 1 0",
+   "name": "test1 tower stair 1 0",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:27:test1 tower stair 1 1",
+   "name": "test1 tower stair 1 1",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:28:test1 tower stair 1 2",
+   "name": "test1 tower stair 1 2",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:29:test1 tower stair 1 3",
+   "name": "test1 tower stair 1 3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:30:test1 annex outer -1 -1",
+   "name": "test1 annex outer -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:31:test1 annex flank -1 -1",
+   "name": "test1 annex flank -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:32:test1 annex outer -1 1",
+   "name": "test1 annex outer -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:33:test1 annex flank -1 1",
+   "name": "test1 annex flank -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:34:test1 annex roof -1",
+   "name": "test1 annex roof -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:35:test1 annex outer 1 -1",
+   "name": "test1 annex outer 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:36:test1 annex flank 1 -1",
+   "name": "test1 annex flank 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:37:test1 annex outer 1 1",
+   "name": "test1 annex outer 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:38:test1 annex flank 1 1",
+   "name": "test1 annex flank 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:39:test1 annex roof 1",
+   "name": "test1 annex roof 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:40:test1 firing line roof",
+   "name": "test1 firing line roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:41:test1 firing column -16.7 -15",
+   "name": "test1 firing column -16.7 -15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:42:test1 firing column -16.7 -9",
+   "name": "test1 firing column -16.7 -9",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:43:test1 firing column -16.7 -3",
+   "name": "test1 firing column -16.7 -3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:44:test1 firing column -16.7 3",
+   "name": "test1 firing column -16.7 3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:45:test1 firing column -16.7 9",
+   "name": "test1 firing column -16.7 9",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:46:test1 firing column -16.7 15",
+   "name": "test1 firing column -16.7 15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:47:test1 firing column -10.9 -15",
+   "name": "test1 firing column -10.9 -15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:48:test1 firing column -10.9 -9",
+   "name": "test1 firing column -10.9 -9",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:49:test1 firing column -10.9 -3",
+   "name": "test1 firing column -10.9 -3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:50:test1 firing column -10.9 3",
+   "name": "test1 firing column -10.9 3",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:51:test1 firing column -10.9 9",
+   "name": "test1 firing column -10.9 9",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:52:test1 firing column -10.9 15",
+   "name": "test1 firing column -10.9 15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:53:test1 firing kerb -15",
+   "name": "test1 firing kerb -15",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:54:test1 firing kerb -10",
+   "name": "test1 firing kerb -10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:55:test1 firing kerb -5",
+   "name": "test1 firing kerb -5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:56:test1 firing kerb 0",
+   "name": "test1 firing kerb 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:57:test1 firing kerb 5",
+   "name": "test1 firing kerb 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:58:test1 firing kerb 10",
+   "name": "test1 firing kerb 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:59:test1 firing kerb 15",
+   "name": "test1 firing kerb 15",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:60:test1 lane traverse -1",
+   "name": "test1 lane traverse -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:61:test1 lane traverse 1",
+   "name": "test1 lane traverse 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:62:test1 target post -15",
+   "name": "test1 target post -15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:63:test1 target silhouette -15",
+   "name": "test1 target silhouette -15",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:64:test1 target post -10",
+   "name": "test1 target post -10",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:65:test1 target silhouette -10",
+   "name": "test1 target silhouette -10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:66:test1 target post -5",
+   "name": "test1 target post -5",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:67:test1 target silhouette -5",
+   "name": "test1 target silhouette -5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:68:test1 target post 0",
+   "name": "test1 target post 0",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:69:test1 target silhouette 0",
+   "name": "test1 target silhouette 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:70:test1 target post 5",
+   "name": "test1 target post 5",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:71:test1 target silhouette 5",
+   "name": "test1 target silhouette 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:72:test1 target post 10",
+   "name": "test1 target post 10",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:73:test1 target silhouette 10",
+   "name": "test1 target silhouette 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:74:test1 target post 15",
+   "name": "test1 target post 15",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:75:test1 target silhouette 15",
+   "name": "test1 target silhouette 15",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:76:test1 backstop berm",
+   "name": "test1 backstop berm",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:77:test1 container a -1",
+   "name": "test1 container a -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:78:test1 container a 1",
+   "name": "test1 container a 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:79:test1 container b -1",
+   "name": "test1 container b -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:80:test1 container b 1",
+   "name": "test1 container b 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:81:test1 container c -1",
+   "name": "test1 container c -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:82:test1 container c 1",
+   "name": "test1 container c 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:83:test1 container d -1",
+   "name": "test1 container d -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:84:test1 container d 1",
+   "name": "test1 container d 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:85:test1 container e",
+   "name": "test1 container e",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:86:test1 container stack -1",
+   "name": "test1 container stack -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:87:test1 container stack 1",
+   "name": "test1 container stack 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:88:test1 yard pallet step -1",
+   "name": "test1 yard pallet step -1",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:89:test1 yard crate -1",
+   "name": "test1 yard crate -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:90:test1 yard barrier -1",
+   "name": "test1 yard barrier -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:91:test1 yard pallet step 1",
+   "name": "test1 yard pallet step 1",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:92:test1 yard crate 1",
+   "name": "test1 yard crate 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:93:test1 yard barrier 1",
+   "name": "test1 yard barrier 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:94:test1 mid crate low -1 -1",
+   "name": "test1 mid crate low -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:95:test1 mid crate high -1 -1",
+   "name": "test1 mid crate high -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:96:test1 concrete block -1 -1",
+   "name": "test1 concrete block -1 -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:97:test1 mid crate low 1 -1",
+   "name": "test1 mid crate low 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:98:test1 mid crate high 1 -1",
+   "name": "test1 mid crate high 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:99:test1 concrete block 1 -1",
+   "name": "test1 concrete block 1 -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:100:test1 mid crate low -1 1",
+   "name": "test1 mid crate low -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:101:test1 mid crate high -1 1",
+   "name": "test1 mid crate high -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:102:test1 concrete block -1 1",
+   "name": "test1 concrete block -1 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:103:test1 mid crate low 1 1",
+   "name": "test1 mid crate low 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:104:test1 mid crate high 1 1",
+   "name": "test1 mid crate high 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:105:test1 concrete block 1 1",
+   "name": "test1 concrete block 1 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:106:test1 spawn shed rear -1",
+   "name": "test1 spawn shed rear -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:107:test1 spawn shed side -1 -1",
+   "name": "test1 spawn shed side -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:108:test1 spawn shed side 1 -1",
+   "name": "test1 spawn shed side 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:109:test1 spawn shed roof -1",
+   "name": "test1 spawn shed roof -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:110:test1 end berm -1 -1",
+   "name": "test1 end berm -1 -1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:111:test1 end berm 1 -1",
+   "name": "test1 end berm 1 -1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:112:test1 jersey barrier -25.5 -1",
+   "name": "test1 jersey barrier -25.5 -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:113:test1 jersey barrier -21.5 -1",
+   "name": "test1 jersey barrier -21.5 -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:114:test1 jersey barrier -17.5 -1",
+   "name": "test1 jersey barrier -17.5 -1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:115:test1 stores rear -1",
+   "name": "test1 stores rear -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:116:test1 stores side -1 -1",
+   "name": "test1 stores side -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:117:test1 stores front -1 -1",
+   "name": "test1 stores front -1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:118:test1 stores side 1 -1",
+   "name": "test1 stores side 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:119:test1 stores front 1 -1",
+   "name": "test1 stores front 1 -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:120:test1 stores roof -1",
+   "name": "test1 stores roof -1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:121:test1 spawn shed rear 1",
+   "name": "test1 spawn shed rear 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:122:test1 spawn shed side -1 1",
+   "name": "test1 spawn shed side -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:123:test1 spawn shed side 1 1",
+   "name": "test1 spawn shed side 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:124:test1 spawn shed roof 1",
+   "name": "test1 spawn shed roof 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:125:test1 end berm -1 1",
+   "name": "test1 end berm -1 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:126:test1 end berm 1 1",
+   "name": "test1 end berm 1 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:127:test1 jersey barrier -25.5 1",
+   "name": "test1 jersey barrier -25.5 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:128:test1 jersey barrier -21.5 1",
+   "name": "test1 jersey barrier -21.5 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:129:test1 jersey barrier -17.5 1",
+   "name": "test1 jersey barrier -17.5 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test1 arena:130:test1 stores rear 1",
+   "name": "test1 stores rear 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:131:test1 stores side -1 1",
+   "name": "test1 stores side -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:132:test1 stores front -1 1",
+   "name": "test1 stores front -1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:133:test1 stores side 1 1",
+   "name": "test1 stores side 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:134:test1 stores front 1 1",
+   "name": "test1 stores front 1 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test1 arena:135:test1 stores roof 1",
+   "name": "test1 stores roof 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  }
+ ]
+}

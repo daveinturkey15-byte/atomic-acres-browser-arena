@@ -9,7 +9,9 @@ import {
   createPass64TslSceneSystems,
 } from './pass64-tsl-scene';
 import { canonicalTslDescriptor, tslDescriptorSha256, TSL_MIGRATION_INVENTORY } from './tsl-migration-inventory';
+import { SCREEN_SPACE_POST_DISABLED } from './screen-space-post-profile';
 import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } from '../water-system';
+import { arenaEnvironmentScale } from '../graphics-refinement';
 
 describe('Pass 64 authored TSL pipeline set', () => {
   it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
@@ -31,6 +33,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
   });
 
   it('builds node-material equivalents and proves the traversal contains no legacy shader material', async () => {
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
     const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
@@ -46,29 +49,31 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.depthAwareBloom).toBe(true);
     expect(systems.ambientOcclusion).toEqual({
       graphId: 'pass65.webgpu-gtao-depth.v1',
-      quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+      quality: 'off', enabled: false, denoise: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
     });
     expect(() => assertRuntimeTslTraversal(audit)).not.toThrow();
     const rustDefinition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
     systems.applyDefinition(rustDefinition);
     expect(systems.root.userData.tslArenaVisualDefinitionId).toBe('rustworks-1v1');
     expect(systems.root.userData.tslAtmosphere).toEqual(rustDefinition.atmosphere);
-    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
-    water.geometry.computeBoundingBox();
-    expect(water.visible).toBe(true);
-    expect(water.userData).toMatchObject({
+    const rustWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    rustWater.geometry.computeBoundingBox();
+    expect(rustWater.visible).toBe(true);
+    expect(rustWater.userData).toMatchObject({
       waveBands: OCEAN_WAVES.length,
       waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
       waveAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
       waveNormalAuthority: RUSTWORKS_OCEAN_AUTHORITY_ID,
       surfaceSegments: 256,
     });
-    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
-    const waterMaterial = water.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown };
+    expect((rustWater.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    const waterMaterial = rustWater.material as THREE.Material & { positionNode?: unknown; normalNode?: unknown; opacityNode?: unknown; alphaTestNode?: unknown };
     expect(waterMaterial.positionNode).toBeTruthy();
     expect(waterMaterial.normalNode).toBeTruthy();
+    expect(waterMaterial.opacityNode).toBeTruthy();
+    expect(waterMaterial.alphaTestNode).toBeTruthy();
     expect(waterMaterial).toMatchObject({ transparent: false, opacity: 1, depthWrite: true });
-    const oceanHorizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    const oceanHorizon = rustWater.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
     expect(oceanHorizon).toBeInstanceOf(THREE.Mesh);
     expect(oceanHorizon.userData).toMatchObject({
       horizonRadius: 3_200,
@@ -77,7 +82,8 @@ describe('Pass 64 authored TSL pipeline set', () => {
     });
     expect(oceanHorizon.frustumCulled).toBe(false);
     expect(systems.root.getObjectByName('Pass 64 TSL mist')?.children).toHaveLength(5);
-    expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(rustWater.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(rustWater.position.y).toBeCloseTo(0);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(false);
     const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust') as THREE.Points;
     expect(dust.geometry.drawRange.count).toBe(96);
@@ -88,8 +94,37 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.getObjectByName('Pass 66 galaxy band')?.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 66 aurora curtains')?.visible).toBe(false);
     expect(systems.root.getObjectByName('Pass 66 seamless cloud veil')?.visible).toBe(false);
+    const highSeasDefinition = (await ARENA_VISUAL_REGISTRY['high-seas']()).definition;
+    systems.applyDefinition(highSeasDefinition);
+    expect(rustWater.visible).toBe(false);
+    expect(rustWater.parent).toBeNull();
+    const highSeasWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    highSeasWater.geometry.computeBoundingBox();
+    expect(highSeasWater.visible).toBe(true);
+    expect(highSeasWater.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-2.2);
+    expect(highSeasWater.position.y).toBeCloseTo(0);
+    expect(highSeasWater.userData).toMatchObject({
+      dryFootprintMask: 'none',
+      presentationOwner: 'shared-ocean',
+      nearSize: 960,
+      waterLevel: -2.2,
+      waveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender * 0.15,
+    });
+    expect(highSeasWater.userData.dryFootprintMaskUniform.value).toBe(0);
+    expect(highSeasWater.userData.islandHalfUniform.value.toArray()).toEqual([12.8, 44.8]);
     systems.applyDefinition(definition);
-    expect(water.visible).toBe(false);
+    expect(highSeasWater.visible).toBe(false);
+    expect(highSeasWater.parent).toBeNull();
+    const noWater = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    expect(noWater.visible).toBe(false);
+    expect(noWater.userData).toMatchObject({
+      waterLevel: null,
+      nearSize: 0,
+      presentationOwner: null,
+      dryFootprintMask: 'none',
+      waveAmplitude: 0,
+    });
+    expect(systems.root.userData.pass65AdvancedGraphics.oceanWaveAmplitude).toBe(0);
     expect(systems.root.getObjectByName('Pass 64 TSL grass')?.visible).toBe(true);
     expect(systems.root.getObjectByName('Pass 66 night stars')?.visible).toBe(false);
     const atmosphereSky = systems.root.getObjectByName('Pass 64 TSL atmosphere sky') as SkyMesh;
@@ -151,7 +186,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(systems.root.userData.tslReviewTimeMs).toBe(12_345);
     expect(systems.root.userData.tslReviewCameraId).toBeUndefined();
     systems.dispose();
-  });
+  }, 20_000);
 
   it('fails closed when a legacy custom shader appears in the WebGPU review scene', () => {
     const scene = new THREE.Scene();
@@ -192,11 +227,14 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 1,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
       post: {
-        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0,
+        bloomStrength: 0.14, exposureScale: 1, toneMapping: 'aces', filmGrainScale: 1, vignetteStrength: 0, sharpness: 0,
       },
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     const root = new THREE.Group();
     root.name = 'exact-coverage-root';
@@ -212,6 +250,16 @@ describe('Pass 64 authored TSL pipeline set', () => {
     expect(renderer.setMRT.mock.calls.at(-1)?.[0]).toBe(previousMrt);
     expect(currentTarget).toBe(previousTarget);
     expect(currentMrt).toBe(previousMrt);
+    // The arena transition profiler can only see `coverage-submit-fence` as a
+    // single number (9.8 s on farcrysis at MAX on an RTX 5080, against a 12 s
+    // cold allowance) and cannot say how much of it is this yielding compile
+    // versus the forced full-coverage draw that follows. Publishing the split
+    // is what stops the next attempt at that budget from guessing, so it is
+    // pinned rather than left as an incidental field.
+    expect(systems.root.userData.pass65AdvancedGraphics.exactScenePassPrecompile)
+      .toMatchObject({ runs: 1 });
+    expect(systems.root.userData.pass65AdvancedGraphics.exactScenePassPrecompile.durationMs)
+      .toBeGreaterThanOrEqual(0);
     systems.dispose();
     previousTarget.dispose();
   });
@@ -252,7 +300,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 0.5,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
       post: {
         bloomStrength: 0,
@@ -260,21 +308,32 @@ describe('Pass 64 authored TSL pipeline set', () => {
         toneMapping: 'agx',
         filmGrainScale: 0,
         vignetteStrength: 0.35,
+        sharpness: 0,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     expect(systems.principalHdrTarget.samples).toBe(2);
     expect(systems.principalHdrTarget.textures.map(({ name }) => name)).toEqual(['output', 'normal']);
+    const { artDirectionForArena } = await import('./art-direction');
+    const rustworksDensity = artDirectionForArena('rustworks-1v1').atmosphere.density;
     expect(systems.root.userData.pass65AdvancedGraphics).toEqual({
       principalSamples: 2,
       volumetricScale: 0.5,
       volumetricActual: {
         scale: 0.5,
-        mistOpacity: (0.035 + 0.28 * 0.09) * 0.5,
+        // Lane L: authored strengths are scaled by the arena art direction's
+        // atmosphere density inside the UNCHANGED opacity ceilings, then by
+        // volumetric scale. The density is read from the catalog rather than
+        // copied here: what this pins is the composition formula and the
+        // ceilings, and a hardcoded copy only ever pins how stale the test is.
+        mistOpacity: Math.min(0.12, (0.035 + 0.28 * 0.09) * rustworksDensity) * 0.5,
         mistLayers: 3,
-        smokeOpacity: (0.035 + 0.28 * 0.12) * 0.5,
+        smokeOpacity: (0.035 + 0.28 * 0.12) * rustworksDensity * 0.5,
         smokeLayers: 2,
-        dustOpacity: 0.076,
+        dustOpacity: Math.min(0.32, (0.08 + 0.1 * 0.72) * rustworksDensity) * 0.5,
         dustMotes: 48,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.performance,
@@ -282,8 +341,65 @@ describe('Pass 64 authored TSL pipeline set', () => {
       filmGrainScale: 0,
       vignetteStrength: 0.35,
       ambientOcclusion: {
-        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52,
+        quality: 'high', enabled: true, resolutionScale: 0.5, samples: 12, radius: 0.22, strength: 0.52, denoise: true,
       },
+      // HF-364: the screen-space stack is reported even when nothing is on, so
+      // telemetry can prove the zero state rather than inferring it from an
+      // absent field.
+      screenSpace: {
+        // HF-401: the shaft receipt now also carries the gain the composite
+        // ACTUALLY received on the last presented frame, because "the tier is
+        // on" and "the shafts are reaching the picture" were indistinguishable
+        // while three was silently substituting a default material for the
+        // raymarch. With the whole stack off it must be exactly zero — one
+        // more pinned field than this expectation carried before, not one
+        // fewer.
+        // HF-418 / Lane AL: baked indirect, and HF-398's trace, were both
+        // absent from this projection while being present in the resolved
+        // runtime - the same hand-written-list defect that kept the trace out
+        // of `pass64LinearSourceStages`. Pinned here in their zero state for
+        // the reason the comment above gives: telemetry proves the zero, it
+        // does not leave it to be inferred from an absent field.
+        bakedIndirect: SCREEN_SPACE_POST_DISABLED.bakedIndirect,
+        rayTracing: SCREEN_SPACE_POST_DISABLED.rayTracing,
+        godrays: { ...SCREEN_SPACE_POST_DISABLED.godrays, effectiveAdditiveGain: 0 },
+        reflections: SCREEN_SPACE_POST_DISABLED.reflections,
+        globalIllumination: SCREEN_SPACE_POST_DISABLED.globalIllumination,
+        depthOfField: SCREEN_SPACE_POST_DISABLED.depthOfField,
+        motionBlur: SCREEN_SPACE_POST_DISABLED.motionBlur,
+        upscaling: SCREEN_SPACE_POST_DISABLED.upscaling,
+      },
+      // Cold-compile attribution for the arena coverage fence, published from
+      // construction so the zero state is provable rather than inferred from
+      // an absent field - the same rule the screen-space block above follows.
+      exactScenePassPrecompile: { durationMs: 0, runs: 0 },
+      // The live scene.environment receipt, published from construction for the
+      // same reason as the two blocks above: this test constructs WITHOUT a
+      // renderer, so there is no PMREM and the honest published state is
+      // `present: false` next to the intensity the arena SHOULD carry. That
+      // gap is exactly what shipped unnoticed on the first arena of every real
+      // session until 2026-08-31, and it is now a published number rather than
+      // an absent field nobody could probe.
+      arenaEnvironment: {
+        arenaId: 'rustworks-1v1',
+        reflectionQuality: 'high',
+        present: false,
+        environmentName: null,
+        environmentIntensity: 1,
+        expectedEnvironmentIntensity: arenaEnvironmentScale('rustworks-1v1'),
+        matchesIblState: false,
+        sourceTextureName: null,
+        // The tier the setting REQUESTED, next to the size the generator
+        // produced. Zero here because no renderer means no PMREM; in the live
+        // game they are published side by side because the WebGPU equirect
+        // path derives its cube size from the panorama and does not honour the
+        // requested tier - a gap that is now visible rather than implied.
+        resolutionTier: 128,
+        generatedCubeSize: 0,
+      },
+      linearSourceStages: [
+        'scene-pass-linear-hdr', 'contact-occlusion-multiply', 'depth-guarded-bloom-add',
+      ],
     });
     expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData).toMatchObject({
       waveBands: OCEAN_WAVES.length,
@@ -298,7 +414,7 @@ describe('Pass 64 authored TSL pipeline set', () => {
       principalSamples: 2,
       volumetricScale: 1,
       ambientOcclusion: {
-        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0,
+        quality: 'off', enabled: false, resolutionScale: 0, samples: 0, radius: 0, strength: 0, denoise: false,
       },
       post: {
         bloomStrength: 0.14,
@@ -306,8 +422,12 @@ describe('Pass 64 authored TSL pipeline set', () => {
         toneMapping: 'aces',
         filmGrainScale: 1,
         vignetteStrength: 0,
+        sharpness: 0,
       },
       oceanWaveAmplitude: RUSTWORKS_OCEAN_AMPLITUDE.blender,
+      reflectionScale: 1,
+      reflectionQuality: 'high',
+      environmentIntensity: 1,
     });
     expect(systems.root.userData.pass65AdvancedGraphics).toMatchObject({
       principalSamples: 2,
@@ -318,6 +438,127 @@ describe('Pass 64 authored TSL pipeline set', () => {
     });
     expect((systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh).userData.waveAmplitudeUniform.value)
       .toBe(RUSTWORKS_OCEAN_AMPLITUDE.blender);
+    systems.dispose();
+  });
+
+  // HF-358: WebGPU water is registry-driven (water-authoring) and built by the
+  // ocean-tsl factory over the shared frozen ocean-spectrum — the same band
+  // table CPU buoyancy samples. RustRig keeps its exact pre-HF-358 surface.
+  it('builds registry-driven ocean-tsl water with CPU/GPU parity metadata (HF-358)', async () => {
+    const { oceanSpectrumFingerprint, OCEAN_SPECTRUM_AUTHORITY_ID, OCEAN_BANDS, sampleOcean } = await import('../water/ocean-spectrum');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    // RustRig regression guard: exact historical surface geometry.
+    water.geometry.computeBoundingBox();
+    expect(water.visible).toBe(true);
+    expect((water.geometry as THREE.PlaneGeometry).parameters.widthSegments).toBe(256);
+    expect(water.geometry.boundingBox?.getCenter(new THREE.Vector3()).y).toBeCloseTo(-19.5);
+    expect(water.userData).toMatchObject({
+      waveBands: OCEAN_BANDS.length,
+      waveAuthority: OCEAN_SPECTRUM_AUTHORITY_ID,
+      waveNormalAuthority: OCEAN_SPECTRUM_AUTHORITY_ID,
+      surfaceSegments: 256,
+      swimmable: false,
+    });
+    expect(water.userData.oceanSpectrumFingerprint).toBe(oceanSpectrumFingerprint());
+    expect(water.getObjectByName('Pass 66 curved RustRig ocean horizon')).toBeInstanceOf(THREE.Mesh);
+    // The GPU displacement expression is built from the same frozen table the
+    // CPU sampler reads; the fingerprint stamp is the machine-checkable proof.
+    const body = water.userData.waterBody as { level: number };
+    const cpu = sampleOcean(31, -17, 4.2);
+    expect(body.level + cpu.height).toBeCloseTo(-19.5 + cpu.height, 12);
+    // Registry-driven: a non-water arena swaps to the inert placeholder.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['gun-range']()).definition);
+    const placeholder = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    expect(placeholder.visible).toBe(false);
+    expect((placeholder.userData.waterBody as unknown)).toBeUndefined();
+    expect(placeholder.geometry.getAttribute('position')).toBeDefined();
+    expect(placeholder.geometry.getAttribute('position')!.count).toBeGreaterThan(0);
+    systems.dispose();
+  });
+
+  it('HF-358: arena switch disposes the retired water subtree including the child horizon ring', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const water = systems.root.getObjectByName('Pass 64 TSL perimeter water') as THREE.Mesh;
+    // The horizon skirt is a CHILD of the water mesh with its own geometry/material.
+    const horizon = water.getObjectByName('Pass 66 curved RustRig ocean horizon') as THREE.Mesh;
+    expect(horizon).toBeInstanceOf(THREE.Mesh);
+    const horizonGeometryDispose = vi.spyOn(horizon.geometry, 'dispose');
+    const horizonMaterialDispose = vi.spyOn(
+      horizon.material as THREE.Material,
+      'dispose',
+    );
+    // Switching to a waterless arena retires the whole water node.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['gun-range']()).definition);
+    expect(horizonGeometryDispose).toHaveBeenCalled();
+    expect(horizonMaterialDispose).toHaveBeenCalled();
+    systems.dispose();
+  });
+});
+
+describe('Lane L arena art direction wiring', () => {
+  it('pushes the arena identity into an installed filmic chain at build and on every arena switch', async () => {
+    const { installFilmicGradeChain } = await import('./filmic-grade-chain');
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = {
+      outputNode: null,
+      outputColorTransform: true,
+      needsUpdate: false,
+    } as unknown as RenderPipeline;
+    const handle = installFilmicGradeChain(
+      renderPipeline as unknown as import('./filmic-grade-chain').GradedRenderPipeline,
+    );
+    expect(handle.arenaArtDirection()).toBeNull();
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    // Building the scene systems handed the chain the first arena's identity.
+    expect(handle.arenaArtDirection()).toBe(ARENA_ART_DIRECTIONS['atomic-acres']);
+    // An arena switch re-points the chain at the new place.
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition);
+    expect(handle.arenaArtDirection()).toBe(ARENA_ART_DIRECTIONS['rustworks-1v1']);
+    systems.dispose();
+    handle.dispose();
+  });
+
+  it('keeps working with no chain installed (unit-test pipelines stay bare)', async () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['gun-range']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    expect(systems.root.userData.tslArenaVisualDefinitionId).toBe('gun-range');
+    systems.dispose();
+  });
+
+  it('tints the atmosphere particles per arena (rust haze is not farm haze)', async () => {
+    const { ARENA_ART_DIRECTIONS } = await import('./art-direction');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera();
+    const renderPipeline = { outputNode: null } as unknown as RenderPipeline;
+    const definition = (await ARENA_VISUAL_REGISTRY['atomic-acres']()).definition;
+    const systems = createPass64TslSceneSystems(scene, camera, renderPipeline, definition);
+    const mist = systems.root.getObjectByName('Pass 64 TSL mist');
+    const dust = systems.root.getObjectByName('Pass 64 TSL deterministic dust');
+    const mistNear = mist?.userData.tintNearUniform as { value: THREE.Color };
+    const dustFar = dust?.userData.tintFarUniform as { value: THREE.Color };
+    const acres = ARENA_ART_DIRECTIONS['atomic-acres'];
+    expect(mistNear.value.getHex()).toBe(acres.atmosphere.mistNear);
+    expect(dustFar.value.getHex()).toBe(acres.atmosphere.dustFar);
+    systems.applyDefinition((await ARENA_VISUAL_REGISTRY['rustworks-1v1']()).definition);
+    const rust = ARENA_ART_DIRECTIONS['rustworks-1v1'];
+    expect(mistNear.value.getHex()).toBe(rust.atmosphere.mistNear);
+    expect(dustFar.value.getHex()).toBe(rust.atmosphere.dustFar);
+    expect(rust.atmosphere.mistNear).not.toBe(acres.atmosphere.mistNear);
     systems.dispose();
   });
 });

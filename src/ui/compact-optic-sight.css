@@ -1,0 +1,65 @@
+/*
+ * The crossbow's compact-optic ADS treatment.
+ *
+ * WHY THIS IS NOT #sniper-scope. The sniper's optic replaces the world with a
+ * black tunnel and removes the viewmodel; at 4x, standing off at range, that
+ * reads correctly. The crossbow is a close-to-mid range launcher, and blacking
+ * out its periphery would cost the player exactly the awareness that weapon is
+ * used for. So this sheet never blacks anything out: the housing is a graded
+ * frame that leaves the centre of the frame completely clear, and the crossbow
+ * itself stays in shot underneath it.
+ *
+ * WHY THERE IS NO RING AND NO RETICLE HERE. There used to be, and it was the
+ * defect the owner reported on 2026-08-31 as the optic feeling "like two
+ * stacked ones". The weapon's authored optic is real geometry with real lenses
+ * and a real illuminated reticle, visible since the HF-405 bore carve. A second
+ * ring drawn in screen space - fixed size, screen centre, not tracking the
+ * weapon's sight axis - could only ever sit beside the real one. The authored
+ * optic is the sight picture; this sheet adds the vignette and the legend and
+ * nothing that geometry already owns.
+ */
+
+#compact-optic {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+  opacity: var(--compact-optic-blend, 0);
+  /* Outer housing diameter of the authored optic at settled ADS. */
+  --compact-optic-glass: clamp(58px, 11.8vh, 148px);
+  --compact-optic-color: #ff7048;
+}
+
+#compact-optic[hidden] { display: none; }
+
+/*
+ * The housing. Fully clear across the middle of the frame, then a graded warm
+ * shade into the corners: enough to say "you are behind an optic" without
+ * taking a single pixel of usable close-range awareness.
+ */
+#compact-optic .compact-optic-housing {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 92% 92% at 50% 50%,
+    rgba(4, 8, 10, 0) 0 42%,
+    rgba(4, 8, 10, 0.22) 60%,
+    rgba(4, 8, 10, 0.5) 80%,
+    rgba(3, 6, 7, 0.7) 100%
+  );
+}
+
+#compact-optic > small {
+  position: absolute;
+  left: 50%;
+  /* Above the glass, like #sniper-scope's own legend. Below it would land on
+     the crossbow's receiver, which is the one part of the frame the optic
+     presentation must not add clutter to. */
+  top: calc(50% - var(--compact-optic-glass) * 0.98);
+  transform: translateX(-50%);
+  font: 900 11px/1 Inter, system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  color: color-mix(in srgb, var(--compact-optic-color) 76%, #f2f7f5);
+  text-shadow: 0 1px 3px #000, 0 0 6px rgba(0, 0, 0, 0.9);
+}
+

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { deepFreezeSubtreeMatrices, deepUnfreezeSubtreeMatrices } from './static-matrix-freeze';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { GrenadeId } from './combat/grenade-catalog';
@@ -260,6 +261,9 @@ export class GrenadeWorldPresentationPool {
     root.userData.presentationPoolSlot = index;
     root.userData.presentationPoolInUse = false;
     root.visible = false;
+    // Perf (2026-08-29): stop the per-frame matrix recompose while pooled;
+    // checkout restores dynamics and refreshes once.
+    deepFreezeSubtreeMatrices(root);
     this.root.add(root);
     this.slots.push({ family, root, inUse: false });
   }
@@ -313,6 +317,8 @@ export class GrenadeWorldPresentationPool {
     slot.root.visible = true;
     slot.root.position.set(0, 0, 0);
     slot.root.quaternion.identity();
+    deepUnfreezeSubtreeMatrices(slot.root);
+    slot.root.updateMatrixWorld(true);
     this.acquisitions += 1;
     this.highWater = Math.max(this.highWater, this.slots.filter((candidate) => candidate.inUse).length);
     return slot.root;
@@ -326,6 +332,8 @@ export class GrenadeWorldPresentationPool {
     slot.root.visible = false;
     slot.root.position.set(0, -10_000, 0);
     slot.root.quaternion.identity();
+    deepFreezeSubtreeMatrices(slot.root);
+    slot.root.updateMatrixWorld(true);
     this.releases += 1;
     return true;
   }
@@ -407,6 +415,9 @@ export class GrenadeWorldPresentationPool {
         .addScaledVector(right, (column - 2.5) * 0.42)
         .addScaledVector(up, (1.5 - row) * 0.42);
       slot.root.position.copy(this.root.worldToLocal(target));
+      // The compile render below must see the staged transforms; lift the
+      // idle-pool matrix freeze for the rehearsal.
+      deepUnfreezeSubtreeMatrices(slot.root);
     }
     try {
       await runtime.compileAndRender(this.root, camera, this.scene);
@@ -423,6 +434,8 @@ export class GrenadeWorldPresentationPool {
         slot.inUse = false;
         slot.root.userData.presentationPoolInUse = false;
         slot.root.visible = false;
+        deepFreezeSubtreeMatrices(slot.root);
+        slot.root.updateMatrixWorld(true);
       }
       this.root.visible = rootVisible;
       this.root.frustumCulled = rootFrustumCulled;

@@ -1,0 +1,6 @@
+[bisect] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH"}
+[bisect] match active; warming up
+[bisect] census: 7121 meshes (201 visible), 1828 materials
+[bisect] presentation {"telemetry":{"status":"healthy","submissionMode":"warmed-live","maximumInFlightSubmissions":3,"inFlightSubmissions":2,"completionProbeTargetSequence":506,"outstandingCompletionProbes":2,"completionProbeCount":507,"submissionSequence":507,"completedSequence":505,"lastSubmittedAt":90936.40000009537,"lastCompletedAt":90940.90000009537,"pendingSince":90940.90000009537,"pendingForMs":0.5,"lastCompletionLatencyMs":20.5,"completionFailures":0,"lastFailure":null,"backpressureActive":false,"skippedSubmissions":17,"progress":{"windowStartedAt":79639.70000004768,"elapsedMs":11301.700000047684,"submissio
+[bisect] candidate5 nuketown2 baseline       fps     51  p50 18.9 p95 38.2 p99 44.3  draws 228.6 tris 391815 inst 11169 pipes+0  (nothing hidden)  js-busy 15.51 ms/frame
+Wrote C:\Users\david\projects\aa-claude-hitl\docs\evidence\pass94\candidate5\bisect\candidate5-nuketown2.json

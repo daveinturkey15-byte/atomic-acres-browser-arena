@@ -1,0 +1,35 @@
+Running 12 tests using 1 worker
+
+
+(node:60532) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:71:5 › runs on a browser that can actually get a WebGPU device
+[2/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:88:5 › the boot roster names every arena module on disk
+[3/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › atomic-acres: boots a clean visible solo match
+[4/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › skyline-terminal: boots a clean visible solo match
+[5/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › rustworks-1v1: boots a clean visible solo match
+[6/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › gun-range: boots a clean visible solo match
+[7/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › farcrysis: boots a clean visible solo match
+[8/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › high-seas: boots a clean visible solo match
+[9/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test1: boots a clean visible solo match
+[10/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test2: boots a clean visible solo match
+[11/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › map3: boots a clean visible solo match
+[12/12] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match
+  Slow test file: [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts (9.3m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  12 passed (10.9m)
+EXIT=0
+
+# Provenance
+# command: PASS73_NATIVE_WEBGPU=1 npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts --project=chromium --workers=1 --retries=0
+# branch:  contrib/dave-gaming-pc/claude/load-time-deep-cut
+# gitSha:  9ec78a60883d353173883283602fa672a5f2441d
+# build: the spec's webServer (scripts/qa/playwright-web-server.mjs) runs vite build()
+#        from THIS worktree and previews it; the freshly built game bundle landed at
+#        dist/channels/pass86/assets/legacy-main-DvXBviTB.js (mtime 03:54, this run),
+#        which is what ?release=latest resolves to. NOTE: that build replaced the
+#        root dist/assets/legacy-main-BZjJAeqa.js the switch-matrix receipts name, so
+#        re-running the matrix needs a fresh `npm run build` first.
+# machine: headless installed Chrome, hardware WebGPU, ComfyUI idle
+# finished: 2026-09-03T04:05:33+01:00

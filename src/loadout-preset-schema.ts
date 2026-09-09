@@ -1,3 +1,9 @@
+import {
+  createSchemaSnapshotKernel,
+  type SchemaIssue,
+  type SchemaIssueCode,
+  type UnknownRecord,
+} from './schema-snapshot-kernel';
 import { parseWeaponDefinitions, type WeaponDefinitionId } from './combat/weapon-schema';
 import { GRENADE_IDS, type GrenadeId as CanonicalGrenadeId } from './combat/grenade-catalog';
 import {
@@ -96,22 +102,8 @@ export type LoadoutItemEligibility = Readonly<{
   secondaryIds: readonly WeaponDefinitionId[];
 }>;
 
-export type LoadoutSchemaIssueCode =
-  | 'bounds'
-  | 'cross-field'
-  | 'duplicate'
-  | 'format'
-  | 'issue-limit'
-  | 'missing-key'
-  | 'type'
-  | 'unknown-key'
-  | 'unsupported-value';
-
-export type LoadoutSchemaIssue = Readonly<{
-  path: string;
-  code: LoadoutSchemaIssueCode;
-  message: string;
-}>;
+export type LoadoutSchemaIssueCode = SchemaIssueCode;
+export type LoadoutSchemaIssue = SchemaIssue;
 
 export class LoadoutSchemaValidationError extends Error {
   readonly issues: readonly LoadoutSchemaIssue[];
@@ -130,12 +122,7 @@ export class LoadoutEligibilityError extends Error {
   }
 }
 
-type UnknownRecord = Readonly<Record<string, unknown>>;
 
-const MAX_SCHEMA_ISSUES = 96;
-const MAX_SNAPSHOT_KEYS = 64;
-const MAX_SNAPSHOT_DEPTH = 8;
-const MAX_SNAPSHOT_ARRAY_LENGTH = 16;
 const trustedEligibilityValues = new WeakSet<object>();
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f]/gu;
 const BIDI_OR_INVISIBLE_CONTROL_PATTERN = /[\u061c\u200b\u200e\u200f\u202a-\u202e\u2060-\u2069\u206a-\u206f\ufeff]/gu;
@@ -156,24 +143,18 @@ const PRESET_KEYS = Object.freeze([
 const STORAGE_KEYS = Object.freeze(['schemaVersion', 'selected', 'customPresets'] as const);
 const DEPLOYMENT_KEYS = Object.freeze(['primary', 'secondary', 'grenade'] as const);
 
-function addIssue(
-  issues: LoadoutSchemaIssue[],
-  path: string,
-  code: LoadoutSchemaIssueCode,
-  message: string,
-): void {
-  if (issues.length >= MAX_SCHEMA_ISSUES) {
-    if (issues[MAX_SCHEMA_ISSUES - 1]?.code !== 'issue-limit') {
-      issues[MAX_SCHEMA_ISSUES - 1] = Object.freeze({
-        path: '$',
-        code: 'issue-limit',
-        message: `validation stopped after ${MAX_SCHEMA_ISSUES - 1} detailed issues`,
-      });
-    }
-    return;
-  }
-  issues.push(Object.freeze({ path, code, message }));
-}
+const {
+  addIssue,
+  isRecord,
+  snapshotInput,
+  exactRecord,
+  oneOf,
+} = createSchemaSnapshotKernel({
+  maxIssues: 96,
+  maxSnapshotKeys: 64,
+  maxSnapshotDepth: 8,
+  maxSnapshotArrayLength: 16,
+});
 
 function sortedIssues(issues: readonly LoadoutSchemaIssue[]): readonly LoadoutSchemaIssue[] {
   return Object.freeze([...issues].sort((left, right) => (
@@ -183,230 +164,6 @@ function sortedIssues(issues: readonly LoadoutSchemaIssue[]): readonly LoadoutSc
   )));
 }
 
-function isRecord(value: unknown): value is UnknownRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function snapshotFailure(issues: LoadoutSchemaIssue[], path: string, operation: string): void {
-  addIssue(issues, path, 'type', `${operation} could not be read safely`);
-}
-
-function snapshotOwnKeys(
-  value: object,
-  path: string,
-  issues: LoadoutSchemaIssue[],
-): readonly PropertyKey[] | null {
-  try {
-    const keys = Reflect.ownKeys(value);
-    if (keys.length > MAX_SNAPSHOT_KEYS) {
-      addIssue(issues, path, 'bounds', `must not expose more than ${MAX_SNAPSHOT_KEYS} own properties`);
-    }
-    return keys.slice(0, MAX_SNAPSHOT_KEYS);
-  } catch {
-    snapshotFailure(issues, path, 'own property keys');
-    return null;
-  }
-}
-
-function snapshotDescriptor(
-  value: object,
-  key: PropertyKey,
-  path: string,
-  issues: LoadoutSchemaIssue[],
-): PropertyDescriptor | null {
-  try {
-    const first = Reflect.getOwnPropertyDescriptor(value, key);
-    const second = Reflect.getOwnPropertyDescriptor(value, key);
-    if (!first || !second) {
-      snapshotFailure(issues, path, 'own property descriptor');
-      return null;
-    }
-    const firstIsData = Object.hasOwn(first, 'value');
-    const secondIsData = Object.hasOwn(second, 'value');
-    const stable = firstIsData === secondIsData
-      && first.configurable === second.configurable
-      && first.enumerable === second.enumerable
-      && (firstIsData
-        ? first.writable === second.writable && Object.is(first.value, second.value)
-        : first.get === second.get && first.set === second.set);
-    if (!stable) {
-      addIssue(issues, path, 'cross-field', 'own property descriptor changed during snapshot');
-      return null;
-    }
-    return first;
-  } catch {
-    snapshotFailure(issues, path, 'own property descriptor');
-    return null;
-  }
-}
-
-function snapshotArray(
-  value: object,
-  path: string,
-  issues: LoadoutSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): unknown[] {
-  const lengthDescriptor = snapshotDescriptor(value, 'length', `${path}.length`, issues);
-  if (!lengthDescriptor) return [];
-  if (!Object.hasOwn(lengthDescriptor, 'value')) {
-    addIssue(issues, `${path}.length`, 'type', 'accessor properties are forbidden');
-    return [];
-  }
-  const length = lengthDescriptor.value;
-  if (
-    typeof length !== 'number'
-    || !Number.isSafeInteger(length)
-    || length < 0
-    || length > MAX_SNAPSHOT_ARRAY_LENGTH
-  ) {
-    addIssue(
-      issues,
-      `${path}.length`,
-      'bounds',
-      `must be a safe integer from 0 through ${MAX_SNAPSHOT_ARRAY_LENGTH}`,
-    );
-    return [];
-  }
-  const snapshot = new Array<unknown>(length);
-  const keys = snapshotOwnKeys(value, path, issues);
-  if (!keys) return snapshot;
-  for (const key of keys) {
-    if (key === 'length') continue;
-    if (typeof key === 'symbol') {
-      addIssue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol array properties are forbidden');
-      continue;
-    }
-    const index = Number(key);
-    const isIndex = Number.isSafeInteger(index) && index >= 0 && index < length && String(index) === key;
-    if (!isIndex) {
-      addIssue(issues, `${path}.${key}`, 'unknown-key', 'non-index array properties are forbidden');
-      continue;
-    }
-    const propertyPath = `${path}[${index}]`;
-    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
-    if (!descriptor) continue;
-    if (!descriptor.enumerable) {
-      addIssue(issues, propertyPath, 'unknown-key', 'non-enumerable array entries are forbidden');
-      continue;
-    }
-    if (!Object.hasOwn(descriptor, 'value')) {
-      addIssue(issues, propertyPath, 'type', 'accessor properties are forbidden');
-      continue;
-    }
-    snapshot[index] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
-  }
-  return snapshot;
-}
-
-function snapshotRecord(
-  value: object,
-  path: string,
-  issues: LoadoutSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): UnknownRecord {
-  const snapshot: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  const keys = snapshotOwnKeys(value, path, issues);
-  if (!keys) return snapshot;
-  for (const key of keys) {
-    if (typeof key === 'symbol') {
-      addIssue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol object properties are forbidden');
-      continue;
-    }
-    const propertyPath = `${path}.${key}`;
-    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
-    if (!descriptor) continue;
-    if (!descriptor.enumerable) {
-      addIssue(issues, propertyPath, 'unknown-key', 'non-enumerable object properties are forbidden');
-      continue;
-    }
-    if (!Object.hasOwn(descriptor, 'value')) {
-      addIssue(issues, propertyPath, 'type', 'accessor properties are forbidden');
-      continue;
-    }
-    snapshot[key] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
-  }
-  return snapshot;
-}
-
-function snapshotValue(
-  value: unknown,
-  path: string,
-  issues: LoadoutSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): unknown {
-  if (value === null || typeof value !== 'object') return value;
-  if (depth > MAX_SNAPSHOT_DEPTH) {
-    addIssue(issues, path, 'bounds', `must not exceed snapshot depth ${MAX_SNAPSHOT_DEPTH}`);
-    return null;
-  }
-  if (active.has(value)) {
-    addIssue(issues, path, 'cross-field', 'cyclic values are forbidden');
-    return null;
-  }
-  let array: boolean;
-  try {
-    array = Array.isArray(value);
-  } catch {
-    snapshotFailure(issues, path, 'value kind');
-    return null;
-  }
-  active.add(value);
-  try {
-    return array
-      ? snapshotArray(value, path, issues, active, depth)
-      : snapshotRecord(value, path, issues, active, depth);
-  } catch {
-    snapshotFailure(issues, path, 'value snapshot');
-    return null;
-  } finally {
-    active.delete(value);
-  }
-}
-
-function snapshotInput(value: unknown, issues: LoadoutSchemaIssue[]): unknown {
-  try {
-    return snapshotValue(value, '$', issues, new WeakSet<object>(), 0);
-  } catch {
-    snapshotFailure(issues, '$', 'input snapshot');
-    return null;
-  }
-}
-
-function exactRecord(
-  value: unknown,
-  path: string,
-  keys: readonly string[],
-  issues: LoadoutSchemaIssue[],
-): UnknownRecord | null {
-  if (!isRecord(value)) {
-    addIssue(issues, path, 'type', 'must be an object');
-    return null;
-  }
-  const allowed = new Set(keys);
-  for (const key of keys) {
-    if (!Object.hasOwn(value, key)) addIssue(issues, `${path}.${key}`, 'missing-key', 'is required');
-  }
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) addIssue(issues, `${path}.${key}`, 'unknown-key', 'is not allowed');
-  }
-  return value;
-}
-
-function oneOf<T extends string>(
-  value: unknown,
-  values: readonly T[],
-  path: string,
-  issues: LoadoutSchemaIssue[],
-): value is T {
-  if (typeof value !== 'string' || !values.includes(value as T)) {
-    addIssue(issues, path, 'unsupported-value', `must be one of ${values.join(', ')}`);
-    return false;
-  }
-  return true;
-}
 
 function validateDenseArray(value: readonly unknown[], path: string, issues: LoadoutSchemaIssue[]): void {
   for (let index = 0; index < value.length; index += 1) {

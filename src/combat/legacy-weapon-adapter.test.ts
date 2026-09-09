@@ -27,7 +27,7 @@ function expectDeepFrozen(value: unknown): void {
 
 describe('Pass 65 runtime weapon adapter', () => {
   it('projects the complete current-protocol roster in canonical order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(19);
     expect(Object.keys(LEGACY_WEAPONS)).toEqual(WEAPON_CATALOG.map((weapon) => weapon.id));
     expect(Object.keys(LEGACY_WEAPONS).slice(0, 9)).toEqual(legacyBaseline.legacyEnumerationOrder);
     expect(LEGACY_WEAPONS.carbine).toMatchObject({ id: 'carbine', name: 'HK416', damage: 31, mag: 30 });
@@ -43,8 +43,10 @@ describe('Pass 65 runtime weapon adapter', () => {
   });
 
   it('rejects missing, duplicate, unknown, and reordered catalogs without a fallback', () => {
+    // The roster's last entry is the HF-334 livery variant; dropping it must
+    // still fail closed rather than silently shipping a short catalog.
     expect(() => adaptWeaponCatalogToLegacy(WEAPON_CATALOG.slice(0, -1)))
-      .toThrow(/missing flare-gun/);
+      .toThrow(/missing crimson-flamethrower/);
 
     const duplicate = [...WEAPON_CATALOG.slice(0, -1), WEAPON_CATALOG[0]];
     expect(() => adaptWeaponCatalogToLegacy(duplicate)).toThrow(/duplicate weapon id "carbine"/);

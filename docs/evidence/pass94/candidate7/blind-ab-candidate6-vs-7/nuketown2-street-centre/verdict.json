@@ -1,0 +1,72 @@
+{
+  "station": "nuketown2-street-centre",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "right",
+  "winner": "B",
+  "confidence": 0.88,
+  "probes": {
+    "left": {
+      "expected": "WDRK",
+      "answered": "WDRK"
+    },
+    "right": {
+      "expected": "KHTU",
+      "answered": "KHTU"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate6\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "bf506d1f2a746e6921f512ea38745c6ea0a316b38f1e1bf516c301eed6ea2056",
+      "shownSha256": "aa2da14700f064b9066fc26f971fe977952bfd9c0ec0ab3498162f270f7062cc",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate7\\nuketown2\\nuketown2\\nuketown2-street-centre.png",
+      "sourceSha256": "d262ba7fe660b561775a3f1e5b442aeaafb80de0b5531cd1592a27facf82c2f3",
+      "shownSha256": "770c258bb59e3d95cbd0a2771266425ea83adfdcf31d8416703ffd04fc9570f8",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.png",
+        "sha256": "f9cb7a112095f5d49dada0996c286209d9c8777a6986a47ac559f85d37ccc142"
+      },
+      {
+        "shownAs": "reference-2.png",
+        "sha256": "eb24f859573178e8df9bb17dc48061610751e058d08ae482babad811024ae3cb"
+      },
+      {
+        "shownAs": "reference-3.png",
+        "sha256": "a577ad79ed2e17449b68b59164e1924ff32d3a2a4d19e369469b6a7d224b1e2c"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "c9c773671e957d21c26c9760f33a045dede64a580311c2c8bb50648ffaea974c"
+      }
+    ]
+  },
+  "why": "Both share identical layout but RIGHT preserves the reference daylight value and material read while LEFT crushes shadows to black; the asphalt road readable as mid-grey in the aerial reference is near-black in LEFT in r2c0 and r2c1, the left foreground building that should read as light siding like the white houses in the references is a solid black mass in LEFT in r1c0, and the bus body in r1c1 loses all modelling and reads black in LEFT versus dark blue-grey with highlights in RIGHT, matching the brighter balanced exposure of the reference set.",
+  "leftCloser": [],
+  "rightCloser": [
+    "road in r2c0 and r2c1 reads as mid-grey asphalt with curb and lane detail matching references instead of crushed black",
+    "left building in r1c0 retains light siding and doorway detail matching reference houses instead of solid black",
+    "bus body in r1c1 shows volume, glass and highlight modelling matching reference vehicle read instead of black silhouette",
+    "contact shadow under bus in r2c1 is soft grey with falloff matching reference daylight instead of harsh deep black"
+  ],
+  "largestDifference": {
+    "region": "r2c0",
+    "what": "road surface and left foreground are near-black featureless in LEFT versus mid-grey asphalt with visible detail in RIGHT"
+  },
+  "elapsedMs": 66824,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3"
+}

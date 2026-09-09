@@ -1,0 +1,834 @@
+{
+  "contract": "mp-lab-host-guest-v1",
+  "label": "test2-baseline",
+  "arenaId": "test2",
+  "arenaName": "Raid",
+  "measuredAt": "2026-09-03T00:21:25.060Z",
+  "hostedBotsRequested": 0,
+  "renderer": "webgpu",
+  "renderProfile": "quality",
+  "chromeFlags": "stock",
+  "sampleSeconds": 20,
+  "flow": [
+    "boot",
+    "booted",
+    "host-click",
+    "room-code",
+    "guest-join-click",
+    "joined",
+    "host-selected-arena",
+    "arena-synced",
+    "guest-ready",
+    "host-start-click",
+    "deployed",
+    "sampling",
+    "sampled"
+  ],
+  "join": {
+    "ok": true,
+    "roomMs": 966,
+    "joinMs": 1001
+  },
+  "arenaSync": {
+    "ok": true,
+    "hostMs": 51676,
+    "guestMs": 49892,
+    "hostGuidance": "Share the invite, then start when every player is ready.",
+    "guestGuidance": "Ready up. The host controls match start.",
+    "timeline": {
+      "host": [
+        {
+          "atMs": 7166,
+          "bootstrapStage": "waiting-for-authored-textures",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 12621,
+          "bootstrapStage": "prewarming-weapon-catalog",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 21132,
+          "bootstrapStage": "prewarming-batched-presentations",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 39868,
+          "bootstrapStage": "compiling-scene",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        }
+      ],
+      "guest": [
+        {
+          "atMs": 10338,
+          "bootstrapStage": "waiting-for-authored-textures",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 13688,
+          "bootstrapStage": "prewarming-weapon-catalog",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 24961,
+          "bootstrapStage": "prewarming-batched-presentations",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 40058,
+          "bootstrapStage": "compiling-scene",
+          "arenaId": "test2",
+          "readyDisabled": true,
+          "guidance": "Synchronizing Raid before ready-up…"
+        },
+        {
+          "atMs": 49800,
+          "bootstrapStage": "gameplay-assets-ready",
+          "arenaId": "test2",
+          "readyDisabled": false,
+          "guidance": "Ready up. The host controls match start."
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "ok": true,
+    "hostOk": true,
+    "guestOk": true,
+    "hostMs": 21593,
+    "guestMs": 21544,
+    "hostedBotsSeen": 0,
+    "timeline": {
+      "host": [
+        {
+          "atMs": 595,
+          "lobbyPhase": "countdown",
+          "bootstrapStage": "finalizing",
+          "matchPhase": "warmup",
+          "gameStarted": false,
+          "menuHidden": true
+        },
+        {
+          "atMs": 15091,
+          "lobbyPhase": "countdown",
+          "bootstrapStage": "verifying-first-presentation",
+          "matchPhase": "warmup",
+          "gameStarted": false,
+          "menuHidden": true
+        }
+      ],
+      "guest": [
+        {
+          "atMs": 933,
+          "lobbyPhase": "countdown",
+          "bootstrapStage": "finalizing",
+          "matchPhase": "warmup",
+          "gameStarted": false,
+          "menuHidden": true
+        },
+        {
+          "atMs": 15177,
+          "lobbyPhase": "countdown",
+          "bootstrapStage": "verifying-first-presentation",
+          "matchPhase": "warmup",
+          "gameStarted": false,
+          "menuHidden": true
+        }
+      ]
+    }
+  },
+  "host": {
+    "backend": "webgpu",
+    "presentedSource": "presented",
+    "sampledMs": 20020,
+    "frames": 396,
+    "meanIntervalMs": 50.19,
+    "meanFps": 19.9,
+    "p50Ms": 37.6,
+    "p95Ms": 128.5,
+    "p99Ms": 245.3,
+    "maxMs": 272.9,
+    "unplayableSamples": 0,
+    "worstStallMs": 272.9,
+    "stallCount": 3,
+    "stallsWhilePlayable": 3,
+    "stalls": [
+      {
+        "atMs": 17767,
+        "durationMs": 273,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 172,
+        "kind": "main-thread"
+      },
+      {
+        "atMs": 18322,
+        "durationMs": 272,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 273,
+        "kind": "main-thread"
+      },
+      {
+        "atMs": 15344,
+        "durationMs": 268,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 273,
+        "kind": "main-thread"
+      }
+    ],
+    "worstRafGapMs": 273,
+    "longTasksRecorded": 88,
+    "longTasksOver100Ms": 22,
+    "longTasks": [
+      {
+        "atMs": 15077,
+        "durationMs": 266
+      },
+      {
+        "atMs": 2480,
+        "durationMs": 244
+      },
+      {
+        "atMs": 11301,
+        "durationMs": 238
+      },
+      {
+        "atMs": 3599,
+        "durationMs": 225
+      },
+      {
+        "atMs": 6777,
+        "durationMs": 190
+      },
+      {
+        "atMs": 19254,
+        "durationMs": 187
+      },
+      {
+        "atMs": 2858,
+        "durationMs": 152
+      },
+      {
+        "atMs": 12648,
+        "durationMs": 151
+      },
+      {
+        "atMs": 17520,
+        "durationMs": 146
+      },
+      {
+        "atMs": 15856,
+        "durationMs": 142
+      },
+      {
+        "atMs": 14605,
+        "durationMs": 135
+      },
+      {
+        "atMs": 205,
+        "durationMs": 127
+      },
+      {
+        "atMs": 1701,
+        "durationMs": 125
+      },
+      {
+        "atMs": 6565,
+        "durationMs": 121
+      },
+      {
+        "atMs": 10738,
+        "durationMs": 120
+      },
+      {
+        "atMs": 333,
+        "durationMs": 116
+      },
+      {
+        "atMs": 18205,
+        "durationMs": 115
+      },
+      {
+        "atMs": 7107,
+        "durationMs": 114
+      },
+      {
+        "atMs": 7404,
+        "durationMs": 113
+      },
+      {
+        "atMs": 15744,
+        "durationMs": 110
+      }
+    ],
+    "deadlockCount": 0,
+    "deadlocksFreedByTurning": 0,
+    "deadlocksNotFreed": 0,
+    "deadlocksUnclassified": 0,
+    "deadlocks": [],
+    "deaths": 0,
+    "respawns": 0,
+    "firstMoveMs": 332,
+    "spawnPosition": {
+      "x": -32,
+      "y": 1.6983986282348633,
+      "z": -15
+    },
+    "maxDisplacementM": 26.33,
+    "positionSamples": 211,
+    "positionTrail": [
+      [
+        83,
+        -32,
+        1.7,
+        -15
+      ],
+      [
+        2123,
+        -24.4,
+        1.73,
+        -10.33
+      ],
+      [
+        4453,
+        -21.48,
+        2.21,
+        -4.3
+      ],
+      [
+        5931,
+        -15,
+        1.73,
+        0.14
+      ],
+      [
+        7744,
+        -15.01,
+        1.73,
+        -2.25
+      ],
+      [
+        9277,
+        -9.91,
+        1.73,
+        -4.87
+      ],
+      [
+        11082,
+        -7.47,
+        2.21,
+        -5.59
+      ],
+      [
+        13161,
+        -14.57,
+        1.73,
+        -5.6
+      ],
+      [
+        14818,
+        -22.15,
+        1.73,
+        -8.44
+      ],
+      [
+        17063,
+        -23.2,
+        1.73,
+        -16.54
+      ],
+      [
+        18953,
+        -23.2,
+        2.02,
+        -9.51
+      ]
+    ],
+    "menuInterruptions": 0,
+    "poseSource": "samplePlayerPose",
+    "coalescedReads": 74,
+    "driverErrors": []
+  },
+  "guest": {
+    "backend": "webgpu",
+    "presentedSource": "presented",
+    "sampledMs": 20035,
+    "frames": 369,
+    "meanIntervalMs": 54.22,
+    "meanFps": 18.4,
+    "p50Ms": 36.1,
+    "p95Ms": 148.7,
+    "p99Ms": 259.7,
+    "maxMs": 393.6,
+    "unplayableSamples": 0,
+    "worstStallMs": 393.6,
+    "stallCount": 5,
+    "stallsWhilePlayable": 5,
+    "stalls": [
+      {
+        "atMs": 18025,
+        "durationMs": 394,
+        "advance": 2,
+        "playable": true,
+        "worstRafGapMs": 188,
+        "kind": "presentation-only"
+      },
+      {
+        "atMs": 13225,
+        "durationMs": 309,
+        "advance": 2,
+        "playable": true,
+        "worstRafGapMs": 266,
+        "kind": "main-thread"
+      },
+      {
+        "atMs": 17036,
+        "durationMs": 275,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 206,
+        "kind": "main-thread"
+      },
+      {
+        "atMs": 7551,
+        "durationMs": 260,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 261,
+        "kind": "main-thread"
+      },
+      {
+        "atMs": 19896,
+        "durationMs": 257,
+        "advance": 1,
+        "playable": true,
+        "worstRafGapMs": 261,
+        "kind": "main-thread"
+      }
+    ],
+    "worstRafGapMs": 266,
+    "longTasksRecorded": 98,
+    "longTasksOver100Ms": 25,
+    "longTasks": [
+      {
+        "atMs": 7292,
+        "durationMs": 258
+      },
+      {
+        "atMs": 19640,
+        "durationMs": 255
+      },
+      {
+        "atMs": 16777,
+        "durationMs": 195
+      },
+      {
+        "atMs": 15959,
+        "durationMs": 181
+      },
+      {
+        "atMs": 12428,
+        "durationMs": 174
+      },
+      {
+        "atMs": 15662,
+        "durationMs": 165
+      },
+      {
+        "atMs": 17631,
+        "durationMs": 146
+      },
+      {
+        "atMs": 17417,
+        "durationMs": 144
+      },
+      {
+        "atMs": 7552,
+        "durationMs": 143
+      },
+      {
+        "atMs": 12609,
+        "durationMs": 142
+      },
+      {
+        "atMs": 12958,
+        "durationMs": 141
+      },
+      {
+        "atMs": 19498,
+        "durationMs": 141
+      },
+      {
+        "atMs": 4244,
+        "durationMs": 134
+      },
+      {
+        "atMs": 3049,
+        "durationMs": 128
+      },
+      {
+        "atMs": 1932,
+        "durationMs": 127
+      },
+      {
+        "atMs": 1077,
+        "durationMs": 126
+      },
+      {
+        "atMs": 1509,
+        "durationMs": 126
+      },
+      {
+        "atMs": 13100,
+        "durationMs": 123
+      },
+      {
+        "atMs": 15412,
+        "durationMs": 119
+      },
+      {
+        "atMs": 3224,
+        "durationMs": 118
+      }
+    ],
+    "deadlockCount": 0,
+    "deadlocksFreedByTurning": 0,
+    "deadlocksNotFreed": 0,
+    "deadlocksUnclassified": 0,
+    "deadlocks": [],
+    "deaths": 0,
+    "respawns": 0,
+    "firstMoveMs": 294,
+    "spawnPosition": {
+      "x": -32,
+      "y": 1.6983986282348633,
+      "z": 19
+    },
+    "maxDisplacementM": 33,
+    "positionSamples": 205,
+    "positionTrail": [
+      [
+        112,
+        -32,
+        1.7,
+        19
+      ],
+      [
+        2145,
+        -23.53,
+        1.73,
+        16.4
+      ],
+      [
+        4041,
+        -12.87,
+        2.16,
+        13.79
+      ],
+      [
+        5635,
+        -4.33,
+        1.77,
+        9.42
+      ],
+      [
+        7696,
+        -2.23,
+        1.73,
+        4.84
+      ],
+      [
+        9496,
+        -4.59,
+        1.73,
+        7.82
+      ],
+      [
+        11316,
+        -7.32,
+        2.18,
+        10.73
+      ],
+      [
+        13428,
+        -5.8,
+        1.73,
+        14.52
+      ],
+      [
+        14859,
+        -5.81,
+        1.73,
+        15.19
+      ],
+      [
+        17265,
+        -5.81,
+        1.73,
+        14.94
+      ],
+      [
+        19345,
+        -4.96,
+        2.18,
+        8.4
+      ]
+    ],
+    "menuInterruptions": 0,
+    "poseSource": "samplePlayerPose",
+    "coalescedReads": 73,
+    "driverErrors": []
+  },
+  "errors": {
+    "host": {
+      "page": [],
+      "console": []
+    },
+    "guest": {
+      "page": [],
+      "console": []
+    }
+  },
+  "failure": null,
+  "finalState": {
+    "host": {
+      "gameStarted": true,
+      "matchPhase": "active",
+      "arenaId": "test2",
+      "lobbyArenaId": "test2",
+      "lobbyPhase": "active",
+      "members": 2,
+      "hostedBotCount": 0,
+      "remotes": 1,
+      "bots": 0,
+      "alive": true,
+      "position": [
+        -23.19497299194336,
+        1.7249939823150635,
+        -6.8049397468566895
+      ],
+      "awaitingCanonicalGuestAuthority": false,
+      "bootstrapStage": "ready",
+      "bootstrapError": null,
+      "matchAdmissionCadence": {
+        "backend": "webgpu",
+        "waitedMs": 5092.20000007152,
+        "stableWindowMs": 0,
+        "samples": 47,
+        "resets": 47,
+        "maximumGapMs": 238.89999999999418,
+        "startingSubmissionSequence": 68,
+        "startingCompletedSequence": 68,
+        "admittedDegraded": true,
+        "visibilityState": "visible",
+        "documentHasFocus": true,
+        "endingSubmissionSequence": 113,
+        "endingCompletedSequence": 113,
+        "submissionAdvances": 45,
+        "completionAdvances": 45,
+        "maximumSubmissionGapMs": 156.09999990463257,
+        "maximumCompletionGapMs": 151.60000002384186,
+        "maximumPendingForMs": 151.60000002384186,
+        "maximumCompletionLatencyMs": 151.60000002384186,
+        "drained": false
+      },
+      "effectPrewarmProfile": {
+        "durationMs": 18384.9,
+        "groups": [
+          [
+            "tracers-impacts",
+            1266
+          ],
+          [
+            "explosions",
+            1264
+          ],
+          [
+            "death-drops-glass",
+            5870
+          ],
+          [
+            "world-ordnance",
+            3478
+          ],
+          [
+            "nuke-overdrive-bolts",
+            3374
+          ],
+          [
+            "smoke-volumes",
+            6749
+          ],
+          [
+            "bot-world-weapons",
+            3421
+          ],
+          [
+            "flare-first-shot",
+            1432
+          ],
+          [
+            "flamethrower-first-shot",
+            210
+          ],
+          [
+            "killstreak-vocabulary",
+            9933
+          ]
+        ]
+      },
+      "stateAdmissionDrops": {
+        "total": 0,
+        "byReason": {},
+        "last": null
+      },
+      "matchAdmissionPark": {
+        "parked": 7,
+        "replayed": 3,
+        "coalesced": 4,
+        "droppedOverflow": 0,
+        "droppedStale": 0
+      },
+      "clientWorldRepairFailures": {
+        "total": 0,
+        "last": null
+      },
+      "menuHidden": true,
+      "readyDisabled": true,
+      "startDisabled": true,
+      "guidance": "Match active · disconnected players have a 90 second rejoin slot.",
+      "roster": 2
+    },
+    "guest": {
+      "gameStarted": true,
+      "matchPhase": "active",
+      "arenaId": "test2",
+      "lobbyArenaId": "test2",
+      "lobbyPhase": "active",
+      "members": 2,
+      "hostedBotCount": 0,
+      "remotes": 1,
+      "bots": 0,
+      "alive": true,
+      "position": [
+        -4.477010726928711,
+        1.936862030029297,
+        7.846019268035889
+      ],
+      "awaitingCanonicalGuestAuthority": false,
+      "bootstrapStage": "ready",
+      "bootstrapError": null,
+      "matchAdmissionCadence": {
+        "backend": "webgpu",
+        "waitedMs": 5049.599999928469,
+        "stableWindowMs": 0,
+        "samples": 51,
+        "resets": 51,
+        "maximumGapMs": 272.3000000000029,
+        "startingSubmissionSequence": 68,
+        "startingCompletedSequence": 68,
+        "admittedDegraded": true,
+        "visibilityState": "visible",
+        "documentHasFocus": true,
+        "endingSubmissionSequence": 116,
+        "endingCompletedSequence": 116,
+        "submissionAdvances": 48,
+        "completionAdvances": 48,
+        "maximumSubmissionGapMs": 147.70000004768372,
+        "maximumCompletionGapMs": 147.10000002384186,
+        "maximumPendingForMs": 147.10000002384186,
+        "maximumCompletionLatencyMs": 147.10000002384186,
+        "drained": false
+      },
+      "effectPrewarmProfile": {
+        "durationMs": 16935.9,
+        "groups": [
+          [
+            "tracers-impacts",
+            897
+          ],
+          [
+            "explosions",
+            895
+          ],
+          [
+            "death-drops-glass",
+            5352
+          ],
+          [
+            "world-ordnance",
+            4249
+          ],
+          [
+            "nuke-overdrive-bolts",
+            4185
+          ],
+          [
+            "smoke-volumes",
+            6474
+          ],
+          [
+            "bot-world-weapons",
+            4245
+          ],
+          [
+            "flare-first-shot",
+            1519
+          ],
+          [
+            "flamethrower-first-shot",
+            112
+          ],
+          [
+            "killstreak-vocabulary",
+            8826
+          ]
+        ]
+      },
+      "stateAdmissionDrops": {
+        "total": 0,
+        "byReason": {},
+        "last": null
+      },
+      "matchAdmissionPark": {
+        "parked": 0,
+        "replayed": 0,
+        "coalesced": 0,
+        "droppedOverflow": 0,
+        "droppedStale": 0
+      },
+      "clientWorldRepairFailures": {
+        "total": 0,
+        "last": null
+      },
+      "menuHidden": true,
+      "readyDisabled": true,
+      "startDisabled": true,
+      "guidance": "Match active · disconnected players have a 90 second rejoin slot.",
+      "roster": 2
+    }
+  },
+  "verdict": {
+    "pass": false,
+    "reasons": [
+      "host 3 stall(s) > 250 ms (worst 272.9 ms)",
+      "guest 5 stall(s) > 250 ms (worst 393.6 ms)"
+    ]
+  }
+}

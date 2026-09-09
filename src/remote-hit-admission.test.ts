@@ -13,15 +13,16 @@ import {
 } from './remote-hit-admission';
 
 describe('remote hit admission', () => {
-  it('carries the exact 0.6x M14 envelope through offline, legacy-remote and host-canonical derivation', () => {
+  it('carries the exact HF-398 M14 envelope (52.1 / 33.6) through offline, legacy-remote and host-canonical derivation', () => {
     const m14 = WEAPONS['m14-ebr'];
     const target = { id: 'target', x: 0, y: 1.7, z: 0, yaw: 0, stance: 'stand' as const };
-    const previousEnvelope = { base: 62, minimum: 40 } as const;
+    // HF-398 (2026-09-02): the owner's +40% envelope, re-derived here independently of the catalog.
+    const previousEnvelope = { base: 52.1, minimum: 33.6 } as const;
     const independentlyScaledDamage = (distance: number, multiplier: number): number => {
       const falloff = distance <= 38 ? 0 : Math.min(1, (distance - 38) / (100 - 38));
       const previousBase = previousEnvelope.base
         + (previousEnvelope.minimum - previousEnvelope.base) * falloff;
-      return Math.max(1, Math.round(previousBase * 0.6 * multiplier * 10) / 10);
+      return Math.max(1, Math.round(previousBase * multiplier * 10) / 10);
     };
     for (const [distance, zone, multiplier] of [
       [0, 'body', 1], [0, 'head', 1.7], [0, 'limb', 0.82],
@@ -33,21 +34,21 @@ describe('remote hit admission', () => {
 
     // The legacy recipient derives the ray itself before clamping an untrusted
     // claim; neither close body/head nor far body receives a second 0.6 factor.
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target)).toBe(37.2);
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.58, 6], [[0, 0, -1]], target)).toBe(63.2);
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 100], [[0, 0, -1]], target)).toBe(24.1);
-    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target, () => 0.5)).toBe(19);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target)).toBe(52.1);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.58, 6], [[0, 0, -1]], target)).toBe(88.6);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 100], [[0, 0, -1]], target)).toBe(33.7);
+    expect(deriveRemoteShotBaseDamage('m14-ebr', [0, 1.0, 6], [[0, 0, -1]], target, () => 0.5)).toBe(26);
 
     // The host shot-request lane uses the multi-target canonical derivation
     // and therefore returns the same exact close-body value and modifiers.
     const host = deriveAuthoritativeShotOutcomes(
       'm14-ebr', [0, 1.0, 6], [[0, 0, -1]], [target],
     ).get(target.id);
-    expect(host).toMatchObject({ damage: 37.2, rawDamage: 37.2, pelletHits: 1, hitZone: 'body' });
-    expect(maximumRemoteShotBaseDamage('m14-ebr')).toBe(63.2);
-    expect(admitRemoteBaseDamage(63.2, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(true);
-    expect(admitRemoteBaseDamage(64, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(false);
-    expect(resolveRemotePoweredDamage(37.2, 2)).toBe(74.4);
+    expect(host).toMatchObject({ damage: 52.1, rawDamage: 52.1, pelletHits: 1, hitZone: 'body' }); // HF-398
+    expect(maximumRemoteShotBaseDamage('m14-ebr')).toBe(88.6); // HF-398: 52.1 * 1.7 head
+    expect(admitRemoteBaseDamage(88.6, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(true);
+    expect(admitRemoteBaseDamage(89, maximumRemoteShotBaseDamage('m14-ebr'))).toBe(false);
+    expect(resolveRemotePoweredDamage(52.1, 2)).toBe(100); // HF-398: 104.2 raw, capped at the 100 HP ceiling
   });
 
   it('hits the visible standing skull and rejects the former empty-air crit point', () => {

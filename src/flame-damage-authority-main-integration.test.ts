@@ -62,7 +62,10 @@ describe('HF-279 flame authority integration', () => {
     const localFire = slice('function tryFire(now: number): void {', '\nfunction throwGrenade(): void {');
     expect(localFire).toContain('flamethrowerStreamPresentation.igniteGround(authoritativeEnd, now)');
     expect(localFire).toContain("if (network.role !== 'client') {\n        flamethrowerGroundFires.ignite({");
-    expect(localFire).toContain("if (player.weapon === 'flamethrower'");
+    // Re-pinned 2026-08-30 (owner: "cant see any flames ... crimson one"): the
+    // local flame branch is now a FAMILY predicate so the crimson variant gets
+    // the stream and ground fire. The invariant is unchanged - only the spelling.
+    expect(localFire).toContain('if (flamethrowerShot) {');
     expect(localFire).toContain('matchEpoch: interactiveWorldMatchEpoch');
 
     const remoteFire = slice('function resolveAuthoritativeShot(request:', '\nfunction acceptAuthoritativeShotResult(');
@@ -74,7 +77,8 @@ describe('HF-279 flame authority integration', () => {
 
   it('retains the admitted residual action through the last pulse without target-deduping canonical receipts', () => {
     const lifetime = slice('function admittedShotActionLifetimeMs(', '\nconst createRailgunClaimAudit');
-    expect(lifetime).toContain("weapon === 'flamethrower'");
+    // Re-pinned 2026-08-30: residual-action lifetime is a family property now.
+    expect(lifetime).toContain('isFlamethrowerFamilyWeapon(weapon)');
     expect(lifetime).toContain('FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000');
     expect(FLAMETHROWER_GROUND_FIRE_DURATION_MS + 1_000).toBe(6_000);
     expect(lifetime).toContain('action.matchEpoch !== interactiveWorldMatchEpoch');

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass75-high-seas-menu-preview-v1",
+  "generatedAt": "2026-08-22",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "arenas": {
+    "high-seas": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // HIGH SEAS",
+      "presentationId": "menu-video-runtime-helo-high-seas-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 75012201,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [0, 4.8, 0],
+      "radius": [30, 52],
+      "altitudeM": 26,
+      "lookAt": [0, 4.8, 0],
+      "phaseRadians": 1.15,
+      "safeVolume": {
+        "x": [-31.5, 31.5],
+        "y": [25, 27],
+        "z": [-53.5, 53.5]
+      },
+      "reviewLabel": "High Seas cockpit flyover"
+    }
+  }
+}

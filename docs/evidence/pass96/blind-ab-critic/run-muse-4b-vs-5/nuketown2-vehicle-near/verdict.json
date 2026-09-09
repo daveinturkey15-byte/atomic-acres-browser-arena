@@ -1,0 +1,74 @@
+{
+  "station": "nuketown2-vehicle-near",
+  "assignment": {
+    "left": "A",
+    "right": "B"
+  },
+  "valid": true,
+  "invalidReason": null,
+  "errors": [],
+  "winnerSide": "tie",
+  "winner": "tie",
+  "confidence": 0.95,
+  "probes": {
+    "left": {
+      "expected": "AXWM",
+      "answered": "AXWM"
+    },
+    "right": {
+      "expected": "HWHW",
+      "answered": "HWHW"
+    }
+  },
+  "images": {
+    "left": {
+      "candidate": "A",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate4b\\captures\\nuketown2\\nuketown2-vehicle-near.png",
+      "sourceSha256": "b30091cfa3c4c4f2c902ea2e3bb11708761acd60b955ce77b23cee7b1c1ad0bb",
+      "shownSha256": "c29210dd36c2dd02ed46ec2d1eb5463134f0276ff396e0cb56999995b437ce14",
+      "leakedFields": []
+    },
+    "right": {
+      "candidate": "B",
+      "source": "C:\\Users\\david\\projects\\aa-claude-hitl\\docs\\evidence\\pass94\\candidate5\\nuketown2\\nuketown2-vehicle-near.png",
+      "sourceSha256": "edc137dc8f3d40a5bbdaac2017b4043892f3428dbfbb52515e5db8165f22bc96",
+      "shownSha256": "9c735dcca30b43cb90471c24a6fc1af2bf824de061f019253dcc72c74a216805",
+      "leakedFields": []
+    },
+    "references": [
+      {
+        "shownAs": "reference-1.jpg",
+        "sha256": "cba85d16337fce8629b31e3f03dd0946a0de1ffbc34c8890b4d9624f06d3dc82"
+      },
+      {
+        "shownAs": "reference-2.jpg",
+        "sha256": "07fa58a75eeb0ee87244caa7e5255da49b0bc965e182ce7f42d22a84479406da"
+      },
+      {
+        "shownAs": "reference-3.jpg",
+        "sha256": "8a5eab97781e4201d3955063e2d5179f8301d3caf418798e3cb4c2995336fd3d"
+      },
+      {
+        "shownAs": "reference-4.png",
+        "sha256": "e7cbd0aaf9430d5da85897ba3f9b8ebbb2ffe1148f1ded824dc4846cb4abd07d"
+      }
+    ]
+  },
+  "why": "LEFT and RIGHT are geometrically identical and equidistant from the reference set: both place the same three off-white vehicles in r0c0-r2c2, the same two-storey sided block in r0c2-r1c2, and the same tree-line and mountain backdrop in r0c0-r0c1, and both disagree equally with the references in r1c1-r2c1 where the references show varied coloured vehicles and bright high-sun asphalt with soft contact shadows while both renders show uniform cream vehicles with very dark long shadows; the only LEFT-vs-RIGHT variation is overall road exposure in r2c0-r2c1, which is absolute colour grade and not a criterion, so neither is closer.",
+  "leftCloser": [],
+  "rightCloser": [],
+  "largestDifference": {
+    "region": "r2c0",
+    "what": "road value is near-black in LEFT versus lighter brown-gray in RIGHT with no change in geometry, layout or materials"
+  },
+  "elapsedMs": 54247,
+  "route": "omp-muse",
+  "model": "meta-contributor/muse-spark-1.3",
+  "revalidated": {
+    "at": "2026-09-04T21:41:35.656Z",
+    "previousInvalidReason": "schema-invalid",
+    "previousErrors": [
+      "confidence must be a number in 0..1"
+    ]
+  }
+}

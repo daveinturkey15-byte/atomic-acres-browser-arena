@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
+import { FIRST_PERSON_CAMERA_NEAR_METERS } from '../../src/viewmodel-body-fit';
 
 const renderer = process.env.PASS70_CHOPPER_RENDERER === 'webgpu' ? 'webgpu' : 'webgl2';
 const loadout = Object.freeze({
@@ -516,7 +517,11 @@ test('renders the complete possessed Chopper cockpit and cleans up on exit', asy
   expect(exteriorReceipt.yaw).toBeCloseTo(tracker.yaw, 8);
   expect(exteriorReceipt.pitch).toBeCloseTo(tracker.pitch, 8);
   expect(exteriorReceipt.fov).toBeCloseTo(tracker.fov, 8);
-  expect(exteriorReceipt.near).toBeCloseTo(0.08, 8);
+  // HF-410: the on-foot near plane is 0.02 m - the first-person rig is fitted
+  // inside the player's collision capsule and is drawn with this camera, and
+  // 0.08 m clipped weapon geometry inside the viewport in 42 of 60 graded
+  // poses. The gunner cockpit mirrors the on-foot plane, as it always has.
+  expect(exteriorReceipt.near).toBeCloseTo(FIRST_PERSON_CAMERA_NEAR_METERS, 8);
   expect(exteriorReceipt.far).toBeCloseTo(180, 8);
   expect(exteriorReceipt.submissionSequence).toBe(exteriorCaptureCommit.paused.presentation.submissionSequence);
   expect(exteriorCaptureCommit.completion.completedSequence)

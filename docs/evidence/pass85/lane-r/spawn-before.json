@@ -1,0 +1,210 @@
+{
+  "generatedAt": "2026-09-02T15:00:03.782Z",
+  "reports": [
+    {
+      "arenaId": "farcrysis",
+      "bounds": {
+        "minX": -64,
+        "maxX": 64,
+        "minZ": -64,
+        "maxZ": 64
+      },
+      "botArena": true,
+      "teamArena": true,
+      "points": [
+        {
+          "team": 0,
+          "index": 0,
+          "x": -52,
+          "y": 1.7,
+          "z": -52,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 2.4,
+          "wallStandoffM": 2.4,
+          "openArcFraction": 0.944,
+          "poiDistanceM": 0,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 0,
+          "index": 1,
+          "x": -44,
+          "y": 1.7,
+          "z": -48,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 4.76,
+          "wallStandoffM": 11.25,
+          "openArcFraction": 1,
+          "poiDistanceM": 8.94,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 0,
+          "index": 2,
+          "x": -48,
+          "y": 1.7,
+          "z": -40,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 3.7,
+          "wallStandoffM": 13.28,
+          "openArcFraction": 0.972,
+          "poiDistanceM": 12,
+          "enemySpawnsVisible": 1,
+          "nearestVisibleEnemyM": 124.58,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 0,
+          "index": 3,
+          "x": -36,
+          "y": 1.7,
+          "z": -52,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 2.9,
+          "wallStandoffM": 7.74,
+          "openArcFraction": 0.806,
+          "poiDistanceM": 12,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 1,
+          "index": 0,
+          "x": 52,
+          "y": 1.7,
+          "z": 52,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 2.4,
+          "wallStandoffM": 2.4,
+          "openArcFraction": 0.944,
+          "poiDistanceM": 0,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 1,
+          "index": 1,
+          "x": 44,
+          "y": 1.7,
+          "z": 48,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 3.7,
+          "wallStandoffM": 11.25,
+          "openArcFraction": 0.972,
+          "poiDistanceM": 8.94,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 1,
+          "index": 2,
+          "x": 48,
+          "y": 1.7,
+          "z": 40,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 3.7,
+          "wallStandoffM": 6.58,
+          "openArcFraction": 0.972,
+          "poiDistanceM": 12,
+          "enemySpawnsVisible": 0,
+          "nearestVisibleEnemyM": null,
+          "failures": [
+            "no-floor"
+          ]
+        },
+        {
+          "team": 1,
+          "index": 3,
+          "x": 36,
+          "y": 1.7,
+          "z": 52,
+          "standable": true,
+          "floorGapM": null,
+          "floorSource": null,
+          "reachable": true,
+          "reachableCells": 15704,
+          "reachableByJump": true,
+          "coverDistanceM": 2.95,
+          "wallStandoffM": 11.95,
+          "openArcFraction": 0.833,
+          "poiDistanceM": 12,
+          "enemySpawnsVisible": 1,
+          "nearestVisibleEnemyM": 124.58,
+          "failures": [
+            "no-floor"
+          ]
+        }
+      ],
+      "summary": {
+        "spawnCount": 8,
+        "inEnvelopePercent": 0,
+        "floorPercent": 0,
+        "reachablePercent": 100,
+        "medianPoiDistanceM": 12,
+        "maxCoverDistanceM": 4.76,
+        "minWallStandoffM": 2.4,
+        "minOpenArcFraction": 0.806,
+        "crossTeamMinDistanceM": 124.58,
+        "crossTeamMinFraction": 0.973,
+        "enemyLosPairs": 1,
+        "nearestVisibleEnemyPairM": 124.58,
+        "worstOffender": "team 0 (-44, -48): no-floor"
+      },
+      "failures": []
+    }
+  ]
+}

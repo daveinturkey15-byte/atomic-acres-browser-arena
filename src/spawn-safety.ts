@@ -1,44 +1,9 @@
-import { segmentIntersectsBox, type Box2, type Point3 } from './collision';
-import type { ArenaId } from './map-selection';
+import { isBlocked, pointInsideBounds, type Box2, type Point3 } from './collision';
+import { FFA_MINIMUM_SPAWN_SEPARATION } from './spawn-selection';
+import type { SpawnCandidate, SpawnMode } from './spawn-selection';
 
-export type SpawnMode = 'solo' | 'tdm' | 'ffa';
-export type SpawnCandidate = Readonly<{ index: number; point: Point3 }>;
-export type SpawnSelectionContext = Readonly<{
-  arenaId: ArenaId;
-  mode: SpawnMode;
-  population: number;
-  candidates: readonly SpawnCandidate[];
-  threats: readonly Point3[];
-  occupants: readonly Point3[];
-  recentDeaths: readonly Point3[];
-  colliders: readonly Box2[];
-  previousIndex: number;
-  tieBreakSeed?: number;
-}>;
-export type SpawnCandidateScore = Readonly<{
-  index: number;
-  score: number;
-  visibleThreats: number;
-  nearestThreatDistanceSq: number;
-  nearestOccupantDistanceSq: number;
-  recentDeathPressure: number;
-  repeated: boolean;
-}>;
-export type SpawnSelection = Readonly<{
-  index: number;
-  score: number;
-  reason: string;
-  candidates: readonly SpawnCandidateScore[];
-}>;
-
-const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
-  'atomic-acres': 9,
-  'rustworks-1v1': 7,
-  'gun-range': 8,
-  'skyline-terminal': 10,
-});
-
-export const FFA_MINIMUM_SPAWN_SEPARATION = 8;
+export { FFA_MINIMUM_SPAWN_SEPARATION, MAP_TRAP_RADIUS, scoreSpawnCandidates } from './spawn-selection';
+export type { SpawnCandidate, SpawnMode, SpawnSelectionContext, SpawnCandidateScore, SpawnSelection } from './spawn-selection';
 
 export function playerSpawnProtectionMs(mode: SpawnMode): number {
   // FFA now owns safety through spatial separation. Per-client immunity made
@@ -108,38 +73,22 @@ function finitePoint(point: Point3): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y ?? 0) && Number.isFinite(point.z);
 }
 
-export function scoreSpawnCandidates(context: SpawnSelectionContext): SpawnSelection {
-  if (context.candidates.length === 0) throw new Error('No spawn candidates');
-  const trapRadius = MAP_TRAP_RADIUS[context.arenaId] + Math.min(4, Math.max(0, context.population - 2) * 0.5);
-  const trapRadiusSq = trapRadius * trapRadius;
-  const scored = context.candidates.filter(({ point }) => finitePoint(point)).map(({ index, point }) => {
-    const visibleThreats = context.threats.filter((threat) => !context.colliders.some((box) => segmentIntersectsBox(point, threat, box))).length;
-    const nearestThreatDistanceSq = context.threats.length === 0 ? 10_000 : Math.min(...context.threats.map((threat) => distanceSq(point, threat)));
-    const nearestOccupantDistanceSq = context.occupants.length === 0 ? 10_000 : Math.min(...context.occupants.map((occupant) => distanceSq(point, occupant)));
-    const recentDeathPressure = context.recentDeaths.filter((death) => distanceSq(point, death) <= trapRadiusSq).length;
-    const repeated = index === context.previousIndex;
-    const modePressure = context.mode === 'ffa' ? 1.25 : context.mode === 'solo' ? 0.9 : 1;
-    const separationSq = context.mode === 'ffa' ? FFA_MINIMUM_SPAWN_SEPARATION ** 2 : 25;
-    const proximityPenalty = nearestOccupantDistanceSq < separationSq ? (separationSq - nearestOccupantDistanceSq) * 20_000 : 0;
-    const score = nearestThreatDistanceSq
-      - visibleThreats * 1_000_000 * modePressure
-      - recentDeathPressure * 250_000
-      - proximityPenalty
-      - (repeated ? 125_000 : 0);
-    return { index, score, visibleThreats, nearestThreatDistanceSq, nearestOccupantDistanceSq, recentDeathPressure, repeated };
-  }).sort((left, right) => right.score - left.score
-    || seededRank(left.index, context.tieBreakSeed ?? 0) - seededRank(right.index, context.tieBreakSeed ?? 0)
-    || left.index - right.index);
-  if (scored.length === 0) throw new Error('No finite spawn candidates');
-  const selected = scored[0];
-  const reason = [
-    selected.visibleThreats === 0 ? 'no-immediate-los' : `minimum-los:${selected.visibleThreats}`,
-    `nearest-threat-sq:${Math.round(selected.nearestThreatDistanceSq)}`,
-    selected.recentDeathPressure === 0 ? 'recent-death-clear' : `recent-death-pressure:${selected.recentDeathPressure}`,
-    selected.repeated ? 'repeat-fallback' : 'repeat-avoided',
-    `nearest-occupant-sq:${Math.round(selected.nearestOccupantDistanceSq)}`,
-    `mode:${context.mode}`,
-    `population:${context.population}`,
-  ].join('|');
-  return { index: selected.index, score: selected.score, reason, candidates: scored };
+/** Validates an authored spawn at its authored elevation, not an assumed ground plane. */
+export function validArenaSpawnPoint(
+  point: Point3,
+  bounds: Box2,
+  colliders: readonly Box2[],
+  radius = 0.44,
+): boolean {
+  return finitePoint(point)
+    && pointInsideBounds(point, bounds, radius)
+    && !isBlocked(point, colliders, radius);
+}
+
+/** Converts a floor/waypoint position to the bot's LOS eye without losing deck elevation. */
+export function waypointEyePoint(
+  point: Readonly<{ x: number; y?: number; z: number }>,
+  eyeHeight = 1.42,
+): Readonly<{ x: number; y: number; z: number }> {
+  return { x: point.x, y: (point.y ?? 0) + eyeHeight, z: point.z };
 }

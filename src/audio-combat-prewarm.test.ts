@@ -160,7 +160,10 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     expect(audio.prepareCombat()).toBe(true);
     expect(audio.telemetry()).toMatchObject({
       combatPrewarm: { prepared: true, runs: 1, sources: 3 },
-      lowHealth: { active: true, audible: true, automationWrites: 2, broadbandSources: 0 },
+      lowHealth: {
+        active: true, audible: false, breathingGain: 0, heartbeatGain: 0,
+        automationWrites: 0, broadbandSources: 0,
+      },
       damageFeedback: { pulses: 2 },
     });
 
@@ -169,14 +172,17 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       breathingGain: 0, heartbeatGain: 0, pulseHz: 0,
     });
     expect(audio.telemetry()).toMatchObject({
-      lowHealth: { active: true, audible: false, automationWrites: 4 },
+      lowHealth: {
+        active: true, audible: false, breathingGain: 0, heartbeatGain: 0,
+        automationWrites: 0,
+      },
       runtime: { voices: 3 },
     });
     audio.setLowHealthFeedback({
       active: false, severity: 0, vignetteOpacity: 0,
       breathingGain: 0, heartbeatGain: 0, pulseHz: 0,
     });
-    expect(audio.telemetry().lowHealth).toMatchObject({ active: false, audible: false, automationWrites: 4 });
+    expect(audio.telemetry().lowHealth).toMatchObject({ active: false, audible: false, automationWrites: 0 });
     expect(context.oscillators.every((source) => !source.ended)).toBe(true);
 
     audio.dispose();
@@ -255,25 +261,37 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       gains: context.gains.length,
       filters: context.filters.length,
     };
+    // HF-376 re-pinned this budget when the grenade mix was re-authored. The
+    // guarantees the assertion exists for are unchanged and still exact: the
+    // warmup allocates a known set of nodes, it covers every node class the
+    // live path will later use, every warmed gain is silent, and a second live
+    // grenade allocates exactly as much as the first (the no-growth check
+    // further down). Only the authored recipe behind the numbers moved.
+    //
+    // Four broadband warm entries instead of two, because the live path gained
+    // the `bandpass` of the metallic bounce contact and the `peaking` resonance
+    // under the blast body.
     expect(preparedFactories).toEqual({
       oscillators: beforeWarmup.oscillators + 5,
-      bufferSources: beforeWarmup.bufferSources + 2,
-      gains: beforeWarmup.gains + 7,
-      filters: beforeWarmup.filters + 2,
+      bufferSources: beforeWarmup.bufferSources + 4,
+      gains: beforeWarmup.gains + 9,
+      filters: beforeWarmup.filters + 4,
     });
     expect(context.oscillators.slice(-5).map(({ type }) => type)).toEqual([
       'triangle', 'square', 'square', 'sine', 'sawtooth',
     ]);
-    expect(context.filters.slice(-2).map(({ type }) => type)).toEqual(['lowpass', 'highpass']);
-    expect(context.gains.slice(-7).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(context.filters.slice(-4).map(({ type }) => type)).toEqual([
+      'lowpass', 'peaking', 'bandpass', 'highpass',
+    ]);
+    expect(context.gains.slice(-9).every((gain) => gain.gain.value === 0)).toBe(true);
     expect(audio.telemetry().grenadeEffectsPrewarm).toEqual({
       prepared: true,
       runs: 1,
-      warmupSources: 7,
-      warmupNodes: 9,
+      warmupSources: 9,
+      warmupNodes: 13,
       retainedSources: 0,
       retainedBroadbandLoops: 0,
-      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+      liveRecipe: 'layered-blast-brown-body-sub-and-crackle-debris-v2',
     });
 
     const exerciseGrenadeAudio = (now: number) => {
@@ -292,16 +310,23 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
         gains: context.gains.length,
         filters: context.filters.length,
       };
+      // HF-376 re-pinned. Same guarantee, re-authored mix: a bounce is now a
+      // metallic contact (crackle burst through a bandpass and an inharmonic
+      // peaking resonance, plus its tone) and a blast is a saturated pressure
+      // body, a sine sub, a brown broadband layer with a resonance stage, and
+      // crackle debris. The numbers below are that mix counted exactly, and
+      // the second invocation must still allocate identically - which is the
+      // property this test actually protects.
       expect(after).toEqual({
-        oscillators: before.oscillators + 5,
-        bufferSources: before.bufferSources + 2,
-        gains: before.gains + 7,
-        filters: before.filters + 2,
+        oscillators: before.oscillators + 6,
+        bufferSources: before.bufferSources + 3,
+        gains: before.gains + 9,
+        filters: before.filters + 5,
       });
-      expect(context.oscillators.slice(-5).map(({ type }) => type)).toEqual([
-        'triangle', 'square', 'square', 'sine', 'sawtooth',
+      expect(context.oscillators.slice(-6).map(({ type }) => type)).toEqual([
+        'square', 'square', 'square', 'sine', 'sawtooth', 'sine',
       ]);
-      expect(context.filters.slice(-2).map(({ type }) => type)).toEqual(['lowpass', 'highpass']);
+      expect(context.filters.slice(-3).map(({ type }) => type)).toEqual(['lowpass', 'peaking', 'highpass']);
       return after;
     };
     const afterFirst = exerciseGrenadeAudio(1_000);
@@ -311,13 +336,13 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
       bufferSources: afterSecond.bufferSources - afterFirst.bufferSources,
       gains: afterSecond.gains - afterFirst.gains,
       filters: afterSecond.filters - afterFirst.filters,
-    }).toEqual({ oscillators: 5, bufferSources: 2, gains: 7, filters: 2 });
+    }).toEqual({ oscillators: 6, bufferSources: 3, gains: 9, filters: 5 });
     expect(audio.prepareGrenadeEffects()).toBe(true);
     expect(audio.telemetry().grenadeEffectsPrewarm).toMatchObject({
       runs: 1,
-      warmupSources: 7,
+      warmupSources: 9,
       retainedSources: 0,
-      liveRecipe: 'sawtooth-pressure-plus-dual-filtered-noise-v1',
+      liveRecipe: 'layered-blast-brown-body-sub-and-crackle-debris-v2',
     });
 
     audio.dispose();
@@ -412,5 +437,64 @@ describe('HF-280/HF-282 pre-owned combat audio', () => {
     expect(audio.telemetry().combatPrewarm).toMatchObject({ prepared: false, sources: 0, nodes: 0 });
     audio.dispose();
     expect(context.state).toBe('closed');
+  });
+
+  // HF-332: Interactive destruction and collapse debris audio prewarm
+  it('silently warms destruction/debris impact filters and sweeps at zero gain without retaining loops', () => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    const audio = new ArenaAudio();
+    audio.unlock();
+    const context = FakeAudioContext.instances[0]!;
+    const beforeWarmup = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    const preparedFactories = {
+      oscillators: context.oscillators.length,
+      bufferSources: context.bufferSources.length,
+      gains: context.gains.length,
+      filters: context.filters.length,
+    };
+    expect(preparedFactories).toEqual({
+      oscillators: beforeWarmup.oscillators + 4,
+      bufferSources: beforeWarmup.bufferSources + 3,
+      gains: beforeWarmup.gains + 7,
+      filters: beforeWarmup.filters + 3,
+    });
+    expect(context.oscillators.slice(-4).map(({ type }) => type)).toEqual([
+      'square', 'triangle', 'triangle', 'triangle',
+    ]);
+    expect(context.filters.slice(-3).map(({ type }) => type)).toEqual(['bandpass', 'bandpass', 'bandpass']);
+    expect(context.gains.slice(-7).every((gain) => gain.gain.value === 0)).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm).toEqual({
+      prepared: true,
+      runs: 1,
+      warmupSources: 7,
+      warmupNodes: 10,
+      retainedSources: 0,
+      retainedBroadbandLoops: 0,
+    });
+
+    // Idempotent
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm.runs).toBe(1);
+
+    audio.dispose();
+    expect(context.state).toBe('closed');
+  });
+
+  it('handles destruction effects prewarm failure gracefully and re-arms for retry', () => {
+    const audio = new ArenaAudio();
+    expect(audio.prepareDestructionEffects()).toBe(false);
+    expect(audio.telemetry().destructionEffectsPrewarm.prepared).toBe(false);
+
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    audio.unlock();
+    expect(audio.prepareDestructionEffects()).toBe(true);
+    expect(audio.telemetry().destructionEffectsPrewarm.prepared).toBe(true);
+    audio.dispose();
   });
 });

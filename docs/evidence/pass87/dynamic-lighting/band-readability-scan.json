@@ -1,0 +1,718 @@
+{
+  "lane": "AB",
+  "contract": "band-readability-scan-v1",
+  "generatedAt": "2026-09-03T01:23:52.829Z",
+  "gitSha": "a5348dcd7fdb8bd42bf9ea8772d3caf54647d761",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "maxShadowMassGrowthPoints": 3,
+  "environmentInvalid": null,
+  "scans": [
+    {
+      "arena": "atomic-acres",
+      "weather": "clear",
+      "band": [
+        15,
+        19
+      ],
+      "authoredHour": 17.5,
+      "samples": [
+        {
+          "hour": 15,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 15.37,
+          "shadowMassGrowthPoints": -4.35,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 15.4,
+          "identityShadowMassPercent": 19.71,
+          "shadowMassPercent": 15.55,
+          "shadowMassGrowthPoints": -4.16,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 15.8,
+          "identityShadowMassPercent": 19.74,
+          "shadowMassPercent": 15.74,
+          "shadowMassGrowthPoints": -4,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.2,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 15.83,
+          "shadowMassGrowthPoints": -3.89,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.6,
+          "identityShadowMassPercent": 19.73,
+          "shadowMassPercent": 15.82,
+          "shadowMassGrowthPoints": -3.91,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 16.25,
+          "shadowMassGrowthPoints": -3.47,
+          "sunIntensityScale": 1.1117,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17.4,
+          "identityShadowMassPercent": 19.73,
+          "shadowMassPercent": 18.56,
+          "shadowMassGrowthPoints": -1.17,
+          "sunIntensityScale": 1.0237,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17.8,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 20.82,
+          "shadowMassGrowthPoints": 1.1,
+          "sunIntensityScale": 0.9251,
+          "shadowFloorScale": 1.0862,
+          "safe": true
+        },
+        {
+          "hour": 18.2,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 22.41,
+          "shadowMassGrowthPoints": 2.69,
+          "sunIntensityScale": 0.8164,
+          "shadowFloorScale": 1.2112,
+          "safe": true
+        },
+        {
+          "hour": 18.6,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 23.11,
+          "shadowMassGrowthPoints": 3.39,
+          "sunIntensityScale": 0.7253,
+          "shadowFloorScale": 1.3159,
+          "safe": false
+        },
+        {
+          "hour": 19,
+          "identityShadowMassPercent": 19.72,
+          "shadowMassPercent": 23.15,
+          "shadowMassGrowthPoints": 3.43,
+          "sunIntensityScale": 0.7253,
+          "shadowFloorScale": 1.3159,
+          "safe": false
+        }
+      ],
+      "safeBand": [
+        15,
+        18.2
+      ],
+      "anchorSafe": true,
+      "unsafeHours": [
+        18.6,
+        19
+      ]
+    },
+    {
+      "arena": "atomic-acres",
+      "weather": "heavy-rain",
+      "band": [
+        15,
+        19
+      ],
+      "authoredHour": 17.5,
+      "samples": [
+        {
+          "hour": 15,
+          "identityShadowMassPercent": 19.09,
+          "shadowMassPercent": 15.74,
+          "shadowMassGrowthPoints": -3.35,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 15.4,
+          "identityShadowMassPercent": 19.08,
+          "shadowMassPercent": 15.73,
+          "shadowMassGrowthPoints": -3.35,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 15.8,
+          "identityShadowMassPercent": 18.99,
+          "shadowMassPercent": 15.7,
+          "shadowMassGrowthPoints": -3.29,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.2,
+          "identityShadowMassPercent": 19.09,
+          "shadowMassPercent": 15.86,
+          "shadowMassGrowthPoints": -3.23,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.6,
+          "identityShadowMassPercent": 19.1,
+          "shadowMassPercent": 15.91,
+          "shadowMassGrowthPoints": -3.19,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17,
+          "identityShadowMassPercent": 19.1,
+          "shadowMassPercent": 16.75,
+          "shadowMassGrowthPoints": -2.35,
+          "sunIntensityScale": 1.1117,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17.4,
+          "identityShadowMassPercent": 19.05,
+          "shadowMassPercent": 18.37,
+          "shadowMassGrowthPoints": -0.68,
+          "sunIntensityScale": 1.0237,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17.8,
+          "identityShadowMassPercent": 19.06,
+          "shadowMassPercent": 19.51,
+          "shadowMassGrowthPoints": 0.45,
+          "sunIntensityScale": 0.9251,
+          "shadowFloorScale": 1.0862,
+          "safe": true
+        },
+        {
+          "hour": 18.2,
+          "identityShadowMassPercent": 19.08,
+          "shadowMassPercent": 20.32,
+          "shadowMassGrowthPoints": 1.24,
+          "sunIntensityScale": 0.8164,
+          "shadowFloorScale": 1.2112,
+          "safe": true
+        },
+        {
+          "hour": 18.6,
+          "identityShadowMassPercent": 19.11,
+          "shadowMassPercent": 21.23,
+          "shadowMassGrowthPoints": 2.12,
+          "sunIntensityScale": 0.7253,
+          "shadowFloorScale": 1.3159,
+          "safe": true
+        },
+        {
+          "hour": 19,
+          "identityShadowMassPercent": 19.09,
+          "shadowMassPercent": 21.74,
+          "shadowMassGrowthPoints": 2.65,
+          "sunIntensityScale": 0.7253,
+          "shadowFloorScale": 1.3159,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        15,
+        19
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "clear",
+      "band": [
+        5.8,
+        10.5
+      ],
+      "authoredHour": 7,
+      "samples": [
+        {
+          "hour": 5.8,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 14.61,
+          "shadowMassGrowthPoints": 2.77,
+          "sunIntensityScale": 0.695,
+          "shadowFloorScale": 1.3507,
+          "safe": true
+        },
+        {
+          "hour": 6.27,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 15.15,
+          "shadowMassGrowthPoints": 3.31,
+          "sunIntensityScale": 0.7475,
+          "shadowFloorScale": 1.2903,
+          "safe": false
+        },
+        {
+          "hour": 6.74,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 13.02,
+          "shadowMassGrowthPoints": 1.18,
+          "sunIntensityScale": 0.9138,
+          "shadowFloorScale": 1.0991,
+          "safe": true
+        },
+        {
+          "hour": 7.21,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 10.94,
+          "shadowMassGrowthPoints": -0.9,
+          "sunIntensityScale": 1.0663,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.68,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 6.37,
+          "shadowMassGrowthPoints": -2.55,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.15,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 5.33,
+          "shadowMassGrowthPoints": -3.59,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.62,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 4.72,
+          "shadowMassGrowthPoints": -4.2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.09,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 4.28,
+          "shadowMassGrowthPoints": -4.64,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.56,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 3.94,
+          "shadowMassGrowthPoints": -4.98,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.03,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 3.69,
+          "shadowMassGrowthPoints": -5.23,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.5,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 3.51,
+          "shadowMassGrowthPoints": -5.41,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        6.74,
+        10.5
+      ],
+      "anchorSafe": true,
+      "unsafeHours": [
+        6.27
+      ]
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "heavy-rain",
+      "band": [
+        5.8,
+        10.5
+      ],
+      "authoredHour": 7,
+      "samples": [
+        {
+          "hour": 5.8,
+          "identityShadowMassPercent": 18.86,
+          "shadowMassPercent": 19.17,
+          "shadowMassGrowthPoints": 0.31,
+          "sunIntensityScale": 0.695,
+          "shadowFloorScale": 1.3507,
+          "safe": true
+        },
+        {
+          "hour": 6.27,
+          "identityShadowMassPercent": 18.87,
+          "shadowMassPercent": 19.21,
+          "shadowMassGrowthPoints": 0.34,
+          "sunIntensityScale": 0.7475,
+          "shadowFloorScale": 1.2903,
+          "safe": true
+        },
+        {
+          "hour": 6.74,
+          "identityShadowMassPercent": 18.56,
+          "shadowMassPercent": 18.91,
+          "shadowMassGrowthPoints": 0.35,
+          "sunIntensityScale": 0.9138,
+          "shadowFloorScale": 1.0991,
+          "safe": true
+        },
+        {
+          "hour": 7.21,
+          "identityShadowMassPercent": 18.86,
+          "shadowMassPercent": 18.02,
+          "shadowMassGrowthPoints": -0.84,
+          "sunIntensityScale": 1.0663,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.68,
+          "identityShadowMassPercent": 18.86,
+          "shadowMassPercent": 17.04,
+          "shadowMassGrowthPoints": -1.82,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.15,
+          "identityShadowMassPercent": 18.83,
+          "shadowMassPercent": 15.58,
+          "shadowMassGrowthPoints": -3.25,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.62,
+          "identityShadowMassPercent": 18.73,
+          "shadowMassPercent": 14.68,
+          "shadowMassGrowthPoints": -4.05,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.09,
+          "identityShadowMassPercent": 18.87,
+          "shadowMassPercent": 13.62,
+          "shadowMassGrowthPoints": -5.25,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.56,
+          "identityShadowMassPercent": 18.87,
+          "shadowMassPercent": 12.87,
+          "shadowMassGrowthPoints": -6,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.03,
+          "identityShadowMassPercent": 18.81,
+          "shadowMassPercent": 12.02,
+          "shadowMassGrowthPoints": -6.79,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.5,
+          "identityShadowMassPercent": 18.69,
+          "shadowMassPercent": 11.26,
+          "shadowMassGrowthPoints": -7.43,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        5.8,
+        10.5
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "test1",
+      "weather": "clear",
+      "band": [
+        9,
+        13
+      ],
+      "authoredHour": 10.5,
+      "samples": [
+        {
+          "hour": 9,
+          "identityShadowMassPercent": 7.2,
+          "shadowMassPercent": 11.29,
+          "shadowMassGrowthPoints": 4.09,
+          "sunIntensityScale": 0.8854,
+          "shadowFloorScale": 1.1318,
+          "safe": false
+        },
+        {
+          "hour": 9.4,
+          "identityShadowMassPercent": 7.21,
+          "shadowMassPercent": 11.25,
+          "shadowMassGrowthPoints": 4.04,
+          "sunIntensityScale": 0.8854,
+          "shadowFloorScale": 1.1318,
+          "safe": false
+        },
+        {
+          "hour": 9.8,
+          "identityShadowMassPercent": 10.39,
+          "shadowMassPercent": 12.16,
+          "shadowMassGrowthPoints": 1.77,
+          "sunIntensityScale": 0.9324,
+          "shadowFloorScale": 1.0778,
+          "safe": true
+        },
+        {
+          "hour": 10.2,
+          "identityShadowMassPercent": 10.39,
+          "shadowMassPercent": 10.96,
+          "shadowMassGrowthPoints": 0.57,
+          "sunIntensityScale": 0.9755,
+          "shadowFloorScale": 1.0282,
+          "safe": true
+        },
+        {
+          "hour": 10.6,
+          "identityShadowMassPercent": 10.4,
+          "shadowMassPercent": 10.15,
+          "shadowMassGrowthPoints": -0.25,
+          "sunIntensityScale": 1.0068,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 11,
+          "identityShadowMassPercent": 10.39,
+          "shadowMassPercent": 9.45,
+          "shadowMassGrowthPoints": -0.94,
+          "sunIntensityScale": 1.0282,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 11.4,
+          "identityShadowMassPercent": 7.22,
+          "shadowMassPercent": 5.75,
+          "shadowMassGrowthPoints": -1.47,
+          "sunIntensityScale": 1.0414,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 11.8,
+          "identityShadowMassPercent": 7.22,
+          "shadowMassPercent": 5.61,
+          "shadowMassGrowthPoints": -1.61,
+          "sunIntensityScale": 1.0476,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 12.2,
+          "identityShadowMassPercent": 7.22,
+          "shadowMassPercent": 5.67,
+          "shadowMassGrowthPoints": -1.55,
+          "sunIntensityScale": 1.0476,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 12.6,
+          "identityShadowMassPercent": 7.22,
+          "shadowMassPercent": 5.95,
+          "shadowMassGrowthPoints": -1.27,
+          "sunIntensityScale": 1.0414,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 13,
+          "identityShadowMassPercent": 7.22,
+          "shadowMassPercent": 6.47,
+          "shadowMassGrowthPoints": -0.75,
+          "sunIntensityScale": 1.0282,
+          "shadowFloorScale": 1,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        9.8,
+        13
+      ],
+      "anchorSafe": true,
+      "unsafeHours": [
+        9,
+        9.4
+      ]
+    },
+    {
+      "arena": "test2",
+      "weather": "clear",
+      "band": [
+        16,
+        18.5
+      ],
+      "authoredHour": 17,
+      "samples": [
+        {
+          "hour": 16,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.68,
+          "shadowMassGrowthPoints": -0.05,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.25,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.69,
+          "shadowMassGrowthPoints": -0.04,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.5,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.7,
+          "shadowMassGrowthPoints": -0.03,
+          "sunIntensityScale": 1.1104,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 16.75,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.71,
+          "shadowMassGrowthPoints": -0.02,
+          "sunIntensityScale": 1.0573,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.73,
+          "shadowMassGrowthPoints": 0,
+          "sunIntensityScale": 1,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 17.25,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.74,
+          "shadowMassGrowthPoints": 0.01,
+          "sunIntensityScale": 0.9385,
+          "shadowFloorScale": 1.0708,
+          "safe": true
+        },
+        {
+          "hour": 17.5,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.75,
+          "shadowMassGrowthPoints": 0.02,
+          "sunIntensityScale": 0.8728,
+          "shadowFloorScale": 1.1463,
+          "safe": true
+        },
+        {
+          "hour": 17.75,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.78,
+          "shadowMassGrowthPoints": 0.05,
+          "sunIntensityScale": 0.8033,
+          "shadowFloorScale": 1.2263,
+          "safe": true
+        },
+        {
+          "hour": 18,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.86,
+          "shadowMassGrowthPoints": 0.13,
+          "sunIntensityScale": 0.73,
+          "shadowFloorScale": 1.3105,
+          "safe": true
+        },
+        {
+          "hour": 18.25,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.82,
+          "shadowMassGrowthPoints": 0.09,
+          "sunIntensityScale": 0.6534,
+          "shadowFloorScale": 1.3986,
+          "safe": true
+        },
+        {
+          "hour": 18.5,
+          "identityShadowMassPercent": 0.73,
+          "shadowMassPercent": 0.68,
+          "shadowMassGrowthPoints": -0.05,
+          "sunIntensityScale": 0.5738,
+          "shadowFloorScale": 1.4902,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        16,
+        18.5
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    }
+  ]
+}

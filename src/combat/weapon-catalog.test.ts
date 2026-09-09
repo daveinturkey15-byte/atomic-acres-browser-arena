@@ -22,9 +22,18 @@ const PASS65_WEAPON_IDS = [
 ] as const;
 
 const PASS66_SPECIAL_WEAPON_IDS = ['flamethrower', 'flare-gun'] as const;
+// HF-334: appended after the Pass 66 specials so every earlier index holds.
+const PASS74_LIVERY_WEAPON_IDS = ['crimson-flamethrower'] as const;
 
 function compatibilityProjection(definition: Record<string, any>): Record<string, any> {
   const copy = structuredClone(definition);
+  // HF-368: the B1 oracle predates the per-weapon wallbang term, so fill its
+  // documented 1.0 default on the baseline side only. The shipped value is left
+  // alone, which keeps this comparison asserting that every oracle weapon is
+  // still exactly 1 rather than dropping the field from the contract.
+  if (copy.penetration && copy.penetration.wallPenetrationMultiplier === undefined) {
+    copy.penetration.wallPenetrationMultiplier = 1;
+  }
   delete copy.displayName;
   delete copy.effects;
   if (copy.id === 'scattergun') {
@@ -46,10 +55,11 @@ function compatibilityProjection(definition: Record<string, any>): Record<string
 
 describe('Pass 65 canonical weapon catalog', () => {
   it('contains exactly the current-protocol roster in a stable enumeration order', () => {
-    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(18);
+    expect(MULTIPLAYER_PROTOCOL_VERSION).toBe(19);
     expect(LEGACY_WEAPON_ENUMERATION_ORDER).toEqual([
       ...PASS65_WEAPON_IDS,
       ...PASS66_SPECIAL_WEAPON_IDS,
+      ...PASS74_LIVERY_WEAPON_IDS,
     ]);
     expect(WEAPON_CATALOG.map((definition) => definition.id)).toEqual(LEGACY_WEAPON_ENUMERATION_ORDER);
     expect(new Set(WEAPON_CATALOG.map((definition) => definition.id))).toEqual(new Set(WEAPON_IDS));
@@ -84,7 +94,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['m14-ebr']).toMatchObject({
       displayName: 'M14 EBR', optic: { kind: 'thermal-smoke-only', magnification: 2.5 },
-      damage: { base: 37.2, minimum: 24, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 },
+      damage: { base: 52.1, minimum: 33.6, falloffStartM: 38, falloffEndM: 100, headMultiplier: 1.7 }, // HF-398 (2026-09-02)
     });
     expect(byId['slug-shotgun']).toMatchObject({ displayName: 'Benelli M4 Slug', fireKind: 'slug', pellets: 1 });
     expect(byId['flashlight-pistol']).toMatchObject({
@@ -93,7 +103,7 @@ describe('Pass 65 canonical weapon catalog', () => {
     });
     expect(byId['explosive-crossbow']).toMatchObject({
       displayName: 'TAC-15 Explosive Crossbow', fireKind: 'projectile',
-      optic: { kind: 'standard', magnification: 1.5 },
+      optic: { kind: 'standard', magnification: 2.5 },
       policies: { authority: 'host-projectile-v1' },
     });
     expect(byId.flamethrower).toMatchObject({
@@ -131,6 +141,32 @@ describe('Pass 65 canonical weapon catalog', () => {
     expect(machinePistol.damage.base).toBe(Math.min(...eligibleSecondaries.map((definition) => definition.damage.base)));
     expect(sustainedRecoilRanking(eligibleSecondaries)[0]).toMatchObject({ weaponId: 'machine-pistol' });
     expect(sustainedRecoilBurden(machinePistol)).toBeGreaterThan(0);
+  });
+
+  it('HF-368: gives only the M14 EBR a non-default wall-penetration multiplier', () => {
+    const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    expect(byId['m14-ebr'].penetration.wallPenetrationMultiplier).toBe(1.5);
+    // Every other weapon authors the documented 1.0 default so the owner's EBR tune
+    // cannot leak into the shared material table or any other gun.
+    const nonDefault = WEAPON_CATALOG
+      .filter((definition) => definition.penetration.wallPenetrationMultiplier !== 1)
+      .map((definition) => definition.id);
+    expect(nonDefault).toEqual(['m14-ebr']);
+    expect(WEAPON_CATALOG.every((definition) =>
+      Number.isFinite(definition.penetration.wallPenetrationMultiplier))).toBe(true);
+  });
+
+  it('HF-353: leaves the M14 EBR thermal see-through-walls optic exactly as retained', () => {
+    const byId = Object.fromEntries(WEAPON_CATALOG.map((definition) => [definition.id, definition]));
+    // Retained positive - HF-368 changes penetration (damage survival), never visibility.
+    expect(byId['m14-ebr'].optic).toEqual({
+      kind: 'thermal-smoke-only',
+      magnification: 2.5,
+      solidOcclusion: 'required',
+      targetPolicy: 'living-targets-through-smoke',
+      authority: 'presentation-only',
+    });
+    expect(byId['m14-ebr'].damage).toMatchObject({ base: 52.1, minimum: 33.6, headMultiplier: 1.7 }); // HF-398
   });
 
   it('retains special pickup and entitlement-only metadata', () => {

@@ -1,0 +1,208 @@
+/**
+ * HF-410 - FIT THE RIG INSIDE THE BODY THAT CARRIES IT.
+ *
+ * THE DEFECT, measured (2026-09-02, `scripts/qa/measure-viewmodel-body-fit-cdp.mjs`,
+ * 60/60 valid rows on atomic-acres, WebGPU, 2560x1440):
+ *
+ *   weapon   stance  hold  forward from eye   radial from player axis   capsule margin
+ *   carbine  crouch  hip        1.795 m               1.973 m              -1.593 m
+ *   mini-uzi stand   hip        1.769 m               1.950 m              -1.570 m
+ *   m4a1     crouch  hip        1.675 m               1.897 m              -1.517 m
+ *   lmg      stand   hip        1.521 m               1.789 m              -1.409 m
+ *   minigun  prone   hip        1.523 m               1.565 m              -1.185 m
+ *
+ * The standing capsule radius is 0.38 m. EVERY graded row was negative: the
+ * first-person rig lived between 1.2 m and 1.6 m OUTSIDE the player's own
+ * collision body, and the lowest visible vertex sat 0.776 m BELOW the surface
+ * the player was standing on. A body that is 0.38 m wide cannot carry a rig
+ * that is 1.97 m wide. Every wall, floor and corner the capsule is allowed to
+ * touch therefore contains the weapon, and that is why six passes of retreat,
+ * high-ready fold, contact clip planes and a depth-cleared overlay could not
+ * fix it: they were all treating a size mismatch as a rendering problem.
+ *
+ * THE FIX, and why it does not change what the player sees.
+ *
+ * A perspective projection is invariant under a uniform scale about its own
+ * centre. For any camera-space point p, the point k*p projects to exactly the
+ * same screen position, because the projection divides by depth:
+ *
+ *     ndc(k*p) = (f * k*p.x / (k*p.z), f * k*p.y / (k*p.z)) = ndc(p)
+ *
+ * So scaling the WHOLE first-person rig - position, rotation origin and size -
+ * about the eye by one factor k leaves the rendered image pixel-identical while
+ * dividing its world footprint by 1/k. The rig keeps its framing, its sight
+ * picture, its silhouette and its perspective; it simply stops being a
+ * two-metre object bolted to the outside of a 0.38 m body.
+ *
+ * That invariance holds for geometry. Three things are NOT scale-invariant and
+ * are compensated here rather than left to drift:
+ *
+ *  1. THE NEAR PLANE. Every rig point moves k times closer to the eye, so the
+ *     gameplay camera's 0.08 m near plane would slice the rig in half. The
+ *     first-person overlay is already a separate depth-cleared submission, so
+ *     it gets its own near plane (`VIEWMODEL_OVERLAY_NEAR_METERS`) for that
+ *     submission only. A perspective matrix's x/y mapping does not depend on
+ *     `near` (the frustum extents scale with it), so this changes the depth
+ *     range and nothing else on screen.
+ *  2. THE VIEWMODEL-ONLY LIGHTS. Three's point lights are physical: irradiance
+ *     is intensity / r^2 and `distance` is a world-space cutoff. Moving a light
+ *     k times closer to the surface it lights would brighten it by 1/k^2, so
+ *     viewmodel-only fills carry `viewmodelBodyFitLightDistance` and
+ *     `viewmodelBodyFitLightIntensity` and the rig is lit exactly as before.
+ *  3. THE UNITS OF EVERY WORLD-SPACE MEASUREMENT that enters the rig's own
+ *     frame. The contact probe, the fold solve and the near-plane admission all
+ *     compare metres of world against metres of rig. `viewmodelWorldToRigMeters`
+ *     and `viewmodelRigToWorldMeters` are the only sanctioned conversions.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO: it does not weaken one gate, threshold or
+ * ceiling. The contact fold keeps its 1.5 rad ceiling and the surface clip
+ * planes stay armed. They simply stop engaging, because the geometry they were
+ * defending is no longer outside the body.
+ */
+
+/** The identity of this fit, carried on telemetry so a silent revert is visible. */
+export const VIEWMODEL_BODY_FIT_CONTRACT = 'viewmodel-body-fit-inside-capsule-v1';
+
+/**
+ * The capsule radius the fit is sized against, from
+ * `CHARACTER_PHYSICS_CONFIG.playerRadius`. Duplicated as a literal on purpose:
+ * this module must not import the physics runtime, and the anatomy contract
+ * asserts the two agree.
+ */
+export const VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS = 0.38;
+
+/**
+ * Metres of capsule radius the fitted rig must leave unused. The character
+ * controller keeps its own 0.025 m offset, and an authored wall can sit exactly
+ * on the capsule surface, so the rig stops short of the boundary rather than on
+ * it.
+ */
+export const VIEWMODEL_BODY_FIT_MARGIN_METERS = 0.06;
+
+/**
+ * THE FACTOR. Solved, not authored:
+ *
+ *     k = (capsuleRadius - margin) / worstMeasuredExtent
+ *       = (0.38 - 0.06) / 2.438
+ *       = 0.1312
+ *
+ * rounded DOWN to 0.13. Two rigs have to fit, and the budget is sized on the
+ * larger of them:
+ *
+ *   - the SHIPPED GLB rig, measured in installed Chrome on WebGPU: worst radial
+ *     extent 1.973 m (carbine, crouch, hip), which the fit lands at 0.256 m
+ *     with 0.124 m of capsule to spare;
+ *   - the HEADLESS PROCEDURAL fallback rig the unit gates mount, which is the
+ *     larger mesh: worst forward extent 2.438 m (sniper and LMG), landing at
+ *     0.317 m inside the 0.32 m budget.
+ *
+ * Lowering k further is free on screen - the projection is invariant under it -
+ * and costs only near-plane margin. HF-410 REPAIR, one number and one plane:
+ * the plane in force on the shipped route is FIRST_PERSON_CAMERA_NEAR_METERS =
+ * 0.02 m, and the nearest ON-SCREEN rig vertex measured against it is 0.0246 m
+ * on this headless catalog rig (m4a1, deep prone squeeze) and 0.0293 m on the
+ * shipped GLB rig in installed Chrome - 1.23x and 1.47x of margin. Raising k
+ * puts the weapon back outside the body, which is the defect.
+ */
+export const VIEWMODEL_BODY_FIT_SCALE = 0.13;
+
+/**
+ * The WebGL2 compatibility overlay's own near plane, in metres.
+ *
+ * SCOPE, CORRECTED. This constant has exactly one consumer:
+ * `renderSceneOverlayLayer` in src/atomic-signal.ts, the depth-cleared
+ * first-person submission on the WebGL2 route. It is NOT the plane the shipped
+ * WebGPU route draws the rig with - `atomicSignal` is hardcoded null in
+ * legacy-main, so that submission never runs there and the rig is drawn with
+ * the gameplay camera at FIRST_PERSON_CAMERA_NEAR_METERS.
+ *
+ * The first HF-410 pass used this constant to grade the viewmodel's near-plane
+ * telemetry, its contact clip plane, its aperture raycaster and its fold
+ * admission. That was a gate pinned to a submission that does not run, and it
+ * is corrected: every shipped-route consumer now reads
+ * FIRST_PERSON_CAMERA_NEAR_METERS, and nothing outside src/atomic-signal.ts
+ * reads this.
+ *
+ * SIZED FROM MEASUREMENT: under the fit the nearest rig vertex anywhere - the
+ * off-frame sleeve end, which the frame edge discards either way - is 0.0070 m
+ * from the eye on the headless catalog rig, so 0.002 m keeps even that drawn on
+ * the route that owns its own depth buffer. Depth resolution over the rig's
+ * 0.002-0.32 m span is around a micrometre.
+ */
+export const VIEWMODEL_OVERLAY_NEAR_METERS = 0.002;
+
+/**
+ * The on-foot gameplay camera's near plane, in metres.
+ *
+ * 0.08 m was a VIEWMODEL number. Nothing in the world is ever within 8 cm of
+ * the eye - the player's own capsule is 0.38 m wide - so the only geometry that
+ * plane has ever had to clear is the first-person rig, and 0.08 m cleared a rig
+ * whose nearest point sat 0.126 m out.
+ *
+ * The fitted rig sits closer, and the standard technique pairs a body-fitted
+ * viewmodel with a SEPARATE submission carrying its own near plane. This build
+ * has none: `atomicSignal` is hardcoded null in legacy-main, so the
+ * depth-cleared first-person overlay does not run on the shipped WebGPU route
+ * and the rig is drawn with the gameplay camera.
+ * `renderSceneOverlayLayer` still narrows the plane for the WebGL2
+ * compatibility route, which does run it.
+ *
+ * MEASURED (docs/evidence/pass85/hf410/body-fit-after.json, field
+ * `viewportForwardMinM`, all 60 graded poses, installed Chrome, WebGPU): the
+ * nearest ON-SCREEN rig vertex is 0.0293 m - slug-shotgun, prone, hip, with the
+ * other five long guns within 4 mm. Off-screen sleeve geometry reaches closer
+ * and is cut either way, below the frame, by contract.
+ *
+ * WHAT 0.08 m WOULD COST, measured rather than asserted. The skeptic pass found
+ * the original "42 of 60 poses clipped at 0.08 m" figure absent from the tree,
+ * and it was: the two 0.08 m runs predate the instrument fields that report it.
+ * `sampleViewmodelRigExtent` now carries an exact counterfactual - a perspective
+ * matrix's x/y mapping does not depend on `near`, so the vertices a 0.08 m plane
+ * would discard, and where on screen they would land, are computable in the same
+ * pass from the same vertices. Fields `referenceNearM`,
+ * `referenceNearPlaneCutVertices`, `referenceNearPlaneCutInViewport`; the run is
+ * docs/evidence/pass85/hf410/body-fit-after.json.
+ *
+ * 0.02 m clears the measured minimum with 1.47x of margin. THE COST, stated
+ * rather than hidden: depth resolution scales as 1/near, so distant precision
+ * is 4x coarser - about 1 cm at 60 m and 3 cm at 100 m, against 0.3 cm and
+ * 0.8 cm before. That is a shared graphics budget. The durable fix is to give
+ * the first-person layer its own submission again, which is a render-runtime
+ * change this lane does not own.
+ */
+export const FIRST_PERSON_CAMERA_NEAR_METERS = 0.02;
+
+/**
+ * The on-foot near plane this build shipped with BEFORE HF-410 (PASS 84,
+ * 75a4e508). Kept as a named constant for exactly one purpose: the browser
+ * instrument grades an exact counterfactual against it, so the cost of moving
+ * the plane is evidence in the tree rather than a number in a report.
+ */
+export const FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS = 0.08;
+
+/** World metres expressed in the unfitted rig frame the presentation composes in. */
+export function viewmodelWorldToRigMeters(worldMeters: number): number {
+  return worldMeters / VIEWMODEL_BODY_FIT_SCALE;
+}
+
+/** Rig-frame metres expressed as the world metres the fitted rig really occupies. */
+export function viewmodelRigToWorldMeters(rigMeters: number): number {
+  return rigMeters * VIEWMODEL_BODY_FIT_SCALE;
+}
+
+/**
+ * A viewmodel-only light's cutoff radius under the fit. `distance` is world
+ * space, so it shrinks with everything else.
+ */
+export function viewmodelBodyFitLightDistance(authoredMeters: number): number {
+  return authoredMeters * VIEWMODEL_BODY_FIT_SCALE;
+}
+
+/**
+ * A viewmodel-only light's intensity under the fit. Irradiance is
+ * intensity / r^2 and every r has shrunk by k, so intensity must shrink by k^2
+ * for the rig to be lit exactly as it was before the fit.
+ */
+export function viewmodelBodyFitLightIntensity(authoredIntensity: number): number {
+  return authoredIntensity * VIEWMODEL_BODY_FIT_SCALE * VIEWMODEL_BODY_FIT_SCALE;
+}

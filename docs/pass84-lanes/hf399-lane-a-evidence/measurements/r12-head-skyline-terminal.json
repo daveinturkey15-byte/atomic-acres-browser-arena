@@ -1,0 +1,191 @@
+{
+  "contract": "hf399-fps-phase-probe-v1",
+  "measuredAt": "2026-09-02T13:25:06.612Z",
+  "label": "r12-head",
+  "arena": "skyline-terminal",
+  "base": "http://127.0.0.1:41941/",
+  "requestedProfile": "high",
+  "viewport": {
+    "width": 2560,
+    "height": 1440
+  },
+  "secondsPerPhase": 6,
+  "phases": [
+    {
+      "phase": "menu",
+      "frames": 10125,
+      "elapsedMs": 6016,
+      "fps": 1683,
+      "frameMs": {
+        "p50": 0.6,
+        "p95": 0.8,
+        "p99": 1,
+        "max": 3.2,
+        "mean": 0.59
+      },
+      "perFrame": {
+        "draws": 0,
+        "triangles": 0,
+        "instances": 0,
+        "renderPasses": 0,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 0
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 0,
+        "shaderModulesTotal": 0
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 108521734,
+        "endBytes": 111368610,
+        "deltaMbPerMinute": 27.08
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "yaw": 0,
+        "alive": true,
+        "phase": "warmup"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r12-head-skyline-terminal-menu.png"
+    },
+    {
+      "phase": "deployed-idle",
+      "frames": 479,
+      "elapsedMs": 6012,
+      "fps": 79.7,
+      "frameMs": {
+        "p50": 12.4,
+        "p95": 15.5,
+        "p99": 16.4,
+        "max": 17.5,
+        "mean": 12.53
+      },
+      "perFrame": {
+        "draws": 126.3,
+        "triangles": 58681.6,
+        "instances": 577.2,
+        "renderPasses": 23,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 300,
+        "shaderModulesTotal": 346
+      },
+      "longTasks": {
+        "count": 0,
+        "totalMs": 0,
+        "maxMs": 0
+      },
+      "heap": {
+        "startBytes": 241288956,
+        "endBytes": 226474573,
+        "deltaMbPerMinute": -141
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          -27,
+          1.6983986282348633,
+          -14
+        ],
+        "yaw": -2.0491487581735544,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r12-head-skyline-terminal-deployed-idle.png"
+    },
+    {
+      "phase": "move",
+      "frames": 421,
+      "elapsedMs": 6021,
+      "fps": 69.9,
+      "frameMs": {
+        "p50": 14.1,
+        "p95": 17.3,
+        "p99": 20.9,
+        "max": 77.5,
+        "mean": 14.27
+      },
+      "perFrame": {
+        "draws": 110.1,
+        "triangles": 57716.4,
+        "instances": 547.1,
+        "renderPasses": 23.1,
+        "computePasses": 0,
+        "dispatches": 0,
+        "submits": 23.1
+      },
+      "created": {
+        "renderPipelines": 0,
+        "computePipelines": 0,
+        "shaderModules": 0,
+        "renderPipelinesTotal": 300,
+        "shaderModulesTotal": 346
+      },
+      "longTasks": {
+        "count": 2,
+        "totalMs": 113,
+        "maxMs": 63
+      },
+      "heap": {
+        "startBytes": 237029764,
+        "endBytes": 200599031,
+        "deltaMbPerMinute": -346.21
+      },
+      "activeClipPlanes": 5,
+      "pose": {
+        "position": [
+          6.955145835876465,
+          1.727222421169281,
+          1.200111746788025
+        ],
+        "yaw": -2.0491487581735544,
+        "alive": true,
+        "phase": "active"
+      },
+      "hooked": true,
+      "screenshot": "C:\\Users\\david\\projects\\aa-claude-hf399\\artifacts\\qa\\hf399\\r12-head-skyline-terminal-move.png"
+    }
+  ],
+  "profileSelection": {
+    "before": "high",
+    "after": "high",
+    "options": [
+      "high=QUALITY",
+      "performance=PERFORMANCE",
+      "raytraced=RAY TRACED",
+      "max=MAX",
+      "custom=CUSTOM"
+    ]
+  },
+  "profileState": {
+    "graphicsPreset": "high",
+    "renderBackend": "webgpu",
+    "effective": "EFFECTIVE: HIGH",
+    "advanced": null,
+    "devicePixelRatio": 1,
+    "hardwareConcurrency": 16,
+    "deviceMemory": 32
+  }
+}

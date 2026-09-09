@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
@@ -39,6 +39,134 @@ function fatalBrowserErrors(errors) {
 
 const finiteArray = (values) => Array.isArray(values) && values.every(Number.isFinite);
 
+// HF-410 GATE RE-PIN (PASS 86). WHY, and what is NOT relaxed.
+//
+// The wall and prone contact steps below used to WAIT on the wall-pullback
+// symptom - `surfaceRetreat > 0.15`, then `> 0.25` - as their precondition.
+// HF-410 (src/viewmodel-body-fit.ts; docs/pass84-lanes/LANE-W-viewmodel-rework.md
+// step 3) fits the whole rig INSIDE the player's own 0.38 m capsule and
+// therefore sets VIEWMODEL_WALL_PULLBACK_SCALE to 0 BY DESIGN: "there is no
+// wall for it to be pulled out of". Measured on the merged tree at these exact
+// poses, wall-hip retreat is 0 and prone-wall retreat is 0 with lift 0.2. So
+// the wait could never satisfy and the gate ABORTED on a 10 s timeout before
+// counting anything - it yielded no violation number at all, which is strictly
+// worse than red.
+//
+// Retreat and lift are now OBSERVED AND RECORDED (`contactObservations` in the
+// receipt) instead of waited on. The preconditions are re-pinned to what the
+// reworked rig actually contracts and what really changes on screen: the
+// teleport landed, the weapon is m4a1, the stance is prone, ADS converged.
+//
+// NOTHING IS WEAKENED IN ITS PLACE - the opposite. The penetration that the
+// retreat existed to prevent is now asserted DIRECTLY, on the two margins the
+// lane itself ships and measures via `sampleViewmodelRigExtent`:
+//
+//   capsuleMarginM   > 0  - the rig stays inside the body that carries it, so
+//                           no wall the capsule may touch can contain it.
+//                           0.123..0.261 m over all 60 graded poses after the
+//                           fit; -1.593 m before it.
+//   floorClearanceMinM > 0 - the lowest visible vertex stays above the surface
+//                           the player is standing on. 0.559..1.819 m after;
+//                           -0.776 m before.
+//                           (docs/evidence/pass85/hf410/body-fit-after-repair.json)
+//
+// and the live fit scale is pinned to the source constant, so a silent revert
+// of the fit fails here rather than passing quietly. The anatomy contract, the
+// -0.98 shoulder-entry continuation floor and every near-plane assertion in
+// presentationViolations() are untouched.
+const contactObservations = [];
+
+function readBodyFitConstant(name) {
+  const source = readFileSync('src/viewmodel-body-fit.ts', 'utf8');
+  const match = new RegExp(`export const ${name} = ([0-9.]+);`).exec(source);
+  if (!match) throw new Error(`Pass 65 arms visual gate could not read ${name} from src/viewmodel-body-fit.ts`);
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`Pass 65 arms visual gate read a non-positive ${name}: ${match[1]}`);
+  }
+  return value;
+}
+const VIEWMODEL_BODY_FIT_SCALE = readBodyFitConstant('VIEWMODEL_BODY_FIT_SCALE');
+
+/**
+ * HF-410: the rig's own envelope against the body that carries it. This is the
+ * falsifier that replaces the retreat precondition - it fails on the defect the
+ * retreat was a symptom treatment for, rather than on the treatment.
+ */
+function bodyFitViolations(label, extent) {
+  if (!extent || extent.contract !== 'viewmodel-rig-extent-v1') {
+    return [`${label}: viewmodel rig extent telemetry is unavailable ${JSON.stringify(extent ?? null)}`];
+  }
+  const violations = [];
+  if (extent.bodyFitScale !== VIEWMODEL_BODY_FIT_SCALE) {
+    violations.push(`${label}: body fit scale is ${extent.bodyFitScale}, source says ${VIEWMODEL_BODY_FIT_SCALE}`);
+  }
+  if (!Number.isFinite(extent.capsuleMarginM) || extent.capsuleMarginM <= 0) {
+    violations.push(`${label}: rig leaves the player capsule - capsuleMarginM ${extent.capsuleMarginM} (radial ${extent.capsuleRadialMaxM} vs radius ${extent.capsuleRadiusM}, mesh ${extent.radialMesh})`);
+  }
+  if (!Number.isFinite(extent.floorClearanceMinM) || extent.floorClearanceMinM <= 0) {
+    violations.push(`${label}: rig penetrates the floor - floorClearanceMinM ${extent.floorClearanceMinM} (mesh ${extent.floorMesh})`);
+  }
+  if (!Number.isFinite(extent.verticesMeasured) || extent.verticesMeasured < 1) {
+    violations.push(`${label}: rig extent measured no vertices`);
+  }
+  return violations;
+}
+
+/**
+ * HF-410: the contact pose the label names must really be established. The old
+ * preconditions read `surfaceRetreat`, which since HF-387 publishes the APPLIED
+ * camera-space translation - the quantity HF-410 zeroes on purpose. The PROBE
+ * DEMAND survives untouched ("the retreat is still probed, still reported in
+ * telemetry", src/weapon-presentation.ts VIEWMODEL_WALL_PULLBACK_SCALE), so the
+ * original thresholds are kept verbatim and re-pinned onto
+ * `requestedSurfaceRetreat`, where they still mean what they were written to
+ * mean. Measured on the fitted rig: demand 0.82 m and wallBlend 1 at all three
+ * poses, against the 0.15 / 0.25 the gate has always asked for.
+ *
+ * These are ASSERTIONS, not waits: a pose that stops being a wall pose must go
+ * red with a number, never time out with none.
+ */
+function contactPoseViolations(label, observed, requiredDemandMeters, requiredLiftMeters) {
+  const violations = [];
+  if (!(observed.contactWallBlend > 0.99)) {
+    violations.push(`${label}: the wall contact pose was not established - wallBlend ${observed.contactWallBlend}`);
+  }
+  if (!(observed.requestedSurfaceRetreat > requiredDemandMeters)) {
+    violations.push(`${label}: probed retreat demand ${observed.requestedSurfaceRetreat} is not > ${requiredDemandMeters}`);
+  }
+  if (requiredLiftMeters !== null && !(observed.surfaceLift >= requiredLiftMeters)) {
+    violations.push(`${label}: floor lift ${observed.surfaceLift} is not >= ${requiredLiftMeters}`);
+  }
+  return violations;
+}
+
+async function observeContactPose(page, where, expected) {
+  const observed = await page.evaluate(() => {
+    const api = window.__ATOMIC_ACRES_DEBUG__;
+    const presentation = api?.snapshot()?.weaponPresentation;
+    return {
+      surfaceRetreat: presentation?.surfaceRetreat ?? null,
+      requestedSurfaceRetreat: presentation?.requestedSurfaceRetreat ?? null,
+      surfaceLift: presentation?.surfaceLift ?? null,
+      contactWallBlend: presentation?.contactResponse?.wallBlend ?? null,
+      contactFloorBlend: presentation?.contactResponse?.floorBlend ?? null,
+      contactHighReadyBlend: presentation?.contactResponse?.highReadyBlend ?? null,
+      contactLiftMeters: presentation?.contactResponse?.additionalLiftMeters ?? null,
+      contactDropMeters: presentation?.contactResponse?.additionalDropMeters ?? null,
+      contactFoldEngaged: presentation?.contactFold?.engaged ?? null,
+      // A throw here must surface as a violation, not as an aborted run - the
+      // whole point of this re-pin is that the gate always yields a number.
+      extent: (() => {
+        try { return api?.sampleViewmodelRigExtent?.() ?? null; }
+        catch (error) { return { contract: 'unavailable', error: String(error).slice(0, 300) }; }
+      })(),
+    };
+  });
+  contactObservations.push({ where, expectedBeforeHf410: expected, observed });
+  return observed;
+}
+
 function presentationViolations(label, state) {
   const violations = [];
   const presentation = state?.weaponPresentation;
@@ -72,7 +200,21 @@ function presentationViolations(label, state) {
     const policy = presentation.riggedArms.find((arm) => arm.handPolicy)?.handPolicy;
     const activeArms = presentation.riggedArms.filter((arm) => arm.active === true);
     const stowedArms = presentation.riggedArms.filter((arm) => arm.stowed === true);
-    if (policy?.contract !== 'right-firing-hand-handgun-support-reload-only-v1') violations.push(`${label}: hand policy is missing`);
+    // HF-413 re-pin (2026-09-02), reason recorded rather than relaxed: this
+    // gate still demanded the v1 contract string
+    // ('right-firing-hand-handgun-support-reload-only-v1'), which HF-341
+    // RETIRED when it removed the handgun '+40 m support stow'. The shipped
+    // runtime has published
+    // FIRST_PERSON_HAND_POLICY_CONTRACT = 'right-firing-hand-two-hand-support-always-active-v2'
+    // (src/weapon-presentation.ts) ever since, so every row of this gate failed
+    // with "hand policy is missing" while telling nobody anything about the
+    // arms - a gate that cannot pass reports no information. Pinning the
+    // CURRENT contract restores the assertion's meaning: a silent revert to
+    // stowing, or any further unreviewed contract bump, still fails here. The
+    // one-hand stow branch below is kept deliberately: under v2 it is
+    // unreachable, and it is the falsifier that catches a regression back to
+    // v1's stow.
+    if (policy?.contract !== 'right-firing-hand-two-hand-support-always-active-v2') violations.push(`${label}: hand policy is ${policy?.contract ?? 'missing'}`);
     if (activeArms.length !== policy?.activeChainCount) violations.push(`${label}: ${activeArms.length} active chains do not match policy ${policy?.activeChainCount}`);
     if (policy?.activeChainCount === 1) {
       if (stowedArms.length !== 1 || stowedArms[0]?.side !== 'left'
@@ -194,6 +336,29 @@ async function capture(page, name) {
   return path;
 }
 
+/**
+ * HF-413. Progress samples for the reload and melee strips. The brief asks for
+ * a six-frame strip of each so a reversed clip, a hand that reaches the wrong
+ * way or a magazine arriving from the wrong side is visible as MOTION rather
+ * than inferred from one still.
+ */
+const ACTION_STRIP_PROGRESS = Object.freeze([0.08, 0.24, 0.4, 0.56, 0.72, 0.9]);
+/** Families whose reload is captured as a full strip. */
+const RELOAD_STRIP_SUBJECTS = Object.freeze([
+  { family: 'handgun', weapon: 'pistol' },
+  { family: 'long-gun', weapon: 'm4a1' },
+  { family: 'heavy', weapon: 'minigun' },
+]);
+/** Support (left) palm world position at the resting hip pose, per weapon. */
+const hipSupportPalmByWeapon = new Map();
+
+function supportPalm(state) {
+  const arm = state?.weaponPresentation?.riggedArms?.find((candidate) => candidate.side === 'left');
+  return finiteArray(arm?.palm) ? arm.palm : null;
+}
+
+const palmDistance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
 await mkdir(artifactRoot, { recursive: true });
 const server = await createServer({ server: { host: '127.0.0.1', port, strictPort: true }, logLevel: 'error' });
 let browser;
@@ -205,7 +370,7 @@ try {
   browser = await chromium.launch({
     headless: true,
     executablePath,
-    args: ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
+    args: ['--mute-audio', '--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'],
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
   page.on('pageerror', (error) => errors.push(error.message));
@@ -263,6 +428,31 @@ try {
     violations.push(...presentationViolations(`${family}/${weapon}/hip`, state));
     const screenshot = await capture(page, `${family}-${weapon}-hip`);
     evidence.push(evidenceFor(`${family}/${weapon}/hip`, state, screenshot, cadence));
+    const hipSupportPalm = supportPalm(state);
+    if (hipSupportPalm) hipSupportPalmByWeapon.set(weapon, hipSupportPalm);
+
+    // HF-413 review: ADS was captured for the m4a1 alone, so "wrong handedness
+    // after ADS" - one of the defect classes the brief names - was unobserved
+    // on six of the seven families. Every representative now gets an aimed
+    // still on the same instrument.
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98,
+      undefined,
+      { timeout: 15_000 },
+    );
+    await page.waitForTimeout(300);
+    const adsState = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+    const adsLabel = `${family}/${weapon}/ads`;
+    violations.push(...presentationViolations(adsLabel, adsState));
+    const adsScreenshot = await capture(page, `${family}-${weapon}-ads`);
+    evidence.push(evidenceFor(adsLabel, adsState, adsScreenshot));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(false));
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress < 0.02,
+      undefined,
+      { timeout: 15_000 },
+    );
   }
 
   await page.setViewportSize({ width: 2560, height: 1440 });
@@ -291,50 +481,96 @@ try {
   }
   await page.setViewportSize({ width: 1600, height: 900 });
 
-  await page.evaluate(() => { const api = window.__ATOMIC_ACRES_DEBUG__; api.equipWeapon('m4a1'); api.setAds(true); });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.98, undefined, { timeout: 12_000 });
-  await page.waitForTimeout(300);
-  let state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
-  violations.push(...presentationViolations('long-gun/m4a1/ads', state));
-  let screenshot = await capture(page, 'long-gun-m4a1-ads');
-  evidence.push(evidenceFor('long-gun/m4a1/ads', state, screenshot));
+  // HF-413 review: the previous version captured ONE reload frame, for the
+  // m4a1 only, so "magazine inserted from the wrong side" and "clip playing
+  // reversed" had no evidence at all - and the M134, whose ammunition is on a
+  // side-mounted drum rather than a centreline magwell, was never reloaded on
+  // screen even while its reload socket was being edited. Each subject below
+  // now gets the six-frame strip the brief asks for, plus a measurement of how
+  // far the SUPPORT palm actually travels from its own resting hip pose (a
+  // reload that drives no support-hand motion is a dead clip, and that is
+  // invisible in a single still).
+  let state;
+  let screenshot;
+  for (const { family, weapon } of RELOAD_STRIP_SUBJECTS) {
+    await page.evaluate((selected) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAds(false);
+      api.setMeleeCaptureProgress(null);
+      api.setReloadCaptureProgress(null);
+      api.equipWeapon(selected);
+    }, weapon);
+    await page.waitForFunction((selected) => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.weapon === selected && presentation?.importedModel?.weapon === selected;
+    }, weapon, { timeout: 30_000 });
+    await page.waitForTimeout(600);
+    await page.evaluate((selected) => {
+      const api = window.__ATOMIC_ACRES_DEBUG__;
+      api.setAmmo(selected, 1, 90);
+      api.reload();
+      api.setReloadCaptureProgress(0.08);
+    }, weapon);
+    await page.waitForFunction(
+      () => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.actionContract?.state === 'reload',
+      undefined,
+      { timeout: 12_000 },
+    );
+    let maximumSupportTravel = 0;
+    for (const progress of ACTION_STRIP_PROGRESS) {
+      await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(value), progress);
+      await page.waitForTimeout(140);
+      state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
+      const label = `${family}/${weapon}/reload-${progress.toFixed(2)}`;
+      violations.push(...presentationViolations(label, state));
+      if (state.weaponPresentation?.actionContract?.state !== 'reload') {
+        violations.push(`${label}: action contract is ${state.weaponPresentation?.actionContract?.state}`);
+      }
+      const palm = supportPalm(state);
+      const hipPalm = hipSupportPalmByWeapon.get(weapon);
+      if (palm && hipPalm) maximumSupportTravel = Math.max(maximumSupportTravel, palmDistance(palm, hipPalm));
+      screenshot = await capture(page, `${family}-${weapon}-reload-${String(progress).replace('.', '_')}`);
+      evidence.push(evidenceFor(label, state, screenshot));
+    }
+    // A reload whose support hand never leaves the rest pose is a clip that is
+    // not playing. 3 cm is far below every authored draw and is a liveness
+    // floor, not a pose assertion - the strip itself is the pose evidence.
+    if (!(maximumSupportTravel > 0.03)) {
+      violations.push(`${family}/${weapon}/reload: support palm moved only ${maximumSupportTravel.toFixed(4)} m from its hip pose across the strip`);
+    }
+    evidence.push(Object.freeze({
+      label: `${family}/${weapon}/reload-support-travel`,
+      maximumSupportPalmTravelMeters: maximumSupportTravel,
+      hipSupportPalm: hipSupportPalmByWeapon.get(weapon) ?? null,
+    }));
+    await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
+    // The deterministic pose override does not cancel authoritative reload
+    // timing. Await the real reload exit before the next subject (and before
+    // the melee strip) so no screenshot can combine one action with another
+    // action's state.
+    await page.waitForFunction(() => {
+      const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
+      return presentation?.actionContract?.state !== 'reload';
+    }, undefined, { timeout: 10_000 });
+    await page.waitForFunction(() => ![...document.querySelectorAll('#killfeed > *')]
+      .some((row) => row.textContent?.includes('Reloading')), undefined, { timeout: 10_000 });
+  }
 
-  await page.evaluate(() => {
-    const api = window.__ATOMIC_ACRES_DEBUG__;
-    api.setAds(false); api.setAmmo('m4a1', 10, 60); api.reload(); api.setReloadCaptureProgress(0.46);
-  });
-  await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.actionContract?.state === 'reload', undefined, { timeout: 12_000 });
-  await page.waitForTimeout(250);
-  state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
-  violations.push(...presentationViolations('long-gun/m4a1/reload', state));
-  screenshot = await capture(page, 'long-gun-m4a1-reload');
-  evidence.push(evidenceFor('long-gun/m4a1/reload', state, screenshot));
-  await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setReloadCaptureProgress(null));
-
-  // The deterministic pose override does not cancel authoritative reload
-  // timing. Await the real reload exit before starting independent melee proof
-  // so no screenshot can combine a knife pose with "Reloading M4A1" state.
-  await page.waitForFunction(() => {
-    const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
-    return presentation?.actionContract?.state !== 'reload';
-  }, undefined, { timeout: 6_000 });
-  await page.waitForFunction(() => ![...document.querySelectorAll('#killfeed > *')]
-    .some((row) => row.textContent?.includes('Reloading M4A1')), undefined, { timeout: 7_000 });
-
-  await page.evaluate(() => {
+  await page.evaluate((firstProgress) => {
     const api = window.__ATOMIC_ACRES_DEBUG__;
     api.setAds(false);
+    api.equipWeapon('m4a1');
     api.setAmmo('m4a1', 30, 60);
     api.melee();
-    api.setMeleeCaptureProgress(0.12);
-  });
+    api.setMeleeCaptureProgress(firstProgress);
+  }, ACTION_STRIP_PROGRESS[0]);
   await page.waitForFunction(() => {
     const presentation = window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation;
     return presentation?.actionContract?.state === 'melee'
       && presentation?.meleeArmSource === 'authored-rigged-arms'
       && presentation?.knifeVisible === true;
   }, undefined, { timeout: 5_000 });
-  for (const progress of [0.12, 0.42, 0.82]) {
+  for (const progress of ACTION_STRIP_PROGRESS) {
     await page.evaluate((value) => window.__ATOMIC_ACRES_DEBUG__.setMeleeCaptureProgress(value), progress);
     await page.waitForTimeout(120);
     state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
@@ -368,18 +604,44 @@ try {
     api.equipWeapon('m4a1');
     api.teleportPlayer(-19.65, 1.7, -14.5, Math.PI / 2, 0);
   });
-  await page.waitForFunction(() => (
-    window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.surfaceRetreat > 0.15
-  ), undefined, { timeout: 10_000 });
+  // HF-410 re-pin (see the block above presentationViolations): wait for the
+  // POSE, not for the removed pullback. The teleport landing at the wall is the
+  // real, observable precondition; the retreat it used to produce is recorded.
+  await page.waitForFunction(() => {
+    const current = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
+    const position = current?.player?.position;
+    return current?.weaponPresentation?.weapon === 'm4a1'
+      && Array.isArray(position)
+      && Math.hypot(position[0] - -19.65, position[2] - -14.5) < 0.35
+      && current?.weaponPresentation?.adsProgress < 0.001;
+  }, undefined, { timeout: 10_000 });
+  await page.waitForTimeout(400);
+  const wallHipObservation = await observeContactPose(
+    page,
+    'contact/m4a1/wall-hip',
+    'surfaceRetreat > 0.15',
+  );
+  violations.push(...bodyFitViolations('contact/m4a1/wall-hip', wallHipObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/wall-hip', wallHipObservation, 0.15, null));
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setStance('prone'));
+  // The prone precondition kept its LIFT half: the floor lift is real under the
+  // fit (measured 0.2 m, at the VIEWMODEL_PRONE_BASE_LIFT_METERS cap) and it is
+  // what makes this a floor-contact pose. Only the retreat half - the removed
+  // wall pullback - became an observation.
   await page.waitForFunction(() => {
     const current = window.__ATOMIC_ACRES_DEBUG__?.snapshot();
     return current?.player?.stance === 'prone'
       && current?.weaponPresentation?.weapon === 'm4a1'
-      && current?.weaponPresentation?.surfaceRetreat > 0.25
       && current?.weaponPresentation?.surfaceLift >= 0.13;
   }, undefined, { timeout: 15_000 });
   await page.waitForTimeout(400);
+  const proneHipObservation = await observeContactPose(
+    page,
+    'contact/m4a1/prone-wall-floor-hip',
+    'surfaceRetreat > 0.25 && surfaceLift >= 0.13',
+  );
+  violations.push(...bodyFitViolations('contact/m4a1/prone-wall-floor-hip', proneHipObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/prone-wall-floor-hip', proneHipObservation, 0.25, 0.13));
   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-hip', state));
   if (state.weaponPresentation.contactResponse?.contract !== 'catalog-viewmodel-contact-response-v2'
@@ -392,6 +654,13 @@ try {
   await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.setAds(true));
   await page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot()?.weaponPresentation?.adsProgress > 0.999, undefined, { timeout: 12_000 });
   await page.waitForTimeout(350);
+  const proneAdsObservation = await observeContactPose(
+    page,
+    'contact/m4a1/prone-wall-floor-ads',
+    'surfaceRetreat > 0.25 && surfaceLift >= 0.13 (inherited from the hip step)',
+  );
+  violations.push(...bodyFitViolations('contact/m4a1/prone-wall-floor-ads', proneAdsObservation.extent));
+  violations.push(...contactPoseViolations('contact/m4a1/prone-wall-floor-ads', proneAdsObservation, 0.25, 0.13));
   state = await page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.snapshot());
   violations.push(...presentationViolations('contact/m4a1/prone-wall-floor-ads', state));
   if (state.weaponPresentation.contactResponse?.highReadyBlend <= 0.2
@@ -415,6 +684,11 @@ try {
     sourceRevision, route, browser: browser.version(),
     renderer: { requested: 'webgpu', actual: state.render.runtime.actualBackend, softwareAdapter: state.render.runtime.softwareAdapter, profile: state.render.profile },
     representatives, evidence, browserErrors: fatalBrowserErrors(errors), violations,
+    violationCount: violations.length,
+    // HF-410: what the removed wall pullback now measures at the two contact
+    // poses, plus the body-fit margins that replaced it as the falsifier.
+    bodyFitScale: VIEWMODEL_BODY_FIT_SCALE,
+    contactObservations,
   };
   await writeFile(`${artifactRoot}/receipt.json`, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
   if (violations.length > 0) throw new Error(`Pass 65 first-person arms visual gate failed:\n- ${violations.join('\n- ')}`);

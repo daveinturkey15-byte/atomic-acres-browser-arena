@@ -73,11 +73,29 @@ function hiddenCpuPreparationIssues(sources: HiddenCpuSources): readonly string[
   if ((compile.match(/await waitForVisibleBrowserPreparation\(\);/g)?.length ?? 0) < 2) {
     issues.push('render-runtime:foreground-barrier-missing');
   }
-  if (!compile.includes('submitted = this.submitFrame(this.clock(), true);')) {
+  // Cold prewarm must still take the FORCED submission path.
+  if (!compile.includes("submitted = this.submitFrame(this.clock(), true, 'serialized', force);")) {
     issues.push('render-runtime:forced-submission-path-missing');
   }
-  if (!submit.includes('if (!browserOwnsForegroundPresentation()) return false;')) {
+  // Prewarm may settle for a VISIBLE-but-unfocused document after waiting
+  // politely for focus (an unbounded focus wait hung loading forever), but it
+  // must never settle for a HIDDEN one. Pin all three halves of that rule:
+  // the bounded patience, the visibility re-check before forcing, and a
+  // submitFrame guard that still refuses a hidden document in either mode.
+  if (!compile.includes('const force = attempt >= WebGpuRenderRuntime.PREWARM_FOCUS_ATTEMPTS;')) {
+    issues.push('render-runtime:prewarm-focus-patience-missing');
+  }
+  if (!compile.includes('if (force && !browserPresentationIsVisible()) continue;')) {
+    issues.push('render-runtime:prewarm-hidden-escape-missing');
+  }
+  if (!submit.includes('? !browserPresentationIsVisible()')
+    || !submit.includes(': !browserOwnsForegroundPresentation()) return false;')) {
     issues.push('render-runtime:hidden-submission-guard-missing');
+  }
+  // The weaker gate must be reachable ONLY through the explicit prewarm flag -
+  // gameplay submission keeps the strict foreground requirement.
+  if (!submit.includes('allowUnfocusedVisible = false,')) {
+    issues.push('render-runtime:unfocused-allowance-not-opt-in');
   }
   return Object.freeze(issues);
 }

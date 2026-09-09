@@ -222,6 +222,7 @@ function materialsOf(node: THREE.Object3D): THREE.Material[] {
 const TEXTURE_PROPERTIES = [
   'map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap', 'lightMap', 'envMap',
 ] as const;
+type TextureBridgeDisposer = { dispose: () => void };
 
 export function createIdempotentRootDisposer(root: THREE.Group): () => void {
   let disposed = false;
@@ -232,12 +233,15 @@ export function createIdempotentRootDisposer(root: THREE.Group): () => void {
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();
     const textures = new Set<THREE.Texture>();
+    const textureBridges = new Set<TextureBridgeDisposer>();
     root.traverse((node) => {
       const geometry = (node as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
       if (geometry) geometries.add(geometry);
       for (const material of materialsOf(node)) {
         materials.add(material);
         const record = material as THREE.Material & Record<string, unknown>;
+        const bridge = record.userData?.nuketown2TextureBridge as TextureBridgeDisposer | undefined;
+        if (bridge && typeof bridge.dispose === 'function') textureBridges.add(bridge);
         for (const property of TEXTURE_PROPERTIES) {
           const texture = record[property];
           if (texture instanceof THREE.Texture) textures.add(texture);
@@ -248,6 +252,7 @@ export function createIdempotentRootDisposer(root: THREE.Group): () => void {
       }
     });
     for (const texture of textures) texture.dispose();
+    for (const bridge of textureBridges) bridge.dispose();
     for (const material of materials) material.dispose();
     for (const geometry of geometries) geometry.dispose();
     root.clear();

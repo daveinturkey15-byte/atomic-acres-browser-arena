@@ -1,0 +1,2 @@
+# PASS 94 candidate - npx tsc --noEmit
+exit=0

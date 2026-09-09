@@ -1,0 +1,9 @@
+[hf467] backend=webgpu gpu={"secureContext":true,"navigatorGpu":true,"vendor":"nvidia","hasDevice":true}
+[hf467] nuketown2      FAIL 49623 ms pistolCrossed={"interior-wall":1578,"vehicle":103,"wood":165,"glass":68,"concrete":30,"thin-metal":68,"structural-metal":7,"fence":8} pistolStopped={"concrete":251,"earth":228,"interior-wall":765,"vehicle":308,"wood":200,"glass":29,"thin-metal":64,"structural-metal":17,"fence":4} — concrete is class 'stop' but a pistol crossed it 30x
+{
+  "verdict": "FAIL",
+  "backend": "webgpu",
+  "failedArenas": [
+    "nuketown2"
+  ]
+}

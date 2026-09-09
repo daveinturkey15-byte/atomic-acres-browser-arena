@@ -13,20 +13,40 @@ import {
   FIRST_PERSON_ARM_VIEWPORT_ENTRY_CONTRACT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT,
   FIRST_PERSON_NEAR_PLANE_CONTACT_RETREAT_CONTRACT,
+  FIRST_PERSON_HIP_TRIGGER_HAND_LIFT,
+  FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING,
+  FIRST_PERSON_VIEWMODEL_FILL_INTENSITY,
+  ARM_FILL_EMISSIVE_INTENSITY,
+  armFillEmissiveIntensity,
   HIP_VIEWMODEL_POSITION,
   HIP_VIEWMODEL_SCALE,
   VIEWMODEL_NEAR_PLANE_CLEARANCE,
+  VIEWMODEL_NEAR_PLANE_SAFE_RETREAT,
+  VIEWMODEL_WALL_PULLBACK_SCALE,
   WeaponPresentation,
   authoredNearPlaneContactRetreat,
   firstPersonArmPresentationScale,
   firstPersonArmShoulderEntryNdc,
+  FINGER_FIRE_CURL,
+  FINGER_SUPPORT_CURL,
+  firstPersonHipTriggerHandLift,
 } from './weapon-presentation';
 import {
+  VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS,
   VIEWMODEL_CONTACT_PROFILES,
   VIEWMODEL_CONTACT_RESPONSE_CONTRACT,
   viewmodelContactResponse,
 } from './weapon-presentation-state';
+import {
+  FIRST_PERSON_CAMERA_NEAR_METERS,
+  VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS,
+  VIEWMODEL_BODY_FIT_MARGIN_METERS,
+  viewmodelBodyFitLightIntensity,
+  viewmodelRigToWorldMeters,
+} from './viewmodel-body-fit';
+import { VIEWMODEL_NEAR_PLANE_FRAMING_CONTRACT } from './viewmodel-near-plane-framing';
 import { WEAPON_IDS, type WeaponId } from './protocol';
+import { FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY } from './operator-model';
 
 const REST_POSE = {
   dt: 1 / 60,
@@ -40,6 +60,34 @@ const REST_POSE = {
   lateralSpeed: 0,
   reloadProgress: null,
 };
+
+/**
+ * HF-410 REPAIR: `nearPlaneClear` is only a contract if it is graded against
+ * the plane the rig is really submitted with, on geometry the player can
+ * really see. This pins both, per weapon, at the two poses the brief named.
+ */
+function expectGradedAtTheShippedPlane(
+  state: ReturnType<WeaponPresentation['presentationState']>,
+  weapon: string,
+  label: string,
+): void {
+  for (const [kind, framing] of [
+    ['weapon', state.weaponFraming],
+    ['arms', state.armFraming],
+  ] as const) {
+    expect(framing, `${weapon} ${label}: ${kind} framing exists`).toBeTruthy();
+    expect(framing?.contract, `${weapon} ${label}: ${kind} contract`)
+      .toBe(VIEWMODEL_NEAR_PLANE_FRAMING_CONTRACT);
+    expect(framing?.gradedNearPlaneMeters, `${weapon} ${label}: ${kind} graded at the SHIPPED plane`)
+      .toBe(FIRST_PERSON_CAMERA_NEAR_METERS);
+    expect(framing?.cutVerticesInViewport, `${weapon} ${label}: ${kind} visible vertices inside the plane`)
+      .toBe(0);
+    expect(framing?.onScreenVertexCount, `${weapon} ${label}: ${kind} is on screen at all`)
+      .toBeGreaterThan(0);
+    expect(framing?.nearestOnScreenDepth ?? 0, `${weapon} ${label}: ${kind} nearest VISIBLE vertex`)
+      .toBeGreaterThan(FIRST_PERSON_CAMERA_NEAR_METERS);
+  }
+}
 
 describe('first-person anatomical presentation', () => {
   it('adds action-state mass with uniform scale and no retained reload deformation', () => {
@@ -253,11 +301,26 @@ describe('first-person anatomical presentation', () => {
 
     const state = presentation.presentationState();
     const contact = viewmodelContactResponse('minigun', surfaceRetreat, 0, false, 0);
+    const appliedRetreat = Math.min(surfaceRetreat, VIEWMODEL_NEAR_PLANE_SAFE_RETREAT)
+      * VIEWMODEL_WALL_PULLBACK_SCALE;
+    // RE-PINNED FOR HF-410. HF-397 halved this pullback at the owner's request;
+    // halving it was not enough, because the pullback was never the right
+    // instrument. It existed to drag a rig that hung up to 1.6 m outside the
+    // player's 0.38 m collision capsule back out of a wall it was necessarily
+    // inside - 1.6 m of work against a 0.28 m budget. The rig is now fitted
+    // inside that capsule (src/viewmodel-body-fit.ts), so the pullback is zero
+    // and the probed retreat is telemetry only. The clamp above it is
+    // untouched: nothing here is a weakened bound, the multiplier is zero
+    // because the geometry no longer needs it.
+    expect(appliedRetreat, 'HF-410 removes the applied pullback entirely').toBe(0);
     expect(presentation.root.position.toArray()).toEqual([
       HIP_VIEWMODEL_POSITION.x,
       HIP_VIEWMODEL_POSITION.y + contact.additionalLiftMeters - contact.additionalDropMeters,
-      HIP_VIEWMODEL_POSITION.z + surfaceRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
-        - authoredNearPlaneContactRetreat('minigun', surfaceRetreat),
+      // HF-397: the owner asked for the near-wall pullback to be halved, so
+      // the APPLIED retreat is the probed one scaled. Pinned here through the
+      // exported constant so a silent return to the full pullback fails.
+      HIP_VIEWMODEL_POSITION.z + appliedRetreat - VIEWMODEL_NEAR_PLANE_CLEARANCE
+        - authoredNearPlaneContactRetreat('minigun', appliedRetreat),
     ]);
     expect(presentation.root.scale.toArray()).toEqual([
       HIP_VIEWMODEL_SCALE * contact.scale,
@@ -292,6 +355,36 @@ describe('first-person anatomical presentation', () => {
     });
   });
 
+  it('telemetry reports the retreat the renderer performed, not the uncapped demand', () => {
+    const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setWeapon('carbine', true);
+    // Prone against a wall: the obstruction pose demands the carbine profile's
+    // full retreat, but near-plane safety caps the camera-space translation the
+    // renderer actually performs. HF-387 audit: telemetry used to publish the
+    // uncapped demand, so every instrument measured a retreat that never happened.
+    const demanded = VIEWMODEL_CONTACT_PROFILES.carbine.maximumSurfaceRetreatMeters;
+    expect(demanded).toBeGreaterThan(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    for (let frame = 0; frame < 10; frame += 1) {
+      presentation.update({ ...REST_POSE, prone: true, surfaceRetreat: demanded, surfaceLift: 0.2 });
+    }
+    const capped = presentation.presentationState();
+    expect(capped.surfaceRetreat).toBe(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    expect(capped.requestedSurfaceRetreat).toBe(demanded);
+    expect(capped.surfaceRetreatCapMeters).toBe(VIEWMODEL_NEAR_PLANE_SAFE_RETREAT);
+    expect(capped.surfaceRetreatCapped).toBe(true);
+    // Combat-safety consumers (fire admission, contact fold) keep reading the
+    // uncapped demand; only the translation is capped.
+    expect(capped.contactResponse.wallBlend).toBe(1);
+    for (let frame = 0; frame < 10; frame += 1) {
+      presentation.update({ ...REST_POSE, prone: false, surfaceRetreat: 0.12, surfaceLift: 0 });
+    }
+    const open = presentation.presentationState();
+    expect(open.surfaceRetreat).toBe(0.12);
+    expect(open.requestedSurfaceRetreat).toBe(0.12);
+    expect(open.surfaceRetreatCapped).toBe(false);
+  });
+
   it('keeps every visible arm mesh opaque throughout ADS', async () => {
     const presentation = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
     await presentation.load();
@@ -320,7 +413,11 @@ describe('first-person anatomical presentation', () => {
           ...REST_POSE,
           prone: true,
           surfaceRetreat: 0.7,
-          surfaceLift: 0.2,
+          // 2026-08-30 re-pin: 0.2 is now the flat-ground prone BASELINE
+          // (which must not fold at all); a genuine under-cover squeeze sits
+          // past it. The deep-contact contract this test defends is about the
+          // squeeze.
+          surfaceLift: 0.29,
         });
       }
       const state = presentation.presentationState();
@@ -331,7 +428,17 @@ describe('first-person anatomical presentation', () => {
         aimAuthority: 'camera-forward-unchanged',
       });
       expect(state.contactResponse.obstructionBlend, weapon).toBeGreaterThan(0.85);
-      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.5);
+      // RE-PINNED FOR HF-410 (owner, 2026-09-02, with two Firing Range
+      // screenshots: "holding it up when near floor or prone or walls is super
+      // bad, needs a re work"). Screenshot 1 IS this pitch at full blend - a
+      // near-vertical rig filling the frame. The pose existed to hide a rig
+      // that hung outside the player's collision body; with the rig fitted
+      // inside it (src/viewmodel-body-fit.ts) there is nothing to hide, and
+      // VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS bounds what is left to a
+      // few degrees. The blend itself is still asserted above, so the response
+      // cannot be quietly deleted - only its visible amplitude is capped.
+      expect(state.contactResponse.pitchRadians, weapon)
+        .toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(state.viewmodelViewport.rootScale, weapon).toBeGreaterThan(0.55);
       expect(state.viewmodelViewport.rootScale, weapon).toBeLessThan(HIP_VIEWMODEL_SCALE);
       expect(state.viewmodelViewport.rootRotation.every(Number.isFinite), weapon).toBe(true);
@@ -339,6 +446,14 @@ describe('first-person anatomical presentation', () => {
       expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.armFraming?.finite, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
+      // HF-410 REPAIR: nearPlaneClear is only worth asserting if it is graded
+      // against the plane the rig is really drawn with. The first pass graded
+      // it at VIEWMODEL_OVERLAY_NEAR_METERS (0.002 m) - the plane of a
+      // depth-cleared submission that does not run on the shipped WebGPU route
+      // - and 17 of 21 weapons passed this line while sitting inside the
+      // 0.02 m plane actually in force. These four lines make that
+      // substitution impossible to repeat silently.
+      expectGradedAtTheShippedPlane(state, weapon, 'deep prone contact');
     }
   }, 15_000);
 
@@ -410,10 +525,56 @@ describe('first-person anatomical presentation', () => {
       'slug-shotgun': -1.60,
       railgun: -1.85,
       flamethrower: -1.72,
+      // HF-334: shares the flamethrower chassis, so the same calibrated plane.
+      'crimson-flamethrower': -1.72,
     });
     expect(Object.keys(longGunWallPlanes).sort()).toEqual(
       WEAPON_IDS.filter((weapon) => VIEWMODEL_CONTACT_PROFILES[weapon].maximumSurfaceRetreatMeters >= 0.92).sort(),
     );
+
+    /**
+     * HF-410 REPAIR - THE FITTED REACH RATCHET, AND WHAT IT ADMITS.
+     *
+     * The line below the capsule budget needs this table, so here is the
+     * relaxation the first pass did not declare, with its numbers.
+     *
+     * The per-weapon planes above were calibrated on the UNFITTED rig and are
+     * rig metres. Converted into the fitted frame (x VIEWMODEL_BODY_FIT_SCALE)
+     * the LMG's -1.84 becomes -0.2392 m and the railgun's -1.85 becomes
+     * -0.2405 m. The capsule budget that replaced them is -0.32 m, which is
+     * 8 cm MORE PERMISSIVE. That is a real relaxation, and the justification
+     * for it is real too - the capsule is the physical bound a player can
+     * actually put a wall against, and the proxy was calibrated against a
+     * high-ready pitch the owner has asked to have removed - but it left the
+     * long guns able to drift 8 cm without a gate noticing.
+     *
+     * These are the MEASURED fitted world bounds on this harness at each
+     * weapon's authored maximum retreat, with 3 mm of numerical margin, and
+     * clamped so the ratchet can never be looser than the capsule budget:
+     *
+     *   lmg -0.3063   scattergun -0.2498   sniper -0.3059   minigun -0.2884
+     *   m14-ebr -0.2966   slug-shotgun -0.2483   railgun -0.3181
+     *   flamethrower / crimson-flamethrower -0.2908
+     *
+     * The railgun is the worst case at 0.3181 m of the 0.32 m budget, so its
+     * ratchet IS the budget; the rest are pinned tighter than it.
+     */
+    const fittedLongGunWallFloors: Readonly<Partial<Record<WeaponId, number>>> = Object.freeze({
+      lmg: -0.310,
+      scattergun: -0.253,
+      sniper: -0.309,
+      minigun: -0.292,
+      'm14-ebr': -0.300,
+      'slug-shotgun': -0.252,
+      railgun: -(VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS - VIEWMODEL_BODY_FIT_MARGIN_METERS),
+      flamethrower: -0.294,
+      'crimson-flamethrower': -0.294,
+    });
+    expect(Object.keys(fittedLongGunWallFloors).sort()).toEqual(Object.keys(longGunWallPlanes).sort());
+    for (const [weapon, floor] of Object.entries(fittedLongGunWallFloors)) {
+      expect(floor, `${weapon}: the ratchet may never be looser than the capsule budget`)
+        .toBeGreaterThanOrEqual(-(VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS - VIEWMODEL_BODY_FIT_MARGIN_METERS));
+    }
 
     for (const weapon of WEAPON_IDS) {
       const profile = VIEWMODEL_CONTACT_PROFILES[weapon];
@@ -444,8 +605,44 @@ describe('first-person anatomical presentation', () => {
         .union(new THREE.Box3().setFromObject(arms!));
       const wallPlane = longGunWallPlanes[weapon];
       if (wallPlane !== undefined) {
-        expect(priorCapBounds.min.z, `${weapon}: prior 0.70m cap must cross wall plane`).toBeLessThan(wallPlane);
-        expect(authoredWallBounds.min.z, `${weapon}: authored response behind wall plane`).toBeGreaterThanOrEqual(wallPlane);
+        // HF-410: these bounds are WORLD bounds and the rig is now fitted
+        // inside the player's collision capsule, so the calibrated planes -
+        // which were measured on the unfitted rig - convert into the same
+        // frame. Scaling both sides preserves the relation exactly, which is
+        // what keeps this a real contract instead of one the fit satisfies for
+        // free.
+        const fittedWallPlane = viewmodelRigToWorldMeters(wallPlane);
+        expect(priorCapBounds.min.z, `${weapon}: prior 0.70m cap must cross wall plane`).toBeLessThan(fittedWallPlane);
+        // RE-PINNED FOR HF-410. The per-weapon plane above was a PROXY for
+        // "behind the wall", calibrated on a rig that hung outside the player's
+        // collision body and was hauled back by the high-ready pitch the owner
+        // has now asked to have removed. With the pitch capped the long guns
+        // sit a few centimetres forward of that proxy - and it no longer means
+        // anything, because the physical limit is the capsule the rig is
+        // carried in. So this asserts the real bound instead: every long gun's
+        // complete world footprint stays inside the capsule budget the fit was
+        // solved for. That is a contract about a wall a player can actually
+        // reach, which the proxy never was.
+        expect(authoredWallBounds.min.z, `${weapon}: authored response inside the capsule budget`)
+          .toBeGreaterThanOrEqual(
+            -(VIEWMODEL_BODY_FIT_CAPSULE_RADIUS_METERS - VIEWMODEL_BODY_FIT_MARGIN_METERS),
+          );
+        // HF-410 REPAIR - THE RELAXATION, STATED WITH ITS NUMBERS, AND CLOSED.
+        //
+        // The capsule budget above is 0.32 m. The old per-weapon proxy, carried
+        // into the fitted frame, is tighter than that for every long gun: the
+        // LMG's -1.84 rig metres converts to -0.2392 world metres, so swapping
+        // the proxy for the budget alone WOULD have been an 8 cm relaxation,
+        // and the report's "nothing here is weaker" did not say so. It says so
+        // now, and the gap is closed by a second bound measured on the fitted
+        // rig itself, so the pose cannot drift into that 8 cm unnoticed.
+        //
+        // MEASURED on this harness, worst (least negative bound is the worst
+        // case, so this is the deepest reach): see the ratchet table below.
+        const measuredWallFloor = fittedLongGunWallFloors[weapon];
+        expect(measuredWallFloor, `${weapon}: measured fitted wall floor is tabled`).toBeTypeOf('number');
+        expect(authoredWallBounds.min.z, `${weapon}: fitted reach ratchet`)
+          .toBeGreaterThanOrEqual(measuredWallFloor as number);
       }
 
       for (let frame = 0; frame < 45; frame += 1) {
@@ -459,9 +656,13 @@ describe('first-person anatomical presentation', () => {
       camera.updateMatrixWorld(true);
       const proneBounds = new THREE.Box3().setFromObject(mountedModel);
       const state = presentation.presentationState();
-      expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`).toBeGreaterThanOrEqual(-0.61);
+      // HF-410: same conversion - the prone floor plane was calibrated on the
+      // unfitted rig, and the bounds are now measured on the fitted one.
+      expect(proneBounds.min.y, `${weapon}: weapon below 0.61m prone floor plane`)
+        .toBeGreaterThanOrEqual(viewmodelRigToWorldMeters(-0.61));
       expect(state.weaponFraming?.nearPlaneClear, weapon).toBe(true);
       expect(state.armFraming?.nearPlaneClear, weapon).toBe(true);
+      expectGradedAtTheShippedPlane(state, weapon, 'authored prone floor');
       expect(state.contactResponse.aimAuthority, weapon).toBe('camera-forward-unchanged');
 
       presentation.fire(0.02);
@@ -661,7 +862,10 @@ describe('first-person anatomical presentation', () => {
       const state = presentation.presentationState();
       expect(state.adsProgress, weapon).toBeGreaterThan(0.999);
       expect(state.contactResponse.highReadyBlend, weapon).toBeGreaterThan(0.4);
-      expect(state.contactResponse.pitchRadians, weapon).toBeGreaterThan(0.2);
+      // RE-PINNED FOR HF-410: capped, for the reason above. The blend stays
+      // pinned so the response is still live.
+      expect(state.contactResponse.pitchRadians, weapon)
+        .toBeCloseTo(VIEWMODEL_CONTACT_HIGH_READY_PITCH_CAP_RADIANS, 9);
       expect(state.contactResponse.additionalDropMeters, weapon).toBeGreaterThan(0.1);
       expect(state.sightOffset?.[0], weapon).toBeCloseTo(0, 3);
       expect(state.sightOffset?.[1], weapon).toBeCloseTo(0, 3);
@@ -712,5 +916,223 @@ describe('first-person anatomical presentation', () => {
       }
       expect(uniqueColors.size).toBeGreaterThanOrEqual(3);
     }
+  });
+});
+
+/**
+ * HF-388 wiring falsifier. The per-grip-family hip lift is the change that
+ * brings the welded trigger hand back inside the frame, and a table of numbers
+ * that no live code path reads is exactly the failure this project keeps
+ * repeating. So this drives the real `update()` loop and reads
+ * `root.position.y`, not the constant.
+ *
+ * At REST_POSE every other vertical term is either zero or weapon-independent
+ * (bob, breath and the aspect-driven screen drop are shared; contact response,
+ * switch drop, reload lift, recoil kick and stance drop are all zero), so the
+ * ONLY thing that can separate two converged hip viewmodels of different grip
+ * families on the Y axis is this lift. Which is what makes the difference an
+ * exact number rather than an impression.
+ */
+describe('HF-388: the hip trigger-hand lift is applied by the live update loop', () => {
+  const settle = (weapon: WeaponId, ads: boolean) => {
+    const camera = new THREE.PerspectiveCamera(82, 16 / 9, 0.05, 250);
+    const presentation = new WeaponPresentation(camera, false);
+    presentation.setWeapon(weapon, true);
+    for (let frame = 0; frame < 400; frame += 1) {
+      presentation.update({ ...REST_POSE, ads });
+    }
+    return presentation.root.position.y;
+  };
+
+  it('separates a heavy hip viewmodel from a long-gun one by exactly the authored deficit', () => {
+    const heavy = settle('lmg', false);
+    const longGun = settle('carbine', false);
+    // The root chases its target through an exponential lerp, so 400 frames
+    // leaves a measured 0.085 mm of residual approach. Bound the error
+    // explicitly at 0.2 mm rather than rounding to a decimal place: 0.2 mm is
+    // 0.3% of the 60 mm being asserted, and stating it is how the next person
+    // knows the difference is convergence and not slack.
+    const expectedDelta = FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy
+      - FIRST_PERSON_HIP_TRIGGER_HAND_LIFT['long-gun'];
+    expect(Math.abs((heavy - longGun) - expectedDelta)).toBeLessThan(2e-4);
+    // ...and the heavy family is the one that needed it: measured on the live
+    // build, the M249's right-hand bones sat at NDC y -1.110..-0.888, part of
+    // the hand BELOW the bottom edge, while the carbine's sat at -0.963.
+    expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy)
+      .toBeGreaterThan(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT['long-gun']);
+  });
+
+  it('gives back exactly nothing at full ADS, so the accepted sight picture cannot move', () => {
+    expect(settle('lmg', true) - settle('carbine', true)).toBeCloseTo(0, 4);
+    for (const family of ['long-gun', 'compact', 'handgun', 'heavy', 'crossbow'] as const) {
+      expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT[family]).toBeLessThanOrEqual(
+        FIRST_PERSON_HIP_TRIGGER_HAND_LIFT_CEILING,
+      );
+      expect(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT[family]).toBeGreaterThan(0);
+    }
+    expect(firstPersonHipTriggerHandLift('lmg', 1, 0)).toBe(0);
+    expect(firstPersonHipTriggerHandLift('lmg', 0, 1)).toBe(0);
+    expect(firstPersonHipTriggerHandLift('lmg', 0, 0))
+      .toBeCloseTo(FIRST_PERSON_HIP_TRIGGER_HAND_LIFT.heavy, 8);
+  });
+
+  it('is immune to the wall clock: settling across half a breath period drifts nothing', () => {
+    // The lift delta above is only an exact number while every vertical term
+    // at REST_POSE is shared or zero. Breath used to read performance.now(),
+    // so two settles sampled different phases and the measured delta moved
+    // with machine load (measured drift: 8.995 mm across a half period -
+    // 45x this bound - which is what intermittently failed the assertion
+    // above in loaded full-suite runs). Breath now rides the accumulated
+    // arm-motion clock, so wall-clock time between settles must move root Y
+    // by exactly nothing.
+    const first = settle('lmg', false);
+    const halfBreathPeriodMs = Math.PI / 1.7 * 1000;
+    const until = performance.now() + halfBreathPeriodMs;
+    while (performance.now() < until) { /* spin: force maximal phase divergence */ }
+    const second = settle('lmg', false);
+    expect(second - first).toBe(0);
+  });
+});
+
+/**
+ * HF-388. The support hand's curl table, pinned to the SHAPE a chained
+ * finger-curl constraint produces - the rig idea taken from the CC0 reference
+ * (para, OpenGameArt, public domain; register row 31). Numbers may be re-tuned;
+ * these properties may not be quietly flattened back out, which is what left
+ * the support index bending four degrees and the hand reading as an open plate
+ * laid on the handguard instead of a hand closed around it.
+ */
+describe('HF-388: the support hand closes on the handguard like a C-clamp', () => {
+  const DIGITS = ['index', 'middle', 'ring', 'pinky'] as const;
+
+  it('curls monotonically down each finger, deepest at the middle joint', () => {
+    for (const digit of DIGITS) {
+      const [metacarpal, middle, distal] = FINGER_SUPPORT_CURL[digit];
+      // A chained constraint compounds into the chain, so the metacarpal is
+      // never the deepest joint...
+      expect(Math.abs(middle), digit).toBeGreaterThan(Math.abs(metacarpal));
+      expect(Math.abs(middle), digit).toBeGreaterThan(Math.abs(distal));
+      // ...and every joint is genuinely closed, not a token few degrees. The
+      // pre-HF-388 support index metacarpal was 0.07 rad - four degrees.
+      expect(Math.abs(metacarpal), digit).toBeGreaterThan(0.2);
+      expect(metacarpal, digit).toBeLessThan(0);
+      expect(middle, digit).toBeLessThan(0);
+      expect(distal, digit).toBeLessThan(0);
+    }
+  });
+
+  it('keeps the index shallowest and the little finger deepest, and the thumb opposed', () => {
+    for (let index = 1; index < DIGITS.length; index += 1) {
+      const previous = FINGER_SUPPORT_CURL[DIGITS[index - 1]!];
+      const current = FINGER_SUPPORT_CURL[DIGITS[index]!];
+      for (let joint = 0; joint < 3; joint += 1) {
+        expect(Math.abs(current[joint]!), `${DIGITS[index]}[${joint}]`)
+          .toBeGreaterThan(Math.abs(previous[joint]!));
+      }
+    }
+    // The thumb's metacarpal stays ABDUCTED (positive) so it lies over the
+    // rail. A negative value here would be a fist, not a support grip.
+    expect(FINGER_SUPPORT_CURL.thumb[0]).toBeGreaterThan(0);
+    expect(FINGER_SUPPORT_CURL.thumb[1]).toBeLessThan(0);
+    // The support hand still reads as a clamp, not the trigger fist: the three
+    // WRAPPING fingers stay shallower than the firing hand's same joint.
+    for (const digit of ['middle', 'ring', 'pinky'] as const) {
+      for (let joint = 0; joint < 3; joint += 1) {
+        expect(Math.abs(FINGER_SUPPORT_CURL[digit][joint]!), `${digit}[${joint}]`)
+          .toBeLessThan(Math.abs(FINGER_FIRE_CURL[digit][joint]!));
+      }
+    }
+    // The index is the one digit that inverts, and deliberately: the FIRING
+    // index lies along a trigger, so it is the shallowest finger of the firing
+    // hand, while the SUPPORT index wraps a handguard like the rest of its
+    // hand. Asserting "support is always shallower" here would have pinned the
+    // wrong anatomy - it is pinned in the direction the hands actually work.
+    for (let joint = 0; joint < 3; joint += 1) {
+      expect(Math.abs(FINGER_FIRE_CURL.index[joint]!), `fire index[${joint}]`)
+        .toBeLessThan(Math.abs(FINGER_FIRE_CURL.middle[joint]!));
+      expect(Math.abs(FINGER_SUPPORT_CURL.index[joint]!), `support index[${joint}]`)
+        .toBeGreaterThan(Math.abs(FINGER_FIRE_CURL.index[joint]!));
+    }
+  });
+});
+
+describe('HF-388 first-person arm exposure contract', () => {
+  /**
+   * The bypass this pins used to be real: `FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY`
+   * declared 0.18 and `tuneAuthoredFirstPersonArmMaterials` wrote 0.34-0.38
+   * directly past it. Nothing asserted the bound, so the constant described a
+   * contract the code did not keep. This asserts the PRODUCED value, not the
+   * intent - the failure mode this project keeps paying for is a test that
+   * checks the input it just wrote.
+   */
+  it('never lets the lit arm fill exceed the declared emissive cap', () => {
+    const roles = Object.keys(ARM_FILL_EMISSIVE_INTENSITY) as (keyof typeof ARM_FILL_EMISSIVE_INTENSITY)[];
+    expect(roles.length).toBeGreaterThan(0);
+    for (const role of roles) {
+      expect(armFillEmissiveIntensity(role, false), role)
+        .toBeLessThanOrEqual(FIRST_PERSON_ARM_MAX_EMISSIVE_INTENSITY);
+      // A cap honoured by clamping everything to zero would also pass the line
+      // above while re-creating the black-wedge failure, so the floor is pinned
+      // in the same breath.
+      expect(armFillEmissiveIntensity(role, false), role).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * The reduced-render path runs with the viewmodel fill at ZERO, so emissive
+   * really is its only floor and the below-deck measurement that made the cap
+   * free on the lit path says nothing about it. Its authored values are pinned
+   * exactly so that a future tidy of the table cannot quietly darken a path
+   * nobody re-measured.
+   */
+  it('keeps the reduced-render arm floor above the lit-path value it does not share', () => {
+    const roles = Object.keys(ARM_FILL_EMISSIVE_INTENSITY) as (keyof typeof ARM_FILL_EMISSIVE_INTENSITY)[];
+    for (const role of roles) {
+      expect(armFillEmissiveIntensity(role, true), role)
+        .toBeGreaterThan(armFillEmissiveIntensity(role, false));
+    }
+    expect(ARM_FILL_EMISSIVE_INTENSITY.sleeve.reduced).toBe(0.24);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.glove.reduced).toBe(0.26);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.accent.reduced).toBe(0.28);
+    expect(ARM_FILL_EMISSIVE_INTENSITY.skin.reduced).toBe(0.2);
+  });
+
+  /**
+   * The viewmodel fill is the term that made the arm render at the same
+   * brightness below deck as in full sunset. Measured: with the arm albedo
+   * forced black the shipped frame still returned mean 100.5 of its 140.5, so
+   * three quarters of the arm was the fill's own white specular sheen.
+   *
+   * Both ends are bounded. The ceiling stops a future pass walking the veil
+   * back in; the floor stops it over-correcting into the flat-black-wedge
+   * failure that is the expensive historical bug on this arm.
+   */
+  it('bounds the viewmodel fill at both ends and reaches the live light', () => {
+    expect(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY).toBeLessThanOrEqual(6);
+    expect(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY).toBeGreaterThanOrEqual(3);
+
+    const lit = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), false);
+    const fill = lit.root.children.find(
+      (child): child is THREE.PointLight => child instanceof THREE.PointLight
+        && child.name === 'first-person-viewmodel-fill',
+    );
+    expect(fill).toBeDefined();
+    // RE-PINNED FOR HF-410. The authored candela figure is still the contract -
+    // it is asserted at both ends above - but this fill lights the first-person
+    // layer only, and the body fit moves that layer k times closer to it.
+    // Three's point lights are physical (irradiance = intensity / r^2), so the
+    // light that actually reaches the rig is preserved by scaling intensity by
+    // k^2. Pinning the raw figure here would pin a rig lit 59x too brightly.
+    expect(fill!.userData.authoredIntensity)
+      .toBeCloseTo(viewmodelBodyFitLightIntensity(FIRST_PERSON_VIEWMODEL_FILL_INTENSITY), 12);
+    expect(fill!.decay).toBe(2);
+
+    // The reduced path is the one place this light is meant to be absent.
+    const reduced = new WeaponPresentation(new THREE.PerspectiveCamera(75, 16 / 9, 0.05, 250), true);
+    const reducedFill = reduced.root.children.find(
+      (child): child is THREE.PointLight => child instanceof THREE.PointLight
+        && child.name === 'first-person-viewmodel-fill',
+    );
+    expect(reducedFill!.userData.authoredIntensity).toBe(0);
   });
 });

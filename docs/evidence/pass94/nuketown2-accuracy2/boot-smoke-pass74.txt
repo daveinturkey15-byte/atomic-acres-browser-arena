@@ -1,0 +1,15 @@
+[10/13] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test2: boots a clean visible solo match
+[11/13] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › map3: boots a clean visible solo match
+[12/13] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match
+[13/13] [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › raid2: boots a clean visible solo match
+  13 passed (9.5m)
+
+Command:
+  PASS73_NATIVE_WEBGPU=1 QA_EXTERNAL_PREVIEW=1 BASE_URL=http://127.0.0.1:41942 \
+    npx playwright test tests/e2e/pass74-arena-boot-smoke.spec.ts \
+      --project=chromium --workers=1 --retries=0
+
+PASS73_NATIVE_WEBGPU=1 is REQUIRED and is not in the npm script: without it the
+chromium project selects the bundled Chromium, which cannot acquire a WebGPU
+device on this machine, and the spec's own first case says so in as many words
+before every arena times out. A run without it is not evidence about the build.

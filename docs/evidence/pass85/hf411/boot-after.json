@@ -1,0 +1,359 @@
+{
+  "generatedAt": "2026-09-02T17:27:42.343Z",
+  "panelSolid": [
+    {
+      "id": "z-8 corner-west-near",
+      "solid": true
+    },
+    {
+      "id": "z-8 corner-west-far",
+      "solid": true
+    },
+    {
+      "id": "z-8 corner-east-near",
+      "solid": true
+    },
+    {
+      "id": "z-8 corner-east-far",
+      "solid": true
+    },
+    {
+      "id": "z-8 edge-west",
+      "solid": true
+    },
+    {
+      "id": "z-8 edge-east",
+      "solid": true
+    },
+    {
+      "id": "z-8 edge-near",
+      "solid": true
+    },
+    {
+      "id": "z-8 edge-far",
+      "solid": true
+    },
+    {
+      "id": "z8 corner-west-near",
+      "solid": true
+    },
+    {
+      "id": "z8 corner-west-far",
+      "solid": true
+    },
+    {
+      "id": "z8 corner-east-near",
+      "solid": true
+    },
+    {
+      "id": "z8 corner-east-far",
+      "solid": true
+    },
+    {
+      "id": "z8 edge-west",
+      "solid": true
+    },
+    {
+      "id": "z8 edge-east",
+      "solid": true
+    },
+    {
+      "id": "z8 edge-near",
+      "solid": true
+    },
+    {
+      "id": "z8 edge-far",
+      "solid": true
+    }
+  ],
+  "rows": [
+    {
+      "panelZ": -8,
+      "point": "corner-west-near",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-west-far",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.864,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-east-near",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-east-far",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-west",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-east",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-near",
+      "stance": "stand",
+      "startFeetY": 3.03,
+      "endFeetY": 3.005,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-far",
+      "stance": "stand",
+      "startFeetY": 3.03,
+      "endFeetY": 3.006,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-west-near",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-west-far",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.864,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-east-near",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-east-far",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-west",
+      "stance": "stand",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-east",
+      "stance": "stand",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-near",
+      "stance": "stand",
+      "startFeetY": 3.03,
+      "endFeetY": 3.005,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-far",
+      "stance": "stand",
+      "startFeetY": 3.03,
+      "endFeetY": 3.006,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-west-near",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-west-far",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-east-near",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "corner-east-far",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-west",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.864,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-east",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-near",
+      "stance": "crouch",
+      "startFeetY": 3.03,
+      "endFeetY": 3.005,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": -8,
+      "point": "edge-far",
+      "stance": "crouch",
+      "startFeetY": 3.03,
+      "endFeetY": 3.006,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-west-near",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-west-far",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.863,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-east-near",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "corner-east-far",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-west",
+      "stance": "crouch",
+      "startFeetY": 2.888,
+      "endFeetY": 2.864,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-east",
+      "stance": "crouch",
+      "startFeetY": 3.172,
+      "endFeetY": 3.147,
+      "dropM": -0.026,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-near",
+      "stance": "crouch",
+      "startFeetY": 3.03,
+      "endFeetY": 3.005,
+      "dropM": -0.025,
+      "fellThrough": false
+    },
+    {
+      "panelZ": 8,
+      "point": "edge-far",
+      "stance": "crouch",
+      "startFeetY": 3.03,
+      "endFeetY": 3.006,
+      "dropM": -0.026,
+      "fellThrough": false
+    }
+  ]
+}

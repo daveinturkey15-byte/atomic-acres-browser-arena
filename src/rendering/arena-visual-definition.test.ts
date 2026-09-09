@@ -8,8 +8,14 @@ import type { ArenaId } from '../map-selection';
 import type { ArenaVisualDefinition, LoadedArenaVisual } from './arena-visual-definition';
 import { createIdempotentRootDisposer, validateArenaVisualDefinition } from './arena-visual-definition';
 import { ARENA_VISUAL_REGISTRY, ArenaVisualStreamController, type ArenaVisualRegistry } from './arena-visual-stream';
+import { skyBackdropAssetForPreset, skyBackdropPreset } from './sky-backdrop';
+import { FIRST_PERSON_CAMERA_NEAR_METERS, FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS } from '../viewmodel-body-fit';
 
-const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal'];
+// owner 2026-08-30: Test1/Test2 arenas added — eight ids; ARENA_VISUAL_REGISTRY
+// entries for them land separately with the arena visual modules.
+// owner 2026-09-02 (HF-405): Map 3 added.
+// owner 2026-09-03 (HF-408): Raid Rebuild added.
+const ARENA_IDS: readonly ArenaId[] = ['atomic-acres', 'rustworks-1v1', 'gun-range', 'skyline-terminal', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'];
 
 describe('Pass 64 arena visual definitions', () => {
   it('defines exactly one dynamically imported contract for every stable arena ID', async () => {
@@ -28,6 +34,38 @@ describe('Pass 64 arena visual definitions', () => {
     }
   });
 
+  /**
+   * PASS 87 Lane AR, item 6. `setArenaReviewCamera` copies `reviewCamera.near`
+   * straight onto the shipped camera, so a review capture is only evidence
+   * about the shipped near plane while the two are the same number. They were
+   * not: the helper in `arenas/shared.ts` froze 0.08, the value the game used
+   * before HF-410, and kept it after HF-410 moved the gameplay plane to 0.02.
+   *
+   * Asserted over the roster rather than over the helper, because an arena
+   * that hand-rolls its own review camera (or a future helper) has to be
+   * caught too - the failure mode is a definition that skips the helper, not
+   * the helper changing.
+   */
+  it('renders every review camera at the shipped first-person near plane', async () => {
+    expect(FIRST_PERSON_CAMERA_NEAR_METERS).not.toBe(FIRST_PERSON_CAMERA_NEAR_BEFORE_HF410_METERS);
+    let cameras = 0;
+    for (const id of ARENA_IDS) {
+      const { definition } = await ARENA_VISUAL_REGISTRY[id]();
+      expect(definition.reviewCameras.length, `${id} must define review cameras`).toBeGreaterThan(0);
+      for (const reviewCamera of definition.reviewCameras) {
+        cameras += 1;
+        expect(
+          reviewCamera.near,
+          `${id}/${reviewCamera.id} renders at near ${reviewCamera.near} while the game renders at `
+            + `${FIRST_PERSON_CAMERA_NEAR_METERS}; a near-plane regression would be invisible to the `
+            + 'visual-regression instrument that drives this camera.',
+        ).toBe(FIRST_PERSON_CAMERA_NEAR_METERS);
+        expect(reviewCamera.far).toBeGreaterThan(reviewCamera.near);
+      }
+    }
+    expect(cameras, 'the roster must actually have been walked').toBeGreaterThan(ARENA_IDS.length);
+  });
+
   it('requires physical practical lights to carry coherent occlusion policy', async () => {
     for (const id of ARENA_IDS) {
       const { definition } = await ARENA_VISUAL_REGISTRY[id]();
@@ -35,6 +73,15 @@ describe('Pass 64 arena visual definitions', () => {
         if (practical.policy === 'shadowed-local') expect(practical.castsShadow).toBe(true);
         else expect(practical.castsShadow).toBe(false);
       }
+    }
+  });
+
+  it('declares the exact generated sky selected by every supported arena preset', async () => {
+    for (const id of ARENA_IDS) {
+      const { definition } = await ARENA_VISUAL_REGISTRY[id]();
+      expect(skyBackdropPreset(definition.atmosphere.preset)).toBe(definition.atmosphere.preset);
+      const selectedSky = skyBackdropAssetForPreset(definition.atmosphere.preset);
+      if (selectedSky) expect(definition.assetDependencies).toContain(selectedSky);
     }
   });
 
@@ -99,7 +146,7 @@ describe('Pass 64 arena visual definitions', () => {
     expect(solid).toBeDefined();
     expect(portal).toBeDefined();
     expect(solid!.position).toEqual(portal!.position);
-    expect(solid!.position).toEqual([-9, 2.2, -23]);
+    expect(solid!.position).toEqual([-19, 2.2, -12.4]); // v3: the aqua house at its team end
     expect(solid!.target).not.toEqual(portal!.target);
     expect(solid!.purpose).toBe('light-occlusion');
     expect(portal!.purpose).toBe('portal');

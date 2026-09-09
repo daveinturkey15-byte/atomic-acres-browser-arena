@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 
 const baseUrl = process.env.QA_BASE_URL ?? 'http://127.0.0.1:4180/';
 const screenshotDir = process.env.QA_SCREENSHOT_DIR ?? tmpdir();
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ args: ['--mute-audio'], headless: true });
 const reports = [];
 try {
   for (const profile of [

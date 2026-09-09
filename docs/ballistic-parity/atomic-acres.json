@@ -1,0 +1,3086 @@
+{
+ "arena": "atomic-acres",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 345,
+  "ratedDirect": 77,
+  "ratedByFootprint": 127,
+  "dynamicTargets": 6,
+  "excludedByRule": 123,
+  "unrated": 12,
+  "acceptedByLedger": 12,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 237,
+  "byMaterial": {
+   "earth": 31,
+   "concrete": 11,
+   "interior-wall": 52,
+   "wood": 86,
+   "glass": 22,
+   "thin-metal": 14,
+   "vehicle": 3,
+   "structural-metal": 14,
+   "fence": 4
+  },
+  "byClassification": {
+   "explicit": 199,
+   "rule": 38
+  }
+ },
+ "excludedByRule": {
+  "walkable surface": 2,
+  "above the standing combat volume (canopy/eaves/overhead dressing)": 110,
+  "soft foliage": 11
+ },
+ "footprintExplained": [
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -4.4,
+    0.7,
+    -1.2
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -4.4,
+    0.7,
+    1.2
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    4.4,
+    0.7,
+    -1.2
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    4.4,
+    0.7,
+    1.2
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "east-irrigation-vessel",
+   "centre": [
+    27,
+    1.65,
+    24
+   ],
+   "surfaceId": "atomic-acres:165:east-irrigation-vessel-collider",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.95
+  },
+  {
+   "name": "performance-cargo-lower",
+   "centre": [
+    -8.7,
+    0.52,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-cargo-lower",
+   "centre": [
+    -7.3,
+    0.52,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-cargo-upper",
+   "centre": [
+    -8,
+    1.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-concrete-pipe",
+   "centre": [
+    7.15,
+    0.53,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-concrete-pipe",
+   "centre": [
+    8,
+    0.53,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-concrete-pipe",
+   "centre": [
+    8.85,
+    0.53,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-concrete-pipe",
+   "centre": [
+    7.42,
+    1.52,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-concrete-pipe",
+   "centre": [
+    8.58,
+    1.52,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-skip-side",
+   "centre": [
+    22.75,
+    1.02,
+    -13
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.97
+  },
+  {
+   "name": "performance-skip-side",
+   "centre": [
+    25.25,
+    1.02,
+    -13
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.97
+  },
+  {
+   "name": "performance-skip-rear",
+   "centre": [
+    24,
+    1.02,
+    -10.96
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-skip-front",
+   "centre": [
+    24,
+    0.62,
+    -15.04
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-generator-body",
+   "centre": [
+    -24,
+    1.28,
+    13.28
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "performance-generator-panel",
+   "centre": [
+    -25.23,
+    1.3,
+    13.28
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    -28.5
+   ],
+   "surfaceId": "atomic-acres:155:quality-earth-bank-north-west-collider-0",
+   "surfaceMaterial": "earth",
+   "share": 0.56
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    -28.5
+   ],
+   "surfaceId": "atomic-acres:158:quality-earth-bank-north-east-collider-0",
+   "surfaceMaterial": "earth",
+   "share": 0.56
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    -21.37
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    -21.37
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    -14.25
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    -14.25
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    -7.12
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    -7.12
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    0
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    0
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    7.13
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    7.13
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    14.25
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    14.25
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    21.38
+   ],
+   "surfaceId": "atomic-acres:229:west fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    21.38
+   ],
+   "surfaceId": "atomic-acres:230:east fence",
+   "surfaceMaterial": "fence",
+   "share": 0.67
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    -31.45,
+    2.1,
+    28.5
+   ],
+   "surfaceId": "atomic-acres:160:quality-earth-bank-south-west-collider-0",
+   "surfaceMaterial": "earth",
+   "share": 0.56
+  },
+  {
+   "name": "fence post",
+   "centre": [
+    31.45,
+    2.1,
+    28.5
+   ],
+   "surfaceId": "atomic-acres:162:quality-earth-bank-south-east-collider-0",
+   "surfaceMaterial": "earth",
+   "share": 0.56
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    0.35,
+    2.97,
+    0
+   ],
+   "surfaceId": "atomic-acres:11:front-ground-far-left",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.01
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    4.88,
+    2.37,
+    0
+   ],
+   "surfaceId": "atomic-acres:12:front-ground-centre",
+   "surfaceMaterial": "interior-wall",
+   "share": 0
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -1.02,
+    2.6,
+    0
+   ],
+   "surfaceId": "atomic-acres:11:front-ground-far-left",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.01
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -3.69,
+    2,
+    0
+   ],
+   "surfaceId": "atomic-acres:11:front-ground-far-left",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.01
+  },
+  {
+   "name": "coach-body",
+   "centre": [
+    0,
+    2.02,
+    0
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 0.9
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    -4.75,
+    2.68,
+    2.77
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 0.68
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    -2.35,
+    2.68,
+    2.72
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 0.93
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    0.05,
+    2.68,
+    2.67
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    2.45,
+    2.68,
+    2.62
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    4.85,
+    2.68,
+    2.57
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    -4.85,
+    2.68,
+    -2.57
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    -2.45,
+    2.68,
+    -2.62
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    -0.05,
+    2.68,
+    -2.67
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    2.35,
+    2.68,
+    -2.72
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 0.93
+  },
+  {
+   "name": "coach-window",
+   "centre": [
+    4.75,
+    2.68,
+    -2.77
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 0.68
+  },
+  {
+   "name": "windshield",
+   "centre": [
+    -6.82,
+    2.64,
+    0.14
+   ],
+   "surfaceId": "atomic-acres:123:coach windshield",
+   "surfaceMaterial": "glass",
+   "share": 0.71
+  },
+  {
+   "name": "rear-glass",
+   "centre": [
+    6.82,
+    2.64,
+    -0.14
+   ],
+   "surfaceId": "atomic-acres:124:coach rear glass",
+   "surfaceMaterial": "glass",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -4.56,
+    0.74,
+    1.89
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    4.64,
+    0.74,
+    1.71
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -4.64,
+    0.74,
+    -1.71
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    4.56,
+    0.74,
+    -1.89
+   ],
+   "surfaceId": "atomic-acres:114:central transit bus",
+   "surfaceMaterial": "vehicle",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -19,
+    2.37,
+    -28
+   ],
+   "surfaceId": "atomic-acres:145:corner hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -19,
+    0.22,
+    -27.53
+   ],
+   "surfaceId": "atomic-acres:145:corner hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -19,
+    0.22,
+    -28.47
+   ],
+   "surfaceId": "atomic-acres:145:corner hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -19.47,
+    0.22,
+    -28
+   ],
+   "surfaceId": "atomic-acres:145:corner hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    19,
+    2.37,
+    28
+   ],
+   "surfaceId": "atomic-acres:147:corner hedge 2",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    19,
+    0.22,
+    28.47
+   ],
+   "surfaceId": "atomic-acres:147:corner hedge 2",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    19.47,
+    0.22,
+    28
+   ],
+   "surfaceId": "atomic-acres:147:corner hedge 2",
+   "surfaceMaterial": "earth",
+   "share": 1
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    19,
+    0.22,
+    27.53
+   ],
+   "surfaceId": "atomic-acres:147:corner hedge 2",
+   "surfaceMaterial": "earth",
+   "share": 0.5
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -24.6,
+    0.92,
+    -8
+   ],
+   "surfaceId": "atomic-acres:135:front hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.37
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -24,
+    1,
+    -8
+   ],
+   "surfaceId": "atomic-acres:135:front hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.3
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -23.4,
+    0.92,
+    -8
+   ],
+   "surfaceId": "atomic-acres:135:front hedge 0",
+   "surfaceMaterial": "earth",
+   "share": 0.37
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    23.4,
+    0.92,
+    8
+   ],
+   "surfaceId": "atomic-acres:138:front hedge 3",
+   "surfaceMaterial": "earth",
+   "share": 0.37
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    24,
+    1,
+    8
+   ],
+   "surfaceId": "atomic-acres:138:front hedge 3",
+   "surfaceMaterial": "earth",
+   "share": 0.3
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    24.6,
+    0.92,
+    8
+   ],
+   "surfaceId": "atomic-acres:138:front hedge 3",
+   "surfaceMaterial": "earth",
+   "share": 0.37
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -9.6,
+    0.92,
+    -27
+   ],
+   "surfaceId": "atomic-acres:197:authored-terminal-collider-2",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.28
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -9,
+    1,
+    -27
+   ],
+   "surfaceId": "atomic-acres:197:authored-terminal-collider-2",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.81
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    -8.4,
+    0.92,
+    -27
+   ],
+   "surfaceId": "atomic-acres:197:authored-terminal-collider-2",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.28
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    8.4,
+    0.92,
+    27
+   ],
+   "surfaceId": "atomic-acres:198:authored-terminal-collider-3",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.28
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    9,
+    1,
+    27
+   ],
+   "surfaceId": "atomic-acres:198:authored-terminal-collider-3",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.81
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "centre": [
+    9.6,
+    0.92,
+    27
+   ],
+   "surfaceId": "atomic-acres:198:authored-terminal-collider-3",
+   "surfaceMaterial": "thin-metal",
+   "share": 0.28
+  },
+  {
+   "name": "west-reclamation-tank-shell",
+   "centre": [
+    -29.5,
+    2.78,
+    -14
+   ],
+   "surfaceId": "atomic-acres:204:authored-reclamation-tank-collider",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.94
+  },
+  {
+   "name": "garage-facade-finish",
+   "centre": [
+    17.7,
+    3.5,
+    -9.2
+   ],
+   "surfaceId": "atomic-acres:13:front-ground-far-right",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.24
+  },
+  {
+   "name": "garage-door-finish",
+   "centre": [
+    17.7,
+    2.05,
+    -9.08
+   ],
+   "surfaceId": "atomic-acres:13:front-ground-far-right",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.15
+  },
+  {
+   "name": "garage-facade-finish",
+   "centre": [
+    -17.7,
+    3.5,
+    9.2
+   ],
+   "surfaceId": "atomic-acres:59:front-ground-far-left",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.28
+  },
+  {
+   "name": "garage-door-finish",
+   "centre": [
+    -17.7,
+    2.05,
+    9.08
+   ],
+   "surfaceId": "atomic-acres:59:front-ground-far-left",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.15
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -30,
+    1.5,
+    21
+   ],
+   "surfaceId": "atomic-acres:182:greenhouse-shot-pane-0",
+   "surfaceMaterial": "glass",
+   "share": 0.81
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -22,
+    1.5,
+    21
+   ],
+   "surfaceId": "atomic-acres:183:greenhouse-shot-pane-1",
+   "surfaceMaterial": "glass",
+   "share": 0.81
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -28.02,
+    1.5,
+    24.8
+   ],
+   "surfaceId": "atomic-acres:184:greenhouse-shot-pane-2",
+   "surfaceMaterial": "glass",
+   "share": 0.8
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -22.97,
+    1.5,
+    24.8
+   ],
+   "surfaceId": "atomic-acres:148:corner hedge 3",
+   "surfaceMaterial": "earth",
+   "share": 0.9
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -28.5,
+    1.5,
+    17.2
+   ],
+   "surfaceId": "atomic-acres:150:side hedge 1",
+   "surfaceMaterial": "earth",
+   "share": 0.95
+  },
+  {
+   "name": "greenhouse-frame-wall",
+   "centre": [
+    -23.5,
+    1.5,
+    17.2
+   ],
+   "surfaceId": "atomic-acres:187:greenhouse-shot-pane-5",
+   "surfaceMaterial": "glass",
+   "share": 0.78
+  },
+  {
+   "name": "service-channel-wall",
+   "centre": [
+    22.5,
+    0.75,
+    9
+   ],
+   "surfaceId": "atomic-acres:176:service wall west",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  },
+  {
+   "name": "service-channel-wall",
+   "centre": [
+    28.5,
+    0.75,
+    9
+   ],
+   "surfaceId": "atomic-acres:177:service wall east",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  },
+  {
+   "name": "solar-column",
+   "centre": [
+    23,
+    2.1,
+    -27
+   ],
+   "surfaceId": "atomic-acres:146:corner hedge 1",
+   "surfaceMaterial": "earth",
+   "share": 1
+  },
+  {
+   "name": "solar-column",
+   "centre": [
+    23,
+    2.1,
+    -17
+   ],
+   "surfaceId": "atomic-acres:179:solar canopy column",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.73
+  },
+  {
+   "name": "solar-column",
+   "centre": [
+    30.5,
+    2.1,
+    -22
+   ],
+   "surfaceId": "atomic-acres:180:solar canopy column",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.73
+  },
+  {
+   "name": "solar-column",
+   "centre": [
+    30.5,
+    2.1,
+    -12
+   ],
+   "surfaceId": "atomic-acres:181:solar canopy column",
+   "surfaceMaterial": "structural-metal",
+   "share": 0.73
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -21.02,
+    0.78,
+    -2
+   ],
+   "surfaceId": "atomic-acres:166:cover 0",
+   "surfaceMaterial": "concrete",
+   "share": 0.95
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -18.98,
+    0.78,
+    -2
+   ],
+   "surfaceId": "atomic-acres:166:cover 0",
+   "surfaceMaterial": "concrete",
+   "share": 0.95
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -20,
+    0.78,
+    -3.83
+   ],
+   "surfaceId": "atomic-acres:166:cover 0",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -20,
+    0.78,
+    -0.17
+   ],
+   "surfaceId": "atomic-acres:166:cover 0",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    18.98,
+    0.78,
+    2
+   ],
+   "surfaceId": "atomic-acres:167:cover 1",
+   "surfaceMaterial": "concrete",
+   "share": 0.95
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    21.02,
+    0.78,
+    2
+   ],
+   "surfaceId": "atomic-acres:167:cover 1",
+   "surfaceMaterial": "concrete",
+   "share": 0.95
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    20,
+    0.78,
+    0.17
+   ],
+   "surfaceId": "atomic-acres:167:cover 1",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    20,
+    0.78,
+    3.84
+   ],
+   "surfaceId": "atomic-acres:167:cover 1",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "cargo-crate",
+   "centre": [
+    -8.95,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 0.8
+  },
+  {
+   "name": "cargo-ratchet-strap",
+   "centre": [
+    -9.37,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "cargo-ratchet-strap",
+   "centre": [
+    -8.53,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "cargo-crate",
+   "centre": [
+    -7.05,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 0.8
+  },
+  {
+   "name": "cargo-ratchet-strap",
+   "centre": [
+    -7.47,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "cargo-ratchet-strap",
+   "centre": [
+    -6.63,
+    0.62,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -9.32,
+    0.78,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 0.92
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -6.68,
+    0.78,
+    -22
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 0.92
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -8,
+    0.78,
+    -23.13
+   ],
+   "surfaceId": "atomic-acres:168:cover 2",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -8,
+    0.78,
+    -20.86
+   ],
+   "surfaceId": "atomic-acres:46:exterior-access-ramp",
+   "surfaceMaterial": "wood",
+   "share": 0.3
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    6.68,
+    0.78,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 0.92
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    9.32,
+    0.78,
+    22
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 0.92
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    8,
+    0.78,
+    20.87
+   ],
+   "surfaceId": "atomic-acres:94:exterior-access-ramp",
+   "surfaceMaterial": "wood",
+   "share": 0.3
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    8,
+    0.78,
+    23.14
+   ],
+   "surfaceId": "atomic-acres:169:cover 3",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "service-skip-body",
+   "centre": [
+    24,
+    0.91,
+    -13
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    22.78,
+    0.78,
+    -13
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.96
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    25.22,
+    0.78,
+    -13
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.96
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    24,
+    0.78,
+    -15.23
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    24,
+    0.78,
+    -10.76
+   ],
+   "surfaceId": "atomic-acres:170:cover 4",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "generator-shell",
+   "centre": [
+    -24,
+    1.1,
+    13
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 1
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -25.22,
+    0.78,
+    13
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 0.96
+  },
+  {
+   "name": "barrier-rib",
+   "centre": [
+    -22.78,
+    0.78,
+    13
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 0.96
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -24,
+    0.78,
+    10.77
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  },
+  {
+   "name": "barrier-recessed-panel",
+   "centre": [
+    -24,
+    0.78,
+    15.24
+   ],
+   "surfaceId": "atomic-acres:171:cover 5",
+   "surfaceMaterial": "concrete",
+   "share": 0.29
+  }
+ ],
+ "acceptedShootThrough": [
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    -27,
+    2.13,
+    -21
+   ],
+   "size": [
+    1.12,
+    4.28,
+    1.15
+   ],
+   "vertices": 133,
+   "instanced": false,
+   "bestSurfaceShare": 0.24,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    -18.53,
+    0.22,
+    -28
+   ],
+   "size": [
+    0.4,
+    0.95,
+    1.39
+   ],
+   "vertices": 52,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    -13,
+    2.01,
+    28.5
+   ],
+   "size": [
+    1.06,
+    4.04,
+    1.09
+   ],
+   "vertices": 133,
+   "instanced": false,
+   "bestSurfaceShare": 0.24,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    13,
+    2.01,
+    -28.5
+   ],
+   "size": [
+    1.06,
+    4.04,
+    1.09
+   ],
+   "vertices": 133,
+   "instanced": false,
+   "bestSurfaceShare": 0.24,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    18.53,
+    0.22,
+    28
+   ],
+   "size": [
+    0.4,
+    0.95,
+    1.39
+   ],
+   "vertices": 52,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "(unnamed Mesh)",
+   "path": "original-arena-art",
+   "centre": [
+    27,
+    2.13,
+    21
+   ],
+   "size": [
+    1.12,
+    4.28,
+    1.15
+   ],
+   "vertices": 133,
+   "instanced": false,
+   "bestSurfaceShare": 0.24,
+   "acceptedReason": "addTree trunk/root flare hugging the authored wood trunk proxy; the proxy is the rated authority and a flare surface would double-charge it"
+  },
+  {
+   "name": "animated-atomic-ring-1",
+   "path": "original-arena-art/original-atomic-landmark/animated-atomic-ring-1",
+   "centre": [
+    27,
+    3.25,
+    -20
+   ],
+   "size": [
+    3.41,
+    5.66,
+    6.39
+   ],
+   "vertices": 473,
+   "instanced": false,
+   "bestSurfaceShare": 0.25,
+   "acceptedReason": "open animated ring sculpture; an AABB surface would block the ring opening; plinth below is rated cover"
+  },
+  {
+   "name": "animated-atomic-ring-2",
+   "path": "original-arena-art/original-atomic-landmark/animated-atomic-ring-2",
+   "centre": [
+    27,
+    3.25,
+    -20
+   ],
+   "size": [
+    3.41,
+    5.66,
+    6.39
+   ],
+   "vertices": 473,
+   "instanced": false,
+   "bestSurfaceShare": 0.25,
+   "acceptedReason": "open animated ring sculpture; an AABB surface would block the ring opening; plinth below is rated cover"
+  },
+  {
+   "name": "interior-ramp-rail-inner",
+   "path": "Atomic Acres arena/interior-ramp-rail-inner",
+   "centre": [
+    -11.18,
+    2.4,
+    13.5
+   ],
+   "size": [
+    0.08,
+    3.55,
+    6.24
+   ],
+   "vertices": 24,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "sloped 0.08 m handrail bar; AABB inflation of a rotated thin rail, not a real plane"
+  },
+  {
+   "name": "interior-ramp-rail-inner",
+   "path": "Atomic Acres arena/interior-ramp-rail-inner",
+   "centre": [
+    11.18,
+    2.4,
+    -13.5
+   ],
+   "size": [
+    0.08,
+    3.55,
+    6.24
+   ],
+   "vertices": 24,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "sloped 0.08 m handrail bar; AABB inflation of a rotated thin rail, not a real plane"
+  },
+  {
+   "name": "interior-ramp-rail-outer",
+   "path": "Atomic Acres arena/interior-ramp-rail-outer",
+   "centre": [
+    -13.52,
+    2.4,
+    13.5
+   ],
+   "size": [
+    0.08,
+    3.55,
+    6.24
+   ],
+   "vertices": 24,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "sloped 0.08 m handrail bar; AABB inflation of a rotated thin rail, not a real plane"
+  },
+  {
+   "name": "interior-ramp-rail-outer",
+   "path": "Atomic Acres arena/interior-ramp-rail-outer",
+   "centre": [
+    13.52,
+    2.4,
+    -13.5
+   ],
+   "size": [
+    0.08,
+    3.55,
+    6.24
+   ],
+   "vertices": 24,
+   "instanced": false,
+   "bestSurfaceShare": 0.11,
+   "acceptedReason": "sloped 0.08 m handrail bar; AABB inflation of a rotated thin rail, not a real plane"
+  }
+ ],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "atomic-acres:0:ground",
+   "name": "atomic-acres-ground",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:1:road",
+   "name": "atomic-acres-road",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:2:ground-west-wall",
+   "name": "ground-west-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:3:ground-east-wall",
+   "name": "ground-east-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:4:rear-ground-far-left",
+   "name": "rear-ground-far-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:5:rear-ground-centre",
+   "name": "rear-ground-centre",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:6:rear-ground-far-right",
+   "name": "rear-ground-far-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:7:rear-door-lintel",
+   "name": "rear-door-lintel",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:8:rear-ground-window-sill-wall",
+   "name": "rear-ground-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:9:rear-ground-window-lintel-wall",
+   "name": "rear-ground-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:10:rear-ground-window-glass",
+   "name": "rear-ground-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:11:front-ground-far-left",
+   "name": "front-ground-far-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:12:front-ground-centre",
+   "name": "front-ground-centre",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:13:front-ground-far-right",
+   "name": "front-ground-far-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:14:front-door-lintel",
+   "name": "front-door-lintel",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:15:ground-window-sill-wall",
+   "name": "ground-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:16:ground-window-lintel-wall",
+   "name": "ground-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:17:ground-window-glass",
+   "name": "ground-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:18:front-entry-frame-left",
+   "name": "front-entry-frame-left",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:19:front-entry-frame-right",
+   "name": "front-entry-frame-right",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:20:front-entry-frame-head",
+   "name": "front-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:21:rear-entry-frame-left",
+   "name": "rear-entry-frame-left",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:22:rear-entry-frame-right",
+   "name": "rear-entry-frame-right",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:23:rear-entry-frame-head",
+   "name": "rear-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:24:ground-room-partition-left",
+   "name": "ground-room-partition-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:25:ground-room-partition-right",
+   "name": "ground-room-partition-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:26:upper-ramp-side-wall-rear",
+   "name": "upper-ramp-side-wall-rear",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:27:upper-ramp-side-wall-front",
+   "name": "upper-ramp-side-wall-front",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:28:upper-east-wall",
+   "name": "upper-east-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:29:upper-rear-wall",
+   "name": "upper-rear-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:30:front-upper-left",
+   "name": "front-upper-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:31:front-upper-right",
+   "name": "front-upper-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:32:upper-window-sill-wall",
+   "name": "upper-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:33:upper-window-lintel-wall",
+   "name": "upper-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:34:upper-window-glass",
+   "name": "upper-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:35:upper-room-partition-left",
+   "name": "upper-room-partition-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:36:upper-room-partition-right",
+   "name": "upper-room-partition-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:37:upper-ramp-entry-frame-rear",
+   "name": "upper-ramp-entry-frame-rear",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:38:upper-ramp-entry-frame-front",
+   "name": "upper-ramp-entry-frame-front",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:39:upper-ramp-entry-frame-head",
+   "name": "upper-ramp-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:40:entrance-canopy",
+   "name": "entrance-canopy",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:41:upper-floor-main",
+   "name": "upper-floor-main",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:42:upper-floor-ramp-front",
+   "name": "upper-floor-ramp-front",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:43:upper-floor-ramp-rear",
+   "name": "upper-floor-ramp-rear",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:44:ramp-top-landing",
+   "name": "ramp-top-landing",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:45:interior-ramp-top-landing",
+   "name": "interior-ramp-top-landing",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:46:exterior-access-ramp",
+   "name": "exterior-access-ramp",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:47:interior-access-ramp",
+   "name": "interior-access-ramp",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:48:aqua-irrigation-workshop:authored-roof-east-slab",
+   "name": "aqua-irrigation-workshop:authored-roof-east-slab",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:49:aqua-irrigation-workshop:authored-roof-west-slab",
+   "name": "aqua-irrigation-workshop:authored-roof-west-slab",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:50:ground-west-wall",
+   "name": "ground-west-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:51:ground-east-wall",
+   "name": "ground-east-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:52:rear-ground-far-left",
+   "name": "rear-ground-far-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:53:rear-ground-centre",
+   "name": "rear-ground-centre",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:54:rear-ground-far-right",
+   "name": "rear-ground-far-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:55:rear-door-lintel",
+   "name": "rear-door-lintel",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:56:rear-ground-window-sill-wall",
+   "name": "rear-ground-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:57:rear-ground-window-lintel-wall",
+   "name": "rear-ground-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:58:rear-ground-window-glass",
+   "name": "rear-ground-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:59:front-ground-far-left",
+   "name": "front-ground-far-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:60:front-ground-centre",
+   "name": "front-ground-centre",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:61:front-ground-far-right",
+   "name": "front-ground-far-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:62:front-door-lintel",
+   "name": "front-door-lintel",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:63:ground-window-sill-wall",
+   "name": "ground-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:64:ground-window-lintel-wall",
+   "name": "ground-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:65:ground-window-glass",
+   "name": "ground-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:66:front-entry-frame-left",
+   "name": "front-entry-frame-left",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:67:front-entry-frame-right",
+   "name": "front-entry-frame-right",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:68:front-entry-frame-head",
+   "name": "front-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:69:rear-entry-frame-left",
+   "name": "rear-entry-frame-left",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:70:rear-entry-frame-right",
+   "name": "rear-entry-frame-right",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:71:rear-entry-frame-head",
+   "name": "rear-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:72:ground-room-partition-left",
+   "name": "ground-room-partition-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:73:ground-room-partition-right",
+   "name": "ground-room-partition-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:74:upper-west-wall",
+   "name": "upper-west-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:75:upper-ramp-side-wall-rear",
+   "name": "upper-ramp-side-wall-rear",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:76:upper-ramp-side-wall-front",
+   "name": "upper-ramp-side-wall-front",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:77:upper-rear-wall",
+   "name": "upper-rear-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:78:front-upper-left",
+   "name": "front-upper-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:79:front-upper-right",
+   "name": "front-upper-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:80:upper-window-sill-wall",
+   "name": "upper-window-sill-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:81:upper-window-lintel-wall",
+   "name": "upper-window-lintel-wall",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:82:upper-window-glass",
+   "name": "upper-window-glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:83:upper-room-partition-left",
+   "name": "upper-room-partition-left",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:84:upper-room-partition-right",
+   "name": "upper-room-partition-right",
+   "material": "interior-wall",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:85:upper-ramp-entry-frame-rear",
+   "name": "upper-ramp-entry-frame-rear",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:86:upper-ramp-entry-frame-front",
+   "name": "upper-ramp-entry-frame-front",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:87:upper-ramp-entry-frame-head",
+   "name": "upper-ramp-entry-frame-head",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:88:entrance-canopy",
+   "name": "entrance-canopy",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:89:upper-floor-main",
+   "name": "upper-floor-main",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:90:upper-floor-ramp-front",
+   "name": "upper-floor-ramp-front",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:91:upper-floor-ramp-rear",
+   "name": "upper-floor-ramp-rear",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:92:ramp-top-landing",
+   "name": "ramp-top-landing",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:93:interior-ramp-top-landing",
+   "name": "interior-ramp-top-landing",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:94:exterior-access-ramp",
+   "name": "exterior-access-ramp",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:95:interior-access-ramp",
+   "name": "interior-access-ramp",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:96:coral-orchard-conservatory:authored-roof-east-slab",
+   "name": "coral-orchard-conservatory:authored-roof-east-slab",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:97:coral-orchard-conservatory:authored-roof-west-slab",
+   "name": "coral-orchard-conservatory:authored-roof-west-slab",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:98:street-bench-collider-0",
+   "name": "street-bench-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:99:street-bench-collider-1",
+   "name": "street-bench-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:100:street-bench-collider-2",
+   "name": "street-bench-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:101:street-bench-collider-3",
+   "name": "street-bench-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:102:street-recycling-bin-collider-0",
+   "name": "street-recycling-bin-collider-0",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:103:street-recycling-bin-collider-1",
+   "name": "street-recycling-bin-collider-1",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:104:street-recycling-bin-collider-2",
+   "name": "street-recycling-bin-collider-2",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:105:street-recycling-bin-collider-3",
+   "name": "street-recycling-bin-collider-3",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:106:street-recycling-bin-collider-4",
+   "name": "street-recycling-bin-collider-4",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:107:street-recycling-bin-collider-5",
+   "name": "street-recycling-bin-collider-5",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:108:street-mannequin-collider-0",
+   "name": "street-mannequin-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:109:street-mannequin-collider-1",
+   "name": "street-mannequin-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:110:street-mannequin-collider-2",
+   "name": "street-mannequin-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:111:street-mannequin-collider-3",
+   "name": "street-mannequin-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:112:street-mannequin-collider-4",
+   "name": "street-mannequin-collider-4",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:113:street-mannequin-collider-5",
+   "name": "street-mannequin-collider-5",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:114:central transit bus",
+   "name": "central transit bus",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:115:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:116:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:117:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:118:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:119:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:120:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:121:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:122:coach window",
+   "name": "coach window",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:123:coach windshield",
+   "name": "coach windshield",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:124:coach rear glass",
+   "name": "coach rear glass",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:125:east-parked-van",
+   "name": "east-parked-van",
+   "material": "vehicle",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:126:west-parked-van",
+   "name": "west-parked-van",
+   "material": "vehicle",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:127:garage 0",
+   "name": "garage 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:128:garage door",
+   "name": "garage door",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:129:garage 1",
+   "name": "garage 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:130:garage door",
+   "name": "garage door",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:131:yard fence 0",
+   "name": "yard fence 0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:132:yard fence 1",
+   "name": "yard fence 1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:133:yard fence 2",
+   "name": "yard fence 2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:134:yard fence 3",
+   "name": "yard fence 3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:135:front hedge 0",
+   "name": "front hedge 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:136:front hedge 1",
+   "name": "front hedge 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:137:front hedge 2",
+   "name": "front hedge 2",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:138:front hedge 3",
+   "name": "front hedge 3",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:139:front hedge fin 0",
+   "name": "front hedge fin 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:140:front hedge fin 1",
+   "name": "front hedge fin 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:141:front hedge fin 2",
+   "name": "front hedge fin 2",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:142:front hedge fin 3",
+   "name": "front hedge fin 3",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:143:rear hedge 0",
+   "name": "rear hedge 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:144:rear hedge 1",
+   "name": "rear hedge 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:145:corner hedge 0",
+   "name": "corner hedge 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:146:corner hedge 1",
+   "name": "corner hedge 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:147:corner hedge 2",
+   "name": "corner hedge 2",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:148:corner hedge 3",
+   "name": "corner hedge 3",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:149:side hedge 0",
+   "name": "side hedge 0",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:150:side hedge 1",
+   "name": "side hedge 1",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:151:side hedge 2",
+   "name": "side hedge 2",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:152:side hedge 3",
+   "name": "side hedge 3",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:153:terrain-mound-west-verge-collider",
+   "name": "terrain-mound-west-verge-collider",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:154:terrain-mound-east-verge-collider",
+   "name": "terrain-mound-east-verge-collider",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:155:quality-earth-bank-north-west-collider-0",
+   "name": "quality-earth-bank-north-west-collider-0",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:156:quality-earth-bank-north-west-collider-1",
+   "name": "quality-earth-bank-north-west-collider-1",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:157:quality-earth-bank-north-west-collider-2",
+   "name": "quality-earth-bank-north-west-collider-2",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:158:quality-earth-bank-north-east-collider-0",
+   "name": "quality-earth-bank-north-east-collider-0",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:159:quality-earth-bank-north-east-collider-1",
+   "name": "quality-earth-bank-north-east-collider-1",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:160:quality-earth-bank-south-west-collider-0",
+   "name": "quality-earth-bank-south-west-collider-0",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:161:quality-earth-bank-south-west-collider-1",
+   "name": "quality-earth-bank-south-west-collider-1",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:162:quality-earth-bank-south-east-collider-0",
+   "name": "quality-earth-bank-south-east-collider-0",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:163:quality-earth-bank-south-east-collider-1",
+   "name": "quality-earth-bank-south-east-collider-1",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:164:quality-earth-bank-south-east-collider-2",
+   "name": "quality-earth-bank-south-east-collider-2",
+   "material": "earth",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:165:east-irrigation-vessel-collider",
+   "name": "east-irrigation-vessel-collider",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:166:cover 0",
+   "name": "cover 0",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:167:cover 1",
+   "name": "cover 1",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:168:cover 2",
+   "name": "cover 2",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:169:cover 3",
+   "name": "cover 3",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:170:cover 4",
+   "name": "cover 4",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:171:cover 5",
+   "name": "cover 5",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:172:skyline trellis column",
+   "name": "skyline trellis column",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:173:skyline trellis column",
+   "name": "skyline trellis column",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:174:skyline trellis column",
+   "name": "skyline trellis column",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:175:skyline trellis column",
+   "name": "skyline trellis column",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:176:service wall west",
+   "name": "service wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:177:service wall east",
+   "name": "service wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:178:solar canopy column",
+   "name": "solar canopy column",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:179:solar canopy column",
+   "name": "solar canopy column",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:180:solar canopy column",
+   "name": "solar canopy column",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:181:solar canopy column",
+   "name": "solar canopy column",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:182:greenhouse-shot-pane-0",
+   "name": "greenhouse-shot-pane-0",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:183:greenhouse-shot-pane-1",
+   "name": "greenhouse-shot-pane-1",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:184:greenhouse-shot-pane-2",
+   "name": "greenhouse-shot-pane-2",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:185:greenhouse-shot-pane-3",
+   "name": "greenhouse-shot-pane-3",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:186:greenhouse-shot-pane-4",
+   "name": "greenhouse-shot-pane-4",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:187:greenhouse-shot-pane-5",
+   "name": "greenhouse-shot-pane-5",
+   "material": "glass",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:188:atomic landmark plinth",
+   "name": "atomic landmark plinth",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:189:authored-tree-trunk-collider-0",
+   "name": "authored-tree-trunk-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:190:authored-tree-trunk-collider-1",
+   "name": "authored-tree-trunk-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:191:authored-tree-trunk-collider-2",
+   "name": "authored-tree-trunk-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:192:authored-tree-trunk-collider-3",
+   "name": "authored-tree-trunk-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:193:authored-tree-trunk-collider-4",
+   "name": "authored-tree-trunk-collider-4",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:194:authored-tree-trunk-collider-5",
+   "name": "authored-tree-trunk-collider-5",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:195:authored-terminal-collider-0",
+   "name": "authored-terminal-collider-0",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:196:authored-terminal-collider-1",
+   "name": "authored-terminal-collider-1",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:197:authored-terminal-collider-2",
+   "name": "authored-terminal-collider-2",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:198:authored-terminal-collider-3",
+   "name": "authored-terminal-collider-3",
+   "material": "thin-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:199:authored-extra-lamp-collider-0",
+   "name": "authored-extra-lamp-collider-0",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:200:authored-extra-lamp-collider-1",
+   "name": "authored-extra-lamp-collider-1",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:201:authored-hydro-bed-collider-0",
+   "name": "authored-hydro-bed-collider-0",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:202:authored-hydro-bed-collider-1",
+   "name": "authored-hydro-bed-collider-1",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:203:authored-hydro-bed-collider-2",
+   "name": "authored-hydro-bed-collider-2",
+   "material": "concrete",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:204:authored-reclamation-tank-collider",
+   "name": "authored-reclamation-tank-collider",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:205:authored-civic-post-collider-0",
+   "name": "authored-civic-post-collider-0",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:206:authored-civic-post-collider-1",
+   "name": "authored-civic-post-collider-1",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:207:authored-house-0-dining-collider",
+   "name": "authored-house-0-dining-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:208:authored-house-0-chair-collider-0",
+   "name": "authored-house-0-chair-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:209:authored-house-0-chair-collider-1",
+   "name": "authored-house-0-chair-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:210:authored-house-0-chair-collider-2",
+   "name": "authored-house-0-chair-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:211:authored-house-0-chair-collider-3",
+   "name": "authored-house-0-chair-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:212:authored-house-0-sofa-collider",
+   "name": "authored-house-0-sofa-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:213:authored-house-0-kitchen-collider",
+   "name": "authored-house-0-kitchen-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:214:authored-house-0-coffee-table-collider",
+   "name": "authored-house-0-coffee-table-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:215:authored-house-0-media-collider",
+   "name": "authored-house-0-media-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:216:authored-house-0-upper-bed-collider",
+   "name": "authored-house-0-upper-bed-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:217:authored-house-0-upper-desk-collider",
+   "name": "authored-house-0-upper-desk-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:218:authored-house-1-dining-collider",
+   "name": "authored-house-1-dining-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:219:authored-house-1-chair-collider-0",
+   "name": "authored-house-1-chair-collider-0",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:220:authored-house-1-chair-collider-1",
+   "name": "authored-house-1-chair-collider-1",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:221:authored-house-1-chair-collider-2",
+   "name": "authored-house-1-chair-collider-2",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:222:authored-house-1-chair-collider-3",
+   "name": "authored-house-1-chair-collider-3",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:223:authored-house-1-sofa-collider",
+   "name": "authored-house-1-sofa-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:224:authored-house-1-kitchen-collider",
+   "name": "authored-house-1-kitchen-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:225:authored-house-1-coffee-table-collider",
+   "name": "authored-house-1-coffee-table-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:226:authored-house-1-media-collider",
+   "name": "authored-house-1-media-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:227:authored-house-1-upper-bed-collider",
+   "name": "authored-house-1-upper-bed-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:228:authored-house-1-upper-desk-collider",
+   "name": "authored-house-1-upper-desk-collider",
+   "material": "wood",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:229:west fence",
+   "name": "west fence",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:230:east fence",
+   "name": "east fence",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:231:north fence",
+   "name": "north fence",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:232:south fence",
+   "name": "south fence",
+   "material": "fence",
+   "classification": "rule"
+  },
+  {
+   "id": "atomic-acres:233:lamp pole",
+   "name": "lamp pole",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:234:lamp pole",
+   "name": "lamp pole",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:235:lamp pole",
+   "name": "lamp pole",
+   "material": "structural-metal",
+   "classification": "explicit"
+  },
+  {
+   "id": "atomic-acres:236:lamp pole",
+   "name": "lamp pole",
+   "material": "structural-metal",
+   "classification": "explicit"
+  }
+ ]
+}

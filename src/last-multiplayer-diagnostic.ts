@@ -1,16 +1,15 @@
 import type { HumanDamageEventInput } from './match-report';
+import { isArenaId, type ArenaId } from './arena-identity';
 
 export const LAST_MULTIPLAYER_DIAGNOSTIC_STORAGE_KEY = 'atomic-acres:last-completed-multiplayer-diagnostic:v1';
 export const LAST_MULTIPLAYER_DIAGNOSTIC_SCHEMA_VERSION = 1;
 export const LAST_MULTIPLAYER_DAMAGE_EVENT_LIMIT = 64;
 
-const ARENAS = ['atomic-acres', 'skyline-terminal', 'rustworks-1v1'] as const;
 const MODES = ['tdm', 'ffa'] as const;
 const ROLES = ['host', 'guest'] as const;
 const KINDS = ['player', 'hosted-bot', 'solo-bot', 'environment', 'unknown'] as const;
 const SOURCES = ['railgun', 'firearm', 'grenade', 'melee', 'support', 'environment', 'other'] as const;
 
-type Arena = typeof ARENAS[number];
 type Mode = typeof MODES[number];
 type Role = typeof ROLES[number];
 type Kind = typeof KINDS[number];
@@ -32,7 +31,7 @@ export type SanitizedDamageEvent = Readonly<{
 export type LastMultiplayerDiagnostic = Readonly<{
   schemaVersion: typeof LAST_MULTIPLAYER_DIAGNOSTIC_SCHEMA_VERSION;
   completedAtEpochMinute: number;
-  arena: Arena;
+  arena: ArenaId;
   mode: Mode;
   role: Role;
   protocolVersion: number;
@@ -125,7 +124,7 @@ export function createLastMultiplayerDiagnostic(input: LastMultiplayerDiagnostic
   return {
     schemaVersion: LAST_MULTIPLAYER_DIAGNOSTIC_SCHEMA_VERSION,
     completedAtEpochMinute: Math.floor(Math.max(0, Number.isFinite(input.completedAtEpochMs) ? input.completedAtEpochMs : 0) / 60_000) * 60_000,
-    arena: oneOf(ARENAS, input.arena, 'atomic-acres'),
+    arena: isArenaId(input.arena) ? input.arena : 'atomic-acres',
     mode: oneOf(MODES, input.mode, 'tdm'),
     role: oneOf(ROLES, input.role, 'guest'),
     protocolVersion: count(input.protocolVersion, 1_000),
@@ -171,7 +170,7 @@ export function loadLastMultiplayerDiagnostic(storage: StorageLike | undefined):
     if (!value) return null;
     const candidate = JSON.parse(value) as LastMultiplayerDiagnostic;
     if (candidate.schemaVersion !== LAST_MULTIPLAYER_DIAGNOSTIC_SCHEMA_VERSION
-      || !ARENAS.includes(candidate.arena) || !MODES.includes(candidate.mode) || !ROLES.includes(candidate.role)
+      || !isArenaId(candidate.arena) || !MODES.includes(candidate.mode) || !ROLES.includes(candidate.role)
       || !Array.isArray(candidate.recentDamage) || candidate.recentDamage.length > LAST_MULTIPLAYER_DAMAGE_EVENT_LIMIT) return null;
     return createLastMultiplayerDiagnostic({
       completedAtEpochMs: candidate.completedAtEpochMinute,

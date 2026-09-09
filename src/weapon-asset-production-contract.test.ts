@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { WEAPON_LIVERY_ALIASES } from './weapon-model';
 import { WEAPON_IDS } from './protocol';
 import { WEAPON_CATALOG } from './combat/weapon-catalog';
 
@@ -54,11 +55,15 @@ const manifest = JSON.parse(readFileSync('source-assets/blender/pass65-weapon-pr
   weapons: readonly ProductionEntry[];
 };
 
+const PRODUCED_WEAPON_IDS = WEAPON_IDS.filter((id) => !(id in WEAPON_LIVERY_ALIASES));
+
 describe('Pass 65 Blender weapon and operator production gate', () => {
   it('tracks every shipped weapon exactly once and fails closed', () => {
     expect(manifest.releaseGate).toBe('fail-closed-until-every-entry-is-release-ready');
-    expect(manifest.weapons.map((entry) => entry.id).sort()).toEqual([...WEAPON_IDS].sort());
-    expect(new Set(manifest.weapons.map((entry) => entry.id)).size).toBe(WEAPON_IDS.length);
+    // Livery variants reuse another weapon's Blender delivery (HF-334), so
+    // they are deliberately absent from the production manifest.
+    expect(manifest.weapons.map((entry) => entry.id).sort()).toEqual([...PRODUCED_WEAPON_IDS].sort());
+    expect(new Set(manifest.weapons.map((entry) => entry.id)).size).toBe(PRODUCED_WEAPON_IDS.length);
   });
 
   it('requires complete PBR, socket, action, LOD and provenance production rather than a shared hero fallback', () => {
@@ -186,9 +191,9 @@ describe('Pass 65 Blender weapon and operator production gate', () => {
       ]));
     }
     expect(new Set(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
-      .map((entry) => entry.designId)).size).toBe(WEAPON_IDS.length - 1);
+      .map((entry) => entry.designId)).size).toBe(PRODUCED_WEAPON_IDS.length - 1);
     expect(new Set(manifest.weapons.filter((entry) => entry.id !== 'explosive-crossbow')
-      .map((entry) => entry.platformAnatomy)).size).toBe(WEAPON_IDS.length - 1);
+      .map((entry) => entry.platformAnatomy)).size).toBe(PRODUCED_WEAPON_IDS.length - 1);
     expect(manifest.supportVehicles.map((entry) => entry.id)).toEqual([
       'hunter-drone-visual-family-v1', 'chopper-gunner-vehicle-v1', 'support-aircraft-family-v1',
     ]);

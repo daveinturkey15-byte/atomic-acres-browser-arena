@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import type { PresentationPrewarmRuntime } from './rendering/render-runtime';
+import { runPooledGpuPrewarm } from './presentation-gpu-prewarm';
 import {
   SHED_ANGLE_Q,
   SHED_DAMAGE_REGION_RADIUS_Q,
@@ -22,6 +24,7 @@ import {
   FIELD_SHED_MATERIAL_IDS,
   FIELD_SHED_MATERIAL_POLICY_ID,
 } from './destructible-shed-definition';
+import { normaliseApertures } from './destructible-shed-panel-topology';
 
 export { FIELD_SHED_DEFINITION } from './destructible-shed-definition';
 
@@ -44,15 +47,35 @@ function ridgedMetalBumpTexture(): THREE.DataTexture {
   return texture;
 }
 
-function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
-  const { halfU, halfV } = surface.frame;
+function buildShedPanelShape(
+  surface: SheetSurfaceDefinition,
+  apertures: readonly BallisticAperture[],
+): THREE.Shape {
+  const { halfU, halfV, outlineUVQ } = surface.frame;
   const shape = new THREE.Shape();
-  shape.moveTo(-halfU, -halfV);
-  shape.lineTo(halfU, -halfV);
-  shape.lineTo(halfU, halfV);
-  shape.lineTo(-halfU, halfV);
-  shape.closePath();
-  for (const aperture of state.apertures) {
+  if (outlineUVQ && outlineUVQ.length >= 3) {
+    // Owner 2026-08-30: a gable is a triangle, not its bounding rectangle -
+    // rendering the rectangle would stand a slab up to 1.04 m proud of the
+    // sloped roofline at each end. Ballistics still use the bounding frame.
+    const point = (index: number) => ({
+      u: outlineUVQ[index]!.uQ / SHED_PANEL_COORD_Q * halfU,
+      v: outlineUVQ[index]!.vQ / SHED_PANEL_COORD_Q * halfV,
+    });
+    const first = point(0);
+    shape.moveTo(first.u, first.v);
+    for (let index = 1; index < outlineUVQ.length; index += 1) {
+      const next = point(index);
+      shape.lineTo(next.u, next.v);
+    }
+    shape.closePath();
+  } else {
+    shape.moveTo(-halfU, -halfV);
+    shape.lineTo(halfU, -halfV);
+    shape.lineTo(halfU, halfV);
+    shape.lineTo(-halfU, halfV);
+    shape.closePath();
+  }
+  for (const aperture of apertures) {
     const hole = new THREE.Path();
     hole.absellipse(
       aperture.uQ / SHED_PANEL_COORD_Q * halfU,
@@ -68,7 +91,20 @@ function panelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfa
   return shape;
 }
 
-function panelBasis(surface: SheetSurfaceDefinition): THREE.Matrix4 {
+export function createShedPanelShape(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
+  return buildShedPanelShape(surface, normaliseApertures(surface, state.apertures));
+}
+
+/** QA-only raw construction used to keep the historical r185 collapse falsifier alive. */
+export function createRawShedPanelShapeForQA(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.Shape {
+  return buildShedPanelShape(surface, state.apertures);
+}
+
+// Named export retained for the CPU QA instruments; runtime callers use the
+// same function above so the instrument cannot drift into a second shape port.
+export const panelShape = createShedPanelShape;
+
+export function panelBasis(surface: SheetSurfaceDefinition): THREE.Matrix4 {
   const u = new THREE.Vector3(surface.frame.uAxis.x, surface.frame.uAxis.y, surface.frame.uAxis.z);
   const v = new THREE.Vector3(surface.frame.vAxis.x, surface.frame.vAxis.y, surface.frame.vAxis.z);
   const normal = new THREE.Vector3().crossVectors(u, v).normalize();
@@ -83,16 +119,20 @@ function transformedPanelGeometry(
   surface: SheetSurfaceDefinition,
   state: DamageableSheetSurfaceState,
 ): THREE.BufferGeometry {
-  const geometry = new THREE.ShapeGeometry(panelShape(surface, state), 18);
+  const geometry = new THREE.ShapeGeometry(createShedPanelShape(surface, state), 18);
   geometry.applyMatrix4(panelBasis(surface));
   geometry.computeVertexNormals();
   return geometry;
 }
 
 function localPanelGeometry(surface: SheetSurfaceDefinition, state: DamageableSheetSurfaceState): THREE.BufferGeometry {
-  const geometry = new THREE.ShapeGeometry(panelShape(surface, state), 18);
+  const geometry = new THREE.ShapeGeometry(createShedPanelShape(surface, state), 18);
   geometry.computeVertexNormals();
   return geometry;
+}
+
+function indexedTriangleCount(geometry: THREE.BufferGeometry): number {
+  return Math.floor((geometry.index?.count ?? 0) / 3);
 }
 
 /**
@@ -345,6 +385,7 @@ export type ShedPresentationTelemetry = Readonly<{
   detachedChunks: number;
   retiredGeometries: number;
   frameCollapsed: boolean;
+  prewarmed: boolean;
 }>;
 
 function presentationTopologySignature(state: ShedState): string {
@@ -373,6 +414,9 @@ export class DestructibleShedPresentation {
   private topologySignature = '';
   private revision = -1;
   private disposed = false;
+  // HF-332: Per-group prewarm generation and promise for interactive-destruction / collapse-debris
+  gpuPrewarmGeneration: number | null = null;
+  gpuPrewarmPromise: Promise<void> | null = null;
 
   constructor(
     readonly definition: DestructibleShedDefinition,
@@ -480,6 +524,17 @@ export class DestructibleShedPresentation {
       const shellGeometry = staticGeometries.length > 0
         ? mergeGeometries(staticGeometries, false) ?? new THREE.BufferGeometry()
         : new THREE.BufferGeometry();
+      const expectedTriangles = staticGeometries.reduce((sum, geometry) => sum + indexedTriangleCount(geometry), 0);
+      const mergedTriangles = indexedTriangleCount(shellGeometry);
+      if (mergedTriangles !== expectedTriangles) {
+        // A three.js triangulation/merge regression must not replace a valid
+        // shell with an empty or truncated one. Leave the previous mesh and
+        // its telemetry in place; the unchanged topology signature makes the
+        // next sync retry after the renderer has recovered.
+        shellGeometry.dispose();
+        staticGeometries.forEach((geometry) => geometry.dispose());
+        return;
+      }
       staticGeometries.forEach((geometry) => geometry.dispose());
       const oldShell = this.shell;
       const oldShellGeometry = oldShell.geometry;
@@ -630,6 +685,62 @@ export class DestructibleShedPresentation {
     else this.retiredGeometries.add(geometry);
   }
 
+  // HF-332: Prewarms all presentation resources (sheet, frame, rims, dents, debris) for interactive destruction
+  async prewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration = 0,
+  ): Promise<void> {
+    await runPooledGpuPrewarm(this, sceneGeneration, () => this.performGpuPrewarm(runtime, camera, sceneGeneration));
+  }
+
+  private async performGpuPrewarm(
+    runtime: PresentationPrewarmRuntime,
+    camera: THREE.Camera,
+    sceneGeneration: number,
+  ): Promise<void> {
+    const parentScene = this.root.parent;
+    if (!(parentScene instanceof THREE.Scene)) {
+      throw new Error('Destructible shed presentation must be attached to a scene before prewarm');
+    }
+    const previousRimsCount = this.apertureRims.count;
+    const previousDentsCount = this.dents.count;
+    const previousDebrisCount = this.debris.count;
+
+    if (this.apertureRims.count === 0) {
+      placeBoxInstance(this.apertureRims, 0, new THREE.Vector3(0, 1.5, 0), new THREE.Vector3(0.5, 0.5, 0.05));
+      this.apertureRims.count = 1;
+      this.apertureRims.instanceMatrix.needsUpdate = true;
+    }
+    if (this.dents.count === 0) {
+      placeBoxInstance(this.dents, 0, new THREE.Vector3(0, 1.5, 0), new THREE.Vector3(0.5, 0.5, 0.05));
+      this.dents.setColorAt(0, regionalDamageTint(1));
+      this.dents.count = 1;
+      this.dents.instanceMatrix.needsUpdate = true;
+      if (this.dents.instanceColor) this.dents.instanceColor.needsUpdate = true;
+    }
+    if (this.debris.count === 0) {
+      placeBoxInstance(this.debris, 0, new THREE.Vector3(0, 0.1, 0), new THREE.Vector3(1, 1, 1));
+      this.debris.setColorAt(0, debrisTint(this.definition.preauthoredChunkIds[0] ?? 'chunk-0'));
+      this.debris.count = 1;
+      this.debris.instanceMatrix.needsUpdate = true;
+      if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    }
+    try {
+      await runtime.compileAndRender(this.root, camera, parentScene);
+      this.gpuPrewarmGeneration = sceneGeneration;
+    } finally {
+      this.apertureRims.count = previousRimsCount;
+      this.apertureRims.instanceMatrix.needsUpdate = true;
+      this.dents.count = previousDentsCount;
+      this.dents.instanceMatrix.needsUpdate = true;
+      if (this.dents.instanceColor) this.dents.instanceColor.needsUpdate = true;
+      this.debris.count = previousDebrisCount;
+      this.debris.instanceMatrix.needsUpdate = true;
+      if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    }
+  }
+
   telemetry(state: ShedState): ShedPresentationTelemetry {
     const optionalDraws = Number(this.apertureRims.count > 0) + Number(this.dents.count > 0) + Number(this.debris.count > 0);
     return Object.freeze({
@@ -640,6 +751,7 @@ export class DestructibleShedPresentation {
       detachedChunks: state.detachedChunkIds.length,
       retiredGeometries: this.retiredGeometries.size,
       frameCollapsed: this.frameToppled,
+      prewarmed: this.gpuPrewarmGeneration !== null,
     });
   }
 

@@ -4,6 +4,8 @@ import { LEADERBOARD_SEASON } from '../shared/leaderboard-season';
 import { isHostedBotSnapshot, type HostedBotSnapshot } from './hosted-bots';
 import type { KillCause } from './kill-provenance';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
+import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { isOperatorEmoteId, isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
 import type { CombatTiming } from './network-fairness';
 import { isDhv, type Dhv } from './handicap';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
@@ -53,6 +55,14 @@ import {
   type FlashProtocolMessage,
 } from './flash-protocol';
 import {
+  isTaserProtocolMessage,
+  type TaserProtocolMessage,
+} from './taser-protocol';
+import {
+  isThinMetalPerforationStateMessage,
+  type ThinMetalPerforationStateMessage,
+} from './thin-metal-perforation';
+import {
   isTimedMapWeaponProtocolMessage,
   type TimedMapWeaponProtocolMessage,
   type TimedMapWeaponStateMessage,
@@ -66,19 +76,31 @@ import {
   isBotWeaponPresentationMessage,
   type BotWeaponPresentationMessage,
 } from './bot-weapon-presentation';
+// HF-325: host succession carriage. A satellite module on purpose — it must not
+// import protocol.ts back, and the checkpoint it carries is typed through an
+// erased `import type`, so protocol.ts stays free of runtime import cycles.
+import {
+  hostSuccessionMessageBelongsToPlayer,
+  isHostSuccessionProtocolMessage,
+  type HostSuccessionProtocolMessage,
+} from './host-succession-protocol';
 import { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 import { validateKillstreakLoadout, type KillstreakLoadoutV1 } from './killstreak-catalog';
 
 export { GRENADE_IDS, type GrenadeId } from './combat/grenade-catalog';
 
 export type Team = 0 | 1;
-export const MULTIPLAYER_PROTOCOL_VERSION = 18;
+export const MULTIPLAYER_PROTOCOL_VERSION = 19;
 export type PrimaryWeaponId =
   | 'carbine' | 'smg' | 'lmg' | 'scattergun' | 'sniper'
   | 'mini-uzi' | 'mp5' | 'm4a1' | 'ak-47' | 'minigun' | 'm14-ebr' | 'slug-shotgun';
 export type SidearmWeaponId =
   | 'pistol' | 'machine-pistol' | 'magnum' | 'flashlight-pistol' | 'explosive-crossbow';
-export type SpecialWeaponId = 'railgun' | 'flamethrower' | 'flare-gun';
+/** HF-334: `crimson-flamethrower` is the care-package reward variant — a
+ * SEPARATE weapon instance from the arena-bound map `flamethrower`, so a
+ * package grant can never consume the world pickup. Red livery, 30% less
+ * direct damage. Owner decision 2026-08-22. */
+export type SpecialWeaponId = 'railgun' | 'flamethrower' | 'crimson-flamethrower' | 'flare-gun';
 export type WeaponId = PrimaryWeaponId | SidearmWeaponId | SpecialWeaponId;
 
 export const PRIMARY_WEAPON_IDS: readonly PrimaryWeaponId[] = Object.freeze([
@@ -89,7 +111,7 @@ export const SIDEARM_WEAPON_IDS: readonly SidearmWeaponId[] = Object.freeze([
   'pistol', 'machine-pistol', 'magnum', 'flashlight-pistol', 'explosive-crossbow',
 ]);
 export const SPECIAL_WEAPON_IDS: readonly SpecialWeaponId[] = Object.freeze([
-  'railgun', 'flamethrower', 'flare-gun',
+  'railgun', 'flamethrower', 'crimson-flamethrower', 'flare-gun',
 ]);
 export const WEAPON_IDS: readonly WeaponId[] = Object.freeze([
   ...PRIMARY_WEAPON_IDS,
@@ -138,6 +160,10 @@ export type PlayerSnapshot = {
   grenade: GrenadeId;
   weapon: WeaponId;
   stance?: 'stand' | 'crouch' | 'prone';
+  /** HF-358: true while the swim movement state is engaged (swimmable water). */
+  swimming?: boolean;
+  /** HF-504 R-5: host-authored reload presentation state for remote players. */
+  reloading?: boolean;
   seq: number;
 };
 
@@ -207,6 +233,11 @@ export type ShotOutcome = {
   hitZone: 'head' | 'body' | 'limb';
   wallbang: boolean;
   penetrationMultiplier: number;
+  /** HF-347: exact host respawn timestamp for a killed gun-range training
+   * dummy, so the guest's replicated respawnAt (and the lifeId derived from
+   * it) matches the host byte-for-byte instead of being re-derived from the
+   * guest's own clock. Only present on training-dummy death outcomes. */
+  targetRespawnAtHostTimeMs?: number;
 };
 export type ShotResultMessage = {
   type: 'shot-result';
@@ -325,7 +356,46 @@ export type SupportActivateMessage = {
   timing?: CombatTiming;
   nonce: number;
 };
-export type DeathMessage = { type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number };
+export type DeathMessage = {
+  type: 'death'; killer: string; victim: string; cause: KillCause; nonce: number;
+  /** Host-canonical weapon drop; guests never derive a drop from local state. */
+  drop?: PickupResultDropRecord;
+};
+/**
+ * HF-535: a host-authored health/life fact about ONE player, carried on the
+ * reliable event lane so an observer learns it inside one RTT instead of
+ * waiting for the victim's next self-authored movement sequence.
+ *
+ * Why it is a separate message and not a field on `StateMessage`: the canonical
+ * re-broadcast the host emits after applying damage re-uses the LAST sequence
+ * it admitted from the victim, which every observer has already applied, so
+ * `admitRemoteSnapshot` rejects it as an older sequence. Health then arrives
+ * three legs later (host -> victim -> host -> observer). This message carries
+ * its own monotonic `revision` and is ordered independently of movement, so
+ * movement reconciliation is untouched.
+ *
+ * `by` is the AUTHOR and must be the sitting host: `isHostAuthorityMessage`
+ * lists this type, so `network.ts` drops it on a guest connection, and
+ * `admitHealthAuthority` independently re-checks the author against the lobby
+ * host id on the observer. A guest can therefore neither mint one nor have one
+ * relayed on its behalf.
+ */
+export type HealthAuthorityMessage = {
+  type: 'health-authority';
+  /** Sitting host player id; the only legitimate author. */
+  by: string;
+  /** Subject of the health fact. Never equal to `by`. */
+  playerId: string;
+  hp: number;
+  alive: boolean;
+  /** The subject's life/continuity this fact belongs to. */
+  continuity: number;
+  matchEpoch: number;
+  /** Monotonic per subject; an observer applies only a strictly newer one. */
+  revision: number;
+  hostTimeMs: number;
+  nonce: number;
+};
 export type BotStateMessage = { type: 'bot-state'; by: string; seq: number; bots: HostedBotSnapshot[]; nonce: number };
 export type BotDamageMessage = {
   type: 'bot-damage'; by: string; botId: string; target: string; weapon: WeaponId;
@@ -343,6 +413,42 @@ export type PickupMessage = {
   selectedGrenade: GrenadeId;
   grenadeGranted: 0 | 1;
   position: [number, number, number];
+  nonce: number;
+};
+/** Every named admission guard of the host pickup transaction. 'accepted' is
+ * reserved for accepted results; each rejection names the exact failed guard so
+ * a guest can revert its optimistic swap instead of silently diverging. */
+export type PickupResultReason = 'accepted' | 'duplicate' | 'unknown-sender' | 'unknown-drop'
+  | 'weapon-mismatch' | 'out-of-bounds' | 'sender-distance' | 'drop-distance' | 'expired'
+  | 'payload-consumed' | 'grenade-state' | 'grenade-grant' | 'no-inventory'
+  | 'nothing-to-scavenge' | 'not-consumable';
+/** Host-canonical record of what remains on the ground after the transaction. */
+export type PickupResultDropRecord = Readonly<{
+  weapon: WeaponId;
+  ammo: number;
+  reserve: number;
+  position: [number, number, number];
+  expiresAt: number;
+}>;
+/**
+ * Owner requirement (HF-315a): the host answers EVERY pickup request —
+ * accepted or rejected with a named reason — so an optimistic guest swap can
+ * be confirmed against the canonical inventory projection or reverted, instead
+ * of silently diverging host and guest combat authority.
+ */
+export type PickupResultMessage = {
+  type: 'pickup-result';
+  protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
+  by: string;
+  forPlayerId: string;
+  dropId: string;
+  status: 'accepted' | 'rejected';
+  reason: PickupResultReason;
+  /** Host-canonical equipped inventory after the transaction resolved. */
+  combatInventory: GuestCombatInventoryProjection;
+  /** Canonical surviving drop record, or 'removed' when nothing remains. */
+  drop: PickupResultDropRecord | 'removed';
+  /** Echo of the originating PickupMessage nonce for guest correlation. */
   nonce: number;
 };
 export type WindowBreakMessage = {
@@ -399,6 +505,14 @@ export type LobbyJoinMessage = {
   requestedTeam: Team;
   squadName?: string;
   squadColor?: SquadColor;
+  /** HF-360: the joiner's preferred operator skin; host-validated. */
+  skinId?: string;
+  /** HF-382: the joiner's idle stance; host-validated, optional-tolerant. */
+  stanceId?: string;
+  /** Build identity: the pass label the joiner was shipped as. The host refuses
+   * joiners stamped for a different pass (or omitting the field) so a guest on
+   * an older channel can never silently play a different map. */
+  buildId?: string;
   resumeToken: string;
   nonce: number;
 };
@@ -464,6 +578,13 @@ export type LobbyReadyMessage = { type: 'lobby-ready'; by: string; ready: boolea
 export type LobbyTeamMessage = { type: 'lobby-team'; by: string; team: Team; nonce: number };
 export type LobbyHandicapMessage = { type: 'lobby-handicap'; by: string; dhv: Dhv; nonce: number };
 export type LobbySquadMessage = { type: 'lobby-squad'; by: string; squadName: string; squadColor: SquadColor; nonce: number };
+/** HF-360: a member's operator-skin selection. Host-validated against the
+ * canonical selectable catalog; replicated via the lobby snapshot. */
+export type LobbySkinMessage = { type: 'lobby-skin'; by: string; skinId: string; nonce: number };
+/** HF-382: idle-stance twin of lobby-skin, same host-validated lifecycle. */
+export type LobbyStanceMessage = { type: 'lobby-stance'; by: string; stanceId: string; nonce: number };
+/** Transient gesture event; relayed, never stored in lobby state. */
+export type EmoteMessage = { type: 'emote'; by: string; emoteId: string; nonce: number };
 export type RedeployRequestMessage = {
   type: 'redeploy-request'; protocolVersion: typeof MULTIPLAYER_PROTOCOL_VERSION;
   by: string; primary: PrimaryWeaponId; secondary: SidearmWeaponId; grenade: GrenadeId; nonce: number;
@@ -480,6 +601,8 @@ export type ReloadIntentMessage = {
   connectionEpoch: string;
   lifeId: number;
   actionSequence: number;
+  /** Stable across retries; the host uses this as the idempotency key. */
+  requestId: string;
   weapon: OrdinaryWeaponId;
   action: 'start' | 'cancel';
   nonce: number;
@@ -495,6 +618,8 @@ export type ReloadResultMessage = {
   connectionEpoch: string;
   lifeId: number;
   actionSequence: number;
+  /** Echoes the intent key so a retransmitted result is matched exactly. */
+  requestId: string;
   weapon: OrdinaryWeaponId;
   status: 'started' | 'committed' | 'cancelled' | 'rejected';
   reason: ReloadResultReason;
@@ -511,8 +636,17 @@ export type LobbyStartMessage = {
   type: 'lobby-start'; by: string; activeAtHostTimeMs: number; activeAtEpochMs: number;
   hostSentTimeMs: number; revision: number; nonce: number;
 };
-export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch';
+export type LobbyRejectReason = 'room-full' | 'identity-in-use' | 'rejoin-denied' | 'match-active' | 'invalid-config' | 'protocol-mismatch' | 'build-mismatch';
 export type LobbyRejectMessage = { type: 'lobby-reject'; reason: LobbyRejectReason; nonce: number };
+/** 'host-superseded' (HF-325): the sender observed a newer succession term and
+ * surrendered the room; guests should stop rejoin attempts against it. */
+export type LobbyClosedReason = 'host-reset' | 'host-superseded';
+/**
+ * HF-326 residual polish: a best-effort host farewell sent just before an
+ * intentional lobby reset closes every channel, so guests of the invalidated
+ * room stop the 90-second rejoin loop and ask for the fresh code instead.
+ */
+export type LobbyClosedMessage = { type: 'lobby-closed'; reason: LobbyClosedReason; nonce: number };
 export type ClockPingMessage = {
   type: 'clock-ping'; by: string; guestSentMonoMs: number;
   reportedOffsetMs: number | null; reportedRttMs: number | null; reportedJitterMs: number | null;
@@ -537,11 +671,45 @@ export type ChatHistoryMessage = {
   by: string; forPlayerId: string; entries: ChatEntry[]; nonce: number;
 };
 
-export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
-  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
+/**
+ * Owner 2026-08-30 ("it needs to say STUCK on both peoples screen when it
+ * actually sticks, i thought we had sorted that in a previous build").
+ *
+ * It was never sorted: `stuck: true` only ever rode a HitMessage, and a hit is
+ * only produced when the ordnance DETONATES. The machine that simulates the
+ * stick shows STUCK locally at attach; the other peer sees nothing until the
+ * blast, which for a timed sticky is seconds later - or never, if it is
+ * defused by the victim dying to something else first. This message announces
+ * the ATTACH itself, so both the attacker and the victim are told at the
+ * moment it lands. It carries no damage and no authority: it is a feed/alert
+ * cue only, and the blast still travels the existing authoritative hit path.
+ */
+export type StickyAttachedMessage = {
+  type: 'sticky-attached';
+  /** Owner of the ordnance. */
+  by: string;
+  /** Combatant it attached to. */
+  target: string;
+  targetLifeId: number;
+  source: 'grenade' | 'explosive-crossbow';
+  /** Correlates with the eventual detonation hit, and dedupes replays. */
+  actionNonce: number;
+  nonce: number;
+};
+
+export type GameMessage = JoinMessage | StateMessage | BotStateMessage | BotDamageMessage | ShotMessage | ShotRequestMessage | TriggerStateMessage | ShotResultMessage | StateFeedbackMessage | MeleeMessage | GrenadeThrowMessage | GrenadeResultMessage | HitMessage | SupportActivateMessage | DeathMessage | PickupMessage | PickupResultMessage | WindowBreakMessage | LeaveMessage | TeamPingMessage | HighScoreMessage | LeaderboardSyncMessage | OverdriveClaimMessage | OverdriveStateMessage
+  | LobbyJoinMessage | GuestResumeAuthorityMessage | GuestResumeAckMessage | GuestResumeNackMessage | GuestResumeFailureMessage | LobbyReadyMessage | LobbyTeamMessage | LobbyHandicapMessage | LobbySquadMessage | LobbySkinMessage | LobbyStanceMessage | EmoteMessage | RedeployRequestMessage | RedeployCommitMessage | ReloadIntentMessage | ReloadResultMessage | LobbyConfigMessage | LobbyBalanceMessage | LobbyStateMessage | LobbyStartMessage | LobbyRejectMessage | LobbyClosedMessage | ClockPingMessage | ClockPongMessage | MatchScoreMessage | RangeScoreClaimMessage
   | ChatSubmitMessage | ChatMessage | ChatHistoryMessage | RailgunClaimRequestMessage | RailgunShotRequestMessage | RailgunShotResultMessage | RailgunStateMessage
-  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage
-  | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage;
+  | KillstreakProtocolMessage | InteractiveWorldProtocolMessage | SmokeProtocolMessage | FlashProtocolMessage | TaserProtocolMessage
+  | TimedMapWeaponProtocolMessage | FlarePresentationProtocolMessage | BotWeaponPresentationMessage
+  | HealthAuthorityMessage
+  | StickyAttachedMessage
+  // HF-467: the plain thin-metal panel state. Host-authored exactly like the
+  // shed's interactive-world-snapshot, so network.ts drops any copy arriving
+  // on a guest connection: a guest may never mint a hole.
+  | ThinMetalPerforationStateMessage
+  // HF-325: host-succession-mandate | host-authority-mirror | host-promoted.
+  | HostSuccessionProtocolMessage;
 
 const weapons = new Set<WeaponId>(WEAPON_IDS);
 const primaryWeapons = new Set<PrimaryWeaponId>(PRIMARY_WEAPON_IDS);
@@ -561,6 +729,7 @@ export function isPlayerSnapshot(value: unknown): value is PlayerSnapshot {
     && typeof p.hp === 'number' && Number.isFinite(p.hp) && p.hp >= 0 && p.hp <= 100
     && ['kills', 'deaths', 'seq'].every((key) => Number.isSafeInteger(p[key]) && Number(p[key]) >= 0)
     && (p.stance === undefined || p.stance === 'stand' || p.stance === 'crouch' || p.stance === 'prone')
+    && (p.swimming === undefined || typeof p.swimming === 'boolean')
     && primaryWeapons.has(p.primary as PrimaryWeaponId)
     && sidearmWeapons.has(p.secondary as SidearmWeaponId)
     && grenades.has(p.grenade as GrenadeId)
@@ -645,6 +814,24 @@ function isNormalizedDirection(value: unknown): value is [number, number, number
   return magnitude >= 0.96 && magnitude <= 1.04;
 }
 
+const pickupResultReasons = new Set<PickupResultReason>([
+  'accepted', 'duplicate', 'unknown-sender', 'unknown-drop', 'weapon-mismatch', 'out-of-bounds',
+  'sender-distance', 'drop-distance', 'expired', 'payload-consumed', 'grenade-state',
+  'grenade-grant', 'no-inventory', 'nothing-to-scavenge', 'not-consumable',
+]);
+
+function isPickupResultDropRecord(value: unknown): value is PickupResultDropRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const drop = value as Record<string, unknown>;
+  return Object.keys(drop).length === 5
+    && ['weapon', 'ammo', 'reserve', 'position', 'expiresAt'].every((key) => Object.hasOwn(drop, key))
+    && weapons.has(drop.weapon as WeaponId)
+    && Number.isSafeInteger(drop.ammo) && Number(drop.ammo) >= 0 && Number(drop.ammo) <= 10_000
+    && Number.isSafeInteger(drop.reserve) && Number(drop.reserve) >= 0 && Number(drop.reserve) <= 10_000
+    && Array.isArray(drop.position) && drop.position.length === 3 && drop.position.every(Number.isFinite)
+    && Number.isFinite(drop.expiresAt) && Number(drop.expiresAt) >= 0;
+}
+
 const shotRejectReasons = new Set<ShotRejectReason>([
   'none', 'protocol-mismatch', 'unknown-sender', 'duplicate', 'sequence-gap', 'weapon-mismatch', 'cadence',
   'spin-up', 'stale', 'future', 'invalid-direction', 'invalid-pellets', 'bad-origin', 'missing-history',
@@ -657,9 +844,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
   if (isInteractiveWorldProtocolMessage(value)) return true;
   if (isSmokeProtocolMessage(value)) return true;
   if (isFlashProtocolMessage(value)) return true;
+  if (isTaserProtocolMessage(value)) return true; // HF-458
+  if (isThinMetalPerforationStateMessage(value)) return true; // HF-467
   if (isTimedMapWeaponProtocolMessage(value)) return true;
   if (isFlarePresentationProtocolMessage(value)) return true;
   if (isBotWeaponPresentationMessage(value)) return true;
+  if (isHostSuccessionProtocolMessage(value)) return true; // HF-325
   if (!value || typeof value !== 'object') return false;
   const msg = value as Record<string, unknown>;
   switch (msg.type) {
@@ -719,8 +909,12 @@ export function isGameMessage(value: unknown): value is GameMessage {
       if (!isPlayerSnapshot(msg.player)) return false;
       if (msg.combatInventory !== undefined) {
         if (!isGuestCombatInventoryProjection(msg.combatInventory)) return false;
-        if (msg.combatInventory.revision !== msg.player.seq
-          || msg.combatInventory.primary.weapon !== msg.player.primary
+        // No revision/sequence lockstep here: the sender stamps the snapshot
+        // sequence while the host relay stamps its inventory-event revision, so
+        // demanding equality silently drops every host-relayed guest state
+        // (guest-to-guest replication loss, HF-533). Ordering is enforced on
+        // admission by the monotonic inventory cursors, not by transport shape.
+        if (msg.combatInventory.primary.weapon !== msg.player.primary
           || msg.combatInventory.sidearm.weapon !== msg.player.secondary
             && msg.combatInventory.sidearm.weapon !== 'magnum') return false;
       }
@@ -797,10 +991,16 @@ export function isGameMessage(value: unknown): value is GameMessage {
             && Number.isSafeInteger(item.pelletHits) && Number(item.pelletHits) >= 1 && Number(item.pelletHits) <= 12
             && Number.isFinite(item.damage) && Number(item.damage) >= 0 && Number(item.damage) <= 400
             && (item.rawDamage === undefined || Number.isFinite(item.rawDamage) && Number(item.rawDamage) >= Number(item.damage) && Number(item.rawDamage) <= 9_999)
-            && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0 && Number(item.resultingHealth) <= 100
+            // HF-347: gun-range training dummies (test-dummy-*) carry 300 max
+            // health; every combatant target stays bounded at 100.
+            && Number.isFinite(item.resultingHealth) && Number(item.resultingHealth) >= 0
+            && Number(item.resultingHealth) <= (String(item.target).startsWith('test-dummy-') ? 500 : 100)
             && typeof item.died === 'boolean' && (item.hitZone === 'head' || item.hitZone === 'body' || item.hitZone === 'limb')
             && typeof item.wallbang === 'boolean'
-            && Number.isFinite(item.penetrationMultiplier) && Number(item.penetrationMultiplier) >= 0 && Number(item.penetrationMultiplier) <= 1;
+            && Number.isFinite(item.penetrationMultiplier) && Number(item.penetrationMultiplier) >= 0 && Number(item.penetrationMultiplier) <= 1
+            && (item.targetRespawnAtHostTimeMs === undefined
+              || String(item.target).startsWith('test-dummy-')
+                && Number.isFinite(item.targetRespawnAtHostTimeMs) && Number(item.targetRespawnAtHostTimeMs) >= 0);
         })
         && Number.isFinite(msg.nonce);
     case 'state-feedback':
@@ -883,6 +1083,21 @@ export function isGameMessage(value: unknown): value is GameMessage {
               : msg.effectOrigins.length === 0 && msg.targetIds.length === 0)
         && isOptionalCombatTiming(msg.timing)
         && Number.isFinite(msg.nonce);
+    case 'health-authority':
+      // HF-535. Fail-closed on the wire: ids well-formed and distinct (a host
+      // never authors a health fact about itself here), hp inside the authored
+      // range, `alive` consistent with hp so a forged "alive at 0 hp" cannot
+      // parse, and every ordering field a safe non-negative integer.
+      return typeof msg.by === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.by)
+        && typeof msg.playerId === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(msg.playerId)
+        && msg.by !== msg.playerId
+        && typeof msg.hp === 'number' && Number.isFinite(msg.hp) && msg.hp >= 0 && msg.hp <= 100
+        && typeof msg.alive === 'boolean' && msg.alive === (msg.hp > 0)
+        && Number.isSafeInteger(msg.continuity) && Number(msg.continuity) >= 0
+        && Number.isSafeInteger(msg.matchEpoch) && Number(msg.matchEpoch) >= 0
+        && Number.isSafeInteger(msg.revision) && Number(msg.revision) >= 0
+        && typeof msg.hostTimeMs === 'number' && Number.isFinite(msg.hostTimeMs) && msg.hostTimeMs >= 0
+        && Number.isFinite(msg.nonce);
     case 'death':
       return typeof msg.killer === 'string' && typeof msg.victim === 'string'
         && Boolean(msg.cause) && typeof msg.cause === 'object'
@@ -892,6 +1107,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
           || (msg.cause as { kind?: unknown }).kind === 'environment'
           || (msg.cause as { kind?: unknown; effect?: unknown }).kind === 'killstreak'
             && isPass65KillstreakId((msg.cause as { effect?: unknown }).effect))
+        && (msg.drop === undefined || isPickupResultDropRecord(msg.drop))
         && Number.isFinite(msg.nonce);
     case 'bot-damage':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -929,6 +1145,19 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && grenades.has(msg.selectedGrenade as GrenadeId)
         && (msg.grenadeGranted === 0 || msg.grenadeGranted === 1)
         && Array.isArray(msg.position) && msg.position.length === 3 && msg.position.every(Number.isFinite)
+        && Number.isFinite(msg.nonce);
+    case 'pickup-result':
+      return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
+        && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.forPlayerId === 'string' && msg.forPlayerId.length > 0 && msg.forPlayerId.length <= 80
+        && typeof msg.dropId === 'string' && msg.dropId.length > 0 && msg.dropId.length <= 120
+        && (msg.status === 'accepted' || msg.status === 'rejected')
+        && pickupResultReasons.has(msg.reason as PickupResultReason)
+        && (msg.status === 'accepted' ? msg.reason === 'accepted' : msg.reason !== 'accepted')
+        && isGuestCombatInventoryProjection(msg.combatInventory)
+        && (msg.drop === 'removed' || isPickupResultDropRecord(msg.drop))
+        // The nonce echoes the originating pickup request, whose own validator
+        // only requires a finite number.
         && Number.isFinite(msg.nonce);
     case 'window-break':
       return typeof msg.by === 'string'
@@ -991,6 +1220,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && (msg.requestedTeam === 0 || msg.requestedTeam === 1)
         && (msg.squadName === undefined || isSquadName(msg.squadName))
         && (msg.squadColor === undefined || isSquadColor(msg.squadColor))
+        && (msg.skinId === undefined || isSelectableOperatorSkinId(msg.skinId))
+        && (msg.stanceId === undefined || isOperatorStanceId(msg.stanceId))
         && typeof msg.resumeToken === 'string' && msg.resumeToken.length >= 24 && msg.resumeToken.length <= 128
         && /^[a-zA-Z0-9_-]+$/.test(msg.resumeToken)
         && Number.isFinite(msg.nonce);
@@ -1006,6 +1237,15 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'lobby-squad':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isSquadName(msg.squadName) && isSquadColor(msg.squadColor) && Number.isFinite(msg.nonce);
+    case 'lobby-skin':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isSelectableOperatorSkinId(msg.skinId) && Number.isFinite(msg.nonce);
+    case 'lobby-stance':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isOperatorStanceId(msg.stanceId) && Number.isFinite(msg.nonce);
+    case 'emote':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && isOperatorEmoteId(msg.emoteId) && msg.emoteId !== 'none' && Number.isFinite(msg.nonce);
     case 'redeploy-request':
       return msg.protocolVersion === MULTIPLAYER_PROTOCOL_VERSION
         && typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
@@ -1028,6 +1268,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
         && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && typeof msg.requestId === 'string' && /^[a-zA-Z0-9_-]{8,160}$/.test(msg.requestId)
         && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
         && (msg.action === 'start' || msg.action === 'cancel')
         && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
@@ -1038,6 +1279,7 @@ export function isGameMessage(value: unknown): value is GameMessage {
         && typeof msg.connectionEpoch === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(msg.connectionEpoch)
         && Number.isSafeInteger(msg.lifeId) && Number(msg.lifeId) >= 0
         && Number.isSafeInteger(msg.actionSequence) && Number(msg.actionSequence) >= 0 && Number(msg.actionSequence) <= 1_000_000_000
+        && typeof msg.requestId === 'string' && /^[a-zA-Z0-9_-]{8,160}$/.test(msg.requestId)
         && ORDINARY_WEAPON_IDS.includes(msg.weapon as OrdinaryWeaponId)
         && (msg.status === 'started' || msg.status === 'committed' || msg.status === 'cancelled' || msg.status === 'rejected')
         && (msg.reason === 'accepted' || msg.reason === 'action-sequence' || msg.reason === 'connection-epoch'
@@ -1062,6 +1304,14 @@ export function isGameMessage(value: unknown): value is GameMessage {
     case 'railgun-shot-result':
     case 'railgun-state':
       return isRailgunProtocolMessage(msg, MULTIPLAYER_PROTOCOL_VERSION);
+    case 'sticky-attached':
+      return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
+        && typeof msg.target === 'string' && msg.target.length > 0 && msg.target.length <= 80
+        && msg.by !== msg.target
+        && Number.isSafeInteger(msg.targetLifeId) && Number(msg.targetLifeId) >= 0
+        && (msg.source === 'grenade' || msg.source === 'explosive-crossbow')
+        && Number.isSafeInteger(msg.actionNonce) && Number(msg.actionNonce) >= 0
+        && Number.isSafeInteger(msg.nonce) && Number(msg.nonce) >= 0;
     case 'lobby-config':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && isPrivateMatchConfig(msg.config) && Number.isFinite(msg.nonce);
@@ -1083,6 +1333,8 @@ export function isGameMessage(value: unknown): value is GameMessage {
       return (msg.reason === 'room-full' || msg.reason === 'identity-in-use' || msg.reason === 'rejoin-denied'
         || msg.reason === 'match-active' || msg.reason === 'invalid-config' || msg.reason === 'protocol-mismatch')
         && Number.isFinite(msg.nonce);
+    case 'lobby-closed':
+      return (msg.reason === 'host-reset' || msg.reason === 'host-superseded') && Number.isFinite(msg.nonce);
     case 'clock-ping':
       return typeof msg.by === 'string' && msg.by.length > 0 && msg.by.length <= 80
         && Number.isFinite(msg.guestSentMonoMs) && Number(msg.guestSentMonoMs) >= 0
@@ -1137,11 +1389,16 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
   if (!playerId) return false;
   if (isKillstreakProtocolMessage(message)) return killstreakMessageBelongsToPlayer(message, playerId);
   if (isInteractiveWorldProtocolMessage(message)) return message.by === playerId;
+  // HF-467: the thin-metal state is authored by its sender (the host).
+  if (isThinMetalPerforationStateMessage(message)) return message.by === playerId;
   if (isSmokeProtocolMessage(message)) return message.by === playerId;
   if (isFlashProtocolMessage(message)) return message.by === playerId;
+  if (isTaserProtocolMessage(message)) return message.by === playerId;
   if (isTimedMapWeaponProtocolMessage(message)) return message.by === playerId;
   if (isFlarePresentationProtocolMessage(message)) return message.by === playerId;
   if (isBotWeaponPresentationMessage(message)) return message.by === playerId;
+  // HF-325: every succession message is signed by its own author.
+  if (isHostSuccessionProtocolMessage(message)) return hostSuccessionMessageBelongsToPlayer(message, playerId);
   switch (message.type) {
     case 'join':
     case 'state':
@@ -1168,6 +1425,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'support-activate':
     case 'ping':
     case 'pickup':
+    case 'pickup-result':
     case 'window-break':
     case 'high-score':
     case 'leaderboard-sync':
@@ -1177,6 +1435,9 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'lobby-team':
     case 'lobby-handicap':
     case 'lobby-squad':
+    case 'lobby-skin':
+    case 'lobby-stance':
+    case 'emote':
     case 'redeploy-request':
     case 'redeploy-commit':
     case 'reload-intent':
@@ -1185,6 +1446,7 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'railgun-shot-request':
     case 'railgun-shot-result':
     case 'railgun-state':
+    case 'sticky-attached':
     case 'lobby-config':
     case 'lobby-balance':
     case 'lobby-state':
@@ -1196,20 +1458,34 @@ export function messageBelongsToPlayer(message: GameMessage, playerId: string): 
     case 'chat-submit':
     case 'chat-message':
     case 'chat-history':
+    // HF-535: the author, not the subject. Unreachable in practice because
+    // `isHostAuthorityMessage` already drops it on a guest connection; kept so
+    // the exhaustive switch states the ownership rule rather than defaulting.
+    case 'health-authority':
       return message.by === playerId;
     case 'death':
       return message.victim === playerId;
     case 'leave':
       return message.playerId === playerId;
     case 'lobby-reject':
+    case 'lobby-closed':
       return false;
   }
 }
 
 export function isHostAuthorityMessage(message: GameMessage): boolean {
   return isKillstreakProtocolMessage(message) && isKillstreakHostAuthorityMessage(message)
+    // HF-325: mandate, mirror and promotion claim are all host-authored, so
+    // network.ts drops every one of them arriving on a guest connection. A
+    // guest may never mint a mandate, inject a mirror, or announce a promotion
+    // to the sitting host.
+    || isHostSuccessionProtocolMessage(message)
     || isFlashProtocolMessage(message)
+    // HF-458: the taser stun is host-authored exactly like the flash result, so
+    // a guest may never mint one and network.ts drops it on a guest connection.
+    || isTaserProtocolMessage(message)
     || message.type === 'interactive-world-snapshot'
+    || message.type === 'thin-metal-perforation-state'
     || message.type === 'smoke-state'
     || message.type === 'lobby-config'
     || message.type === 'guest-resume-authority'
@@ -1217,8 +1493,13 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'lobby-state'
     || message.type === 'lobby-start'
     || message.type === 'lobby-reject'
+    || message.type === 'lobby-closed'
     || message.type === 'clock-pong'
     || message.type === 'death'
+    // HF-535: only the sitting host may state a health/life fact about another
+    // player. Listing it here makes network.ts drop it on a guest connection,
+    // so a guest cannot mint one or have one relayed on its behalf.
+    || message.type === 'health-authority'
     || message.type === 'shot-result'
     || message.type === 'grenade-result'
     || message.type === 'match-score'
@@ -1226,6 +1507,7 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'chat-history'
     || message.type === 'redeploy-commit'
     || message.type === 'reload-result'
+    || message.type === 'pickup-result'
     || message.type === 'railgun-state'
     || message.type === 'timed-map-weapon-state'
     || message.type === 'flare-presentation-state'
@@ -1237,9 +1519,10 @@ export function isHostAuthorityMessage(message: GameMessage): boolean {
     || message.type === 'window-break' && message.hostAuthority !== undefined;
 }
 
-export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
+export function isStateTrafficMessage(message: GameMessage): message is StateMessage | BotStateMessage | RailgunStateMessage | KillstreakStateMessage | InteractiveWorldSnapshotMessage | SmokeStateMessage | ThinMetalPerforationStateMessage | TimedMapWeaponStateMessage | FlarePresentationStateMessage {
   return message.type === 'state' || message.type === 'bot-state' || message.type === 'railgun-state'
     || message.type === 'killstreak-state' || message.type === 'interactive-world-snapshot' || message.type === 'smoke-state'
+    || message.type === 'thin-metal-perforation-state'
     || message.type === 'timed-map-weapon-state' || message.type === 'flare-presentation-state';
 }
 

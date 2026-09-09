@@ -1,0 +1,135 @@
+{
+  "baseUrl": "http://127.0.0.1:4300/",
+  "sampleMs": 60000,
+  "at": "2026-09-04T16:26:40.177Z",
+  "runs": [
+    {
+      "arenaId": "nuketown2",
+      "ok": false,
+      "reason": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+      "pageErrors": [
+        "Error: WebGPU was required, but no GPU adapter was available at all"
+      ]
+    },
+    {
+      "arenaId": "skyline-terminal",
+      "ok": false,
+      "reason": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+      "pageErrors": [
+        "Error: WebGPU was required, but no GPU adapter was available at all"
+      ]
+    }
+  ],
+  "raw": [
+    {
+      "arenaId": "nuketown2",
+      "ok": false,
+      "reason": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+      "samples": [],
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town WebGPU diagnostics]\nNUKE TOWN - WEBGPU DIAGNOSTICS\n\nWHAT THIS PAGE CAN SEE (re-probed after the renderer failed to start)\n  navigator.gpu: present\n  requestAdapter({ powerPreference: 'high-performance' }): null - the browser offered no adapter\n  requestAdapter({ powerPreference: 'low-power' }): null - the browser offered no adapter\n  requestAdapter() unhinted: null - the browser offered"
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town fatal] Error: This game needs WebGPU. Use a current Chrome, Edge or Firefox (Windows) - or check that graphics acceleration is enabled in your browser settings. (WebGPU was required, but no GPU adapter was available at all)\n    at http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:759:217998"
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town unhandled rejection] WebGPU was required, but no GPU adapter was available at all\nError: WebGPU was required, but no GPU adapter was available at all\n    at dl (http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:27:54550)\n    at e.create (http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:27:59229)\n    at async http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:759:217725"
+        }
+      ],
+      "pageErrors": [
+        "Error: WebGPU was required, but no GPU adapter was available at all"
+      ]
+    },
+    {
+      "arenaId": "skyline-terminal",
+      "ok": false,
+      "reason": "TimeoutError: page.waitForFunction: Timeout 120000ms exceeded.",
+      "samples": [],
+      "consoleMessages": [
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "The powerPreference option is currently ignored when calling requestAdapter() on Windows. See https://crbug.com/369219127"
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "warning",
+          "text": "No available adapters."
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town WebGPU diagnostics]\nNUKE TOWN - WEBGPU DIAGNOSTICS\n\nWHAT THIS PAGE CAN SEE (re-probed after the renderer failed to start)\n  navigator.gpu: present\n  requestAdapter({ powerPreference: 'high-performance' }): null - the browser offered no adapter\n  requestAdapter({ powerPreference: 'low-power' }): null - the browser offered no adapter\n  requestAdapter() unhinted: null - the browser offered"
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town fatal] Error: This game needs WebGPU. Use a current Chrome, Edge or Firefox (Windows) - or check that graphics acceleration is enabled in your browser settings. (WebGPU was required, but no GPU adapter was available at all)\n    at http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:759:217998"
+        },
+        {
+          "type": "error",
+          "text": "[Nuke Town unhandled rejection] WebGPU was required, but no GPU adapter was available at all\nError: WebGPU was required, but no GPU adapter was available at all\n    at dl (http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:27:54550)\n    at e.create (http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:27:59229)\n    at async http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:759:217725"
+        }
+      ],
+      "pageErrors": [
+        "Error: WebGPU was required, but no GPU adapter was available at all"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,9 @@ import {
 describe('HF-184/HF-185 killstreak demo media registry', () => {
   it('covers every canonical killstreak with truthful local poster/video metadata', () => {
     expect(Object.keys(KILLSTREAK_DEMO_MEDIA).sort())
-      .toEqual(PASS65_KILLSTREAK_CATALOG.definitions.map(({ id }) => id).sort());
+      .toEqual(PASS65_KILLSTREAK_CATALOG.definitions
+        .filter(({ availability }) => availability !== 'care-only')
+        .map(({ id }) => id).sort());
     for (const definition of Object.values(KILLSTREAK_DEMO_MEDIA)) {
       expect(definition.media.posterPath).toBe(killstreakDemoPosterPath(definition.id));
       expect(definition.media.posterPath).toMatch(/^\.\/assets\/original\/killstreak-demo\/.+\.jpg$/u);
@@ -20,7 +22,8 @@ describe('HF-184/HF-185 killstreak demo media registry', () => {
       expect(definition.summary.length).toBeGreaterThan(40);
     }
     expect(new Set(Object.values(KILLSTREAK_DEMO_MEDIA).map(({ media }) => media.videoPath)).size)
-      .toBe(PASS65_KILLSTREAK_CATALOG.definitions.length);
+      .toBe(PASS65_KILLSTREAK_CATALOG.definitions
+        .filter(({ availability }) => availability !== 'care-only').length);
   });
 
   it('ships one bounded decoder with a poster fallback and no live renderer', () => {

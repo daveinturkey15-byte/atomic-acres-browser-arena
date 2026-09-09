@@ -1,0 +1,113 @@
+{
+  "contract": "pipeline-compile-stall-probe-v1",
+  "measuredAt": "2026-09-02T18:40:04.124Z",
+  "label": "hf410-repair-run3",
+  "arena": "atomic-acres",
+  "idle": false,
+  "dist": "C:\\Users\\david\\projects\\aa-claude-hf395\\dist",
+  "seconds": 75,
+  "hooked": true,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "window": {
+    "windowS": 75.006,
+    "rafCallbacks": 2747,
+    "stallCount": 8,
+    "stallsPerMinute": 6.4,
+    "frozenFractionPercent": 1.36,
+    "medianStallMs": 127.8,
+    "maxStallMs": 150
+  },
+  "pipelines": {
+    "beforeWindow": 374,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 1.36,
+    "enrichment": null
+  },
+  "shaderModules": {
+    "beforeWindow": 431,
+    "inWindow": 0,
+    "perMinuteInWindow": 0,
+    "inStall": 0,
+    "inStallSharePercent": null,
+    "expectedIfUnrelatedPercent": 1.36,
+    "enrichment": null
+  },
+  "stateTransitions": [
+    {
+      "atMs": 87090,
+      "alive": true,
+      "weapon": "carbine"
+    }
+  ],
+  "cacheKeyDiffs": [],
+  "cacheKeyDiffCount": 0,
+  "determinantFlips": [
+    {
+      "atMs": 86847,
+      "signs": [
+        "MAT_Pass65_Arms_FingerGlove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Glove_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_Sleeve_PBR:pos:9.28e-3",
+        "MAT_Pass65_Arms_WristAccent_PBR:pos:9.28e-3",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1",
+        "MAT_Pass65_carbine_Gunmetal:pos:1.04e-1"
+      ]
+    }
+  ],
+  "determinantFlipCount": 1,
+  "samplePipelineLabels": [],
+  "stalls": [
+    {
+      "startMs": 94524.5,
+      "endMs": 94669,
+      "durationMs": 144.5
+    },
+    {
+      "startMs": 115268.9,
+      "endMs": 115380,
+      "durationMs": 111.1
+    },
+    {
+      "startMs": 125797,
+      "endMs": 125947,
+      "durationMs": 150
+    },
+    {
+      "startMs": 128791,
+      "endMs": 128891,
+      "durationMs": 100
+    },
+    {
+      "startMs": 131280.6,
+      "endMs": 131392,
+      "durationMs": 111.4
+    },
+    {
+      "startMs": 143786.2,
+      "endMs": 143914,
+      "durationMs": 127.8
+    },
+    {
+      "startMs": 151764,
+      "endMs": 151914,
+      "durationMs": 150
+    },
+    {
+      "startMs": 154513.2,
+      "endMs": 154641,
+      "durationMs": 127.8
+    }
+  ]
+}

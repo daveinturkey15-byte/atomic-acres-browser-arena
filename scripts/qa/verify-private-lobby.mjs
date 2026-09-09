@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, dirname } from 'node:path';
 import { chromium } from '@playwright/test';
+import { OFFSCREEN_ARGS, SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 
 const baseUrl = process.env.QA_BASE_URL ?? '';
 const peerPort = Number(process.env.QA_PEER_PORT ?? Number.NaN);
@@ -34,6 +35,7 @@ if (servedCandidate?.schemaVersion !== 4 || servedCandidate.channel !== 'the-big
 const browser = await chromium.launch({
   headless: process.env.QA_HEADED !== '1',
   args: [
+    ...OFFSCREEN_ARGS,...SILENT_ARGS,
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows', '--allow-loopback-in-peer-connection',
     '--disable-features=WebRtcHideLocalIpsWithMdns',

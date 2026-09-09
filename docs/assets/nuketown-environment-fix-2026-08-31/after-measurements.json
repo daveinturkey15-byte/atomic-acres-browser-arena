@@ -1,0 +1,220 @@
+{
+  "label": "after",
+  "backend": "webgpu",
+  "base": "http://127.0.0.1:41932",
+  "fixedTimeMs": 42000,
+  "seed": 82031,
+  "inventory": {
+    "layers": {
+      "nuketown-mountain-backdrop": {
+        "found": true,
+        "drawCalls": 4,
+        "triangles": 5280,
+        "instances": 0
+      },
+      "nuketown-forest-surround": {
+        "found": true,
+        "drawCalls": 5,
+        "triangles": 61953,
+        "instances": 1447
+      },
+      "nuketown-lawn": {
+        "found": true,
+        "drawCalls": 4,
+        "triangles": 370980,
+        "instances": 24732
+      },
+      "nuketown-yard-vegetation": {
+        "found": true,
+        "drawCalls": 6,
+        "triangles": 8716,
+        "instances": 81
+      }
+    },
+    "budget": null,
+    "neighbourhoodLife": {
+      "presentationOnly": true,
+      "blocksShots": false,
+      "streetBatchStats": {
+        "sourceMeshes": 72,
+        "batches": 1
+      },
+      "nuketownYardVegetationStats": {
+        "trees": 8,
+        "understoryClumps": 49,
+        "meshes": 6,
+        "triangles": 8716,
+        "maxPlantingHeightM": 0.403
+      },
+      "nuketownForestStats": {
+        "conifers": 340,
+        "broadleafs": 169,
+        "understory": 260,
+        "contactSkirts": 509,
+        "meshes": 5,
+        "triangles": 61953
+      },
+      "nuketownLawnStats": {
+        "blades": 24732,
+        "triangles": 370980,
+        "drawCalls": 4,
+        "regions": 4
+      },
+      "nuketownBackdropStats": {
+        "meshes": 4,
+        "triangles": 5280
+      },
+      "neighbourhoodLife": {
+        "flowers": 72,
+        "flowerBeds": 6,
+        "benches": 4,
+        "bins": 6,
+        "mannequins": 0,
+        "bicycles": 0,
+        "markers": 0,
+        "butterflies": 0,
+        "birds": 0
+      },
+      "pass65StaticBatchReady": true
+    }
+  },
+  "shots": {
+    "1-lane": {
+      "pose": {
+        "name": "1-lane",
+        "x": -27,
+        "y": 1.7,
+        "z": 0,
+        "lookX": 34,
+        "lookZ": 0,
+        "pitch": -0.02,
+        "yaw": -1.5707963267948966
+      }
+    },
+    "2-horizon": {
+      "pose": {
+        "name": "2-horizon",
+        "x": 0,
+        "y": 1.7,
+        "z": -20,
+        "lookX": 0,
+        "lookZ": -90,
+        "pitch": 0.05,
+        "yaw": 0
+      }
+    },
+    "3-grass": {
+      "pose": {
+        "name": "3-grass",
+        "x": 0,
+        "y": 0.92,
+        "z": -18,
+        "lookX": -3.5,
+        "lookZ": -21.5,
+        "pitch": -0.36,
+        "yaw": 0.7853981633974483
+      }
+    },
+    "4-tree": {
+      "pose": {
+        "name": "4-tree",
+        "x": 17,
+        "y": 1.62,
+        "z": -24.2,
+        "lookX": 13,
+        "lookZ": -27.5,
+        "pitch": 0.18,
+        "yaw": 0.8809962820612887
+      }
+    },
+    "4b-tree-side": {
+      "pose": {
+        "name": "4b-tree-side",
+        "x": -13.5,
+        "y": 1.62,
+        "z": -25.5,
+        "lookX": -9,
+        "lookZ": -28.5,
+        "pitch": 0.16,
+        "yaw": -0.982793723247329
+      }
+    },
+    "5-forest-contact": {
+      "pose": {
+        "name": "5-forest-contact",
+        "x": 0,
+        "y": 6.5,
+        "z": -27,
+        "lookX": 0,
+        "lookZ": -48,
+        "pitch": -0.16,
+        "yaw": 0
+      }
+    },
+    "6-ridge-meter": {
+      "pose": {
+        "name": "6-ridge-meter",
+        "x": 0,
+        "y": 11,
+        "z": -8,
+        "lookX": 0,
+        "lookZ": -90,
+        "pitch": 0.02,
+        "yaw": 0
+      }
+    },
+    "7-ridge-meter-south": {
+      "pose": {
+        "name": "7-ridge-meter-south",
+        "x": 0,
+        "y": 11,
+        "z": 8,
+        "lookX": 0,
+        "lookZ": 90,
+        "pitch": 0.02,
+        "yaw": -3.141592653589793
+      }
+    }
+  },
+  "ridgeSky": {
+    "2-horizon": {
+      "pixels": 29691,
+      "coveragePercent": 3.22,
+      "ridgeLuminance": 92.41,
+      "skyLuminance": 104.5,
+      "ratio": 0.884
+    },
+    "6-ridge-meter": {
+      "pixels": 157108,
+      "coveragePercent": 17.05,
+      "ridgeLuminance": 69.36,
+      "skyLuminance": 141.65,
+      "ratio": 0.49
+    },
+    "7-ridge-meter-south": {
+      "pixels": 145526,
+      "coveragePercent": 15.79,
+      "ridgeLuminance": 65.37,
+      "skyLuminance": 155.45,
+      "ratio": 0.421
+    }
+  },
+  "framePacing": {
+    "1-lane": {
+      "frames": 570,
+      "meanMs": 8.759,
+      "medianMs": 8.5,
+      "p95Ms": 12.600000023841858,
+      "fps": 114.2
+    },
+    "2-horizon": {
+      "frames": 570,
+      "meanMs": 8.235,
+      "medianMs": 7.600000023841858,
+      "p95Ms": 15,
+      "fps": 121.4
+    }
+  },
+  "errors": [],
+  "capturedAt": "2026-08-31T08:32:02.992Z"
+}

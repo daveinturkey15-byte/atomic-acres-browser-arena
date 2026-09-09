@@ -1,0 +1,82 @@
+[
+  {
+    "name": "skin-card-default",
+    "out": "skin-cards/default-card-master.png",
+    "width": 896,
+    "height": 1152,
+    "prompt": "Tactical FPS video game operator selection card: portrait of a single special forces operator, three-quarter view from the chest up, wearing teal-grey standard issue woven fatigues with a matte ballistic plate carrier and webbing, full-face helmet with a glowing cyan visor strip, subtle teal-cyan trim lines on the gear, warm tan skin visible at the jaw, dramatic cyan rim light from the left, dark teal vertical gradient studio backdrop fading from deep teal at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, matte woven fabric texture, no text, no letters, no watermark, no logo, original character design"
+  },
+  {
+    "name": "skin-card-explorer",
+    "out": "skin-cards/explorer-card-master.png",
+    "width": 896,
+    "height": 1152,
+    "prompt": "Tactical FPS video game operator selection card: portrait of a single high-altitude survey climber, three-quarter view from the chest up, wearing a sand-bleached hooded canvas wrap over a ribbed thermal layer, a mirrored wraparound visor with a cracked corner, a chest-mounted anemometer and two carabiner-hung rope coils across the torso, taped forearms, no exposed hair, weathered pale-ochre and slate palette, harsh high-desert sunlight, matte cinematic game key art, original character design"
+  },
+  {
+    "name": "skin-card-symbiote",
+    "out": "skin-cards/symbiote-card-master.png",
+    "width": 896,
+    "height": 1152,
+    "prompt": "Tactical FPS video game operator selection card: portrait of a single heavy breacher in sealed chitin-plate exo-armour, three-quarter view from the chest up, layered matte ceramic carapace plating with amber translucent pressure ridges along the shoulder seams, a full sealed mandible respirator with four intake ports and no visible face, recessed teal indicator strips, industrial rivet seams, charcoal and amber palette, cold rig lighting, matte cinematic game key art, original character design"
+  },
+  {
+    "name": "skin-card-navalops",
+    "out": "skin-cards/navalops-card-master.png",
+    "width": 896,
+    "height": 1152,
+    "prompt": "Tactical FPS video game operator selection card: portrait of a single maritime special operations diver, three-quarter view from the chest up, wearing a matte navy-blue wet neoprene dive suit with a snug hood, low-profile grey maritime chest rig, compact dive mask with a pale ice-blue glass pushed up on the forehead, fine water droplets beading on the wet rubber, cool steel-blue rim light from the left, deep navy vertical gradient studio backdrop fading from dark ocean blue at the top to near-black at the bottom, painterly realistic concept art, crisp silhouette, centered composition, wet sheen neoprene texture, no text, no letters, no watermark, no logo, original character design"
+  },
+  {
+    "name": "loading-atomic-acres",
+    "out": "loading/atomic-acres-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide shot from a low-flying helicopter: a retro-futuristic 1950s atompunk suburban cul-de-sac at late afternoon, two tidy single-storey houses painted vibrant aqua and orange with atomic-age fins and porthole windows, a parked yellow school bus on the asphalt loop, white picket fences and trimmed lawns, long warm shadows, dramatic orange sunset sky with scattered clouds, slight downward camera angle over the street, painterly realistic, rich saturated colour, no people, no text, no watermark"
+  },
+  {
+    "name": "loading-skyline-terminal",
+    "out": "loading/skyline-terminal-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide shot on a helicopter apron approach: a modern glass airport concourse at crisp cool dawn, a white twin-engine jetliner parked at the tarmac apron with a boarding gangway attached, wet concrete reflecting pale blue morning light, ground service vehicles and baggage carts, control tower silhouette in the distance, cold cyan-blue colour grade with a thin warm sunrise line on the horizon, painterly realistic, no people, no text, no watermark"
+  },
+  {
+    "name": "loading-rustworks",
+    "out": "loading/rustworks-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide shot orbiting at night: a weathered offshore oil rig platform standing alone far out at sea, one tall lattice steel derrick tower sharply silhouetted against a clear deep-blue night sky, heavily rusted orange-brown steel plates, gratings, catwalks and tangled pipework picked out in crisp detail, harsh industrial floodlights throwing bright warm pools of light across the deck and casting long hard shadows, dark choppy ocean below with moonlit swells breaking against the legs, high contrast between the warm lit steel and the cold blue night, clear air, moody maritime atmosphere, painterly realistic, no people, no text, no watermark",
+    "seed": 20260823002
+  },
+  {
+    "name": "loading-gun-range",
+    "out": "loading/gun-range-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide interior shot looking straight down a modern indoor firearms training range: four parallel shooting lanes divided by dark partition walls, each lane lit by its own overhead spotlight, white paper human-silhouette targets with concentric scoring rings hanging on wire carriers at the far end of every lane, sturdy shooting benches in the foreground with magazines and ammunition boxes laid out, spent brass casings scattered on the polished concrete floor, black acoustic foam panelling on the walls and ceiling, strong one-point perspective with deep receding depth, cool clinical white-and-teal colour grade with crisp highlights, painterly realistic, no people, no text, no watermark",
+    "seed": 20260823001
+  },
+  {
+    "name": "loading-farcrysis",
+    "out": "loading/farcrysis-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide aerial establishing shot high above a lush tropical Pacific island at golden hour: a broad turquoise lagoon with visible coral heads and a bright curving sand beach in the foreground, dense green jungle canopy rising behind it to steep volcanic ridges, a weathered grey concrete research station ruin with tall antenna masts half-swallowed by vines in a jungle clearing, warm low sun flaring across the water, scattered palms along the shoreline, unobstructed full-frame open view, painterly realistic, adventure island atmosphere, no people, no text, no watermark, no window frame, no border, no vignette",
+    "seed": 20260823003
+  },
+  {
+    "name": "loading-high-seas",
+    "out": "loading/high-seas-loading-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Tactical FPS deployment loading screen concept art, cinematic wide shot from a helicopter making a starboard pass stern to bow: a sleek white luxury superyacht under way on open ocean at daybreak, three stacked white decks with tinted glass railings, a long foaming wake trailing behind, warm low sun catching the white superstructure, cool blue-grey sea and soft dawn sky, subtle tension of a vessel running dark with no crew visible, painterly realistic, no people, no text, no watermark"
+  },
+  {
+    "name": "menu-backdrop",
+    "out": "menu/main-menu-backdrop-master.png",
+    "width": 1536,
+    "height": 864,
+    "prompt": "Cinematic main menu key art for a tactical FPS video game: four special forces operators seen from behind in silhouette standing on a concrete helipad at dusk, looking out over a retro-futuristic pastel suburban coastline on the right and a white superyacht offshore on the left, dramatic teal-and-orange sunset sky with towering clouds, dark low-contrast foreground suitable for overlaying interface elements, painterly realistic concept art, wide composition with calm negative space in the upper left, no text, no letters, no watermark, no logo"
+  }
+]

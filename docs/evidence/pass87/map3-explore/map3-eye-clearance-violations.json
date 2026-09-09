@@ -1,0 +1,344 @@
+{
+ "arena": "map3",
+ "probeM": 0.15,
+ "spotCount": 3399,
+ "traces": 23721,
+ "violations": [
+  {
+   "x": -34.12,
+   "z": -40.34,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    -0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.5,
+   "z": -40.72,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.23,
+   "z": -39.79,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    -0.57,
+    0.6,
+    -0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -32.8,
+   "z": -40.72,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.12,
+   "z": -43.66,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    -0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.18,
+   "z": -43.94,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.07,
+   "z": -44.21,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    0.57,
+    0.6,
+    0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.5,
+   "z": -46.88,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    -0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.23,
+   "z": -47.81,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    -0.57,
+    0.6,
+    0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.18,
+   "z": -47.26,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -32.8,
+   "z": -46.88,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    -0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.07,
+   "z": -46.99,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    0.57,
+    0.6,
+    -0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.12,
+   "z": -51.14,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    -0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.5,
+   "z": -51.52,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.23,
+   "z": -50.59,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    -0.57,
+    0.6,
+    -0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -32.8,
+   "z": -51.52,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.12,
+   "z": -54.46,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    -0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.18,
+   "z": -54.74,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.07,
+   "z": -55.01,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    0.57,
+    0.6,
+    0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.5,
+   "z": -57.68,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    -0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -34.23,
+   "z": -58.61,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    -0.57,
+    0.6,
+    0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.18,
+   "z": -58.06,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0.8,
+    0.6,
+    0
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -32.8,
+   "z": -57.68,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "face",
+   "dir": [
+    0,
+    0.6,
+    -0.8
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  },
+  {
+   "x": -33.07,
+   "z": -57.79,
+   "eyeY": 0.61,
+   "stance": "prone",
+   "kind": "corner",
+   "dir": [
+    0.57,
+    0.6,
+    -0.57
+   ],
+   "distance": 0.033,
+   "surface": "map3-shoreline-pier-deck"
+  }
+ ]
+}

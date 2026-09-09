@@ -1,0 +1,12 @@
+  ok 11 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test1: boots a clean visible solo match (41.4s)
+  ok 12 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › test2: boots a clean visible solo match (41.8s)
+  ok 13 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › map3: boots a clean visible solo match (46.9s)
+
+  Slow test file: [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts (8.8m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  13 passed (8.9m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m

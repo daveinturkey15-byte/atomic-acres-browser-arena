@@ -1,0 +1,1403 @@
+{
+  "lane": "AB",
+  "contract": "band-readability-scan-v2-with-shadow-floor",
+  "generatedAt": "2026-09-03T03:49:20.522Z",
+  "gitSha": "adc1baf7840e50c6040321cd345c58dd1b4a08db",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "maxShadowMassGrowthPoints": 3,
+  "maxShadowFloorDropSteps": 2,
+  "environmentInvalid": null,
+  "scans": [
+    {
+      "arena": "farcrysis",
+      "weather": "clear",
+      "band": [
+        9,
+        17
+      ],
+      "authoredHour": 12.5,
+      "samples": [
+        {
+          "hour": 9,
+          "identityShadowMassPercent": 24.97,
+          "shadowMassPercent": 25.25,
+          "shadowMassGrowthPoints": 0.28,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8401,
+          "shadowFloorScale": 1.1838,
+          "safe": true
+        },
+        {
+          "hour": 9.667,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 25.33,
+          "shadowMassGrowthPoints": 0.38,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9102,
+          "shadowFloorScale": 1.1032,
+          "safe": true
+        },
+        {
+          "hour": 10.333,
+          "identityShadowMassPercent": 24.97,
+          "shadowMassPercent": 25.29,
+          "shadowMassGrowthPoints": 0.32,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9562,
+          "shadowFloorScale": 1.0504,
+          "safe": true
+        },
+        {
+          "hour": 11,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 25.22,
+          "shadowMassGrowthPoints": 0.27,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9835,
+          "shadowFloorScale": 1.019,
+          "safe": true
+        },
+        {
+          "hour": 11.667,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 25.09,
+          "shadowMassGrowthPoints": 0.14,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9971,
+          "shadowFloorScale": 1.0033,
+          "safe": true
+        },
+        {
+          "hour": 12.333,
+          "identityShadowMassPercent": 24.96,
+          "shadowMassPercent": 25,
+          "shadowMassGrowthPoints": 0.04,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0006,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 13,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 24.89,
+          "shadowMassGrowthPoints": -0.06,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9948,
+          "shadowFloorScale": 1.006,
+          "safe": true
+        },
+        {
+          "hour": 13.667,
+          "identityShadowMassPercent": 24.96,
+          "shadowMassPercent": 24.84,
+          "shadowMassGrowthPoints": -0.12,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9781,
+          "shadowFloorScale": 1.0252,
+          "safe": true
+        },
+        {
+          "hour": 14.333,
+          "identityShadowMassPercent": 24.97,
+          "shadowMassPercent": 24.6,
+          "shadowMassGrowthPoints": -0.37,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9467,
+          "shadowFloorScale": 1.0613,
+          "safe": true
+        },
+        {
+          "hour": 15,
+          "identityShadowMassPercent": 24.97,
+          "shadowMassPercent": 24.41,
+          "shadowMassGrowthPoints": -0.56,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.8952,
+          "shadowFloorScale": 1.1205,
+          "safe": true
+        },
+        {
+          "hour": 15.667,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 24.38,
+          "shadowMassGrowthPoints": -0.57,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.8183,
+          "shadowFloorScale": 1.209,
+          "safe": true
+        },
+        {
+          "hour": 16.333,
+          "identityShadowMassPercent": 24.95,
+          "shadowMassPercent": 24.38,
+          "shadowMassGrowthPoints": -0.57,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.712,
+          "shadowFloorScale": 1.3312,
+          "safe": true
+        },
+        {
+          "hour": 17,
+          "identityShadowMassPercent": 24.96,
+          "shadowMassPercent": 24.2,
+          "shadowMassGrowthPoints": -0.76,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.5755,
+          "shadowFloorScale": 1.4882,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        9,
+        17
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "farcrysis",
+      "weather": "storm",
+      "band": [
+        9,
+        17
+      ],
+      "authoredHour": 12.5,
+      "samples": [
+        {
+          "hour": 9,
+          "identityShadowMassPercent": 24.84,
+          "shadowMassPercent": 24.87,
+          "shadowMassGrowthPoints": 0.03,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8401,
+          "shadowFloorScale": 1.1838,
+          "safe": true
+        },
+        {
+          "hour": 9.667,
+          "identityShadowMassPercent": 24.86,
+          "shadowMassPercent": 28.49,
+          "shadowMassGrowthPoints": 3.63,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9102,
+          "shadowFloorScale": 1.1032,
+          "safe": false
+        },
+        {
+          "hour": 10.333,
+          "identityShadowMassPercent": 28.44,
+          "shadowMassPercent": 28.39,
+          "shadowMassGrowthPoints": -0.05,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9562,
+          "shadowFloorScale": 1.0504,
+          "safe": true
+        },
+        {
+          "hour": 11,
+          "identityShadowMassPercent": 28.43,
+          "shadowMassPercent": 28.5,
+          "shadowMassGrowthPoints": 0.07,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9835,
+          "shadowFloorScale": 1.019,
+          "safe": true
+        },
+        {
+          "hour": 11.667,
+          "identityShadowMassPercent": 28.43,
+          "shadowMassPercent": 28.46,
+          "shadowMassGrowthPoints": 0.03,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9971,
+          "shadowFloorScale": 1.0033,
+          "safe": true
+        },
+        {
+          "hour": 12.333,
+          "identityShadowMassPercent": 28.38,
+          "shadowMassPercent": 28.39,
+          "shadowMassGrowthPoints": 0.01,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0006,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 13,
+          "identityShadowMassPercent": 24.77,
+          "shadowMassPercent": 24.81,
+          "shadowMassGrowthPoints": 0.04,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9948,
+          "shadowFloorScale": 1.006,
+          "safe": true
+        },
+        {
+          "hour": 13.667,
+          "identityShadowMassPercent": 24.82,
+          "shadowMassPercent": 24.77,
+          "shadowMassGrowthPoints": -0.05,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9781,
+          "shadowFloorScale": 1.0252,
+          "safe": true
+        },
+        {
+          "hour": 14.333,
+          "identityShadowMassPercent": 24.69,
+          "shadowMassPercent": 24.7,
+          "shadowMassGrowthPoints": 0.01,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9467,
+          "shadowFloorScale": 1.0613,
+          "safe": true
+        },
+        {
+          "hour": 15,
+          "identityShadowMassPercent": 24.74,
+          "shadowMassPercent": 24.69,
+          "shadowMassGrowthPoints": -0.05,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8952,
+          "shadowFloorScale": 1.1205,
+          "safe": true
+        },
+        {
+          "hour": 15.667,
+          "identityShadowMassPercent": 24.77,
+          "shadowMassPercent": 24.44,
+          "shadowMassGrowthPoints": -0.33,
+          "identityLumaP05": 3,
+          "lumaP05": 3,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8183,
+          "shadowFloorScale": 1.209,
+          "safe": true
+        },
+        {
+          "hour": 16.333,
+          "identityShadowMassPercent": 24.79,
+          "shadowMassPercent": 24.35,
+          "shadowMassGrowthPoints": -0.44,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.712,
+          "shadowFloorScale": 1.3312,
+          "safe": true
+        },
+        {
+          "hour": 17,
+          "identityShadowMassPercent": 24.78,
+          "shadowMassPercent": 24.38,
+          "shadowMassGrowthPoints": -0.4,
+          "identityLumaP05": 3,
+          "lumaP05": 4,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.5755,
+          "shadowFloorScale": 1.4882,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        10.333,
+        17
+      ],
+      "anchorSafe": true,
+      "unsafeHours": [
+        9.667
+      ]
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "clear",
+      "band": [
+        6.8,
+        10.5
+      ],
+      "authoredHour": 7,
+      "samples": [
+        {
+          "hour": 6.8,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 10.71,
+          "shadowMassGrowthPoints": 1.79,
+          "identityLumaP05": 17,
+          "lumaP05": 16,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.9341,
+          "shadowFloorScale": 1.0758,
+          "safe": true
+        },
+        {
+          "hour": 7.108,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 8.37,
+          "shadowMassGrowthPoints": -0.55,
+          "identityLumaP05": 17,
+          "lumaP05": 18,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.0346,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.417,
+          "identityShadowMassPercent": 8.91,
+          "shadowMassPercent": 7.21,
+          "shadowMassGrowthPoints": -1.7,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.1285,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.725,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 6.24,
+          "shadowMassGrowthPoints": -2.68,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.033,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 8.52,
+          "shadowMassGrowthPoints": -0.4,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.342,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 8.11,
+          "shadowMassGrowthPoints": -3.73,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.65,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 7.81,
+          "shadowMassGrowthPoints": -4.03,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.958,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 7.57,
+          "shadowMassGrowthPoints": -4.27,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.267,
+          "identityShadowMassPercent": 11.84,
+          "shadowMassPercent": 7.37,
+          "shadowMassGrowthPoints": -4.47,
+          "identityLumaP05": 17,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.575,
+          "identityShadowMassPercent": 8.91,
+          "shadowMassPercent": 3.94,
+          "shadowMassGrowthPoints": -4.97,
+          "identityLumaP05": 17,
+          "lumaP05": 41,
+          "shadowFloorDropSteps": -24,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.883,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 3.76,
+          "shadowMassGrowthPoints": -5.16,
+          "identityLumaP05": 17,
+          "lumaP05": 44,
+          "shadowFloorDropSteps": -27,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.192,
+          "identityShadowMassPercent": 8.92,
+          "shadowMassPercent": 3.62,
+          "shadowMassGrowthPoints": -5.3,
+          "identityLumaP05": 17,
+          "lumaP05": 46,
+          "shadowFloorDropSteps": -29,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.5,
+          "identityShadowMassPercent": 8.91,
+          "shadowMassPercent": 3.51,
+          "shadowMassGrowthPoints": -5.4,
+          "identityLumaP05": 17,
+          "lumaP05": 47,
+          "shadowFloorDropSteps": -30,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        6.8,
+        10.5
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "skyline-terminal",
+      "weather": "heavy-rain",
+      "band": [
+        6.8,
+        10.5
+      ],
+      "authoredHour": 7,
+      "samples": [
+        {
+          "hour": 6.8,
+          "identityShadowMassPercent": 18.77,
+          "shadowMassPercent": 19.3,
+          "shadowMassGrowthPoints": 0.53,
+          "identityLumaP05": 12,
+          "lumaP05": 13,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.9341,
+          "shadowFloorScale": 1.0758,
+          "safe": true
+        },
+        {
+          "hour": 7.108,
+          "identityShadowMassPercent": 18.92,
+          "shadowMassPercent": 18.62,
+          "shadowMassGrowthPoints": -0.3,
+          "identityLumaP05": 14,
+          "lumaP05": 14,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0346,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.417,
+          "identityShadowMassPercent": 19.04,
+          "shadowMassPercent": 18.15,
+          "shadowMassGrowthPoints": -0.89,
+          "identityLumaP05": 14,
+          "lumaP05": 15,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.1285,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 7.725,
+          "identityShadowMassPercent": 19.14,
+          "shadowMassPercent": 17.21,
+          "shadowMassGrowthPoints": -1.93,
+          "identityLumaP05": 14,
+          "lumaP05": 15,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.033,
+          "identityShadowMassPercent": 19.08,
+          "shadowMassPercent": 15.94,
+          "shadowMassGrowthPoints": -3.14,
+          "identityLumaP05": 14,
+          "lumaP05": 15,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.342,
+          "identityShadowMassPercent": 18.89,
+          "shadowMassPercent": 15.19,
+          "shadowMassGrowthPoints": -3.7,
+          "identityLumaP05": 12,
+          "lumaP05": 16,
+          "shadowFloorDropSteps": -4,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.65,
+          "identityShadowMassPercent": 18.88,
+          "shadowMassPercent": 14.66,
+          "shadowMassGrowthPoints": -4.22,
+          "identityLumaP05": 12,
+          "lumaP05": 16,
+          "shadowFloorDropSteps": -4,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 8.958,
+          "identityShadowMassPercent": 18.74,
+          "shadowMassPercent": 14.06,
+          "shadowMassGrowthPoints": -4.68,
+          "identityLumaP05": 12,
+          "lumaP05": 16,
+          "shadowFloorDropSteps": -4,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.267,
+          "identityShadowMassPercent": 18.89,
+          "shadowMassPercent": 13.48,
+          "shadowMassGrowthPoints": -5.41,
+          "identityLumaP05": 12,
+          "lumaP05": 17,
+          "shadowFloorDropSteps": -5,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.575,
+          "identityShadowMassPercent": 18.9,
+          "shadowMassPercent": 12.89,
+          "shadowMassGrowthPoints": -6.01,
+          "identityLumaP05": 12,
+          "lumaP05": 18,
+          "shadowFloorDropSteps": -6,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 9.883,
+          "identityShadowMassPercent": 17.97,
+          "shadowMassPercent": 12.23,
+          "shadowMassGrowthPoints": -5.74,
+          "identityLumaP05": 12,
+          "lumaP05": 18,
+          "shadowFloorDropSteps": -6,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.192,
+          "identityShadowMassPercent": 18.87,
+          "shadowMassPercent": 11.7,
+          "shadowMassGrowthPoints": -7.17,
+          "identityLumaP05": 12,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -7,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 10.5,
+          "identityShadowMassPercent": 18.89,
+          "shadowMassPercent": 11.27,
+          "shadowMassGrowthPoints": -7.62,
+          "identityLumaP05": 12,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": -7,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        6.8,
+        10.5
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "rustworks-1v1",
+      "weather": "clear",
+      "band": [
+        20,
+        22
+      ],
+      "authoredHour": 21,
+      "samples": [
+        {
+          "hour": 20,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.57,
+          "shadowMassGrowthPoints": -0.29,
+          "identityLumaP05": 33,
+          "lumaP05": 34,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.167,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.59,
+          "shadowMassGrowthPoints": -0.27,
+          "identityLumaP05": 33,
+          "lumaP05": 34,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.333,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.62,
+          "shadowMassGrowthPoints": -0.24,
+          "identityLumaP05": 33,
+          "lumaP05": 34,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.5,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.69,
+          "shadowMassGrowthPoints": -0.17,
+          "identityLumaP05": 33,
+          "lumaP05": 34,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.1297,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.667,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.74,
+          "shadowMassGrowthPoints": -0.12,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0875,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.833,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.79,
+          "shadowMassGrowthPoints": -0.07,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0443,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 21,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.86,
+          "shadowMassGrowthPoints": 0,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 21.167,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.87,
+          "shadowMassGrowthPoints": 0.01,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9547,
+          "shadowFloorScale": 1.052,
+          "safe": true
+        },
+        {
+          "hour": 21.333,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.91,
+          "shadowMassGrowthPoints": 0.05,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9085,
+          "shadowFloorScale": 1.1052,
+          "safe": true
+        },
+        {
+          "hour": 21.5,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.95,
+          "shadowMassGrowthPoints": 0.09,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8614,
+          "shadowFloorScale": 1.1593,
+          "safe": true
+        },
+        {
+          "hour": 21.667,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 0.96,
+          "shadowMassGrowthPoints": 0.1,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8135,
+          "shadowFloorScale": 1.2145,
+          "safe": true
+        },
+        {
+          "hour": 21.833,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 1,
+          "shadowMassGrowthPoints": 0.14,
+          "identityLumaP05": 33,
+          "lumaP05": 33,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.7647,
+          "shadowFloorScale": 1.2706,
+          "safe": true
+        },
+        {
+          "hour": 22,
+          "identityShadowMassPercent": 0.86,
+          "shadowMassPercent": 1.02,
+          "shadowMassGrowthPoints": 0.16,
+          "identityLumaP05": 33,
+          "lumaP05": 32,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.7152,
+          "shadowFloorScale": 1.3276,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        20,
+        22
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "rustworks-1v1",
+      "weather": "storm",
+      "band": [
+        20,
+        22
+      ],
+      "authoredHour": 21,
+      "samples": [
+        {
+          "hour": 20,
+          "identityShadowMassPercent": 6.29,
+          "shadowMassPercent": 5.88,
+          "shadowMassGrowthPoints": -0.41,
+          "identityLumaP05": 22,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.167,
+          "identityShadowMassPercent": 6.22,
+          "shadowMassPercent": 5.63,
+          "shadowMassGrowthPoints": -0.59,
+          "identityLumaP05": 22,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.333,
+          "identityShadowMassPercent": 6.09,
+          "shadowMassPercent": 6.05,
+          "shadowMassGrowthPoints": -0.04,
+          "identityLumaP05": 22,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.15,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.5,
+          "identityShadowMassPercent": 6.29,
+          "shadowMassPercent": 6.12,
+          "shadowMassGrowthPoints": -0.17,
+          "identityLumaP05": 22,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.1297,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.667,
+          "identityShadowMassPercent": 3.48,
+          "shadowMassPercent": 3.37,
+          "shadowMassGrowthPoints": -0.11,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0875,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 20.833,
+          "identityShadowMassPercent": 3.53,
+          "shadowMassPercent": 3.43,
+          "shadowMassGrowthPoints": -0.1,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1.0443,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 21,
+          "identityShadowMassPercent": 3.49,
+          "shadowMassPercent": 3.48,
+          "shadowMassGrowthPoints": -0.01,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 1,
+          "shadowFloorScale": 1,
+          "safe": true
+        },
+        {
+          "hour": 21.167,
+          "identityShadowMassPercent": 3.47,
+          "shadowMassPercent": 3.47,
+          "shadowMassGrowthPoints": 0,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9547,
+          "shadowFloorScale": 1.052,
+          "safe": true
+        },
+        {
+          "hour": 21.333,
+          "identityShadowMassPercent": 3.44,
+          "shadowMassPercent": 3.43,
+          "shadowMassGrowthPoints": -0.01,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9085,
+          "shadowFloorScale": 1.1052,
+          "safe": true
+        },
+        {
+          "hour": 21.5,
+          "identityShadowMassPercent": 3.5,
+          "shadowMassPercent": 3.42,
+          "shadowMassGrowthPoints": -0.08,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8614,
+          "shadowFloorScale": 1.1593,
+          "safe": true
+        },
+        {
+          "hour": 21.667,
+          "identityShadowMassPercent": 3.44,
+          "shadowMassPercent": 3.11,
+          "shadowMassGrowthPoints": -0.33,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8135,
+          "shadowFloorScale": 1.2145,
+          "safe": true
+        },
+        {
+          "hour": 21.833,
+          "identityShadowMassPercent": 3.51,
+          "shadowMassPercent": 3.41,
+          "shadowMassGrowthPoints": -0.1,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.7647,
+          "shadowFloorScale": 1.2706,
+          "safe": true
+        },
+        {
+          "hour": 22,
+          "identityShadowMassPercent": 3.48,
+          "shadowMassPercent": 3.41,
+          "shadowMassGrowthPoints": -0.07,
+          "identityLumaP05": 27,
+          "lumaP05": 27,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.7152,
+          "shadowFloorScale": 1.3276,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        20,
+        22
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    },
+    {
+      "arena": "high-seas",
+      "weather": "clear",
+      "band": [
+        7.5,
+        19
+      ],
+      "authoredHour": 13,
+      "samples": [
+        {
+          "hour": 7.5,
+          "identityShadowMassPercent": 4.86,
+          "shadowMassPercent": 1.57,
+          "shadowMassGrowthPoints": -3.29,
+          "identityLumaP05": 24,
+          "lumaP05": 28,
+          "shadowFloorDropSteps": -4,
+          "sunIntensityScale": 0.5734,
+          "shadowFloorScale": 1.4906,
+          "safe": true
+        },
+        {
+          "hour": 8.458,
+          "identityShadowMassPercent": 4.86,
+          "shadowMassPercent": 2.98,
+          "shadowMassGrowthPoints": -1.88,
+          "identityLumaP05": 24,
+          "lumaP05": 26,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 0.7279,
+          "shadowFloorScale": 1.3129,
+          "safe": true
+        },
+        {
+          "hour": 9.417,
+          "identityShadowMassPercent": 4.86,
+          "shadowMassPercent": 4.46,
+          "shadowMassGrowthPoints": -0.4,
+          "identityLumaP05": 24,
+          "lumaP05": 25,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.8437,
+          "shadowFloorScale": 1.1798,
+          "safe": true
+        },
+        {
+          "hour": 10.375,
+          "identityShadowMassPercent": 4.87,
+          "shadowMassPercent": 4.88,
+          "shadowMassGrowthPoints": 0.01,
+          "identityLumaP05": 24,
+          "lumaP05": 24,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9227,
+          "shadowFloorScale": 1.0889,
+          "safe": true
+        },
+        {
+          "hour": 11.333,
+          "identityShadowMassPercent": 4.87,
+          "shadowMassPercent": 9.15,
+          "shadowMassGrowthPoints": 4.28,
+          "identityLumaP05": 24,
+          "lumaP05": 20,
+          "shadowFloorDropSteps": 4,
+          "sunIntensityScale": 0.971,
+          "shadowFloorScale": 1.0334,
+          "safe": false
+        },
+        {
+          "hour": 12.292,
+          "identityShadowMassPercent": 9.1,
+          "shadowMassPercent": 9.01,
+          "shadowMassGrowthPoints": -0.09,
+          "identityLumaP05": 20,
+          "lumaP05": 20,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.995,
+          "shadowFloorScale": 1.0058,
+          "safe": true
+        },
+        {
+          "hour": 13.25,
+          "identityShadowMassPercent": 9.09,
+          "shadowMassPercent": 9.15,
+          "shadowMassGrowthPoints": 0.06,
+          "identityLumaP05": 20,
+          "lumaP05": 20,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9994,
+          "shadowFloorScale": 1.0007,
+          "safe": true
+        },
+        {
+          "hour": 14.208,
+          "identityShadowMassPercent": 9.09,
+          "shadowMassPercent": 9.48,
+          "shadowMassGrowthPoints": 0.39,
+          "identityLumaP05": 20,
+          "lumaP05": 20,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9851,
+          "shadowFloorScale": 1.0171,
+          "safe": true
+        },
+        {
+          "hour": 15.167,
+          "identityShadowMassPercent": 9.1,
+          "shadowMassPercent": 9.76,
+          "shadowMassGrowthPoints": 0.66,
+          "identityLumaP05": 20,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.9492,
+          "shadowFloorScale": 1.0584,
+          "safe": true
+        },
+        {
+          "hour": 16.125,
+          "identityShadowMassPercent": 4.87,
+          "shadowMassPercent": 5.58,
+          "shadowMassGrowthPoints": 0.71,
+          "identityLumaP05": 24,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.8857,
+          "shadowFloorScale": 1.1314,
+          "safe": true
+        },
+        {
+          "hour": 17.083,
+          "identityShadowMassPercent": 4.86,
+          "shadowMassPercent": 4.87,
+          "shadowMassGrowthPoints": 0.01,
+          "identityLumaP05": 24,
+          "lumaP05": 24,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.7881,
+          "shadowFloorScale": 1.2437,
+          "safe": true
+        },
+        {
+          "hour": 18.042,
+          "identityShadowMassPercent": 4.86,
+          "shadowMassPercent": 4.02,
+          "shadowMassGrowthPoints": -0.84,
+          "identityLumaP05": 24,
+          "lumaP05": 26,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 0.652,
+          "shadowFloorScale": 1.4001,
+          "safe": true
+        },
+        {
+          "hour": 19,
+          "identityShadowMassPercent": 4.87,
+          "shadowMassPercent": 3.52,
+          "shadowMassGrowthPoints": -1.35,
+          "identityLumaP05": 24,
+          "lumaP05": 26,
+          "shadowFloorDropSteps": -2,
+          "sunIntensityScale": 0.55,
+          "shadowFloorScale": 1.5175,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        12.292,
+        19
+      ],
+      "anchorSafe": true,
+      "unsafeHours": [
+        11.333
+      ]
+    },
+    {
+      "arena": "high-seas",
+      "weather": "storm",
+      "band": [
+        7.5,
+        19
+      ],
+      "authoredHour": 13,
+      "samples": [
+        {
+          "hour": 7.5,
+          "identityShadowMassPercent": 5.68,
+          "shadowMassPercent": 5.4,
+          "shadowMassGrowthPoints": -0.28,
+          "identityLumaP05": 23,
+          "lumaP05": 24,
+          "shadowFloorDropSteps": -1,
+          "sunIntensityScale": 0.5734,
+          "shadowFloorScale": 1.4906,
+          "safe": true
+        },
+        {
+          "hour": 8.458,
+          "identityShadowMassPercent": 5.79,
+          "shadowMassPercent": 5.61,
+          "shadowMassGrowthPoints": -0.18,
+          "identityLumaP05": 23,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.7279,
+          "shadowFloorScale": 1.3129,
+          "safe": true
+        },
+        {
+          "hour": 9.417,
+          "identityShadowMassPercent": 5.78,
+          "shadowMassPercent": 5.69,
+          "shadowMassGrowthPoints": -0.09,
+          "identityLumaP05": 23,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.8437,
+          "shadowFloorScale": 1.1798,
+          "safe": true
+        },
+        {
+          "hour": 10.375,
+          "identityShadowMassPercent": 5.77,
+          "shadowMassPercent": 5.71,
+          "shadowMassGrowthPoints": -0.06,
+          "identityLumaP05": 23,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9227,
+          "shadowFloorScale": 1.0889,
+          "safe": true
+        },
+        {
+          "hour": 11.333,
+          "identityShadowMassPercent": 9.58,
+          "shadowMassPercent": 9.48,
+          "shadowMassGrowthPoints": -0.1,
+          "identityLumaP05": 19,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.971,
+          "shadowFloorScale": 1.0334,
+          "safe": true
+        },
+        {
+          "hour": 12.292,
+          "identityShadowMassPercent": 9.48,
+          "shadowMassPercent": 9.44,
+          "shadowMassGrowthPoints": -0.04,
+          "identityLumaP05": 19,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.995,
+          "shadowFloorScale": 1.0058,
+          "safe": true
+        },
+        {
+          "hour": 13.25,
+          "identityShadowMassPercent": 9.51,
+          "shadowMassPercent": 9.58,
+          "shadowMassGrowthPoints": 0.07,
+          "identityLumaP05": 19,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9994,
+          "shadowFloorScale": 1.0007,
+          "safe": true
+        },
+        {
+          "hour": 14.208,
+          "identityShadowMassPercent": 9.54,
+          "shadowMassPercent": 9.73,
+          "shadowMassGrowthPoints": 0.19,
+          "identityLumaP05": 19,
+          "lumaP05": 19,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.9851,
+          "shadowFloorScale": 1.0171,
+          "safe": true
+        },
+        {
+          "hour": 15.167,
+          "identityShadowMassPercent": 9.47,
+          "shadowMassPercent": 5.95,
+          "shadowMassGrowthPoints": -3.52,
+          "identityLumaP05": 19,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": -4,
+          "sunIntensityScale": 0.9492,
+          "shadowFloorScale": 1.0584,
+          "safe": true
+        },
+        {
+          "hour": 16.125,
+          "identityShadowMassPercent": 5.78,
+          "shadowMassPercent": 6.18,
+          "shadowMassGrowthPoints": 0.4,
+          "identityLumaP05": 23,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.8857,
+          "shadowFloorScale": 1.1314,
+          "safe": true
+        },
+        {
+          "hour": 17.083,
+          "identityShadowMassPercent": 5.73,
+          "shadowMassPercent": 6.28,
+          "shadowMassGrowthPoints": 0.55,
+          "identityLumaP05": 23,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.7881,
+          "shadowFloorScale": 1.2437,
+          "safe": true
+        },
+        {
+          "hour": 18.042,
+          "identityShadowMassPercent": 5.78,
+          "shadowMassPercent": 6.3,
+          "shadowMassGrowthPoints": 0.52,
+          "identityLumaP05": 23,
+          "lumaP05": 22,
+          "shadowFloorDropSteps": 1,
+          "sunIntensityScale": 0.652,
+          "shadowFloorScale": 1.4001,
+          "safe": true
+        },
+        {
+          "hour": 19,
+          "identityShadowMassPercent": 5.79,
+          "shadowMassPercent": 5.77,
+          "shadowMassGrowthPoints": -0.02,
+          "identityLumaP05": 23,
+          "lumaP05": 23,
+          "shadowFloorDropSteps": 0,
+          "sunIntensityScale": 0.55,
+          "shadowFloorScale": 1.5175,
+          "safe": true
+        }
+      ],
+      "safeBand": [
+        7.5,
+        19
+      ],
+      "anchorSafe": true,
+      "unsafeHours": []
+    }
+  ]
+}

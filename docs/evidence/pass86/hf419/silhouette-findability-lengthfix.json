@@ -1,0 +1,1053 @@
+{
+  "contract": "silhouette-findability-v1",
+  "measuredAt": "2026-09-03T02:32:43.195Z",
+  "playerProxyLuminance": 0.085,
+  "weberThreshold": 0.35,
+  "hudStripExcludedPx": 46,
+  "rule": "PASS requires after.camouflageFraction <= before.camouflageFraction for every view",
+  "views": {
+    "corridor-3-street-cell": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-street-cell.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.42982,
+        "camouflageFraction": 0.00382
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after-lengthfix\\corridor-3-street-cell.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.15671,
+        "camouflageFraction": 0.08335
+      },
+      "delta": 0.07953,
+      "verdict": "FAIL",
+      "sweepFailCount": "20/24",
+      "sweep": [
+        {
+          "playerL": 0.03,
+          "threshold": 0.2,
+          "before": 0,
+          "after": 0.01587,
+          "delta": 0.01587,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.35,
+          "before": 0,
+          "after": 0.18824,
+          "delta": 0.18824,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.5,
+          "before": 0,
+          "after": 0.26161,
+          "delta": 0.26161,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.2,
+          "before": 0.00153,
+          "after": 0.07438,
+          "delta": 0.07285,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.35,
+          "before": 0.00381,
+          "after": 0.08861,
+          "delta": 0.0848,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.5,
+          "before": 0.00381,
+          "after": 0.15999,
+          "delta": 0.15618,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.2,
+          "before": 0.00381,
+          "after": 0.03274,
+          "delta": 0.02893,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.35,
+          "before": 0.00381,
+          "after": 0.13998,
+          "delta": 0.13617,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.5,
+          "before": 0.00382,
+          "after": 0.16038,
+          "delta": 0.15656,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.2,
+          "before": 0,
+          "after": 0.06727,
+          "delta": 0.06727,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.35,
+          "before": 0.00382,
+          "after": 0.08335,
+          "delta": 0.07953,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.5,
+          "before": 0.00508,
+          "after": 0.21081,
+          "delta": 0.20573,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.2,
+          "before": 0.00001,
+          "after": 0.01328,
+          "delta": 0.01327,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.35,
+          "before": 0.00128,
+          "after": 0.13743,
+          "delta": 0.13615,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.5,
+          "before": 0.00509,
+          "after": 0.21148,
+          "delta": 0.20639,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.2,
+          "before": 0.00127,
+          "after": 0.11136,
+          "delta": 0.11009,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.35,
+          "before": 0.00128,
+          "after": 0.14129,
+          "delta": 0.14001,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.5,
+          "before": 0.00129,
+          "after": 0.21209,
+          "delta": 0.2108,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.2,
+          "before": 0.00001,
+          "after": 0.10625,
+          "delta": 0.10624,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.35,
+          "before": 0.00128,
+          "after": 0.14011,
+          "delta": 0.13883,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.5,
+          "before": 0.55683,
+          "after": 0.21033,
+          "delta": -0.3465,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.2,
+          "before": 0.45507,
+          "after": 0.04872,
+          "delta": -0.40635,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.35,
+          "before": 0.67301,
+          "after": 0.13144,
+          "delta": -0.54157,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.5,
+          "before": 0.90962,
+          "after": 0.36179,
+          "delta": -0.54783,
+          "verdict": "PASS"
+        }
+      ]
+    },
+    "corridor-3-street-kerbside": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-street-kerbside.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.40967,
+        "camouflageFraction": 0.00128
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after-lengthfix\\corridor-3-street-kerbside.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.15791,
+        "camouflageFraction": 0.09196
+      },
+      "delta": 0.09068,
+      "verdict": "FAIL",
+      "sweepFailCount": "16/24",
+      "sweep": [
+        {
+          "playerL": 0.03,
+          "threshold": 0.2,
+          "before": 0,
+          "after": 0.09845,
+          "delta": 0.09845,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.35,
+          "before": 0.00381,
+          "after": 0.14063,
+          "delta": 0.13682,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.5,
+          "before": 0.00381,
+          "after": 0.24974,
+          "delta": 0.24593,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.2,
+          "before": 0.00381,
+          "after": 0.11536,
+          "delta": 0.11155,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.35,
+          "before": 0.00381,
+          "after": 0.17467,
+          "delta": 0.17086,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.5,
+          "before": 0.00382,
+          "after": 0.28818,
+          "delta": 0.28436,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.2,
+          "before": 0,
+          "after": 0.05901,
+          "delta": 0.05901,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.35,
+          "before": 0.00382,
+          "after": 0.17365,
+          "delta": 0.16983,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.5,
+          "before": 0.00509,
+          "after": 0.24244,
+          "delta": 0.23735,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.2,
+          "before": 0.00001,
+          "after": 0.06472,
+          "delta": 0.06471,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.35,
+          "before": 0.00128,
+          "after": 0.09197,
+          "delta": 0.09069,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.5,
+          "before": 0.0051,
+          "after": 0.19021,
+          "delta": 0.18511,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.2,
+          "before": 0.00127,
+          "after": 0.01993,
+          "delta": 0.01866,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.35,
+          "before": 0.00128,
+          "after": 0.07756,
+          "delta": 0.07628,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.5,
+          "before": 0.00494,
+          "after": 0.10112,
+          "delta": 0.09618,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.2,
+          "before": 0.00128,
+          "after": 0.00914,
+          "delta": 0.00786,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.35,
+          "before": 0.23908,
+          "after": 0.0272,
+          "delta": -0.21188,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.5,
+          "before": 0.4904,
+          "after": 0.09448,
+          "delta": -0.39592,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.2,
+          "before": 0.3979,
+          "after": 0.01257,
+          "delta": -0.38533,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.35,
+          "before": 0.49359,
+          "after": 0.02649,
+          "delta": -0.4671,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.5,
+          "before": 0.51997,
+          "after": 0.05516,
+          "delta": -0.46481,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.2,
+          "before": 0.17735,
+          "after": 0.02522,
+          "delta": -0.15213,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.35,
+          "before": 0.54019,
+          "after": 0.03723,
+          "delta": -0.50296,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.5,
+          "before": 0.75865,
+          "after": 0.14914,
+          "delta": -0.60951,
+          "verdict": "PASS"
+        }
+      ]
+    },
+    "corridor-3-grammar": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\corridor-3-grammar.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.43787,
+        "camouflageFraction": 0.03238
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after-lengthfix\\corridor-3-grammar.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.43565,
+        "camouflageFraction": 0.03295
+      },
+      "delta": 0.00057,
+      "verdict": "FAIL",
+      "sweepFailCount": "19/24",
+      "sweep": [
+        {
+          "playerL": 0.03,
+          "threshold": 0.2,
+          "before": 0.00152,
+          "after": 0.00168,
+          "delta": 0.00016,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.35,
+          "before": 0.00418,
+          "after": 0.00534,
+          "delta": 0.00116,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.5,
+          "before": 0.00499,
+          "after": 0.00655,
+          "delta": 0.00156,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.2,
+          "before": 0.00108,
+          "after": 0.0015,
+          "delta": 0.00042,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.35,
+          "before": 0.00648,
+          "after": 0.00694,
+          "delta": 0.00046,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.5,
+          "before": 0.02091,
+          "after": 0.02173,
+          "delta": 0.00082,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.2,
+          "before": 0.00585,
+          "after": 0.00593,
+          "delta": 0.00008,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.35,
+          "before": 0.02016,
+          "after": 0.02083,
+          "delta": 0.00067,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.5,
+          "before": 0.03158,
+          "after": 0.03253,
+          "delta": 0.00095,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.2,
+          "before": 0.01954,
+          "after": 0.01876,
+          "delta": -0.00078,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.35,
+          "before": 0.03238,
+          "after": 0.03295,
+          "delta": 0.00057,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.5,
+          "before": 0.06265,
+          "after": 0.06466,
+          "delta": 0.00201,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.2,
+          "before": 0.02975,
+          "after": 0.03025,
+          "delta": 0.0005,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.35,
+          "before": 0.05679,
+          "after": 0.05835,
+          "delta": 0.00156,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.5,
+          "before": 0.14662,
+          "after": 0.14665,
+          "delta": 0.00003,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.2,
+          "before": 0.12443,
+          "after": 0.12316,
+          "delta": -0.00127,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.35,
+          "before": 0.12766,
+          "after": 0.12734,
+          "delta": -0.00032,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.5,
+          "before": 0.1475,
+          "after": 0.14938,
+          "delta": 0.00188,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.2,
+          "before": 0.0949,
+          "after": 0.0938,
+          "delta": -0.0011,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.35,
+          "before": 0.12257,
+          "after": 0.12412,
+          "delta": 0.00155,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.5,
+          "before": 0.16524,
+          "after": 0.16781,
+          "delta": 0.00257,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.2,
+          "before": 0.02954,
+          "after": 0.032,
+          "delta": 0.00246,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.35,
+          "before": 0.23946,
+          "after": 0.24528,
+          "delta": 0.00582,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.5,
+          "before": 0.70794,
+          "after": 0.68015,
+          "delta": -0.02779,
+          "verdict": "PASS"
+        }
+      ]
+    },
+    "hub-overview": {
+      "before": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\before\\hub-overview.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.37788,
+        "camouflageFraction": 0.04676
+      },
+      "after": {
+        "file": "C:\\Users\\david\\projects\\aa-claude-gtaart\\docs\\evidence\\pass86\\hf419\\after-lengthfix\\hub-overview.png",
+        "width": 1280,
+        "height": 720,
+        "pixelsScored": 862720,
+        "meanLuminance": 0.37796,
+        "camouflageFraction": 0.0471
+      },
+      "delta": 0.00034,
+      "verdict": "FAIL",
+      "sweepFailCount": "15/24",
+      "sweep": [
+        {
+          "playerL": 0.03,
+          "threshold": 0.2,
+          "before": 0.00986,
+          "after": 0.00987,
+          "delta": 0.00001,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.35,
+          "before": 0.01925,
+          "after": 0.01922,
+          "delta": -0.00003,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.03,
+          "threshold": 0.5,
+          "before": 0.04789,
+          "after": 0.04817,
+          "delta": 0.00028,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.2,
+          "before": 0.01193,
+          "after": 0.01213,
+          "delta": 0.0002,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.35,
+          "before": 0.02492,
+          "after": 0.02507,
+          "delta": 0.00015,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.05,
+          "threshold": 0.5,
+          "before": 0.05635,
+          "after": 0.05675,
+          "delta": 0.0004,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.2,
+          "before": 0.01943,
+          "after": 0.01945,
+          "delta": 0.00002,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.35,
+          "before": 0.04466,
+          "after": 0.04514,
+          "delta": 0.00048,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.065,
+          "threshold": 0.5,
+          "before": 0.05929,
+          "after": 0.05969,
+          "delta": 0.0004,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.2,
+          "before": 0.03427,
+          "after": 0.03449,
+          "delta": 0.00022,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.35,
+          "before": 0.04675,
+          "after": 0.04709,
+          "delta": 0.00034,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.085,
+          "threshold": 0.5,
+          "before": 0.06013,
+          "after": 0.06061,
+          "delta": 0.00048,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.2,
+          "before": 0.02052,
+          "after": 0.02078,
+          "delta": 0.00026,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.35,
+          "before": 0.04521,
+          "after": 0.04555,
+          "delta": 0.00034,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.11,
+          "threshold": 0.5,
+          "before": 0.06127,
+          "after": 0.06146,
+          "delta": 0.00019,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.2,
+          "before": 0.01161,
+          "after": 0.01172,
+          "delta": 0.00011,
+          "verdict": "FAIL"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.35,
+          "before": 0.02695,
+          "after": 0.02669,
+          "delta": -0.00026,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.15,
+          "threshold": 0.5,
+          "before": 0.12176,
+          "after": 0.1216,
+          "delta": -0.00016,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.2,
+          "before": 0.05228,
+          "after": 0.05162,
+          "delta": -0.00066,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.35,
+          "before": 0.08893,
+          "after": 0.08856,
+          "delta": -0.00037,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.2,
+          "threshold": 0.5,
+          "before": 0.22323,
+          "after": 0.22135,
+          "delta": -0.00188,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.2,
+          "before": 0.1201,
+          "after": 0.11922,
+          "delta": -0.00088,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.35,
+          "before": 0.33345,
+          "after": 0.32919,
+          "delta": -0.00426,
+          "verdict": "PASS"
+        },
+        {
+          "playerL": 0.3,
+          "threshold": 0.5,
+          "before": 0.77763,
+          "after": 0.7763,
+          "delta": -0.00133,
+          "verdict": "PASS"
+        }
+      ]
+    }
+  },
+  "verdict": "FAIL",
+  "fairControl": {
+    "controlViews": [
+      "corridor-3-grammar",
+      "hub-overview"
+    ],
+    "targetViews": [
+      "corridor-3-street-cell",
+      "corridor-3-street-kerbside"
+    ],
+    "rule": "ratio = worst target AFTER / worst control BEFORE; above 1 means the new content is busier in the operator band than anything the map already ships",
+    "rows": [
+      {
+        "playerL": 0.03,
+        "threshold": 0.2,
+        "worstControlBefore": 0.00986,
+        "worstTargetAfter": 0.09845,
+        "ratio": 9.985
+      },
+      {
+        "playerL": 0.03,
+        "threshold": 0.35,
+        "worstControlBefore": 0.01925,
+        "worstTargetAfter": 0.18824,
+        "ratio": 9.779
+      },
+      {
+        "playerL": 0.03,
+        "threshold": 0.5,
+        "worstControlBefore": 0.04789,
+        "worstTargetAfter": 0.26161,
+        "ratio": 5.463
+      },
+      {
+        "playerL": 0.05,
+        "threshold": 0.2,
+        "worstControlBefore": 0.01193,
+        "worstTargetAfter": 0.11536,
+        "ratio": 9.67
+      },
+      {
+        "playerL": 0.05,
+        "threshold": 0.35,
+        "worstControlBefore": 0.02492,
+        "worstTargetAfter": 0.17467,
+        "ratio": 7.009
+      },
+      {
+        "playerL": 0.05,
+        "threshold": 0.5,
+        "worstControlBefore": 0.05635,
+        "worstTargetAfter": 0.28818,
+        "ratio": 5.114
+      },
+      {
+        "playerL": 0.065,
+        "threshold": 0.2,
+        "worstControlBefore": 0.01943,
+        "worstTargetAfter": 0.05901,
+        "ratio": 3.037
+      },
+      {
+        "playerL": 0.065,
+        "threshold": 0.35,
+        "worstControlBefore": 0.04466,
+        "worstTargetAfter": 0.17365,
+        "ratio": 3.888
+      },
+      {
+        "playerL": 0.065,
+        "threshold": 0.5,
+        "worstControlBefore": 0.05929,
+        "worstTargetAfter": 0.24244,
+        "ratio": 4.089
+      },
+      {
+        "playerL": 0.085,
+        "threshold": 0.2,
+        "worstControlBefore": 0.03427,
+        "worstTargetAfter": 0.06727,
+        "ratio": 1.963
+      },
+      {
+        "playerL": 0.085,
+        "threshold": 0.35,
+        "worstControlBefore": 0.04675,
+        "worstTargetAfter": 0.09197,
+        "ratio": 1.967
+      },
+      {
+        "playerL": 0.085,
+        "threshold": 0.5,
+        "worstControlBefore": 0.06265,
+        "worstTargetAfter": 0.21081,
+        "ratio": 3.365
+      },
+      {
+        "playerL": 0.11,
+        "threshold": 0.2,
+        "worstControlBefore": 0.02975,
+        "worstTargetAfter": 0.01993,
+        "ratio": 0.67
+      },
+      {
+        "playerL": 0.11,
+        "threshold": 0.35,
+        "worstControlBefore": 0.05679,
+        "worstTargetAfter": 0.13743,
+        "ratio": 2.42
+      },
+      {
+        "playerL": 0.11,
+        "threshold": 0.5,
+        "worstControlBefore": 0.14662,
+        "worstTargetAfter": 0.21148,
+        "ratio": 1.442
+      },
+      {
+        "playerL": 0.15,
+        "threshold": 0.2,
+        "worstControlBefore": 0.12443,
+        "worstTargetAfter": 0.11136,
+        "ratio": 0.895
+      },
+      {
+        "playerL": 0.15,
+        "threshold": 0.35,
+        "worstControlBefore": 0.12766,
+        "worstTargetAfter": 0.14129,
+        "ratio": 1.107
+      },
+      {
+        "playerL": 0.15,
+        "threshold": 0.5,
+        "worstControlBefore": 0.1475,
+        "worstTargetAfter": 0.21209,
+        "ratio": 1.438
+      },
+      {
+        "playerL": 0.2,
+        "threshold": 0.2,
+        "worstControlBefore": 0.0949,
+        "worstTargetAfter": 0.10625,
+        "ratio": 1.12
+      },
+      {
+        "playerL": 0.2,
+        "threshold": 0.35,
+        "worstControlBefore": 0.12257,
+        "worstTargetAfter": 0.14011,
+        "ratio": 1.143
+      },
+      {
+        "playerL": 0.2,
+        "threshold": 0.5,
+        "worstControlBefore": 0.22323,
+        "worstTargetAfter": 0.21033,
+        "ratio": 0.942
+      },
+      {
+        "playerL": 0.3,
+        "threshold": 0.2,
+        "worstControlBefore": 0.1201,
+        "worstTargetAfter": 0.04872,
+        "ratio": 0.406
+      },
+      {
+        "playerL": 0.3,
+        "threshold": 0.35,
+        "worstControlBefore": 0.33345,
+        "worstTargetAfter": 0.13144,
+        "ratio": 0.394
+      },
+      {
+        "playerL": 0.3,
+        "threshold": 0.5,
+        "worstControlBefore": 0.77763,
+        "worstTargetAfter": 0.36179,
+        "ratio": 0.465
+      }
+    ],
+    "summary": "ratio 1.967 at the gate constants; 0.394 to 9.779 across the PLAYER_L sweep at threshold 0.35"
+  }
+}

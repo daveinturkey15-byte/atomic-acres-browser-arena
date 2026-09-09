@@ -1,0 +1,48 @@
+
+Running 1 test using 1 worker
+
+(node:240) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  1 [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match (1.8m)
+
+
+  1) [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match 
+
+    Error: nuketown2: no console errors
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 4
+
+    - Array []
+    + Array [
+    +   "[Nuke Town Rebuild map selection failed] Error: WebGPU queue completion exceeded 12000 ms for submission 1 (completed 0, mode serialized, in-flight 1, pending 12001 ms, probes 1, prior latency none, fenced draws 568)
+    +     at http://127.0.0.1:4300/assets/legacy-main-CY9mr4UI.js:27:52990",
+    + ]
+
+      178 |
+      179 |       expect(pageErrors, `${arenaId}: no uncaught page errors`).toEqual([]);
+    > 180 |       expect(consoleErrors, `${arenaId}: no console errors`).toEqual([]);
+          |                                                              ^
+      181 |     });
+      182 |   }
+      183 | });
+        at C:\Users\david\projects\aa-claude-hitl\tests\e2e\pass74-arena-boot-smoke.spec.ts:180:62
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-fb2bf--a-clean-visible-solo-match-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-fb2bf--a-clean-visible-solo-match-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-fb2bf--a-clean-visible-solo-match-chromium\trace.zip
+    Usage:
+
+        npx playwright show-trace artifacts\pass25a\playwright-results\pass74-arena-boot-smoke-ar-fb2bf--a-clean-visible-solo-match-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › tests\e2e\pass74-arena-boot-smoke.spec.ts:119:9 › arena boot smoke — every canonical arena › nuketown2: boots a clean visible solo match 

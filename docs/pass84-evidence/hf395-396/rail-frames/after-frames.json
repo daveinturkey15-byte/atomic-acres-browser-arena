@@ -1,0 +1,38 @@
+[
+  {
+    "weapon": "m14-ebr",
+    "hip": "after-m14-ebr-hip.png",
+    "ads": "after-m14-ebr-ads.png",
+    "adsProgress": 0.9999999995165145
+  },
+  {
+    "weapon": "railgun",
+    "hip": "after-railgun-hip.png",
+    "ads": "after-railgun-ads.png",
+    "adsProgress": 0.9999999999464282
+  },
+  {
+    "weapon": "carbine",
+    "hip": "after-carbine-hip.png",
+    "ads": "after-carbine-ads.png",
+    "adsProgress": 0.9999999982552712
+  },
+  {
+    "weapon": "m4a1",
+    "hip": "after-m4a1-hip.png",
+    "ads": "after-m4a1-ads.png",
+    "adsProgress": 0.9999999982552712
+  },
+  {
+    "weapon": "slug-shotgun",
+    "hip": "after-slug-shotgun-hip.png",
+    "ads": "after-slug-shotgun-ads.png",
+    "adsProgress": 0.999999998993379
+  },
+  {
+    "weapon": "sniper",
+    "hip": "after-sniper-hip.png",
+    "ads": "after-sniper-ads.png",
+    "adsProgress": 1
+  }
+]

@@ -1,0 +1,43 @@
+=== 17:19:40 A1-hitl4 nuketown2  gpu: 15 %, 1468 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] A1-hitl4 nuketown2 menu           fps 1171.2  p50 0.7 p95 1.5 p99 2.5  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] A1-hitl4 nuketown2 deployed-idle  fps     59  p50 16.7 p95 32.2 p99 33.7  draws 167.3 tris 325545 pipes+0 clip 7
+[hf399] A1-hitl4 nuketown2 move           fps   53.9  p50 18.3 p95 32.4 p99 34.6  draws 157.7 tris 325471 pipes+1 clip 7
+=== 17:21:42 B1-pass93 nuketown2  gpu: 14 %, 1439 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] B1-pass93 nuketown2 menu           fps 1275.5  p50 0.7 p95 1.2 p99 2.5  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] B1-pass93 nuketown2 deployed-idle  fps   79.4  p50 12.3 p95 15.5 p99 29.5  draws 125.2 tris 270678 pipes+0 clip 7
+[hf399] B1-pass93 nuketown2 move           fps   67.3  p50 14.6 p95 30.2 p99 32.9  draws 120.5 tris 270539 pipes+0 clip 7
+=== 17:23:19 A1-hitl4 atomic-acres  gpu: 14 %, 1467 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] A1-hitl4 atomic-acres menu           fps 1335.1  p50 0.7 p95 1.2 p99 1.9  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] A1-hitl4 atomic-acres deployed-idle  fps   58.9  p50 16.5 p95 32 p99 33.9  draws 191.3 tris 539540 pipes+0 clip 7
+[hf399] A1-hitl4 atomic-acres lawn-move      fps   59.9  p50 16 p95 31.7 p99 34  draws 102.3 tris 508819 pipes+0 clip 7
+[hf399] A1-hitl4 atomic-acres near-wall      fps   61.1  p50 15 p95 30.6 p99 34.9  draws 112 tris 504262 pipes+0 clip 7
+[hf399] A1-hitl4 atomic-acres open-ground    fps   57.7  p50 16.1 p95 32.5 p99 34.3  draws 168.3 tris 521199 pipes+0 clip 7
+[hf399] A1-hitl4 atomic-acres lawn-idle      fps   59.1  p50 15.9 p95 31.3 p99 33.9  draws 113.2 tris 511028 pipes+0 clip 7
+=== 17:27:02 B1-pass93 atomic-acres  gpu: 17 %, 1419 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] B1-pass93 atomic-acres menu           fps 1046.9  p50 0.7 p95 2.1 p99 6.8  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] B1-pass93 atomic-acres deployed-idle  fps   61.9  p50 15.5 p95 26.7 p99 37.6  draws 189.3 tris 539565 pipes+0 clip 7
+[hf399] B1-pass93 atomic-acres lawn-move      fps   60.9  p50 15.2 p95 30.2 p99 45.9  draws 116.3 tris 523758 pipes+0 clip 7
+[hf399] B1-pass93 atomic-acres near-wall      fps   67.7  p50 14 p95 25.8 p99 32.7  draws 112.2 tris 505001 pipes+0 clip 7
+[hf399] B1-pass93 atomic-acres open-ground    fps   60.9  p50 15.6 p95 27.4 p99 38.8  draws 186 tris 538631 pipes+0 clip 7
+[hf399] B1-pass93 atomic-acres lawn-idle      fps     65  p50 15.1 p95 24 p99 29.4  draws 131.2 tris 529317 pipes+0 clip 7
+=== 17:29:54 A2-hitl4 nuketown2  gpu: 0 %, 1556 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] A2-hitl4 nuketown2 menu           fps 1230.4  p50 0.7 p95 1.4 p99 3.1  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] A2-hitl4 nuketown2 deployed-idle  fps   62.9  p50 15.5 p95 22.6 p99 34.2  draws 167.3 tris 325512 pipes+0 clip 7
+[hf399] A2-hitl4 nuketown2 move           fps   54.9  p50 17.2 p95 35.9 p99 42  draws 157.7 tris 324976 pipes+1 clip 7
+=== 17:31:54 B2-pass93 nuketown2  gpu: 0 %, 2899 MiB
+[hf399] profile {"graphicsPreset":"high","renderBackend":"webgpu","effective":"EFFECTIVE: HIGH","advanced":null,"devicePixelRatio":1,"hardwareConcurrency":16,"deviceMemory":32}
+[hf399] B2-pass93 nuketown2 menu           fps 1087.3  p50 0.7 p95 1.8 p99 6.5  draws 0 tris 0 pipes+0 clip 7
+[hf399] match active; warming up
+[hf399] B2-pass93 nuketown2 deployed-idle  fps   67.7  p50 13.8 p95 22.9 p99 37.5  draws 126.2 tris 273342 pipes+0 clip 7
+[hf399] B2-pass93 nuketown2 move           fps     62  p50 15.3 p95 27.5 p99 36.8  draws 121.5 tris 273180 pipes+0 clip 7
+=== done 17:33:51

@@ -1,0 +1,476 @@
+{
+  "contract": "arena-switch-matrix-v1",
+  "measuredAt": "2026-09-03T00:24:11.186Z",
+  "label": "fix-base-gun-range",
+  "dist": "C:\\Users\\david\\projects\\aa-loadcut-base\\dist",
+  "gitSha": "43247dafe8c655834b6f156670be62453304cfe7",
+  "gitDirty": false,
+  "gitDirtyFiles": [],
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "machine": {
+    "comfyUi": "idle",
+    "gpuFreeMiB": 7720,
+    "gpuTotalMiB": 16303,
+    "rivalPlaywrightBrowsersAtLaunch": 17,
+    "rivalWaitAttempts": 0,
+    "playwrightChromeProcessesSelf": 27,
+    "playwrightChromeProcessesMax": 27,
+    "playwrightChromeProcessSamples": 1,
+    "rivalPlaywrightBrowsersMaxDuringRun": 0
+  },
+  "roster": {
+    "registryIds": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "farcrysis",
+      "high-seas",
+      "test1",
+      "test2",
+      "map3",
+      "nuketown2"
+    ],
+    "sourceSelectable": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "high-seas",
+      "test1",
+      "test2",
+      "map3",
+      "nuketown2"
+    ],
+    "menuIds": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "high-seas",
+      "test1",
+      "test2",
+      "map3",
+      "nuketown2"
+    ],
+    "includeHidden": false,
+    "roster": [
+      "atomic-acres",
+      "skyline-terminal",
+      "rustworks-1v1",
+      "gun-range",
+      "high-seas",
+      "test1",
+      "test2",
+      "map3",
+      "nuketown2"
+    ],
+    "backend": "webgpu",
+    "device": {
+      "gpu": true,
+      "adapter": true,
+      "device": true
+    }
+  },
+  "edges": [
+    {
+      "source": "gun-range",
+      "target": "test1",
+      "committed": true,
+      "ok": true,
+      "selectMs": 14578,
+      "deployMs": 19155,
+      "transitionMs": 14545.9,
+      "outcome": "committed",
+      "phase": "idle",
+      "failure": null,
+      "committedArenaId": "test1",
+      "matchActive": true,
+      "matchArenaId": "test1",
+      "matchAdmission": null,
+      "residentArenaRoots": 2,
+      "effectPrewarm": {
+        "durationMs": 5524,
+        "groups": [
+          [
+            "tracers-impacts",
+            668.1
+          ],
+          [
+            "explosions",
+            667.7
+          ],
+          [
+            "death-drops-glass",
+            0.9
+          ],
+          [
+            "world-ordnance",
+            1851.8
+          ],
+          [
+            "nuke-overdrive-bolts",
+            1821.6
+          ],
+          [
+            "smoke-volumes",
+            2658.5
+          ],
+          [
+            "bot-world-weapons",
+            1851.3
+          ],
+          [
+            "flare-first-shot",
+            539.1
+          ],
+          [
+            "flamethrower-first-shot",
+            37.8
+          ],
+          [
+            "killstreak-vocabulary",
+            2287.8
+          ]
+        ]
+      },
+      "pipelinesCreated": 182,
+      "pipelinesCreatedSync": 163,
+      "pipelinesCreatedAsync": 19,
+      "shaderModulesCreated": 200,
+      "pipelinesCreatedDuringDeploy": 13,
+      "pipelinesByPhase": {
+        "visual-definition": 44,
+        "weapon-catalog-prewarm": 5,
+        "prewarm-batched-effects": 113,
+        "coverage-submit-fence": 20
+      },
+      "pipelinesSyncByPhase": {
+        "visual-definition": 44,
+        "weapon-catalog-prewarm": 5,
+        "prewarm-batched-effects": 113,
+        "coverage-submit-fence": 1
+      },
+      "pipelinesAsyncByPhase": {
+        "coverage-submit-fence": 19
+      },
+      "shaderModulesByPhase": {
+        "visual-definition": 72,
+        "weapon-catalog-prewarm": 7,
+        "prewarm-batched-effects": 99,
+        "coverage-submit-fence": 22
+      },
+      "phases": [
+        {
+          "phase": "shared-gameplay-assets",
+          "startedAt": 59286.299999952316,
+          "completedAt": 59286.799999952316,
+          "durationMs": 0.5
+        },
+        {
+          "phase": "previous-webgpu-fence",
+          "startedAt": 59286.799999952316,
+          "completedAt": 59286.799999952316,
+          "durationMs": 0
+        },
+        {
+          "phase": "arena-construction",
+          "startedAt": 59286.799999952316,
+          "completedAt": 60097.299999952316,
+          "durationMs": 810.5
+        },
+        {
+          "phase": "interactive-world-construction",
+          "startedAt": 60097.299999952316,
+          "completedAt": 60097.299999952316,
+          "durationMs": 0
+        },
+        {
+          "phase": "physics-construction",
+          "startedAt": 60097.299999952316,
+          "completedAt": 60111.199999928474,
+          "durationMs": 13.9
+        },
+        {
+          "phase": "authority-commit",
+          "startedAt": 60111.199999928474,
+          "completedAt": 60112.199999928474,
+          "durationMs": 1
+        },
+        {
+          "phase": "visual-definition",
+          "startedAt": 60112.199999928474,
+          "completedAt": 64544.699999928474,
+          "durationMs": 4432.5
+        },
+        {
+          "phase": "quality-presentation",
+          "startedAt": 64544.699999928474,
+          "completedAt": 64547.09999990463,
+          "durationMs": 2.4
+        },
+        {
+          "phase": "material-tuning",
+          "startedAt": 64547.09999990463,
+          "completedAt": 64774.199999928474,
+          "durationMs": 227.1
+        },
+        {
+          "phase": "art-texture-settle",
+          "startedAt": 64774.199999928474,
+          "completedAt": 64774.199999928474,
+          "durationMs": 0
+        },
+        {
+          "phase": "weapon-catalog-prewarm",
+          "startedAt": 64774.199999928474,
+          "completedAt": 65948.89999997616,
+          "durationMs": 1174.7
+        },
+        {
+          "phase": "presentation-batching",
+          "startedAt": 65948.89999997616,
+          "completedAt": 65977.19999992847,
+          "durationMs": 28.3
+        },
+        {
+          "phase": "match-authority-reset",
+          "startedAt": 65977.19999992847,
+          "completedAt": 65982.69999992847,
+          "durationMs": 5.5
+        },
+        {
+          "phase": "prewarm-batched-effects",
+          "startedAt": 65982.69999992847,
+          "completedAt": 71506.79999995232,
+          "durationMs": 5524.1
+        },
+        {
+          "phase": "coverage-submit-fence",
+          "startedAt": 71506.79999995232,
+          "completedAt": 73830.79999995232,
+          "durationMs": 2324
+        },
+        {
+          "phase": "retire-previous-arenas",
+          "startedAt": 73830.79999995232,
+          "completedAt": 73830.79999995232,
+          "durationMs": 0
+        },
+        {
+          "phase": "commit-bookkeeping",
+          "startedAt": 73830.79999995232,
+          "completedAt": 73832.19999992847,
+          "durationMs": 1.4
+        },
+        {
+          "phase": "finalize",
+          "startedAt": 73832.19999992847,
+          "completedAt": 73832.19999992847,
+          "durationMs": 0
+        }
+      ],
+      "selectionError": null,
+      "errors": []
+    }
+  ],
+  "firstLoads": [
+    {
+      "arena": "gun-range",
+      "ms": 57025,
+      "timeToMenuMs": 1259,
+      "transitionMs": 36389.6,
+      "outcome": "committed",
+      "deployMs": 20020,
+      "matchActive": true,
+      "phases": [
+        {
+          "phase": "shared-gameplay-assets",
+          "startedAt": 1056.5999999046326,
+          "completedAt": 4151.399999976158,
+          "durationMs": 3094.8
+        },
+        {
+          "phase": "previous-webgpu-fence",
+          "startedAt": 4151.399999976158,
+          "completedAt": 4151.699999928474,
+          "durationMs": 0.3
+        },
+        {
+          "phase": "arena-construction",
+          "startedAt": 4151.699999928474,
+          "completedAt": 4277.599999904633,
+          "durationMs": 125.9
+        },
+        {
+          "phase": "interactive-world-construction",
+          "startedAt": 4277.599999904633,
+          "completedAt": 4277.899999976158,
+          "durationMs": 0.3
+        },
+        {
+          "phase": "physics-construction",
+          "startedAt": 4277.899999976158,
+          "completedAt": 4342.699999928474,
+          "durationMs": 64.8
+        },
+        {
+          "phase": "authority-commit",
+          "startedAt": 4342.699999928474,
+          "completedAt": 4343.399999976158,
+          "durationMs": 0.7
+        },
+        {
+          "phase": "visual-definition",
+          "startedAt": 4343.399999976158,
+          "completedAt": 8747.199999928474,
+          "durationMs": 4403.8
+        },
+        {
+          "phase": "quality-presentation",
+          "startedAt": 8747.199999928474,
+          "completedAt": 8754.599999904633,
+          "durationMs": 7.4
+        },
+        {
+          "phase": "material-tuning",
+          "startedAt": 8754.599999904633,
+          "completedAt": 8965.399999976158,
+          "durationMs": 210.8
+        },
+        {
+          "phase": "art-texture-settle",
+          "startedAt": 8965.399999976158,
+          "completedAt": 8965.699999928474,
+          "durationMs": 0.3
+        },
+        {
+          "phase": "weapon-catalog-prewarm",
+          "startedAt": 8965.699999928474,
+          "completedAt": 15116.699999928474,
+          "durationMs": 6151
+        },
+        {
+          "phase": "presentation-batching",
+          "startedAt": 15116.699999928474,
+          "completedAt": 15133.099999904633,
+          "durationMs": 16.4
+        },
+        {
+          "phase": "match-authority-reset",
+          "startedAt": 15133.099999904633,
+          "completedAt": 15141.299999952316,
+          "durationMs": 8.2
+        },
+        {
+          "phase": "prewarm-batched-effects",
+          "startedAt": 15141.299999952316,
+          "completedAt": 30127.399999976158,
+          "durationMs": 14986.1
+        },
+        {
+          "phase": "coverage-submit-fence",
+          "startedAt": 30127.399999976158,
+          "completedAt": 37445.59999990463,
+          "durationMs": 7318.2
+        },
+        {
+          "phase": "retire-previous-arenas",
+          "startedAt": 37445.59999990463,
+          "completedAt": 37445.699999928474,
+          "durationMs": 0.1
+        },
+        {
+          "phase": "commit-bookkeeping",
+          "startedAt": 37445.699999928474,
+          "completedAt": 37446.199999928474,
+          "durationMs": 0.5
+        },
+        {
+          "phase": "finalize",
+          "startedAt": 37446.199999928474,
+          "completedAt": 37446.199999928474,
+          "durationMs": 0
+        }
+      ],
+      "effectPrewarm": {
+        "durationMs": 14986,
+        "groups": [
+          [
+            "tracers-impacts",
+            946.6
+          ],
+          [
+            "explosions",
+            945.1
+          ],
+          [
+            "death-drops-glass",
+            4196.3
+          ],
+          [
+            "world-ordnance",
+            4243.8
+          ],
+          [
+            "nuke-overdrive-bolts",
+            4195.9
+          ],
+          [
+            "smoke-volumes",
+            5079.1
+          ],
+          [
+            "bot-world-weapons",
+            4241.5
+          ],
+          [
+            "flare-first-shot",
+            4516.2
+          ],
+          [
+            "flamethrower-first-shot",
+            779.3
+          ],
+          [
+            "killstreak-vocabulary",
+            4607.5
+          ]
+        ]
+      },
+      "matchAdmission": null,
+      "pipelinesBeforeAdmission": 255,
+      "pipelinesSyncBeforeAdmission": 232,
+      "pipelinesAsyncBeforeAdmission": 23,
+      "shaderModulesBeforeAdmission": 287,
+      "pipelinesDuringAdmission": 9,
+      "census": {
+        "uniqueMaterials": 192,
+        "distinctMaterialNames": 61,
+        "triangles": 117678,
+        "meshes": 243,
+        "instancedMeshes": 8,
+        "instances": 558,
+        "skinnedMeshes": 40
+      }
+    }
+  ],
+  "invalidated": null,
+  "plannedEdges": 1,
+  "summary": {
+    "edges": 1,
+    "failed": 0,
+    "failedPairs": [],
+    "medianTransitionMs": 14545.9,
+    "slowestEdges": [
+      {
+        "pair": "gun-range->test1",
+        "transitionMs": 14545.9,
+        "pipelines": 182
+      }
+    ]
+  }
+}

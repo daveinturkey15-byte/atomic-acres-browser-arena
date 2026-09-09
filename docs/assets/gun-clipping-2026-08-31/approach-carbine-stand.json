@@ -1,0 +1,2450 @@
+[
+  {
+    "requestedGapM": 3,
+    "name": "approach-carbine-stand-300cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59490966796875,
+        1.707337954044342,
+        23.001680374145508
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3346633846877127,
+      -0.5264220832650627,
+      -0.8600000362453807
+    ],
+    "rootRot": [
+      0.8199999831467115,
+      0.0400035693016611,
+      0.0900027963831578
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59490966796875,
+      1.8473379540443422,
+      23.001680374145508
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0280940539588634,
+          -1.8629754325322576,
+          -2.113522631939489
+        ],
+        "max": [
+          1.69417535354372,
+          0.8259210765131064,
+          0.4165709985142385
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19179811499137855,
+          -1.0759802879032727,
+          -1.4676430841735524
+        ],
+        "max": [
+          0.4589343540533477,
+          0.1339908438660733,
+          -0.43609195600046746
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.30608836069871614,
+      -0.02918999004695122,
+      -1.2889712975787617
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9132120539656192,
+        0.9815850590273636,
+        -0.4910336061613947
+      ],
+      "left-hand-grip-socket": [
+        1.0178299004784641,
+        0.8445130404275936,
+        -0.21283178626399035
+      ],
+      "right-hand-grip-socket": [
+        0.6289461768857727,
+        -1.2291937845594876,
+        0.37492460793774285
+      ],
+      "right-wrist-knife-socket": [
+        0.360887974024493,
+        -0.7650024787279661,
+        -0.9772732049480837
+      ],
+      "eject-socket": [
+        0.24514613840872457,
+        -0.4860787513933027,
+        -0.8330432573520312
+      ],
+      "front-sight-socket": [
+        0.3040157765784812,
+        -0.09388305475278069,
+        -1.083654513241001
+      ],
+      "grip-socket-r": [
+        0.3608879756256762,
+        -0.765002475823638,
+        -0.9772732059797349
+      ],
+      "magazine-socket": [
+        0.33787648569159145,
+        -0.5002447267571344,
+        -1.0043865439792086
+      ],
+      "muzzle-socket": [
+        0.30608836069871614,
+        -0.02918999004695122,
+        -1.2889712975787617
+      ],
+      "optic-socket": [
+        0.31664651831516366,
+        -0.381192829054235,
+        -0.7355962019352731
+      ],
+      "rear-sight-socket": [
+        0.32749573645739716,
+        -0.5227967435918641,
+        -0.683441563614771
+      ],
+      "reload-socket-l": [
+        0.4254087194335767,
+        -0.6028839812051443,
+        -1.1195218353894276
+      ],
+      "support-socket-l": [
+        0.3962440022962497,
+        -0.28230504696860725,
+        -1.1187472147259854
+      ]
+    }
+  },
+  {
+    "requestedGapM": 2.2,
+    "name": "approach-carbine-stand-220cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7075075888633728,
+        23.001008987426758
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.34200976834639274,
+      -0.5476587391379627,
+      -0.8600000034495274
+    ],
+    "rootRot": [
+      0.8199999990382641,
+      0.0400006475524847,
+      0.09000467547751176
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489822387695,
+      1.847507588863373,
+      23.001008987426758
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0207449039229104,
+          -1.884211521778335,
+          -2.1135253087129584
+        ],
+        "max": [
+          1.7015189591366848,
+          0.8046838545004997,
+          0.41657373214175664
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19914591577514074,
+          -1.0972169249148145,
+          -1.4676433583516797
+        ],
+        "max": [
+          0.4662798065789602,
+          0.1127541731127919,
+          -0.4360916376681345
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.31343661358448216,
+      -0.05042658242743325,
+      -1.2889713156977223
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9231560650912165,
+        0.9575662577522748,
+        -0.4875910238149075
+      ],
+      "left-hand-grip-socket": [
+        1.0278370485619845,
+        0.8194593521779414,
+        -0.209925291290169
+      ],
+      "right-hand-grip-socket": [
+        0.6479865278759291,
+        -1.2505870489454827,
+        0.37250004164732786
+      ],
+      "right-wrist-knife-socket": [
+        0.3682345483910652,
+        -0.786239146317754,
+        -0.9772731055902071
+      ],
+      "eject-socket": [
+        0.25249246583481977,
+        -0.5073153331568854,
+        -0.8330435222049601
+      ],
+      "front-sight-socket": [
+        0.3113632830216737,
+        -0.11511966405216256,
+        -1.0836545442272865
+      ],
+      "grip-socket-r": [
+        0.36823454997825067,
+        -0.7862391434498499,
+        -0.9772731066298732
+      ],
+      "magazine-socket": [
+        0.34522337775495515,
+        -0.5214813722335541,
+        -1.0043864979837949
+      ],
+      "muzzle-socket": [
+        0.31343661358448216,
+        -0.05042658242743325,
+        -1.2889713156977223
+      ],
+      "optic-socket": [
+        0.3239926074350983,
+        -0.4024294808429518,
+        -0.7355962165644243
+      ],
+      "rear-sight-socket": [
+        0.33484152890828156,
+        -0.5440334094078256,
+        -0.6834415546166852
+      ],
+      "reload-socket-l": [
+        0.4327559112635768,
+        -0.6241206910655128,
+        -1.1195215040979036
+      ],
+      "support-socket-l": [
+        0.4035914657076134,
+        -0.30354173195525447,
+        -1.1187469524192792
+      ]
+    }
+  },
+  {
+    "requestedGapM": 1.8,
+    "name": "approach-carbine-stand-180cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7083845520019532,
+        23.001907348632812
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3481069821723047,
+      -0.5427252118011431,
+      -0.8600000009375584
+    ],
+    "rootRot": [
+      0.8199999997725339,
+      0.04000027041636842,
+      0.09000491802691206
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489822387695,
+      1.8483845520019533,
+      23.001907348632812
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0146473330143841,
+          -1.879277920631856,
+          -2.113525656672792
+        ],
+        "max": [
+          1.7076158143713087,
+          0.8096173081209093,
+          0.4165740839768546
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.2052433125225832,
+          -1.0922833949661206,
+          -1.4676433958832433
+        ],
+        "max": [
+          0.47237690021463763,
+          0.1176876981989905,
+          -0.4360915978848823
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.31953406868820267,
+      -0.045493047460319236,
+      -1.2889713204123652
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9107367603777234,
+        0.9819840636015298,
+        -0.5123370482589067
+      ],
+      "left-hand-grip-socket": [
+        1.0149136545617168,
+        0.8512801984412983,
+        -0.2309235463856396
+      ],
+      "right-hand-grip-socket": [
+        0.6568687066607559,
+        -1.245698507104863,
+        0.37190436994249865
+      ],
+      "right-wrist-knife-socket": [
+        0.3743317868242997,
+        -0.7813056206621507,
+        -0.9772730941647083
+      ],
+      "eject-socket": [
+        0.25858967240246145,
+        -0.5023817962184769,
+        -0.833043558166203
+      ],
+      "front-sight-socket": [
+        0.3174606417756287,
+        -0.11018613099837227,
+        -1.0836545505177924
+      ],
+      "grip-socket-r": [
+        0.37433178841820336,
+        -0.7813056177846869,
+        -0.9772730952128654
+      ],
+      "magazine-socket": [
+        0.3513206572049974,
+        -0.5165478437450299,
+        -1.0043864938024214
+      ],
+      "muzzle-socket": [
+        0.31953406868820267,
+        -0.045493047460319236,
+        -1.2889713204123652
+      ],
+      "optic-socket": [
+        0.33008978324266636,
+        -0.3974959528150086,
+        -0.7355962203654087
+      ],
+      "rear-sight-socket": [
+        0.34093866642201576,
+        -0.5390998831217877,
+        -0.6834415551814175
+      ],
+      "reload-socket-l": [
+        0.43885322940677796,
+        -0.6191871710394232,
+        -1.1195214629556602
+      ],
+      "support-socket-l": [
+        0.4096888189066945,
+        -0.2986082087174491,
+        -1.1187469206037548
+      ]
+    }
+  },
+  {
+    "requestedGapM": 1.5,
+    "name": "approach-carbine-stand-150cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59491729736328,
+        1.7073299074172974,
+        23.001415252685547
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3488411526813725,
+      -0.5354013338680901,
+      -0.8600000000777311
+    ],
+    "rootRot": [
+      0.819999999927329,
+      0.040000122894873404,
+      0.0900050125269695
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59491729736328,
+      1.8473299074172975,
+      23.001415252685547
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0139130227229103,
+          -1.8719540135685973,
+          -2.1135257927602566
+        ],
+        "max": [
+          1.708349844518871,
+          0.816941156964408,
+          0.4165742213331711
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.20597755467791856,
+          -1.0849595159822378,
+          -1.4676434107065361
+        ],
+        "max": [
+          0.47311102361127766,
+          0.1250115752034744,
+          -0.436091582425135
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3202683335857124,
+      -0.038169166598531534,
+      -1.2889713224447803
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9101966930299668,
+        0.9906193834947206,
+        -0.5140588039525937
+      ],
+      "left-hand-grip-socket": [
+        1.0143348933272058,
+        0.8604272551280974,
+        -0.23239387955403146
+      ],
+      "right-hand-grip-socket": [
+        0.643118332745825,
+        -1.2381734622858465,
+        0.37492573838581933
+      ],
+      "right-wrist-knife-socket": [
+        0.3750659668684797,
+        -0.7739817434198677,
+        -0.9772730898150499
+      ],
+      "eject-socket": [
+        0.25932384009012566,
+        -0.4950579145027123,
+        -0.8330435723369902
+      ],
+      "front-sight-socket": [
+        0.3181948690245662,
+        -0.10286225085418788,
+        -1.0836545531565207
+      ],
+      "grip-socket-r": [
+        0.3750659684619535,
+        -0.773981740529545,
+        -0.9772730908417273
+      ],
+      "magazine-socket": [
+        0.35205485335079345,
+        -0.5092239653835946,
+        -1.0043864922943087
+      ],
+      "muzzle-socket": [
+        0.3202683335857124,
+        -0.038169166598531534,
+        -1.2889713224447803
+      ],
+      "optic-socket": [
+        0.33082393895181283,
+        -0.39017207458864456,
+        -0.735596221991436
+      ],
+      "rear-sight-socket": [
+        0.34167280713007386,
+        -0.5317760055718799,
+        -0.6834415555236575
+      ],
+      "reload-socket-l": [
+        0.4395874406299285,
+        -0.6118632960276036,
+        -1.1195214469987604
+      ],
+      "support-socket-l": [
+        0.4104230439247978,
+        -0.2912843324417349,
+        -1.11874690833438
+      ]
+    }
+  },
+  {
+    "requestedGapM": 1.2,
+    "name": "approach-carbine-stand-120cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59498977661133,
+        1.7071251058578492,
+        23.001150131225586
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3417097640813752,
+      -0.536370216540698,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999799901,
+      0.040000047059438375,
+      0.09000506059344492
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59498977661133,
+      1.8471251058578493,
+      23.001150131225586
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0210443393227528,
+          -1.8729228809919853,
+          -2.1135258628012608
+        ],
+        "max": [
+          1.7012183836360677,
+          0.8159722590656262,
+          0.41657429129827506
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19884620303705347,
+          -1.085928398095569,
+          -1.4676434186686649
+        ],
+        "max": [
+          0.46597961065826965,
+          0.12404269202626672,
+          -0.43609157486212524
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3131369935204873,
+      -0.03913804777594154,
+      -1.2889713238667113
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9221440637838505,
+        0.9696186939242386,
+        -0.4885326284627709
+      ],
+      "left-hand-grip-socket": [
+        1.0268074477519917,
+        0.8317952778640514,
+        -0.21071944172019386
+      ],
+      "right-hand-grip-socket": [
+        0.6359868209561483,
+        -1.239142354061317,
+        0.3749257626305891
+      ],
+      "right-wrist-knife-socket": [
+        0.3679345830483669,
+        -0.774950626445309,
+        -0.9772730879344778
+      ],
+      "eject-socket": [
+        0.2521924500639443,
+        -0.4960267951982098,
+        -0.8330435799543565
+      ],
+      "front-sight-socket": [
+        0.31106350965985285,
+        -0.10383113239003139,
+        -1.0836545548862873
+      ],
+      "grip-socket-r": [
+        0.3679345846361173,
+        -0.7749506235653665,
+        -0.9772730889574603
+      ],
+      "magazine-socket": [
+        0.3449234778847945,
+        -0.5101928478439568,
+        -1.004386491885768
+      ],
+      "muzzle-socket": [
+        0.3131369935204873,
+        -0.03913804777594154,
+        -1.2889713238667113
+      ],
+      "optic-socket": [
+        0.323692542841048,
+        -0.39114095709827756,
+        -0.7355962231917346
+      ],
+      "rear-sight-socket": [
+        0.33454140327785353,
+        -0.5327448884305719,
+        -0.6834415560613465
+      ],
+      "reload-socket-l": [
+        0.432456072835663,
+        -0.6128321802459245,
+        -1.119521439190521
+      ],
+      "support-socket-l": [
+        0.4032916833343272,
+        -0.292253216000107,
+        -1.1187469024260466
+      ]
+    }
+  },
+  {
+    "requestedGapM": 1,
+    "name": "approach-carbine-stand-100cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7063716435432434,
+        23.001441955566406
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3338309375526856,
+      -0.5453642133295501,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999938372,
+      0.04000001838609347,
+      0.09000508003744798
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489822387695,
+      1.8463716435432436,
+      23.001441955566406
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0289231389827656,
+          -1.8819168726581967,
+          -2.1135258900492104
+        ],
+        "max": [
+          1.6933395300945762,
+          0.8069782571591986,
+          0.4165743184566466
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19096739016446662,
+          -1.094922394710459,
+          -1.4676434217868888
+        ],
+        "max": [
+          0.45810077525432646,
+          0.11504869509594728,
+          -0.43609157195943027
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3052581853103078,
+      -0.04813204400501303,
+      -1.288971324438009
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9130685759815051,
+        0.9619061046805435,
+        -0.4901175943402052
+      ],
+      "left-hand-grip-socket": [
+        1.0177023734642958,
+        0.8245593924432828,
+        -0.21205728838452131
+      ],
+      "right-hand-grip-socket": [
+        0.6427470075909021,
+        -1.2483401237696268,
+        0.371871149190909
+      ],
+      "right-wrist-knife-socket": [
+        0.3600557586439237,
+        -0.7839446233230509,
+        -0.9772730872188831
+      ],
+      "eject-socket": [
+        0.2443136229360725,
+        -0.5050207913182263,
+        -0.8330435829451233
+      ],
+      "front-sight-socket": [
+        0.30318469401805004,
+        -0.11282512876560435,
+        -1.0836545555788035
+      ],
+      "grip-socket-r": [
+        0.3600557602279153,
+        -0.7839446204635998,
+        -0.977273088260759
+      ],
+      "magazine-socket": [
+        0.3370446564333669,
+        -0.519186844543319,
+        -1.0043864917565344
+      ],
+      "muzzle-socket": [
+        0.3052581853103078,
+        -0.04813204400501303,
+        -1.288971324438009
+      ],
+      "optic-socket": [
+        0.3158137132313712,
+        -0.40013495384667186,
+        -0.7355962236851852
+      ],
+      "rear-sight-socket": [
+        0.32666257081533345,
+        -0.5417388853038851,
+        -0.6834415563005294
+      ],
+      "reload-socket-l": [
+        0.4245772544806172,
+        -0.6218261775290359,
+        -1.1195214361868366
+      ],
+      "support-socket-l": [
+        0.3954128674247528,
+        -0.3012472130589774,
+        -1.1187469001534467
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.85,
+    "name": "approach-carbine-stand-085cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7078765416145325,
+        23.001564025878906
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.33108794285925874,
+      -0.5385083473114213,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999991734,
+      0.0400000039611912,
+      0.09000508939778079
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489822387695,
+      1.8478765416145326,
+      23.001564025878906
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0316661200415211,
+          -1.875061003847718,
+          -2.1135259035147556
+        ],
+        "max": [
+          1.690596521706322,
+          0.8138341203888211,
+          0.4165743318777615
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.18822440244667504,
+          -1.0880665285918787,
+          -1.467643423330749
+        ],
+        "max": [
+          0.4553577759855756,
+          0.12190456102562774,
+          -0.43609157052207337
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3025151998432669,
+      -0.04127617770499059,
+      -1.2889713247258001
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.8914952350963254,
+        0.9884858531275338,
+        -0.5153416513636557
+      ],
+      "left-hand-grip-socket": [
+        0.99560430695864,
+        0.8586747339329763,
+        -0.23349016711060955
+      ],
+      "right-hand-grip-socket": [
+        0.6361852017159251,
+        -1.2414231828316913,
+        0.37268668996843957
+      ],
+      "right-wrist-knife-socket": [
+        0.3573127648873502,
+        -0.7770887574187588,
+        -0.9772730868611248
+      ],
+      "eject-socket": [
+        0.2415706279610923,
+        -0.4981649249374023,
+        -0.8330435844228887
+      ],
+      "front-sight-socket": [
+        0.30044170485696853,
+        -0.10596926253489247,
+        -1.0836545559257331
+      ],
+      "grip-socket-r": [
+        0.35731276649658383,
+        -0.7770887545102005,
+        -0.9772730879139218
+      ],
+      "magazine-socket": [
+        0.3343016642572536,
+        -0.512330978483762,
+        -1.0043864916929905
+      ],
+      "muzzle-socket": [
+        0.3025151998432669,
+        -0.04127617770499059,
+        -1.2889713247258001
+      ],
+      "optic-socket": [
+        0.31307071706799405,
+        -0.3932790878007131,
+        -0.735596223930564
+      ],
+      "rear-sight-socket": [
+        0.3239195731921427,
+        -0.5348830193229233,
+        -0.6834415564187069
+      ],
+      "reload-socket-l": [
+        0.42183426379727607,
+        -0.6149703117904286,
+        -1.1195214347022784
+      ],
+      "support-socket-l": [
+        0.39266987806401943,
+        -0.29439134719916527,
+        -1.1187468990336242
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.7,
+    "name": "approach-carbine-stand-070cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7068608784675598,
+        23.001977920532227
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.33708034618218696,
+      -0.5291264759693592,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999999994,
+      0.04,
+      0.09000509160755074
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489521913005,
+      1.84686087846756,
+      23.016730704821118
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0256737128737292,
+          -1.8656791315550476,
+          -2.113525907004778
+        ],
+        "max": [
+          1.6965889211784386,
+          0.8232159907824201,
+          0.4165743353561453
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19421680777550776,
+          -1.078684657211266,
+          -1.4676434237332145
+        ],
+        "max": [
+          0.46135017795763034,
+          0.13128643232880433,
+          -0.43609157014721234
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3085076057090532,
+      -0.03189430628495549,
+      -1.2889713248048054
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9015188347842695,
+        0.9937147345468047,
+        -0.5098969807879499
+      ],
+      "left-hand-grip-socket": [
+        1.0057496042625012,
+        0.8622849832436088,
+        -0.2288417338122386
+      ],
+      "right-hand-grip-socket": [
+        0.6313573261330561,
+        -1.2318986189787333,
+        0.3749257778554451
+      ],
+      "right-wrist-knife-socket": [
+        0.3633051683972077,
+        -0.767706886091347,
+        -0.9772730867928558
+      ],
+      "eject-socket": [
+        0.2475630312237307,
+        -0.48878305347332796,
+        -0.833043584805722
+      ],
+      "front-sight-socket": [
+        0.3064341097465295,
+        -0.09658739113028836,
+        -1.0836545560194608
+      ],
+      "grip-socket-r": [
+        0.3633051699941596,
+        -0.7677068831941276,
+        -0.9772730878219988
+      ],
+      "magazine-socket": [
+        0.3402940682398423,
+        -0.5029491071332883,
+        -1.0043864916767902
+      ],
+      "muzzle-socket": [
+        0.3085076057090532,
+        -0.03189430628495549,
+        -1.2889713248048054
+      ],
+      "optic-socket": [
+        0.31906312005574833,
+        -0.38389721644470565,
+        -0.7355962239953868
+      ],
+      "rear-sight-socket": [
+        0.3299119757579412,
+        -0.525501147986646,
+        -0.6834415564493383
+      ],
+      "reload-socket-l": [
+        0.4278266681342231,
+        -0.6055884405513439,
+        -1.1195214343173703
+      ],
+      "support-socket-l": [
+        0.3986622828431905,
+        -0.2850094759196151,
+        -1.1187468987460178
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.6,
+    "name": "approach-carbine-stand-060cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59491729736328,
+        1.7070209765434265,
+        23.001956939697266
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3478077014455963,
+      -0.5508700282896469,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999999994,
+      0.04,
+      0.0900050912945439
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59491730266733,
+      1.8470209765434267,
+      23.001930897767267
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0149463575229447,
+          -1.8874226837160921,
+          -2.1135259068242007
+        ],
+        "max": [
+          1.707316276363649,
+          0.8014724383038228,
+          0.41657433517606535
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.20494416311732166,
+          -1.1004282095221107,
+          -1.4676434237143852
+        ],
+        "max": [
+          0.47207753313907475,
+          0.10954287999598789,
+          -0.43609157016461353
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.319234960980463,
+      -0.05363785860451609,
+      -1.2889713248044927
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9306467040730055,
+        0.9525337262927318,
+        -0.48535406502299594
+      ],
+      "left-hand-grip-socket": [
+        1.035368138453368,
+        0.8137531539937852,
+        -0.208039697166015
+      ],
+      "right-hand-grip-socket": [
+        0.6420846815305694,
+        -1.2536421712669403,
+        0.3749257777836448
+      ],
+      "right-wrist-knife-socket": [
+        0.3740325236201407,
+        -0.7894504383505525,
+        -0.9772730868200838
+      ],
+      "eject-socket": [
+        0.2582903865019155,
+        -0.510526605774178,
+        -0.8330435847857558
+      ],
+      "front-sight-socket": [
+        0.31716146505108966,
+        -0.11833094344683603,
+        -1.0836545560178692
+      ],
+      "grip-socket-r": [
+        0.37403252517984953,
+        -0.7894504355214784,
+        -0.9772730878250115
+      ],
+      "magazine-socket": [
+        0.351021423475828,
+        -0.5246926594560692,
+        -1.004386491677856
+      ],
+      "muzzle-socket": [
+        0.319234960980463,
+        -0.05363785860451609,
+        -1.2889713248044927
+      ],
+      "optic-socket": [
+        0.32979047537859785,
+        -0.40564076875959176,
+        -0.7355962239930847
+      ],
+      "rear-sight-socket": [
+        0.3406393310625013,
+        -0.5472447003031939,
+        -0.6834415564477467
+      ],
+      "reload-socket-l": [
+        0.4385540233219771,
+        -0.6273319928942425,
+        -1.119521434337166
+      ],
+      "support-socket-l": [
+        0.40938963809952256,
+        -0.30675302825628137,
+        -1.1187468987631561
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.5,
+    "name": "approach-carbine-stand-050cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.7072306656837464,
+        23.001436233520508
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.3482412642577526,
+      -0.5293419939535697,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999999994,
+      0.04,
+      0.09000509093818354
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489854384966,
+      1.8472306656837465,
+      22.999865223226944
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0145127946113064,
+          -1.865894649198715,
+          -2.113525906618605
+        ],
+        "max": [
+          1.7077498390867767,
+          0.8230004724596636,
+          0.41657433497103113
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.20537772601873172,
+          -1.0789001751752827,
+          -1.4676434236929339
+        ],
+        "max": [
+          0.4725110958579073,
+          0.1310709143178006,
+          -0.43609157018441636
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3196685238017274,
+      -0.032109824267610554,
+      -1.2889713248041375
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9234081029217442,
+        0.982262363306283,
+        -0.4955255187759846
+      ],
+      "left-hand-grip-socket": [
+        1.0279379032080165,
+        0.8465392587041507,
+        -0.2166301182841508
+      ],
+      "right-hand-grip-socket": [
+        0.6605624075209384,
+        -1.2323770790498811,
+        0.3711327894525098
+      ],
+      "right-wrist-knife-socket": [
+        0.37446609038256184,
+        -0.7679223846512226,
+        -0.9772730944989405
+      ],
+      "eject-socket": [
+        0.25872394933088216,
+        -0.4889985714159708,
+        -0.8330435847630184
+      ],
+      "front-sight-socket": [
+        0.317595027910091,
+        -0.09680290910650147,
+        -1.083654556016043
+      ],
+      "grip-socket-r": [
+        0.37446608790351377,
+        -0.7679224011934429,
+        -0.9772730878284364
+      ],
+      "magazine-socket": [
+        0.3514549862567442,
+        -0.5031646251228299,
+        -1.0043864916790568
+      ],
+      "muzzle-socket": [
+        0.3196685238017274,
+        -0.032109824267610554,
+        -1.2889713248041375
+      ],
+      "optic-socket": [
+        0.3302240382584145,
+        -0.38411273441736493,
+        -0.7355962239904557
+      ],
+      "rear-sight-socket": [
+        0.3410728939214991,
+        -0.5257166659628596,
+        -0.6834415564459277
+      ],
+      "reload-socket-l": [
+        0.4389875860479897,
+        -0.6058039585839077,
+        -1.1195214343596973
+      ],
+      "support-socket-l": [
+        0.4098232009036131,
+        -0.2852249939388507,
+        -1.1187468987826605
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.45,
+    "name": "approach-carbine-stand-045cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59489822387695,
+        1.706459321975708,
+        23.00119972229004
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.34173797121022026,
+      -0.5353507221295265,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999999994,
+      0.04,
+      0.0900050907726787
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59489822387695,
+      1.8464593219757082,
+      23.00119972229004
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.0210160876126366,
+          -1.8719033772904707,
+          -2.1135259065231224
+        ],
+        "max": [
+          1.7012465459979005,
+          0.8169917441999994,
+          0.4165743348758042
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.19887443301266217,
+          -1.0849089033462467,
+          -1.4676434236829792
+        ],
+        "max": [
+          0.46600780276703446,
+          0.12506218613521902,
+          -0.4360915701936321
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3131652307584325,
+      -0.03811855244318263,
+      -1.288971324803974
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9003840606640061,
+        0.9934460339577573,
+        -0.5177280195835436
+      ],
+      "left-hand-grip-socket": [
+        1.004438363314172,
+        0.8643430086694732,
+        -0.2355312874131883
+      ],
+      "right-hand-grip-socket": [
+        0.6413144594320599,
+        -1.2381871542271088,
+        0.37384234364087376
+      ],
+      "right-wrist-knife-socket": [
+        0.3679627932165985,
+        -0.7739311322671243,
+        -0.9772730867924864
+      ],
+      "eject-socket": [
+        0.25222065629116486,
+        -0.4950072995816497,
+        -0.8330435847524669
+      ],
+      "front-sight-socket": [
+        0.31109173488431807,
+        -0.10281163728048082,
+        -1.0836545560152118
+      ],
+      "grip-socket-r": [
+        0.36796279481488625,
+        -0.7739311293731344,
+        -0.977273087830028
+      ],
+      "magazine-socket": [
+        0.34495169319471586,
+        -0.5091733533001046,
+        -1.0043864916796181
+      ],
+      "muzzle-socket": [
+        0.3131652307584325,
+        -0.03811855244318263,
+        -1.288971324803974
+      ],
+      "optic-socket": [
+        0.32372074524231564,
+        -0.39012146259046543,
+        -0.7355962239892477
+      ],
+      "rear-sight-socket": [
+        0.33456960089572974,
+        -0.5317253941368387,
+        -0.6834415564450893
+      ],
+      "reload-socket-l": [
+        0.43248429296045643,
+        -0.6118126867718201,
+        -1.1195214343701636
+      ],
+      "support-socket-l": [
+        0.4033199078523424,
+        -0.29123372212346776,
+        -1.118746898791727
+      ]
+    }
+  },
+  {
+    "requestedGapM": 0.405,
+    "name": "approach-carbine-stand-041cm",
+    "diag": {
+      "weapon": "carbine",
+      "stance": "stand",
+      "position": [
+        -36.59491729736328,
+        1.706975736618042,
+        23.001644134521484
+      ],
+      "yawRadians": 1.571,
+      "pitchRadians": 0,
+      "fullStowDistanceMeters": 0.594,
+      "probeLengthMeters": 1.65,
+      "probePaddingMeters": 0.1456,
+      "retreat": 0.78,
+      "adsProgress": 0,
+      "probes": [
+        {
+          "offset": "0/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/centre",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/centre",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "0/lower",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/upper",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/upper",
+          "hitMeters": 0.259
+        },
+        {
+          "offset": "-1/lower",
+          "hitMeters": 0.26
+        },
+        {
+          "offset": "1/lower",
+          "hitMeters": 0.259
+        }
+      ],
+      "nearestForwardMeters": 0.259,
+      "nearestColliderBounds": {
+        "minX": -37.599999999999994,
+        "maxX": -37,
+        "minZ": -30.8,
+        "maxZ": 30.8,
+        "minY": 0,
+        "maxY": 3
+      },
+      "fireAdmission": {
+        "contract": "viewmodel-fire-admission-hf343-v1",
+        "weapon": "carbine",
+        "obstructionBlend": 1,
+        "highReadyBlend": 1,
+        "fireBlocked": true,
+        "blockReason": "full-stow",
+        "spreadPenaltyRadians": 0.014,
+        "policy": "block-full-stow-graduate-partial-v1",
+        "aimAuthority": "camera-forward-unchanged"
+      }
+    },
+    "rootVisible": true,
+    "rootPos": [
+      0.33371176173194406,
+      -0.5508479523993683,
+      -0.8600000000000004
+    ],
+    "rootRot": [
+      0.8199999999999994,
+      0.04,
+      0.09000509063638244
+    ],
+    "rootScale": 0.7338774180751115,
+    "rootLayerMask": 4,
+    "layerMasks": {
+      "4": 10,
+      "12": 1
+    },
+    "visibleMeshes": 11,
+    "hiddenMeshes": 292,
+    "cameraNear": 0.08,
+    "cameraFov": 82,
+    "cameraPos": [
+      -36.59491729736328,
+      1.8469757366180422,
+      23.001644134521484
+    ],
+    "groups": {
+      "arms": {
+        "min": [
+          -1.029042297052868,
+          -1.8874006074909715,
+          -2.1135259064444796
+        ],
+        "max": [
+          1.6932203364855738,
+          0.801494513861222,
+          0.4165743347973887
+        ],
+        "count": 4
+      },
+      "weapon": {
+        "min": [
+          0.1908482235685227,
+          -1.100406133611977,
+          -1.4676434236747724
+        ],
+        "max": [
+          0.4579815932530593,
+          0.10956495585992121,
+          -0.4360915702011994
+        ],
+        "count": 7
+      }
+    },
+    "muzzleCam": [
+      0.3051390212836331,
+      -0.05361578271270839,
+      -1.288971324803839
+    ],
+    "sockets": {
+      "left-hand-grenade-socket": [
+        0.9019797803276113,
+        0.9680130035294314,
+        -0.5047472228903302
+      ],
+      "left-hand-grip-socket": [
+        1.0063214398541582,
+        0.8350483234616215,
+        -0.2244561302242758
+      ],
+      "right-hand-grip-socket": [
+        0.6279887420996424,
+        -1.2536200954678016,
+        0.37492577765780766
+      ],
+      "right-wrist-knife-socket": [
+        0.3599365837476256,
+        -0.7894283624668426,
+        -0.9772730868293564
+      ],
+      "eject-socket": [
+        0.24419444681932134,
+        -0.5105045298430277,
+        -0.8330435847437698
+      ],
+      "front-sight-socket": [
+        0.3030655254239569,
+        -0.11830886754869474,
+        -1.0836545560145154
+      ],
+      "grip-socket-r": [
+        0.3599365853027692,
+        -0.7894283596460523,
+        -0.9772730878313354
+      ],
+      "magazine-socket": [
+        0.33692548370449416,
+        -0.5246705835710324,
+        -1.00438649168008
+      ],
+      "muzzle-socket": [
+        0.3051390212836331,
+        -0.05361578271270839,
+        -1.288971324803839
+      ],
+      "optic-socket": [
+        0.3156945357899197,
+        -0.4056186928579557,
+        -0.7355962239882388
+      ],
+      "rear-sight-socket": [
+        0.32654339143536504,
+        -0.5472226244050526,
+        -0.683441556444393
+      ],
+      "reload-socket-l": [
+        0.42445808344923464,
+        -0.6273099170515082,
+        -1.1195214343787825
+      ],
+      "support-socket-l": [
+        0.39529369837098116,
+        -0.30673095240044157,
+        -1.1187468987991878
+      ]
+    }
+  }
+]

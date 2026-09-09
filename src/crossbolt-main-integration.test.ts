@@ -6,7 +6,9 @@ const source = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8'
 describe('Pass 65 explosive crossbolt runtime integration', () => {
   it('uses the 3x speed constant and sticks to current-life player, remote, and bot targets', () => {
     const targetsStart = source.indexOf('function fillExplosiveBoltTargets(');
-    const targetsEnd = source.indexOf('\nfunction segmentSphereFraction(', targetsStart);
+    // HF-355 moved segmentSphereFraction into legacy-pure-helpers; the block now
+    // ends at the next remaining function. Anchor updated, assertions untouched.
+    const targetsEnd = source.indexOf('\nfunction explosiveBoltTargetDistance(', targetsStart);
     const targets = source.slice(targetsStart, targetsEnd);
     expect(targets).toContain("localContinuity, 'player', player.position, -0.62");
     expect(targets).toContain("remote.continuity, 'remote', remote.target, 1");
@@ -39,10 +41,21 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(update).toContain('const targetHitLifeId = targetHit.lifeId;');
     expect(update).toContain('bolt.targetId = targetHitId;');
     expect(update).toContain('bolt.targetLifeId = targetHitLifeId;');
-    expect(update).toContain('if (targetHitId === player.id) {');
-    expect(update).toContain("'explosive-crossbow', targetHitId, targetHitLifeId, bolt.actionNonce, now,");
-    expect(update).toContain("addFeed('STUCK', 'coral');");
-    expect(update).toContain("else if (bolt.ownerId === player.id) addFeed('STUCK', 'gold');");
+    // Re-pinned 2026-08-30 (owner: "it needs to say STUCK on both peoples
+    // screen when it actually sticks"): the victim/attacker branch moved into
+    // the shared announceStickyAttachment(), which ALSO tells the remote peer
+    // at attach time. The stick-to-current-life invariant is unchanged.
+    expect(update).toContain('announceStickyAttachment(');
+    expect(update).toContain("'explosive-crossbow', bolt.ownerId, targetHitId, targetHitLifeId,");
+    // The victim/attacker feeds now live in the ONE shared announcer, and are
+    // asserted there instead - including the part that never existed before:
+    // it also tells the remote peer at attach time.
+    const announceStart = source.indexOf('function announceStickyAttachment(');
+    const announce = source.slice(announceStart, source.indexOf('function presentStickyVictimUrgentAlert(', announceStart));
+    expect(announce).toContain("addFeed('STUCK', 'coral');");
+    expect(announce).toContain("addFeed('STUCK', 'gold');");
+    expect(announce).toContain("type: 'sticky-attached',");
+    expect(announce).toContain('announcedStickyAttachNonces');
     expect(update).toContain('explosiveBoltTargetBuffer.findIndex(bolt.targetId, bolt.targetLifeId)');
     expect(update).toContain('let targetHitIndex = -1;');
     expect(update).not.toContain('let targetHit:');
@@ -50,9 +63,14 @@ describe('Pass 65 explosive crossbolt runtime integration', () => {
     expect(attachmentWrite).toBeGreaterThan(update.indexOf('const targetHitLifeId = targetHit.lifeId;'));
     expect(update.slice(attachmentWrite)).not.toContain('targetHit.');
 
-    const segmentStart = source.indexOf('function segmentSphereFraction(');
-    const segmentEnd = source.indexOf('\nfunction createExplosiveBoltMesh(', segmentStart);
-    const segment = source.slice(segmentStart, segmentEnd);
+    // HF-355 moved segmentSphereFraction verbatim into legacy-pure-helpers.ts.
+    // The allocation-free contract travels with the function: same assertions,
+    // read from where the body now lives.
+    const helpers = readFileSync(new URL('./legacy-pure-helpers.ts', import.meta.url), 'utf8');
+    const segmentStart = helpers.indexOf('export function segmentSphereFraction(');
+    const segmentEnd = helpers.indexOf('\nexport function', segmentStart + 1);
+    const segment = segmentEnd === -1 ? helpers.slice(segmentStart) : helpers.slice(segmentStart, segmentEnd);
+    expect(segmentStart).toBeGreaterThanOrEqual(0);
     expect(segment).not.toContain('.clone()');
     expect(segment).not.toContain('new THREE.Vector3');
     expect(segment).toContain('nearestX * nearestX + nearestY * nearestY + nearestZ * nearestZ');

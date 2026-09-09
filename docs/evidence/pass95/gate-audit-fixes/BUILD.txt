@@ -1,0 +1,28 @@
+npm run build - under C:/Users/david/AppData/Local/Temp/aa-heavy.lock, released immediately after.
+Run by: Claude Opus lane, branch contrib/dave-gaming-pc/claude/v7-gate-audit-fixes
+
+dist/assets/map3-arena-yZo9o7h2.js                       5.40 kB │ gzip:   2.35 kB
+dist/assets/shared-P20zNDxp.js                           6.45 kB │ gzip:   2.40 kB
+dist/assets/webgpu-adapter-diagnostics-BK_qrMAJ.js       7.75 kB │ gzip:   3.19 kB
+dist/assets/combat-feedback-CzeCIk8V.js                  9.42 kB │ gzip:   3.70 kB
+dist/assets/sky-backdrop-LnOHvGrF.js                     9.52 kB │ gzip:   3.56 kB
+dist/assets/three.webgpu-Og9Rccq9.js                    19.21 kB │ gzip:   7.46 kB
+dist/assets/changelog-D7nAbofp.js                       40.92 kB │ gzip:  15.33 kB
+dist/assets/vendor-three-loaders-BMzNHKB4.js            42.89 kB │ gzip:  12.74 kB
+dist/assets/map-AJ7Zf51z.js                             43.96 kB │ gzip:  15.39 kB
+dist/assets/high-seas-rt49zAKv.js                       45.42 kB │ gzip:  14.37 kB
+dist/assets/test-maps-6a6FhMNP.js                       51.95 kB │ gzip:  18.93 kB
+dist/assets/vendor-peer-DW-fpQKQ.js                     86.87 kB │ gzip:  23.17 kB
+dist/assets/additional-maps-C5qoLrcS.js                110.65 kB │ gzip:  33.20 kB
+dist/assets/farcrysis-CoU7-ozD.js                      145.65 kB │ gzip:  47.17 kB
+dist/assets/gameplay-DZJh9Ps9.js                       501.31 kB │ gzip: 135.68 kB
+dist/assets/vendor-three-CkGIDcsI.js                 1,553.45 kB │ gzip: 439.65 kB
+dist/assets/legacy-main-Cg3vpz7j.js                  1,848.74 kB │ gzip: 568.07 kB
+dist/assets/rapier-USIc5Cek.js                       2,236.65 kB │ gzip: 842.25 kB
+
+✓ built in 1.96s
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

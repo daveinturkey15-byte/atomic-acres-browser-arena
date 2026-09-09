@@ -10,7 +10,8 @@ import { MULTIPLAYER_PROTOCOL_VERSION, type ReloadIntentMessage } from './protoc
 const epoch = 'connection_epoch_a';
 const intent = (actionSequence: number, action: 'start' | 'cancel' = 'start'): ReloadIntentMessage => ({
   type: 'reload-intent', protocolVersion: MULTIPLAYER_PROTOCOL_VERSION, by: 'guest-a', connectionEpoch: epoch,
-  lifeId: 4, actionSequence, weapon: 'm4a1', action, nonce: 100 + actionSequence,
+  lifeId: 4, actionSequence, requestId: `reload-request-${action}-${actionSequence}`,
+  weapon: 'm4a1', action, nonce: 100 + actionSequence,
 });
 
 describe('guest reload authority', () => {

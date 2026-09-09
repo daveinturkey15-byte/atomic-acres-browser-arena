@@ -1,5 +1,6 @@
 import type { MatchMode } from './private-match';
 import type { KillstreakDamageEvent, KillstreakSupportShotEvent } from './killstreak-runtime';
+import type { SpatialPoint } from './spatial-audio';
 
 export type SupportGunAudioKind = 'chopper' | 'drone';
 export const SUPPORT_SHOT_REPLAY_CAPACITY = 256;
@@ -47,10 +48,20 @@ export function supportShotAudioKindForListener(
   listener: SupportCombatListener,
 ): SupportGunAudioKind | null {
   const owner = event.ownerId === listener.playerId;
-  const teammate = listener.mode === 'tdm' && event.ownerTeam === listener.team;
-  if (!owner && !teammate) return null;
-  return event.source === 'chopper' ? 'chopper' : 'drone';
+  // HF-337: explicit listener policy — owner and teammates always hear support fire.
+  // Enemies in TDM hear it positionally at reduced volume (enforced in audio runtime).
+  // FFA non-owners hear nothing.
+  if (owner) return event.source === 'chopper' ? 'chopper' : 'drone';
+  if (listener.mode === 'tdm') {
+    // Teammates and enemies both hear; volume reduction is applied in the audio runtime.
+    return event.source === 'chopper' ? 'chopper' : 'drone';
+  }
+  // FFA: only owner hears support fire
+  return null;
 }
+
+/** HF-337: positional audio callback with emitter position for spatial routing. */
+export type SupportGunPositionalCallback = (kind: SupportGunAudioKind, emitter: SpatialPoint, isEnemy?: boolean) => void;
 
 export function presentSupportShotAudio(
   events: readonly KillstreakSupportShotEvent[],
@@ -64,6 +75,29 @@ export function presentSupportShotAudio(
     const kind = supportShotAudioKindForListener(event, listener);
     if (kind === null) continue;
     play(kind);
+    presented += 1;
+  }
+  return presented;
+}
+
+/** HF-337: positional overload with entity position lookup for spatial support gunfire. */
+export function presentSupportShotAudioPositional(
+  events: readonly KillstreakSupportShotEvent[],
+  listener: SupportCombatListener,
+  getEntityPosition: (entityId: string) => SpatialPoint | null,
+  playPositional: SupportGunPositionalCallback,
+  replayGuard?: SupportShotReplayGuard,
+): number {
+  let presented = 0;
+  for (const event of events) {
+    if (replayGuard && !replayGuard.admit(event)) continue;
+    const kind = supportShotAudioKindForListener(event, listener);
+    if (kind === null) continue;
+    const emitter = getEntityPosition(event.entityId);
+    if (!emitter) continue;
+    // HF-337: determine if this is an enemy entity for the listener
+    const isEnemy = listener.mode === 'tdm' && event.ownerTeam !== listener.team;
+    playPositional(kind, emitter, isEnemy);
     presented += 1;
   }
   return presented;

@@ -1,3 +1,10 @@
+import {
+  createSchemaSnapshotKernel,
+  type SchemaIssue,
+  type SchemaIssueCode,
+  type UnknownRecord,
+} from '../schema-snapshot-kernel';
+
 export const WEAPON_SCHEMA_VERSION = 2 as const;
 export const WEAPON_MATERIAL_POLICY_ID = 'pass64-ballistic-materials-v1' as const;
 
@@ -73,6 +80,13 @@ export type WeaponPenetrationProfile = Readonly<{
   calibreLabel: string;
   power: number;
   fmjMultiplier: number;
+  /**
+   * HF-368: per-weapon wallbang scalar applied to the close-range energy budget
+   * (power x fmjMultiplier) and to nothing else. Every weapon authors 1 so the
+   * shared material table stays the single arena-wide resistance authority;
+   * only a weapon the owner has explicitly re-tuned may leave the default.
+   */
+  wallPenetrationMultiplier: number;
   materialPolicyId: typeof WEAPON_MATERIAL_POLICY_ID;
   energyFalloffStartM: number;
   energyFalloffEndM: number;
@@ -171,22 +185,8 @@ export type WeaponDefinition = Readonly<{
   evidenceIds: readonly string[];
 }>;
 
-export type WeaponSchemaIssueCode =
-  | 'bounds'
-  | 'cross-field'
-  | 'duplicate'
-  | 'format'
-  | 'issue-limit'
-  | 'missing-key'
-  | 'type'
-  | 'unknown-key'
-  | 'unsupported-value';
-
-export type WeaponSchemaIssue = Readonly<{
-  path: string;
-  code: WeaponSchemaIssueCode;
-  message: string;
-}>;
+export type WeaponSchemaIssueCode = SchemaIssueCode;
+export type WeaponSchemaIssue = SchemaIssue;
 
 export class WeaponSchemaValidationError extends Error {
   readonly issues: readonly WeaponSchemaIssue[];
@@ -198,17 +198,12 @@ export class WeaponSchemaValidationError extends Error {
   }
 }
 
-type UnknownRecord = Readonly<Record<string, unknown>>;
 
 const IDENTIFIER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const FORBIDDEN_DISPLAY_NAME_PATTERN = /[\u0000-\u001f\u007f]/;
 const MAX_DEFINITION_COUNT = 128;
 const MAX_EVIDENCE_ID_COUNT = 64;
 const MAX_COMPANION_PRIMARY_COUNT = 64;
-const MAX_SCHEMA_ISSUES = 128;
-const MAX_SNAPSHOT_KEYS = 256;
-const MAX_SNAPSHOT_DEPTH = 12;
-const MAX_SNAPSHOT_ARRAY_LENGTH = MAX_DEFINITION_COUNT;
 
 const WEAPON_KEYS = Object.freeze([
   'id',
@@ -237,244 +232,18 @@ const WEAPON_KEYS = Object.freeze([
   'evidenceIds',
 ] as const);
 
-function issue(
-  issues: WeaponSchemaIssue[],
-  path: string,
-  code: WeaponSchemaIssueCode,
-  message: string,
-): void {
-  if (issues.length >= MAX_SCHEMA_ISSUES) {
-    if (issues[MAX_SCHEMA_ISSUES - 1]?.code !== 'issue-limit') {
-      issues[MAX_SCHEMA_ISSUES - 1] = Object.freeze({
-        path: '$',
-        code: 'issue-limit',
-        message: `validation stopped after ${MAX_SCHEMA_ISSUES - 1} detailed issues`,
-      });
-    }
-    return;
-  }
-  issues.push(Object.freeze({ path, code, message }));
-}
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function snapshotFailure(issues: WeaponSchemaIssue[], path: string, operation: string): void {
-  issue(issues, path, 'type', `${operation} could not be read safely`);
-}
-
-function snapshotOwnKeys(
-  value: object,
-  path: string,
-  issues: WeaponSchemaIssue[],
-): readonly PropertyKey[] | null {
-  try {
-    const keys = Reflect.ownKeys(value);
-    if (keys.length > MAX_SNAPSHOT_KEYS) {
-      issue(issues, path, 'bounds', `must not expose more than ${MAX_SNAPSHOT_KEYS} own properties`);
-    }
-    return keys.slice(0, MAX_SNAPSHOT_KEYS);
-  } catch {
-    snapshotFailure(issues, path, 'own property keys');
-    return null;
-  }
-}
-
-function snapshotDescriptor(
-  value: object,
-  key: PropertyKey,
-  path: string,
-  issues: WeaponSchemaIssue[],
-): PropertyDescriptor | null {
-  try {
-    const first = Reflect.getOwnPropertyDescriptor(value, key);
-    const second = Reflect.getOwnPropertyDescriptor(value, key);
-    if (!first || !second) {
-      snapshotFailure(issues, path, 'own property descriptor');
-      return null;
-    }
-    const firstIsData = Object.hasOwn(first, 'value');
-    const secondIsData = Object.hasOwn(second, 'value');
-    const stable = firstIsData === secondIsData
-      && first.configurable === second.configurable
-      && first.enumerable === second.enumerable
-      && (firstIsData
-        ? first.writable === second.writable && Object.is(first.value, second.value)
-        : first.get === second.get && first.set === second.set);
-    if (!stable) {
-      issue(issues, path, 'cross-field', 'own property descriptor changed during snapshot');
-      return null;
-    }
-    return first;
-  } catch {
-    snapshotFailure(issues, path, 'own property descriptor');
-    return null;
-  }
-}
-
-function snapshotArray(
-  value: object,
-  path: string,
-  issues: WeaponSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): unknown[] {
-  const lengthDescriptor = snapshotDescriptor(value, 'length', `${path}.length`, issues);
-  if (!lengthDescriptor) return [];
-  if (!Object.hasOwn(lengthDescriptor, 'value')) {
-    issue(issues, `${path}.length`, 'type', 'accessor properties are forbidden');
-    return [];
-  }
-  const length = lengthDescriptor.value;
-  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0 || length > MAX_SNAPSHOT_ARRAY_LENGTH) {
-    issue(
-      issues,
-      `${path}.length`,
-      'bounds',
-      `must be a safe integer from 0 through ${MAX_SNAPSHOT_ARRAY_LENGTH}`,
-    );
-    return [];
-  }
-  const snapshot = new Array<unknown>(length);
-  const keys = snapshotOwnKeys(value, path, issues);
-  if (!keys) return snapshot;
-  for (const key of keys) {
-    if (key === 'length') continue;
-    if (typeof key === 'symbol') {
-      issue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol array properties are forbidden');
-      continue;
-    }
-    const index = Number(key);
-    const isIndex = Number.isSafeInteger(index) && index >= 0 && index < length && String(index) === key;
-    if (!isIndex) {
-      issue(issues, `${path}.${key}`, 'unknown-key', 'non-index array properties are forbidden');
-      continue;
-    }
-    const propertyPath = `${path}[${index}]`;
-    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
-    if (!descriptor) continue;
-    if (!descriptor.enumerable) {
-      issue(issues, propertyPath, 'unknown-key', 'non-enumerable array entries are forbidden');
-      continue;
-    }
-    if (!Object.hasOwn(descriptor, 'value')) {
-      issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
-      continue;
-    }
-    snapshot[index] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
-  }
-  return snapshot;
-}
-
-function snapshotRecord(
-  value: object,
-  path: string,
-  issues: WeaponSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): UnknownRecord {
-  const snapshot: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  const keys = snapshotOwnKeys(value, path, issues);
-  if (!keys) return snapshot;
-  for (const key of keys) {
-    if (typeof key === 'symbol') {
-      issue(issues, `${path}[${String(key)}]`, 'unknown-key', 'symbol object properties are forbidden');
-      continue;
-    }
-    const propertyPath = `${path}.${key}`;
-    const descriptor = snapshotDescriptor(value, key, propertyPath, issues);
-    if (!descriptor) continue;
-    if (!descriptor.enumerable) {
-      issue(issues, propertyPath, 'unknown-key', 'non-enumerable object properties are forbidden');
-      continue;
-    }
-    if (!Object.hasOwn(descriptor, 'value')) {
-      issue(issues, propertyPath, 'type', 'accessor properties are forbidden');
-      continue;
-    }
-    snapshot[key] = snapshotValue(descriptor.value, propertyPath, issues, active, depth + 1);
-  }
-  return snapshot;
-}
-
-function snapshotValue(
-  value: unknown,
-  path: string,
-  issues: WeaponSchemaIssue[],
-  active: WeakSet<object>,
-  depth: number,
-): unknown {
-  if (value === null || typeof value !== 'object') return value;
-  if (depth > MAX_SNAPSHOT_DEPTH) {
-    issue(issues, path, 'bounds', `must not exceed snapshot depth ${MAX_SNAPSHOT_DEPTH}`);
-    return null;
-  }
-  if (active.has(value)) {
-    issue(issues, path, 'cross-field', 'cyclic values are forbidden');
-    return null;
-  }
-  let array: boolean;
-  try {
-    array = Array.isArray(value);
-  } catch {
-    snapshotFailure(issues, path, 'value kind');
-    return null;
-  }
-  active.add(value);
-  try {
-    return array
-      ? snapshotArray(value, path, issues, active, depth)
-      : snapshotRecord(value, path, issues, active, depth);
-  } catch {
-    snapshotFailure(issues, path, 'value snapshot');
-    return null;
-  } finally {
-    active.delete(value);
-  }
-}
-
-function snapshotInput(value: unknown, issues: WeaponSchemaIssue[]): unknown {
-  try {
-    return snapshotValue(value, '$', issues, new WeakSet<object>(), 0);
-  } catch {
-    snapshotFailure(issues, '$', 'input snapshot');
-    return null;
-  }
-}
-
-function exactRecord(
-  value: unknown,
-  path: string,
-  keys: readonly string[],
-  issues: WeaponSchemaIssue[],
-): UnknownRecord | null {
-  if (!isRecord(value)) {
-    issue(issues, path, 'type', 'must be an object');
-    return null;
-  }
-  const allowed = new Set(keys);
-  for (const key of keys) {
-    if (!Object.hasOwn(value, key)) issue(issues, `${path}.${key}`, 'missing-key', 'is required');
-  }
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) issue(issues, `${path}.${key}`, 'unknown-key', 'is not allowed');
-  }
-  return value;
-}
-
-function oneOf<T extends string>(
-  value: unknown,
-  values: readonly T[],
-  path: string,
-  issues: WeaponSchemaIssue[],
-): value is T {
-  if (typeof value !== 'string' || !values.includes(value as T)) {
-    issue(issues, path, 'unsupported-value', `must be one of ${values.join(', ')}`);
-    return false;
-  }
-  return true;
-}
+const {
+  addIssue: issue,
+  isRecord,
+  snapshotInput,
+  exactRecord,
+  oneOf,
+} = createSchemaSnapshotKernel({
+  maxIssues: 128,
+  maxSnapshotKeys: 256,
+  maxSnapshotDepth: 12,
+  maxSnapshotArrayLength: MAX_DEFINITION_COUNT,
+});
 
 function boundedNumber(
   value: unknown,
@@ -700,6 +469,7 @@ function validatePenetration(value: unknown, path: string, issues: WeaponSchemaI
       'calibreLabel',
       'power',
       'fmjMultiplier',
+      'wallPenetrationMultiplier',
       'materialPolicyId',
       'energyFalloffStartM',
       'energyFalloffEndM',
@@ -721,6 +491,9 @@ function validatePenetration(value: unknown, path: string, issues: WeaponSchemaI
   }
   boundedNumber(penetration.power, 0, 100_000, `${path}.power`, issues);
   boundedNumber(penetration.fmjMultiplier, 1, 4, `${path}.fmjMultiplier`, issues);
+  // HF-368: bounded well below the railgun's power term so a wallbang tune can
+  // never smuggle in a second, unbounded damage or energy channel.
+  boundedNumber(penetration.wallPenetrationMultiplier, 0.25, 4, `${path}.wallPenetrationMultiplier`, issues);
   if (penetration.materialPolicyId !== WEAPON_MATERIAL_POLICY_ID) {
     issue(issues, `${path}.materialPolicyId`, 'unsupported-value', `must equal ${WEAPON_MATERIAL_POLICY_ID}`);
   }

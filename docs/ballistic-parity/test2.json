@@ -1,0 +1,2056 @@
+{
+ "arena": "test2",
+ "contract": "every substantial visible mesh is rated for gunfire, excluded by a stated rule, or accepted below with a reason; unrated is the honest remainder",
+ "completionPercent": 100,
+ "ratchet": {
+  "unratedAfterLedger": 0,
+  "ceiling": 0,
+  "withinCeiling": true
+ },
+ "census": {
+  "total": 266,
+  "ratedDirect": 251,
+  "ratedByFootprint": 13,
+  "dynamicTargets": 0,
+  "excludedByRule": 2,
+  "unrated": 0,
+  "acceptedByLedger": 0,
+  "unratedAfterLedger": 0
+ },
+ "shotSurfaceStats": {
+  "total": 311,
+  "byMaterial": {
+   "reinforced": 135,
+   "wood": 10,
+   "interior-wall": 111,
+   "concrete": 12,
+   "vehicle": 24,
+   "glass": 4,
+   "structural-metal": 8,
+   "earth": 7
+  },
+  "byClassification": {
+   "fallback": 135,
+   "rule": 176
+  }
+ },
+ "excludedByRule": {
+  "above the standing combat volume (canopy/eaves/overhead dressing)": 2
+ },
+ "footprintExplained": [
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    -22,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:122:test2 house north wall -24",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    -18.5,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:122:test2 house north wall -24",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    -8,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    -4.5,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    0,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    3.5,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    11.5,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:124:test2 house north wall 8.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    16,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:124:test2 house north wall 8.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-pilaster",
+   "centre": [
+    26,
+    1.7,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:125:test2 house north wall 24",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.84
+  },
+  {
+   "name": "test2-wing-window",
+   "centre": [
+    -20.25,
+    1.9,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:122:test2 house north wall -24",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  },
+  {
+   "name": "test2-wing-window",
+   "centre": [
+    -6.25,
+    1.9,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  },
+  {
+   "name": "test2-wing-window",
+   "centre": [
+    1.75,
+    1.9,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:123:test2 house north wall -11.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  },
+  {
+   "name": "test2-wing-window",
+   "centre": [
+    13.75,
+    1.9,
+    -19.75
+   ],
+   "surfaceId": "Test2 arena:124:test2 house north wall 8.5",
+   "surfaceMaterial": "interior-wall",
+   "share": 0.87
+  }
+ ],
+ "acceptedShootThrough": [],
+ "unratedMeshes": [],
+ "staleLedgerRows": [],
+ "shotSurfaces": [
+  {
+   "id": "Test2 arena:0:test2 paving north tip",
+   "name": "test2 paving north tip",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:1:test2 paving pool head",
+   "name": "test2 paving pool head",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:2:test2 paving pool head west",
+   "name": "test2 paving pool head west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:3:test2 paving pool head east",
+   "name": "test2 paving pool head east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:4:test2 paving court head west",
+   "name": "test2 paving court head west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:5:test2 paving court head east",
+   "name": "test2 paving court head east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:6:test2 paving court flank west",
+   "name": "test2 paving court flank west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:7:test2 paving court walk",
+   "name": "test2 paving court walk",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:8:test2 paving pool flank east",
+   "name": "test2 paving pool flank east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:9:test2 paving court flank south",
+   "name": "test2 paving court flank south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:10:test2 paving pool deck",
+   "name": "test2 paving pool deck",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:11:test2 paving lane sill",
+   "name": "test2 paving lane sill",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:12:test2 paving house north band",
+   "name": "test2 paving house north band",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:13:test2 paving approach band",
+   "name": "test2 paving approach band",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:14:test2 paving long axis",
+   "name": "test2 paving long axis",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:15:test2 paving drive north band",
+   "name": "test2 paving drive north band",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:16:test2 paving drive mid band",
+   "name": "test2 paving drive mid band",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:17:test2 paving drive band",
+   "name": "test2 paving drive band",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:18:test2 paving drive circle",
+   "name": "test2 paving drive circle",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:19:test2 paving drive approach",
+   "name": "test2 paving drive approach",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:20:test2 paving drive tip",
+   "name": "test2 paving drive tip",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:21:test2 boundary west 0",
+   "name": "test2 boundary west 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:22:test2 boundary west 1",
+   "name": "test2 boundary west 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:23:test2 boundary west 4",
+   "name": "test2 boundary west 4",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:24:test2 boundary west 5",
+   "name": "test2 boundary west 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:25:test2 boundary west 6",
+   "name": "test2 boundary west 6",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:26:test2 boundary west 7",
+   "name": "test2 boundary west 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:27:test2 boundary west 8",
+   "name": "test2 boundary west 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:28:test2 boundary west 9",
+   "name": "test2 boundary west 9",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:29:test2 boundary west 10",
+   "name": "test2 boundary west 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:30:test2 boundary west 11",
+   "name": "test2 boundary west 11",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:31:test2 boundary east 0",
+   "name": "test2 boundary east 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:32:test2 boundary east 1",
+   "name": "test2 boundary east 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:33:test2 boundary east 2",
+   "name": "test2 boundary east 2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:34:test2 boundary east 3",
+   "name": "test2 boundary east 3",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:35:test2 boundary east 4",
+   "name": "test2 boundary east 4",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:36:test2 boundary east 7",
+   "name": "test2 boundary east 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:37:test2 boundary east 8",
+   "name": "test2 boundary east 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:38:test2 boundary east 9",
+   "name": "test2 boundary east 9",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:39:test2 boundary east 10",
+   "name": "test2 boundary east 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:40:test2 boundary east 11",
+   "name": "test2 boundary east 11",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:41:test2 boundary jog west 0",
+   "name": "test2 boundary jog west 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:42:test2 boundary jog east 0",
+   "name": "test2 boundary jog east 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:43:test2 boundary jog east 1",
+   "name": "test2 boundary jog east 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:44:test2 boundary jog east 2",
+   "name": "test2 boundary jog east 2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:45:test2 boundary jog west 3",
+   "name": "test2 boundary jog west 3",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:46:test2 boundary jog east 3",
+   "name": "test2 boundary jog east 3",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:47:test2 boundary jog west 4",
+   "name": "test2 boundary jog west 4",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:48:test2 boundary jog west 5",
+   "name": "test2 boundary jog west 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:49:test2 boundary jog west 6",
+   "name": "test2 boundary jog west 6",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:50:test2 boundary jog east 6",
+   "name": "test2 boundary jog east 6",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:51:test2 boundary jog west 7",
+   "name": "test2 boundary jog west 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:52:test2 boundary jog east 7",
+   "name": "test2 boundary jog east 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:53:test2 boundary jog west 8",
+   "name": "test2 boundary jog west 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:54:test2 boundary jog east 8",
+   "name": "test2 boundary jog east 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:55:test2 boundary jog west 9",
+   "name": "test2 boundary jog west 9",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:56:test2 boundary jog east 9",
+   "name": "test2 boundary jog east 9",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:57:test2 boundary jog west 10",
+   "name": "test2 boundary jog west 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:58:test2 boundary jog east 10",
+   "name": "test2 boundary jog east 10",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:59:test2 boundary cap north",
+   "name": "test2 boundary cap north",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:60:test2 boundary cap south",
+   "name": "test2 boundary cap south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:61:test2 court floor",
+   "name": "test2 court floor",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:62:test2 court kerb north",
+   "name": "test2 court kerb north",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:63:test2 court kerb south",
+   "name": "test2 court kerb south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:64:test2 court equipment box",
+   "name": "test2 court equipment box",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:65:test2 court store base",
+   "name": "test2 court store base",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:66:test2 court store body",
+   "name": "test2 court store body",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:67:test2 court store roof",
+   "name": "test2 court store roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:68:test2 pavilion wall north",
+   "name": "test2 pavilion wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:69:test2 pavilion wall west",
+   "name": "test2 pavilion wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:70:test2 pavilion wall east",
+   "name": "test2 pavilion wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:71:test2 pavilion wall south west",
+   "name": "test2 pavilion wall south west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:72:test2 pavilion wall south east",
+   "name": "test2 pavilion wall south east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:73:test2 pavilion roof",
+   "name": "test2 pavilion roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:74:test2 pavilion bar",
+   "name": "test2 pavilion bar",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:75:test2 pool basin floor",
+   "name": "test2 pool basin floor",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:76:test2 pool basin wall north",
+   "name": "test2 pool basin wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:77:test2 pool basin wall south",
+   "name": "test2 pool basin wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:78:test2 pool basin wall west",
+   "name": "test2 pool basin wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:79:test2 pool basin wall east",
+   "name": "test2 pool basin wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:80:test2 pool step sw low",
+   "name": "test2 pool step sw low",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:81:test2 pool step sw high",
+   "name": "test2 pool step sw high",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:82:test2 pool step ne high",
+   "name": "test2 pool step ne high",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:83:test2 pool step ne low",
+   "name": "test2 pool step ne low",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:84:test2 pool coping south",
+   "name": "test2 pool coping south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:85:test2 pool coping west",
+   "name": "test2 pool coping west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:86:test2 pool coping east",
+   "name": "test2 pool coping east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:87:test2 deck planter run",
+   "name": "test2 deck planter run",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:88:test2 deck cabana pier west",
+   "name": "test2 deck cabana pier west",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:89:test2 deck cabana pier east",
+   "name": "test2 deck cabana pier east",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:90:test2 ledge east flank",
+   "name": "test2 ledge east flank",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:91:test2 ledge north rim",
+   "name": "test2 ledge north rim",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:92:test2 wing wall north",
+   "name": "test2 wing wall north",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:93:test2 wing wall east",
+   "name": "test2 wing wall east",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:94:test2 wing wall west",
+   "name": "test2 wing wall west",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:95:test2 wing wall south west",
+   "name": "test2 wing wall south west",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:96:test2 wing wall south east",
+   "name": "test2 wing wall south east",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:97:test2 wing room divider",
+   "name": "test2 wing room divider",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:98:test2 wing counter",
+   "name": "test2 wing counter",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:99:test2 wing glazing north",
+   "name": "test2 wing glazing north",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:100:test2 walk pier 17.5 -25.2",
+   "name": "test2 walk pier 17.5 -25.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:101:test2 walk pier 17.5 -21.2",
+   "name": "test2 walk pier 17.5 -21.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:102:test2 walk pier 22 -25.2",
+   "name": "test2 walk pier 22 -25.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:103:test2 walk pier 22 -21.2",
+   "name": "test2 walk pier 22 -21.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:104:test2 walk pier 26.5 -25.2",
+   "name": "test2 walk pier 26.5 -25.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:105:test2 walk pier 26.5 -21.2",
+   "name": "test2 walk pier 26.5 -21.2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:106:test2 wing floor landing",
+   "name": "test2 wing floor landing",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:107:test2 wing floor main",
+   "name": "test2 wing floor main",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:108:test2 wing stair riser 0",
+   "name": "test2 wing stair riser 0",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:109:test2 wing stair riser 1",
+   "name": "test2 wing stair riser 1",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:110:test2 wing stair riser 2",
+   "name": "test2 wing stair riser 2",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:111:test2 wing stair riser 3",
+   "name": "test2 wing stair riser 3",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:112:test2 wing stair riser 4",
+   "name": "test2 wing stair riser 4",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:113:test2 wing stair riser 5",
+   "name": "test2 wing stair riser 5",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:114:test2 wing stair riser 6",
+   "name": "test2 wing stair riser 6",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:115:test2 wing stair riser 7",
+   "name": "test2 wing stair riser 7",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:116:test2 wing stair riser 8",
+   "name": "test2 wing stair riser 8",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:117:test2 wing upper wall north",
+   "name": "test2 wing upper wall north",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:118:test2 wing upper wall east",
+   "name": "test2 wing upper wall east",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:119:test2 wing balcony rail west",
+   "name": "test2 wing balcony rail west",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:120:test2 wing balcony rail south",
+   "name": "test2 wing balcony rail south",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:121:test2 wing stairwell rail",
+   "name": "test2 wing stairwell rail",
+   "material": "vehicle",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:122:test2 house north wall -24",
+   "name": "test2 house north wall -24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:123:test2 house north wall -11.5",
+   "name": "test2 house north wall -11.5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:124:test2 house north wall 8.5",
+   "name": "test2 house north wall 8.5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:125:test2 house north wall 24",
+   "name": "test2 house north wall 24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:126:test2 house office sill",
+   "name": "test2 house office sill",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:127:test2 house office lintel",
+   "name": "test2 house office lintel",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:128:test2 house office step low",
+   "name": "test2 house office step low",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:129:test2 house office step high",
+   "name": "test2 house office step high",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:130:test2 house south wall -24",
+   "name": "test2 house south wall -24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:131:test2 house south wall -17",
+   "name": "test2 house south wall -17",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:132:test2 house south wall 4",
+   "name": "test2 house south wall 4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:133:test2 house south wall 19",
+   "name": "test2 house south wall 19",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:134:test2 house wall west",
+   "name": "test2 house wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:135:test2 house wall east",
+   "name": "test2 house wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:136:test2 house cross west a",
+   "name": "test2 house cross west a",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:137:test2 house cross west b",
+   "name": "test2 house cross west b",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:138:test2 house cross east a",
+   "name": "test2 house cross east a",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:139:test2 house cross east b",
+   "name": "test2 house cross east b",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:140:test2 house door screen west",
+   "name": "test2 house door screen west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:141:test2 house door screen east",
+   "name": "test2 house door screen east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:142:test2 house spine counter",
+   "name": "test2 house spine counter",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:143:test2 house office counter",
+   "name": "test2 house office counter",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:144:test2 house upper floor landing",
+   "name": "test2 house upper floor landing",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:145:test2 house upper floor main",
+   "name": "test2 house upper floor main",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:146:test2 house stair riser 0",
+   "name": "test2 house stair riser 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:147:test2 house stair riser 1",
+   "name": "test2 house stair riser 1",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:148:test2 house stair riser 2",
+   "name": "test2 house stair riser 2",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:149:test2 house stair riser 3",
+   "name": "test2 house stair riser 3",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:150:test2 house stair riser 4",
+   "name": "test2 house stair riser 4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:151:test2 house stair riser 5",
+   "name": "test2 house stair riser 5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:152:test2 house stair riser 6",
+   "name": "test2 house stair riser 6",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:153:test2 house stair riser 7",
+   "name": "test2 house stair riser 7",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:154:test2 house stair riser 8",
+   "name": "test2 house stair riser 8",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:155:test2 house upper north wall -15.95",
+   "name": "test2 house upper north wall -15.95",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:156:test2 house upper north wall -11",
+   "name": "test2 house upper north wall -11",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:157:test2 house upper north wall -6",
+   "name": "test2 house upper north wall -6",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:158:test2 house window slot -13",
+   "name": "test2 house window slot -13",
+   "material": "glass",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:159:test2 house window slot -8",
+   "name": "test2 house window slot -8",
+   "material": "glass",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:160:test2 house upper wall west",
+   "name": "test2 house upper wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:161:test2 house upper wall south",
+   "name": "test2 house upper wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:162:test2 house upper wall east",
+   "name": "test2 house upper wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:163:test2 house stairwell rail",
+   "name": "test2 house stairwell rail",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:164:test2 house roof west",
+   "name": "test2 house roof west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:165:test2 house roof south",
+   "name": "test2 house roof south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:166:test2 house roof east",
+   "name": "test2 house roof east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:167:test2 house parapet west",
+   "name": "test2 house parapet west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:168:test2 house parapet east",
+   "name": "test2 house parapet east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:169:test2 house parapet south",
+   "name": "test2 house parapet south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:170:test2 house parapet north west",
+   "name": "test2 house parapet north west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:171:test2 house parapet north east",
+   "name": "test2 house parapet north east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:172:test2 living wall west",
+   "name": "test2 living wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:173:test2 living wall south -24",
+   "name": "test2 living wall south -24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:174:test2 living wall south -14",
+   "name": "test2 living wall south -14",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:175:test2 living window sill",
+   "name": "test2 living window sill",
+   "material": "glass",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:176:test2 living window lintel",
+   "name": "test2 living window lintel",
+   "material": "glass",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:177:test2 living glazing south",
+   "name": "test2 living glazing south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:178:test2 living sofa run",
+   "name": "test2 living sofa run",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:179:test2 living chimney breast",
+   "name": "test2 living chimney breast",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:180:test2 living roof",
+   "name": "test2 living roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:181:test2 living parapet west",
+   "name": "test2 living parapet west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:182:test2 living parapet south",
+   "name": "test2 living parapet south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:183:test2 courtyard wall west -6",
+   "name": "test2 courtyard wall west -6",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:184:test2 courtyard wall east -6",
+   "name": "test2 courtyard wall east -6",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:185:test2 courtyard wall west 2",
+   "name": "test2 courtyard wall west 2",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:186:test2 courtyard wall east 2",
+   "name": "test2 courtyard wall east 2",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:187:test2 courtyard wall south -6.6",
+   "name": "test2 courtyard wall south -6.6",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:188:test2 courtyard wall south 4",
+   "name": "test2 courtyard wall south 4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:189:test2 courtyard pier -2.5 -3.5",
+   "name": "test2 courtyard pier -2.5 -3.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:190:test2 courtyard pier -2.5 1.5",
+   "name": "test2 courtyard pier -2.5 1.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:191:test2 courtyard pier 6.5 -3.5",
+   "name": "test2 courtyard pier 6.5 -3.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:192:test2 courtyard pier 6.5 1.5",
+   "name": "test2 courtyard pier 6.5 1.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:193:test2 courtyard fountain kerb",
+   "name": "test2 courtyard fountain kerb",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:194:test2 kitchen wall east",
+   "name": "test2 kitchen wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:195:test2 kitchen wall south 10.4",
+   "name": "test2 kitchen wall south 10.4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:196:test2 kitchen wall south 24",
+   "name": "test2 kitchen wall south 24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:197:test2 kitchen divider -6",
+   "name": "test2 kitchen divider -6",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:198:test2 kitchen divider 2.5",
+   "name": "test2 kitchen divider 2.5",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:199:test2 kitchen glazing south",
+   "name": "test2 kitchen glazing south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:200:test2 kitchen counter run",
+   "name": "test2 kitchen counter run",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:201:test2 kitchen island",
+   "name": "test2 kitchen island",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:202:test2 kitchen roof",
+   "name": "test2 kitchen roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:203:test2 kitchen parapet east",
+   "name": "test2 kitchen parapet east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:204:test2 kitchen parapet south",
+   "name": "test2 kitchen parapet south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:205:test2 laundry wall north -30",
+   "name": "test2 laundry wall north -30",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:206:test2 laundry wall north -23.5",
+   "name": "test2 laundry wall north -23.5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:207:test2 laundry wall north -9.5",
+   "name": "test2 laundry wall north -9.5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:208:test2 laundry wall west 5",
+   "name": "test2 laundry wall west 5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:209:test2 laundry wall west 10.5",
+   "name": "test2 laundry wall west 10.5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:210:test2 laundry wall south -30",
+   "name": "test2 laundry wall south -30",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:211:test2 laundry wall south -15",
+   "name": "test2 laundry wall south -15",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:212:test2 laundry wall east 5",
+   "name": "test2 laundry wall east 5",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:213:test2 laundry wall east 11",
+   "name": "test2 laundry wall east 11",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:214:test2 laundry cross 5",
+   "name": "test2 laundry cross 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:215:test2 laundry cross 13.5",
+   "name": "test2 laundry cross 13.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:216:test2 laundry bench",
+   "name": "test2 laundry bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:217:test2 laundry floor west",
+   "name": "test2 laundry floor west",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:218:test2 laundry floor south",
+   "name": "test2 laundry floor south",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:219:test2 laundry floor north",
+   "name": "test2 laundry floor north",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:220:test2 laundry stair riser 0",
+   "name": "test2 laundry stair riser 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:221:test2 laundry stair riser 1",
+   "name": "test2 laundry stair riser 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:222:test2 laundry stair riser 2",
+   "name": "test2 laundry stair riser 2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:223:test2 laundry stair riser 3",
+   "name": "test2 laundry stair riser 3",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:224:test2 laundry stair riser 4",
+   "name": "test2 laundry stair riser 4",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:225:test2 laundry stair riser 5",
+   "name": "test2 laundry stair riser 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:226:test2 laundry stair riser 6",
+   "name": "test2 laundry stair riser 6",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:227:test2 laundry stair riser 7",
+   "name": "test2 laundry stair riser 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:228:test2 laundry stair riser 8",
+   "name": "test2 laundry stair riser 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:229:test2 laundry upper wall north",
+   "name": "test2 laundry upper wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:230:test2 laundry upper wall west",
+   "name": "test2 laundry upper wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:231:test2 laundry upper wall east a",
+   "name": "test2 laundry upper wall east a",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:232:test2 laundry upper wall east b",
+   "name": "test2 laundry upper wall east b",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:233:test2 laundry balcony rail",
+   "name": "test2 laundry balcony rail",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:234:test2 laundry stairwell rail west",
+   "name": "test2 laundry stairwell rail west",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:235:test2 laundry stairwell rail north",
+   "name": "test2 laundry stairwell rail north",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:236:test2 gallery wall north 12",
+   "name": "test2 gallery wall north 12",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:237:test2 gallery wall north 24",
+   "name": "test2 gallery wall north 24",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:238:test2 gallery wall west 4",
+   "name": "test2 gallery wall west 4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:239:test2 gallery wall south 12",
+   "name": "test2 gallery wall south 12",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:240:test2 gallery wall south 23",
+   "name": "test2 gallery wall south 23",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:241:test2 gallery wall east",
+   "name": "test2 gallery wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:242:test2 gallery glazing north",
+   "name": "test2 gallery glazing north",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:243:test2 gallery sculpture",
+   "name": "test2 gallery sculpture",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:244:test2 gallery service north",
+   "name": "test2 gallery service north",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:245:test2 gallery service east",
+   "name": "test2 gallery service east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:246:test2 gallery service south",
+   "name": "test2 gallery service south",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:247:test2 gallery service west",
+   "name": "test2 gallery service west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:248:test2 gallery service roof",
+   "name": "test2 gallery service roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:249:test2 gallery floor east",
+   "name": "test2 gallery floor east",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:250:test2 gallery floor north",
+   "name": "test2 gallery floor north",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:251:test2 gallery floor south",
+   "name": "test2 gallery floor south",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:252:test2 gallery stair riser 0",
+   "name": "test2 gallery stair riser 0",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:253:test2 gallery stair riser 1",
+   "name": "test2 gallery stair riser 1",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:254:test2 gallery stair riser 2",
+   "name": "test2 gallery stair riser 2",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:255:test2 gallery stair riser 3",
+   "name": "test2 gallery stair riser 3",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:256:test2 gallery stair riser 4",
+   "name": "test2 gallery stair riser 4",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:257:test2 gallery stair riser 5",
+   "name": "test2 gallery stair riser 5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:258:test2 gallery stair riser 6",
+   "name": "test2 gallery stair riser 6",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:259:test2 gallery stair riser 7",
+   "name": "test2 gallery stair riser 7",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:260:test2 gallery stair riser 8",
+   "name": "test2 gallery stair riser 8",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:261:test2 gallery upper wall north",
+   "name": "test2 gallery upper wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:262:test2 gallery upper wall east",
+   "name": "test2 gallery upper wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:263:test2 gallery upper wall west a",
+   "name": "test2 gallery upper wall west a",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:264:test2 gallery upper wall west b",
+   "name": "test2 gallery upper wall west b",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:265:test2 gallery balcony rail",
+   "name": "test2 gallery balcony rail",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:266:test2 gallery stairwell rail east",
+   "name": "test2 gallery stairwell rail east",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:267:test2 gallery stairwell rail north",
+   "name": "test2 gallery stairwell rail north",
+   "material": "structural-metal",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:268:test2 drive island kerb",
+   "name": "test2 drive island kerb",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:269:test2 drive planter -3 22",
+   "name": "test2 drive planter -3 22",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:270:test2 drive planter 2 21.6",
+   "name": "test2 drive planter 2 21.6",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:271:test2 drive planter 7 22",
+   "name": "test2 drive planter 7 22",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:272:test2 drive planter -3 28",
+   "name": "test2 drive planter -3 28",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:273:test2 drive planter 2 28.4",
+   "name": "test2 drive planter 2 28.4",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:274:test2 drive planter 7 28",
+   "name": "test2 drive planter 7 28",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:275:test2 drive fountain plinth",
+   "name": "test2 drive fountain plinth",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:276:test2 carport wall north",
+   "name": "test2 carport wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:277:test2 carport wall west",
+   "name": "test2 carport wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:278:test2 carport wall south",
+   "name": "test2 carport wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:279:test2 carport pier east",
+   "name": "test2 carport pier east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:280:test2 carport pier east b",
+   "name": "test2 carport pier east b",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:281:test2 carport roof",
+   "name": "test2 carport roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:282:test2 drive verge 16.5",
+   "name": "test2 drive verge 16.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:283:test2 drive verge 19.5",
+   "name": "test2 drive verge 19.5",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:284:test2 drive approach kerb west",
+   "name": "test2 drive approach kerb west",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:285:test2 drive approach kerb east",
+   "name": "test2 drive approach kerb east",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:286:test2 apron garden wall north",
+   "name": "test2 apron garden wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:287:test2 apron garden wall south",
+   "name": "test2 apron garden wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:288:test2 apron planter run",
+   "name": "test2 apron planter run",
+   "material": "earth",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:289:test2 store wall north",
+   "name": "test2 store wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:290:test2 store wall south",
+   "name": "test2 store wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:291:test2 store wall west",
+   "name": "test2 store wall west",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:292:test2 store wall east a",
+   "name": "test2 store wall east a",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:293:test2 store wall east b",
+   "name": "test2 store wall east b",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:294:test2 store roof",
+   "name": "test2 store roof",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:295:test2 store rack",
+   "name": "test2 store rack",
+   "material": "reinforced",
+   "classification": "fallback"
+  },
+  {
+   "id": "Test2 arena:296:test2 garage wall north",
+   "name": "test2 garage wall north",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:297:test2 garage wall south",
+   "name": "test2 garage wall south",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:298:test2 garage wall east",
+   "name": "test2 garage wall east",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:299:test2 garage roof",
+   "name": "test2 garage roof",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:300:test2 garage pier -12",
+   "name": "test2 garage pier -12",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:301:test2 garage pier -8",
+   "name": "test2 garage pier -8",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:302:test2 garage pier -4",
+   "name": "test2 garage pier -4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:303:test2 garage pier 0",
+   "name": "test2 garage pier 0",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:304:test2 garage pier 4",
+   "name": "test2 garage pier 4",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:305:test2 garage pier 8",
+   "name": "test2 garage pier 8",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:306:test2 garage kerb",
+   "name": "test2 garage kerb",
+   "material": "interior-wall",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:307:test2 garage bench",
+   "name": "test2 garage bench",
+   "material": "wood",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:308:test2 zone plinth A",
+   "name": "test2 zone plinth A",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:309:test2 zone plinth B",
+   "name": "test2 zone plinth B",
+   "material": "concrete",
+   "classification": "rule"
+  },
+  {
+   "id": "Test2 arena:310:test2 zone plinth C",
+   "name": "test2 zone plinth C",
+   "material": "concrete",
+   "classification": "rule"
+  }
+ ]
+}

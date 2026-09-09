@@ -1,0 +1,13 @@
+farcrysis-textures ensureTextures (14 procedural maps): 10027 ms
+farcrysis-ground-textures generateSandTextures: 1313 ms
+buildFarcrysis WHOLE (textures cached): 11229 ms
+buildFarcrysis WHOLE again (warm JIT): 1292 ms
+buildVegetation (39 layers): 311 ms
+buildFarcrysisGrassField: 561 ms
+buildEnhancedPalms: 2 ms
+applyVista: 0 ms
+applyMountains: 2 ms
+buildAtmosphere: 109 ms
+buildDetail: 11 ms
+buildWaterFX: 2 ms
+farcrysisTerrainPhysicsTiles: 0 ms

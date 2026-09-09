@@ -1,0 +1,8 @@
+{
+  "tsc_clean": true,
+  "tests_passed": 4384,
+  "tests_failed": 0,
+  "test_files_passed": 489,
+  "failing_files": [],
+  "discounted_flaky": []
+}

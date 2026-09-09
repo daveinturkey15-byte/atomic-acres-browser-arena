@@ -1,0 +1,32 @@
+# Lane AD repair: release-production.yml parsed as YAML (skeptic minor 4)
+# Parser: yaml@2.9.0 from C:/Users/david/AppData/Roaming/npm/node_modules/prime-agent/node_modules/yaml
+# (no yaml/js-yaml in this checkout's node_modules and no python yaml; read-only require of an
+#  already-installed package elsewhere on the machine - nothing installed, nothing modified)
+# 2026-09-03T02:10:09Z  file sha256: ffcdd93ea25671844daef0f24a8531b15ad4575f7fe4d9c9eea420c846ebf94c
+
+parse errors: []
+parse warnings: []
+top-level keys: name, on, permissions, concurrency, jobs
+name: release-verification
+on: {"workflow_dispatch":{"inputs":{"source_sha":{"description":"Exact full origin/main SHA already green in verify","required":true,"type":"string"},"release_pass":{"description":"Exact approved live pass (e.g. PASS 86)","required":true,"type":"string"}}}}
+permissions: {"actions":"read","checks":"read","contents":"read"}
+concurrency: {"group":"atomic-acres-production-verification","cancel-in-progress":false}
+jobs: verify | runs-on: ubuntu-latest | steps: 18
+ 0 - actions/checkout@v4
+ 1 - actions/setup-node@v4
+ 2 - Capture release workflow start
+ 3 - run: npm ci --ignore-scripts
+ 4 - Validate immutable green main candidate
+ 5 - Build exact frozen-evidence candidate bytes
+ 6 - Validate accepted requirement manifest
+ 7 - Reproduce static release gates
+ 8 - Capture immutable production build timestamp
+ 9 - Build production bytes
+10 - Verify exact production bytes
+11 - Verify the HF-400 two-channel release policy
+12 - Rebuild Pass 67.1 stable with its original Pages publication timestamp
+13 - Install topology browser
+14 - Rebuild Pass 63 rollback with its original Pages publication timestamp
+15 - Stage the full local channel topology and verify it end to end
+16 - Write the release-candidate verification receipt
+17 - actions/upload-artifact@v4

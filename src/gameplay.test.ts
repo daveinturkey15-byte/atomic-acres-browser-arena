@@ -78,16 +78,16 @@ describe('headshot damage contract', () => {
     expect(computeDamage(WEAPONS.railgun, 220, 'limb')).toBe(50);
   });
 
-  it('reduces the M14 damage envelope by exactly 40% without changing range or headshot policy', () => {
+  it('HF-398: raises the M14 envelope by 40% (base 52.1, floor 33.6) without changing range or headshot policy', () => {
     const m14 = WEAPONS['m14-ebr'];
-    expect(m14.damage).toBeCloseTo(37.2, 8);
-    expect(m14.minimumDamage).toBeCloseTo(24, 8);
+    expect(m14.damage).toBeCloseTo(52.1, 8);
+    expect(m14.minimumDamage).toBeCloseTo(33.6, 8);
     expect(m14.falloffStart).toBe(38);
     expect(m14.falloffEnd).toBe(100);
     expect(m14.headMultiplier).toBe(1.7);
-    expect(computeDamage(m14, 10, 'body')).toBe(37.2);
-    expect(computeDamage(m14, 10, 'head')).toBe(63.2);
-    expect(computeDamage(m14, 100, 'body')).toBe(24);
+    expect(computeDamage(m14, 10, 'body')).toBe(52.1);
+    expect(computeDamage(m14, 10, 'head')).toBe(88.6);
+    expect(computeDamage(m14, 100, 'body')).toBe(33.6);
   });
 
   it('SMG body is 23 and headshot is 1.5× (35), never a one-shot from full HP', () => {
@@ -423,5 +423,25 @@ describe('match flow', () => {
     expect(winner).toMatchObject({ phase: 'ended', winner: null, winnerPlayerId: 'a' });
     const draw = advanceFreeForAllMatch(state, 63_000, [{ id: 'a', kills: 8 }, { id: 'b', kills: 8 }], rules);
     expect(draw).toMatchObject({ phase: 'ended', winner: 'draw' });
+  });
+  it('HF-377: ends TDM the moment a squad reaches the host kill limit, before time', () => {
+    const rules = { durationMs: 600_000, scoreLimit: 25 } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceMatch(state, 3_000, [0, 0], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 603_000 });
+    expect(advanceMatch(state, 120_000, [24, 24], rules)).toMatchObject({ phase: 'active' });
+    expect(advanceMatch(state, 120_000, [25, 19], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 0 });
+    expect(advanceMatch(state, 120_000, [22, 25], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 1 });
+    expect(advanceMatch(state, 120_000, [25, 25], rules)).toMatchObject({ phase: 'ended', endReason: 'score', winner: 'draw' });
+  });
+
+  it('HF-377: ends FFA when any leader reaches the host kill limit, identically to TDM', () => {
+    const rules = { durationMs: 600_000, scoreLimit: 25 } as const;
+    let state: MatchState = { phase: 'warmup', phaseStartedAt: 0, endsAt: 3_000, winner: null };
+    state = advanceFreeForAllMatch(state, 3_000, [{ id: 'a', kills: 0 }, { id: 'b', kills: 0 }], rules);
+    expect(state).toMatchObject({ phase: 'active', endsAt: 603_000 });
+    expect(advanceFreeForAllMatch(state, 90_000, [{ id: 'a', kills: 24 }, { id: 'b', kills: 21 }], rules).phase).toBe('active');
+    const ended = advanceFreeForAllMatch(state, 90_000, [{ id: 'b', kills: 25 }, { id: 'a', kills: 23 }], rules);
+    expect(ended).toMatchObject({ phase: 'ended', endReason: 'score', winnerPlayerId: 'b' });
   });
 });

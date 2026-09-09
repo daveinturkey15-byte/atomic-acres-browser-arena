@@ -1,0 +1,32 @@
+gh-pages at 7c9f1033
+DRY RUN PUBLISH (HF-400) against C:\Users\david\projects\aa-claude-release84\.gh-pages-publish - nothing will be written, added, committed or pushed
+  build-present: WOULD REFUSE - no build at C:\Users\david\projects\aa-claude-release84\dist-pass95
+  backup-present: WOULD REFUSE - REFUSING: gh-pages has no ['pass94'] tree to pin as the safe backup (present: ['pass92', 'pass93']). HF-400 pins PASS 94 beside PASS 95; it cannot be pinned if it is not there.
+
+PLAN
+  channel trees on gh-pages now: []
+  would keep   []
+  would write channels/pass95/ <- dist-pass95/ (replacing any existing tree)
+  channels/ post-state would be: ['pass95']
+  chooser keys live now: ['experimental', 'previous']; would become: ['experimental', 'previous'] (dropped/re-keyed: ['experimental', 'previous'])
+    experimental: PASS 95 -> channels/pass95  "PASS 95"
+    previous: PASS 94 -> channels/pass94  "PASS 94 · SAFE BACKUP"
+  predecessor guard: OK (offering PASS 95, PASS 94)
+  chooser-matches-post-state: WOULD REFUSE - REFUSING: chooser offers trees ['pass94', 'pass95'] but gh-pages would carry ['pass95']; the two must be identical under HF-400
+  post-state-exact: WOULD REFUSE - post-state would be ['pass95'], expected ['pass94', 'pass95']
+  in-build-fallback: WOULD REFUSE - REFUSING: the in-build fallback channels/pass94 is NOT on gh-pages. Every visitor opening a channel URL directly would be offered PASS 94 and get a 404.
+  root chooser would be published as generation fa874a801d65 (2 channels inlined, 3 superseded asset(s) swept, keeping ['2ff646727518', 'fa874a801d65'])
+  would write index.html
+  would write release-shell.fa874a801d65.js
+  would write release-shell.fa874a801d65.css
+  would write release-manifest.fa874a801d65.json
+  would write release-index.json
+  would write release-shell.js
+  would write release-shell.css
+  would write release-channel-config.js
+  would sweep release-manifest.f45765ee9b4f.json
+  would sweep release-shell.f45765ee9b4f.css
+  would sweep release-shell.f45765ee9b4f.js
+  plan written to docs/evidence/pass95/cut/publish_pass95-plan.json
+
+DRY RUN: publish WOULD REFUSE (5 guard(s) red: build-present, backup-present, chooser-matches-post-state, post-state-exact, in-build-fallback)

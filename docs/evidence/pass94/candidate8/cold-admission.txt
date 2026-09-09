@@ -1,0 +1,9 @@
+[cold-admission][coverage] trial 1: cold subject 'nuketown2' exposes no art-loaded signal, so this run asserts that no arena's real art loaded; originalArtLoaded/qualityArtRootVisible/qualityAssetStreaming are atomic-acres-only (see ARENAS_WITH_ART_LOADED_SIGNAL). Gate audit F3 remains OPEN.
+file:///C:/Users/david/projects/aa-claude-hitl/scripts/qa/verify-pass65-cold-webgpu-admission.mjs:552
+      if (failures.length > 0) throw new Error(`cold Atomic trial ${trial} failed: ${failures.join('; ')}`);
+                                     ^
+
+Error: cold Atomic trial 1 failed: foreground match admission was degraded: {"backend":"webgpu","waitedMs":5008.500000071523,"stableWindowMs":0,"samples":82,"resets":82,"maximumGapMs":77.80000000000291,"startingSubmissionSequence":56,"startingCompletedSequence":56,"admittedDegraded":true,"visibilityState":"visible","documentHasFocus":true,"endingSubmissionSequence":138,"endingCompletedSequence":138,"submissionAdvances":82,"completionAdvances":82,"maximumSubmissionGapMs":110.79999995231628,"maximumCompletionGapMs":60,"maximumPendingForMs":60.60000002384186,"maximumCompletionLatencyMs":60.60000002384186,"drained":false}; cold transition 21807.6ms exceeded 10000ms; combined cold preparation work 22341.7ms exceeded preserved 10000ms budget; menu deployment prewarm produced 3 >=50ms main-thread tasks (max 441.0ms); cold admission produced 298 >=50ms main-thread tasks (max 1855.0ms)
+    at file:///C:/Users/david/projects/aa-claude-hitl/scripts/qa/verify-pass65-cold-webgpu-admission.mjs:552:38
+
+Node.js v24.12.0

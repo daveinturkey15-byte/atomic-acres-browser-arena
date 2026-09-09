@@ -115,11 +115,11 @@ Before release, also run a real multi-device or multi-household smoke test:
 
 ### GitHub Pages
 
-This repository publishes the built `dist/` folder to a dedicated `gh-pages` branch. Normal production promotion is serialized through the `release-production` GitHub Actions workflow using an exact green `main` SHA.
+This repository publishes the built `dist/` folder to a dedicated `gh-pages` branch. Production promotion is `python scripts/orchestration/publish_pass<N>.py` run from the canonical checkout; the `release-production` workflow verifies a candidate against an exact green `main` SHA and cannot publish (it has `contents: read`).
 
 Direct `npm run deploy` is recovery-only. Contributors and ordinary agent tasks must not run it; follow `docs/CONTRIBUTION_AND_RELEASE_PIPELINE.md`.
 
-GitHub Pages remains configured as **Deploy from a branch → `gh-pages` / root**. The production workflow is the only normal writer to that branch.
+GitHub Pages remains configured as **Deploy from a branch → `gh-pages` / root**. `scripts/orchestration/publish_pass<N>.py` is the only normal writer to that branch, and it keeps exactly the live pass and its pinned safe backup (HF-400).
 
 ## Design notes
 

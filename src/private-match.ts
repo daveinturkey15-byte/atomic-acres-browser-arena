@@ -1,5 +1,5 @@
 import type { Team } from './protocol';
-import type { ArenaId } from './map-selection';
+import { isArenaId, type ArenaId } from './arena-identity';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 import { isDhv, type Dhv } from './handicap';
 import {
@@ -9,10 +9,20 @@ import {
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
 import type { GunRangeTestBayDoorState } from './gun-range-test-bay';
 import { isSquadColor, isSquadName, type SquadColor } from './squad-presentation';
+import { isSelectableOperatorSkinId } from './operator-skin-catalog'; // HF-360
+import { isOperatorStanceId } from './operator-appearance-catalog'; // HF-382 replication
+// Lane AB (PASS 87): the replicated time-of-day mode. Type-only for the choice
+// plus two pure helpers; the lighting module imports no netcode, so there is no
+// cycle and this file stays free of THREE.
+import {
+  DEFAULT_LIGHTING_TIME_CHOICE,
+  isLightingTimeChoice,
+  type LightingTimeChoice,
+} from './rendering/lighting-conditions';
 
 export const ROOM_CAPACITIES = [4, 6] as const;
 export type RoomCapacity = typeof ROOM_CAPACITIES[number];
-export type MatchMode = 'tdm' | 'ffa';
+export type MatchMode = 'tdm' | 'ffa' | 'domination';
 export type LobbyPhase = 'waiting' | 'countdown' | 'active' | 'ended';
 export type MultiplayerArenaId = ArenaId;
 
@@ -23,6 +33,26 @@ export type PrivateMatchConfig = Readonly<{
   hostedBotCount: HostedBotCount;
   autoBalance: boolean;
   durationMs: number;
+  /** HF-377: host-settable kill limit replicated as part of the match
+   * contract. `null` keeps the historical uncapped score race. */
+  scoreLimit: number | null;
+  /**
+   * Lane AB (PASS 87): the host's TIME OF DAY choice for the match.
+   *
+   * It lives in the replicated match contract rather than in a player's own
+   * graphics options for the same reason `weatherIntensity` does NOT: a local
+   * weather setting is a presentation clamp that can only show LESS of a sky
+   * every peer already agrees on, whereas the hour is the sky itself. Two peers
+   * on different hours are arguing about a different match.
+   *
+   * Optional and tolerant exactly like `skinId` and `stanceId`, so pre-PASS-87
+   * checkpoints, rejoin envelopes and saved lobbies still validate; absent means
+   * `DEFAULT_LIGHTING_TIME_CHOICE`. The VALUE is a mode, not an hour: the hour
+   * itself is derived from the mode plus the match seed both peers already hold,
+   * so this field costs one short string per lobby snapshot and nothing per
+   * frame.
+   */
+  timeOfDay?: LightingTimeChoice;
 }>;
 
 export type LobbyMember = Readonly<{
@@ -33,9 +63,21 @@ export type LobbyMember = Readonly<{
   connected: boolean;
   pingMs: number | null;
   dhv: Dhv;
-  /** Presentation-only squad identity; team remains the authority boundary. */
+  /**
+   * HF-328: canonical colour-name identity stamped host-side from `team`
+   * (AQUA / CORAL) via team-prescription.ts; team remains the authority
+   * boundary. Optional and bounded-tolerant so pre-Pass-74 checkpoints and
+   * rejoin envelopes still restore — renderers collapse any legacy free-form
+   * value back to the canonical pair.
+   */
   squadName?: string;
   squadColor?: SquadColor;
+  /** HF-360: host-validated operator-skin selection; absent means default. */
+  skinId?: string;
+  /** HF-382: replicated idle stance for the peer's third-person presentation.
+   * Optional and tolerant exactly like skinId, so pre-Pass-81 checkpoints and
+   * lobbies still validate; renderers fall back to the catalog default. */
+  stanceId?: string;
 }>;
 
 export type PlayerScore = Readonly<{
@@ -47,6 +89,16 @@ export type PlayerScore = Readonly<{
   rangeScore?: number;
   rangeHits?: number;
   rangeShots?: number;
+}>;
+
+/** HF-347: host-authoritative lifecycle state of one gun-range training dummy.
+ * Pose needs no replication (it is a pure function of host time); active,
+ * health and the exact host respawn timestamp are the replicated truth. */
+export type GunRangeDummySnapshotEntry = Readonly<{
+  id: string;
+  active: boolean;
+  health: number;
+  respawnAtHostTimeMs: number;
 }>;
 
 export type LobbySnapshot = Readonly<{
@@ -61,6 +113,12 @@ export type LobbySnapshot = Readonly<{
   activeAtEpochMs: number | null;
   matchClock: GunRangeMatchClockSnapshot | null;
   testBayDoor: GunRangeTestBayDoorState | null;
+  /** HF-347: absent on snapshots from hosts predating the dummy authority;
+   * null outside an active gun-range match. Guests reconcile every heartbeat. */
+  testDummies?: readonly GunRangeDummySnapshotEntry[] | null;
+  /** Owner 2026-08-30: present on active Domination matches; null otherwise.
+   * Optional so pre-Domination hosts still validate. */
+  domination?: DominationLobbyState | null;
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
@@ -72,7 +130,42 @@ export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
   hostedBotCount: 0,
   autoBalance: true,
   durationMs: 300_000,
+  scoreLimit: null,
+  timeOfDay: DEFAULT_LIGHTING_TIME_CHOICE,
 });
+
+/** Owner 2026-08-30: replicated Domination zone truth (host-authoritative). */
+export type DominationZoneSnapshotEntry = Readonly<{
+  id: 'A' | 'B' | 'C';
+  owner: Team | null;
+  capturingTeam: Team | null;
+  /** 0..1 toward the capturing team's current ownership flip. */
+  progress: number;
+  contested: boolean;
+}>;
+export type DominationLobbyState = Readonly<{
+  zones: readonly DominationZoneSnapshotEntry[];
+  scores: readonly [number, number];
+}>;
+
+export function isDominationLobbyState(value: unknown): value is DominationLobbyState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Record<string, unknown>;
+  if (!Array.isArray(state.zones) || state.zones.length !== 3) return false;
+  const ids = new Set<string>();
+  for (const zone of state.zones as Array<Record<string, unknown>>) {
+    if (!zone || typeof zone !== 'object') return false;
+    if (zone.id !== 'A' && zone.id !== 'B' && zone.id !== 'C') return false;
+    ids.add(zone.id as string);
+    if (zone.owner !== null && zone.owner !== 0 && zone.owner !== 1) return false;
+    if (zone.capturingTeam !== null && zone.capturingTeam !== 0 && zone.capturingTeam !== 1) return false;
+    if (typeof zone.progress !== 'number' || !Number.isFinite(zone.progress) || zone.progress < 0 || zone.progress > 1) return false;
+    if (typeof zone.contested !== 'boolean') return false;
+  }
+  if (ids.size !== 3) return false;
+  return Array.isArray(state.scores) && state.scores.length === 2
+    && (state.scores as unknown[]).every((score) => typeof score === 'number' && Number.isSafeInteger(score) && score >= 0 && score <= 100_000);
+}
 
 export const REJOIN_GRACE_MS = 90_000;
 export const MAX_PRIVATE_MATCH_DURATION_MS = 900_000;
@@ -86,7 +179,7 @@ export function rejoinReservationExpired(disconnectedAtMonoMs: number, nowMonoMs
   return Number.isFinite(disconnectedAtMonoMs) && Number.isFinite(nowMonoMs)
     && nowMonoMs - disconnectedAtMonoMs >= REJOIN_GRACE_MS;
 }
-export const LOBBY_START_LEAD_MS = 3_500;
+export const LOBBY_START_LEAD_MS = 5_000;
 export const CLOCK_PING_INTERVAL_MS = 2_000;
 export const MAX_CLOCK_RTT_MS = 5_000;
 
@@ -95,25 +188,47 @@ export function isRoomCapacity(value: unknown): value is RoomCapacity {
 }
 
 export function isMatchMode(value: unknown): value is MatchMode {
-  return value === 'tdm' || value === 'ffa';
+  // Owner 2026-08-30: Domination ships with the Test2 arena.
+  return value === 'tdm' || value === 'ffa' || value === 'domination';
+}
+
+/** HF-377: the only kill limits a lobby can publish. `null` means uncapped and
+ * is rendered as OFF; every other entry is a first-to-N kills target applied
+ * identically to TDM squads and FFA leaders through MatchRules.scoreLimit. */
+export const LOBBY_KILL_LIMITS: readonly (number | null)[] = Object.freeze([null, 10, 25, 50, 100]);
+/** HF-377: the only match durations a lobby can publish, in milliseconds.
+ * Bounded by MAX_PRIVATE_MATCH_DURATION_MS below. */
+export const LOBBY_TIME_LIMITS_MS: readonly number[] = Object.freeze([120_000, 300_000, 600_000, 900_000]);
+
+export function isLobbyKillLimit(value: unknown): value is number | null {
+  return value === null
+    || typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 999;
+}
+
+export function isLobbyTimeLimitMs(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+    && value >= 60_000 && value <= MAX_PRIVATE_MATCH_DURATION_MS;
 }
 
 export function isPrivateMatchConfig(value: unknown): value is PrivateMatchConfig {
   if (!value || typeof value !== 'object') return false;
   const config = value as Record<string, unknown>;
-  return (config.arenaId === 'atomic-acres' || config.arenaId === 'rustworks-1v1' || config.arenaId === 'gun-range' || config.arenaId === 'skyline-terminal')
+  return isArenaId(config.arenaId)
     && isMatchMode(config.mode)
     && isRoomCapacity(config.capacity)
     && isHostedBotCount(config.hostedBotCount)
     && typeof config.autoBalance === 'boolean'
-    && Number.isSafeInteger(config.durationMs)
-    && Number(config.durationMs) >= 60_000
-    && Number(config.durationMs) <= MAX_PRIVATE_MATCH_DURATION_MS
+    && isLobbyTimeLimitMs(config.durationMs)
+    && isLobbyKillLimit(config.scoreLimit)
+    && (config.timeOfDay === undefined || isLightingTimeChoice(config.timeOfDay))
     && (config.arenaId !== 'gun-range'
       || config.mode === 'ffa'
         && config.hostedBotCount === 0
         && config.autoBalance === false
-        && config.durationMs === GUN_RANGE_ROUND_MS);
+        && config.durationMs === GUN_RANGE_ROUND_MS
+        && config.scoreLimit === null)
+    // Owner 2026-08-30: Domination is authored for Test2's three zones only.
+    && (config.mode !== 'domination' || config.arenaId === 'test2');
 }
 
 export function isLobbyMember(value: unknown): value is LobbyMember {
@@ -127,6 +242,8 @@ export function isLobbyMember(value: unknown): value is LobbyMember {
     && isDhv(member.dhv)
     && (member.squadName === undefined || isSquadName(member.squadName))
     && (member.squadColor === undefined || isSquadColor(member.squadColor))
+    && (member.skinId === undefined || isSelectableOperatorSkinId(member.skinId))
+    && (member.stanceId === undefined || isOperatorStanceId(member.stanceId))
     && (member.pingMs === null || Number.isFinite(member.pingMs) && Number(member.pingMs) >= 0 && Number(member.pingMs) <= MAX_CLOCK_RTT_MS);
 }
 
@@ -141,6 +258,19 @@ export function isPlayerScore(value: unknown): value is PlayerScore {
     && (score.rangeScore === undefined || Number.isSafeInteger(score.rangeScore) && Number(score.rangeScore) >= 0 && Number(score.rangeScore) <= 10_000_000)
     && (score.rangeHits === undefined || Number.isSafeInteger(score.rangeHits) && Number(score.rangeHits) >= 0 && Number(score.rangeHits) <= 100_000)
     && (score.rangeShots === undefined || Number.isSafeInteger(score.rangeShots) && Number(score.rangeShots) >= 0 && Number(score.rangeShots) <= 100_000);
+}
+
+function isGunRangeDummySnapshotEntry(value: unknown): value is GunRangeDummySnapshotEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  const keys = ['id', 'active', 'health', 'respawnAtHostTimeMs'];
+  return Object.keys(entry).length === keys.length
+    && keys.every((key) => Object.hasOwn(entry, key))
+    && typeof entry.id === 'string' && entry.id.startsWith('test-dummy-') && entry.id.length <= 80
+    && typeof entry.active === 'boolean'
+    && Number.isFinite(entry.health) && Number(entry.health) >= 0 && Number(entry.health) <= 500
+    && Number.isFinite(entry.respawnAtHostTimeMs) && Number(entry.respawnAtHostTimeMs) >= 0
+    && (entry.active === false || Number(entry.health) > 0);
 }
 
 function isLobbyTestBayDoorState(value: unknown): value is GunRangeTestBayDoorState {
@@ -206,12 +336,34 @@ export function isLobbySnapshot(value: unknown): value is LobbySnapshot {
     ? isLobbyTestBayDoorState(snapshot.testBayDoor)
       && snapshot.testBayDoor.updatedAtMs <= Number(snapshot.snapshotHostTimeMs)
     : snapshot.testBayDoor === null;
+  // HF-347: tolerate absence (older host), require well-formed entries when
+  // present, and reject dummy state outside an active gun-range match.
+  const validTestDummies = snapshot.testDummies === undefined
+    || (activeGunRange
+      ? Array.isArray(snapshot.testDummies)
+        && snapshot.testDummies.length <= 16
+        && snapshot.testDummies.every(isGunRangeDummySnapshotEntry)
+        && new Set((snapshot.testDummies as GunRangeDummySnapshotEntry[]).map((entry) => entry.id)).size === snapshot.testDummies.length
+      : snapshot.testDummies === null);
+  // Owner 2026-08-30: Domination truth rides the lobby heartbeat. Tolerate
+  // absence (older host); require well-formed state on active Domination.
+  const activeDomination = snapshot.config.mode === 'domination' && snapshot.phase === 'active';
+  const validDomination = snapshot.domination === undefined
+    || (activeDomination ? isDominationLobbyState(snapshot.domination) : snapshot.domination === null);
   return validHostStart && validEpochStart
     && (snapshot.activeAtHostTimeMs === null) === (snapshot.activeAtEpochMs === null)
     && validMatchClock
-    && validTestBayDoor;
+    && validTestDummies
+    && validTestBayDoor
+    && validDomination;
 }
 
+/**
+ * Deterministic host-first / stable-id / alternate-fill assignment.
+ * HF-328: wrapped by team-prescription.ts `prescribeTeams`, the prescription
+ * authority that also stamps canonical squad identities; new host-side call
+ * sites should go through that module rather than calling this directly.
+ */
 export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[] {
   const connected = members.filter((member) => member.connected)
     .sort((a, b) => Number(b.id === members[0]?.id) - Number(a.id === members[0]?.id) || a.id.localeCompare(b.id));
@@ -227,21 +379,34 @@ export function balanceLobbyTeams(members: readonly LobbyMember[]): LobbyMember[
   return members.map((member) => ({ ...member, team: assigned.get(member.id) ?? member.team }));
 }
 
-export function canHostStart(snapshot: LobbySnapshot): boolean {
+// HF-323: hold the start while any guest admission is in-flight or transport connection is pending.
+// A hosted-bot-only round is still a complete round, but a human multiplayer
+// lobby must have at least the host and one connected guest. Disconnected
+// members remain reservations during the rejoin grace and therefore also hold
+// the start fence instead of disappearing from the predicate.
+export function canHostStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
-  return snapshot.phase === 'waiting'
-    && connected.length >= 1
+  const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);
+  const hasSecondParticipant = connected.length >= 2 || snapshot.config.hostedBotCount > 0;
+  return !hasPendingGuests
+    && !hasDisconnectedReservation
+    && snapshot.phase === 'waiting'
+    && hasSecondParticipant
     && connected.length <= snapshot.config.capacity
     && connected.every((member) => member.ready);
 }
 
-export function canHostCommitStart(snapshot: LobbySnapshot): boolean {
+export function canHostCommitStart(snapshot: LobbySnapshot, hasPendingGuests = false): boolean {
   const connected = snapshot.members.filter((member) => member.connected);
-  return snapshot.phase === 'waiting'
-    && connected.length >= 1
+  const hasDisconnectedReservation = snapshot.members.some((member) => !member.connected);
+  const hasSecondParticipant = connected.length >= 2 || snapshot.config.hostedBotCount > 0;
+  return !hasPendingGuests
+    && !hasDisconnectedReservation
+    && snapshot.phase === 'waiting'
+    && hasSecondParticipant
     && connected.length <= snapshot.config.capacity
     && connected.some((member) => member.id === snapshot.hostId)
-    && connected.every((member) => member.id === snapshot.hostId || member.ready);
+    && connected.every((member) => member.ready);
 }
 
 export function canGuestModifyHostedBots(role: 'host' | 'guest'): boolean {

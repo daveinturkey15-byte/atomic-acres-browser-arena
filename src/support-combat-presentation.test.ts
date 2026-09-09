@@ -64,12 +64,13 @@ describe('support combat presentation audience', () => {
 
   it('does not leak support-shot audio to TDM opponents', () => {
     const play = vi.fn();
+    // HF-337: enemies now hear chopper/drone gunfire positionally at reduced volume
     expect(presentSupportShotAudio(
       [chopperShot, droneShot],
       { playerId: 'enemy', team: 1, mode: 'tdm' },
       play,
-    )).toBe(0);
-    expect(play).not.toHaveBeenCalled();
+    )).toBe(2);
+    expect(play.mock.calls).toEqual([['chopper'], ['drone']]);
   });
 
   it('does not infer FFA friendship from the reused team value', () => {

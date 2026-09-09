@@ -22,10 +22,32 @@ export type Pass65PreviewArenaDependencyManifest = Readonly<{
   manifestSha256: string;
 }>;
 
+/**
+ * Every arena the menu can offer, in ARENA_SELECTIONS order, with the exact set
+ * of public bytes its visual definition pulls in.
+ *
+ * The roster is DERIVED, never listed: it walks ARENA_SELECTIONS and resolves
+ * each id through ARENA_VISUAL_REGISTRY, so an arena added to the player-facing
+ * registry joins this closure the moment it exists. That is how test1/test2
+ * (owner 2026-08-30) entered it with no edit here. Both declare
+ * `assetDependencies: []` on purpose - they build their own procedural sky in
+ * src/rendering/arenas/test1.ts and test2.ts rather than sampling a baked sky
+ * webp - so their closure is the shared gameplay set alone, and an empty
+ * `assetDependencies` is a legitimate answer rather than a missing one.
+ *
+ * The registry lookup is checked rather than assumed: a selectable arena with no
+ * visual module used to fail here as `module is not a function`, which reads as
+ * a bug in this file instead of a missing registration in the one it derives
+ * from.
+ */
 export async function canonicalPass65PreviewArenaDependencies(): Promise<Pass65PreviewArenaDependencyManifest> {
   const arenaOrder = ARENA_SELECTIONS.map((arena) => arena.id);
   const arenas = await Promise.all(arenaOrder.map(async (arenaId) => {
-    const module = await ARENA_VISUAL_REGISTRY[arenaId]();
+    const load = ARENA_VISUAL_REGISTRY[arenaId];
+    if (typeof load !== 'function') {
+      throw new Error(`Canonical arena dependency roster: ${arenaId} is offered by ARENA_SELECTIONS but has no ARENA_VISUAL_REGISTRY entry`);
+    }
+    const module = await load();
     if (module.definition.id !== arenaId) throw new Error(`Canonical arena dependency identity mismatch: ${arenaId} != ${module.definition.id}`);
     const assetDependencies = [...module.definition.assetDependencies];
     const sharedAssetDependencies = [...module.definition.sharedAssetDependencies];

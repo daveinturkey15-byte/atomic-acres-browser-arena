@@ -1,0 +1,6098 @@
+[
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "carbine",
+    "stance": "stand",
+    "eye": [
+      -36.59489822387695,
+      1.7158017539978028,
+      23.00228500366211
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.259,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.26
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.259
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.33082909104776864,
+      -0.5422978807096952,
+      -0.8600000000000058
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.0400000000432552,
+      0.09000509174513487
+    ],
+    "vmWorldMin": [
+      -38.708324483714776,
+      -0.023050039318480486,
+      21.3120003497949
+    ],
+    "vmWorldMax": [
+      -36.1785576475572,
+      2.66584974338434,
+      24.034501551632232
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1135435554728663
+    },
+    "muzzleWorld": [
+      -37.88393108349516,
+      1.8107370279451298,
+      22.700291041452143
+    ],
+    "muzzleForwardMeters": 1.2889713248041006,
+    "muzzleY": 1.8107370279451298,
+    "vmForwardMaxMeters": 2.113636450853663,
+    "vmForwardPoint": [
+      -38.708324483714776,
+      -0.023050039318480486,
+      24.034501551632232
+    ],
+    "vmLowestY": -0.023050039318480486,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.66584974338434,
+      "z": 2.722501201837332,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-carbine-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "carbine",
+    "stance": "crouch",
+    "eye": [
+      -36.614906311035156,
+      1.1849886345863343,
+      23.00691032409668
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.239,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.239
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3415386711830539,
+      -0.5043478595146466,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.040000000006826957,
+      0.09000542629107428
+    ],
+    "vmWorldMin": [
+      -38.728334945163915,
+      -0.5159134202122414,
+      21.305915545678488
+    ],
+    "vmWorldMax": [
+      -36.198567723488324,
+      2.172987263947514,
+      24.028417709606863
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.113543748619311
+    },
+    "muzzleWorld": [
+      -37.90394135221346,
+      1.3178740868649643,
+      22.69420691137385
+    ],
+    "muzzleForwardMeters": 1.2889713251360513,
+    "muzzleY": 1.3178740868649643,
+    "vmForwardMaxMeters": 2.1136366439751226,
+    "vmForwardPoint": [
+      -38.728334945163915,
+      -0.5159134202122414,
+      24.028417709606863
+    ],
+    "vmLowestY": -0.5159134202122414,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.172987263947514,
+      "z": 2.7225021639283753,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-carbine-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "carbine",
+    "stance": "prone",
+    "eye": [
+      -36.614898681640625,
+      0.6350686657428741,
+      23.000947952270508
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.239,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.239
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3405843478879689,
+      -0.02176491779696413,
+      -0.8600000000000564
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999935935,
+      0.040000021388585015,
+      0.09000202335172128
+    ],
+    "vmWorldMin": [
+      -38.728325145501536,
+      -0.5832485830582878,
+      21.300910481330906
+    ],
+    "vmWorldMax": [
+      -36.19856186951035,
+      2.1056481092233064,
+      24.023410106930196
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1135417726990364
+    },
+    "muzzleWorld": [
+      -37.90393352435995,
+      1.2505369411179625,
+      22.689200365350107
+    ],
+    "muzzleForwardMeters": 1.2889713213531815,
+    "muzzleY": 1.2505369411179625,
+    "vmForwardMaxMeters": 2.113634668168211,
+    "vmForwardPoint": [
+      -38.728325145501536,
+      -0.5832485830582878,
+      24.023410106930196
+    ],
+    "vmLowestY": -0.5832485830582878,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.1056481092233064,
+      "z": 2.7224996255992906,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-carbine-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "sniper",
+    "stance": "stand",
+    "eye": [
+      -36.59489822387695,
+      1.7164037013053894,
+      23.002286911010742
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.223,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.223
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.34378810344656274,
+      -0.5563618564623968,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.06999999998569514,
+      0.10000509187034136
+    ],
+    "vmWorldMin": [
+      -38.7508677195839,
+      0.03921085682209613,
+      21.341842413035167
+    ],
+    "vmWorldMax": [
+      -36.41553644413473,
+      2.572983760752691,
+      23.99330905946217
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.156084415470982
+    },
+    "muzzleWorld": [
+      -37.98258094758689,
+      1.9624930935847753,
+      22.61944547334717
+    ],
+    "muzzleForwardMeters": 1.3876047203853554,
+    "muzzleY": 1.9624930935847753,
+    "vmForwardMaxMeters": 2.1561712956450583,
+    "vmForwardPoint": [
+      -38.7508677195839,
+      0.03921085682209613,
+      23.99330905946217
+    ],
+    "vmLowestY": 0.03921085682209613,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.5337729039305947,
+      "z": 2.6514666464270036,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-sniper-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "sniper",
+    "stance": "crouch",
+    "eye": [
+      -36.614906311035156,
+      1.1849886345863343,
+      23.00691032409668
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.203,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.203
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3441003584036068,
+      -0.5337717531042712,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.0699999999961032,
+      0.10000542629317083
+    ],
+    "vmWorldMin": [
+      -38.77087769689164,
+      -0.46958465802010096,
+      21.338128098641608
+    ],
+    "vmWorldMax": [
+      -36.435546020331856,
+      2.064085819811531,
+      23.989684123998277
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1560846262442643
+    },
+    "muzzleWorld": [
+      -38.002590734769115,
+      1.4536432405887274,
+      22.615734593156226
+    ],
+    "muzzleForwardMeters": 1.38760472293713,
+    "muzzleY": 1.4536432405887274,
+    "vmForwardMaxMeters": 2.156171505826978,
+    "vmForwardPoint": [
+      -38.77087769689164,
+      -0.46958465802010096,
+      23.989684123998277
+    ],
+    "vmLowestY": -0.46958465802010096,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.064085819811531,
+      "z": 2.651556025356669,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-sniper-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "sniper",
+    "stance": "prone",
+    "eye": [
+      -36.614898681640625,
+      0.6350686657428741,
+      23.000947952270508
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.203,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.203
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3415987054914275,
+      -0.015641590605579268,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999991812,
+      -0.06999999345174249,
+      0.10000203324960978
+    ],
+    "vmWorldMin": [
+      -38.770867611121,
+      -0.5013727825949628,
+      21.334669765681728
+    ],
+    "vmWorldMax": [
+      -36.435539814801466,
+      2.0322940476725737,
+      23.986224710497694
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.156082679560912
+    },
+    "muzzleWorld": [
+      -38.00258256984876,
+      1.4218532725914657,
+      22.612275305994153
+    ],
+    "muzzleForwardMeters": 1.3876046972225926,
+    "muzzleY": 1.4218532725914657,
+    "vmForwardMaxMeters": 2.1561695592364614,
+    "vmForwardPoint": [
+      -38.770867611121,
+      -0.5013727825949628,
+      23.986224710497694
+    ],
+    "vmLowestY": -0.5013727825949628,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.0322940476725737,
+      "z": 2.6515549448159668,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-sniper-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "explosive-crossbow",
+    "stance": "stand",
+    "eye": [
+      -36.59489822387695,
+      1.7137192273139954,
+      23.00813102722168
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.239,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.239
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.34438912185348514,
+      -0.5577573927491878,
+      -0.8600000000000056
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.02999999995232629,
+      0.08509348316159862
+    ],
+    "vmWorldMin": [
+      -38.78193643842432,
+      0.004887109462783812,
+      21.299536571430796
+    ],
+    "vmWorldMax": [
+      -36.10546326143803,
+      2.604153978272096,
+      24.03031054951877
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.187151995493911
+    },
+    "muzzleWorld": [
+      -37.887366419461856,
+      1.9008054311185363,
+      22.652761219251616
+    ],
+    "muzzleForwardMeters": 1.2923957894700333,
+    "muzzleY": 1.9008054311185363,
+    "vmForwardMaxMeters": 2.1872463597632157,
+    "vmForwardPoint": [
+      -38.78193643842432,
+      0.004887109462783812,
+      24.03031054951877
+    ],
+    "vmLowestY": 0.004887109462783812,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.599266868809312,
+      "z": 2.7307739780879743,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-explosive-crossbow-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "explosive-crossbow",
+    "stance": "crouch",
+    "eye": [
+      -36.61491012573242,
+      1.185081617832184,
+      23.000761032104492
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.219,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.219
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3348201272885185,
+      -0.5121934610242362,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.029999999989963597,
+      0.08500509149345592
+    ],
+    "vmWorldMin": [
+      -38.80189883499734,
+      -0.4781094660596963,
+      21.301754736897234
+    ],
+    "vmWorldMax": [
+      -36.12552051361883,
+      2.12096434227602,
+      24.0325495929429
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1871044447698185
+    },
+    "muzzleWorld": [
+      -37.90737547072552,
+      1.4177119652398062,
+      22.65494657140008
+    ],
+    "muzzleForwardMeters": 1.2923948850464773,
+    "muzzleY": 1.4177119652398062,
+    "vmForwardMaxMeters": 2.187198811585459,
+    "vmForwardPoint": [
+      -38.80189883499734,
+      -0.4781094660596963,
+      24.0325495929429
+    ],
+    "vmLowestY": -0.4781094660596963,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.12096434227602,
+      "z": 2.730794856045666,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-explosive-crossbow-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "explosive-crossbow",
+    "stance": "prone",
+    "eye": [
+      -36.614898681640625,
+      0.6353531289100647,
+      23.00072479248047
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.219,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.219
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.33807086106772544,
+      -0.02526391315551705,
+      -0.8600000000000293
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.779999999983951,
+      -0.029999966507892172,
+      0.0850020150131326
+    ],
+    "vmWorldMin": [
+      -38.80188664417613,
+      -0.5409381250985684,
+      21.297177090976895
+    ],
+    "vmWorldMax": [
+      -36.12551167438714,
+      2.0582390405905926,
+      24.027890427380804
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.187102756375301
+    },
+    "muzzleWorld": [
+      -37.90736492095054,
+      1.354935835659771,
+      22.650366262199928
+    ],
+    "muzzleForwardMeters": 1.29239485385807,
+    "muzzleY": 1.354935835659771,
+    "vmForwardMaxMeters": 2.1871971232899257,
+    "vmForwardPoint": [
+      -38.80188664417613,
+      -0.5409381250985684,
+      24.027890427380804
+    ],
+    "vmLowestY": -0.5409381250985684,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.0582390405905926,
+      "z": 2.730713336403909,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-explosive-crossbow-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "flamethrower",
+    "stance": "stand",
+    "eye": [
+      -36.59491729736328,
+      1.7161603951454163,
+      23.00091552734375
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.207,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.208
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.208
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.208
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.207
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3313681275964538,
+      -0.49422328397365867,
+      -0.8600000000000012
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999996867489,
+      0.11000509157756526
+    ],
+    "vmWorldMin": [
+      -38.62018436898144,
+      0.10007431106704456,
+      21.3324200363763
+    ],
+    "vmWorldMax": [
+      -36.266316546512286,
+      2.6358937088092564,
+      24.008944133370385
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.025386061278661
+    },
+    "muzzleWorld": [
+      -37.879710185196814,
+      2.022916927656657,
+      22.610324397459284
+    ],
+    "muzzleForwardMeters": 1.2847133082383873,
+    "muzzleY": 2.022916927656657,
+    "vmForwardMaxMeters": 2.0254723380269173,
+    "vmForwardPoint": [
+      -38.62018436898144,
+      0.10007431106704456,
+      24.008944133370385
+    ],
+    "vmLowestY": 0.10007431106704456,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.5358193977422117,
+      "z": 2.676524096994086,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-flamethrower-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "flamethrower",
+    "stance": "crouch",
+    "eye": [
+      -36.614898681640625,
+      1.184996681213379,
+      23.001264572143555
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.187,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.187
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.33616050191841385,
+      -0.4703823831468629,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.0799999999964412,
+      0.11000509288506544
+    ],
+    "vmWorldMin": [
+      -38.64016673007025,
+      -0.40724848511615586,
+      21.327976784506383
+    ],
+    "vmWorldMax": [
+      -36.286298906108534,
+      2.128570910484809,
+      24.004500881166255
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.025386062027653
+    },
+    "muzzleWorld": [
+      -37.89969254554114,
+      1.515594130444926,
+      22.605881145878318
+    ],
+    "muzzleForwardMeters": 1.2847133082429953,
+    "muzzleY": 1.515594130444926,
+    "vmForwardMaxMeters": 2.025472338775877,
+    "vmForwardPoint": [
+      -38.64016673007025,
+      -0.40724848511615586,
+      24.004500881166255
+    ],
+    "vmLowestY": -0.40724848511615586,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.128570910484809,
+      "z": 2.676524096659872,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-flamethrower-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "flat-wall",
+    "siteLabel": "long perimeter wall x=-37, faced head-on",
+    "weapon": "flamethrower",
+    "stance": "prone",
+    "eye": [
+      -36.6149787902832,
+      0.6350801694393158,
+      23.00037384033203
+    ],
+    "yaw": 1.571,
+    "pitch": 0,
+    "forward": [
+      -0.9999999792586128,
+      0,
+      0.00020367320369517786
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.187,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.187
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.33845164424130936,
+      0.055229905225638684,
+      -0.8600000000001841
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999926058019,
+      -0.07999859410032034,
+      0.11000114290915576
+    ],
+    "vmWorldMin": [
+      -38.64024012713608,
+      -0.43224960634834564,
+      21.346671824949187
+    ],
+    "vmWorldMax": [
+      -36.28637754035398,
+      2.1045191421892904,
+      24.024111319214533
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.02538353200893
+    },
+    "muzzleWorld": [
+      -37.899768694752765,
+      1.4910270628190965,
+      22.624607636102454
+    ],
+    "muzzleForwardMeters": 1.2847133443145817,
+    "muzzleY": 1.4910270628190965,
+    "vmForwardMaxMeters": 2.0254698027382156,
+    "vmForwardPoint": [
+      -38.64024012713608,
+      -0.43224960634834564,
+      24.024111319214533
+    ],
+    "vmLowestY": -0.43224960634834564,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.1045191421892904,
+      "z": 2.6774394942653466,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-flat-wall-flamethrower-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "carbine",
+    "stance": "stand",
+    "eye": [
+      -34.500003814697266,
+      1.7051914715766907,
+      10.711097717285156
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.259,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.259
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.259
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3393754443796976,
+      -0.5367114082150728,
+      -0.8600000000000078
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.040000000053869396,
+      0.08999999996536963
+    ],
+    "vmWorldMin": [
+      -35.523033410065125,
+      -0.028060766901814693,
+      8.597574747815466
+    ],
+    "vmWorldMax": [
+      -32.80082237281223,
+      2.6607941761856244,
+      11.127669123135524
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.11352296946969
+    },
+    "muzzleWorld": [
+      -34.188866038597254,
+      1.8057046353814192,
+      9.422126397522625
+    ],
+    "muzzleForwardMeters": 1.2889713197625312,
+    "muzzleY": 1.8057046353814192,
+    "vmForwardMaxMeters": 2.11352296946969,
+    "vmForwardPoint": [
+      -35.523033410065125,
+      -0.028060766901814693,
+      8.597574747815466
+    ],
+    "vmLowestY": -0.028060766901814693,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.6607941761856244,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-carbine-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "carbine",
+    "stance": "crouch",
+    "eye": [
+      -34.500003814697266,
+      1.2304080295562745,
+      10.691082000732422
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.239,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.239
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3438636649889101,
+      -0.5051979624694984,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.04000000001358356,
+      0.08999999999126769
+    ],
+    "vmWorldMin": [
+      -35.518892787423525,
+      -0.47133999812192595,
+      8.577559031225265
+    ],
+    "vmWorldMax": [
+      -32.796632846741616,
+      2.217549958646183,
+      11.107653406620148
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.113522969507157
+    },
+    "muzzleWorld": [
+      -34.184712760042174,
+      1.362442248598799,
+      9.402110680969088
+    ],
+    "muzzleForwardMeters": 1.2889713197633341,
+    "muzzleY": 1.362442248598799,
+    "vmForwardMaxMeters": 2.113522969507157,
+    "vmForwardPoint": [
+      -35.518892787423525,
+      -0.47133999812192595,
+      8.577559031225265
+    ],
+    "vmLowestY": -0.47133999812192595,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.217549958646183,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-carbine-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "carbine",
+    "stance": "prone",
+    "eye": [
+      -34.5,
+      0.6370475399494171,
+      10.691100120544434
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.24,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.24
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.24
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3414995105848777,
+      -0.017770733135282258,
+      -0.8600000000000014
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999303,
+      0.04000000147517144,
+      0.0899999990516755
+    ],
+    "vmWorldMin": [
+      -35.52144101017184,
+      -0.5772759018626284,
+      8.577577152396826
+    ],
+    "vmWorldMax": [
+      -32.7991669898047,
+      2.1116241341174864,
+      11.107671525077103
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.113522968147608
+    },
+    "muzzleWorld": [
+      -34.187257339393625,
+      1.256511193704069,
+      9.402128800810486
+    ],
+    "muzzleForwardMeters": 1.2889713197339479,
+    "muzzleY": 1.256511193704069,
+    "vmForwardMaxMeters": 2.113522968147608,
+    "vmForwardPoint": [
+      -35.52144101017184,
+      -0.5772759018626284,
+      8.577577152396826
+    ],
+    "vmLowestY": -0.5772759018626284,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.1116241341174864,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-carbine-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "sniper",
+    "stance": "stand",
+    "eye": [
+      -34.500003814697266,
+      1.7051914715766907,
+      10.711099624633789
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.223,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.223
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.223
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3414827074007225,
+      -0.5601298669063853,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.06999999996936006,
+      0.09999999998197656
+    ],
+    "vmWorldMin": [
+      -35.48535551021571,
+      0.024264180114206724,
+      8.55507156991384
+    ],
+    "vmWorldMax": [
+      -32.83347824608712,
+      2.5579239299324454,
+      10.890656009406177
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1560280547199486
+    },
+    "muzzleWorld": [
+      -34.111162301217924,
+      1.9474865343371266,
+      9.323494943104661
+    ],
+    "muzzleForwardMeters": 1.3876046815291279,
+    "muzzleY": 1.9474865343371266,
+    "vmForwardMaxMeters": 2.1560280547199486,
+    "vmForwardPoint": [
+      -35.48535551021571,
+      0.024264180114206724,
+      8.55507156991384
+    ],
+    "vmLowestY": 0.024264180114206724,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.5336597498182387,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-sniper-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "sniper",
+    "stance": "crouch",
+    "eye": [
+      -34.500003814697266,
+      1.2304080295562745,
+      10.691082000732422
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.203,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.203
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.33603255979414554,
+      -0.526128147734486,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.06999999999038842,
+      0.09999999999434618
+    ],
+    "vmWorldMin": [
+      -35.49179441913833,
+      -0.4164937782842756,
+      8.535053945997701
+    ],
+    "vmWorldMax": [
+      -32.839846716209436,
+      2.117084853273423,
+      10.870638385519495
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.156028054734721
+    },
+    "muzzleWorld": [
+      -34.11753340317833,
+      1.5066855471847709,
+      9.30347731920377
+    ],
+    "muzzleForwardMeters": 1.3876046815286518,
+    "muzzleY": 1.5066855471847709,
+    "vmForwardMaxMeters": 2.156028054734721,
+    "vmForwardPoint": [
+      -35.49179441913833,
+      -0.4164937782842756,
+      8.535053945997701
+    ],
+    "vmLowestY": -0.4164937782842756,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.117084853273423,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-sniper-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "sniper",
+    "stance": "prone",
+    "eye": [
+      -34.5,
+      0.6370475399494171,
+      10.691100120544434
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.203,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.203
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.203
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3384113063058324,
+      -0.012164063038268912,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999954,
+      -0.06999999970771328,
+      0.09999999982806668
+    ],
+    "vmWorldMin": [
+      -35.488423096308786,
+      -0.4959139477497688,
+      8.535072066008297
+    ],
+    "vmWorldMax": [
+      -32.83654583278879,
+      2.037745802277404,
+      10.870656505134118
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1560280545361366
+    },
+    "muzzleWorld": [
+      -34.11422988780612,
+      1.4273084065881205,
+      9.303495439009371
+    ],
+    "muzzleForwardMeters": 1.3876046815350627,
+    "muzzleY": 1.4273084065881205,
+    "vmForwardMaxMeters": 2.1560280545361366,
+    "vmForwardPoint": [
+      -35.488423096308786,
+      -0.4959139477497688,
+      8.535072066008297
+    ],
+    "vmLowestY": -0.4959139477497688,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.037745802277404,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-sniper-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "explosive-crossbow",
+    "stance": "stand",
+    "eye": [
+      -34.49996566772461,
+      1.7065018796920777,
+      10.711099624633789
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.239,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.239
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.239
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3358243157147319,
+      -0.5570691140621712,
+      -0.8600000000000019
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.029999999978519373,
+      0.084999999985955
+    ],
+    "vmWorldMin": [
+      -35.53078347212283,
+      -0.0015603886371882147,
+      8.524030711998009
+    ],
+    "vmWorldMax": [
+      -32.79957655608268,
+      2.597502319051661,
+      11.200705153690368
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1870689126357803
+    },
+    "muzzleWorld": [
+      -34.15288284273478,
+      1.8942554716465412,
+      9.418704791662496
+    ],
+    "muzzleForwardMeters": 1.2923948329712935,
+    "muzzleY": 1.8942554716465412,
+    "vmForwardMaxMeters": 2.1870689126357803,
+    "vmForwardPoint": [
+      -35.53078347212283,
+      -0.0015603886371882147,
+      8.524030711998009
+    ],
+    "vmLowestY": -0.0015603886371882147,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.597502319051661,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-explosive-crossbow-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "explosive-crossbow",
+    "stance": "crouch",
+    "eye": [
+      -34.5,
+      1.2304107713699342,
+      10.69112491607666
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.219,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.219
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3453398772182492,
+      -0.5137842490512424,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.029999999993783506,
+      0.0849999999959354
+    ],
+    "vmWorldMin": [
+      -35.52130224291498,
+      -0.43436663194525527,
+      8.504056003427461
+    ],
+    "vmWorldMax": [
+      -32.79009532683434,
+      2.164696075737317,
+      11.180730445146597
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.187068912649199
+    },
+    "muzzleWorld": [
+      -34.14340161349673,
+      1.461449228335156,
+      9.398730083105388
+    ],
+    "muzzleForwardMeters": 1.2923948329712722,
+    "muzzleY": 1.461449228335156,
+    "vmForwardMaxMeters": 2.187068912649199,
+    "vmForwardPoint": [
+      -35.52130224291498,
+      -0.43436663194525527,
+      8.504056003427461
+    ],
+    "vmLowestY": -0.43436663194525527,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.164696075737317,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-explosive-crossbow-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "explosive-crossbow",
+    "stance": "prone",
+    "eye": [
+      -34.5,
+      0.6370475399494171,
+      10.691100120544434
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.219,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.219
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.219
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.34202987328734125,
+      -0.031090697516640963,
+      -0.8600000000000018
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999995235,
+      -0.029999995808189343,
+      0.08499999725920075
+    ],
+    "vmWorldMin": [
+      -35.5169945710047,
+      -0.5451261913979755,
+      8.504031211574526
+    ],
+    "vmWorldMax": [
+      -32.786017511063335,
+      2.054244254324916,
+      11.180705645952196
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.1870689089699074
+    },
+    "muzzleWorld": [
+      -34.139319566339054,
+      1.350845945319795,
+      9.398705287567362
+    ],
+    "muzzleForwardMeters": 1.292394832977072,
+    "muzzleY": 1.350845945319795,
+    "vmForwardMaxMeters": 2.1870689089699074,
+    "vmForwardPoint": [
+      -35.5169945710047,
+      -0.5451261913979755,
+      8.504031211574526
+    ],
+    "vmLowestY": -0.5451261913979755,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.054244254324916,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-explosive-crossbow-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "flamethrower",
+    "stance": "stand",
+    "eye": [
+      -34.5,
+      1.7030187034606934,
+      10.711099624633789
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.207,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.207
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.207
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3491565959752257,
+      -0.5089471621789922,
+      -0.8600000000000009
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999997801979,
+      0.10999999998656769
+    ],
+    "vmWorldMin": [
+      -35.490224753897685,
+      0.07220306271654797,
+      8.685776724824077
+    ],
+    "vmWorldMax": [
+      -32.81338703734053,
+      2.6080316719374625,
+      11.039890388255817
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.025322899809712
+    },
+    "muzzleWorld": [
+      -34.09135803038904,
+      1.9950500837808605,
+      9.42638633802428
+    ],
+    "muzzleForwardMeters": 1.2847132866095095,
+    "muzzleY": 1.9950500837808605,
+    "vmForwardMaxMeters": 2.025322899809712,
+    "vmForwardPoint": [
+      -35.490224753897685,
+      0.07220306271654797,
+      8.685776724824077
+    ],
+    "vmLowestY": 0.07220306271654797,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.5358286092209146,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-flamethrower-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "flamethrower",
+    "stance": "crouch",
+    "eye": [
+      -34.5,
+      1.230414526462555,
+      10.691082000732422
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.187,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.187
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.187
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3412136832458041,
+      -0.47596104512860127,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999999837022,
+      0.10999999999900403
+    ],
+    "vmWorldMin": [
+      -35.49816766665048,
+      -0.3674149972376016,
+      8.66575910090845
+    ],
+    "vmWorldMax": [
+      -32.82132995004663,
+      2.1684136119961765,
+      11.019872764368614
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.0253228998239727
+    },
+    "muzzleWorld": [
+      -34.09930094310287,
+      1.555432023832122,
+      9.406368714123554
+    ],
+    "muzzleForwardMeters": 1.2847132866088682,
+    "muzzleY": 1.555432023832122,
+    "vmForwardMaxMeters": 2.0253228998239727,
+    "vmForwardPoint": [
+      -35.49816766665048,
+      -0.3674149972376016,
+      8.66575910090845
+    ],
+    "vmLowestY": -0.3674149972376016,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.1684136119961765,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-flamethrower-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "post",
+    "siteLabel": "0.61m square post (crate-scale) x -34.81..-34.19 z 9.69..10.31",
+    "weapon": "flamethrower",
+    "stance": "prone",
+    "eye": [
+      -34.5,
+      0.6353868353366852,
+      10.691158294677734
+    ],
+    "yaw": 0,
+    "pitch": 0,
+    "forward": [
+      0,
+      0,
+      -1
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0.188,
+    "nearestColliderBounds": {
+      "minX": -34.806,
+      "maxX": -34.194,
+      "minZ": 9.693999999999999,
+      "maxZ": 10.306000000000001,
+      "minY": 0,
+      "maxY": 3.6
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.188
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.188
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3408197925329182,
+      0.04831846467938163,
+      -0.8600000000000008
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999928085,
+      -0.0799999766714082,
+      0.10999998574363835
+    ],
+    "vmWorldMin": [
+      -35.49858964222063,
+      -0.43817013731237797,
+      8.665835411193218
+    ],
+    "vmWorldMax": [
+      -32.82174278889622,
+      2.097667921412885,
+      11.01994904208439
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.0253228834845167
+    },
+    "muzzleWorld": [
+      -34.099714102598085,
+      1.4846812048568405,
+      9.406445007328843
+    ],
+    "muzzleForwardMeters": 1.2847132873488913,
+    "muzzleY": 1.4846812048568405,
+    "vmForwardMaxMeters": 2.0253228834845167,
+    "vmForwardPoint": [
+      -35.49858964222063,
+      -0.43817013731237797,
+      8.665835411193218
+    ],
+    "vmLowestY": -0.43817013731237797,
+    "colliderOverlap": {
+      "x": 0.6119999999999948,
+      "y": 2.097667921412885,
+      "z": 0.6120000000000019,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-post-flamethrower-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "carbine",
+    "stance": "stand",
+    "eye": [
+      -36.59489822387695,
+      1.725092329978943,
+      29.594987869262695
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.127,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.367
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.127
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.127
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.367
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.367
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.127
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.127
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.127
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.127
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.33084887701817367,
+      -0.5356254627368523,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.04000000000000003,
+      0.09000349338153298
+    ],
+    "vmWorldMin": [
+      -39.07006015205105,
+      -0.007085748208692788,
+      28.247980982520172
+    ],
+    "vmWorldMax": [
+      -35.78900467673757,
+      2.6818106186821167,
+      31.679002049379445
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.223878074547569
+    },
+    "muzzleWorld": [
+      -37.72021585080604,
+      1.8266996464329666,
+      30.292467793383018
+    ],
+    "muzzleForwardMeters": 1.2889713232223436,
+    "muzzleY": 1.8266996464329666,
+    "vmForwardMaxMeters": 3.223878074547569,
+    "vmForwardPoint": [
+      -39.07006015205105,
+      -0.007085748208692788,
+      31.679002049379445
+    ],
+    "vmLowestY": -0.007085748208692788,
+    "colliderOverlap": {
+      "x": 1.7109953232624306,
+      "y": 2.6818106186821167,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-carbine-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "carbine",
+    "stance": "crouch",
+    "eye": [
+      -36.61498260498047,
+      1.1850637364387513,
+      29.61488914489746
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.099,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.099
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3353890707717346,
+      -0.5040311586479204,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.04000000000000126,
+      0.09106007129846795
+    ],
+    "vmWorldMin": [
+      -39.09279297593461,
+      -0.516432079961888,
+      28.26380779295338
+    ],
+    "vmWorldMax": [
+      -35.813526470898296,
+      2.1749447542047893,
+      31.69589090877722
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.2236214849643776
+    },
+    "muzzleWorld": [
+      -37.743496259023836,
+      1.318565704025847,
+      30.30917329303275
+    ],
+    "muzzleForwardMeters": 1.288972379832381,
+    "muzzleY": 1.318565704025847,
+    "vmForwardMaxMeters": 3.2236214849643776,
+    "vmForwardPoint": [
+      -39.09279297593461,
+      -0.516432079961888,
+      31.69589090877722
+    ],
+    "vmLowestY": -0.516432079961888,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.1749447542047893,
+      "z": 2.5361922070466214,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-carbine-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "carbine",
+    "stance": "prone",
+    "eye": [
+      -36.614986419677734,
+      0.6362510728836059,
+      26.444181442260742
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.78,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": 0.099,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.578
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.339
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.578
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.099
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.578
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.099
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.34412864906666357,
+      -0.01764472002176704,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7338774180751115,
+    "vmRootRot": [
+      0.8199999999999994,
+      0.040000000031278016,
+      0.09499009487384669
+    ],
+    "vmWorldMin": [
+      -39.09459001290577,
+      -0.5829100048555231,
+      25.08456504815171
+    ],
+    "vmWorldMax": [
+      -35.8238381938148,
+      2.120461065166001,
+      28.521619144433668
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.222370049178902
+    },
+    "muzzleWorld": [
+      -37.74757373397454,
+      1.2579170561161221,
+      27.13439616448792
+    ],
+    "muzzleForwardMeters": 1.288976493847257,
+    "muzzleY": 1.2579170561161221,
+    "vmForwardMaxMeters": 3.222370049178902,
+    "vmForwardPoint": [
+      -39.09459001290577,
+      -0.5829100048555231,
+      28.521619144433668
+    ],
+    "vmLowestY": -0.5829100048555231,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.120461065166001,
+      "z": 3.4370540962819582,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-carbine-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "sniper",
+    "stance": "stand",
+    "eye": [
+      -36.59489822387695,
+      1.725092329978943,
+      29.594987869262695
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0.005,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.315
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.005
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.006
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.315
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.315
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.005
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.006
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.005
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.006
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3474159252111769,
+      -0.5543994771539088,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.06999999999999995,
+      0.10000349338153301
+    ],
+    "vmWorldMin": [
+      -39.0515630825335,
+      0.049892947001008325,
+      28.49560241053998
+    ],
+    "vmWorldMax": [
+      -36.02794971305818,
+      2.5835590434156632,
+      31.604439241060675
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.1580825155770658
+    },
+    "muzzleWorld": [
+      -37.85536702086311,
+      1.9731185736063401,
+      30.296779849758654
+    ],
+    "muzzleForwardMeters": 1.3876047081866112,
+    "muzzleY": 1.9731185736063401,
+    "vmForwardMaxMeters": 3.1580825155770658,
+    "vmForwardPoint": [
+      -39.0515630825335,
+      0.049892947001008325,
+      31.604439241060675
+    ],
+    "vmLowestY": 0.049892947001008325,
+    "colliderOverlap": {
+      "x": 1.4720502869418226,
+      "y": 2.533666096414655,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-sniper-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "sniper",
+    "stance": "crouch",
+    "eye": [
+      -36.61490249633789,
+      1.1850079464912415,
+      29.61492156982422
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3481765982483478,
+      -0.5233689447028982,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.0699999999999997,
+      0.10805937914478403
+    ],
+    "vmWorldMin": [
+      -39.06740838633977,
+      -0.46522350284733316,
+      28.50860091677358
+    ],
+    "vmWorldMax": [
+      -36.05703617185182,
+      2.0843859903184727,
+      31.626422707839655
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.1565902304006976
+    },
+    "muzzleWorld": [
+      -37.87505487848165,
+      1.466232238605174,
+      30.317119378199898
+    ],
+    "muzzleForwardMeters": 1.3876678334237593,
+    "muzzleY": 1.466232238605174,
+    "vmForwardMaxMeters": 3.1565902304006976,
+    "vmForwardPoint": [
+      -39.06740838633977,
+      -0.46522350284733316,
+      31.626422707839655
+    ],
+    "vmLowestY": -0.46522350284733316,
+    "colliderOverlap": {
+      "x": 1.44296382814818,
+      "y": 2.0843859903184727,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-sniper-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "sniper",
+    "stance": "prone",
+    "eye": [
+      -36.6149787902832,
+      0.6362511920928955,
+      26.498910903930664
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.597
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.287
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.597
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.597
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3476933478544845,
+      -0.009919457285806708,
+      -1.0000000000000007
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.06999999999755278,
+      0.10496556388012379
+    ],
+    "vmWorldMin": [
+      -39.06569624087465,
+      -0.5002809451761036,
+      25.394641218419597
+    ],
+    "vmWorldMax": [
+      -36.05427169092185,
+      2.0505066557060263,
+      28.512976597597216
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.157138428799999
+    },
+    "muzzleWorld": [
+      -37.871776572185475,
+      1.4318737968811535,
+      27.20442977456786
+    ],
+    "muzzleForwardMeters": 1.387643200418435,
+    "muzzleY": 1.4318737968811535,
+    "vmForwardMaxMeters": 3.157138428799999,
+    "vmForwardPoint": [
+      -39.06569624087465,
+      -0.5002809451761036,
+      28.512976597597216
+    ],
+    "vmLowestY": -0.5002809451761036,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.0505066557060263,
+      "z": 3.118335379177619,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-sniper-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "explosive-crossbow",
+    "stance": "stand",
+    "eye": [
+      -36.5949592590332,
+      1.725085952281952,
+      29.594989776611328
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0.017,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.337
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.017
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0.018
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.337
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.337
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.017
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0.018
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.017
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0.018
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3429476689748378,
+      -0.5504826988976507,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.029999999999999995,
+      0.08500365495634851
+    ],
+    "vmWorldMin": [
+      -39.129075990664454,
+      0.023607138636931202,
+      28.220043022251893
+    ],
+    "vmWorldMax": [
+      -35.74809923579941,
+      2.6226770318278962,
+      31.69012431475793
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.2734352739386496
+    },
+    "muzzleWorld": [
+      -37.75941063249478,
+      1.919426600375294,
+      30.258163297685968
+    ],
+    "muzzleForwardMeters": 1.2923948703534462,
+    "muzzleY": 1.919426600375294,
+    "vmForwardMaxMeters": 3.2734352739386496,
+    "vmForwardPoint": [
+      -39.129075990664454,
+      0.023607138636931202,
+      31.69012431475793
+    ],
+    "vmLowestY": 0.023607138636931202,
+    "colliderOverlap": {
+      "x": 1.7519007642005917,
+      "y": 2.599069893190965,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-explosive-crossbow-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "explosive-crossbow",
+    "stance": "crouch",
+    "eye": [
+      -36.615440368652344,
+      1.1855777668952943,
+      29.614898681640625
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.308
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.308
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.308
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3430491603190348,
+      -0.515213965793938,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.029999999999999655,
+      0.08931890714284393
+    ],
+    "vmWorldMin": [
+      -39.14772055026571,
+      -0.48460991732844316,
+      28.23693603162144
+    ],
+    "vmWorldMax": [
+      -35.77278886228811,
+      2.124633375502206,
+      31.710691228212546
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.2726015761374168
+    },
+    "muzzleWorld": [
+      -37.77940420330314,
+      1.416314615133992,
+      30.2786235241705
+    ],
+    "muzzleForwardMeters": 1.292439828623404,
+    "muzzleY": 1.416314615133992,
+    "vmForwardMaxMeters": 3.2726015761374168,
+    "vmForwardPoint": [
+      -39.14772055026571,
+      -0.48460991732844316,
+      31.710691228212546
+    ],
+    "vmLowestY": -0.48460991732844316,
+    "colliderOverlap": {
+      "x": 1.7272111377118904,
+      "y": 2.124633375502206,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-explosive-crossbow-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "explosive-crossbow",
+    "stance": "prone",
+    "eye": [
+      -36.6134147644043,
+      0.6354441452026367,
+      26.218055725097656
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.86,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.311
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.631
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.311
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.311
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.631
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.631
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3468606410171283,
+      -0.03060020781667836,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.7431670056456826,
+    "vmRootRot": [
+      0.7799999999999999,
+      -0.02999999996841625,
+      0.09008416357941501
+    ],
+    "vmWorldMin": [
+      -39.14517253988493,
+      -0.5528012438532164,
+      24.836915443615307
+    ],
+    "vmWorldMax": [
+      -35.77454529706174,
+      2.0651585089217663,
+      28.313767719299168
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.27217515933305
+    },
+    "muzzleWorld": [
+      -37.7769171776957,
+      1.3525210353861268,
+      26.882253688641992
+    ],
+    "muzzleForwardMeters": 1.2924479730054355,
+    "muzzleY": 1.3525210353861268,
+    "vmForwardMaxMeters": 3.27217515933305,
+    "vmForwardPoint": [
+      -39.14517253988493,
+      -0.5528012438532164,
+      28.313767719299168
+    ],
+    "vmLowestY": -0.5528012438532164,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.0651585089217663,
+      "z": 3.4768522756838607,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-explosive-crossbow-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "flamethrower",
+    "stance": "stand",
+    "eye": [
+      -36.59491729736328,
+      1.7250091814994812,
+      29.595300674438477
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.5,
+      "maxX": 37.5,
+      "minZ": 30,
+      "maxZ": 30.6,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.293
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.293
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.293
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.331246895658185,
+      -0.5019912975087117,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999999999988,
+      0.1100240306458341
+    ],
+    "vmWorldMin": [
+      -38.93729979988188,
+      0.10117376134696898,
+      28.40959305405946
+    ],
+    "vmWorldMax": [
+      -35.92124011814833,
+      2.636962244334179,
+      31.516186437166333
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.014643809837161
+    },
+    "muzzleWorld": [
+      -37.779757212079524,
+      2.0240015258942563,
+      30.227212353018352
+    ],
+    "muzzleForwardMeters": 1.2847133886943314,
+    "muzzleY": 2.0240015258942563,
+    "vmForwardMaxMeters": 3.014643809837161,
+    "vmForwardPoint": [
+      -38.93729979988188,
+      0.10117376134696898,
+      31.516186437166333
+    ],
+    "vmLowestY": 0.10117376134696898,
+    "colliderOverlap": {
+      "x": 1.578759881851667,
+      "y": 2.5357884829872104,
+      "z": 0.6000000000000014,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-flamethrower-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "flamethrower",
+    "stance": "crouch",
+    "eye": [
+      -36.61495590209961,
+      1.1856458950042725,
+      28.762222290039062
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3404461055639794,
+      -0.4680397026937629,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999999999774,
+      0.12204501080744265
+    ],
+    "vmWorldMin": [
+      -38.95640437296301,
+      -0.4099415528429057,
+      27.561355926304394
+    ],
+    "vmWorldMax": [
+      -35.96000877464027,
+      2.142501503750643,
+      30.68053035027166
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.0121608648989926
+    },
+    "muzzleWorld": [
+      -37.80501118710561,
+      1.5216682967616162,
+      29.388991398926116
+    ],
+    "muzzleForwardMeters": 1.2847662909682735,
+    "muzzleY": 1.5216682967616162,
+    "vmForwardMaxMeters": 3.0121608648989926,
+    "vmForwardPoint": [
+      -38.95640437296301,
+      -0.4099415528429057,
+      30.68053035027166
+    ],
+    "vmLowestY": -0.4099415528429057,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.142501503750643,
+      "z": 3.119174423967266,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-flamethrower-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "corner",
+    "siteLabel": "inside corner of x=-37 wall and z=30 wall",
+    "weapon": "flamethrower",
+    "stance": "prone",
+    "eye": [
+      -36.61473083496094,
+      0.6352454829216003,
+      25.906583786010742
+    ],
+    "yaw": 2.356,
+    "pitch": 0,
+    "forward": [
+      -0.7072442931458977,
+      0,
+      0.7069692424798688
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": 0,
+    "nearestColliderBounds": {
+      "minX": -37.599999999999994,
+      "maxX": -37,
+      "minZ": -30.8,
+      "maxZ": 30.8,
+      "minY": 0,
+      "maxY": 3
+    },
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": 0
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": 0.265
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": 0
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": 0.605
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": 0
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.34407769666583277,
+      0.05753963532252605,
+      -0.8600000000000004
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999999995,
+      -0.07999999993885776,
+      0.11500752980512269
+    ],
+    "vmWorldMin": [
+      -38.959586347593536,
+      -0.43177425054995977,
+      24.707532529460426
+    ],
+    "vmWorldMax": [
+      -35.95585385321371,
+      2.11491011049764,
+      27.823560269738877
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Skin",
+      "forwardMeters": 3.0136290921141056
+    },
+    "muzzleWorld": [
+      -37.804471297910275,
+      1.4969717709296595,
+      26.53362340298821
+    ],
+    "muzzleForwardMeters": 1.284734875765104,
+    "muzzleY": 1.4969717709296595,
+    "vmForwardMaxMeters": 3.0136290921141056,
+    "vmForwardPoint": [
+      -38.959586347593536,
+      -0.43177425054995977,
+      27.823560269738877
+    ],
+    "vmLowestY": -0.43177425054995977,
+    "colliderOverlap": {
+      "x": 0.5999999999999943,
+      "y": 2.11491011049764,
+      "z": 3.116027740278451,
+      "intersects": true
+    },
+    "screenshot": "atomic-acres-corner-flamethrower-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "carbine",
+    "stance": "stand",
+    "eye": [
+      -18.041179656982422,
+      1.7078112149238587,
+      20.003320693969727
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 0,
+      "highReadyBlend": 0,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.34839930861484814,
+      -0.38120437139100816,
+      -1.1399999999999806
+    ],
+    "vmRootScale": 0.9289587570571032,
+    "vmRootRot": [
+      6.76770686083604e-17,
+      0.17999999995611488,
+      2.8211852311936796e-11
+    ],
+    "vmWorldMin": [
+      -19.18768268163889,
+      -1.2371280675473557,
+      18.482565625842543
+    ],
+    "vmWorldMax": [
+      -16.748456898182436,
+      2.5490405284617923,
+      22.217541249600156
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 3.213459871694607
+    },
+    "muzzleWorld": [
+      -17.656759578833253,
+      -0.10345853860082754,
+      20.203021055699686
+    ],
+    "muzzleForwardMeters": 1.8274999390478541,
+    "muzzleY": -0.10345853860082754,
+    "vmForwardMaxMeters": 3.213538692174663,
+    "vmForwardPoint": [
+      -16.748456898182436,
+      -1.2371280675473557,
+      22.217541249600156
+    ],
+    "vmLowestY": -1.2371280675473557,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-carbine-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "carbine",
+    "stance": "crouch",
+    "eye": [
+      -22.768306732177734,
+      1.230416672229767,
+      20.00153923034668
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.299,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 0.3833333333333333,
+      "highReadyBlend": 0.3833333333333333,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.0059629629629629624,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3431730493843966,
+      -0.40967079394727957,
+      -0.8600000000041396
+    ],
+    "vmRootScale": 0.8541775771140063,
+    "vmRootRot": [
+      0.3143333333333147,
+      0.12633333408875733,
+      0.03449999951437029
+    ],
+    "vmWorldMin": [
+      -24.35826607821025,
+      -1.1517527261137974,
+      18.672037655785065
+    ],
+    "vmWorldMax": [
+      -21.40211864848567,
+      2.0168411249396048,
+      22.013938542995962
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.715533818378524
+    },
+    "muzzleWorld": [
+      -22.361907945628822,
+      -0.14783181138551005,
+      20.24752425822031
+    ],
+    "muzzleForwardMeters": 1.4318778690828846,
+    "muzzleY": -0.14783181138551005,
+    "vmForwardMaxMeters": 2.7156074451929713,
+    "vmForwardPoint": [
+      -21.40211864848567,
+      -1.1517527261137974,
+      22.013938542995962
+    ],
+    "vmLowestY": -1.1517527261137974,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-carbine-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "carbine",
+    "stance": "prone",
+    "eye": [
+      -24.91123390197754,
+      0.6352158296108246,
+      20.000917434692383
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.74,
+    "probeLengthMeters": 1.65,
+    "fullStowDistanceMeters": 0.594,
+    "probePaddingMeters": 0.1456,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "carbine",
+      "obstructionBlend": 0.9420289855072463,
+      "highReadyBlend": 0.9420289855072463,
+      "fireBlocked": true,
+      "blockReason": "high-ready",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 11,
+    "vmRootLocal": [
+      0.3387753659586193,
+      -0.01855219559531739,
+      -0.8600000000129903
+    ],
+    "vmRootScale": 0.7451864812045024,
+    "vmRootRot": [
+      0.7724637681156495,
+      0.0481159479133109,
+      0.08478260491287157
+    ],
+    "vmWorldMin": [
+      -26.071143834503758,
+      -1.055647948360256,
+      18.948762336532692
+    ],
+    "vmWorldMax": [
+      -23.155154811426655,
+      1.016834187383782,
+      21.72759998272734
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.21245814366166
+    },
+    "muzzleWorld": [
+      -24.000129362316464,
+      -0.2855817004643846,
+      20.305762951848504
+    ],
+    "muzzleForwardMeters": 1.188408026393255,
+    "muzzleY": -0.2855817004643846,
+    "vmForwardMaxMeters": 2.212523333911029,
+    "vmForwardPoint": [
+      -23.155154811426655,
+      -1.055647948360256,
+      21.72759998272734
+    ],
+    "vmLowestY": -1.055647948360256,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-carbine-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "sniper",
+    "stance": "stand",
+    "eye": [
+      -18.656185150146484,
+      1.7070942902565003,
+      20.00309181213379
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.098,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 0.1,
+      "highReadyBlend": 0.1,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.0015555555555555557,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3351013006371452,
+      -0.3828156539897504,
+      -1.0909999999999993
+    ],
+    "vmRootScale": 0.9057347881306755,
+    "vmRootRot": [
+      0.09600000000000003,
+      0.08299999999967145,
+      0.010000000000193292
+    ],
+    "vmWorldMin": [
+      -19.89707403764967,
+      -1.0560564223026834,
+      18.6311624554704
+    ],
+    "vmWorldMax": [
+      -17.310150833020813,
+      2.4590810554726925,
+      22.043374641968317
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 3.06331809603602
+    },
+    "muzzleWorld": [
+      -18.098166105599766,
+      -0.1583885192953658,
+      20.254999087272974
+    ],
+    "muzzleForwardMeters": 1.9409409116865914,
+    "muzzleY": -0.1583885192953658,
+    "vmForwardMaxMeters": 3.063397978203613,
+    "vmForwardPoint": [
+      -17.310150833020813,
+      -1.0560564223026834,
+      22.043374641968317
+    ],
+    "vmLowestY": -1.0560564223026834,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-sniper-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "sniper",
+    "stance": "crouch",
+    "eye": [
+      -22.610801696777344,
+      1.230416672229767,
+      20.001596450805664
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.553,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 0.5642857142857144,
+      "highReadyBlend": 0.5642857142857144,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.00877777777777778,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.3361507427300413,
+      -0.4415822734227391,
+      -1.0000000000008415
+    ],
+    "vmRootScale": 0.797909218115119,
+    "vmRootRot": [
+      0.541714285714275,
+      0.004071429276186863,
+      0.056428571014007715
+    ],
+    "vmWorldMin": [
+      -24.11785297830579,
+      -1.020002419338609,
+      18.91047618871664
+    ],
+    "vmWorldMax": [
+      -21.187158310404882,
+      1.603410523935227,
+      21.770832128857208
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.6135240174703736
+    },
+    "muzzleWorld": [
+      -21.921835122302717,
+      -0.20178042768076848,
+      20.333899857821716
+    ],
+    "muzzleForwardMeters": 1.584562876058275,
+    "muzzleY": -0.20178042768076848,
+    "vmForwardMaxMeters": 2.61359610864961,
+    "vmForwardPoint": [
+      -21.187158310404882,
+      -1.020002419338609,
+      21.770832128857208
+    ],
+    "vmLowestY": -1.020002419338609,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-sniper-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "sniper",
+    "stance": "prone",
+    "eye": [
+      -24.93706703186035,
+      0.6352158296108246,
+      20.000905990600586
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.95,
+    "fullStowDistanceMeters": 0.702,
+    "probePaddingMeters": 0.182,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "sniper",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 12,
+    "vmRootLocal": [
+      0.34144943432470326,
+      -0.004440519921092963,
+      -1.0000000000087672
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999994753,
+      -0.06999999058083949,
+      0.09999999445931737
+    ],
+    "vmWorldMin": [
+      -25.91179780738684,
+      -0.9664149741689867,
+      19.015300060488197
+    ],
+    "vmWorldMax": [
+      -23.24344324550171,
+      0.6758514813774086,
+      21.667905883308258
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.106654778967781
+    },
+    "muzzleWorld": [
+      -23.821141850307075,
+      -0.2796602163242542,
+      20.390148326608625
+    ],
+    "muzzleForwardMeters": 1.2571192097156907,
+    "muzzleY": -0.2796602163242542,
+    "vmForwardMaxMeters": 2.106715139863954,
+    "vmForwardPoint": [
+      -23.24344324550171,
+      -0.9664149741689867,
+      21.667905883308258
+    ],
+    "vmLowestY": -0.9664149741689867,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-sniper-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "explosive-crossbow",
+    "stance": "stand",
+    "eye": [
+      -19.08640480041504,
+      1.7069915914535523,
+      20.003108978271484
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 0,
+      "highReadyBlend": 0,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3315627992291141,
+      -0.386747213658309,
+      -1.1399999999999995
+    ],
+    "vmRootScale": 0.9289587570571032,
+    "vmRootRot": [
+      1.6447392847727695e-20,
+      0.0999999999996958,
+      1.9894272666887757e-13
+    ],
+    "vmWorldMin": [
+      -20.21537891365218,
+      -1.1806271583025112,
+      18.564112780974543
+    ],
+    "vmWorldMax": [
+      -17.821116589325992,
+      2.4870306919774317,
+      22.100249132772333
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 3.1500745093159375
+    },
+    "muzzleWorld": [
+      -18.556290468227534,
+      -0.14783112483394012,
+      20.241770202399533
+    ],
+    "muzzleForwardMeters": 1.9208919329276797,
+    "muzzleY": -0.14783112483394012,
+    "vmForwardMaxMeters": 3.1501560924151355,
+    "vmForwardPoint": [
+      -17.821116589325992,
+      -1.1806271583025112,
+      22.100249132772333
+    ],
+    "vmLowestY": -1.1806271583025112,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-explosive-crossbow-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "explosive-crossbow",
+    "stance": "crouch",
+    "eye": [
+      -22.98150062561035,
+      1.230416672229767,
+      20.001554489135742
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.388,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 0.45116279069767445,
+      "highReadyBlend": 0.45116279069767445,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.007018087855297159,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3359342361983883,
+      -0.4333483238126896,
+      -0.8600000000030666
+    ],
+    "vmRootScale": 0.8451364320017181,
+    "vmRootRot": [
+      0.3519069767441715,
+      0.04134883787389101,
+      0.03834883677476353
+    ],
+    "vmWorldMin": [
+      -24.515335915027705,
+      -1.064382451773852,
+      18.785419760922938
+    ],
+    "vmWorldMax": [
+      -21.61163744151686,
+      1.912754776073223,
+      21.887487241535453
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.635413725623666
+    },
+    "muzzleWorld": [
+      -22.41566899335323,
+      -0.11749686223787703,
+      20.29775877402648
+    ],
+    "muzzleForwardMeters": 1.4613833128035665,
+    "muzzleY": -0.11749686223787703,
+    "vmForwardMaxMeters": 2.6354888101160077,
+    "vmForwardPoint": [
+      -21.61163744151686,
+      -1.064382451773852,
+      21.887487241535453
+    ],
+    "vmLowestY": -1.064382451773852,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-explosive-crossbow-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "explosive-crossbow",
+    "stance": "prone",
+    "eye": [
+      -24.884782791137695,
+      0.6352006006240845,
+      20.00067138671875
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.843,
+    "probeLengthMeters": 1.75,
+    "fullStowDistanceMeters": 0.63,
+    "probePaddingMeters": 0.16640000000000002,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "explosive-crossbow",
+      "obstructionBlend": 0.9779220779220779,
+      "highReadyBlend": 0.9779220779220779,
+      "fireBlocked": true,
+      "blockReason": "high-ready",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 54,
+    "vmRootLocal": [
+      0.3417311354668708,
+      -0.029269246503047013,
+      -0.8600000000021474
+    ],
+    "vmRootScale": 0.7472689014560646,
+    "vmRootRot": [
+      0.7627792207791886,
+      -0.027129868584026048,
+      0.08312337561263242
+    ],
+    "vmWorldMin": [
+      -26.004834866420985,
+      -1.095686465429496,
+      18.971813311541197
+    ],
+    "vmWorldMax": [
+      -23.188045422912438,
+      1.0489829431074014,
+      21.711146550350243
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.2282554799503345
+    },
+    "muzzleWorld": [
+      -23.879457006346353,
+      -0.23425828458893141,
+      20.352236966192667
+    ],
+    "muzzleForwardMeters": 1.174706784182937,
+    "muzzleY": -0.23425828458893141,
+    "vmForwardMaxMeters": 2.2283213866991853,
+    "vmForwardPoint": [
+      -23.188045422912438,
+      -1.095686465429496,
+      21.711146550350243
+    ],
+    "vmLowestY": -1.095686465429496,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-explosive-crossbow-prone.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "flamethrower",
+    "stance": "stand",
+    "eye": [
+      -20.184165954589844,
+      1.7075912141799927,
+      20.00275421142578
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.061,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 0.06224489795918367,
+      "highReadyBlend": 0.06224489795918367,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.0009682539682539683,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.342358530085679,
+      -0.31695033613462287,
+      -1.0789999999999995
+    ],
+    "vmRootScale": 0.9145030212967759,
+    "vmRootRot": [
+      0.059755102040816355,
+      0.08879591836678784,
+      0.006846938775851894
+    ],
+    "vmWorldMin": [
+      -21.333827221181178,
+      -1.0509913213538855,
+      18.615383196405816
+    ],
+    "vmWorldMax": [
+      -18.814291466219807,
+      2.524252407515628,
+      22.07302706024837
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 3.0677026141836614
+    },
+    "muzzleWorld": [
+      -19.621695829492033,
+      -0.1911073360475175,
+      20.253410667102106
+    ],
+    "muzzleForwardMeters": 1.97351198739404,
+    "muzzleY": -0.1911073360475175,
+    "vmForwardMaxMeters": 3.0677831560241495,
+    "vmForwardPoint": [
+      -18.814291466219807,
+      -1.0509913213538855,
+      22.07302706024837
+    ],
+    "vmLowestY": -1.0509913213538855,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-flamethrower-stand.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "flamethrower",
+    "stance": "crouch",
+    "eye": [
+      -23.48792839050293,
+      1.230416672229767,
+      20.001245498657227
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.528,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 0.5387755102040817,
+      "highReadyBlend": 0.5387755102040817,
+      "fireBlocked": false,
+      "blockReason": "open-space",
+      "spreadPenaltyRadians": 0.008380952380952381,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.34348086953028845,
+      -0.3787996184940518,
+      -0.8600000000035629
+    ],
+    "vmRootScale": 0.8038336999841056,
+    "vmRootRot": [
+      0.5172244897958926,
+      0.003020409388025623,
+      0.059265305373984334
+    ],
+    "vmWorldMin": [
+      -24.987782975542046,
+      -0.8972383764505435,
+      18.90349846193302
+    ],
+    "vmWorldMax": [
+      -22.055499444436823,
+      1.7867963430896174,
+      21.784122101925163
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 2.5022879944537393
+    },
+    "muzzleWorld": [
+      -22.802007549353334,
+      -0.11348796974760567,
+      20.340107082926956
+    ],
+    "muzzleForwardMeters": 1.5011681336389968,
+    "muzzleY": -0.11348796974760567,
+    "vmForwardMaxMeters": 2.5023606604573057,
+    "vmForwardPoint": [
+      -22.055499444436823,
+      -0.8972383764505435,
+      21.784122101925163
+    ],
+    "vmLowestY": -0.8972383764505435,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-flamethrower-crouch.png"
+  },
+  {
+    "arena": "atomic-acres",
+    "site": "floor-down",
+    "siteLabel": "open ground, looking steeply down (no wall)",
+    "weapon": "flamethrower",
+    "stance": "prone",
+    "eye": [
+      -25.29234504699707,
+      0.6369127142429352,
+      20.00061798095703
+    ],
+    "yaw": 4.712,
+    "pitch": -1.2,
+    "forward": [
+      0.36235772706326996,
+      -0.9320390859672263,
+      0.00014095005517735675
+    ],
+    "retreat": 0.98,
+    "probeLengthMeters": 1.9,
+    "fullStowDistanceMeters": 0.6839999999999999,
+    "probePaddingMeters": 0.1976,
+    "nearestForwardMeters": null,
+    "nearestColliderBounds": null,
+    "probes": [
+      {
+        "offset": "0/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/centre",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "0/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/upper",
+        "hitMeters": null
+      },
+      {
+        "offset": "-1/lower",
+        "hitMeters": null
+      },
+      {
+        "offset": "1/lower",
+        "hitMeters": null
+      }
+    ],
+    "fireAdmission": {
+      "contract": "viewmodel-fire-admission-hf343-v1",
+      "weapon": "flamethrower",
+      "obstructionBlend": 1,
+      "highReadyBlend": 1,
+      "fireBlocked": true,
+      "blockReason": "full-stow",
+      "spreadPenaltyRadians": 0.014,
+      "policy": "block-full-stow-graduate-partial-v1",
+      "aimAuthority": "camera-forward-unchanged"
+    },
+    "adsProgress": 0,
+    "vmMeshes": 16,
+    "vmRootLocal": [
+      0.3384926009345747,
+      0.05600248658248497,
+      -0.860000000017535
+    ],
+    "vmRootScale": 0.6967190677928274,
+    "vmRootRot": [
+      0.9599999999994753,
+      -0.07999999002619174,
+      0.10999999390489497
+    ],
+    "vmWorldMin": [
+      -26.26612620911761,
+      -0.8208151575270027,
+      19.00721499034343
+    ],
+    "vmWorldMax": [
+      -23.587990304607814,
+      0.8385395597241525,
+      21.683825336117398
+    ],
+    "vmLayerMask": 4,
+    "deepestPart": {
+      "name": "Pass65_Arms_Batch_Sleeve",
+      "forwardMeters": 1.976422742627598
+    },
+    "muzzleWorld": [
+      -24.158470322906958,
+      -0.1605886401172445,
+      20.40582345829352
+    ],
+    "muzzleForwardMeters": 1.1542278149056613,
+    "muzzleY": -0.1605886401172445,
+    "vmForwardMaxMeters": 1.9764827119246635,
+    "vmForwardPoint": [
+      -23.587990304607814,
+      -0.8208151575270027,
+      21.683825336117398
+    ],
+    "vmLowestY": -0.8208151575270027,
+    "colliderOverlap": null,
+    "screenshot": "atomic-acres-floor-down-flamethrower-prone.png"
+  }
+]

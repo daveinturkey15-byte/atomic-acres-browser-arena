@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "recipeId": "pass79-test-arena-menu-preview-v1",
+  "generatedAt": "2026-08-30",
+  "inheritsMotionContract": "pass66-authoritative-runtime-menu-preview-v2",
+  "arenas": {
+    "test1": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // FIRING RANGE",
+      "presentationId": "menu-video-runtime-helo-test1-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 79013001,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [0, 2.4, 0],
+      "radius": [30, 23],
+      "altitudeM": 22,
+      "lookAt": [0, 2.4, 0],
+      "phaseRadians": 0.65,
+      "safeVolume": {
+        "x": [-31.5, 31.5],
+        "y": [21, 23],
+        "z": [-24.5, 24.5]
+      },
+      "reviewLabel": "Test1 range training ground cockpit flyover"
+    },
+    "test2": {
+      "kind": "helicopter",
+      "label": "HELO FLYOVER // RAID",
+      "presentationId": "menu-video-runtime-helo-test2-v1",
+      "cockpitAssetId": "pass66-compact-cockpit-overlay-v1",
+      "seed": 79013002,
+      "fovDegrees": 68,
+      "posterFrame": 60,
+      "centre": [0, 3.6, 0],
+      "radius": [36, 28],
+      "altitudeM": 26,
+      "lookAt": [0, 3.6, 0],
+      "phaseRadians": 2.05,
+      "safeVolume": {
+        "x": [-37.5, 37.5],
+        "y": [25, 27],
+        "z": [-29.5, 29.5]
+      },
+      "reviewLabel": "Test2 hillside mansion cockpit flyover"
+    }
+  }
+}

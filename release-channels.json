@@ -2,14 +2,14 @@
   "schemaVersion": 5,
   "canonicalHostname": "daveinturkey15-byte.github.io",
   "latest": {
-    "label": "PASS 73",
-    "description": "Pass 73: first-person, combat, collision, live-graphics and cross-browser corrections with preserved release channels."
+    "label": "PASS 96",
+    "description": "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint."
   },
   "experimental": {
-    "label": "PASS 73",
-    "description": "Pass 73 first-person, gameplay, world-integrity and renderer-correction build.",
-    "pass": "PASS 73",
-    "path": "channels/the-big-one"
+    "pass": "PASS 96",
+    "label": "PASS 96",
+    "description": "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint.",
+    "path": "channels/pass96"
   },
   "previous": {
     "label": "PASS 72 · PREVIOUS LIVE",
@@ -66,5 +66,11 @@
     "runtimeTreeSha256": "b7416e02c190d8ff0403a65cd7a7c894970507bc6a8de7b196cc2d7979d69bce",
     "path": "channels/pass63-rollback",
     "rebuiltFromSource": true
+  },
+  "pass95Backup": {
+    "label": "PASS 95 · SAFE BACKUP",
+    "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02, HF-400). Pick this if the newest pass misbehaves.",
+    "pass": "PASS 95",
+    "path": "channels/pass95"
   }
 }

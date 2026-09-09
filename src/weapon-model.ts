@@ -26,6 +26,16 @@ export const PASS65_AUTHORED_FIREARM_IDS = Object.freeze([
 ] as const satisfies readonly WeaponId[]);
 export type Pass65AuthoredFirearmId = (typeof PASS65_AUTHORED_FIREARM_IDS)[number];
 
+/**
+ * HF-334: weapons that deliberately reuse another weapon's authored delivery.
+ * A livery variant is the same physical weapon in a different finish, so it
+ * ships no second multi-megabyte GLB and appears in no authored-asset roster.
+ * Anything listed here MUST differ only in finish/tuning, never in geometry.
+ */
+export const WEAPON_LIVERY_ALIASES: Readonly<Record<string, Pass65AuthoredFirearmId>> = Object.freeze({
+  'crimson-flamethrower': 'flamethrower',
+});
+
 export const PASS65_WEAPON_CACHE_BUDGET = Object.freeze({
   'first-person': 2,
   // Bots cycle the complete canonical arsenal and every corpse can retain its
@@ -37,7 +47,9 @@ export const PASS65_WEAPON_CACHE_BUDGET = Object.freeze({
 
 export const PASS65_RUNTIME_WEAPON_CORPUS_BUDGET = Object.freeze({
   variants: Object.freeze(['world', 'drop'] as const),
-  assets: (WEAPON_IDS.length + 1) * 2,
+  // HF-334: livery variants ship no GLB of their own - they reuse another
+  // weapon's delivery - so they must not inflate the on-disk corpus budget.
+  assets: (WEAPON_IDS.length - Object.keys(WEAPON_LIVERY_ALIASES).length + 1) * 2,
   maximumCompressedBytes: 12 * 1024 * 1024,
   // This retained-corpus budget is incremental over the already-required
   // first-person catalog. A separate all-variant ceiling below still accounts
@@ -320,16 +332,20 @@ export function loadPass65FieldKnifeAsset(variant: Pass65WeaponVariant): Promise
 }
 
 export function loadPass65WeaponPresentation(id: WeaponId, variant: Pass65WeaponVariant): Promise<void> {
-  return id === 'explosive-crossbow'
-    ? loadPass65CrossbowAssets(variant)
-    : loadPass65WeaponAsset(id as Pass65AuthoredFirearmId, variant);
+  if (id === 'explosive-crossbow') return loadPass65CrossbowAssets(variant);
+  // HF-334: a livery variant resolves to the asset it reuses, so prewarm loads
+  // one delivery for both and never asks for a URL that does not exist.
+  const authoredId = authoredFirearmIdFor(id);
+  return authoredId ? loadPass65WeaponAsset(authoredId, variant) : Promise.resolve();
 }
 
 function runtimeCorpusReady(): boolean {
   return PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants.every((variant) => (
-    WEAPON_IDS.every((id) => id === 'explosive-crossbow'
-      ? pass65CrossbowAssets.has(variant)
-      : cache.has(cacheKey(id as Pass65AuthoredFirearmId, variant)))
+    WEAPON_IDS.every((id) => {
+      if (id === 'explosive-crossbow') return pass65CrossbowAssets.has(variant);
+      const authoredId = authoredFirearmIdFor(id);
+      return authoredId === null || cache.has(cacheKey(authoredId, variant));
+    })
     && pass65FieldKnifeAssets.has(variant)
   ));
 }
@@ -364,6 +380,10 @@ export async function prewarmPass65RuntimeWeaponCorpus(
   const operation = (async () => {
     for (const variant of PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.variants) {
       for (const id of WEAPON_IDS) {
+        // HF-334: a livery variant resolves to an asset another weapon already
+        // loads, so counting it here would double-count one decode against the
+        // corpus budget and report progress the disk never did.
+        if (id in WEAPON_LIVERY_ALIASES) continue;
         await loadPass65WeaponPresentation(id, variant);
         loadedAssets += 1;
         if (loadedAssets % PASS65_RUNTIME_WEAPON_CORPUS_BUDGET.yieldEveryAssets === 0) {
@@ -408,6 +428,14 @@ export const PASS70_RAILGUN_HIP_OPTIC_CONTRACT = 'clear-glass-and-opaque-backer-
 export const PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_CONTRACT = 'mesh-geometry-only-socket-invariant-width-v1' as const;
 export const PASS70_FLARE_GUN_FIRST_PERSON_WIDTH_MULTIPLIER = 3.5;
 export const PASS70_CROSSBOW_LOADED_BOLT_CLEARANCE_CONTRACT = 'semantic-loaded-bolt-local-y-zero-v1' as const;
+export const HF405_COMPACT_OPTIC_BORE_CONTRACT = 'authored-optic-assembly-bore-spatial-degenerate-v1' as const;
+/**
+ * Bore radius as a fraction of the ocular lens radius. The lens is the widest
+ * thing the shooter may see through, so the corridor stays comfortably inside
+ * it: wide enough to clear the housing caps, never wide enough to reach the
+ * tube's side walls or the authored reticle's outer arms.
+ */
+export const HF405_COMPACT_OPTIC_BORE_LENS_FRACTION = 0.74;
 
 /** Restores the semantic loaded bolt after the shipped NLA bind pose leaked its empty-reload offset. */
 export function resetPass70CrossbowLoadedBoltRestPose(bolt: THREE.Object3D): void {
@@ -547,6 +575,223 @@ export function capturePass70FirstPersonMaterialState(root: THREE.Object3D): Pas
     invalidOpaqueBodyCount,
     opticWindows: Object.freeze(opticWindows.map((entry) => Object.freeze(entry))),
   });
+}
+
+export type Hf405CompactOpticBoreState = Readonly<{
+  applied: boolean;
+  contract: typeof HF405_COMPACT_OPTIC_BORE_CONTRACT;
+  corridorLengthMeters: number;
+  rayCount: number;
+  boreRadiusMeters: number;
+  submittedElements: number;
+  suppressedElements: number;
+  batches: readonly Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>[];
+}>;
+
+const NO_COMPACT_OPTIC_BORE: Hf405CompactOpticBoreState = Object.freeze({
+  applied: false,
+  contract: HF405_COMPACT_OPTIC_BORE_CONTRACT,
+  corridorLengthMeters: 0,
+  rayCount: 0,
+  boreRadiusMeters: 0,
+  submittedElements: 0,
+  suppressedElements: 0,
+  batches: Object.freeze([]),
+});
+
+/**
+ * HF-405 — "need a better scope 1.5x on the crossbow".
+ *
+ * THE DEFECT THIS CLOSES. The authored compact optic is a CAPPED cylinder.
+ * Both lenses are correctly marked as clear optic windows (2% opacity), but
+ * the housing between them closes at each end, so aiming down the crossbow's
+ * 1.5x put a solid gunmetal disc exactly on the aim point: the sight picture
+ * was the end cap, not the world, and the authored illuminated reticle sat
+ * behind it where nothing could ever see it. Magnification had already been
+ * fixed; the glass you looked through was still a wall. Measured on the gun
+ * range: hiding the housing mesh alone restored both the view and the reticle.
+ *
+ * WHY A BORE AND NOT A HIDDEN MESH. Hiding the housing deletes the optic from
+ * every angle — hip, third person and the whole approach to ADS — for a defect
+ * that is two triangle fans deep. Degenerating only the cloned indices that
+ * actually block the rear-to-front corridor keeps the housing, its silhouette,
+ * its materials, its sockets and the source GLB exactly as authored, and is
+ * the same spatial-degeneration contract `carvePass70RailgunHipOpticBacker`
+ * already uses for the railgun's opaque backer.
+ *
+ * SAFETY. Only meshes under the authored optic assembly with an opaque-body
+ * material are eligible: the semantic lenses stay, the illuminated reticle
+ * stays, and nothing outside the optic can be reached. Geometries have already
+ * been cloned per instance by `cloneMeshGeometriesForOwner`, so the mutation
+ * cannot leak into the world/drop variants or another mounted copy.
+ */
+export function carveHf405CompactOpticBore(
+  assembly: THREE.Object3D,
+  ocular: THREE.Mesh,
+  rearSocket: THREE.Object3D,
+  frontSocket: THREE.Object3D,
+): Hf405CompactOpticBoreState {
+  assembly.updateWorldMatrix(true, true);
+  const rear = rearSocket.getWorldPosition(new THREE.Vector3());
+  const front = frontSocket.getWorldPosition(new THREE.Vector3());
+  const axis = front.clone().sub(rear);
+  if (axis.lengthSq() < 1e-12) return NO_COMPACT_OPTIC_BORE;
+  axis.normalize();
+
+  ocular.geometry.computeBoundingBox();
+  const ocularBounds = ocular.geometry.boundingBox;
+  if (!ocularBounds) return NO_COMPACT_OPTIC_BORE;
+  const ocularScale = ocular.getWorldScale(new THREE.Vector3());
+  const ocularSize = ocularBounds.getSize(new THREE.Vector3());
+  // The ocular is a disc: its two largest world extents span the glass.
+  const extents = [
+    Math.abs(ocularSize.x * ocularScale.x),
+    Math.abs(ocularSize.y * ocularScale.y),
+    Math.abs(ocularSize.z * ocularScale.z),
+  ].sort((left, right) => right - left);
+  const boreRadius = (extents[0]! / 2) * HF405_COMPACT_OPTIC_BORE_LENS_FRACTION;
+  if (!Number.isFinite(boreRadius) || boreRadius <= 0) return NO_COMPACT_OPTIC_BORE;
+
+  // The corridor is the cylinder of `boreRadius` about the sight axis, running
+  // from half an optic length behind the rear socket to half an optic length
+  // ahead of the front one. A triangle is IN the bore when any of its vertices
+  // is inside that cylinder.
+  //
+  // TWO predicates, because one cap topology defeats each of them on its own.
+  //
+  //  - A ray rosette alone misses a triangulated cap's apex: a ray through a
+  //    shared vertex is numerically excluded from every triangle that owns it,
+  //    so the ray most likely to be cast - straight down the axis - reports a
+  //    solid cap as clear, and the rest clear only the wedges they land in.
+  //  - The vertex test alone misses a cap whose triangulation puts no vertex
+  //    inside the corridor, which is exactly what the delivered crossbow
+  //    housing does: its caps were carved by the rosette and by nothing else.
+  //
+  // Together they are conservative on a tube wall either way: its vertices sit
+  // out at the tube radius and its triangles run parallel to every ray.
+  const optic = rear.distanceTo(front);
+  const corridorStart = -optic * 0.5;
+  const corridorEnd = optic * 1.5;
+  const offset = new THREE.Vector3();
+  const insideBore = (vertex: THREE.Vector3): boolean => {
+    offset.subVectors(vertex, rear);
+    const along = offset.dot(axis);
+    if (along < corridorStart || along > corridorEnd) return false;
+    return offset.addScaledVector(axis, -along).length() <= boreRadius;
+  };
+
+  const lateral = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(lateral.dot(axis)) > 0.9) lateral.set(0, 1, 0);
+  lateral.addScaledVector(axis, -lateral.dot(axis)).normalize();
+  const vertical = new THREE.Vector3().crossVectors(axis, lateral).normalize();
+  const start = rear.clone().addScaledVector(axis, corridorStart);
+  const maximumDistance = corridorEnd - corridorStart;
+  const rays: THREE.Ray[] = [new THREE.Ray(start.clone(), axis)];
+  for (const radius of [0.35, 0.65, 0.92]) {
+    for (let step = 0; step < 12; step += 1) {
+      const angle = (step / 12) * Math.PI * 2;
+      rays.push(new THREE.Ray(
+        start.clone()
+          .addScaledVector(lateral, Math.cos(angle) * radius * boreRadius)
+          .addScaledVector(vertical, Math.sin(angle) * radius * boreRadius),
+        axis,
+      ));
+    }
+  }
+
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const hit = new THREE.Vector3();
+  const batches: Array<Readonly<{ mesh: string; submittedElements: number; suppressedElements: number }>> = [];
+  let submittedElements = 0;
+  let suppressedElements = 0;
+
+  assembly.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material.userData.pass70FirstPersonSurface === 'opaque-body')) return;
+    const position = node.geometry.getAttribute('position');
+    const index = node.geometry.index;
+    const elementCount = index?.count ?? 0;
+    if (!position || position.itemSize < 3 || !index || elementCount < 3 || elementCount % 3 !== 0) return;
+    submittedElements += elementCount;
+    let batchSuppressed = 0;
+    for (let element = 0; element < elementCount; element += 3) {
+      const ia = index.getX(element);
+      const ib = index.getX(element + 1);
+      const ic = index.getX(element + 2);
+      if (ia === ib && ib === ic) continue;
+      a.fromBufferAttribute(position, ia).applyMatrix4(node.matrixWorld);
+      b.fromBufferAttribute(position, ib).applyMatrix4(node.matrixWorld);
+      c.fromBufferAttribute(position, ic).applyMatrix4(node.matrixWorld);
+      const blocksBore = insideBore(a) || insideBore(b) || insideBore(c)
+        || rays.some((ray) => {
+          const intersection = ray.intersectTriangle(a, b, c, false, hit);
+          return intersection !== null && ray.origin.distanceTo(intersection) <= maximumDistance;
+        });
+      if (!blocksBore) continue;
+      index.setX(element + 1, ia);
+      index.setX(element + 2, ia);
+      batchSuppressed += 3;
+    }
+    if (batchSuppressed === 0) return;
+    index.needsUpdate = true;
+    node.userData.hf405CompactOpticBore = Object.freeze({
+      contract: HF405_COMPACT_OPTIC_BORE_CONTRACT,
+      submittedElements: elementCount,
+      suppressedElements: batchSuppressed,
+      boreRadiusMeters: boreRadius,
+    });
+    batches.push(Object.freeze({ mesh: node.name, submittedElements: elementCount, suppressedElements: batchSuppressed }));
+    suppressedElements += batchSuppressed;
+  });
+
+  const state: Hf405CompactOpticBoreState = Object.freeze({
+    applied: suppressedElements > 0,
+    contract: HF405_COMPACT_OPTIC_BORE_CONTRACT,
+    corridorLengthMeters: corridorEnd - corridorStart,
+    rayCount: rays.length,
+    boreRadiusMeters: boreRadius,
+    submittedElements,
+    suppressedElements,
+    batches: Object.freeze(batches),
+  });
+  assembly.userData.hf405CompactOpticBore = state;
+  return state;
+}
+
+/**
+ * The authored optic assembly: the node that carries BOTH the optic socket
+ * semantic and its own authored magnification. `optic-socket` carries the same
+ * socket semantic but is an empty locator with no magnification and no
+ * geometry, so the magnification is what separates the assembly from it.
+ */
+/** The optic window nearest the shooter: the ocular the eye actually looks into. */
+export function nearestOpticWindowMesh(assembly: THREE.Object3D, rearSocket: THREE.Object3D): THREE.Mesh | null {
+  assembly.updateWorldMatrix(true, true);
+  const rear = rearSocket.getWorldPosition(new THREE.Vector3());
+  let nearest: THREE.Mesh | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  assembly.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(node.material) ? node.material : [node.material];
+    if (!materials.some((material) => material.userData.pass70FirstPersonSurface === 'optic-window')) return;
+    const distance = node.getWorldPosition(new THREE.Vector3()).distanceTo(rear);
+    if (distance >= nearestDistance) return;
+    nearestDistance = distance;
+    nearest = node;
+  });
+  return nearest;
+}
+
+export function authoredOpticAssembly(model: THREE.Object3D): THREE.Object3D | null {
+  let assembly: THREE.Object3D | null = null;
+  model.traverse((node) => {
+    if (assembly) return;
+    if (node.userData.atomic_socket === 'optic' && Number.isFinite(node.userData.magnification)) assembly = node;
+  });
+  return assembly;
 }
 
 type Pass70RailgunHipOpticApertureState = Readonly<{
@@ -807,6 +1052,27 @@ function instantiateWeaponAsset(
   if (id === 'railgun' && variant === 'first-person' && !railgunHipOpticAperture?.applied) {
     throw new Error('Railgun first-person semantic lens did not intersect its cloned opaque backer');
   }
+  if (id === 'explosive-crossbow' && variant === 'first-person') {
+    // HF-405. The AUTHORED optic assembly is the trigger, not the weapon id:
+    // a delivery with no optic has no bore to open, and the headless fixtures
+    // that mock GLTFLoader legitimately carry none. Once an assembly is
+    // present this fails closed, because a crossbow whose 1.5x still has a
+    // capped bore aims at a gunmetal disc — the exact defect reported. That
+    // the shipped GLB does carry the assembly, both sockets and two lenses is
+    // asserted directly against the delivered file in
+    // hf405-compact-optic-bore.test.ts.
+    const assembly = authoredOpticAssembly(visual);
+    if (assembly) {
+      const rearSocket = visual.getObjectByName('rear-sight-socket');
+      const frontSocket = visual.getObjectByName('front-sight-socket');
+      const ocular = rearSocket ? nearestOpticWindowMesh(assembly, rearSocket) : null;
+      if (!rearSocket || !frontSocket || !ocular) {
+        throw new Error('Explosive crossbow first-person optic assembly has no sight sockets or ocular lens');
+      }
+      const bore = carveHf405CompactOpticBore(assembly, ocular, rearSocket, frontSocket);
+      if (!bore.applied) throw new Error('Explosive crossbow compact optic bore did not intersect its cloned housing');
+    }
+  }
   if (id === 'flare-gun' && variant === 'first-person') {
     const socketNames = ['grip-socket-r', 'support-socket-l', 'reload-socket-l', 'muzzle-socket'] as const;
     visual.updateWorldMatrix(true, true);
@@ -919,14 +1185,37 @@ export function createPass65CrossbowModel(
   return root;
 }
 
+/**
+ * HF-334: weapons that reuse another weapon's authored GLB. The crimson
+ * flamethrower is the map flamethrower's chassis in a different livery, so it
+ * resolves to the same authored asset and takes its colour at material time —
+ * no second multi-megabyte delivery ships for a repaint.
+ */
+export function authoredFirearmIdFor(id: WeaponId): Pass65AuthoredFirearmId | null {
+  const alias = WEAPON_LIVERY_ALIASES[id];
+  if (alias) return alias;
+  return (PASS65_AUTHORED_FIREARM_IDS as readonly WeaponId[]).includes(id)
+    ? id as Pass65AuthoredFirearmId
+    : null;
+}
+
 export function createPass65WeaponModel(
-  id: Pass65AuthoredFirearmId,
+  id: WeaponId,
   flattenMaterials: boolean,
   variant: Pass65WeaponVariant,
 ): THREE.Group | null {
-  const entry = cache.get(cacheKey(id, variant));
+  const authoredId = authoredFirearmIdFor(id);
+  if (!authoredId) return null;
+  const entry = cache.get(cacheKey(authoredId, variant));
   if (!entry) return null;
-  return instantiateWeaponAsset(id, variant, entry, PASS65_AUTHORED_WEAPON_URLS[id][variant], flattenMaterials, entry);
+  // Named for the weapon that ASKED for it, loaded from the asset it reuses:
+  // a livery variant is its own scene-graph instance, so presentation lookups
+  // by weapon id keep working (HF-334).
+  const model = instantiateWeaponAsset(id as PresentationAssetId, variant, entry, PASS65_AUTHORED_WEAPON_URLS[authoredId][variant], flattenMaterials, entry);
+  // The livery is the only difference; record which weapon actually asked for
+  // the asset so presentation tinting and telemetry stay truthful.
+  if (model) model.userData.liveryWeaponId = id;
+  return model;
 }
 
 export function createPass65FieldKnifeModel(
@@ -1127,6 +1416,29 @@ function runtime(root: THREE.Object3D): ImportedWeaponRuntime | null {
     }
   });
   return nested;
+}
+
+const NO_ANIMATED_NODES: ReadonlySet<string> = Object.freeze(new Set<string>());
+
+/**
+ * Node names the authored Pass 65 clips actually drive. Every firearm parents
+ * its whole frame under `weapon-action-driver` and every clip translates that
+ * node, so a mesh below it is static only RELATIVE TO IT - never relative to
+ * the model root. Consumers that re-parent or merge "static" geometry must
+ * treat these nodes as the boundary, or the merged body stops following the
+ * clip while its siblings keep moving.
+ */
+export function importedWeaponAnimatedNodeNames(root: THREE.Object3D): ReadonlySet<string> {
+  const state = runtime(root);
+  if (!state) return NO_ANIMATED_NODES;
+  const names = new Set<string>();
+  for (const action of state.actions.values()) {
+    for (const track of action.getClip().tracks) {
+      const nodeName = THREE.PropertyBinding.parseTrackName(track.name).nodeName;
+      if (nodeName) names.add(nodeName);
+    }
+  }
+  return names;
 }
 
 function playMatching(root: THREE.Object3D, fragment: string): void {

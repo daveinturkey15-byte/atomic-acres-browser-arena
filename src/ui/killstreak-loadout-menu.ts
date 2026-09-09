@@ -1,7 +1,7 @@
 import {
   PASS65_KILLSTREAK_CATALOG,
   PASS65_KILLSTREAK_SLOT_DEFINITIONS,
-  type Pass65KillstreakId,
+  type Pass65KillstreakId, type SelectableKillstreakId,
 } from '../killstreak-catalog';
 import {
   DEFAULT_KILLSTREAK_LOADOUT,
@@ -23,7 +23,7 @@ export function activeKillstreakDurationMs(id: Pass65KillstreakId): number {
   return definition.durationMs;
 }
 
-function killstreakDurationSeconds(id: Pass65KillstreakId): number {
+function killstreakDurationSeconds(id: SelectableKillstreakId): number {
   const durationMs = activeKillstreakDurationMs(id);
   if (durationMs <= 0 || durationMs % 1_000 !== 0) {
     throw new Error(`Killstreak ${id} requires a positive whole-second duration`);
@@ -36,6 +36,7 @@ function killstreakDurationSeconds(id: Pass65KillstreakId): number {
  * DOES, shown in the loadout menu so every reward is self-explanatory.
  */
 export const KILLSTREAK_DESCRIPTIONS: Readonly<Record<Pass65KillstreakId, string>> = Object.freeze({
+  'crimson-flamethrower': 'Care-package only (10% chance): a red flamethrower of your own, 30% weaker than the map one.',
   'scout-sweep': 'Reveals every enemy on your minimap for 12s.',
   'adrenaline': '+10% damage and move speed, -10% reload time for 15s.',
   'care-package': 'Calls a supply crate you can capture for a bonus reward.',
@@ -119,7 +120,7 @@ export function bindKillstreakLoadoutMenu(
   let previewedSlot = 1;
   const previewSlot = (select: HTMLSelectElement): void => {
     previewedSlot = Number(select.dataset.killstreakSlot);
-    demo.show(select.value as Pass65KillstreakId);
+    demo.show(select.value as SelectableKillstreakId);
     root.querySelectorAll<HTMLElement>('[data-killstreak-slot-card]').forEach((card) => {
       card.classList.toggle('is-previewed', Number(card.dataset.killstreakSlotCard) === previewedSlot);
     });
@@ -129,8 +130,10 @@ export function bindKillstreakLoadoutMenu(
     selects.forEach((select, index) => {
       select.value = selected.slots[index];
       select.disabled = matchActive;
-      const otherHeavy = index === 2 ? selected.slots[3] : index === 3 ? selected.slots[2] : null;
-      for (const option of [...select.options]) option.disabled = otherHeavy !== null && option.value === otherHeavy;
+      // HF-316 owner correction: the sibling heavy slot's current pick is no
+      // longer a disabled (silently unpickable) option — choosing it now swaps
+      // the two heavy slots via KillstreakLoadoutController.select.
+      for (const option of [...select.options]) option.disabled = false;
     });
     renderDetails(root, controller);
     const activePreview = selects.find((select) => Number(select.dataset.killstreakSlot) === previewedSlot) ?? selects[0];
@@ -146,14 +149,21 @@ export function bindKillstreakLoadoutMenu(
     select.addEventListener('change', () => {
       const slot = Number(select.dataset.killstreakSlot) as 1 | 2 | 3 | 4 | 5;
       const id = select.value as Pass65KillstreakId;
+      // sync() rewrites the status line, so outcome messages (swap notice or
+      // rejection) are applied after it to stay visible.
+      let statusOverride: string | null = null;
       try {
-        controller.select(slot, id);
+        const result = controller.select(slot, id);
+        // HF-316 owner correction: a sibling heavy-slot conflict swaps the two
+        // picks instead of being blocked; tell the player what moved where.
+        if (result.swappedSlot !== null) statusOverride = `SWAPPED WITH SLOT ${result.swappedSlot}`;
         onChange(id, slot);
       } catch (error) {
-        if (status) status.textContent = error instanceof Error ? error.message.toUpperCase() : 'SELECTION REJECTED';
+        statusOverride = error instanceof Error ? error.message.toUpperCase() : 'SELECTION REJECTED';
       }
       previewSlot(select);
       sync();
+      if (statusOverride !== null && status) status.textContent = statusOverride;
     });
   }
   sync();

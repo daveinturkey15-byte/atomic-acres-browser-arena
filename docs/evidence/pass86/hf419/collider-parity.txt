@@ -1,0 +1,40 @@
+
+=== atomic-acres: 0 invisible collider(s), 8 walk-through mesh(es) [209 colliders, 0 boundary, 8 runtime-replaced statics, 819 visible meshes]
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9,0.22,-28.03],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-8.53,0.22,-28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9,0.22,-28.97],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[-9.47,0.22,-28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9,0.22,28.97],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9.47,0.22,28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[9,0.22,28.03],"size":[1.39,0.95,0.4],"presentationOnly":false,"instanced":false,"vertices":52}
+  WALK-THROUGH MESH {"name":"yard-root-flare","path":"original-arena-art/yard-root-flare","centre":[8.53,0.22,28.5],"size":[0.4,0.95,1.39],"presentationOnly":false,"instanced":false,"vertices":52}
+  rule-excluded substantial meshes: walkable surface=18, above reachable height (no standing contact)=146, training target (solidity owned by runtime colliders)=6, terrain/sky-scale surface=18, soft foliage=6, outside playable bounds (backdrop)=9
+
+=== rustworks-1v1: 0 invisible collider(s), 0 walk-through mesh(es) [63 colliders, 0 boundary, 0 runtime-replaced statics, 104 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=6, above reachable height (no standing contact)=4
+
+=== gun-range: 0 invisible collider(s), 3 walk-through mesh(es) [37 colliders, 2 boundary, 0 runtime-replaced statics, 237 visible meshes]
+  WALK-THROUGH MESH {"name":"gun-range-presentation-batch-0","path":"Acres Indoor Gun Range arena/gun-range-presentation-batch-0","centre":[75.7,12.54,6.32],"size":[38.2,25.08,50.95],"presentationOnly":true,"instanced":false,"vertices":504}
+  WALK-THROUGH MESH {"name":"gun-range-wallbang-panel-interior-wall","path":"Acres Indoor Gun Range arena/gun-range-wallbang-panel-interior-wall","centre":[-12.3,1.45,-7.6],"size":[2.05,2.9,0.42],"presentationOnly":false,"instanced":false,"vertices":24}
+  WALK-THROUGH MESH {"name":"gun-range-wallbang-panel-brick","path":"Acres Indoor Gun Range arena/gun-range-wallbang-panel-brick","centre":[-9.9,1.45,-7.6],"size":[2.05,2.9,0.7],"presentationOnly":false,"instanced":false,"vertices":24}
+  rule-excluded substantial meshes: above reachable height (no standing contact)=8, soft foliage=1, training target (solidity owned by runtime colliders)=4
+
+=== skyline-terminal: 0 invisible collider(s), 0 walk-through mesh(es) [154 colliders, 0 boundary, 0 runtime-replaced statics, 277 visible meshes]
+  rule-excluded substantial meshes: water volume presentation=14, sky/atmosphere dressing=49, above reachable height (no standing contact)=12, terrain/sky-scale surface=5
+
+=== farcrysis: 0 invisible collider(s), 0 walk-through mesh(es) [6050 colliders, 4 boundary, 0 runtime-replaced statics, 541 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=58, water volume presentation=122, above reachable height (no standing contact)=19, outside playable bounds (backdrop)=27
+
+=== high-seas: 0 invisible collider(s), 0 walk-through mesh(es) [213 colliders, 0 boundary, 0 runtime-replaced statics, 260 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=2, water volume presentation=10, above reachable height (no standing contact)=24
+
+=== test1: 0 invisible collider(s), 0 walk-through mesh(es) [122 colliders, 0 boundary, 0 runtime-replaced statics, 296 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=7, above reachable height (no standing contact)=2, outside playable bounds (backdrop)=4
+
+=== test2: 0 invisible collider(s), 0 walk-through mesh(es) [307 colliders, 0 boundary, 0 runtime-replaced statics, 401 visible meshes]
+  rule-excluded substantial meshes: water volume presentation=10, walkable surface=1, above reachable height (no standing contact)=37, terrain/sky-scale surface=5, outside playable bounds (backdrop)=2
+
+=== map3: 0 invisible collider(s), 0 walk-through mesh(es) [302 colliders, 0 boundary, 0 runtime-replaced statics, 302 visible meshes]
+  rule-excluded substantial meshes: terrain/sky-scale surface=1, water volume presentation=25, outside playable bounds (backdrop)=1
+
+Gate: any unexplained collider fails the run (exit 1). Walk-through meshes are reported for triage (--gate-walkthrough hardens this); src/collider-visual-parity-gate.test.ts hardens both directions in vitest.

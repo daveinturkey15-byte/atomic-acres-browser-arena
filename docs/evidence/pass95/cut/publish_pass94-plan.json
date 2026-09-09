@@ -1,0 +1,120 @@
+{
+  "policy": "HF-400",
+  "mode": "publish",
+  "ghPagesDir": "C:\\Users\\david\\projects\\aa-claude-release84\\.gh-pages-publish",
+  "channel": "channels/pass94",
+  "backup": "channels/pass93",
+  "treesPresent": [
+    "pass92",
+    "pass93"
+  ],
+  "treesToDelete": [
+    "pass92"
+  ],
+  "treesKept": [
+    "pass93"
+  ],
+  "treeAdded": "pass94",
+  "postState": [
+    "pass93",
+    "pass94"
+  ],
+  "chooser": {
+    "keys": [
+      "experimental",
+      "previous"
+    ],
+    "channels": {
+      "experimental": {
+        "label": "PASS 94",
+        "description": "Nuke Town Rebuild leads the map chooser with old Raid retired; Pass 94 carries the approved candidate 5, killstreak tuning, Chrome 153 WebGPU hardening and validated map/menu polish.",
+        "pass": "PASS 94",
+        "path": "channels/pass94",
+        "deploymentState": "live"
+      },
+      "previous": {
+        "label": "PASS 93 \u00b7 SAFE BACKUP",
+        "description": "The build that was live before this one, pinned as the single safe backup (owner, 2026-09-02). Pick this if the newest pass misbehaves.",
+        "pass": "PASS 93",
+        "path": "channels/pass93"
+      }
+    },
+    "droppedLiveKeys": [
+      "experimental",
+      "previous"
+    ]
+  },
+  "fallback": {
+    "key": "pass93Backup",
+    "path": "channels/pass93",
+    "pass": "PASS 93",
+    "ok": true
+  },
+  "generation": "7c9adb8db2b1",
+  "keepGenerations": [
+    "2ff646727518",
+    "7c9adb8db2b1"
+  ],
+  "rootFilesToWrite": [
+    "index.html",
+    "release-shell.7c9adb8db2b1.js",
+    "release-shell.7c9adb8db2b1.css",
+    "release-manifest.7c9adb8db2b1.json",
+    "release-index.json",
+    "release-shell.js",
+    "release-shell.css",
+    "release-channel-config.js"
+  ],
+  "rootAssetsToSweep": [
+    "release-manifest.f45765ee9b4f.json",
+    "release-shell.f45765ee9b4f.css",
+    "release-shell.f45765ee9b4f.js"
+  ],
+  "guards": {
+    "build-freshness": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "farcrysis-red-test": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "farcrysis-admission": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "release-identity-red-test": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "release-identity": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "backup-present": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "predecessor-red-test": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "predecessors-offered": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "chooser-matches-post-state": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "post-state-exact": {
+      "ok": true,
+      "detail": "OK"
+    },
+    "in-build-fallback": {
+      "ok": true,
+      "detail": "OK"
+    }
+  },
+  "wouldPublish": true
+}

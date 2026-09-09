@@ -1,0 +1,9 @@
+
+ RUN  v4.1.9 C:/Users/david/projects/aa-claude-i1
+
+
+ Test Files  18 passed (18)
+      Tests  201 passed (201)
+   Start at  12:05:48
+   Duration  11.11s (transform 22.27s, setup 0ms, import 19.14s, tests 30.48s, environment 4ms)
+

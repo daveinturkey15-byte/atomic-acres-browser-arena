@@ -1,0 +1,23 @@
+{
+ "materials": 202,
+ "nodeMaterials": 85,
+ "distinctGraphs": 4,
+ "graphs": [
+  [
+   "c1138|p1250",
+   82
+  ],
+  [
+   "c1031|pnone",
+   1
+  ],
+  [
+   "c1419|p1373",
+   1
+  ],
+  [
+   "c1474|pnone",
+   1
+  ]
+ ]
+}
