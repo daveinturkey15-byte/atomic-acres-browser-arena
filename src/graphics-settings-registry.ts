@@ -912,8 +912,8 @@ export const GRAPHICS_PRESET_VALUES: Readonly<Record<'performance' | 'balanced' 
   // HF-438 (owner 2026-09-03, verbatim: "I don't think we should have a ray
   // tracing AND an RTX mode"). The RAY TRACED preset is RETIRED as a rung: its
   // ray-traced reflection stage lives in QUALITY at the light tier and here at
-  // the FULL tier; BALANCED and PERFORMANCE take none of it. The RTX menu entry
-  // remains the native-runtime explainer — it was never a preset and changes no
+  // the FULL tier; BALANCED and PERFORMANCE take none of it. HF-565 removes the
+  // native-runtime explainer — it was never a preset and changes no
   // renderer value. Refractions stay a deliberate Custom opt-in.
   max: Object.freeze({
     // Max deliberately selects the highest supported values, but it must stay as

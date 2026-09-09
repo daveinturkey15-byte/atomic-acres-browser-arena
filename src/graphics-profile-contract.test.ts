@@ -14,8 +14,8 @@
  * comes back:
  *   - no in-browser preset may claim RTX, RT cores, hardware acceleration or
  *     path tracing;
- *   - the RTX entry that DOES exist is an explainer whose value cannot be
- *     persisted as a preset.
+ *   - HF-565 removes the native-runtime entry and dialog; its old value still
+ *     cannot be persisted as a browser preset.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -28,12 +28,7 @@ import {
   graphicsControlSetHashes,
   graphicsProfileDescription,
 } from './ui/graphics-profile-descriptions';
-import {
-  RTX_NATIVE_RUNTIME_AVAILABLE,
-  RTX_NATIVE_RUNTIME_COPY,
-  RTX_NATIVE_RUNTIME_DOWNLOAD_URL,
-  RTX_NATIVE_RUNTIME_OPTION_VALUE,
-} from './ui/rtx-native-runtime-explainer';
+const RTX_NATIVE_RUNTIME_OPTION_VALUE = 'rtx-native-runtime-info'; // Retired value: normalization still rejects it.
 import { createPass64ShellViewModel, renderPass64Shell } from './ui/pass64-shell';
 
 const AUDIT_DOC_PATH = 'docs/GRAPHICS_PROFILES_2026-09-03.md';
@@ -68,7 +63,7 @@ describe('HF-418 graphics ladder', () => {
       ['high', 'QUALITY'],
       ['max', 'MAX'],
       ['custom', 'CUSTOM'],
-      [RTX_NATIVE_RUNTIME_OPTION_VALUE, 'RTX — WHAT IS IT?'],
+
     ]);
   });
 
@@ -101,8 +96,7 @@ describe('HF-418 graphics ladder', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
     const selectable = [...presetMarkup.matchAll(/<option value="([^"]+)">/g)]
-      .map((match) => match[1])
-      .filter((value) => value !== RTX_NATIVE_RUNTIME_OPTION_VALUE);
+      .map((match) => match[1]);
     expect(selectable).toContain('custom');
     const panelStart = markup.indexOf('<details id="graphics-profile-detail-panel">');
     expect(panelStart).toBeGreaterThan(-1);
@@ -230,7 +224,7 @@ describe('HF-418 graphics ladder', () => {
   });
 });
 
-describe('HF-418 RTX explainer', () => {
+describe('HF-565 browser-only Options', () => {
   it('is not a preset and cannot become one', () => {
     // The value is outside GraphicsPreset by construction, so persistence
     // rejects it rather than storing an invented mode.
@@ -255,54 +249,33 @@ describe('HF-418 RTX explainer', () => {
     }
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     const presetMarkup = markup.match(/<select id="graphics-profile">([\s\S]*?)<\/select>/)?.[1] ?? '';
-    // Exactly one option may carry the letters RTX, and it is the explainer.
+    // The retired native explainer must be absent, not hidden.
     const rtxOptions = [...presetMarkup.matchAll(/<option value="([^"]+)">([^<]*RTX[^<]*)<\/option>/g)];
-    expect(rtxOptions).toHaveLength(1);
-    expect(rtxOptions[0][1]).toBe(RTX_NATIVE_RUNTIME_OPTION_VALUE);
+    expect(rtxOptions).toHaveLength(0);
     // The retired preset id is gone from the shipped select, not merely hidden.
     expect(presetMarkup).not.toContain('raytraced');
   });
 
-  it('says what the native runtime is, why the browser cannot do it, and offers no dead link', () => {
-    const copy = [RTX_NATIVE_RUNTIME_COPY.lead, ...RTX_NATIVE_RUNTIME_COPY.whatItIs,
-      ...RTX_NATIVE_RUNTIME_COPY.whyNotInBrowser, ...RTX_NATIVE_RUNTIME_COPY.whatYouHaveInstead,
-      RTX_NATIVE_RUNTIME_COPY.howToGetIt, RTX_NATIVE_RUNTIME_COPY.reassurance].join(' ');
-    expect(copy).toMatch(/separate desktop application/i);
-    expect(copy).toMatch(/native Vulkan/i);
-    expect(copy).toMatch(/no ray-query and no acceleration-structure API/i);
-    expect(copy).toMatch(/any WebGPU graphics card/i);
-    expect(copy).toMatch(/not NVIDIA-only/i);
-    expect(copy).toMatch(/Your graphics profile has not been altered/i);
-    // Until a desktop build exists the screen must say so and link nowhere.
-    expect(RTX_NATIVE_RUNTIME_AVAILABLE).toBe(false);
-    expect(RTX_NATIVE_RUNTIME_DOWNLOAD_URL).toBeNull();
-    expect(RTX_NATIVE_RUNTIME_COPY.howToGetIt).toMatch(/COMING SOON/);
+  it('removes native-runtime markup and dead dialog styling', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
-    expect(markup).toContain('id="rtx-native-runtime-explainer"');
-    expect(markup).toContain(RTX_NATIVE_RUNTIME_COPY.lead);
-    // No anchor may appear inside the dialog while there is nothing to link to.
-    const dialog = markup.slice(markup.indexOf('id="rtx-native-runtime-explainer"'));
-    expect(dialog.slice(0, dialog.indexOf('</dialog>'))).not.toContain('<a ');
+    for (const retired of ['rtx-native-runtime', 'RTX — WHAT IS IT?', 'RTX NATIVE RUNTIME', 'rtx-runtime-dialog']) {
+      expect(markup).not.toContain(retired);
+    }
+    const css = readFileSync('src/ui/advanced-graphics.css', 'utf8');
+    expect(css).not.toContain('.rtx-runtime-');
   });
 
-  it('is wired so that selecting it restores the previous mode before opening', () => {
-    // Source-pinned because the handler lives in legacy-main.ts, which no unit
-    // test can construct. The mechanical falsifier for the RUNTIME behaviour is
-    // scripts/qa/verify-rtx-explainer-headless.mjs, which drives the real menu
-    // and asserts the renderer settings did not move.
+  it('removes the dialog binder while preserving real-preset staging and control refresh', () => {
     const source = readFileSync('src/legacy-main.ts', 'utf8');
+    for (const retired of ['bindRtxNativeRuntimeExplainer', 'rtxNativeRuntimeExplainer', 'RTX_NATIVE_RUNTIME_OPTION_VALUE']) {
+      expect(source).not.toContain(retired);
+    }
     const handler = source.slice(source.indexOf("graphicsProfileInput.addEventListener('change'"));
-    const body = handler.slice(0, handler.indexOf('});') + 3);
-    expect(body).toContain('RTX_NATIVE_RUNTIME_OPTION_VALUE');
-    // The restore and the open must both precede any staging of a preset.
-    const restoreAt = body.indexOf('graphicsProfileInput.value = pendingGraphicsPreset');
-    const openAt = body.indexOf('rtxNativeRuntimeExplainer.open()');
-    const stageAt = body.indexOf('pendingGraphicsPreset = preset');
-    expect(restoreAt).toBeGreaterThan(-1);
-    expect(openAt).toBeGreaterThan(restoreAt);
-    expect(stageAt).toBeGreaterThan(openAt);
-    // And the branch has to return, or the explainer would stage a preset too.
-    expect(body.slice(openAt, stageAt)).toContain('return;');
+    const body = handler.slice(0, handler.indexOf('\n});') + 4);
+    expect(body).toContain('pendingGraphicsPreset = preset');
+    expect(body).toContain('advancedGraphicsBinding.refresh');
+    expect(body).toContain('refreshGraphicsProfileCopy(preset)');
+    expect(body).toContain('refreshGraphicsPendingBadge()');
   });
 });
 

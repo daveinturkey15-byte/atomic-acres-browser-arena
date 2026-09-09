@@ -34,7 +34,6 @@ async function dismissStaleUi(page) {
   for (const selector of [
     '#changelog-close',
     '#project-map-close',
-    '#rtx-native-runtime-explainer-close',
   ]) {
     if (await visible(page, selector)) await page.locator(selector).click();
   }

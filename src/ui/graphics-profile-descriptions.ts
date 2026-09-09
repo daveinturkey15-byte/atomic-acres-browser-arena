@@ -24,8 +24,8 @@
  *  - No line claims hardware the build does not use. The ray-traced controls
  *    that QUALITY and MAX now carry never say RTX, RT cores, hardware
  *    acceleration or path tracing (the naming rule in the shared skill
- *    `threejs-rtx-runtime-route`), and the RTX explainer is not a profile at
- *    all (src/ui/rtx-native-runtime-explainer.ts).
+ *    `threejs-rtx-runtime-route`). HF-565 removes the native-runtime explainer;
+ *    it does not change these browser profiles or their measured hardware context.
  *  - `referenceFrameNote` states the machine a claim is true on. "Smooth" with
  *    no machine attached is the kind of sentence that produced the owner's
  *    "150 fps -> 40 fps" report in the first place.

@@ -41,11 +41,8 @@ export const PASS65_SETTINGS_STORAGE_KEY = 'atomic-acres-pass65-settings-v1';
  * `raytraced` WAS HF-398 and is RETIRED by HF-438 (owner, 2026-09-03:
  * "I don't think we should have a ray tracing AND an RTX mode"). It is no
  * longer a member of this union; a stored `raytraced` preference migrates to
- * `high`, which now carries the trace at its light tier. The word RTX still
- * appears in exactly one place in the player-facing build, and it is not a
- * preset: it is the native-runtime EXPLAINER
- * (src/ui/rtx-native-runtime-explainer.ts), which changes no renderer setting
- * at all.
+ * `high`, which now carries the trace at its light tier. HF-565 removes the
+ * deferred native-runtime explainer from Options; no browser preset changes.
  */
 export type GraphicsPreset = 'performance' | 'balanced' | 'high' | 'max' | 'custom';
 export type ShadowQuality = 'off' | 'high';

@@ -21,7 +21,6 @@ import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './releas
 import { PASS66_RELEASE_IDENTITY } from '../release-identity';
 import { advancedGraphicsMarkup } from './advanced-graphics-controls';
 import { GRAPHICS_PROFILE_DESCRIPTIONS } from './graphics-profile-descriptions'; // HF-414/HF-418
-import { RTX_NATIVE_RUNTIME_OPTION_VALUE, rtxNativeRuntimeExplainerMarkup, RTX_NATIVE_RUNTIME_OPTION_LABEL } from './rtx-native-runtime-explainer'; // HF-418
 import './advanced-graphics.css';
 import { menuPreviewVideoDefinition, menuPreviewVideoMarkup } from './menu-preview-video';
 import { OPERATOR_SKIN_CATALOG } from '../operator-skin-catalog'; // HF-360
@@ -239,10 +238,9 @@ function fieldKitPanelMarkup(): string {
 }
 
 /**
- * HF-418 — the graphics ladder, its truthful per-profile copy, and the RTX
- * explainer entry.
+ * HF-418 / HF-565 — the browser graphics ladder and per-profile copy.
  *
- * THREE THINGS CHANGED HERE AND EACH ONE WAS ASKED FOR.
+ * The actual browser presets remain unchanged by the HF-565 UI removal.
  *
  * 1. ORDER. The list now climbs: PERFORMANCE, BALANCED, QUALITY, MAX. It used
  *    to lead with QUALITY because that is the default, which made PERFORMANCE
@@ -254,12 +252,8 @@ function fieldKitPanelMarkup(): string {
  *    audit by graphics-profile-contract.test.ts. Every block is rendered and
  *    all but the active one are `hidden`, so this stays a pure string function
  *    and legacy-main only toggles visibility.
- * 3. RTX. The last entry is NOT a preset. Its value is not a member of
- *    `GraphicsPreset`, and legacy-main puts the select straight back before
- *    opening the explainer dialog, so selecting it cannot change the renderer.
- *    That is the whole point: the owner asked what RTX is and where it sits,
- *    and the answer is that it is a native runtime that does not exist yet,
- *    not a rung on this ladder.
+ * 3. HF-565 removes the deferred native-runtime explainer entirely. The menu
+ *    offers only implemented browser presets and CUSTOM.
  */
 function graphicsPresetRowMarkup(): string {
   const options = GRAPHICS_PROFILE_DESCRIPTIONS
@@ -289,13 +283,12 @@ function graphicsPresetRowMarkup(): string {
           <p class="graphics-profile-reference"><small>Open ADVANCED GRAPHICS below to see and change the individual controls. Every named mode above lists its own measured cost at 2560x1440 on an RTX 5080; CUSTOM cannot, because its control set is not fixed.</small></p>
         </div>`;
   return `<div class="graphics-preset-row">
-        <label>GRAPHICS MODE<select id="graphics-profile">${options}<option value="custom">CUSTOM</option><option value="${RTX_NATIVE_RUNTIME_OPTION_VALUE}">${RTX_NATIVE_RUNTIME_OPTION_LABEL}</option></select></label>
+        <label>GRAPHICS MODE<select id="graphics-profile">${options}<option value="custom">CUSTOM</option></select></label>
         <div id="graphics-profile-copy">${summaries}
         <p class="graphics-profile-summary" data-graphics-profile="custom" hidden>Your own values, started from the last named mode you had selected. Editing any advanced control saves the mode as Custom.</p>
         </div>
         <details id="graphics-profile-detail-panel"><summary>WHAT THIS MODE TURNS ON, AND WHAT IT COSTS</summary>${detail}${customDetail}</details>
-      </div>
-      ${rtxNativeRuntimeExplainerMarkup()}`;
+      </div>`;
 }
 
 function optionsPanelMarkup(): string {

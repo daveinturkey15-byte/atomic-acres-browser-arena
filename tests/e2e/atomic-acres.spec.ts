@@ -4,15 +4,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { BOT_GRENADE_POOL, BOT_STARTING_WEAPON_POOL } from '../../src/bot-ai';
 import { HIGH_SCORE_SCHEMA_VERSION, HIGH_SCORE_STORAGE_KEY } from '../../src/high-scores';
 import { GRAPHICS_PROFILE_DESCRIPTIONS } from '../../src/ui/graphics-profile-descriptions';
-import { RTX_NATIVE_RUNTIME_OPTION_LABEL } from '../../src/ui/rtx-native-runtime-explainer';
 
 // The GRAPHICS MODE select, as shipped: every rung in the description registry
 // in ladder order, then CUSTOM (no fixed control set, so it has no registry
-// row), then the RTX native-runtime explainer, which is not a preset at all.
+// row). HF-565 removes the deferred native-runtime explainer.
 const EXPECTED_GRAPHICS_OPTION_LABELS = [
   ...GRAPHICS_PROFILE_DESCRIPTIONS.map((profile) => profile.label),
   'CUSTOM',
-  RTX_NATIVE_RUNTIME_OPTION_LABEL,
 ];
 
 

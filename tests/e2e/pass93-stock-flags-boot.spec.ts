@@ -63,7 +63,7 @@ async function visible(page: Page, selector: string): Promise<boolean> {
 }
 
 async function dismissStaleUi(page: Page): Promise<void> {
-  for (const selector of ['#changelog-close', '#project-map-close', '#rtx-native-runtime-explainer-close']) {
+  for (const selector of ['#changelog-close', '#project-map-close']) {
     if (await visible(page, selector)) await page.locator(selector).click();
   }
   await page.keyboard.press('Escape').catch(() => undefined);

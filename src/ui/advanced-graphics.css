@@ -282,7 +282,7 @@
 
 #advanced-graphics:not([open]) .advanced-graphics-catalog { display: none; }
 /* ==========================================================================
-   HF-414 / HF-418 — graphics profile copy and the RTX native-runtime dialog.
+   HF-414 / HF-418 — graphics profile copy.
 
    The copy blocks are all rendered and hidden with the `hidden` attribute, so
    these rules only have to make the visible one readable. The AGENTS.md HUD
@@ -328,87 +328,12 @@
   color: #e4d6c6;
 }
 
-.rtx-runtime-dialog {
-  max-width: 680px;
-  border: 1px solid rgba(255, 190, 120, 0.5);
-  border-radius: 6px;
-  background: #221810;
-  color: #f4e8dc;
-  padding: 0;
-}
-
-.rtx-runtime-dialog::backdrop {
-  background: rgba(14, 8, 4, 0.72);
-}
-
-.rtx-runtime-body {
-  padding: 18px 20px 14px;
-}
-
-.rtx-runtime-body header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  border-bottom: 1px solid rgba(200, 160, 120, 0.3);
-  padding-bottom: 8px;
-}
-
-.rtx-runtime-body header b {
-  font-size: 16px;
-  letter-spacing: 0.12em;
-  color: #ffe09f;
-}
-
-.rtx-runtime-body header span {
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: #ffcf87;
-}
-
-.rtx-runtime-lead {
-  font-size: 14px;
-  line-height: 1.5;
-  color: #fbf6f0;
-}
-
-.rtx-runtime-body h4 {
-  margin: 14px 0 4px;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: #ffd47f;
-}
-
-.rtx-runtime-body li {
-  font-size: 13px;
-  line-height: 1.55;
-  margin-bottom: 4px;
-}
-
-.rtx-runtime-body footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 14px;
-  border-top: 1px solid rgba(200, 160, 120, 0.3);
-  padding-top: 10px;
-}
-
-.rtx-runtime-body footer small {
-  font-size: 11px;
-  color: #c4b29f;
-}
-
-.rtx-runtime-body footer button {
-  min-height: 34px;
-  padding: 0 18px;
-}
+/* HF-565: the removed native-runtime dialog has no retained styles. */
 
 /* ==========================================================================
    PASS 89 INTEGRATION — the HF-414/HF-418 block above is on the WARM deck.
 
-   As authored on Lane AI every colour in this block and in the RTX dialog was
+   As authored on Lane AI every colour in this block was
    COLD (blue channel over red), which is the exact property
    src/ui/pass77-visual-language.test.ts sweeps this sheet for: the Pass 79
    finding was that the surfaces nobody opens while designing keep the old cold
