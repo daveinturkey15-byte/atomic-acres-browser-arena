@@ -46,3 +46,16 @@ export {
   resolveNuketown2Sky,
   type Nuketown2ResolvedSky,
 } from './writes';
+
+// Coordinator wiring pass, 2026-09-09, request 1 of 2 from the fix-nuketown-tod lane. The lane
+// built and tested a continuous day cycle over the three AUTHORED presets and correctly could not
+// mount it - it held only its own new file. Four features this week shipped as modules nothing
+// imported, so the wiring is now owned centrally rather than left to whichever lane happens to
+// hold legacy-main.ts.
+export {
+  NUKETOWN2_DAY_CYCLE_PRACTICAL_FULL_BELOW_DEGREES,
+  NUKETOWN2_DAY_CYCLE_PRACTICAL_NIGHT_BOOST,
+  NUKETOWN2_DAY_CYCLE_PRACTICAL_OFF_ABOVE_DEGREES,
+  nuketown2DayCycle,
+  nuketown2DayCyclePracticalFloor,
+} from './day-cycle';
