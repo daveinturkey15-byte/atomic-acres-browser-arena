@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 
 /** Shallow cutoffs are not parentless commits and must never seed an allowlist. */
 export function readCompleteAncestry(repository, ref = 'HEAD') {
-  const git = (...args) => execFileSync('git', ['-C', repository, ...args], {
+  const git = (...args) => execFileSync('git', ['--no-replace-objects', '-C', repository, ...args], {
     encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024,
   }).trim();
   if (git('rev-parse', '--is-shallow-repository') !== 'false') {

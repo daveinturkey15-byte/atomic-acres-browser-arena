@@ -7,20 +7,20 @@ import { describe, expect, it } from 'vitest';
 import { readCompleteAncestry } from '../scripts/release/ancestry-inventory.mjs';
 import { assertReconciliationMergeShape, readAncestryRootAllowlist } from '../scripts/release/acceptance-gate.mjs';
 
-function fixture() {
+function fixture(bare = true) {
   // Synthetic bare repositories only; no production worktree or refs are edited.
   const repo = mkdtempSync(join(tmpdir(), 'aa-ancestry-fixture-'));
   const git = (...args: string[]) => execFileSync('git', ['-C', repo,
     '-c', 'user.name=Ancestry fixture', '-c', 'user.email=fixture@example.invalid', ...args],
   { encoding: 'utf8', windowsHide: true }).trim();
-  git('init', '--bare');
+  git('init', ...(bare ? ['--bare'] : []));
   const tree = execFileSync('git', ['-C', repo, 'hash-object', '-t', 'tree', '--stdin', '-w'],
     { input: '', encoding: 'utf8', windowsHide: true }).trim();
   const root = git('commit-tree', tree, '-m', 'fixture root');
   const child = git('commit-tree', tree, '-p', root, '-m', 'fixture child');
   git('update-ref', 'refs/heads/main', child);
   git('symbolic-ref', 'HEAD', 'refs/heads/main');
-  return { repo, git, root, child, tree };
+  return { repo, git, root, child, tree, gitDir: git('rev-parse', '--absolute-git-dir') };
 }
 
 describe('complete ancestry inventory', () => {
@@ -28,7 +28,7 @@ describe('complete ancestry inventory', () => {
     const f = fixture();
     expect(readCompleteAncestry(f.repo)).toEqual([f.root]);
     expect(f.git('cat-file', '-p', f.child)).toContain(`parent ${f.root}`);
-    writeFileSync(join(f.repo, 'shallow'), `${f.child}\n`);
+    writeFileSync(join(f.gitDir, 'shallow'), `${f.child}\n`);
     expect(f.git('rev-list', '--max-parents=0', 'HEAD')).toBe(f.child);
     expect(() => readCompleteAncestry(f.repo)).toThrow(/shallow repository boundaries are not actual roots/);
   });
@@ -50,5 +50,28 @@ describe('complete ancestry inventory', () => {
     const repo = fileURLToPath(new URL('..', import.meta.url));
     const recorded = readAncestryRootAllowlist(readFileSync(join(repo, '.github/ancestry-roots.json'), 'utf8'));
     expect([...recorded.allowed].sort()).toEqual(readCompleteAncestry(repo));
+  });
+
+  it('replacement refs cannot conceal an actual orphan root', () => {
+    const f = fixture();
+    const orphan = f.git('commit-tree', f.tree, '-m', 'replacement fixture orphan');
+    const joined = f.git('commit-tree', f.tree, '-p', f.child, '-p', orphan, '-m', 'replacement fixture merge');
+    f.git('replace', orphan, f.child);
+    expect(f.git('rev-list', '--max-parents=0', joined)).toBe(f.root);
+    expect(readCompleteAncestry(f.repo, joined)).toEqual([f.root, orphan].sort());
+  });
+
+  it('doctor reports shallow ancestry as unavailable without inventing a root count', () => {
+    const f = fixture(false);
+    f.git('remote', 'add', 'origin', 'https://github.com/daveinturkey15-byte/atomic-acres-browser-arena.git');
+    writeFileSync(join(f.gitDir, 'shallow'), `${f.child}\n`);
+    const script = fileURLToPath(new URL('../scripts/release/pipeline-guard.mjs', import.meta.url));
+    const report = JSON.parse(execFileSync(process.execPath, [script, 'doctor'], {
+      cwd: f.repo, encoding: 'utf8', windowsHide: true,
+    }));
+    expect(report.ok).toBe(true);
+    expect(report.shallow).toBe(true);
+    expect(report.rootCommitCount).toBeNull();
+    expect(report.ancestryUnavailable).toMatch(/Shallow boundaries are not actual roots/);
   });
 });

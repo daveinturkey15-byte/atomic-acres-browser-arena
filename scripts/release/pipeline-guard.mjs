@@ -56,7 +56,7 @@ function slug(value, label) {
 }
 
 function git(repo, ...args) {
-  return run('git', ['-C', repo, ...args]).stdout;
+  return run('git', ['--no-replace-objects', '-C', repo, ...args]).stdout;
 }
 
 function repositoryName(remote) {
@@ -161,15 +161,17 @@ const receipt = {
   },
 };
 
-const headRoots = readCompleteAncestry(repo);
-receipt.rootCommitCount = headRoots.length;
+receipt.shallow = git(repo, 'rev-parse', '--is-shallow-repository') === 'true';
+const headRoots = mode === 'doctor' && receipt.shallow ? null : readCompleteAncestry(repo);
+receipt.rootCommitCount = headRoots?.length ?? null;
+if (headRoots === null) receipt.ancestryUnavailable = 'Shallow boundaries are not actual roots; complete history is required before contribution or reconciliation.';
 
 if (mode !== 'doctor') {
   run('git', ['-C', repo, 'fetch', 'origin', 'main', '--prune']);
   receipt.originMainSha = git(repo, 'rev-parse', 'origin/main');
   receipt.containsOriginMain = run(
     'git',
-    ['-C', repo, 'merge-base', '--is-ancestor', 'origin/main', 'HEAD'],
+    ['--no-replace-objects', '-C', repo, 'merge-base', '--is-ancestor', 'origin/main', 'HEAD'],
     { allowFailure: true },
   ).status === 0;
   if (!receipt.clean) throw new Error(`Refusing ${mode}: worktree has ${dirty.length} changed path(s)`);

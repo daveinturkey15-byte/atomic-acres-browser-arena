@@ -63,7 +63,7 @@ function parseArgs(argv) {
 const GIT_OUTPUT_MAX_BUFFER = 64 * 1024 * 1024;
 
 function git(...args) {
-  return execFileSync('git', ['-C', REPOSITORY_ROOT, ...args], { encoding: 'utf8', maxBuffer: GIT_OUTPUT_MAX_BUFFER }).trim();
+  return execFileSync('git', ['--no-replace-objects', '-C', REPOSITORY_ROOT, ...args], { encoding: 'utf8', maxBuffer: GIT_OUTPUT_MAX_BUFFER }).trim();
 }
 function passNumber(value) {
   const match = /^PASS ([1-9][0-9]*)$/.exec(value ?? '');
@@ -122,7 +122,7 @@ export function committedManifestBytes(worktreeBytes, headBytes, manifestPath, h
 function readCommittedManifest(manifestPath, head) {
   if (!SHA40.test(head ?? '')) throw new Error('acceptance manifest binding requires one exact --head SHA');
   try {
-    return execFileSync('git', ['-C', REPOSITORY_ROOT, 'show', `${head}:${manifestPath}`]);
+    return execFileSync('git', ['--no-replace-objects', '-C', REPOSITORY_ROOT, 'show', `${head}:${manifestPath}`]);
   } catch (error) {
     throw new Error(`cannot read committed acceptance manifest ${manifestPath} at ${head}: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -452,7 +452,7 @@ export function classifyPreviewDelta(paths, manifestPath, previewSha = null, opt
 
 function approvalStillMatchesPreview(manifestPath, previewSha, head) {
   try {
-    execFileSync('git', ['-C', REPOSITORY_ROOT, 'merge-base', '--is-ancestor', previewSha, head], { stdio: 'ignore' });
+    execFileSync('git', ['--no-replace-objects', '-C', REPOSITORY_ROOT, 'merge-base', '--is-ancestor', previewSha, head], { stdio: 'ignore' });
   } catch {
     return { ok: false, paths: [], reason: `preview source ${previewSha} is not an ancestor of ${head}` };
   }

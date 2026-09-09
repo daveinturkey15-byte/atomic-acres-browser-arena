@@ -33,6 +33,12 @@ A separate actual orphan joined to a fixture graph is still rejected by the exis
 reconciliation guard. The checked-in allowlist must equal complete observed ancestry.
 All existing merge-shape, unlisted-root and owner-acceptance assertions remain active.
 
+Independent review additionally required ignoring replacement refs during ancestry and
+raw-object queries, and retaining the diagnostic-only doctor mode on shallow repositories.
+A replacement-ref fixture reproduced an orphan hidden by normal Git traversal (1 failed /
+3 passed before hardening). Contribution and reconciliation remain fail-closed; doctor
+reports shallow ancestry unavailable with a null root count rather than fabricated roots.
+
 RED evidence before correcting the inventory: `vitest run src/ancestry-inventory.test.ts`
 reported 1 failed / 2 passed: the 15 recorded cutoffs disagreed with the one actual root.
 After correction, ancestry-inventory plus acceptance-gate tests report 35 passed, and
