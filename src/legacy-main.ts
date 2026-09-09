@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyLampPoolLighting } from './forge-kit/lamp-pool';
 import {
   deterministicWindowUnit,
   escapeHtml,
@@ -4391,6 +4392,7 @@ function applyLightingConditionUniforms(force = false): void {
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
   }
   nuketown2ClusteredLightRig?.applyLighting(selectedArena.id, writes.hour);
+  applyLampPoolLighting(selectedArena.id, writes.hour);
   if (scene.fog instanceof THREE.Fog) {
     scene.fog.color.setHex(conditionedFogBaseColorHex());
     pass64TslSystems?.setAtmosphere(scene.fog.color, sunLight?.intensity ?? baseline.sunIntensity);

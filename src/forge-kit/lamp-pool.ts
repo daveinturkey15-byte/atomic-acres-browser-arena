@@ -24,7 +24,7 @@
  * from the face UV (every BoxGeometry face spans 0..1, so one formula serves
  * the pool's top face AND the strip's front face - bright middle fading to
  * both ends, which is the vertical gradient the brief asks for). No texture
- * sampler, no `uniform()` node: colour and opacity are literals baked into
+ * sampler, no `uniform()` node: colour and radial opacity are literals baked into
  * the one graph, so the pipeline budget grows by exactly one program and the
  * black-surface lane's program-set condition holds. Because every pool box
  * shares that one instance, `batchPresentationOnlyBoxes` folds all four
@@ -114,6 +114,27 @@ export function lampPoolParts(): readonly ForgeKitBox[] {
 }
 
 let cachedLampPoolMaterial: MeshBasicNodeMaterial | null = null;
+let lightingOpacity = 1;
+
+/** Presentation only: faint pools in daylight, original strength after dusk.
+ * Keep the authored HF-536 radial falloff/colour/geometry intact at night.
+ * The scalar is written through material.opacity by the existing lighting
+ * transaction, not a new ticker, traversal, material or light. */
+export function lampPoolNightVisibility(hour: number): number {
+  if (!Number.isFinite(hour)) return 1;
+  const wrapped = ((hour % 24) + 24) % 24;
+  const smooth = (value: number): number => {
+    const t = Math.min(1, Math.max(0, value));
+    return t * t * (3 - 2 * t);
+  };
+  const night = wrapped < 12 ? 1 - smooth((wrapped - 6) / 2) : smooth((wrapped - 18) / 2);
+  return 0.12 + 0.88 * night;
+}
+
+export function applyLampPoolLighting(arenaId: string, hour: number): void {
+  lightingOpacity = arenaId === 'nuketown2' ? lampPoolNightVisibility(hour) : 1;
+  if (cachedLampPoolMaterial) cachedLampPoolMaterial.opacity = lightingOpacity;
+}
 
 /**
  * The lane's ONE additive material, shared by every pool and strip in the arena.
@@ -130,6 +151,7 @@ export function getLampPoolMaterial(): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial();
   material.name = 'nuketown2-lamp-pool';
   material.transparent = true;
+  material.opacity = lightingOpacity;
   material.depthWrite = false;
   material.blending = THREE.AdditiveBlending;
   // One tier above the -2 road dashes: the pool draws over the markings, never under them.
