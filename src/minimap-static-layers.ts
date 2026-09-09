@@ -37,6 +37,7 @@
  * the live targets.
  */
 import {
+  MINIMAP_MIN_SEGMENT_PX,
   minimapLandmarkFootprint,
   minimapLandmarkLabel,
   physicalCoverMinimapKind,
@@ -82,6 +83,28 @@ type ColliderLayer = {
   cached: CachedCanvas;
 };
 let colliderLayer: ColliderLayer | null = null;
+type IntRect = { x0: number; y0: number; x1: number; y1: number };
+
+/**
+ * R043 tidy-and-crisp: drop fully embedded collider footprints. Collision is
+ * authored from nested boxes (a floor slab plus its wall segments), and every
+ * embedded rect re-inks pixels the outer rect already painted, which reads as
+ * mottled haze. Containment cannot chain across the map the way overlap can,
+ * so separate structures always keep their separating background pixel.
+ * Repaint-only (the layer is revision-keyed), so the per-frame drawImage path
+ * allocates nothing new.
+ */
+function dropEmbeddedMinimapRects(rects: readonly IntRect[]): IntRect[] {
+  const sorted = [...rects].sort((a, b) =>
+    (b.x1 - b.x0) * (b.y1 - b.y0) - (a.x1 - a.x0) * (a.y1 - a.y0));
+  const kept: IntRect[] = [];
+  for (const rect of sorted) {
+    const embedded = kept.some((outer) =>
+      outer.x0 <= rect.x0 && outer.y0 <= rect.y0 && outer.x1 >= rect.x1 && outer.y1 >= rect.y1);
+    if (!embedded) kept.push(rect);
+  }
+  return kept;
+}
 
 /** The world-collider footprints, repainted only when the collider revision changes. */
 export function activeMinimapColliderLayer(request: Readonly<{
@@ -105,13 +128,25 @@ export function activeMinimapColliderLayer(request: Readonly<{
   ) return previous.cached.canvas;
   const cached = layerCanvas(previous?.cached ?? null, request.width, request.height);
   const context = cached.context;
-  context.lineWidth = 1.5;
   context.fillStyle = request.fillStyle;
-  context.strokeStyle = request.strokeStyle;
+  // Fill-only: the old 1.5 px stroke doubled every collider's cost and
+  // antialiased every shared seam. Its colour was also the brightest static
+  // ink, so dropping it darkens the background the live markers sit on.
+  const blobs: IntRect[] = [];
   for (const collider of request.colliders) {
     const footprint = minimapLandmarkFootprint(collider, request.bounds, request.width, request.height);
-    context.fillRect(footprint.x, footprint.y, footprint.width, footprint.height);
-    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
+    // Same legibility fence as the semantic filter: remnants under
+    // MINIMAP_MIN_SEGMENT_PX cannot be read at HUD resolution.
+    if (Math.max(footprint.width, footprint.height) < MINIMAP_MIN_SEGMENT_PX) continue;
+    blobs.push({
+      x0: footprint.x,
+      y0: footprint.y,
+      x1: footprint.x + footprint.width,
+      y1: footprint.y + footprint.height,
+    });
+  }
+  for (const blob of dropEmbeddedMinimapRects(blobs)) {
+    context.fillRect(blob.x0, blob.y0, blob.x1 - blob.x0, blob.y1 - blob.y0);
   }
   colliderLayer = { ...request, cached };
   return cached.canvas;
