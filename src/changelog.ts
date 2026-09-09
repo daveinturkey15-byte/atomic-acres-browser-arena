@@ -156,7 +156,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = Object.freeze([
     // the identity-surface test fails while the title still names the previous pass.
     id: 'pass96',
     pass: 'PASS 96',
-    title: 'Pass 96 — Nuketown light shafts, Map 3 weather and the see-through floor',
+    title: 'Pass 96 · Nuketown light shafts, Map 3 weather and the see-through floor',
     releasedAt: pass96ReleasedAt,
     areas: Object.freeze(['rendering', 'atmosphere', 'map3', 'nuketown', 'vehicles', 'interiors']),
     summary: "Pass 96 gives Nuketown volumetric sun in-scatter and light shafts at the house openings, promotes Map 3's single stormy bay into a map-wide weather system with wet-surface response, gives Map 3 a signature sky and volumetric corridor light, fixes the colosseum cavity eraser that let you see through the Map 3 floor, removes the garage car and the interior clutter, and settles the blue cast on the vehicle paint.",
