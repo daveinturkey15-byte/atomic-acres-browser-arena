@@ -42,13 +42,13 @@ export {
 } from './materials';
 export type { LampKind, PaintOptions } from './materials';
 
-export { buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet, createForgeSharedMaterials, mergeForgedPlacements } from './build';
+export { applyForgedPlacement, buildForgedVehicle, buildForgedWheelSet, createForgeMaterialSet, createForgeSharedMaterials, forgedVehicleWheelCentres, forgedWheelSetCentres, mergeForgedPlacements, stripForgedPlacement } from './build';
 export type {
   BootSeam,
   CoachVehicleDetail,
   DoorHandleRow,
-  ForgedPartBound,
   ForgedVehicle,
+  ForgedWheelCentre,
   ForgedVehicleMaterials,
   GutterDressing,
   IndicatorDressing,

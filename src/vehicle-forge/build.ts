@@ -742,6 +742,87 @@ function summarizeParts(parts: Readonly<Record<string, THREE.BufferGeometry[]>>)
 }
 
 /**
+ * W1 (HF-536/R006). A wheel centre in the BODY frame: the vehicle frame the
+ * spec is authored in (nose at z = 0, ground at y = 0, +x the vehicle's
+ * right facing +z). The ONLY place a wheel position is authored; geometry and
+ * queries below both derive from it, so neither can drift from the other.
+ */
+export interface ForgedWheelCentre {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+type WheelSide = 1 | -1;
+const WHEEL_SIDES: readonly WheelSide[] = [1, -1];
+
+/**
+ * Every wheel centre of a lofted vehicle in its body frame: one per side per
+ * axle of `[...spec.wheelZ, ...extraWheelZ]` - the SAME axle list
+ * `buildForgedVehicle` emits geometry from. A placement may move the body;
+ * it must never move a wheel relative to the body.
+ */
+export function forgedVehicleWheelCentres(
+  spec: VehicleSpec,
+  extraWheelZ: readonly number[] = [],
+): readonly ForgedWheelCentre[] {
+  const centres: ForgedWheelCentre[] = [];
+  for (const z of [...spec.wheelZ, ...extraWheelZ]) {
+    for (const side of WHEEL_SIDES) centres.push(Object.freeze({ x: side * spec.trackHalfWidth, y: spec.wheelRadius, z }));
+  }
+  return Object.freeze(centres);
+}
+
+/**
+ * Every wheel centre of an axle-only set (the truck bogie) in the body frame
+ * of the vehicle it dresses. `axleZ` MUST be body-frame z (for the truck:
+ * `truckNoseX - worldAxleX`); world-x arithmetic here is the HF-536 defect
+ * that parked a wheel pair 1.5 m ahead of the cab nose.
+ */
+export function forgedWheelSetCentres(
+  radius: number,
+  trackHalfWidth: number,
+  axleZ: readonly number[],
+): readonly ForgedWheelCentre[] {
+  const centres: ForgedWheelCentre[] = [];
+  for (const z of axleZ) {
+    for (const side of WHEEL_SIDES) centres.push(Object.freeze({ x: side * trackHalfWidth, y: radius, z }));
+  }
+  return Object.freeze(centres);
+}
+/**
+ * Body frame -> world for a placement at `(x, z)` with `yaw`: exactly the
+ * transform `mergeForgedPlacements` bakes into geometry
+ * (`makeRotationY(yaw)` then `setPosition(x, 0, z)`).
+ */
+export function applyForgedPlacement(
+  centre: ForgedWheelCentre,
+  x: number,
+  z: number,
+  yaw: number,
+): ForgedWheelCentre {
+  const s = Math.sin(yaw);
+  const c = Math.cos(yaw);
+  return { x: x + centre.x * c + centre.z * s, y: centre.y, z: z - centre.x * s + centre.z * c };
+}
+
+/**
+ * World -> body frame: the inverse of `applyForgedPlacement`. A wheel rigidly
+ * attached to its body recovers its exact body-local centre at any placement.
+ */
+export function stripForgedPlacement(
+  point: ForgedWheelCentre,
+  x: number,
+  z: number,
+  yaw: number,
+): ForgedWheelCentre {
+  const dx = point.x - x;
+  const dz = point.z - z;
+  const s = Math.sin(yaw);
+  const c = Math.cos(yaw);
+  return { x: dx * c - dz * s, y: point.y, z: dx * s + dz * c };
+}
+
+/**
  * Wheels with no body: the axles that belong to a vehicle's presentation but
  * not to any loft.
  *
@@ -764,7 +845,9 @@ export function buildForgedWheelSet(
   dressing: WheelSetDressing = {},
 ): ForgedVehicle {
   const parts = { tyre: [] as THREE.BufferGeometry[], chrome: [] as THREE.BufferGeometry[], lining: [] as THREE.BufferGeometry[] };
-  for (const z of axleZ) {
+  // W1 (HF-536/R006): same single-source binding as the lofted builder above.
+  const wheelSetAxles = [...new Set(forgedWheelSetCentres(radius, trackHalfWidth, axleZ).map((centre) => centre.z))];
+  for (const z of wheelSetAxles) {
     for (const side of [1, -1] as const) {
       const wheel = wheelParts(radius, tyreHalfWidth, style);
       const place = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
@@ -829,7 +912,10 @@ export function buildForgedVehicle(
   if (loft.lining) parts.lining.push(loft.lining);
   if (loft.groove) parts.groove.push(loft.groove);
 
-  const axles = [...spec.wheelZ, ...(dressing.extraWheelZ ?? [])];
+  // W1 (HF-536/R006). The axle list the geometry loop iterates comes from the
+  // same query the attachment test reads, so wheels and centres cannot drift
+  // apart without this line moving with them.
+  const axles = [...new Set(forgedVehicleWheelCentres(spec, dressing.extraWheelZ).map((centre) => centre.z))];
   for (const z of axles) {
     for (const side of [1, -1] as const) {
       const wheel = wheelParts(spec.wheelRadius, spec.tyreHalfWidth, dressing.wheelStyle);
