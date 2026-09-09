@@ -1108,9 +1108,18 @@ export function buildForgedVehicle(
     const { z, y0, y1 } = dressing.pillars;
     const midY = (y0 + y1) / 2;
     const glassX = flankHalfWidth(spec, midY) - 0.005;
+    const isCoachCabin = Boolean(dressing.detail?.coach);
     for (const pillarZ of z) {
       for (const side of [1, -1] as const) {
-        parts.groove.push(translated(chamferedBar(0.012, (y1 - y0) / 2, 0.014, 0.004), side * glassX, midY, pillarZ));
+        if (isCoachCabin) {
+          // Coach-only: same centre/height as the chamfered bar, as a planar
+          // rectangular mullion. 12 tris vs 32, same silhouette at review distance.
+          const geometry = nonIndexed(new THREE.BoxGeometry(0.024, y1 - y0, 0.028));
+          if (side === -1) mirroredToLeft(geometry);
+          parts.groove.push(translated(geometry, side * glassX, midY, pillarZ));
+        } else {
+          parts.groove.push(translated(chamferedBar(0.012, (y1 - y0) / 2, 0.014, 0.004), side * glassX, midY, pillarZ));
+        }
       }
     }
   }
@@ -1189,6 +1198,24 @@ export function buildForgedVehicle(
       reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, y, coach.luggageDoor.z, 0.045, coach.luggageDoor.width, 0.012);
     }
     reliefRearBox(parts, 'accent', 'detail.coach.rear-number-plate-box', coach.rearPlate.width, coach.rearPlate.y, coach.rearPlate.height, spec.length, 0.008);
+    // Coach cabin occupancy: 3 mirrored rows seen through tinted side glass
+    // against the retained inward-only lining backdrop. Maroon accent reads
+    // behind tint; clear central aisle |x|<0.4; outer edge 0.9 stays inside
+    // sillHalfWidth 1.16 / dressed collider. Backs abut cushions, no plates.
+    const cabinRows = [2.6, 4.1, 5.9] as const;
+    for (const rowZ of cabinRows) {
+      for (const side of [1, -1] as const) {
+        const back = nonIndexed(new THREE.BoxGeometry(0.5, 0.78, 0.12));
+        if (side === -1) mirroredToLeft(back);
+        // Seat-back base overlaps the cushion top by 10 mm; no floating gap.
+        translated(back, side * 0.65, 1.56, rowZ + 0.3);
+        parts.accent.push(markPart(back, 'cabin.coach.seat-back'));
+        const cushion = nonIndexed(new THREE.BoxGeometry(0.5, 0.12, 0.48));
+        if (side === -1) mirroredToLeft(cushion);
+        translated(cushion, side * 0.65, 1.12, rowZ);
+        parts.accent.push(markPart(cushion, 'cabin.coach.seat-cushion'));
+      }
+    }
   }
 
   if (detail?.trailer) {
