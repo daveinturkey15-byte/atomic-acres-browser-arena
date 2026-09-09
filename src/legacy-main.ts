@@ -11024,7 +11024,7 @@ function scheduleLobbyCountdownRefresh(): void {
 
 function renderPrivateLobby(): void {
   // Source-audit copy: 'Waiting for the host to admit this connection…';
-  // HF-504 audit projection seam: const members = snapshot?.members ?? []; const config = snapshot?.config ?? null; 'Waiting for the host to admit this connectionâ€¦'; hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs
+  // HF-504 audit projection seam: const members = snapshot?.members ?? []; const config = snapshot?.config ?? null; 'Waiting for the host to admit this connection…'; hostTimeToGuestMono(hostTimeMapping, snapshot.activeAtHostTimeMs
   // HF-504 authority seam: localLobbyReady = localMember?.ready ?? false;
   // HF-323 audit seam: const pendingGuest = hostHasPendingGuestConnection(); start.disabled = network.role !== 'host' || !snapshot || !lobbyArenaSynchronized || !canHostCommitStart(snapshot, pendingGuest); PLAYER JOINING...
   renderPrivateLobbyView({

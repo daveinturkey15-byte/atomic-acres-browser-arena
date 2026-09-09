@@ -35,8 +35,22 @@ All existing merge-shape, unlisted-root and owner-acceptance assertions remain a
 
 RED evidence before correcting the inventory: `vitest run src/ancestry-inventory.test.ts`
 reported 1 failed / 2 passed: the 15 recorded cutoffs disagreed with the one actual root.
-Green results are recorded separately after the correction; no historic empty output is
-being represented as a successful test.
+After correction, ancestry-inventory plus acceptance-gate tests report 35 passed, and
+TypeScript passes. The complete pipeline preflight passes at correction commit
+45574cca0b0f88661935ad3d2b35587c68354f21 with current-main containment and no unlisted roots.
+The retired inventory's canonical Git blob matches the original: ea39cad3a40752c6980f480fba8209a9176eb74a.
+
+## Normal integration and truthful lint repair
+
+Normal merge ff709bdab27018f39a2ff022766b7c95c98108d8 retains both main and PASS96 ancestry.
+The only conflict was the discipline document; current main's stricter lifecycle,
+dependency-install and ownership rules were retained. No runtime repair was hidden in
+the ancestry merge. Existing imported whitespace warnings remain historical debt.
+
+Three previously empty historical tsc.txt artifacts now explicitly state that their
+empty originals proved no outcome. They are not fabricated success transcripts. The
+fourth text-integrity finding was an incorrectly encoded ellipsis inside an HF504 source
+comment; only its text encoding was corrected. No test, threshold or verifier was relaxed.
 
 ## Recovery gotcha
 
