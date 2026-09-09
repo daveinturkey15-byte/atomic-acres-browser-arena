@@ -6779,6 +6779,21 @@ const arenaTransitionProfiler = new ArenaTransitionProfiler();
 function profileArenaTransition(phase: ArenaTransitionProfilePhase): void {
   arenaTransitionProfiler.enter(phase, performance.now());
 }
+let lastMenuDeploymentAssetsProfile: Readonly<{
+  startedAt: number;
+  completedAt: number | null;
+  durationMs: number | null;
+  completed: boolean;
+  error: string | null;
+  phases: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
+let matchAdmissionMarks: { name: string; at: number }[] = [];
+let lastMatchAdmissionProfile: Readonly<{
+  arenaId: string;
+  mode: string;
+  durationMs: number;
+  steps: readonly Readonly<{ name: string; durationMs: number }>[];
+}> | null = null;
 let lastArenaRenderAuditAt = -Infinity;
 const ARENA_RENDER_AUDIT_INTERVAL_MS = 250;
 let debugShadowProbe: THREE.Mesh | null = null;
@@ -30410,9 +30425,47 @@ function activateArenaSelection(
 ): Promise<void> {
   const queued = arenaSelectionTask
     .catch(() => undefined)
-    .then(() => performArenaSelection(id, allowWhilePreparing, admissionToken));
+    .then(() => performArenaSelectionWithColdFenceRetry(id, allowWhilePreparing, admissionToken));
   arenaSelectionTask = queued;
   return queued;
+}
+
+const COLD_FENCE_TIMEOUT_PATTERN = /^WebGPU queue completion exceeded 12000 ms for submission/;
+
+// NIGHT-LOAD (2026-09-08, lane night-load-reliability): a cold session's FIRST
+// fenced submission realises the arena's whole pipeline vocabulary inside the
+// 12 s queue-completion fence in the transition's visual-definition phase
+// (requestStaticShadowRefresh/submitForegroundWebGpuFrame/flushWebGpuFrames
+// block below). Measured on the pass 96 candidate
+// (lanes/night-load-reliability/REPORT.md): Nuke Town's cold visual-definition
+// phase ran 14.8-14.9 s - ~2.9 s of setup plus this fence rejecting - and the
+// selection rolled back with "deployment preparation failed", throwing the
+// owner back to map select. The identical selection retried immediately
+// afterwards COMMITTED both times (18.8 s / 21.5 s), because Dawn had already
+// compiled the doomed submission's pipelines off the fence-timer's clock.
+// cold-session-precompile-reach.ts documents the same fence losing for
+// farcrysis and the Nuke Town Rebuild arena on earlier passes; the pass 96
+// bundle re-arms it for nuketown2 on this machine.
+//
+// So: retry the WHOLE selection exactly once when an attempt failed on that
+// exact fence signature. The retry stays behind the loading surface - the
+// player never sees the menu flash - and the second attempt rides the warm
+// pipeline cache. A retry that fails again fails exactly as before (same
+// rollback, same status line); the fence itself is untouched, and a wedged
+// device is not masked: its second attempt fails the same fence again.
+async function performArenaSelectionWithColdFenceRetry(
+  id: ArenaId,
+  allowWhilePreparing: boolean,
+  admissionToken?: MatchAdmissionToken,
+): Promise<void> {
+  await performArenaSelection(id, allowWhilePreparing, admissionToken);
+  const failure = arenaTransitionFailure;
+  if (!failure || !COLD_FENCE_TIMEOUT_PATTERN.test(failure)) return;
+  const failedGeneration = arenaTransitionGeneration;
+  console.warn(
+    `[arena-transition] cold submission fence timeout (gen ${failedGeneration}, ${id}) - retrying selection once on the warm pipeline cache`,
+  );
+  await performArenaSelection(id, allowWhilePreparing, admissionToken);
 }
 
 function stageMenuArenaSelection(id: ArenaId): void {
@@ -33786,6 +33839,7 @@ function debugRiggedOperatorJointScreenPositions(
           bootstrapStage,
           bootstrapError,
           recentErrors,
+          transition: arenaTransitionProfiler.snapshot(performance.now()),
           statusText: (statusEl.textContent ?? '').slice(0, 90),
           backend: document.documentElement.dataset.renderBackend ?? null,
           // The renderer refuses to submit frames without foreground ownership,
@@ -33799,7 +33853,7 @@ function debugRiggedOperatorJointScreenPositions(
       } finally {
         window.clearInterval(heartbeat);
       }
-      post({ stage: 'arena-selected' });
+      post({ stage: 'arena-selected', transition: arenaTransitionProfiler.snapshot(performance.now()) });
       element<HTMLInputElement>('#player-name').value = 'FPS Probe';
       network.close();
       resetForMode();
@@ -33808,7 +33862,14 @@ function debugRiggedOperatorJointScreenPositions(
         post({ error: 'match-start-timeout', gameStarted, matchPhase: matchState.phase });
         return;
       }
-      post({ stage: 'match-active', arena: probeArena, backend: document.documentElement.dataset.renderBackend ?? null });
+      post({
+        stage: 'match-active',
+        arena: probeArena,
+        backend: document.documentElement.dataset.renderBackend ?? null,
+        transition: arenaTransitionProfiler.snapshot(performance.now()),
+        admission: lastMatchAdmissionProfile,
+        deploymentAssets: lastMenuDeploymentAssetsProfile,
+      });
       // Let streaming and first-use shader compilation drain before sampling -
       // the number wanted is steady state, not warmup.
       await new Promise((settle) => window.setTimeout(settle, 5_000));
@@ -37084,14 +37145,6 @@ async function prepareSharedGameplayAssets(): Promise<void> {
   return sharedGameplayAssetsPromise;
 }
 
-let lastMenuDeploymentAssetsProfile: Readonly<{
-  startedAt: number;
-  completedAt: number | null;
-  durationMs: number | null;
-  completed: boolean;
-  error: string | null;
-  phases: readonly Readonly<{ name: string; durationMs: number }>[];
-}> | null = null;
 
 function prepareMenuDeploymentAssets(priority: PreparationPriority = 'deployment'): Promise<void> {
   const operation = menuDeploymentAssetsCoordinator.prepare(priority, async ({ checkpoint }) => {
@@ -37196,21 +37249,8 @@ let lastArenaEffectPrewarmProfile: Readonly<{
 // and it is 14.4-20.4 s per arena, roughly 30-40% of the wall time between
 // pressing deploy and playing (lane H first-load rows, 2026-09-02). "Attribute
 // it" cannot be done from one number, so this records the same shape the
-// transition profiler records.
-//
-// It is MARKERS ONLY. Every call in the admission block is pinned by exact
-// source string in `src/presentation-prewarm-contract.test.ts`, so nothing here
-// wraps, reorders, adds or removes a step: `markMatchAdmission` stamps
-// performance.now() BETWEEN the existing statements, exactly as
 // `profileArenaTransition` does inside the transition. A mark costs one array
 // push; the block it measures costs seconds.
-let matchAdmissionMarks: { name: string; at: number }[] = [];
-let lastMatchAdmissionProfile: Readonly<{
-  arenaId: string;
-  mode: string;
-  durationMs: number;
-  steps: readonly Readonly<{ name: string; durationMs: number }>[];
-}> | null = null;
 
 function beginMatchAdmissionProfile(): void {
   matchAdmissionMarks = [];
@@ -37219,6 +37259,7 @@ function beginMatchAdmissionProfile(): void {
 function markMatchAdmission(name: string): void {
   matchAdmissionMarks.push({ name, at: performance.now() });
 }
+
 
 /**
  * Closes the open marker and publishes the block. Durations are mark-to-mark, so

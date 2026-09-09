@@ -66,15 +66,41 @@ export function generateLapSiding(options: TextureSetOptions = {}): TextureSet {
 
   const sillYMm = sillV * tileMm;
 
-  const shader: FamilyShader = (x, y, out) => {
-    const yMm = y * mmPerPx;
+
+  // NIGHT-LOAD (2026-09-08): course identity, batch tone, wear edge band, drip
+  // fall and sill band are all functions of the ROW alone (every one of them is
+  // torus-invariant in y, so a value tabled at the wrapped row equals the value
+  // at any y - the wrap probes at y+size included). Tabling them per row takes a
+  // hash, an exp and four smoothsteps out of the per-pixel path. Values,
+  // expression shape and evaluation order are unchanged; the byte-identity and
+  // neighbour-tile proofs in textures.test.ts pin that.
+  const rowBatch = new Float64Array(size);
+  const rowEdgeBand = new Float64Array(size);
+  const rowFall = new Float64Array(size);
+  const rowSillBand = new Float64Array(size);
+  const rowGap = new Float64Array(size);
+  for (let i = 0; i < size; i++) {
+    const yMm = i * mmPerPx;
     const course = Math.floor(yMm / COURSE_PITCH_MM);
     const yLocal = yMm - course * COURSE_PITCH_MM;
     const courseW = ((course % coursesPerTile) + coursesPerTile) % coursesPerTile;
+    rowBatch[i] = 0.66 * (1 + (hash2u(0, courseW, seed) - 0.5) * 0.05);
+    rowEdgeBand[i] = Math.max(
+      smoothstep(COURSE_PITCH_MM - SHADOW_GAP_MM - WEAR_EDGE_BAND_MM, COURSE_PITCH_MM - SHADOW_GAP_MM - 4, yLocal),
+      0.25 * smoothstep(26, 2, yLocal),
+    );
+    const dBelow = ((yMm - sillYMm) % tileMm + tileMm) % tileMm;
+    rowFall[i] = dBelow > 0 ? Math.exp(-dBelow / 240) * (1 - smoothstep(320, 520, dBelow)) : 0;
+    const dSill = circularDistanceMm(yMm, sillYMm, tileMm);
+    rowSillBand[i] = 1 - smoothstep(4, 11, dSill);
+    rowGap[i] = yLocal >= COURSE_PITCH_MM - SHADOW_GAP_MM ? 1 : 0;
+  }
+  const shader: FamilyShader = (x, y, out) => {
+    const yi = y & (size - 1);
     const s = fieldAt(speckle, size, x, y);
     const ridge = fieldAt(ridges, size, x, y);
 
-    if (yLocal >= COURSE_PITCH_MM - SHADOW_GAP_MM) {
+    if (rowGap[yi] > 0) {
       // Shadow gap: the height step under the lap overlap.
       out[0] = 0.36;
       out[1] = 0.335;
@@ -84,9 +110,8 @@ export function generateLapSiding(options: TextureSetOptions = {}): TextureSet {
       return;
     }
 
-
     // Painted board face with per-course batch tone jitter (wrapped course identity).
-    const batch = 0.66 * (1 + (hash2u(0, courseW, seed) - 0.5) * 0.05);
+    const batch = rowBatch[yi];
     let r = batch * 1.06;
     let g = batch * 1.0;
     let b = batch * 0.9;
@@ -94,11 +119,7 @@ export function generateLapSiding(options: TextureSetOptions = {}): TextureSet {
     let height = (ridge - 0.5) * 0.9 + (s - 0.5) * 0.22;
 
     // Paint wear at course edges (scuff scale blotches, strongest at the bottom edge).
-    const edgeBand = Math.max(
-      smoothstep(COURSE_PITCH_MM - SHADOW_GAP_MM - WEAR_EDGE_BAND_MM, COURSE_PITCH_MM - SHADOW_GAP_MM - 4, yLocal),
-      0.25 * smoothstep(26, 2, yLocal),
-    );
-    const worn = smoothstep(0.52, 0.74, fieldAt(wear, size, x, y)) * edgeBand;
+    const worn = smoothstep(0.52, 0.74, fieldAt(wear, size, x, y)) * rowEdgeBand[yi];
     r = r * (1 - worn) + 0.44 * worn;
     g = g * (1 - worn) + 0.34 * worn;
     b = b * (1 - worn) + 0.245 * worn;
@@ -112,9 +133,8 @@ export function generateLapSiding(options: TextureSetOptions = {}): TextureSet {
     b += (ridge - 0.5) * grainAmt * 0.9 + (s - 0.5) * (0.02 + 0.04 * worn);
     // Drip streaks below the sill line: depth is measured on the TORUS so the streak
     // field is periodic (the neighbouring tile sees the same depth below its sill).
-    const dBelow = ((yMm - sillYMm) % tileMm + tileMm) % tileMm;
-    if (dBelow > 0) {
-      const fall = Math.exp(-dBelow / 240) * (1 - smoothstep(320, 520, dBelow));
+    const fall = rowFall[yi];
+    if (fall > 0) {
       const streakCols = smoothstep(0.62, 0.78, fieldAt(streaks, size, x, y));
       const streak = streakCols * fall;
       r *= 1 - 0.14 * streak;
@@ -123,8 +143,7 @@ export function generateLapSiding(options: TextureSetOptions = {}): TextureSet {
       rough += 0.1 * streak;
     }
     // The sill line itself: 8 mm darker band.
-    const dSill = circularDistanceMm(yMm, sillYMm, tileMm);
-    const sillBand = 1 - smoothstep(4, 11, dSill);
+    const sillBand = rowSillBand[yi];
     r *= 1 - 0.1 * sillBand;
     g *= 1 - 0.1 * sillBand;
     b *= 1 - 0.09 * sillBand;

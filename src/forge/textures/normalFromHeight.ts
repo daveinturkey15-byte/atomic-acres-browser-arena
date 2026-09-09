@@ -26,13 +26,16 @@ export function normalFromHeight(
 ): NormalMap {
   const rgba = new Uint8ClampedArray(size * size * 4);
   let mostlyZ = 0;
+  // NIGHT-LOAD (2026-09-08): the wrapped column indices are branches instead of
+  // modulo. Identical neighbour selection - leftmost column wraps to size-1,
+  // rightmost to 0 - so the gradients and the encoded bytes are unchanged.
   for (let y = 0; y < size; y++) {
     const row = y * size;
     const rowUp = ((y - 1 + size) % size) * size;
     const rowDown = ((y + 1) % size) * size;
     for (let x = 0; x < size; x++) {
-      const xLeft = (x - 1 + size) % size;
-      const xRight = (x + 1) % size;
+      const xLeft = x > 0 ? x - 1 : size - 1;
+      const xRight = x + 1 < size ? x + 1 : 0;
       // Sobel operators (gradient along u and along v), wrapped neighbours.
       const su =
         heightMm[row + xLeft] +
