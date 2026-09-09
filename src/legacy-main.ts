@@ -81,6 +81,11 @@ import {
   type ArenaVisualSwitchReceipt,
 } from './rendering/arena-visual-stream';
 import { ArenaRenderWatchdog, auditArenaRenderLiveness } from './rendering/arena-render-watchdog';
+// Pass 96: the day3-nuketown-volumetrics lane built VolumetricShaftSystem and, correctly, could
+// not mount it - the scene owner was held by another lane. Its REPORT.md handed the wiring to the
+// coordinator under CROSS-LANE REQUESTS. Without these three call sites the module is imported by
+// nothing, is tree-shaken out of the bundle entirely, and the arena looks exactly as it did.
+import { VolumetricShaftSystem, type VolumetricShaftQuality } from './rendering/volumetric-light-shafts';
 import { withArenaFrustumCullingDisabled } from './rendering/arena-coverage-prewarm';
 import { arenaNeedsColdSessionPrecompile, coldArenaOperation, withDetachedRoots } from './rendering/cold-session-precompile-reach';
 import { ArenaTransitionProfiler, type ArenaTransitionProfilePhase } from './arena-transition-profile';
@@ -4920,6 +4925,44 @@ async function prewarmOverdrivePresentation(): Promise<void> {
   }
 }
 const atmosphereSystem = ((): AtmosphereSystem | null => null)();
+
+// Nuke Town volumetric opening shafts (Pass 96). Built once on first selection of the arena and
+// parented to the arena root, so it is disposed with the arena rather than leaking across rebuilds.
+// The scratch vector is module-scoped on purpose: `update` runs every frame and the frame-loop
+// audit forbids per-frame allocation.
+let nuketown2VolumetricShafts: VolumetricShaftSystem | null = null;
+const nuketown2SunDirection = new THREE.Vector3();
+
+/** Shaft budget by graphics tier. The lowest tier turns them off, per the lane's brief.
+ *  RenderProfile is 'performance' | 'blender' | 'compat' (src/render-profile.ts): `blender` is the
+ *  fidelity tier, `performance` the tuned-down one, `compat` the fallback that must add nothing. */
+function volumetricShaftQualityFor(profile: RenderProfile): VolumetricShaftQuality {
+  if (profile === 'compat') return 'off';
+  if (profile === 'performance') return 'low';
+  return 'high';
+}
+
+function syncNuketown2VolumetricShafts(): void {
+  const wanted = selectedArena.id === 'nuketown2';
+  if (!wanted) {
+    if (nuketown2VolumetricShafts) nuketown2VolumetricShafts.group.visible = false;
+    return;
+  }
+  if (!nuketown2VolumetricShafts) {
+    nuketown2VolumetricShafts = new VolumetricShaftSystem({
+      quality: volumetricShaftQualityFor(liveGraphicsProfile),
+    });
+  } else {
+    nuketown2VolumetricShafts.setQuality(volumetricShaftQualityFor(liveGraphicsProfile));
+  }
+  const group = nuketown2VolumetricShafts.group;
+  const root = arena.root;
+  if (group.parent !== root) {
+    group.removeFromParent();
+    root.add(group);
+  }
+  group.visible = liveGraphicsProfile !== 'compat';
+}
 void mistQuery;
 // HF-371 weather. Deliberately NOT gated on the webgl2 backend the way
 // AtmosphereSystem is: rain authors no custom shaders (stock materials plus
@@ -29773,6 +29816,7 @@ function setArenaPresentationVisibility(): void {
   if (atmosphereSystem) atmosphereSystem.root.visible = atmosphereSystem.telemetry().enabled;
   waterSystem.configure(selectedArena.id, liveGraphicsProfile);
   ensureRustworksStarfield(scene, selectedArena.id);
+  syncNuketown2VolumetricShafts();
   applyArenaFogProfile();
   applyArenaLightingForSelection();
   setRustworksQualityPresentationActive(rustworksVisible, renderProfile);
@@ -31509,6 +31553,14 @@ function frame(now: number, scheduleNext = true): void {
       flushGunRangeTestBayDoorBroadcast();
     }
     atmosphereSystem?.update(visualNow / 1_000); nukeEvent.update(debugCaptureFixedVisualTimeMs ?? currentHostTimeMs());
+    if (nuketown2VolumetricShafts?.group.visible) {
+      // sunDirection is scene -> sun. A DirectionalLight sits at `position` and shines toward its
+      // target at the origin, so the outward vector is the position itself, normalised. Inverting
+      // this puts every shaft on the shadow side, which is the single fastest way to make the
+      // effect read as fake - the lane's brief called that out explicitly.
+      nuketown2SunDirection.copy(sunLight.position).normalize();
+      nuketown2VolumetricShafts.update(camera, nuketown2SunDirection);
+    }
     // HF-371: weather is a pure function of (arena, match seed, elapsed), so
     // every peer derives the same sky without a byte of network traffic.
     const weatherElapsedSeconds = gameStarted && matchState.phase === 'active'
