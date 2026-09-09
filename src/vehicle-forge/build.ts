@@ -1186,7 +1186,7 @@ export function buildForgedVehicle(
       reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, luggageY, coach.luggageDoor.z + offset, luggageHeight, 0.045, 0.012);
     }
     for (const y of [coach.luggageDoor.y0, coach.luggageDoor.y1] as const) {
-      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, y, coach.luggageDoor.z, coach.luggageDoor.width, 0.045, 0.012);
+      reliefSidePair(parts, 'groove', 'detail.coach.luggage-door-frame', luggageX, y, coach.luggageDoor.z, 0.045, coach.luggageDoor.width, 0.012);
     }
     reliefRearBox(parts, 'accent', 'detail.coach.rear-number-plate-box', coach.rearPlate.width, coach.rearPlate.y, coach.rearPlate.height, spec.length, 0.008);
   }

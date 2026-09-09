@@ -567,6 +567,27 @@ describe('vehicle-forge HF-536 detail pass', () => {
     },
   };
 
+  it('bounds luggage-door horizontal and vertical rails to the authored rectangle', () => {
+    const built = buildForgedVehicle(COACH_SPEC, coachDressing, createForgeMaterialSet(0xe7dec6, 'luggage-bounds'));
+    const rails = built.partBounds.filter(part => part.part === 'detail.coach.luggage-door-frame');
+    const door = coachDressing.detail!.coach!.luggageDoor;
+    const dimensions = rails.map(part => ({ height: part.max[1] - part.min[1], length: part.max[2] - part.min[2] }));
+    expect(rails).toHaveLength(8);
+    const horizontal = dimensions.filter(part => Math.abs(part.height - 0.045) < 1e-5);
+    const vertical = dimensions.filter(part => Math.abs(part.length - 0.045) < 1e-5);
+    expect(horizontal).toHaveLength(4);
+    expect(vertical).toHaveLength(4);
+    for (const part of horizontal) expect(part.length).toBeCloseTo(door.width, 5);
+    for (const part of vertical) expect(part.height).toBeCloseTo(door.y1 - door.y0, 5);
+    for (const part of rails) {
+      expect(part.min[1]).toBeGreaterThanOrEqual(door.y0 - 0.0225 - 1e-5);
+      expect(part.max[1]).toBeLessThanOrEqual(door.y1 + 0.0225 + 1e-5);
+      expect(part.min[2]).toBeGreaterThanOrEqual(door.z - door.width / 2 - 0.0225 - 1e-5);
+      expect(part.max[2]).toBeLessThanOrEqual(door.z + door.width / 2 + 0.0225 + 1e-5);
+    }
+    expect(built.partTriangles['detail.coach.luggage-door-frame']).toBe(96);
+  });
+
   it('keeps every fenced vehicle under its triangle fence', () => {
     for (const [spec, dressing, budget] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `fence-${spec.id}`));
