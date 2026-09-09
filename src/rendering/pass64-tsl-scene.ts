@@ -79,6 +79,7 @@ import {
   composeArtDirectedSceneGrade,
 } from './art-direction';
 import { installedFilmicGradeChain } from './filmic-grade-chain';
+import { sceneLinearContrastNode } from './scene-linear-contrast';
 
 export type Pass65TslGraphicsOptions = Readonly<{
   principalSamples: 1 | 2 | 4;
@@ -938,6 +939,53 @@ function setAnimationTime(root: THREE.Group, timeMs: number): void {
   root.userData.tslReviewTimeMs = timeMs;
 }
 
+/** Local QA only: borrows the existing contrast uniform, never rebuilds its graph. */
+export function installNuketown2ContrastDiagnostic(
+  scene: THREE.Scene,
+  arenaId: string,
+  contrast: { value: number },
+  saturation: { value: number },
+  hostname = typeof window === 'undefined' ? '' : window.location.hostname,
+): () => void {
+  if (arenaId !== 'nuketown2' || !['localhost', '127.0.0.1', '[::1]'].includes(hostname)) return () => {};
+  const key = 'nuketown2ContrastDiagnostic';
+  let disposed = false;
+  let savedContrast: number | null = null;
+  const owns = (): boolean => !disposed && scene.userData[key] === handle;
+  const assertOwner = (): void => {
+    if (!owns()) throw new Error('NukeTown contrast diagnostic is stale');
+  };
+  const read = () => Object.freeze({
+    arenaId, active: owns(), contrast: contrast.value, saturation: saturation.value,
+    savedContrast, overridden: savedContrast !== null,
+  });
+  const handle = Object.freeze({
+    read,
+    setContrast(value: number) {
+      assertOwner();
+      // This seam admits only the requested identity-contrast experiment.
+      if (value !== 1) throw new Error('Contrast diagnostic accepts only 1; use restore() for baseline');
+      savedContrast ??= contrast.value;
+      contrast.value = 1;
+      return read();
+    },
+    restore() {
+      assertOwner();
+      if (savedContrast !== null) contrast.value = savedContrast;
+      savedContrast = null;
+      return read();
+    },
+  });
+  scene.userData[key] = handle;
+  return () => {
+    if (owns()) {
+      handle.restore();
+      delete scene.userData[key];
+    }
+    disposed = true;
+  };
+}
+
 function configureHdrPipeline(
   renderPipeline: RenderPipeline,
   scene: THREE.Scene,
@@ -1031,6 +1079,8 @@ function configureHdrPipeline(
   );
   const saturation = uniform(initialSceneGrade.saturation);
   const contrast = uniform(initialSceneGrade.contrast);
+  const useNuketown2LinearContrast = uniform(definition.id === 'nuketown2');
+  let disposeContrastDiagnostic = installNuketown2ContrastDiagnostic(scene, definition.id, contrast, saturation);
   const pushArtDirectionToChain = (arenaId: ArenaVisualDefinition['id']): void => {
     installedFilmicGradeChain(renderPipeline)?.setArenaArtDirection(artDirectionForArena(arenaId));
   };
@@ -1047,7 +1097,12 @@ function configureHdrPipeline(
   const gradedSource = nodeObject(screenSpace.sceneColor);
   const luma = dot(gradedSource.rgb, vec3(0.2126, 0.7152, 0.0722));
   const saturated = mix(vec3(luma), gradedSource.rgb, saturation);
-  const contrasted = saturated.sub(0.5).mul(contrast).add(0.5);
+  // Preserve the legacy expression for every other arena. The selector is
+  // uniform data so arena switches do not introduce a new graph topology.
+  const legacyContrasted = saturated.sub(0.5).mul(contrast).add(0.5);
+  const contrasted = useNuketown2LinearContrast.select(
+    sceneLinearContrastNode(saturated, contrast), legacyContrasted,
+  );
   const pixel = vec2(1).div(screenSize);
   const depthRight = sceneDepth.sample(screenUV.add(vec2(pixel.x, 0)));
   const depthUp = sceneDepth.sample(screenUV.add(vec2(0, pixel.y)));
@@ -1133,12 +1188,15 @@ function configureHdrPipeline(
       },
       get linearSourceStages() { return linearSourceStages; },
       applyDefinition(next) {
+        disposeContrastDiagnostic();
         const sceneGrade = composeArtDirectedSceneGrade(
           next.colorPipeline.grade,
           artDirectionForArena(next.id),
         );
         saturation.value = sceneGrade.saturation;
         contrast.value = sceneGrade.contrast;
+        useNuketown2LinearContrast.value = next.id === 'nuketown2';
+        disposeContrastDiagnostic = installNuketown2ContrastDiagnostic(scene, next.id, contrast, saturation);
         pushArtDirectionToChain(next.id);
         // HF-481. The arena's AUTHORED fog colour is the haze colour, which is
         // the honest source: it is already the colour the arena says its air is,
@@ -1173,6 +1231,7 @@ function configureHdrPipeline(
           screenSpace.beforeRender();
         },
         dispose() {
+          disposeContrastDiagnostic();
           screenSpace.dispose();
           gtaoDenoise?.dispose();
           gtaoPass?.dispose();
