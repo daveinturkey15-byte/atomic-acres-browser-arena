@@ -1108,11 +1108,13 @@ import {
 } from './smoke-volume-presentation';
 import {
   SMOKE_AUTHORITY_SCHEMA_VERSION,
+  SMOKE_VOLUME_RADIUS_M,
   SmokeAuthority,
   type SmokeAuthoritySnapshot,
   type SmokeCorridorSnapshot,
   type SmokeShotSegment,
 } from './smoke-authority';
+import { grenadeSmokeRadiusM } from './grenade-smoke-policy';
 import type { SmokeStateMessage } from './smoke-protocol';
 import {
   FLASH_AUTHORITY_SCHEMA_VERSION,
@@ -22669,7 +22671,7 @@ function broadcastSmokeState(
   lastSmokeStateBroadcastAt = nowHostTimeMs;
 }
 
-function spawnSmokeVolume(point: THREE.Vector3, nowHostTimeMs: number, actionNonce: number, ownerId: string): string | null {
+function spawnSmokeVolume(point: THREE.Vector3, nowHostTimeMs: number, actionNonce: number, ownerId: string, radiusM = SMOKE_VOLUME_RADIUS_M): string | null {
   if (network.role === 'client') return null;
   const centre = point.clone().add(new THREE.Vector3(0, 1.25, 0));
   const accepted = smokeAuthority.registerVolume({
@@ -22678,6 +22680,7 @@ function spawnSmokeVolume(point: THREE.Vector3, nowHostTimeMs: number, actionNon
     actionNonce,
     centre,
     startsAtHostTimeMs: nowHostTimeMs,
+    radiusM,
   });
   if (!accepted) return null;
   const snapshot = smokeAuthority.snapshot(nowHostTimeMs);
@@ -23044,9 +23047,12 @@ function explodeGrenade(entity: GrenadeEntity): void {
   releaseGrenadeWorldPresentation(entity.mesh);
   releaseBotGrenadeOwner(entity);
   const afterPresentationDetach = performance.now();
+  // Host simulates admitted guest grenades too; register before the remote-only
+  // damage return. Client prediction never creates authoritative smoke.
+  const smokeRadiusM = grenadeSmokeRadiusM(entity.grenade);
+  if (smokeRadiusM !== null) spawnSmokeVolume(point, currentHostTimeMs(), entity.actionNonce, entity.ownerId, smokeRadiusM);
   if (entity.grenade === 'smoke') {
     audio.coverImpact(point.distanceTo(player.position));
-    spawnSmokeVolume(point, afterPresentationDetach, entity.actionNonce, entity.ownerId);
     return;
   }
   if (entity.grenade === 'flash') {
