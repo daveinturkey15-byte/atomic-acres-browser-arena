@@ -214,3 +214,63 @@ cannot produce that line), hoppers, downpipes at the inner faces of the end wall
 160 mm off the lawn. Put the pipes where a builder would: at the corners, clear of every opening.
 
 **Cost:** 96 triangles per run, four runs, +0 draws, +0 materials.
+
+---
+
+## R-008 — Warm the actual image before attributing a lighting change
+
+VERIFIED2026-09-09 bounded Nuke Town run: fixed named camera, authored17.6hour,
+clear weather, fixed outer visual clock and seed still produced early luminance
+drift. The same original bundle converged only after182574ms; candidate1 after
+164371ms. Constant light values, environment UUID/version and texture census did
+not prove the image was settled. Baked indirect was enabled, but its exact share
+of the drift remains an inference, not an established cause.
+
+Method: first camera warmup downsamples actual1280x720 screenshots to160x90 and
+requires three consecutive mean absolute RGB differences<=1/255 at18s intervals,
+after at least90s, with a bounded18check timeout. Only then compare ablations and
+restore A/A. This is a diagnostic screenshot method, never a GPU FPS source.
+Performance separately uses runtime completed-sequence/time counters without
+canvas readback. Preserve failed/unstable pairs rather than choosing their most
+flattering frame. Receipts: root run outputs aa-visual-run/baseline-warm-six,
+candidate1-six and candidate2-lamp-nine.
+
+## R-009 — Preserve channel ratios when applying contrast to linear HDR
+
+VERIFIED stable vehicle A/A: the previous per-channel affine contrast around0.5
+produced blue-pixel fractions0.0533507/0.0533670; identity contrast produced0.
+Nuke-only shared-luminance scaling in commit3912b0d49 removes the blue artifacts
+in six actual warmed views while leaving other arenas on their existing curve.
+
+Method: for finite nonnegative linear RGB and positive contrast c, compute
+Y=dot(rgb,[0.2126,0.7152,0.0722]), then rgb*pow(max(Y,1e-6)/0.5,c-1).
+Identity c=1 selects the original input exactly. No channel offset, no HDR clamp;
+black stays black and positive channel ratios are preserved. This does not repair
+negative values introduced by an upstream saturation operation; that remains a
+separate input-contract question. CPU plus interpreted-TSL tests prove arithmetic;
+actual Chrome WebGPU captures prove this candidate compiled and rendered.
+
+Cost OPEN until matched performance acceptance. The existing scene-grade uniform
+and one arena selector are reused, no new pass or render loop; that does not imply
+the extra expression is free. Current API orientation: https://threejs.org/docs/llms.txt;
+implementation checked against installedThree0.185.1, no dependency upgrade.
+
+## R-010 — Keep the night pool, attenuate its daylight contribution
+
+VERIFIED commit3c5abd7b3: the four shared additive lamp pools stayed full strength
+in daylight and obscured foreground asphalt/curb detail. Writing material.opacity
+through the existing peer-derived lighting transaction reduces authored17.6hour
+strength to0.12, with a smooth18–20h return to1 and6–8h morning fade. Original
+0.95 radial alpha, tint, geometry, depth behavior and shared graph remain intact.
+Invalid hours retain original strength; leaving the arena restores it.
+
+Proof:36focusedtests/4files plus tsc/build and nine actual warm captures. Root and
+worker independently viewed before/after street pixels: road texture, centre
+markings and curb are visible through a restrained warm glow. This is a daylight
+improvement verdict, not night visual approval or complete performance acceptance.
+No extra material/light/draw/geometry/frame loop was added. Night pixels and all
+remaining release gates stay OPEN until their own receipts establish them.
+
+Method provenance for this run: method observed in StarKnightt/morning-diner
+(Claude Fable,2026), shared by owner via https://x.com/prasenx/status/2095537643182563778;
+re-implemented from first principles. No source/shader/prose copied.
