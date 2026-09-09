@@ -36,11 +36,11 @@ violating tree in every non-`doctor` mode, and
   receipts. A runtime commit on a `release/*` branch is how a fix ships without ever
   touching `main`.
 
-Why these exist: seven parentless full-tree snapshot imports on 2026-09-03..05 severed the
-shipping line from `origin/main`. Nothing executable refused them, so the break survived 21
-passes and turned a lossless fast-forward into 385 phantom merge conflicts against a tree
-that was already a strict superset of `main`. Full record with every command:
-`docs/RELEASE_LINE_RECONCILIATION_2026-09-06.md`.
+Correction verified 2026-09-09: the earlier parentless-import diagnosis interpreted shallow
+boundaries as roots. Their raw commit objects have parents. Complete locally available
+history has one actual root; the guard now refuses shallow ancestry before classification.
+The original evidence is retained, with its correction in `docs/ANCESTRY_RECOVERY_2026-09-09.md`.
+The no-new-root, current-main containment and exact acceptance rules remain enforced.
 
 ## Pass 65 routing
 

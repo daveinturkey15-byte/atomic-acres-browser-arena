@@ -466,13 +466,12 @@ describe('ancestry root allowlist', () => {
       .toThrow(/lists a root twice/);
   });
 
-  it('matches the checked-in allowlist: 8 legitimate roots and the 7 quarantined snapshot imports', () => {
+  it('matches the independently verified actual root, not the retired shallow-cutoff inventory', () => {
     const roots = readAncestryRootAllowlist(
       readFileSync(fileURLToPath(new URL('../.github/ancestry-roots.json', import.meta.url)), 'utf8'),
     );
-    expect(roots.legitimate).toHaveLength(8);
-    expect(roots.quarantined).toHaveLength(7);
-    expect(roots.quarantined).toContain('93dacd33934823fa2a6bc931bffb7c1b7fd94d05');
+    expect(roots.legitimate).toEqual(['f7efdafc3ea9ff3d49f142ac39f52e1fe619f35a']);
+    expect(roots.quarantined).toEqual([]);
   });
 });
 

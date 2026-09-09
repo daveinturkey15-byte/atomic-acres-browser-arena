@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join, normalize, relative, resolve } from 'node:pa
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { classifyPaths } from './change-impact.mjs';
+import { readCompleteAncestry } from './ancestry-inventory.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPOSITORY_ROOT = resolve(dirname(SCRIPT_PATH), '..', '..');
@@ -577,6 +578,8 @@ export function selectReconciliationManifest(manifestPaths, policy) {
 }
 
 function evaluateReconciliation(values, policy) {
+  // Refuse truncated history before interpreting parent/root counts.
+  readCompleteAncestry(REPOSITORY_ROOT);
   const head = values.head || git('rev-parse', 'HEAD');
   const base = values.base;
   if (!SHA40.test(head ?? '')) throw new Error('reconciliation acceptance needs one exact --head SHA');
@@ -595,7 +598,7 @@ function evaluateReconciliation(values, policy) {
       ? git('rev-list', '--parents', '-n', '1', firstParent).split(/\s+/).filter(Boolean).length === 1
       : undefined,
     firstParentRoots: SHA40.test(firstParent ?? '')
-      ? git('rev-list', '--max-parents=0', firstParent).split(/\r?\n/).filter(Boolean)
+      ? readCompleteAncestry(REPOSITORY_ROOT, firstParent)
       : [],
     allowedRoots: roots.allowed,
     quarantinedRoots: roots.quarantined,

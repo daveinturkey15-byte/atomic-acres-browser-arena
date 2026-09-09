@@ -3,6 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { readCompleteAncestry } from './ancestry-inventory.mjs';
 
 const ANCESTRY_ROOTS_RELATIVE_PATH = '.github/ancestry-roots.json';
 const SHA40 = /^[0-9a-f]{40}$/;
@@ -160,7 +161,7 @@ const receipt = {
   },
 };
 
-const headRoots = git(repo, 'rev-list', '--max-parents=0', 'HEAD').split(/\r?\n/).filter(Boolean);
+const headRoots = readCompleteAncestry(repo);
 receipt.rootCommitCount = headRoots.length;
 
 if (mode !== 'doctor') {
