@@ -82,6 +82,10 @@ import { createVolumeCorridor, createWaterCorridor, createWeatherCorridor } from
 import { createColosseumCorridor } from './map3/corridor-colosseum';
 import { createPhysicsCorridorSync, isMap3RapierReady, loadMap3Rapier } from './map3/corridor-physics';
 import type { CorridorSolid } from './map3/corridor-solids';
+import { createSky } from './map3/sky';
+import type { Sky } from './map3/sky';
+import type { VolumeCorridor } from './map3/corridor-volume';
+import { setSun } from './map3/foliage-material';
 
 /**
  * Playfield extent. The longest lane is the seasons corridor: 34 m of start
@@ -324,6 +328,27 @@ type PlacedLane = {
   readonly group: THREE.Group;
   readonly inverseYaw: THREE.Quaternion;
 };
+/**
+ * MAP3-SKY: the live graphics tier for the sky degrade path. Reads the same
+ * `graphicsLiveProfile` dataset the selection-time shaft rule reads
+ * (`compat` is the tier that adds nothing). Null outside the game (tests,
+ * audits), where the full sky builds.
+ */
+function map3SkyLiveProfile(): string | null {
+  if (typeof document === 'undefined' || !document.documentElement) return null;
+  return document.documentElement.dataset.graphicsLiveProfile ?? null;
+}
+
+/**
+ * MAP3-SKY: the live sky of an arena built by `buildMap3`, if it has one.
+ * Test/QA surface. The `Sky` object itself lives in `buildMap3`'s closure and
+ * the graph name (`map3-arena-sky`) is the bundle-presence marker, so this is
+ * the handle a test uses to prove the arena tick moves the visible sun.
+ */
+const map3Skies = new WeakMap<THREE.Object3D, Sky>();
+export function map3ArenaSky(root: THREE.Object3D): Sky | null {
+  return map3Skies.get(root) ?? null;
+}
 
 export function buildMap3(scene: THREE.Scene): ArenaMap {
   // PREPARE-THEN-BUILD. Loud, never silent: an arena that quietly came back
@@ -402,6 +427,34 @@ export function buildMap3(scene: THREE.Scene): ArenaMap {
       inverseYaw: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -EDGE_ROTATION[lane.edge]!, 0)),
     });
   }
+  // MAP3-SKY: the showcase sun, parented to the arena root so it admits and
+  // retires with the arena instead of living on the demo page only. The audit
+  // found `createSky` imported by `map3/main.ts` and `signature.test.ts` and
+  // by nothing the player loads; this import is the one that reaches the game.
+  // The lowest tier keeps the authored equirect backdrop: no cloud layer is
+  // built for it, and the tick below keeps the dome hidden there.
+  const sky = createSky(map3SkyLiveProfile() === 'compat' ? { cloudPuffs: 0 } : undefined);
+  // Bundle-presence marker (A1): a string only this wiring produces. It also
+  // keeps the parity audits' `/sky|dome|cloud|atmosphere/` dressing exclusion
+  // matching on the mesh path.
+  sky.group.name = 'map3-arena-sky';
+  // The batcher's documented escape hatch (art-kit.ts, checked on the mesh and
+  // every ancestor) and the static-matrix freeze skip (static-matrix-freeze.ts):
+  // this subtree moves every frame and must never be merged or frozen.
+  sky.group.userData.dynamic = true;
+  // createSky's contract: attach at the ORIGIN with no rotation or scale. The
+  // cloud billboards are assembled from world-space cameraPosition, so a
+  // transformed group would shear them.
+  builder.root.add(sky.group);
+  map3Skies.set(builder.root, sky);
+  for (const lane of placed) {
+    // The god-ray volume reads the live sun object every frame. Storing the
+    // reference once is the demo's own pattern (map3/main.ts), not a copy, so
+    // the beams track the visible disc with no per-frame cost. Corridors
+    // without a sun input keep their authored light.
+    const sunTracker: Corridor & Partial<Pick<VolumeCorridor, 'setSunDirection'>> = lane.corridor;
+    if (typeof sunTracker.setSunDirection === 'function') sunTracker.setSunDirection(sky.sunDirection);
+  }
 
   // Scratch vectors for the frame hook. Allocating these per frame, seven times
   // a frame, is exactly the kind of steady garbage that shows up weeks later as
@@ -439,6 +492,19 @@ export function buildMap3(scene: THREE.Scene): ArenaMap {
         lane.corridor.group.worldToLocal(localPosition);
         localVelocity.copy(context.playerVelocity).applyQuaternion(lane.inverseYaw);
         lane.corridor.update(elapsedSeconds, dtSeconds, localPosition, localVelocity);
+      }
+      // MAP3-SKY: drive the visible sun from the arena clock. The lowest tier
+      // keeps the authored equirect backdrop instead: the dome stays hidden and
+      // the foliage keeps its authored sun, so nothing here can contradict the
+      // backdrop on a path that never sees the disc. One dataset read and a
+      // dirty-checked flag write per frame; the sky owns its scratch, and the
+      // foliage write is the demo's own `setSun` call, so no second convention.
+      const skyVisible = map3SkyLiveProfile() !== 'compat';
+      if (sky.group.visible !== skyVisible) sky.group.visible = skyVisible;
+      if (!skyVisible) return;
+      sky.update(elapsedSeconds, dtSeconds);
+      for (const lane of placed) {
+        if (lane.corridor.foliage) setSun(lane.corridor.foliage, sky.sunDirection, sky.sunColor);
       }
     },
     patrolPoints: MAP3_LANES.flatMap((lane) => {

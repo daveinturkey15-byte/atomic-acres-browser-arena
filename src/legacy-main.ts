@@ -29822,7 +29822,12 @@ function setArenaPresentationVisibility(): void {
   if (neighbourhoodLifeRoot) neighbourhoodLifeRoot.visible = atomicVisible;
   // Shared surrounding oceans need a long view frustum so water, not void,
   // meets the horizon. The authoring registry is the single ownership gate.
-  const desiredFarPlane = selectedArena.id === 'nuketown2' ? NUKE_EVENT_CAMERA_FAR_M : sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
+  // MAP3-SKY: Map 3 carries the showcase sky in its arena root (see
+  // buildMap3): dome r265, sun orbit r190, clouds to +-170, all past the
+  // default 180. Worst case is a corner camera (|pos| ~136) looking out:
+  // 265 + 136 = 401, so 450 with margin. Depth cost is nil: near stays 0.08,
+  // so 24-bit precision at the 30 m paving seams is ~0.7 mm.
+  const desiredFarPlane = selectedArena.id === 'nuketown2' ? NUKE_EVENT_CAMERA_FAR_M : selectedArena.id === 'map3' ? 450 : sharedWaterBodyForArena(selectedArena.id) ? 1_400 : 180;
   if (camera.far !== desiredFarPlane) {
     camera.far = desiredFarPlane;
     camera.updateProjectionMatrix();
