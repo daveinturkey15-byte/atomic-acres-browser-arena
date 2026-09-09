@@ -183,8 +183,12 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
   const mat = new MeshPhysicalNodeMaterial({
     roughness: 0.20,
     metalness: 0,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.25,
+    clearcoat: 0.85,
+    // NT.QUALITY.A1: 0.25 → 0.08. clearcoatRoughness is a uniform (not a
+    // shader define), so this costs zero pipeline recompile and zero load time.
+    // Real fresh clearcoat is 0.04–0.10; 0.25 scattered the IBL into a near-
+    // uniform haze and eliminated all visible highlights on the car bodies.
+    clearcoatRoughness: 0.08,
   });
   mat.name = name;
   mat.specularIntensity = 0.08;
@@ -221,14 +225,19 @@ export function createNuketown2CarPaintMaterial(colorHex: number, name: string):
  * Retro coach cream body material.
  */
 export function createNuketown2CoachMaterial(): MeshStandardNodeMaterial {
-  return createSharedVehiclePaintMaterial('nuketown2-coach-shell', new THREE.Color(0.82, 0.76, 0.64), 0.32, 0.38, 24, 0.02);
+  // NT.QUALITY.B1: metalness 0.38 → 0.08. Painted bodywork is dielectric;
+  // metalness 0.38 replaced most of the cream diffuse with IBL and collapsed
+  // the warm swatch into a near-neutral grey-blue env response. Painted metal
+  // PBR is 0.0–0.08. roughness unchanged (0.32 = used-paintwork, correct).
+  return createSharedVehiclePaintMaterial('nuketown2-coach-shell', new THREE.Color(0.82, 0.76, 0.64), 0.32, 0.08, 24, 0.02);
 }
 
 /**
  * Truck cab painted metal material.
  */
 export function createNuketown2TruckCabMaterial(): MeshStandardNodeMaterial {
-  return createSharedVehiclePaintMaterial('nuketown2-truck-cab', new THREE.Color(0.74, 0.72, 0.66), 0.38, 0.45, 20, 0.025);
+  // NT.QUALITY.B1: metalness 0.45 → 0.08. Same structural fix as the coach.
+  return createSharedVehiclePaintMaterial('nuketown2-truck-cab', new THREE.Color(0.74, 0.72, 0.66), 0.38, 0.08, 20, 0.025);
 }
 
 /**
