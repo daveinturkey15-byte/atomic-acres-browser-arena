@@ -568,11 +568,9 @@ function pushTriangle(
     const normal = n[index]!;
     const coordinate = uv[index]!;
     sink.position.push(position[0], position[1], position[2]);
-    sink.normal.push(
-      flip ? -normal[0] : normal[0],
-      flip ? -normal[1] : normal[1],
-      flip ? -normal[2] : normal[2],
-    );
+    // needsFlip already aligns the emitted winding to the analytic normal.
+    // Negating that normal again would preserve the original opposition.
+    sink.normal.push(normal[0], normal[1], normal[2]);
     sink.uv.push(coordinate[0], coordinate[1]);
   }
 }
@@ -919,6 +917,39 @@ function flankAtHeight(ring: Ring, y: number): { x: number; nx: number; ny: numb
   return null;
 }
 
+/** Remove samples only within a declared bound; never bridge a missing surface.
+ * The error bound applies to every supplied position/normal component at every
+ * original station, not to a modulo stride. Endpoints remain exact.
+ */
+function redundantTrimStations(
+  rings: readonly Ring[],
+  sample: (ring: Ring) => readonly number[] | null,
+  epsilon = 1e-7,
+): readonly Ring[] {
+  if (rings.length < 3) return rings;
+  const values = rings.map(sample);
+  const keep = new Set([0, rings.length - 1]);
+  const pending: Array<[number, number]> = [[0, rings.length - 1]];
+  while (pending.length) {
+    const [first, last] = pending.pop()!;
+    if (last - first < 2) continue;
+    const a = values[first], b = values[last];
+    let split = -1, worst = epsilon;
+    for (let i = first + 1; i < last; i++) {
+      const value = values[i];
+      if (!a || !b || !value) { split = i; break; }
+      const t = (rings[i]!.z - rings[first]!.z) / (rings[last]!.z - rings[first]!.z);
+      const error = Math.max(...value.map((v, k) => Math.abs(v - (a[k]! + (b[k]! - a[k]!) * t))));
+      if (error > worst) { worst = error; split = i; }
+    }
+    if (split >= 0) {
+      keep.add(split);
+      pending.push([first, split], [split, last]);
+    }
+  }
+  return [...keep].sort((a, b) => a - b).map(i => rings[i]!);
+}
+
 export function stripAtHeight(
   rings: readonly Ring[],
   y: number,
@@ -926,11 +957,18 @@ export function stripAtHeight(
   z1: number,
   height: number,
   proud: number,
+  removeRedundantStations = false,
 ): THREE.BufferGeometry | null {
   const sink = emptySink();
   const low = Math.min(z0, z1);
   const high = Math.max(z0, z1);
-  const used = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const spanned = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const used = removeRedundantStations ? redundantTrimStations(spanned, ring => {
+    const hit = flankAtHeight(ring, y);
+    // Chrome strip: at most 0.1 mm position error and 0.01 per normal
+    // component. Retain every bend exceeding either bound, including seams.
+    return hit ? [hit.x + hit.nx * proud, y + hit.ny * proud, hit.nx * 0.01, hit.ny * 0.01] : null;
+  }, 0.0001) : spanned;
   for (let i = 0; i < used.length - 1; i += 1) {
     const a = used[i]!;
     const b = used[i + 1]!;
@@ -976,11 +1014,15 @@ export function roofRail(
   z1: number,
   halfWidth: number,
   height: number,
+  removeRedundantStations = false,
 ): THREE.BufferGeometry | null {
   const BED_M = 0.008;
   const low = Math.min(z0, z1);
   const high = Math.max(z0, z1);
-  const used = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const spanned = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const used = removeRedundantStations
+    ? redundantTrimStations(spanned, ring => [crownSurfaceY(spec, ring.z, xOffset)])
+    : spanned;
   if (used.length < 2) return null;
   const sink = emptySink();
   const quad = (positions: Vec3[], normal: Vec3, u: number): void => {
