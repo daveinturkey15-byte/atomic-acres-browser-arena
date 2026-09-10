@@ -36,9 +36,10 @@ test('cancellation releases a sleeping sampler immediately and prevents another 
 });
 test('real pause/main-menu controls are visible before leave; no force or DOM mutation',async()=>{
   const calls=[],ids={host:'h',guestA:'a',guestB:'b'};
+  let paused=false;
   const handle=value=>({jsonValue:async()=>value,dispose:async()=>{}});
   const peers=Object.fromEntries(roles.map(role=>[role,{page:{
-    keyboard:{press:async key=>calls.push(`key:${key}`)},
+    keyboard:{press:async key=>{calls.push(`key:${key}`);paused=true;}},
     locator:selector=>({waitFor:async options=>{assert.equal(options.state,'visible');calls.push(`visible:${selector}`);}}),
     textContent:async()=> 'ROOM',
     waitForFunction:async(fn,arg)=>{
@@ -49,7 +50,7 @@ test('real pause/main-menu controls are visible before leave; no force or DOM mu
     },
     click:async(selector,options)=>{assert.notEqual(options?.force,true);calls.push(`click:${selector}`);},
     fill:async(selector,value)=>{assert.equal(value,'ROOM');calls.push(`fill:${selector}`);},
-    evaluate:async()=>{throw Error('No direct DOM mutation allowed');},
+    evaluate:async fn=>{assert.equal(fn.name,'pauseStateInPage');return {surface:paused?'paused-match':'hidden',alive:true,focused:true,pointerLocked:false,chatTyping:false,tacticalOpen:false,mainMenuVisible:paused};},
   }}]));
   const bundle={identities:ids,lifecycle:{}};
   const result=await rejoinV2(peers,bundle,async page=>({selfId:page===peers.guestB.page?'b':'h',lobby:{revision:4}}));

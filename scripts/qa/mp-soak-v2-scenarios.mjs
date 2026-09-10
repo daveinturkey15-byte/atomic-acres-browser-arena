@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { V2_PEERS, validNaturalLife } from './mp-soak-v2-contract.mjs';
 import { evaluateHealthLatencyV2 } from './health-latency-v2.mjs';
 import { settledLife } from './mp-soak-v2-runtime.mjs';
+import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 
 export async function calibrate(page) {
   const rows=[];
@@ -47,10 +48,10 @@ export async function naturalDeathRespawn(peers, role, viewOf) {
 }
 export async function rejoinV2(peers, bundle, viewOf) {
   const identityBefore=bundle.identities.guestB;
-  // The active-match lobby button is hidden. Follow the same visible pause
-  // and MAIN MENU route an owner uses; both buttons call returnToMainMenu.
-  await peers.guestB.page.keyboard.press('Escape');
-  await peers.guestB.page.locator('#main-menu').waitFor({state:'visible',timeout:2000});
+  // Escape is a toggle and pointer-lock loss is focus-sensitive. Record and
+  // act on the real state, then use the visible control, never DOM unhide.
+  bundle.menuOpening=[];
+  await ensurePauseMenu(peers.guestB.page,bundle.menuOpening);
   const hostBefore=await viewOf(peers.host.page);
   const transition={role:'guestB',identityBefore,beforeRevision:hostBefore.lobby?.revision,intentAt:Date.now(),leave:{},settled:{}};
   bundle.lifecycle.transition=transition;
