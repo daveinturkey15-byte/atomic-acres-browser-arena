@@ -568,11 +568,9 @@ function pushTriangle(
     const normal = n[index]!;
     const coordinate = uv[index]!;
     sink.position.push(position[0], position[1], position[2]);
-    sink.normal.push(
-      flip ? -normal[0] : normal[0],
-      flip ? -normal[1] : normal[1],
-      flip ? -normal[2] : normal[2],
-    );
+    // needsFlip already aligns the emitted winding to the analytic normal.
+    // Negating that normal again would preserve the original opposition.
+    sink.normal.push(normal[0], normal[1], normal[2]);
     sink.uv.push(coordinate[0], coordinate[1]);
   }
 }
