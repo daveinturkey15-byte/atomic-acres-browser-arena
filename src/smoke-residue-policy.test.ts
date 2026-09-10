@@ -118,6 +118,30 @@ describe('smoke residue footprint HF563/564', () => {
     expect(MAX_SMOKE_STATE_MESSAGE_BYTES).toBe(48 * 1024);
   });
 
+  it('residue bursts evict oldest full smoke at the shared cap before nominal expiry', () => {
+    const host = new SmokeAuthority(EPOCH, 'host');
+    expect(MAX_ACTIVE_SMOKE_VOLUMES).toBe(12);
+    expect(host.registerVolume({ matchEpoch: EPOCH, ownerId: 'full-cloud', actionNonce: 40, centre,
+      startsAtHostTimeMs: T0, radiusM: SMOKE_VOLUME_RADIUS_M })).toBe(true);
+    const full = host.snapshot(T0).volumes[0];
+    const burstTime = T0 + MAX_ACTIVE_SMOKE_VOLUMES;
+    expect(full.expiresAtMs).toBeGreaterThan(burstTime);
+    for (let i = 1; i <= MAX_ACTIVE_SMOKE_VOLUMES; i += 1) {
+      expect(host.registerVolume({ matchEpoch: EPOCH, ownerId: `burst-${i}`, actionNonce: i, centre,
+        startsAtHostTimeMs: T0 + i, radiusM: EXPLOSION_RESIDUE_SMOKE_RADIUS_M })).toBe(true);
+    }
+    const snapshot = host.snapshot(burstTime);
+    expect(snapshot.volumes).toHaveLength(12);
+    expect(snapshot.volumes.some((volume) => volume.ownerId === 'full-cloud')).toBe(false);
+    // Snapshot order is canonical ID order, not insertion/age order.
+    expect(snapshot.volumes.map((volume) => volume.ownerId)).toEqual(
+      Array.from({ length: 12 }, (_, i) => `burst-${i + 1}`).sort());
+    expect(snapshot.volumes.every((volume) => volume.radiusM === EXPLOSION_RESIDUE_SMOKE_RADIUS_M)).toBe(true);
+    const replica = new SmokeAuthority(EPOCH, 'replica');
+    expect(replica.applyAuthoritativeSnapshot(snapshot)).toBe(true);
+    expect(replica.snapshot(burstTime)).toEqual(snapshot);
+  });
+
   it('caps twelve volumes eight corridors and wire bytes hold', () => {
     const host = new SmokeAuthority(EPOCH, 'host');
     for (let i = 0; i < MAX_ACTIVE_SMOKE_VOLUMES + 1; i += 1) {
