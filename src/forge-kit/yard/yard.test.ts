@@ -57,6 +57,18 @@ function buildOnce(): ArenaMap {
   return buildNuketown2(new THREE.Scene());
 }
 
+/** Runtime substitutes are inspected directly; no hidden legacy boxes stand in for them. */
+function runtimeMeshes(map: ArenaMap, placement: ReturnType<typeof yardPropPlacements>[number], side: 'north' | 'south'): THREE.Mesh[] {
+  const names = placement.propId === 'yard domestic bin blue'
+    ? [`nuketown2 ${side} ${placement.propId}`]
+    : placement.parts.map((part) => `nuketown2 ${side} ${placement.propId} ${part.suffix}`);
+  return names.map((name) => {
+    const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+    expect(mesh, `runtime mesh ${name} exists`).toBeInstanceOf(THREE.Mesh);
+    return mesh;
+  });
+}
+
 function meshBox(mesh: THREE.Mesh): { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number } {
   const box = new THREE.Box3().setFromObject(mesh);
   return {
@@ -101,27 +113,38 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
     const totalTrisPerYard = totalBoxesPerYard * YARD_BOX_TRIANGLES;
     expect(totalTrisPerYard, 'total triangles per yard <= 1,200').toBeLessThanOrEqual(1200);
     expect(totalTrisPerYard, 'measured triangles per yard').toBe(756);
+    const map = buildOnce();
+    for (const side of ['north', 'south'] as const) {
+      const runtimeTriangles = placements.flatMap((placement) => runtimeMeshes(map, placement, side))
+        .reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? 0) / 3, 0);
+      expect(runtimeTriangles, `${side} actual yard triangles <= 1,200`).toBeLessThanOrEqual(1200);
+      expect(runtimeTriangles).toBe(1172);
+    }
   });
 
-  it('emits all yard prefabs through pair() into both yards as 12-triangle boxes', () => {
+  it('emits the bin substitute and remaining box prefabs into both yards', () => {
     const map = buildOnce();
     const placements = yardPropPlacements();
 
     for (const placement of placements) {
       for (const side of ['north', 'south'] as const) {
-        for (const part of placement.parts) {
-          const name = `nuketown2 ${side} ${placement.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, placement, side)) {
+          const name = mesh.name;
           expect(mesh, `mesh ${name} exists in scene`).toBeDefined();
-          expect(mesh.geometry, `${name} has geometry`).toBeInstanceOf(THREE.BoxGeometry);
           const triCount = (mesh.geometry.index?.count ?? 0) / 3;
-          expect(triCount, `${name} has exactly 12 triangles`).toBe(12);
+          if (placement.propId === 'yard domestic bin blue') {
+            expect(mesh.visible).toBe(true);
+            expect(triCount).toBe(488);
+          } else {
+            expect(mesh.geometry, `${name} has geometry`).toBeInstanceOf(THREE.BoxGeometry);
+            expect(triCount, `${name} has exactly 12 triangles`).toBe(12);
+          }
         }
       }
     }
   });
 
-  it('uses existing material roles only and resolves onto existing arena materials', () => {
+  it('reuses arena materials for box props and one shared plastic material for the bin substitute', () => {
     const allowedRoles = new Set<string>(YARD_ROLES);
     const placements = yardPropPlacements();
 
@@ -135,7 +158,7 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
       }
     }
 
-    // Material instance reuse: every yard kit mesh borrows an existing material instance
+    // Box props reuse arena instances; the two adapted bins share one new plastic instance.
     const map = buildOnce();
     const nonKitMaterials = new Set<string>();
     map.root.traverse((node) => {
@@ -147,11 +170,15 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
 
     for (const p of placements) {
       for (const side of ['north', 'south'] as const) {
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
+          const name = mesh.name;
           const mat = mesh.material as THREE.Material;
-          expect(nonKitMaterials.has(mat.uuid), `${name} borrows an existing arena material instance`).toBe(true);
+          if (p.propId === 'yard domestic bin blue') {
+            expect(mat.name).toBe('nuketown2-thaikit-clean-bin-plastic');
+            expect(runtimeMeshes(map, p, 'north')[0].material).toBe(runtimeMeshes(map, p, 'south')[0].material);
+          } else {
+            expect(nonKitMaterials.has(mat.uuid), `${name} borrows an existing arena material instance`).toBe(true);
+          }
         }
       }
     }
@@ -172,9 +199,8 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
     for (const p of placements) {
       for (const side of ['north', 'south'] as const) {
         const bounds = FOOTPRINT[side];
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
+          const name = mesh.name;
           const box = meshBox(mesh);
 
           expect(box.minX, `${name} minX inside yard`).toBeGreaterThanOrEqual(bounds.minX - 1e-4);
@@ -208,9 +234,7 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
         let aabbMinZ = Infinity;
         let aabbMaxZ = -Infinity;
 
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
           const box = meshBox(mesh);
           aabbMinX = Math.min(aabbMinX, box.minX);
           aabbMaxX = Math.max(aabbMaxX, box.maxX);
@@ -260,9 +284,7 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
         let aabbMinZ = Infinity;
         let aabbMaxZ = -Infinity;
 
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
           const box = meshBox(mesh);
           aabbMinX = Math.min(aabbMinX, box.minX);
           aabbMaxX = Math.max(aabbMaxX, box.maxX);
@@ -291,9 +313,8 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
 
     for (const p of placements) {
       for (const side of ['north', 'south'] as const) {
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
+          const name = mesh.name;
 
           expect(mesh.userData.presentationOnly, `${name} has presentationOnly`).toBe(true);
           expect(mesh.userData.nuketown2Prop, `${name} has nuketown2Prop propId`).toBe(`${side} ${p.propId}`);
@@ -311,9 +332,8 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
     // Check that none of the map's movement colliders matches any yard kit part
     for (const p of placements) {
       for (const side of ['north', 'south'] as const) {
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
+          const name = mesh.name;
           const box = meshBox(mesh);
 
           const matchesCollider = map.colliders.some((c) => (
@@ -335,11 +355,10 @@ describe('forge-kit yard prefabs (HF-536 night-gemini4)', () => {
     for (const p of placements) {
       const shouldCast = p.propId.includes('bin') || p.propId.includes('table');
       for (const side of ['north', 'south'] as const) {
-        for (const part of p.parts) {
-          const name = `nuketown2 ${side} ${p.propId} ${part.suffix}`;
-          const mesh = map.root.getObjectByName(name) as THREE.Mesh;
+        for (const mesh of runtimeMeshes(map, p, side)) {
+          const name = mesh.name;
           expect(mesh.castShadow, `${name} castShadow expectation`).toBe(shouldCast);
-          expect(part.cast, `${p.propId} ${part.suffix} part.cast`).toBe(shouldCast);
+          expect(p.parts.every((part) => part.cast === shouldCast), `${p.propId} authored cast`).toBe(true);
         }
       }
     }

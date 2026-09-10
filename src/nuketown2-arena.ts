@@ -101,6 +101,7 @@
  * against its own mesh). A suburban street is an axis-aligned place anyway.
  */
 import * as THREE from 'three';
+import { createMunicipalWheelieBin, THAIKIT_BIN_PROP_ID } from './thaikit/municipal-wheelie-bin';
 import {
   type Builder,
   batchPresentationOnlyBoxes,
@@ -4775,6 +4776,21 @@ function yard(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: false });
   // HF-536 night-gemini4: yard props kit (bins, mailbox, garden set, hose reel, washing line, sand-pit toys, planters)
   for (const placement of yardPropPlacements()) {
+    if (placement.propId === THAIKIT_BIN_PROP_ID) {
+      // Replace the six-box blue bin, within its exact old aggregate envelope.
+      // The prefab is presentation-only; no asset collider proposal is adopted.
+      const north = createMunicipalWheelieBin();
+      const south = createMunicipalWheelieBin(north.geometry, north.material);
+      for (const [side, sign, mesh] of [['north', 1, north], ['south', -1, south]] as const) {
+        mesh.name = `nuketown2 ${side} ${placement.propId}`;
+        mesh.position.set(sign * nuketown2HandedX(placement.anchor[0]), placement.anchor[1], sign * placement.anchor[2]);
+        mesh.scale.x = NUKETOWN2_HANDEDNESS;
+        mesh.rotation.y = sign === 1 ? 0 : Math.PI;
+        mesh.userData.nuketown2Prop = `${side} ${placement.propId}`;
+        builder.root.add(mesh);
+      }
+      continue;
+    }
     yardPairKit(builder, placement.propId, placement.anchor, placement.parts, m);
   }
   // HF-536 night-muse-hardware: facade and fence hardware kit (plaque,

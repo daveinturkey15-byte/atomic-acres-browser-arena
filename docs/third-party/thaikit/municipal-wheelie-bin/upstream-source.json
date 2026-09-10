@@ -1,0 +1,33 @@
+{
+  "name": "municipal-wheelie-bin",
+  "package": "@thai-kit/props",
+  "version": "0.4.0",
+  "source": "https://github.com/keysforthewin/thaikit",
+  "license": "MIT",
+  "dependencies": [
+    "three@>=0.185.0"
+  ],
+  "registryDependencies": [],
+  "files": [
+    {
+      "path": "createObjectModel.ts",
+      "sha256": "e74fe0186d075d1c47b9967c713063a42225959145565a40287684f933c231e4",
+      "bytes": 190154
+    },
+    {
+      "path": "model.ts",
+      "sha256": "1ff8865c993d8ada60480490342462d2e7af39a804aeb3fa836fd11479f354fc",
+      "bytes": 5801
+    },
+    {
+      "path": "thaikit.json",
+      "sha256": "940ec2b1fe6dc5a4582afb1726c3779e1bdd4dda1c487f5e08d4da9924f973f6",
+      "bytes": 10462
+    },
+    {
+      "path": "colliders.json",
+      "sha256": "e320acaa2f2171510c060c9cfaa9aced2d318d0914a2fff6ba86a6dcb1a5312f",
+      "bytes": 1654
+    }
+  ]
+}
