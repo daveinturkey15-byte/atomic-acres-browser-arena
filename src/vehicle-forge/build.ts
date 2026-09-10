@@ -999,16 +999,20 @@ export function buildForgedVehicle(
   if (dressing.grille) {
     const { y, width, height, depth, barCount = 5 } = dressing.grille;
     const grilleDepth = depth / 2;
+    // The coach end cap is z=0: positive front depth buried the grille in it.
+    // Expose the existing parts; unrelated vehicle dressing stays unchanged.
+    const coachGrille = spec.id === 'nuketown2-coach';
+    const grilleFront = coachGrille ? -0.012 : 0.008;
     parts.chrome.push(translated(
       chamferedBar(width / 2, height / 2, grilleDepth, Math.min(0.03, height * 0.18, grilleDepth * 0.45)),
-      0, y, grilleDepth + 0.008,
+      0, y, grilleDepth + grilleFront,
     ));
     const count = Math.max(1, Math.floor(barCount));
     for (let index = 0; index < count; index += 1) {
       const x = count === 1 ? 0 : -width * 0.38 + (width * 0.76 * index) / (count - 1);
       const bar = chamferedBar(height / 2, 0.018, grilleDepth * 0.92, 0.006);
       bar.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
-      parts.chrome.push(translated(bar, x, y, grilleDepth + 0.018));
+      parts.chrome.push(translated(bar, x, y, coachGrille ? grilleFront - 0.010 + grilleDepth * 0.92 : grilleDepth + 0.018));
     }
   }
 
@@ -1107,13 +1111,13 @@ export function buildForgedVehicle(
   if (dressing.pillars) {
     const { z, y0, y1 } = dressing.pillars;
     const midY = (y0 + y1) / 2;
-    const glassX = flankHalfWidth(spec, midY) - 0.005;
     const isCoachCabin = Boolean(dressing.detail?.coach);
+    const glassX = flankHalfWidth(spec, midY) + (isCoachCabin ? 0.008 : -0.005);
     for (const pillarZ of z) {
       for (const side of [1, -1] as const) {
         if (isCoachCabin) {
-          // Coach-only: same centre/height as the chamfered bar, as a planar
-          // rectangular mullion. 12 tris vs 32, same silhouette at review distance.
+          // Coach-only: planar mullion keyed4mm into the flank,20mm proud,
+          // instead of half-buried behind the continuous transparent band.
           const geometry = nonIndexed(new THREE.BoxGeometry(0.024, y1 - y0, 0.028));
           if (side === -1) mirroredToLeft(geometry);
           parts.groove.push(translated(geometry, side * glassX, midY, pillarZ));
@@ -1194,7 +1198,13 @@ export function buildForgedVehicle(
         0.012,
       );
     }
-    const skirtZ = (coach.skirt.z0 + coach.skirt.z1) / 2;
+    // Retain the same two skirt pieces but stop before the two wheel arches.
+    // The old continuous spear crossed the tyre discs in front of the wheels.
+    const skirtArchClearance = spec.wheelRadius + spec.archGap + 0.13;
+    const skirtZ0 = Math.max(coach.skirt.z0, Math.min(...axles) + skirtArchClearance);
+    const skirtZ1 = Math.min(coach.skirt.z1, Math.max(...axles) - skirtArchClearance);
+    if (skirtZ1 <= skirtZ0) throw new Error('Coach skirt has no clear span between wheel arches');
+    const skirtZ = (skirtZ0 + skirtZ1) / 2;
     reliefSidePair(
       parts,
       'accent',
@@ -1203,7 +1213,7 @@ export function buildForgedVehicle(
       coach.skirt.y,
       skirtZ,
       coach.skirt.height,
-      coach.skirt.z1 - coach.skirt.z0,
+      skirtZ1 - skirtZ0,
       0.012,
     );
     const luggageY = (coach.luggageDoor.y0 + coach.luggageDoor.y1) / 2;
