@@ -464,14 +464,6 @@ async function writeEvidence() {
     console.log(`Reload diagnostic: ${join(outDir,`${label}-reload-diagnostic.json`)}`);
     return;
   }
-  if(reloadDiagnostic) {
-    bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
-    bundle.reloadDiagnostic={};
-    await reloadStageDiagnostic(peers,bundle.reloadDiagnostic,viewOf,sleep);
-    await writeEvidence();
-    if(Object.values(bundle.reloadDiagnostic.guests).some(row=>!row.completed||!row.refilled||!row.noExtraDeaths))process.exitCode=1;
-    return;
-  }
   if(menuDiagnostic) {
     const result={schema:'menu-lifecycle-diagnostic-v1',runtimeSha:sourceSha,
       driverSha,
@@ -565,6 +557,14 @@ async function main() {
   await peers.host.page.click('#lobby-start');
   await Promise.all(PEERS.map((role) => peers[role].page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true && window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active' && window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2, undefined, { timeout: 180_000 })));
 
+  if(reloadDiagnostic) {
+    bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
+    bundle.reloadDiagnostic={};
+    await reloadStageDiagnostic(peers,bundle.reloadDiagnostic,viewOf,sleep);
+    await writeEvidence();
+    if(Object.values(bundle.reloadDiagnostic.guests).some(row=>!row.completed||!row.refilled||!row.noExtraDeaths))process.exitCode=1;
+    return;
+  }
   if(menuDiagnostic) {
     bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
     bundle.menuOpening=[];

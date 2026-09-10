@@ -20,3 +20,13 @@ test('diagnostic never stages ammo or respawn and preserves sampled uncertainty'
   assert.match(source,/previousReadEnd/);assert.match(source,/nodeBefore,nodeAfter/);
   assert.match(source,/rows.length<1024/);assert.match(source,/25000/);
 });
+test('reload diagnostic dispatch is in boot main before every full-soak scenario',()=>{
+  const source=readFileSync(new URL('./mp-soak-gate-v21.mjs',import.meta.url),'utf8');
+  const writer=source.slice(source.indexOf('async function writeEvidence()'),source.indexOf('async function hardStop()'));
+  const main=source.slice(source.indexOf('async function main()'),source.indexOf('\ntry {\n  await main();'));
+  assert.doesNotMatch(writer,/await reloadStageDiagnostic/);
+  const dispatch=main.indexOf('if(reloadDiagnostic)');
+  assert.ok(dispatch>=0&&dispatch<main.indexOf('await runStairScenarios()'));
+  const branch=main.slice(dispatch,main.indexOf('if(menuDiagnostic)',dispatch));
+  assert.match(branch,/await reloadStageDiagnostic/);assert.match(branch,/return;/);
+});
