@@ -24,6 +24,7 @@
  *   - A FLAT EMISSIVE SKY FILL washes a saturated body pale. The dust film is a
  *     multiplicative albedo term keyed on how upward-facing the surface is -
  *     dusty on sills, roof and hood, clean on the flanks - not an added glow.
+ *     This weathered finish is now opt-in; clean enamel is the default.
  *
  * These are node materials only: no `ShaderMaterial`, no `onBeforeCompile`, no
  * GLSL string, which is the Pass-64 WebGPU contract.
@@ -272,10 +273,12 @@ function trimGrimeMaskNode(): any {
 }
 
 export interface PaintOptions {
+  /** Clean showroom finish is the current art direction; worn remains explicit. */
+  readonly finish?: 'clean' | 'weathered';
   /** sRGB hex; the authored hue is preserved exactly in the linear uniform. */
   readonly color: number;
   readonly name: string;
-  /** 0.35-0.7. Higher is a fresher, wetter-looking finish. */
+  /** 0-1. Higher is a fresher, wetter-looking finish. */
   readonly clearcoat?: number;
   readonly clearcoatRoughness?: number;
   /**
@@ -330,6 +333,26 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   material.userData.nuketown2Spec = forgePaintSpec(options.name, options.color, baseRoughness);
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
+  // One pigment uniform keeps liveries in one shared shader program. Clean
+  // enamel has a smooth clear layer over subtle orange-peel relief, without
+  // world-height grime stripes that crossed unrelated panels and door skins.
+  if (options.finish !== 'weathered') {
+    const pigment = TSL.uniform(new THREE.Vector3(base.r, base.g, base.b));
+    const enamel = valueNoise2(vec2(positionWorld.x.add(positionWorld.z).mul(700), positionWorld.y.mul(700)));
+    material.userData.forgeFinish = 'clean';
+    material.colorNode = pigment;
+    material.roughnessNode = float(baseRoughness);
+    material.clearcoat = options.clearcoat ?? 0.8;
+    material.clearcoatRoughness = options.clearcoatRoughness ?? 0.16;
+    // Kill sub-pixel relief before differentiation, including at low resolution
+    // and grazing views. Distance alone cannot bound a pixel's surface footprint.
+    const footprint = max(length(positionWorld.dFdx()), length(positionWorld.dFdy()));
+    const enamelResolved = float(1).sub(smoothstep(float(0.00035), float(0.0007), footprint));
+    material.normalNode = reliefNormal(enamel.mul(float(0.000012)).mul(enamelResolved));
+    material.clearcoatNormalNode = material.normalNode;
+    return material;
+  }
+  material.userData.forgeFinish = 'weathered';
   const dust = dustFilm();
   const detailFade = weatheringDetailFadeNode();
   const vehicleAnchor = attribute('forgeVehicleAnchor', 'vec2');
@@ -419,6 +442,11 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
  * near-black colour tints the REFLECTION black, so the screens mirror a black
  * sky while the chrome beside them catches white and the car reads as a toy.
  * The tint lives in `color`; the reflection is Fresnel plus clearcoat.
+ * Blending attenuates highlights too, so use a readable tinted-glass base alpha
+ * instead of nearly invisible panes. This is a bounded thin-glass approximation
+ * using the existing environment, with no extra transmission render pass.
+ * Reference: https://threejs.org/docs/pages/MeshPhysicalMaterial.html (r185.1
+ * installed source verified: opacityNode replaces materialOpacity).
  */
 export function createForgeGlassMaterial(name: string, tintHex = 0x243036): MeshPhysicalNodeMaterial {
   const tint = linearOf(tintHex);
@@ -433,6 +461,11 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   });
   material.name = name;
   material.ior = 1.52;
+  // Mirror the tint/alpha onto conventional material fields as well: the
+  // compatibility renderer and batching inspectors do not evaluate TSL.
+  material.color.copy(tint);
+  material.opacity = 0.52;
+  material.userData.forgeRole = 'glass';
   tagCompatibility(material, 'MeshPhysicalMaterial');
 
   // Both vectors must be view-space. Mixing normalWorld with view direction
@@ -440,14 +473,14 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   // Three0.185.1 normalView already handles DoubleSide back-face orientation.
   const cosine = saturate(normalView.dot(positionViewDirection));
   const fresnel = pow(float(1).sub(cosine), float(5));
-  const a0 = float(0.12);
+  const a0 = float(material.opacity);
   material.colorNode = vec3(tint.r, tint.g, tint.b);
   // Bounded coach-only tonal breakup, not a new reflection or emissive fill.
   // Every other vehicle carries an explicit zero through the shared merge.
   const coachFlag = attribute('forgeCoachShade', 'float');
   const coachSheen = valueNoise2(vec2(positionWorld.z.mul(1.7), positionWorld.y.mul(2.3))).mul(coachFlag);
   const coachVariation = coachSheen.sub(float(0.5).mul(coachFlag)).mul(float(0.08));
-  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.22)).add(coachVariation));
+  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(coachVariation));
   material.roughnessNode = float(0.06).add(coachSheen.mul(float(0.05)));
   return material;
 }
@@ -504,6 +537,15 @@ export function createForgeChromeMaterial(worn = false): MeshStandardNodeMateria
   material.name = worn ? 'vehicle-forge-chrome-worn' : 'vehicle-forge-chrome';
   material.userData.forgeRole = 'chrome';
   tagCompatibility(material, 'MeshStandardMaterial');
+  // Brightwork uses the scene environment and real lights; no emissive sky
+  // substitute, so it can become dark naturally at night. Pits/grime remain
+  // available only for an explicitly worn vehicle.
+  if (!worn) {
+    material.userData.nuketown2Spec = spec;
+    material.userData.forgeFinish = 'clean';
+    return material;
+  }
+  material.userData.forgeFinish = 'weathered';
   const uniforms = createNuketown2Uniforms(spec, spec.baseSrgb, 0x4a4238, material);
   material.userData.nuketown2Spec = spec;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
