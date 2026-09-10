@@ -43,7 +43,7 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
   sillY: 0.4,
   beltY: 1.75,
   sillRadius: 0.022,
-  wheelRadius: 0.42,
+  wheelRadius: 0.47,
   tyreHalfWidth: 0.14,
   trackHalfWidth: 1.1,
   wheelZ: Object.freeze([1.65, 7.45]),

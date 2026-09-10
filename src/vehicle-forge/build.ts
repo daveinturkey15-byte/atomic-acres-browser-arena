@@ -146,6 +146,13 @@ function stampVehicleAnchor(geometry: THREE.BufferGeometry, x = 0, z = 0): THREE
   return geometry;
 }
 
+/** Explicit on every glazing mesh so the shared static merge stays valid. */
+function stampCoachShade(geometry: THREE.BufferGeometry, value: number): THREE.BufferGeometry {
+  const count = geometry.getAttribute('position').count;
+  geometry.setAttribute('forgeCoachShade', new THREE.Float32BufferAttribute(new Float32Array(count).fill(value), 1));
+  return geometry;
+}
+
 /**
  * PERF (HITL 5, HF-491). Fold every placed vehicle into ONE mesh per material.
  *
@@ -908,7 +915,7 @@ export function buildForgedVehicle(
   const parts: Record<Bucket, THREE.BufferGeometry[]> = {
     paint: [loft.body], accent: [], glass: [], lining: [], groove: [], chrome: [], tyre: [], headLamp: [], tailLamp: [],
   };
-  if (loft.glass) parts.glass.push(loft.glass);
+  if (loft.glass) parts.glass.push(stampCoachShade(loft.glass, spec.id === 'nuketown2-coach' ? 1 : 0));
   if (loft.lining) parts.lining.push(loft.lining);
   if (loft.groove) parts.groove.push(loft.groove);
 
@@ -1003,10 +1010,14 @@ export function buildForgedVehicle(
     // Expose the existing parts; unrelated vehicle dressing stays unchanged.
     const coachGrille = spec.id === 'nuketown2-coach';
     const grilleFront = coachGrille ? -0.012 : 0.008;
-    parts.chrome.push(translated(
+    const grilleMouth = translated(
       chamferedBar(width / 2, height / 2, grilleDepth, Math.min(0.03, height * 0.18, grilleDepth * 0.45)),
       0, y, grilleDepth + grilleFront,
-    ));
+    );
+    // Preserve the already-exposed chrome bars; their dark backing prevents
+    // the entire lower front becoming one specular white rectangle.
+    if (coachGrille) parts.lining.push(markPart(grilleMouth, 'detail.coach.grille-mouth', 0.012));
+    else parts.chrome.push(grilleMouth);
     const count = Math.max(1, Math.floor(barCount));
     for (let index = 0; index < count; index += 1) {
       const x = count === 1 ? 0 : -width * 0.38 + (width * 0.76 * index) / (count - 1);
@@ -1289,6 +1300,21 @@ export function buildForgedVehicle(
       reliefSidePair(parts, 'groove', 'detail.saloon.door-shut-line', flankHalfWidth(spec, doorY), doorY, z, saloon.doorShutLines.y1 - saloon.doorShutLines.y0, 0.008, 0.004);
     }
     reliefSidePair(parts, 'chrome', 'detail.saloon.sill-strip', flankHalfWidth(spec, saloon.sill.y), saloon.sill.y, (saloon.sill.z0 + saloon.sill.z1) / 2, 0.06, saloon.sill.z1 - saloon.sill.z0, 0.008);
+  }
+
+  if (detail?.coach) {
+    // Existing shared buckets, coach-only hierarchy. Low sweep stays between
+    // the enlarged wheel arches; the narrow rub rail sits above both crowns.
+    const bands = [
+      { part: 'detail.coach.lower-sweep', y0: 0.60, y1: 0.74, bucket: 'accent' as const, z0: 2.35, z1: 6.75, proud: 0.01 },
+      { part: 'detail.coach.rub-rail', y0: 1.395, y1: 1.445, bucket: 'chrome' as const, z0: 1.0, z1: 8.1, proud: 0.014 },
+    ];
+    for (const band of bands) {
+      const surface = band.bucket === 'chrome'
+        ? stripAtHeight(loft.rings, (band.y0 + band.y1) / 2, band.z0, band.z1, band.y1 - band.y0, band.proud, true)
+        : surfaceBandAtHeights(spec, loft.rings, band.y0, band.y1, band.z0, band.z1, band.proud);
+      if (surface) parts[band.bucket].push(markPart(surface, band.part, band.proud));
+    }
   }
 
   if (dressing.surfaceBands) {

@@ -86,6 +86,7 @@ describe('bounded coach-only allocation', () => {
   const pairs: Array<[string, THREE.BufferGeometry, THREE.BufferGeometry, number, number]> = [
     ['lining', dense.lining!, reduced.lining!, .0015, .001],
     ['stripe', stripAtHeight(dense.rings,1.75,.55,8.55,.045,.008)!, stripAtHeight(dense.rings,1.75,.55,8.55,.045,.008,true)!, .00015, .01],
+    ['coach polish rub rail', stripAtHeight(dense.rings,1.42,1,8.1,.05,.014)!, stripAtHeight(dense.rings,1.42,1,8.1,.05,.014,true)!, .00015, .01],
     ['roof rail', roofRail(COACH_SPEC,dense.rings,.62,1.7,7.5,.012,.045)!, roofRail(COACH_SPEC,dense.rings,.62,1.7,7.5,.012,.045,true)!, .000001, .000001],
   ];
   for (const [name, before, after, bound, normalBound] of pairs) it(`${name} preserves bounded interior position/normal fields and outward winding`, () => {
