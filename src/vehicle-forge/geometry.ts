@@ -782,6 +782,7 @@ export function latheGeometry(
   profile: readonly Vec2[],
   segments: number,
   smoothDegrees = 40,
+  omitCollapsedPoleTriangles = false,
 ): THREE.BufferGeometry {
   const sink = emptySink();
   const count = profile.length;
@@ -830,8 +831,11 @@ export function latheGeometry(
         [s / segments, (k + 1) / (count - 1)],
       ];
       const flip = needsFlip(positions, normals[0]!);
-      pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
-      pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
+      // At a true radius-zero pole one pair of corners is identical. Omit
+      // only that zero-area face on the opt-in route; retain every visible
+      // triangle and its complete position/normal/UV record unchanged.
+      if (!omitCollapsedPoleTriangles || a[0] !== 0) pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
+      if (!omitCollapsedPoleTriangles || b[0] !== 0) pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
     }
   }
   return toGeometry(sink, 'lathe')!;

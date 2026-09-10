@@ -85,7 +85,7 @@ function applyContactPatch(geometry: THREE.BufferGeometry, radius: number): void
  * `v` runs ACROSS the section on the tyre, so a tread band lands on the tread
  * rather than being smeared around the circumference.
  */
-export function wheelParts(radius: number, halfWidth: number, style: WheelStyle): WheelParts {
+export function wheelParts(radius: number, halfWidth: number, style: WheelStyle, omitCollapsedPoleTriangles = false): WheelParts {
   const rim = radius * 0.62;
   const face = halfWidth * 0.72;
 
@@ -126,7 +126,7 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
       [rim * 0.05, face + 0.010],
       [0, face + 0.012],
     ];
-  const outboard = toAxleFrame(latheGeometry(coverProfile, RADIAL_SEGMENTS, 40));
+  const outboard = toAxleFrame(latheGeometry(coverProfile, RADIAL_SEGMENTS, 40, omitCollapsedPoleTriangles));
   outboard.name = 'vehicle-forge-wheel-face';
 
   // The inboard disc and the bead-gap annulus against the tyre: matte dark, so
@@ -136,7 +136,7 @@ export function wheelParts(radius: number, halfWidth: number, style: WheelStyle)
     [rim * 0.55, -face - 0.012],
     [0, -face - 0.016],
   ];
-  const dark = toAxleFrame(latheGeometry(darkProfile, DARK_SEGMENTS, 40));
+  const dark = toAxleFrame(latheGeometry(darkProfile, DARK_SEGMENTS, 40, omitCollapsedPoleTriangles));
   dark.name = 'vehicle-forge-wheel-dark';
 
   const whitewall = style === 'whitewall'
@@ -165,7 +165,7 @@ export interface LampParts {
  * the bezel puts it behind the bezel's own solid front face, and it renders
  * black no matter how bright the emissive is.
  */
-export function lampParts(radius: number, depth: number, radialSegments = 18): LampParts {
+export function lampParts(radius: number, depth: number, radialSegments = 18, omitCollapsedPoleTriangles = false): LampParts {
   const bezelProfile: Vec2[] = [
     [radius, -depth],
     [radius, 0],
@@ -181,7 +181,7 @@ export function lampParts(radius: number, depth: number, radialSegments = 18): L
     [radius * 0.60, 0.0045],
     [0, 0.0055],
   ];
-  const lens = latheGeometry(lensProfile, radialSegments, 40);
+  const lens = latheGeometry(lensProfile, radialSegments, 40, omitCollapsedPoleTriangles);
   lens.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   lens.name = 'vehicle-forge-lamp-lens';
 
