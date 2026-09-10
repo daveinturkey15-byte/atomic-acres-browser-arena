@@ -316,8 +316,8 @@ export type FacadeFacing = 'z+' | 'z-' | 'x+' | 'x-';
 
 /** Course pitch of the lap siding, metres (220 mm exposure - the module default). */
 export const FACADE_COURSE_H = 0.22;
-/** Board face height, metres. The 20 mm left over is the shadow gap. */
-export const FACADE_BOARD_H = 0.20;
+/** Board face height, metres. A 4 mm seam replaces the oversized 20 mm black band. */
+export const FACADE_BOARD_H = 0.216;
 /** Board thickness, metres. */
 export const FACADE_BOARD_T = 0.06;
 /** How far a board beds INTO the wall it dresses, metres (no coplanar faces). */

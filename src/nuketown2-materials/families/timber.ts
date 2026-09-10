@@ -80,10 +80,10 @@ export function timberSpec(name: string, baseSrgb: number, variant: TimberVarian
     baseSrgb,
     roughness: painted ? 0.66 : 0.90,
     metalness: 0.0,
-    grain: { sizeM: 0.0012, albedo: painted ? 0.028 : 0.045, roughness: 0.07 },
-    scuff: { sizeM: 0.055, albedo: painted ? 0.055 : 0.065, roughness: 0.10 },
-    traffic: { sizeM: 1.8, albedo: painted ? 0.060 : 0.075, roughness: 0.08 },
-    soil: painted ? 0.075 : 0.085,
+    grain: { sizeM: 0.0012, albedo: painted ? 0.060 : 0.045, roughness: painted ? 0.04 : 0.07 },
+    scuff: { sizeM: 0.055, albedo: painted ? 0.030 : 0.065, roughness: painted ? 0.025 : 0.10 },
+    traffic: { sizeM: 1.8, albedo: painted ? 0.015 : 0.075, roughness: painted ? 0.02 : 0.08 },
+    soil: painted ? 0.002 : 0.085,
   });
 }
 
@@ -141,12 +141,21 @@ function sharedTimberGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2
   const proceduralRoughness = clamp(wear.roughness.add(gap.mul(float(0.06))).add(silver.mul(float(0.08))).sub(knot.mul(float(0.10))), float(0.25), float(1.0));
   const relief = reliefNormal(height);
   const textureSamples = textureSetSamples(textureBridge, 'timber', boxUv());
+  // An opaque maintained paint film covers knots, silvering and dark end grain.
+  // Keep those responses on exposed fence timber; window cases and door trim
+  // get brush tooth and an eggshell highlight rather than raw lumber stripes.
+  const cleanPaint = uniforms.baseColor.mul(wear.albedoMul);
+  const paintNormal = reliefNormal(wear.grain.mul(float(0.000035)));
+  const paintColor = textureSamples
+    ? cleanPaint.mul(mix(float(1), textureSamples.albedo.clamp(0.94, 1.06), float(0.25)))
+    : cleanPaint;
+  const paintRelief = textureSamples ? mix(paintNormal, textureSamples.normal, float(0.04)).normalize() : paintNormal;
   timberGraphs.set(textureBridge, {
-    colorNode: textureSamples ? proceduralColor.mul(textureSamples.albedo) : proceduralColor,
+    colorNode: painted.select(paintColor, textureSamples ? proceduralColor.mul(textureSamples.albedo) : proceduralColor),
     roughnessNode: textureSamples
       ? clamp(proceduralRoughness.mul(float(0.72)).add(textureSamples.roughness.mul(float(0.28))), float(0.25), float(1.0))
       : proceduralRoughness,
-    normalNode: textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief,
+    normalNode: painted.select(paintRelief, textureSamples ? mix(relief, textureSamples.normal, float(0.68)).normalize() : relief),
   });
   return timberGraphs.get(textureBridge)!;
 }

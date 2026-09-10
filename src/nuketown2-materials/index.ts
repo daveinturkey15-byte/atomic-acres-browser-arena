@@ -296,8 +296,8 @@ export function createNuketown2MaterialRegistry(
     // geometry, and a second mechanism for it would only buy a SECOND siding
     // node graph on the cold-compile path this candidate is fighting. Same
     // picture, one pipeline.
-    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper', { textureBridge }),
-    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream', { textureBridge }),
+    sidingA: createSidingMaterial(0x9f6147, 'nuketown2-siding-orange-upper', { textureBridge, geometricCourses: true }),
+    sidingB: createSidingMaterial(0xeae3cf, 'nuketown2-siding-cream', { textureBridge, geometricCourses: true }),
     roof: createRoofMaterial('nuketown2-roof-shingles', textureBridge),
     // HF-477: the white house's PALE BLUE-GREY ROOF GLAZING, the aerial's
     // single strongest identifier for that house (measured #aebdc0/#b6c6c9 on

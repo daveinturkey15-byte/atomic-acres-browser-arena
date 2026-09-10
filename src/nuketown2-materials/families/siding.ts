@@ -68,6 +68,8 @@ const SIDING_NAIL_RELIEF_M = -0.0012;
 const SIDING_BUTT_FAILURE = 0.16;
 
 export interface SidingOptions {
+  /** Courses already exist as geometry: paint must not draw a second set of laps. */
+  readonly geometricCourses?: boolean;
   /** Optional pale ground-floor paint. */
   readonly wainscotSrgb?: number;
   /** World Y at which the wainscot gives way to the upper paint. Snapped to a course. */
@@ -91,6 +93,45 @@ export function sidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpe
 
 type SidingGraph = { colorNode: any; roughnessNode: any; normalNode: any };
 const sidingGraphs = new WeakMap<object, SidingGraph>();
+const maintainedPaintGraphs = new WeakMap<object, SidingGraph>();
+
+/** Clean exterior paint: close-range brush tooth, restrained variation, no failed film. */
+export function maintainedSidingSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
+  return assertSpec({
+    name, family: 'siding', baseSrgb, roughness: 0.66, metalness: 0,
+    grain: { sizeM: 0.0009, albedo: 0.065, roughness: 0.045 },
+    scuff: { sizeM: 0.045, albedo: 0.025, roughness: 0.025 },
+    traffic: { sizeM: 1.6, albedo: 0.015, roughness: 0.020 },
+    soil: 0.002,
+  });
+}
+
+/**
+ * The arena's 220 mm boards already supply the course, lip and shadow seam.
+ * Previously they also wore 184 mm shader laps and photographed laps, which
+ * produced three competing stripe pitches. Keep texture tooth, not its baked
+ * shadows: bounded albedo modulation and a small normal contribution let the
+ * authored boards, window frames and eaves carry the construction.
+ */
+function maintainedPaintGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): SidingGraph {
+  const cached = maintainedPaintGraphs.get(textureBridge);
+  if (cached) return cached;
+  const uv = wallUv();
+  const spec = maintainedSidingSpec('nuketown2-maintained-siding-shared', 0xeae3cf);
+  const wear = buildWear(spec, uv, undefined, uniforms);
+  const samples = textureSetSamples(textureBridge, 'lapSiding', uv);
+  const paint = uniforms.baseColor.mul(wear.albedoMul);
+  const tooth = reliefNormal(wear.grain.mul(float(0.000035)));
+  const graph = {
+    colorNode: samples ? paint.mul(mix(vec3(1), samples.albedo.clamp(0.92, 1.08), float(0.30))) : paint,
+    roughnessNode: samples
+      ? clamp(wear.roughness.mul(float(0.92)).add(samples.roughness.mul(float(0.08))), float(0.55), float(0.82))
+      : wear.roughness,
+    normalNode: samples ? mix(tooth, samples.normal, float(0.06)).normalize() : tooth,
+  };
+  maintainedPaintGraphs.set(textureBridge, graph);
+  return graph;
+}
 
 function sharedSidingGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2TextureBridge): SidingGraph {
   const cached = sidingGraphs.get(textureBridge);
@@ -178,7 +219,7 @@ export function createSidingMaterial(
   options: SidingOptions = {},
 ): MeshStandardNodeMaterial {
   const textureBridge = options.textureBridge ?? createNuketown2TextureBridge();
-  const spec = sidingSpec(name, baseSrgb);
+  const spec = options.geometricCourses ? maintainedSidingSpec(name, baseSrgb) : sidingSpec(name, baseSrgb);
   const mat = new MeshStandardNodeMaterial({ roughness: spec.roughness, metalness: spec.metalness });
   mat.name = name;
   mat.type = 'MeshStandardMaterial';
@@ -194,7 +235,11 @@ export function createSidingMaterial(
   setNuketown2FamilyUniform(uniforms, 'sidingWainscot', sharedWainscotHex === undefined ? 0 : 1);
   setNuketown2FamilyUniform(uniforms, 'sidingWainscotColor', new THREE.Color().setHex(sharedWainscotHex ?? baseSrgb, THREE.SRGBColorSpace));
   setNuketown2FamilyUniform(uniforms, 'sidingWainscotTop', snapped);
-  const shared = sharedSidingGraph(uniforms, textureBridge);
+  const shared = options.geometricCourses
+    ? maintainedPaintGraph(uniforms, textureBridge)
+    : sharedSidingGraph(uniforms, textureBridge);
+  mat.userData.nuketown2SidingCourseAuthority = options.geometricCourses ? 'geometry' : 'material';
+  mat.userData.nuketown2Spec = spec;
   mat.colorNode = shared.colorNode;
   mat.roughnessNode = shared.roughnessNode;
   mat.normalNode = shared.normalNode;

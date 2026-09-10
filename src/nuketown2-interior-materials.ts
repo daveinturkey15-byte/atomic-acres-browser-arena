@@ -51,16 +51,14 @@ const GARAGE_FLOAT_M = 0.00012;
 const GARAGE_SWIRL_M = 0.00015;
 /** 0.06 mm drywall orange-peel roll texture, metres: slope ~0.5 on 0.8 mm. */
 const DRYWALL_PEEL_M = 0.00006;
-/** 1.5 mm taped-joint crown every 1.2 m, metres. */
-const DRYWALL_JOINT_CROWN_M = 0.0015;
 
 function drywallSpec(name: string, baseSrgb: number): Nuketown2MaterialSpec {
   return assertSpec({
-    name, family: 'concrete', baseSrgb, roughness: 0.94, metalness: 0.01,
-    grain: { sizeM: 0.0008, albedo: 0.030, roughness: 0.06 },
-    scuff: { sizeM: 0.045, albedo: 0.055, roughness: 0.09 },
-    traffic: { sizeM: 1.2, albedo: 0.060, roughness: 0.07 },
-    soil: 0.075, readDistanceM: 0.5,
+    name, family: 'concrete', baseSrgb, roughness: 0.82, metalness: 0,
+    grain: { sizeM: 0.0008, albedo: 0.060, roughness: 0.045 },
+    scuff: { sizeM: 0.045, albedo: 0.030, roughness: 0.025 },
+    traffic: { sizeM: 1.2, albedo: 0.015, roughness: 0.02 },
+    soil: 0.002, readDistanceM: 0.5,
   });
 }
 
@@ -215,28 +213,14 @@ export function createNuketown2DrywallMaterial(colorHex: number): MeshStandardNo
   const uniforms = createNuketown2Uniforms(spec, colorHex, 0x6b5741, mat);
   mat.userData.nuketown2Spec = spec;
   const wear = buildWear(spec, boxUv(), undefined, uniforms);
-  const p = positionWorld;
-
-  // Taped-joint crown every 1.2 m of wall run: peaks ON the joint line.
-  const run = p.x.add(p.z).div(float(1.2));
-  const jointDist = float(0.5).sub(abs(fract(run).sub(float(0.5))));
-  const crown = float(1).sub(smoothstep(float(0.0), float(0.06), jointDist));
-
   // The base colour is a per-material UNIFORM, not baked constants, so every
   // drywall tint shares one compiled pipeline (HF-477 pattern).
   const base = uniform(new THREE.Vector3(baseColor.r, baseColor.g, baseColor.b));
-  // Rising damp: the board shows a scuffed grey band climbing the lower wall.
-  // A 1 m world-Y gradient gated by the metre-scale soil field, concrete.ts
-  // weather-band precedent. One-sided (dirt subtracts), tinted to soil.
-  const dampBand = float(1).sub(smoothstep(float(0.05), float(1.0), p.y));
-  const damp = dampBand.mul(wear.soilMask.mul(float(0.6)).add(float(0.4)));
-  const damped = base.mul(float(1).sub(damp.mul(float(0.18))));
-  mat.colorNode = damped.mul(wear.albedoMul);
-  mat.roughnessNode = clamp(wear.roughness.add(damp.mul(float(0.10))), float(0.05), float(1.0));
-  // RELIEF (diagnostic C3b, flattened to zero): joint crown plus the
-  // distance-faded orange-peel roll texture. Revert once measured.
-  void crown; void DRYWALL_PEEL_M; void DRYWALL_JOINT_CROWN_M;
-  mat.normalNode = reliefNormal(float(0));
+  // Maintained residential plaster has a continuous painted finish. Rising
+  // damp and visible taped joints made every ground room read as abandoned.
+  mat.colorNode = base.mul(wear.albedoMul);
+  mat.roughnessNode = clamp(wear.roughness, float(0.72), float(0.92));
+  mat.normalNode = reliefNormal(wear.grain.mul(float(DRYWALL_PEEL_M)));
   return mat;
 }
 
