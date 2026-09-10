@@ -35,6 +35,7 @@ import { evaluateMpSoakV21, naturalDeathRespawnMapped, SOAK_CONTRACT } from './m
 import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 import { finalizationWriter } from './mp-soak-finalization.mjs';
+import { reloadStageDiagnostic } from './mp-reload-stage-diagnostic.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
@@ -53,6 +54,8 @@ const positionBoundM = MP_SOAK_THRESHOLDS.positionBoundM;
 const QA_SEED = 'hf499-mp-soak-20260904';
 const argv = process.argv.slice(2);
 const menuDiagnostic=argv.includes('--menu-diagnostic');
+const reloadDiagnostic=argv.includes('--reload-diagnostic');
+if(menuDiagnostic&&reloadDiagnostic)throw Error('Choose one diagnostic');
 const arg = (name, fallback) => {
   const index = argv.indexOf(name);
   return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
@@ -67,6 +70,7 @@ const distPath = resolve(REPO_ROOT, arg('--dist', 'dist'));
 if(!/^[0-9a-f]{40}$/.test(sourceSha??''))throw Error('Exact immutable source --sha required');
 if(existsSync(join(outDir, `${label}-bundle.json`)))throw Error('Never overwrite prior MP evidence');
 if(menuDiagnostic&&existsSync(join(outDir,`${label}-menu-diagnostic.json`)))throw Error('Never overwrite menu evidence');
+if(reloadDiagnostic&&existsSync(join(outDir,`${label}-reload-diagnostic.json`)))throw Error('Never overwrite reload evidence');
 if(existsSync(join(outDir,`${label}-finalization.json`)))throw Error('Never overwrite finalization evidence');
 const driverSha=spawnSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8',windowsHide:true,timeout:3000}).stdout?.trim();
 if(!/^[0-9a-f]{40}$/.test(driverSha??''))throw Error('Exact test-driver revision required');
@@ -454,6 +458,20 @@ function formatAdmissionSection() {
 }
 
 async function writeEvidence() {
+  if(reloadDiagnostic) {
+    mkdirSync(outDir,{recursive:true});
+    await writeFile(join(outDir,`${label}-reload-diagnostic.json`),JSON.stringify({schema:'reload-stage-diagnostic-v1',runtimeSha:sourceSha,driverSha,failure:bundle.failure,liveArtifact:bundle.liveArtifact,...bundle.reloadDiagnostic},null,2)+'\n');
+    console.log(`Reload diagnostic: ${join(outDir,`${label}-reload-diagnostic.json`)}`);
+    return;
+  }
+  if(reloadDiagnostic) {
+    bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
+    bundle.reloadDiagnostic={};
+    await reloadStageDiagnostic(peers,bundle.reloadDiagnostic,viewOf,sleep);
+    await writeEvidence();
+    if(Object.values(bundle.reloadDiagnostic.guests).some(row=>!row.completed||!row.refilled||!row.noExtraDeaths))process.exitCode=1;
+    return;
+  }
   if(menuDiagnostic) {
     const result={schema:'menu-lifecycle-diagnostic-v1',runtimeSha:sourceSha,
       driverSha,
