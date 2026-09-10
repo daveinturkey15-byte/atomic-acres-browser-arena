@@ -148,9 +148,20 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketow
   const run = p.x.add(p.z);
   const courseV = p.y.div(float(BLOCK_COURSE_M));
   const courseIdx = floor(courseV);
-  const bedJoint = smoothstep(float(0.012), float(0.0), abs(fract(courseV).sub(float(0.5))).mul(float(BLOCK_COURSE_M)));
+  // Align joints with the integer boundaries where the stagger and unit hash
+  // change. Centre-cell joints left an unjointed height step inside each face.
+  const bedDist = float(0.5).sub(abs(fract(courseV).sub(float(0.5)))).mul(float(BLOCK_COURSE_M));
   const stretcherU = run.add(courseIdx.mul(float(BLOCK_STRETCHER_M * 0.5))).div(float(BLOCK_STRETCHER_M));
-  const perpJoint = smoothstep(float(0.012), float(0.0), abs(fract(stretcherU).sub(float(0.5))).mul(float(BLOCK_STRETCHER_M)));
+  const perpDist = float(0.5).sub(abs(fract(stretcherU).sub(float(0.5)))).mul(float(BLOCK_STRETCHER_M));
+  // Filter from continuous world coordinates, never derivatives across fract
+  // or the stagger jump. Preserve the authored 12 mm half-support and fade its
+  // peak as the pixel footprint grows rather than point-sampling a thin line.
+  const bedAa = max(abs(p.y.dFdx()), abs(p.y.dFdy()));
+  const perpAa = max(abs(run.dFdx()), abs(run.dFdy()));
+  const bedW = float(0.012).add(bedAa);
+  const perpW = float(0.012).add(perpAa);
+  const bedJoint = smoothstep(bedW, float(0.0), bedDist).mul(float(0.012).div(bedW));
+  const perpJoint = smoothstep(perpW, float(0.0), perpDist).mul(float(0.012).div(perpW));
   const blockJoint = max(bedJoint, perpJoint);
   const jointX = smoothstep(float(0.006), float(0.0), abs(fract(p.x.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
   const jointZ = smoothstep(float(0.006), float(0.0), abs(fract(p.z.div(float(SLAB_JOINT_M))).sub(float(0.5))).mul(float(SLAB_JOINT_M)));
