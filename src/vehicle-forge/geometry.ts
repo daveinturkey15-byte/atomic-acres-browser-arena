@@ -561,7 +561,19 @@ function pushTriangle(
   uv: readonly Vec2[],
   indices: readonly [number, number, number],
   flip: boolean,
+  orientPerTriangle = false,
 ): void {
+  if (orientPerTriangle) {
+    // A twisted quad's second triangle need not share the first triangle's
+    // winding decision. Use this triangle's averaged analytic normal in the
+    // Float32 representation actually sent to the GPU. Vertex records remain
+    // attached; only their order can change. Preserve degenerate topology.
+    const positions = indices.map((index): Vec3 => [Math.fround(p[index]![0]), Math.fround(p[index]![1]), Math.fround(p[index]![2])]);
+    const a = positions[0]!, b = positions[1]!, c = positions[2]!;
+    const face = cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]);
+    const reference = [0, 1, 2].map(axis => indices.reduce((sum, index) => sum + Math.fround(n[index]![axis]!), 0));
+    if (Math.hypot(...face) >= 1e-10) flip = face.reduce((sum, value, axis) => sum + value * reference[axis]!, 0) < 0;
+  }
   const order = flip ? ([indices[0], indices[2], indices[1]] as const) : indices;
   for (const index of order) {
     const position = p[index]!;
@@ -597,6 +609,7 @@ function needsFlip(positions: readonly Vec3[], reference: Vec3): boolean {
  * dark lining is what makes a window look like a hole.
  */
 export function loftBody(spec: VehicleSpec): LoftResult {
+  const orientPerTriangle = spec.id === 'nuketown2-truck-cab' || spec.id === 'nuketown2-sedan';
   const stations = collectStations(spec);
   const rings = stations.map((z) => stationRing(spec, z));
   const body = emptySink();
@@ -641,8 +654,8 @@ export function loftBody(spec: VehicleSpec): LoftResult {
       ];
       const flip = needsFlip(positions, normals[0]!);
       const sink = sinkFor(kind);
-      pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
-      pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
+      pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip, orientPerTriangle);
+      pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip, orientPerTriangle);
     }
   }
 
@@ -740,8 +753,8 @@ export function loftBody(spec: VehicleSpec): LoftResult {
         ];
         const uvs: Vec2[] = [[0, 0], [0, 1], [1, 1], [1, 0]];
         const flip = needsFlip(positions, inward[0]!);
-        pushTriangle(lining, positions, inward, uvs, [0, 1, 2], flip);
-        pushTriangle(lining, positions, inward, uvs, [0, 2, 3], flip);
+        pushTriangle(lining, positions, inward, uvs, [0, 1, 2], flip, orientPerTriangle);
+        pushTriangle(lining, positions, inward, uvs, [0, 2, 3], flip, orientPerTriangle);
       }
     }
   }
@@ -769,6 +782,7 @@ export function latheGeometry(
   profile: readonly Vec2[],
   segments: number,
   smoothDegrees = 40,
+  omitCollapsedPoleTriangles = false,
 ): THREE.BufferGeometry {
   const sink = emptySink();
   const count = profile.length;
@@ -817,8 +831,11 @@ export function latheGeometry(
         [s / segments, (k + 1) / (count - 1)],
       ];
       const flip = needsFlip(positions, normals[0]!);
-      pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
-      pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
+      // At a true radius-zero pole one pair of corners is identical. Omit
+      // only that zero-area face on the opt-in route; retain every visible
+      // triangle and its complete position/normal/UV record unchanged.
+      if (!omitCollapsedPoleTriangles || a[0] !== 0) pushTriangle(sink, positions, normals, uvs, [0, 1, 2], flip);
+      if (!omitCollapsedPoleTriangles || b[0] !== 0) pushTriangle(sink, positions, normals, uvs, [0, 2, 3], flip);
     }
   }
   return toGeometry(sink, 'lathe')!;

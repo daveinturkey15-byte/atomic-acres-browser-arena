@@ -856,7 +856,7 @@ export function buildForgedWheelSet(
   const wheelSetAxles = [...new Set(forgedWheelSetCentres(radius, trackHalfWidth, axleZ).map((centre) => centre.z))];
   for (const z of wheelSetAxles) {
     for (const side of [1, -1] as const) {
-      const wheel = wheelParts(radius, tyreHalfWidth, style);
+      const wheel = wheelParts(radius, tyreHalfWidth, style, id === 'nuketown2-truck-bogie');
       const place = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         side === 1 ? geometry : mirroredToLeft(geometry), side * trackHalfWidth, radius, z,
       );
@@ -912,6 +912,7 @@ export function buildForgedVehicle(
   materials: ForgedVehicleMaterials,
 ): ForgedVehicle {
   const loft = loftBody(spec);
+  const nonCoachAllocation = spec.id === 'nuketown2-truck-cab' || spec.id === 'nuketown2-sedan';
   const parts: Record<Bucket, THREE.BufferGeometry[]> = {
     paint: [loft.body], accent: [], glass: [], lining: [], groove: [], chrome: [], tyre: [], headLamp: [], tailLamp: [],
   };
@@ -925,7 +926,7 @@ export function buildForgedVehicle(
   const axles = [...new Set(forgedVehicleWheelCentres(spec, dressing.extraWheelZ).map((centre) => centre.z))];
   for (const z of axles) {
     for (const side of [1, -1] as const) {
-      const wheel = wheelParts(spec.wheelRadius, spec.tyreHalfWidth, dressing.wheelStyle);
+      const wheel = wheelParts(spec.wheelRadius, spec.tyreHalfWidth, dressing.wheelStyle, nonCoachAllocation);
       const place = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         side === 1 ? geometry : mirroredToLeft(geometry),
         side * spec.trackHalfWidth,
@@ -948,7 +949,7 @@ export function buildForgedVehicle(
   if (dressing.headLamps) {
     const { x, y, radius } = dressing.headLamps;
     for (const side of [1, -1] as const) {
-      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18);
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18, nonCoachAllocation);
       const nose = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         mirroredToLeft(geometry), side * -x, y, -0.006,
       );
@@ -959,7 +960,7 @@ export function buildForgedVehicle(
   if (dressing.tailLamps) {
     const { x, y, radius } = dressing.tailLamps;
     for (const side of [1, -1] as const) {
-      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18);
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18, nonCoachAllocation);
       const tail = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         geometry, side * x, y, spec.length + 0.006,
       );
@@ -1334,7 +1335,7 @@ export function buildForgedVehicle(
       dressing.stripe.z1,
       dressing.stripe.height,
       dressing.stripe.proud,
-      spec.id === 'nuketown2-coach',
+      spec.id === 'nuketown2-coach' || nonCoachAllocation,
     );
     if (strip) parts[dressing.stripe.bucket].push(strip);
   }
@@ -1349,7 +1350,7 @@ export function buildForgedVehicle(
         rails.z1,
         rails.halfWidth ?? 0.03,
         rails.height ?? 0.045,
-        spec.id === 'nuketown2-coach',
+        spec.id === 'nuketown2-coach' || nonCoachAllocation,
       );
       if (rail) parts[rails.bucket].push(rail);
     }
