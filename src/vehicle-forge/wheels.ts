@@ -165,14 +165,14 @@ export interface LampParts {
  * the bezel puts it behind the bezel's own solid front face, and it renders
  * black no matter how bright the emissive is.
  */
-export function lampParts(radius: number, depth: number): LampParts {
+export function lampParts(radius: number, depth: number, radialSegments = 18): LampParts {
   const bezelProfile: Vec2[] = [
     [radius, -depth],
     [radius, 0],
     [radius * 0.86, 0.0015],
     [radius * 0.84, -0.004],
   ];
-  const bezel = latheGeometry(bezelProfile, 18, 40);
+  const bezel = latheGeometry(bezelProfile, radialSegments, 40);
   bezel.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   bezel.name = 'vehicle-forge-lamp-bezel';
 
@@ -181,7 +181,7 @@ export function lampParts(radius: number, depth: number): LampParts {
     [radius * 0.60, 0.0045],
     [0, 0.0055],
   ];
-  const lens = latheGeometry(lensProfile, 18, 40);
+  const lens = latheGeometry(lensProfile, radialSegments, 40);
   lens.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
   lens.name = 'vehicle-forge-lamp-lens';
 

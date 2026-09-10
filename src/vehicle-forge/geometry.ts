@@ -710,7 +710,7 @@ export function loftBody(spec: VehicleSpec): LoftResult {
     // quads are behind the floor. Full density here cost more triangles than
     // the body it hides inside.
     const spanned = rings.filter((ring) => ring.z >= from && ring.z <= to);
-    const inner = spanned.filter((_, index) => index % 3 === 0 || index === spanned.length - 1);
+    const sampled = spanned.filter((_, index) => index % 3 === 0 || index === spanned.length - 1);
     // Quads 6 to 17 - the greenhouse band, points 6 through 18, exactly
     // mirrored. It starts one point BELOW the belt so nothing shows past its
     // lower edge through a raked pane, and no lower: a lining that reaches the
@@ -719,6 +719,17 @@ export function loftBody(spec: VehicleSpec): LoftResult {
     // ballistic audit reports a car's own interior as unrated ghost cover.
     const LINING_FIRST_QUAD = 6;
     const LINING_LAST_QUAD = 17;
+    // Backdrop simplification is bounded to 1 mm per position component and
+    // 0.001 per normal component. It is not byte-identical H1 geometry.
+    // Other vehicles retain their exact original sampling.
+    const inner = spec.id === 'nuketown2-coach' ? redundantTrimStations(sampled, ring => {
+      const normals = ringNormals(ring.points, (ring.yLow + ring.yTop) / 2);
+      return Array.from({ length: LINING_LAST_QUAD - LINING_FIRST_QUAD + 2 }, (_, index) => {
+        const k = LINING_FIRST_QUAD + index;
+        return [ring.points[k]![0] - normals[k]![0] * liningInset,
+          ring.points[k]![1] - normals[k]![1] * liningInset, ...normals[k]!];
+      }).flat();
+    }, 0.001) : sampled;
     for (let i = 0; i < inner.length - 1; i += 1) {
       const a = inner[i]!;
       const b = inner[i + 1]!;
@@ -917,6 +928,39 @@ function flankAtHeight(ring: Ring, y: number): { x: number; nx: number; ny: numb
   return null;
 }
 
+/** Remove samples only within a declared bound; never bridge a missing surface.
+ * The error bound applies to every supplied position/normal component at every
+ * original station, not to a modulo stride. Endpoints remain exact.
+ */
+function redundantTrimStations(
+  rings: readonly Ring[],
+  sample: (ring: Ring) => readonly number[] | null,
+  epsilon = 1e-7,
+): readonly Ring[] {
+  if (rings.length < 3) return rings;
+  const values = rings.map(sample);
+  const keep = new Set([0, rings.length - 1]);
+  const pending: Array<[number, number]> = [[0, rings.length - 1]];
+  while (pending.length) {
+    const [first, last] = pending.pop()!;
+    if (last - first < 2) continue;
+    const a = values[first], b = values[last];
+    let split = -1, worst = epsilon;
+    for (let i = first + 1; i < last; i++) {
+      const value = values[i];
+      if (!a || !b || !value) { split = i; break; }
+      const t = (rings[i]!.z - rings[first]!.z) / (rings[last]!.z - rings[first]!.z);
+      const error = Math.max(...value.map((v, k) => Math.abs(v - (a[k]! + (b[k]! - a[k]!) * t))));
+      if (error > worst) { worst = error; split = i; }
+    }
+    if (split >= 0) {
+      keep.add(split);
+      pending.push([first, split], [split, last]);
+    }
+  }
+  return [...keep].sort((a, b) => a - b).map(i => rings[i]!);
+}
+
 export function stripAtHeight(
   rings: readonly Ring[],
   y: number,
@@ -924,11 +968,18 @@ export function stripAtHeight(
   z1: number,
   height: number,
   proud: number,
+  removeRedundantStations = false,
 ): THREE.BufferGeometry | null {
   const sink = emptySink();
   const low = Math.min(z0, z1);
   const high = Math.max(z0, z1);
-  const used = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const spanned = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const used = removeRedundantStations ? redundantTrimStations(spanned, ring => {
+    const hit = flankAtHeight(ring, y);
+    // Chrome strip: at most 0.1 mm position error and 0.01 per normal
+    // component. Retain every bend exceeding either bound, including seams.
+    return hit ? [hit.x + hit.nx * proud, y + hit.ny * proud, hit.nx * 0.01, hit.ny * 0.01] : null;
+  }, 0.0001) : spanned;
   for (let i = 0; i < used.length - 1; i += 1) {
     const a = used[i]!;
     const b = used[i + 1]!;
@@ -974,11 +1025,15 @@ export function roofRail(
   z1: number,
   halfWidth: number,
   height: number,
+  removeRedundantStations = false,
 ): THREE.BufferGeometry | null {
   const BED_M = 0.008;
   const low = Math.min(z0, z1);
   const high = Math.max(z0, z1);
-  const used = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const spanned = rings.filter((ring) => ring.z >= low && ring.z <= high);
+  const used = removeRedundantStations
+    ? redundantTrimStations(spanned, ring => [crownSurfaceY(spec, ring.z, xOffset)])
+    : spanned;
   if (used.length < 2) return null;
   const sink = emptySink();
   const quad = (positions: Vec3[], normal: Vec3, u: number): void => {

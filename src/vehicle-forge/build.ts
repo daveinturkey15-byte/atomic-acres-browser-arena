@@ -941,7 +941,7 @@ export function buildForgedVehicle(
   if (dressing.headLamps) {
     const { x, y, radius } = dressing.headLamps;
     for (const side of [1, -1] as const) {
-      const lamp = lampParts(radius, 0.06);
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18);
       const nose = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         mirroredToLeft(geometry), side * -x, y, -0.006,
       );
@@ -952,7 +952,7 @@ export function buildForgedVehicle(
   if (dressing.tailLamps) {
     const { x, y, radius } = dressing.tailLamps;
     for (const side of [1, -1] as const) {
-      const lamp = lampParts(radius, 0.06);
+      const lamp = lampParts(radius, 0.06, spec.id === 'nuketown2-coach' ? 12 : 18);
       const tail = (geometry: THREE.BufferGeometry): THREE.BufferGeometry => translated(
         geometry, side * x, y, spec.length + 0.006,
       );
@@ -1279,6 +1279,7 @@ export function buildForgedVehicle(
       dressing.stripe.z1,
       dressing.stripe.height,
       dressing.stripe.proud,
+      spec.id === 'nuketown2-coach',
     );
     if (strip) parts[dressing.stripe.bucket].push(strip);
   }
@@ -1293,6 +1294,7 @@ export function buildForgedVehicle(
         rails.z1,
         rails.halfWidth ?? 0.03,
         rails.height ?? 0.045,
+        spec.id === 'nuketown2-coach',
       );
       if (rail) parts[rails.bucket].push(rail);
     }
