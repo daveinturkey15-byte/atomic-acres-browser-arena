@@ -36,7 +36,7 @@ import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 import { captureReloadTrigger } from './reload-trigger-identity.mjs';
 import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 import { finalizationWriter } from './mp-soak-finalization.mjs';
-import { safeSkyShot, ammoAcknowledged, installReloadObserver, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
+import { safeSkyShotEvidence, ammoAcknowledged, installReloadObserver, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
@@ -591,6 +591,7 @@ async function reloadAfterNaturalLife(role, naturalLife) {
   let observers = {};
   let reloadTrigger;
   let safeShotEvidence = null;
+  let stageFailure = null;
   let reloadNodeBefore = null;
   let reloadNodeAfter = null;
   let deadlineNodeMs = null;
@@ -604,9 +605,8 @@ async function reloadAfterNaturalLife(role, naturalLife) {
       const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
       return { player: snapshot.player, privateMatch: { hostedBotCount: snapshot.privateMatch?.hostedBotCount }, remotePlayers: snapshot.remotePlayers.map((player) => ({ hp: player.hp, position: player.position })) };
     });
-    const safeShot = safeSkyShot(pose);
-    safeShotEvidence = { safe: safeShot, playerPosition: pose.player?.position ?? null, pitch: pose.player?.pitch ?? null, yaw: pose.player?.yaw ?? null };
-    if (!safeShot) throw Error('safe sky-shot prerequisite failed');
+    safeShotEvidence = safeSkyShotEvidence(pose);
+    if (!safeShotEvidence.safe) throw Error('safe sky-shot prerequisite failed');
     await peers[role].page.evaluate(() => window.__ATOMIC_ACRES_DEBUG__.fireOnce());
     const shotDeadline = Date.now() + 4_000;
     while (Date.now() < shotDeadline) {
@@ -646,17 +646,23 @@ async function reloadAfterNaturalLife(role, naturalLife) {
       }
       await sleep(Math.min(50, Math.max(0, deadlineNodeMs - Date.now())));
     }
+  } catch (error) {
+    stageFailure = String(error);
   } finally {
     observers = Object.fromEntries(await Promise.all(PEERS.map(async (peer) => [
       peer, await peers[peer].page.evaluate(collectReloadObserver).catch(() => null),
     ])));
-    for (const peer of PEERS) calibration.after[peer] = await calibrate(peers[peer].page);
+    for (const peer of PEERS) {
+      try { calibration.after[peer] = await calibrate(peers[peer].page); }
+      catch (error) { stageFailure ??= `after-calibration ${peer}: ${String(error)}`; calibration.after[peer] = null; }
+    }
   }
   const peerEvidence = Object.fromEntries(PEERS.map((peer) => [peer, normalizedReloadObserver(observers[peer], subjectId)]));
   const allAfter = allPeerAmmo(afterViews, subjectId);
   const report = {
     contract: RELOAD_V22_CONTRACT,
-    completed: true,
+    completed: stageFailure === null,
+    failure: stageFailure,
     subjectId,
     config: bundle.config,
     transaction: {

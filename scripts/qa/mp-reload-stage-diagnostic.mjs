@@ -13,6 +13,29 @@ export function safeSkyShot(snapshot) {
   });
 }
 
+// Diagnostic projection only: the existing predicate above remains the gate.
+// Retain every prerequisite's observed inputs when an unsafe pose stops a run.
+export function safeSkyShotEvidence(snapshot) {
+  const p = snapshot.player;
+  return {
+    safe: safeSkyShot(snapshot),
+    playerPosition: p?.position ? [...p.position] : null,
+    pitch: p?.pitch ?? null, yaw: p?.yaw ?? null,
+    alive: p?.alive ?? null, hp: p?.hp ?? null, weapon: p?.weapon ?? null,
+    hostedBotCount: snapshot.privateMatch?.hostedBotCount ?? null,
+    prerequisiteChecks: {
+      alive: p?.alive === true,
+      fullHealth: p?.hp === 100,
+      carbine: p?.weapon === 'carbine',
+      upwardPitch: Number.isFinite(p?.pitch) && p.pitch >= 1.35,
+      zeroHostedBots: snapshot.privateMatch?.hostedBotCount === 0,
+      twoRemotes: snapshot.remotePlayers.length === 2,
+      remotesFullHealth: snapshot.remotePlayers.every(remote => remote.hp === 100),
+    },
+    remotes: snapshot.remotePlayers.map(remote => ({ hp: remote.hp, position: [...remote.position] })),
+  };
+}
+
 export function ammoAcknowledged(rows,id,expected) {
   return V2_PEERS.every(role=>{
     const p=rows[role]?.players?.[id];
@@ -87,7 +110,7 @@ export async function reloadStageDiagnostic(peers,report,viewOf,sleep) {
         const s=window.__ATOMIC_ACRES_DEBUG__.snapshot();
         return {player:s.player,privateMatch:{hostedBotCount:s.privateMatch.hostedBotCount},remotePlayers:s.remotePlayers.map(p=>({hp:p.hp,position:p.position}))};
       });
-      row.safeShot={playerPosition:pose.player.position,pitch:pose.player.pitch,yaw:pose.player.yaw,safe:safeSkyShot(pose)};
+      row.safeShot=safeSkyShotEvidence(pose);
       if(!row.safeShot.safe)throw Error('Safe sky-shot cone prerequisite failed');
       row.shotNodeBefore=Date.now();
       await peers[role].page.evaluate(()=>window.__ATOMIC_ACRES_DEBUG__.fireOnce());
