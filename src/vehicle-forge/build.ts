@@ -1156,11 +1156,30 @@ export function buildForgedVehicle(
   const detail = dressing.detail;
   if (detail?.coach) {
     const coach = detail.coach;
-    const screenY = (coach.windscreen.y0 + coach.windscreen.y1) / 2;
-    const screenHeight = coach.windscreen.y1 - coach.windscreen.y0;
-    reliefFrontPair(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth, screenY, 0.055, screenHeight, 0.012);
-    reliefFrontBox(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth * 2 + 0.11, coach.windscreen.y1, 0.055, 0.012);
-    reliefFrontBox(parts, 'accent', 'detail.coach.destination-board', coach.destinationBoard.width, coach.destinationBoard.y, coach.destinationBoard.height, 0.012);
+    const cap = loft.rings[0]!;
+    const paneEdges = spec.noseGlass ? cap.points.slice(1,12).filter(point => point[1]>=spec.noseGlass!.yMin && point[1]<=spec.noseGlass!.yMax) : [];
+    if (paneEdges.length>=2) {
+      // Frame follows the actual glazed cap taper; old fixed halfWidth0.62
+      // placed a small disconnected rectangle inside a much wider pane.
+      const lower=paneEdges[0]!,upper=paneEdges[paneEdges.length-1]!;
+      const dx=upper[0]-lower[0],dy=upper[1]-lower[1];
+      for(const side of [1,-1] as const) {
+        const bar=nonIndexed(new THREE.BoxGeometry(.055,Math.hypot(dx,dy),.012));
+        bar.rotateZ(-side*Math.atan2(dx,dy));
+        translated(bar,side*(lower[0]+upper[0])/2,(lower[1]+upper[1])/2,-.006);
+        parts.chrome.push(markPart(bar,'detail.coach.windscreen-surround',.012));
+      }
+      for(const edge of [lower,upper])reliefFrontBox(parts,'chrome','detail.coach.windscreen-surround',edge[0]*2+.055,edge[1],.055,.012);
+      const browHeight=cap.yTop-upper[1];
+      const boardHeight=Math.min(coach.destinationBoard.height,Math.max(.02,browHeight-.04));
+      reliefFrontBox(parts,'accent','detail.coach.destination-board',coach.destinationBoard.width,upper[1]+browHeight/2,boardHeight,.012);
+    } else {
+      const screenY = (coach.windscreen.y0 + coach.windscreen.y1) / 2;
+      const screenHeight = coach.windscreen.y1 - coach.windscreen.y0;
+      reliefFrontPair(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth, screenY, 0.055, screenHeight, 0.012);
+      reliefFrontBox(parts, 'chrome', 'detail.coach.windscreen-surround', coach.windscreen.halfWidth * 2 + 0.11, coach.windscreen.y1, 0.055, 0.012);
+      reliefFrontBox(parts, 'accent', 'detail.coach.destination-board', coach.destinationBoard.width, coach.destinationBoard.y, coach.destinationBoard.height, 0.012);
+    }
     reliefFrontPair(parts, 'headLamp', 'detail.coach.fog-lamp', coach.fogLamps.x, coach.fogLamps.y, coach.fogLamps.width, coach.fogLamps.height, 0.012);
     for (let index = 0; index < Math.max(1, Math.floor(coach.rearLouvers.count)); index += 1) {
       const t = (index + 0.5) / Math.max(1, Math.floor(coach.rearLouvers.count));

@@ -49,19 +49,24 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
   wheelZ: Object.freeze([1.65, 7.45]),
   archGap: 0.05,
   top: Object.freeze([
-    { z: 0.0, yTop: 2.3, halfWidthTop: 0.85, topRadius: 0.44 },
-    { z: 0.55, yTop: 3.0, halfWidthTop: 1.14, topRadius: 0.34 },
+    // A full-height coach face, easing into the crowned roof. The former
+    // 2.30m dropped nose made a deep painted wedge below the top-arc screen.
+    { z: 0.0, yTop: 3.04, halfWidthTop: 1.10, topRadius: 0.32 },
+    { z: 0.55, yTop: 3.12, halfWidthTop: 1.14, topRadius: 0.34 },
     { z: 1.3, yTop: 3.26, halfWidthTop: 1.2, topRadius: 0.3 },
     { z: 7.9, yTop: 3.26, halfWidthTop: 1.2, topRadius: 0.3 },
     { z: 8.6, yTop: 3.04, halfWidthTop: 1.14, topRadius: 0.34 },
     { z: 9.1, yTop: 2.36, halfWidthTop: 0.86, topRadius: 0.44 },
   ]),
   sideGlass: Object.freeze([{ z0: 1.45, z1: 8.2 }]),
-  screens: Object.freeze([{ z0: 0.18, z1: 1.12 }, { z0: 8.5, z1: 9.02 }]),
+  // Front glazing now occupies the actual front face, not a second sunroof.
+  screens: Object.freeze([{ z0: 8.5, z1: 9.02 }]),
   shutLines: Object.freeze([1.36, 2.38, 6.7]),
   // A real coach screen in the raked front face, not only the sunroof-like
   // band the top arc gives: without it the nose is a blank painted panel.
-  noseGlass: Object.freeze({ yMin: 1.54, yMax: 2.31 }),
+  // Exact existing cap-ring heights: belt point7 to top-arc start point9.
+  // Whole-slice classification therefore gives one continuous0.97m pane.
+  noseGlass: Object.freeze({ yMin: 1.75, yMax: 2.72 }),
   // W4-374 roof crown: +30 mm at the centre plane over the flat 3.26 roof
   // run. Peak 3.29 stays inside the 3.3 dressed box (proportions gate).
   roofCrownM: 0.03,
