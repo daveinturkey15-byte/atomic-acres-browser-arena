@@ -403,6 +403,7 @@ import { HostKillstreakLoadoutAckRegistry, type HostKillstreakLoadoutAckIdentity
 import { renderPrivateLobbyView } from './mp-lobby-authority-views'; import { armRejoinLatch, clearAllRejoinLatches, clearRejoinLatch, evaluateRejoinLatchRecovery, noteRejoinLatchResend, rejoinLatchArmedAtMs, rejoinLatchLastResendAtMs } from './rejoin-latch-recovery';
 import { acceptLocalPickupResult as acceptLocalPickupResultAuthority, expirePendingLocalPickup as expirePendingLocalPickupAuthority, type PendingLocalPickup } from './mp-pickup-authority';
 import { createLocalReloadRetryRuntime } from './mp-reload-retry';
+import { captureReloadProtocolTrace, type ReloadProtocolTrace, type ReloadProtocolTraceInput } from './reload-protocol-trace';
 import {
   applyCareCaptureProjection,
   applyCareCaptureResult,
@@ -5858,7 +5859,7 @@ const remoteCombatInventoryRevisions = new Map<string, number>();
 const remoteReloadAuthorities = new Map<string, GuestReloadAuthorityState>();
 const remoteReloadTimers = new Map<string, number>();
 const remoteReloadResultCache = createRemoteReloadResultCache();
-const reloadProtocolTrace: Array<Readonly<{ atMs: number; role: string; direction: 'send' | 'receive' | 'cache-hit' | 'admit' | 'commit' | 'clear'; actorId: string; requestId: string; action: 'start' | 'cancel' | 'result'; status: string; reason: string; actionSequence: number }>> = [];
+const reloadProtocolTrace: ReloadProtocolTrace[] = [];
 const remoteHealthAuthorities = new Map<string, RemoteHealthAuthorityState>(); /* HF-535 host: what observers were last told. HF-535 observer: highest revision applied per subject. Both cleared with the health ledger. */ const publishedHealthAuthorities = new Map<string, PublishedHealthAuthority>(); const appliedHealthAuthorityRevisions = new Map<string, AppliedHealthAuthority>();
 const retainedRemoteAuthorities = new Map<string, Readonly<{
   snapshot: PlayerSnapshot;
@@ -6374,8 +6375,8 @@ function resetRemoteCombatInventory(snapshot: PlayerSnapshot, grenades = 1): Gue
   return setRemoteCombatInventory(snapshot.id, inventory);
 }
 
-function recordReloadProtocolTrace(input: Omit<typeof reloadProtocolTrace[number], 'atMs' | 'role'>): void {
-  reloadProtocolTrace.push(Object.freeze({ atMs: Math.round(performance.now()), role: network.role, ...input }));
+function recordReloadProtocolTrace(input: ReloadProtocolTraceInput): void {
+  reloadProtocolTrace.push(captureReloadProtocolTrace(input, network.role, performance.now(), killstreakMatchEpoch));
   if (reloadProtocolTrace.length > 128) reloadProtocolTrace.splice(0, reloadProtocolTrace.length - 128);
 }
 
@@ -6424,6 +6425,7 @@ function sendRemoteReloadResult(
   remoteReloadResultCache.set(remoteReloadResultCacheKey(playerId, connectionEpoch, remote.continuity, requestId), result);
   recordReloadProtocolTrace({
     direction: 'send', actorId: playerId, requestId, action: 'result', status, reason, actionSequence,
+    lifeId: result.lifeId, connectionEpoch: result.connectionEpoch,
   });
   network.send(result);
 }
@@ -6443,6 +6445,7 @@ function clearExpiredLocalReloadAuthority(now = performance.now()): boolean {
   recordReloadProtocolTrace({
     direction: 'clear', actorId: player.id, requestId: pending.requestId, action: 'result',
     status: 'cleared', reason: stale ? 'stale-life' : 'expired', actionSequence: pending.startSequence,
+    lifeId: pending.lifeId, connectionEpoch: pending.connectionEpoch,
   });
   recordMatchDiagnostic('reload-authority', 'rejected', {
     actorId: player.id,
@@ -6545,6 +6548,9 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
       direction: 'cache-hit', actorId: message.by, requestId: message.requestId,
       action: message.action, status: cached.status, reason: cached.reason,
       actionSequence: message.actionSequence,
+      lifeId: cached.lifeId, connectionEpoch: cached.connectionEpoch,
+      requestLifeId: message.lifeId, requestConnectionEpoch: message.connectionEpoch,
+      resultActionSequence: cached.actionSequence,
     });
     network.send(cached);
     return;
@@ -6573,6 +6579,7 @@ function acceptRemoteReloadIntent(message: ReloadIntentMessage): void {
     direction: 'admit', actorId: message.by, requestId: message.requestId,
     action: message.action, status: admission.accepted ? 'accepted' : 'rejected',
     reason: admission.reason, actionSequence: message.actionSequence,
+    lifeId: message.lifeId, connectionEpoch: message.connectionEpoch,
   });
   if (!admission.accepted) {
     sendRemoteReloadResult(
@@ -6606,7 +6613,7 @@ function acceptRemoteReloadResult(message: ReloadResultMessage): void {
   if (!outcome) return;
   remote.snapshot = outcome.snapshot;
   remoteCombatInventories.set(id, outcome.inventory); remoteCombatInventoryRevisions.set(id, message.combatInventory.revision);
-  recordReloadProtocolTrace({ direction: 'receive', actorId: id, requestId: message.requestId, action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence });
+  recordReloadProtocolTrace({ direction: 'receive', actorId: id, requestId: message.requestId, action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence, lifeId: message.lifeId, connectionEpoch: message.connectionEpoch });
 }
 
 function acceptLocalReloadResult(message: ReloadResultMessage): void {
@@ -6615,6 +6622,7 @@ function acceptLocalReloadResult(message: ReloadResultMessage): void {
   recordReloadProtocolTrace({
     direction: 'receive', actorId: message.forPlayerId, requestId: message.requestId,
     action: 'result', status: message.status, reason: message.reason, actionSequence: message.actionSequence,
+    lifeId: message.lifeId, connectionEpoch: message.connectionEpoch,
   });
   const outcome = applyReloadResult(
     pendingLocalReloadAuthority,
@@ -34241,8 +34249,12 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
       lastFiredAtMs: fireBlockTelemetry.lastFiredAtMs,
     },
     reloadAuthority: {
+      // Read by QA before a reload trigger; never reconstructed from a result.
+      localIdentity: { lifeId: localContinuity, connectionEpoch: localConnectionEpoch, matchEpoch: killstreakMatchEpoch },
       localPending: pendingLocalReloadAuthority ? {
         requestId: pendingLocalReloadAuthority.requestId,
+        lifeId: pendingLocalReloadAuthority.lifeId,
+        connectionEpoch: pendingLocalReloadAuthority.connectionEpoch,
         weapon: pendingLocalReloadAuthority.weapon,
         startSequence: pendingLocalReloadAuthority.startSequence,
         cancelSequence: pendingLocalReloadAuthority.cancelSequence,

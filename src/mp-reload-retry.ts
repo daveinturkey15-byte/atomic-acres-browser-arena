@@ -1,8 +1,9 @@
 import type { NetworkRole } from './network';
 import type { ReloadIntentMessage } from './protocol';
 import type { LocalReloadPending } from './local-reload-authority';
+import type { ReloadProtocolTraceInput } from './reload-protocol-trace';
 
-type ReloadRetryTrace = Readonly<{
+type ReloadRetryTrace = ReloadProtocolTraceInput & Readonly<{
   direction: 'send';
   actorId: string;
   requestId: string;
@@ -61,8 +62,10 @@ export function createLocalReloadRetryRuntime(context: ReloadRetryContext) {
     if (!message) return;
     context.record({
       direction: 'send',
-      actorId: context.getPlayerId(), requestId: message.requestId, action: message.action,
+      actorId: message.by, requestId: message.requestId, action: message.action,
       status: 'requested', reason: 'reliable-retry-lane', actionSequence: message.actionSequence,
+      lifeId: message.lifeId, connectionEpoch: message.connectionEpoch,
+      requestLifeId: pending.lifeId, requestConnectionEpoch: pending.connectionEpoch,
     });
     context.send(message);
     schedule(pending, action);
