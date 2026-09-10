@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { V2_PEERS, validNaturalLife } from './mp-soak-v2-contract.mjs';
 import { evaluateHealthLatencyV2 } from './health-latency-v2.mjs';
+import { settledLife } from './mp-soak-v2-runtime.mjs';
 
 export async function calibrate(page) {
   const rows=[];
@@ -15,7 +16,9 @@ export async function calibrate(page) {
 }
 export async function naturalDeathRespawn(peers, role, viewOf) {
   const subjectId=(await viewOf(peers[role].page)).selfId;
-  const before=Object.fromEntries(await Promise.all(V2_PEERS.map(async r=>[r,(await viewOf(peers[r].page)).players[subjectId]])));
+  const prerequisite=await settledLife(async()=>Object.fromEntries(await Promise.all(V2_PEERS.map(async r=>[r,(await viewOf(peers[r].page)).players[subjectId]]))),V2_PEERS);
+  const before=prerequisite.before;
+  if(!prerequisite.ok)return {subjectId,manualRespawn:false,prerequisite,before,dead:{},after:{},ok:false};
   const watches=V2_PEERS.map(async r=>{
     const handle=await peers[r].page.waitForFunction(id=>{
       const s=window.__ATOMIC_ACRES_DEBUG__.snapshot();
@@ -39,11 +42,15 @@ export async function naturalDeathRespawn(peers, role, viewOf) {
     return [r,(await viewOf(peers[r].page)).players[subjectId]];
   }));
   const after=Object.fromEntries(lifeWait.filter(r=>r.status==='fulfilled').map(r=>r.value));
-  const result={subjectId,manualRespawn:false,applied,before,dead,after};
+  const result={subjectId,manualRespawn:false,prerequisite,applied,before,dead,after};
   return {...result,ok:validNaturalLife(result)};
 }
 export async function rejoinV2(peers, bundle, viewOf) {
   const identityBefore=bundle.identities.guestB;
+  // The active-match lobby button is hidden. Follow the same visible pause
+  // and MAIN MENU route an owner uses; both buttons call returnToMainMenu.
+  await peers.guestB.page.keyboard.press('Escape');
+  await peers.guestB.page.locator('#main-menu').waitFor({state:'visible',timeout:2000});
   const hostBefore=await viewOf(peers.host.page);
   const transition={role:'guestB',identityBefore,beforeRevision:hostBefore.lobby?.revision,intentAt:Date.now(),leave:{},settled:{}};
   bundle.lifecycle.transition=transition;
@@ -57,15 +64,14 @@ export async function rejoinV2(peers, bundle, viewOf) {
     },identityBefore,{timeout:2000,polling:20});
     const row=await h.jsonValue();await h.dispose();return[role,row];
   }));
-  await peers.guestB.page.click('#lobby-leave',{force:true});
+  await peers.guestB.page.click('#main-menu',{timeout:2000});
   const leave=await observes;
   transition.leave=Object.fromEntries(leave.filter(r=>r.status==='fulfilled').map(r=>r.value));
   if(Object.keys(transition.leave).length!==2)throw Error('Both remaining peers must acknowledge intentional leave');
-  await peers.guestB.page.evaluate(()=>document.querySelector('#menu')?.classList.remove('hidden'));
   await peers.guestB.page.fill('#room-input',roomCode);
   await peers.guestB.page.waitForFunction(()=>document.querySelector('#join')?.disabled===false,undefined,{timeout:60000});
   transition.joinAt=Date.now();
-  await peers.guestB.page.click('#join',{force:true});
+  await peers.guestB.page.click('#join',{timeout:2000});
   const deadline=transition.joinAt+60000;
   for(const role of V2_PEERS) {
     const h=await peers[role].page.waitForFunction(()=>{

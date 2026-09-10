@@ -29,8 +29,9 @@ import {
   viewOf,
 } from './mp-audit.mjs';
 import { formatMpSoakTable, MP_SOAK_THRESHOLDS } from './mp-soak-assertions.mjs';
-import { evaluateMpSoakV2, inspectConnectedSample } from './mp-soak-v2-contract.mjs';
-import { naturalDeathRespawn, rejoinV2, damageBoundaryV2, verifyLiveArtifact } from './mp-soak-v2-scenarios.mjs';
+import { inspectConnectedSample } from './mp-soak-v2-contract.mjs';
+import { rejoinV2, damageBoundaryV2, verifyLiveArtifact } from './mp-soak-v2-scenarios.mjs';
+import { evaluateMpSoakV21, naturalDeathRespawnMapped, SOAK_CONTRACT } from './mp-soak-v21-life.mjs';
 import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -39,7 +40,7 @@ const PORTS = Object.freeze({
   peer: Number(process.env.MP_SOAK_PEER_PORT ?? '4234'),
 });
 const ALLOWED_QA_PORTS = new Set([4233, 4234, 4235]);
-const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate-v2');
+const OUT_DIR = resolve(REPO_ROOT, 'artifacts/qa/mp-soak-gate-v21');
 const PLAY_DURATION_MS = MP_SOAK_THRESHOLDS.playDurationMs;
 // Keep the browser lifetime below the five-minute owner fence while allowing
 // the already-installed Chrome/WebGPU stack to finish a cold boot and the
@@ -71,7 +72,7 @@ for (const port of Object.values(PORTS)) {
 
 const startedAtEpochMs = Date.now();
 const bundle = {
-  contract: 'mp-soak-gate-v2',
+  contract: SOAK_CONTRACT,
   sourceSha,
   productBase: '966dffb75b13ae35e2f29c44aee454ab18c87ca0',
   diagnosticBase: '566cad49238e6661d18fe69fbed4ba34ea21d401',
@@ -320,7 +321,7 @@ async function runGuestScenarios(role) {
     debug.setAmmo(weapon, 1, 90);
   });
   await sleep(200);
-  const life=await naturalDeathRespawn(peers,role,viewOf);
+  const life=await naturalDeathRespawnMapped(peers,role,viewOf);
   // Numeric lifecycle proof is retained without the old depth truncation.
   bundle.scenarios.guests[role].naturalLife=life;
   bundle.scenarios.guests[role].respawnLoadoutReset=life.ok;
@@ -455,7 +456,7 @@ async function writeEvidence() {
   }
   bundle.timing.endedAtEpochMs ??= Date.now();
   bundle.timing.playDurationMs = bundle.timing.playDurationMs || Math.max(0, bundle.timing.endedAtEpochMs - bundle.timing.startedAtEpochMs);
-  bundle.gate = evaluateMpSoakV2(bundle);
+  bundle.gate = evaluateMpSoakV21(bundle);
   mkdirSync(outDir, { recursive: true });
   await writeFile(join(outDir, `${label}-bundle.json`), `${JSON.stringify(bundle, null, 2)}\n`, 'utf8');
   await writeFile(join(outDir, `${label}-table.md`), `${formatMpSoakTable(bundle.gate.rows)}\n\n${formatAdmissionSection()}\n`, 'utf8');
