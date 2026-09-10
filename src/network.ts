@@ -14,6 +14,7 @@ import {
 import { pingMatchesBoundTeam, shouldRelayMessageToTeam } from './social-ping';
 import { clientRuntimeLogEntryFromError, type ClientRuntimeLogEntry } from './client-runtime-log';
 import { isReservedMultiplayerParticipantId } from './participant-identity';
+import { recordHealthEventTrace } from './qa-health-event-trace';
 
 // PASS 95 netcode diagnostics: the outbound half of the per-peer overlay.
 // Three call sites, all of them one line after an existing `transmit`, because
@@ -514,6 +515,7 @@ export class ArenaNetwork {
         // Recorded BEFORE the handler runs, so a row exists even when the
         // handler throws or the message is dropped by an admission gate.
         this.recordQaTrace('in', message, 'events');
+        recordHealthEventTrace('receive', message);
         onMessage(message);
       };
     this.onStatus = onStatus;
@@ -1663,6 +1665,7 @@ export class ArenaNetwork {
 
   private transmit(connection: DataConnection, message: GameMessage, stateTraffic: boolean): void {
     this.recordQaTrace('out', message, stateTraffic ? 'state' : 'events');
+    recordHealthEventTrace('send-queued', message);
     const impairment = qaNetworkImpairment();
     const sequence = this.qaEventSendSequence;
     this.qaEventSendSequence += 1;
@@ -1672,9 +1675,10 @@ export class ArenaNetwork {
     const send = () => {
       if (shouldDrop) {
         this.qaImpairedDrops += 1;
+        recordHealthEventTrace('send-drop', message);
         return;
       }
-      if (connection.open) connection.send(message);
+      if (connection.open) { recordHealthEventTrace('send-call', message); connection.send(message); }
     };
     if (impairment.delayMs <= 0 && impairment.jitterMs <= 0) {
       send();
