@@ -33,6 +33,7 @@ import { inspectConnectedSample } from './mp-soak-v2-contract.mjs';
 import { rejoinV2, damageBoundaryV2, verifyLiveArtifact } from './mp-soak-v2-scenarios.mjs';
 import { evaluateMpSoakV21, naturalDeathRespawnMapped, SOAK_CONTRACT } from './mp-soak-v21-life.mjs';
 import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
+import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
@@ -50,6 +51,7 @@ const DAMAGE_RTT_MS = MP_SOAK_THRESHOLDS.rttMs;
 const positionBoundM = MP_SOAK_THRESHOLDS.positionBoundM;
 const QA_SEED = 'hf499-mp-soak-20260904';
 const argv = process.argv.slice(2);
+const menuDiagnostic=argv.includes('--menu-diagnostic');
 const arg = (name, fallback) => {
   const index = argv.indexOf(name);
   return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
@@ -63,6 +65,7 @@ const sourceSha = arg('--sha', null);
 const distPath = resolve(REPO_ROOT, arg('--dist', 'dist'));
 if(!/^[0-9a-f]{40}$/.test(sourceSha??''))throw Error('Exact immutable source --sha required');
 if(existsSync(join(outDir, `${label}-bundle.json`)))throw Error('Never overwrite prior MP evidence');
+if(menuDiagnostic&&existsSync(join(outDir,`${label}-menu-diagnostic.json`)))throw Error('Never overwrite menu evidence');
 const TSX_CLI = resolve(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs');
 const ARENA_ROSTER_SCRIPT = resolve(REPO_ROOT, 'scripts/qa/mp-lab/arena-roster.mts');
 
@@ -443,6 +446,17 @@ function formatAdmissionSection() {
 }
 
 async function writeEvidence() {
+  if(menuDiagnostic) {
+    const result={schema:'menu-lifecycle-diagnostic-v1',runtimeSha:sourceSha,
+      driverSha:spawnSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8',windowsHide:true}).stdout.trim(),
+      scope:'early headless pause-input diagnostic, not multiplayer acceptance',failure:bundle.failure,
+      observed:bundle.menuOpening??[],liveArtifact:bundle.liveArtifact,
+      menuVisible:bundle.menuOpening?.at(-1)?.label==='visible-menu'};
+    mkdirSync(outDir,{recursive:true});
+    await writeFile(join(outDir,`${label}-menu-diagnostic.json`),JSON.stringify(result,null,2)+'\n');
+    console.log(JSON.stringify(result));
+    return;
+  }
   // HF-535 (evidence only): mp-audit keeps its own findings array and the soak
   // gate kept a different one appended only by noteFailure, so every
   // RELOAD-UNACKNOWLEDGED / DESYNC-* / PICKUP-* detail the driver recorded was
@@ -524,6 +538,14 @@ async function main() {
   await peers.host.page.waitForFunction(() => document.querySelector('#lobby-start')?.disabled === false, undefined, { timeout: 60_000 });
   await peers.host.page.click('#lobby-start');
   await Promise.all(PEERS.map((role) => peers[role].page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true && window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active' && window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2, undefined, { timeout: 180_000 })));
+
+  if(menuDiagnostic) {
+    bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
+    bundle.menuOpening=[];
+    await ensurePauseMenu(peers.guestB.page,bundle.menuOpening);
+    await writeEvidence();
+    return;
+  }
 
   // All three arenas are active before this point. Run the geometry probe once
   // before the timed sampling window so its deliberate local teleport cannot be
