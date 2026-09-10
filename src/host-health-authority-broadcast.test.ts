@@ -143,7 +143,7 @@ describe('HF-535 host publication ordering', () => {
     hostTimeMs: 1_000, nonce: 42, continuity: 3, nowMs: 0,
   };
 
-  it('publishes the first fact about a player and then only on a drop or life change', () => {
+  it('publishes the first fact, keeps unchanged health quiet and publishes a drop', () => {
     const first = evaluateHealthAuthorityPublication({ ...base, hp: 100, alive: true, published: undefined });
     expect(first.reason).toBe('published');
     expect(first.message?.revision).toBe(0);
@@ -158,7 +158,7 @@ describe('HF-535 host publication ordering', () => {
     expect(damaged.message?.revision).toBe(1);
   });
 
-  it('refreshes the ledger on a silent regeneration so the next real drop still publishes', () => {
+  it('tracks regeneration so the next real drop still publishes', () => {
     // The regression this guards: if the unchanged branch kept the old low
     // watermark, a player who fell to 80 and regenerated to 100 would never
     // publish the NEXT fall to 80 - the drop would look like no change.

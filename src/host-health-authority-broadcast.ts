@@ -41,8 +41,9 @@ export const HEALTH_AUTHORITY_MAX_HP = 100;
  * seeded loss, and that loss is applied BEFORE `connection.send`, so it hits the
  * reliable event lane too - a single-shot health fact has a 1-in-100 chance of
  * simply never existing for one observer, with no retransmit to save it. Three
- * copies 35 ms apart all land inside the 120 ms bound (60/95/130 ms one-way for
- * the first two) and are idempotent: the revision is unchanged, so an observer
+ * copies 35 ms apart have nominal 60/95/130 ms arrival times before scheduling
+ * overhead: only the first two fit 120 ms, so this is NOT latency proof. They
+ * are idempotent: the revision is unchanged, so an observer
  * that already applied the fact rejects the copies as `stale-revision`.
  */
 export const HEALTH_AUTHORITY_EMIT_COPIES = 3;
@@ -104,11 +105,13 @@ export type HealthAuthorityPublishResult = Readonly<{
  * Publishes on: the first evaluation for a player (fail-open would mean a
  * damage hit between the player appearing and its first tick never reaching
  * anyone), a life/continuity change, an `alive` transition, or a drop in whole
- * hp. It does NOT publish on regeneration upward: an increase already rides
- * the victim's next relayed state within one snapshot period and no observer
- * decision is unsafe while it is briefly low, whereas a per-tick regeneration
- * broadcast would put ~10 reliable messages per second per player on the event
- * lane for no correctness gain.
+ * hp, plus one checkpoint on reaching full health. Partial regeneration stays
+ * silent: publishing every tick would flood the reliable event lane. A newer
+ * movement state cannot itself release the observer's same-life damage clamp,
+ * so the former assumption that relayed state carries regeneration was false
+ * (three-peer118e soak: host/subject100, observer80). Full healing therefore
+ * needs its own revision, including while an older damage copy train is open.
+ * Partial-regeneration convergence remains a separate, explicitly open gap.
  */
 export function evaluateHealthAuthorityPublication(
   input: HealthAuthorityPublishInput,
@@ -135,7 +138,8 @@ export function evaluateHealthAuthorityPublication(
     || !prior
     || prior.continuity !== input.continuity
     || alive !== prior.alive
-    || Math.floor(hp) < Math.floor(prior.hp);
+    || Math.floor(hp) < Math.floor(prior.hp)
+    || (alive && hp === HEALTH_AUTHORITY_MAX_HP && prior.hp < HEALTH_AUTHORITY_MAX_HP);
   const mint = (
     factHp: number, factAlive: boolean, factContinuity: number, revision: number,
   ): HealthAuthorityMessage => ({
