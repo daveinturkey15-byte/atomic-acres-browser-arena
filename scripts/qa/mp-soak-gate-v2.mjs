@@ -31,6 +31,7 @@ import {
 import { formatMpSoakTable, MP_SOAK_THRESHOLDS } from './mp-soak-assertions.mjs';
 import { evaluateMpSoakV2, inspectConnectedSample } from './mp-soak-v2-contract.mjs';
 import { naturalDeathRespawn, rejoinV2, damageBoundaryV2, verifyLiveArtifact } from './mp-soak-v2-scenarios.mjs';
+import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
@@ -119,7 +120,9 @@ let peerServer = null;
 let browsers = [];
 let peers = {};
 let hardStopTimer = null;
+let hardKillTimer = null;
 let stopping = false;
+const cancellation = new AbortController();
 const stairGeometryCache = new Map();
 
 function arenaStairGeometry(arena, team) {
@@ -194,13 +197,14 @@ function admissionDeltaFor(role, drops) {
 async function sampleReplication(playStart) {
   let second = 0;
   let nextSample = playStart;
-  while (bundle.replication.samples.length < 180 || Date.now()-playStart < PLAY_DURATION_MS) {
-    await sleep(Math.max(0, nextSample-Date.now()));
+  while (!cancellation.signal.aborted && (bundle.replication.samples.length < 180 || Date.now()-playStart < PLAY_DURATION_MS)) {
+    if(!await waitOrStop(nextSample-Date.now(),cancellation.signal))return;
     const atEpochMs=Date.now();
     // Capture the transition state before reads; if it changes during reads,
     // retain this as a lifecycle sample instead of claiming connected coverage.
     const wasTransition=bundle.lifecycle.active;
     const views = await peerViews();
+    if(cancellation.signal.aborted)return;
     const readEndedAt=Date.now();
     const transitioning=wasTransition||bundle.lifecycle.active
       ||(bundle.lifecycle.transition?.intentAt>=atEpochMs&&bundle.lifecycle.transition.intentAt<=readEndedAt);
@@ -370,11 +374,16 @@ async function scoreboardAtEnd() {
 }
 
 async function scriptedPlay(playStart) {
-  await Promise.all([runGuestScenarios('guestA'), runGuestScenarios('guestB')]);
+  // Fire/death probes share authoritative targets. Do not let one guest's
+  // probe kill or advance the other guest while its baseline is being read.
+  for(const role of ['guestA','guestB']) {
+    if(cancellation.signal.aborted)return;
+    await runGuestScenarios(role);
+  }
   let rejoined = false;
   let lastPulse = Date.now();
   let pulse = 0;
-  while (bundle.replication.samples.length < 180 || Date.now()-playStart < PLAY_DURATION_MS) {
+  while (!cancellation.signal.aborted && (bundle.replication.samples.length < 180 || Date.now()-playStart < PLAY_DURATION_MS)) {
     const elapsed = Date.now() - playStart;
     if (!rejoined && elapsed >= 90_000) {
       const rejoin=await rejoinV2(peers,bundle,viewOf);
@@ -391,26 +400,29 @@ async function scriptedPlay(playStart) {
       lastPulse = Date.now();
       pulse += 1;
     }
-    await sleep(250);
+    if(!await waitOrStop(250,cancellation.signal))return;
   }
 }
 
-function killBrowserTree(browser) {
-  const pid = browser?.process?.()?.pid;
-  if (process.platform === 'win32' && Number.isInteger(pid) && pid > 0) {
-    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+function terminateOwnedRun(code) {
+  // This dedicated Node driver owns the server and every browser descendant.
+  // Playwright Browser has no public process() API. Never enumerate/kill by
+  // executable name or affect an owner's unrelated Chrome processes.
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/PID', String(process.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout:1000 });
   }
+  process.exit(code);
 }
 
-async function closeOwnedBrowsers(force = false) {
-  for (const peer of Object.values(peers)) {
-    if (force) killBrowserTree(peer.browser);
-    else await peer.context.close().catch(() => {});
-  }
-  for (const browser of browsers) {
-    if (force) killBrowserTree(browser);
-    else await browser.close().catch(() => {});
-  }
+async function closeOwnedBrowsers() {
+  await boundedStep(()=>Promise.all(browsers.map(browser=>browser.close())),3000,'owned browser cleanup');
+}
+
+async function captureFailureDiagnostics() {
+  for(const role of PEERS)bundle.consoleErrors[role]=[...(peers[role]?.errors?.page??[]),...(peers[role]?.errors?.console??[])];
+  await Promise.all(PEERS.map(async role=>{
+    bundle.trace[role]=await boundedStep(()=>traceOf(peers[role]?.page),1000,`${role} failure trace`).catch(()=>null);
+  }));
 }
 
 function formatAdmissionSection() {
@@ -456,15 +468,11 @@ async function writeEvidence() {
 async function hardStop() {
   if (stopping) return;
   stopping = true;
-  bundle.failure = `hard browser-run timeout after ${HARD_TIMEOUT_MS} ms`;
+  cancellation.abort();
+  bundle.failure = `run incomplete; finalization reserve before hard ${HARD_TIMEOUT_MS}ms browser ceiling`;
   bundle.completed = false;
-  for (const role of PEERS) bundle.consoleErrors[role] = [...(peers[role]?.errors?.page ?? []), ...(peers[role]?.errors?.console ?? [])];
-  for (const role of PEERS) bundle.trace[role] = await traceOf(peers[role]?.page).catch(() => null);
-  await writeEvidence().catch((error) => console.error(`[mp-soak] evidence write failed: ${error.message}`));
-  await closeOwnedBrowsers(true);
-  peerServer?.kill();
-  server?.close();
-  process.exit(124);
+  await boundedStep(writeEvidence,2000,'timeout evidence').catch(error=>console.error(error.message));
+  terminateOwnedRun(124);
 }
 
 async function main() {
@@ -474,8 +482,16 @@ async function main() {
   bundle.arena = arena.id;
   server = await serveDist(PORTS.dist);
   peerServer = await startPeerServer(PORTS.peer);
-  browsers = await Promise.all(PEERS.map(() => chromium.launch({ headless: true, channel: 'chrome', args: chromeArgs() })));
-  hardStopTimer = setTimeout(() => { void hardStop(); }, HARD_TIMEOUT_MS);
+  // Keep protection alive through failure diagnostics and finalization. The
+  // last five seconds are reserved for evidence/cleanup, not extra gameplay.
+  hardKillTimer=setTimeout(()=>terminateOwnedRun(124),HARD_TIMEOUT_MS);
+  hardStopTimer=setTimeout(()=>{void hardStop();},HARD_TIMEOUT_MS-5000);
+  const launches=await Promise.allSettled(PEERS.map(async()=>{
+    const browser=await chromium.launch({headless:true,channel:'chrome',args:chromeArgs()});
+    browsers.push(browser);
+  }));
+  const launchFailure=launches.find(result=>result.status==='rejected');
+  if(launchFailure)throw launchFailure.reason;
   peers = Object.fromEntries(await Promise.all(PEERS.map(async (role, index) => {
     const browser = browsers[index];
     const peer = await openPeer(browser, role, arena.id, role === 'host' ? 'HOST' : role === 'guestA' ? 'GUESTA' : 'GUESTB', {
@@ -534,20 +550,21 @@ async function main() {
 try {
   await main();
 } catch (error) {
+  cancellation.abort();
   bundle.failure = String(error?.stack ?? error?.message ?? error).slice(0, 2_000);
   noteFailure('run', error);
-  for (const role of PEERS) {
-    bundle.consoleErrors[role] = [...(peers[role]?.errors?.page ?? []), ...(peers[role]?.errors?.console ?? [])];
-    bundle.trace[role] = await traceOf(peers[role]?.page).catch(() => null);
-  }
-  await writeEvidence().catch((writeError) => console.error(`[mp-soak] evidence write failed: ${writeError.message}`));
+  await captureFailureDiagnostics();
+  await boundedStep(writeEvidence,2000,'failure evidence').catch((writeError) => console.error(`[mp-soak] evidence write failed: ${writeError.message}`));
   process.exitCode = 1;
 } finally {
-  if (hardStopTimer) clearTimeout(hardStopTimer);
+  cancellation.abort();
   if (!stopping) {
-    await closeOwnedBrowsers(false);
+    try { await closeOwnedBrowsers(); }
+    catch(error) { console.error(error.message); terminateOwnedRun(process.exitCode||1); }
     peerServer?.kill();
     server?.close();
+    if (hardStopTimer) clearTimeout(hardStopTimer);
+    if (hardKillTimer) clearTimeout(hardKillTimer);
   }
 }
 
