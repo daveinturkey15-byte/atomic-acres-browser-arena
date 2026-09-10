@@ -2,8 +2,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { safeSkyShot, ammoAcknowledged, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
+import { safeSkyShot, ammoAcknowledged, collectReloadObserver, installReloadObserver } from './mp-reload-stage-diagnostic.mjs';
 const pose=()=>({player:{alive:true,hp:100,weapon:'carbine',pitch:1.42,yaw:0,position:[0,1.7,0]},privateMatch:{hostedBotCount:0},remotePlayers:[{hp:100,position:[5,1.7,0]},{hp:100,position:[-5,1.7,0]}]});
+test('observer checks parity once and never polls the full scene snapshot',()=>{
+  let snapshots=0,tick;
+  const p={id:'a',hp:100,alive:true,position:[0,1.7,0],weapon:'carbine',ammo:30,reloading:false};
+  const value={hp:100,alive:true,continuity:3,supportLife:3,deaths:1,position:[0,1.7,0],weapon:'carbine',ammo:30,reloading:false};
+  const debug={snapshot:()=>{snapshots++;return {player:p,networkSync:{localContinuity:3},killstreak:{actors:[{actorId:'a',lifeId:3}]},privateMatch:{scores:[{id:'a',deaths:1}]}};},sampleReloadSubject:()=>({value,shotProtocol:{}})};
+  const context={window:{__ATOMIC_ACRES_DEBUG__:debug},performance:{now:()=>1,timeOrigin:0},setInterval(fn){tick=fn;return 1;},setTimeout(){return 2;},clearInterval(){}};
+  const result=runInNewContext(`(${installReloadObserver.toString()})({id:'a'})`,context);
+  assert.equal(result.lightweightParity,true);
+  for(let n=0;n<20;n++)tick();
+  assert.equal(snapshots,1);
+  assert.equal(context.window.__AA_RELOAD_OBSERVER__.samples,21);
+  delete context.window.__AA_RELOAD_OBSERVER__;
+  debug.sampleReloadSubject=()=>({value:{...value,ammo:29},shotProtocol:{}});
+  assert.throws(()=>runInNewContext(`(${installReloadObserver.toString()})({id:'a'})`,context),/parity failed/);
+});
 test('failed shot evidence preserves existing rejection reasons without inventing actor identity',()=>{
   const state={id:'guestA',rows:[],samples:2,dropped:0,shotProtocolBefore:{received:4}};
   const snapshot={reloadAuthority:{protocolTrace:[]},remotePlayers:[],networkSync:{shotProtocol:{received:5,'rejected-bad-origin':1},shotTimeline:{recentResolutions:[{shotSeq:7,outcome:'rejected-bad-origin'}]}}};

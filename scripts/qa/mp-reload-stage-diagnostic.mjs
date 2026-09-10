@@ -47,17 +47,24 @@ export function ammoAcknowledged(rows,id,expected) {
 // transitions carry before/after browser timestamps, NOT exact apply stamps.
 export function installReloadObserver({id}) {
   if(window.__AA_RELOAD_OBSERVER__)throw Error('diagnostic observer already installed');
-  const state={id,rows:[],dropped:0,samples:0,previousEnd:null,signature:null};
+  if(typeof window.__ATOMIC_ACRES_DEBUG__.sampleReloadSubject!=='function')throw Error('lightweight reload observation unavailable in this runtime');
+  // One setup-only parity check, before the measured life/shot scenario.
+  // Never substitute a smaller read unless it retains the old evidence fields.
+  const initial=window.__ATOMIC_ACRES_DEBUG__.snapshot(),self=initial.player.id===id;
+  const p=self?initial.player:initial.remotePlayers.find(p=>p.id===id);
+  const legacy={hp:p?.hp,alive:self?p?.alive:p?.hp>0,continuity:self?initial.networkSync.localContinuity:p?.continuity,
+    supportLife:initial.killstreak?.actors?.find(a=>a.actorId===id)?.lifeId,
+    deaths:initial.privateMatch?.scores?.find(a=>a.id===id)?.deaths,
+    position:p?.position?.map(n=>Math.round(n*1000)/1000),weapon:p?.weapon,
+    ammo:self?p?.ammo:p?.combatInventory?.ammo?.[p.weapon],reloading:p?.reloading};
+  if(JSON.stringify(legacy)!==JSON.stringify(window.__ATOMIC_ACRES_DEBUG__.sampleReloadSubject(id).value))throw Error('lightweight reload observation parity failed');
+  const state={id,rows:[],dropped:0,samples:0,readCostTotalMs:0,readCostMaxMs:0,previousEnd:null,signature:null};
   const take=()=>{
-    const readStart=performance.now(),s=window.__ATOMIC_ACRES_DEBUG__.snapshot(),self=s.player.id===id;
-    if(state.samples===0)state.shotProtocolBefore={...s.networkSync?.shotProtocol};
-    const p=self?s.player:s.remotePlayers.find(p=>p.id===id);
-    const value={hp:p?.hp,alive:self?p?.alive:p?.hp>0,continuity:self?s.networkSync.localContinuity:p?.continuity,
-      supportLife:s.killstreak?.actors?.find(a=>a.actorId===id)?.lifeId,
-      deaths:s.privateMatch?.scores?.find(a=>a.id===id)?.deaths,
-      position:p?.position?.map(n=>Math.round(n*1000)/1000),weapon:p?.weapon,
-      ammo:self?p?.ammo:p?.combatInventory?.ammo?.[p.weapon],reloading:p?.reloading};
+    const readStart=performance.now(),sample=window.__ATOMIC_ACRES_DEBUG__.sampleReloadSubject(id);
+    if(state.samples===0)state.shotProtocolBefore={...sample.shotProtocol};
+    const value=sample.value;
     const readEnd=performance.now(),signature=JSON.stringify(value);state.samples++;
+    state.readCostTotalMs+=readEnd-readStart;state.readCostMaxMs=Math.max(state.readCostMaxMs,readEnd-readStart);
     if(signature!==state.signature) {
       const row={previousReadEnd:state.previousEnd,readStart,readEnd,timeOrigin:performance.timeOrigin,...value};
       if(state.rows.length<1024)state.rows.push(row);else state.dropped++;
@@ -68,7 +75,7 @@ export function installReloadObserver({id}) {
   take();state.interval=setInterval(take,50);
   state.expiry=setTimeout(()=>clearInterval(state.interval),25000);
   window.__AA_RELOAD_OBSERVER__=state;
-  return {installedAt:performance.now(),origin:performance.timeOrigin};
+  return {installedAt:performance.now(),origin:performance.timeOrigin,lightweightParity:true};
 }
 
 export function collectReloadObserver() {
@@ -78,6 +85,7 @@ export function collectReloadObserver() {
   const s=window.__ATOMIC_ACRES_DEBUG__.snapshot();
   const wire=window.__ATOMIC_ACRES_DEBUG__.sampleMessageTrace?.();
   const result={rows:o.rows,samples:o.samples,dropped:o.dropped,
+    readCostMs:{mean:o.samples?o.readCostTotalMs/o.samples:null,max:o.readCostMaxMs??null},
     protocol:s.reloadAuthority.protocolTrace.filter(p=>p.actorId===o.id),
     protocolCapacity:128,protocolAtCapacity:s.reloadAuthority.protocolTrace.length>=128,
     healthTrace:window.__ATOMIC_ACRES_DEBUG__.sampleHealthAuthorityTrace(),

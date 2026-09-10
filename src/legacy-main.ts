@@ -32717,6 +32717,8 @@ async function capturePass73NativeAdsRevealRoiTriplet(targetId: string) {
 
 const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
+    /** Bounded reload observer: no rig, renderer, material or scene census. */
+    sampleReloadSubject: (id: string) => Record<string, unknown>;
     // MP-LAB: the cheap pose read for movement probes. The full snapshot walks every
     // rigged actor's skinned meshes and costs ~60 ms per call (measured
     // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
@@ -34113,6 +34115,26 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleBodyStancePose,
   sampleGrenadeColdPathTelemetry,
   // MP-LAB: see the type; nothing here allocates beyond the returned object.
+  sampleReloadSubject: (id: string) => {
+    const self = player.id === id;
+    const remote = remotes.get(id);
+    const weapon = self ? player.weapon : remote?.snapshot.weapon;
+    const hp = self ? player.hp : remote?.snapshot.hp;
+    return {
+      value: {
+        hp,
+        alive: self ? player.alive : (hp ?? 0) > 0,
+        continuity: self ? localContinuity : remote?.continuity,
+        supportLife: killstreakSnapshot.actors.find(actor => actor.actorId === id)?.lifeId,
+        deaths: privateLobbySnapshot ? authoritativeScores.get(id)?.deaths : undefined,
+        position: (self ? player.position : remote?.target)?.toArray().map(n => Math.round(n * 1000) / 1000),
+        weapon,
+        ammo: self ? player.ammo[player.weapon] : weapon && isOrdinaryWeapon(weapon) ? remoteCombatInventories.get(id)?.ammo[weapon] : undefined,
+        reloading: self ? player.reloadState !== null : remote ? remote.snapshot.reloading ?? false : undefined,
+      },
+      shotProtocol: { ...shotProtocolTelemetry },
+    };
+  },
   samplePlayerPose: () => ({
     alive: player.alive,
     position: player.position.toArray(),
