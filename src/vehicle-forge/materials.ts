@@ -442,7 +442,13 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   const fresnel = pow(float(1).sub(cosine), float(5));
   const a0 = float(0.14);
   material.colorNode = vec3(tint.r, tint.g, tint.b);
-  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.34)));
+  // Bounded coach-only tonal breakup, not a new reflection or emissive fill.
+  // Every other vehicle carries an explicit zero through the shared merge.
+  const coachFlag = attribute('forgeCoachShade', 'float');
+  const coachSheen = valueNoise2(vec2(positionWorld.z.mul(1.7), positionWorld.y.mul(2.3))).mul(coachFlag);
+  const coachVariation = coachSheen.sub(float(0.5).mul(coachFlag)).mul(float(0.08));
+  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.34)).add(coachVariation));
+  material.roughnessNode = float(0.06).add(coachSheen.mul(float(0.05)));
   return material;
 }
 
