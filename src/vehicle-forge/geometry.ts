@@ -710,7 +710,7 @@ export function loftBody(spec: VehicleSpec): LoftResult {
     // quads are behind the floor. Full density here cost more triangles than
     // the body it hides inside.
     const spanned = rings.filter((ring) => ring.z >= from && ring.z <= to);
-    const sampled = spanned.filter((_, index) => index % 3 === 0 || index === spanned.length - 1);
+    const inner = spanned.filter((_, index) => index % 3 === 0 || index === spanned.length - 1);
     // Quads 6 to 17 - the greenhouse band, points 6 through 18, exactly
     // mirrored. It starts one point BELOW the belt so nothing shows past its
     // lower edge through a raked pane, and no lower: a lining that reaches the
@@ -719,17 +719,6 @@ export function loftBody(spec: VehicleSpec): LoftResult {
     // ballistic audit reports a car's own interior as unrated ghost cover.
     const LINING_FIRST_QUAD = 6;
     const LINING_LAST_QUAD = 17;
-    // Backdrop simplification is bounded to 1 mm per position component and
-    // 0.001 per normal component. It is not byte-identical H1 geometry.
-    // Other vehicles retain their exact original sampling.
-    const inner = spec.id === 'nuketown2-coach' ? redundantTrimStations(sampled, ring => {
-      const normals = ringNormals(ring.points, (ring.yLow + ring.yTop) / 2);
-      return Array.from({ length: LINING_LAST_QUAD - LINING_FIRST_QUAD + 2 }, (_, index) => {
-        const k = LINING_FIRST_QUAD + index;
-        return [ring.points[k]![0] - normals[k]![0] * liningInset,
-          ring.points[k]![1] - normals[k]![1] * liningInset, ...normals[k]!];
-      }).flat();
-    }, 0.001) : sampled;
     for (let i = 0; i < inner.length - 1; i += 1) {
       const a = inner[i]!;
       const b = inner[i + 1]!;

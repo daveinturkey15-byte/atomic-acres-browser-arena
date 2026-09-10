@@ -1,5 +1,11 @@
 # Coach-only measured reallocation
 
+## Superseding strengthened review
+
+VERIFIED quarter-grid barycentric interior tests found the reduced lining's interpolated normal component error0.001002808 above its0.001001 limit including Float32 allowance. Finer station sampling did not remove that interior-field error. The lining optimization is REJECTED and its original geometry restored byte-for-byte; no normal/hash threshold increased. Actual coach now9946/10000; fixture9540/10000. Total saving1168 from two flat rails600, stripe328 and lamps240. Note the independently sampled stripe fixture392 ->60 saves332; actual arena stripe uses a slightly different authored span and saves328. All H1 loft position/UV pins, including lining2520 vertices, remain valid without any hash changes.
+
+VERIFIED new9 focused tests PASS: bidirectional quarter-grid surface and raw interpolated-normal comparisons, exact full loft arrays, unchanged thin-triangle comparator check, flat roof field proof despite omitted arch/inset stations, meaningful authored bend preservation, other vehicle arrays and lamp profile/winding. Stripe maxnormal0.007856067<0.01; flat roof approximately2e-16; restored lining compares identically. Combined63 tests59PASS4FAIL: three inherited normal failures plus unchanged fixture pin9988 vs9540. Fixture pin update remains pending final reviewed art allocation; no other expected values changed. TypeScript PASS. Earlier9850/744lining figures below are historical rejected optimization evidence, not current qualification.
+
 VERIFIED against base 5bd53b81d0b9396440e1e92d0bfdb46c427a4e6b: actual authored arena coach 11114 -> 9850 triangles, below the unchanged 10000 cap. The five other actual vehicle counts remain 8280,9026,9026,9502,9502; their existing overages remain OPEN. Shared draws remain 15. No arena dressing, specification, material, collision, ballistic or spawn authority changed.
 
 VERIFIED allocation: two roof rails 310 -> 10 triangles each; stripe 392 -> 60; loft lining 840 -> 744; four round lamps use 12 rather than 18 radial segments, saving 240 triangles with identical radial/depth profiles. Total saving 1264. No seat, luggage frame, grille bar, wheel, pillar, outer body or glass feature was removed. Actual coach buckets: paint4314,accent380,groove312,chrome1864,tyre1256,lining754,glass626,headLamp184,tailLamp160.
