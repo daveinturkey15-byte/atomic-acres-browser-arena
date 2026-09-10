@@ -48,6 +48,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial, type Node } from 'three/webgpu';
+import { cameraPosition, float, positionLocal, positionWorld, step } from 'three/tsl';
 import { ARENA_BOUNDS } from '../arena-layout';
 import { buildNuketownLawnField } from '../nuketown-lawn-field';
 import {
@@ -60,6 +62,48 @@ import {
 const CRUSHED_SCALE_Y = 0.06;
 /** Matrix4 elements per instance in an InstancedMesh instanceMatrix. */
 const ELEMENTS_PER_INSTANCE = 16;
+
+describe('grass vertex anchoring', () => {
+  function usesCamera(node: Node): boolean {
+    let found = false;
+    node.traverse((child) => { if (child === cameraPosition) found = true; });
+    return found;
+  }
+
+  it('keeps camera distance out of the live vertex displacement graph', () => {
+    const field = buildInstancedGrassField({
+      name: 'anchoring', seed: 17,
+      regions: [{ minX: 20, maxX: 21, minZ: 12, maxZ: 13 }],
+      bladeHeightM: 0.2,
+      material: { color: 0x496438, swayAmount: 0.025 },
+    });
+    try {
+      const material = field.meshes[0].material as MeshStandardNodeMaterial;
+      expect(material.positionNode).toBeTruthy();
+      expect(usesCamera(material.positionNode!)).toBe(false);
+      expect(field.meshes.every((mesh) => mesh.frustumCulled)).toBe(true);
+      // Prove the graph guard catches the historical optimisation, rather
+      // than silently missing a camera nested under TSL's operator nodes.
+      const oldMask = float(1).sub(step(32, positionWorld.distance(cameraPosition)));
+      expect(usesCamera(positionLocal.mul(oldMask))).toBe(true);
+    } finally {
+      field.dispose();
+    }
+  });
+
+  it('reproduces the origin-spanning triangle at the retired 32m threshold', () => {
+    // r185's positionNode sees these AFTER instance translation. Two blade
+    // vertices lie either side of the camera radius, although their authored
+    // separation is only 5cm. The old mask stretched that edge across the map.
+    const a = new THREE.Vector3(20 - 0.025, 0, 12);
+    const b = new THREE.Vector3(20 + 0.025, 0, 12);
+    const camera = new THREE.Vector3(20 + 32, 0, 12);
+    expect(a.distanceTo(b)).toBeCloseTo(0.05);
+    const oldA = a.clone().multiplyScalar(a.distanceTo(camera) < 32 ? 1 : 0);
+    const oldB = b.clone().multiplyScalar(b.distanceTo(camera) < 32 ? 1 : 0);
+    expect(oldA.distanceTo(oldB)).toBeGreaterThan(20);
+  });
+});
 
 /**
  * Two lawn bands spanning the full arena footprint, so the crush index is
