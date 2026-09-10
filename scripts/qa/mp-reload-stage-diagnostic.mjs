@@ -76,6 +76,7 @@ export function collectReloadObserver() {
   if(!o)return null;
   clearInterval(o.interval);clearTimeout(o.expiry);
   const s=window.__ATOMIC_ACRES_DEBUG__.snapshot();
+  const wire=window.__ATOMIC_ACRES_DEBUG__.sampleMessageTrace?.();
   const result={rows:o.rows,samples:o.samples,dropped:o.dropped,
     protocol:s.reloadAuthority.protocolTrace.filter(p=>p.actorId===o.id),
     protocolCapacity:128,protocolAtCapacity:s.reloadAuthority.protocolTrace.length>=128,
@@ -85,6 +86,8 @@ export function collectReloadObserver() {
       protocolBefore:o.shotProtocolBefore??null,
       protocolAfter:s.networkSync?.shotProtocol??null,
       timeline:s.networkSync?.shotTimeline??null,
+      hostTime:s.networkSync?.hostTime??null,
+      wire:wire?{enabled:wire.enabled,recorded:wire.recorded,dropped:wire.dropped,impairment:wire.impairment,entries:wire.entries.filter(p=>p.type==='shot-request'||p.type==='shot-result').slice(-32)}:null,
       localContinuity:s.networkSync?.localContinuity??null,
       localHistory:s.networkSync?.localHistory??null,
       remoteReadiness:s.remotePlayers.filter(p=>p.id===o.id).map(p=>({id:p.id,continuity:p.continuity,authoritativeReady:p.authoritativeReady,position:p.position,authoritativePosition:p.authoritativePosition,historyFirst:p.historyFirst,historyLatest:p.historyLatest})),
@@ -123,7 +126,12 @@ export async function reloadStageDiagnostic(peers,report,viewOf,sleep) {
       row.safeShot=safeSkyShotEvidence(pose);
       if(!row.safeShot.safe)throw Error('Safe sky-shot cone prerequisite failed');
       row.shotNodeBefore=Date.now();
-      await peers[role].page.evaluate(()=>window.__ATOMIC_ACRES_DEBUG__.fireOnce());
+      row.localFireObservation=await peers[role].page.evaluate(()=>{
+        const d=window.__ATOMIC_ACRES_DEBUG__,start=performance.now();
+        d.fireOnce();
+        const end=performance.now(),s=d.snapshot();
+        return {start,end,origin:performance.timeOrigin,hostTime:s.networkSync.hostTime,authored:s.networkSync.shotTimeline.authored};
+      });
       row.shotNodeAfter=Date.now();
       const deadline=Date.now()+4000;let settledAt=null;
       while(Date.now()<deadline) {
