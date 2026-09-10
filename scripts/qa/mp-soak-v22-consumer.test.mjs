@@ -138,6 +138,32 @@ test('v22 reload baseline stability ignores advancing sample clocks', () => {
   assert.equal(first, second);
 });
 
+test('v22 reload encloses quantized reads conservatively and retains transaction timing', () => {
+  const fixture = reloadFixture();
+  for (const peer of Object.values(fixture.transaction.peers)) {
+    Object.assign(peer.rows[0], { previousReadEnd: 50, readStart: 100, readEnd: 100 });
+  }
+  assert.equal(evaluateReloadV22(fixture).pass, true);
+  for (const previousReadEnd of [undefined, null, 100, 101, 0]) {
+    const invalid = structuredClone(fixture);
+    invalid.transaction.peers.guestA.rows[0].previousReadEnd = previousReadEnd;
+    assert.equal(evaluateReloadV22(invalid).pass, false, `previous read ${previousReadEnd}`);
+  }
+  const reversed = structuredClone(fixture);
+  reversed.transaction.peers.guestA.rows[0].readEnd = 99;
+  assert.equal(evaluateReloadV22(reversed).pass, false);
+});
+
+test('v22 reload needs an actual post-acknowledgement sample even when state is unchanged', () => {
+  const fixture = reloadFixture();
+  const peer = fixture.transaction.peers.guestA;
+  const later = { ...peer.rows[0], changed: false };
+  Object.assign(peer.rows[0], { readStart: 5, readEnd: 10 });
+  assert.equal(evaluateReloadV22(fixture).pass, false);
+  peer.rows.push(later);
+  assert.equal(evaluateReloadV22(fixture).pass, true);
+});
+
 test('v22 reload ignores an older same-subject admission when selecting the current trigger', () => {
   const fixture = reloadFixture();
   fixture.transaction.host.protocol.unshift({ atMs: 1, direction: 'admit', actorId: subjectId, requestId: 'reload-old-3-s-9', action: 'start', status: 'accepted', reason: 'accepted', actionSequence: 9 });
@@ -198,6 +224,28 @@ test('v22 death negative fixtures remain failures', () => {
     const fixture = structuredClone(deathFixture());
     mutate(fixture);
     assert.equal(evaluateDeathV22(fixture).pass, false, name);
+  }
+});
+
+test('v22 death separates identical transport copies from independently proven canonical death', () => {
+  const fixture = deathFixture();
+  fixture.traces.host.health.rows.push({ ...fixture.traces.host.health.rows[0], ordinal: 2 });
+  fixture.traces.host.health.recorded = 2;
+  const result = evaluateDeathV22(fixture);
+  assert.equal(result.pass, true, JSON.stringify(result.reasons));
+  assert.equal(result.evidence.hostLethalPublicationCount, 2);
+  assert.equal(result.evidence.canonicalDeath.canonicalLethalFactCount, 1);
+  for (const mutate of [
+    f => { f.traces.host.health.rows[1].revision += 1; },
+    f => { f.traces.host.health.rows[1].hp = 100; },
+    f => { delete f.traces.host.health.rows[1].authorId; },
+    f => { f.trigger.after.deathCount += 1; },
+    f => { f.deathEvents.push({ ...f.deathEvents[0] }); },
+    f => { delete f.trigger.applied; },
+  ]) {
+    const invalid = structuredClone(fixture);
+    mutate(invalid);
+    assert.equal(evaluateDeathV22(invalid).pass, false);
   }
 });
 

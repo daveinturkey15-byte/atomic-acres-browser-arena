@@ -44,7 +44,7 @@ export function ammoAcknowledged(rows,id,expected) {
 }
 
 // Diagnostic-only observer. It never mutates game state. All sampled state
-// transitions carry before/after browser timestamps, NOT exact apply stamps.
+// reads carry before/after browser timestamps, NOT exact apply stamps.
 export function installReloadObserver({id}) {
   if(window.__AA_RELOAD_OBSERVER__)throw Error('diagnostic observer already installed');
   if(typeof window.__ATOMIC_ACRES_DEBUG__.sampleReloadSubject!=='function')throw Error('lightweight reload observation unavailable in this runtime');
@@ -65,11 +65,11 @@ export function installReloadObserver({id}) {
     const value=sample.value;
     const readEnd=performance.now(),signature=JSON.stringify(value);state.samples++;
     state.readCostTotalMs+=readEnd-readStart;state.readCostMaxMs=Math.max(state.readCostMaxMs,readEnd-readStart);
-    if(signature!==state.signature) {
-      const row={previousReadEnd:state.previousEnd,readStart,readEnd,timeOrigin:performance.timeOrigin,...value};
-      if(state.rows.length<1024)state.rows.push(row);else state.dropped++;
-      state.signature=signature;
-    }
+    // Keep unchanged states too: a local reload can start before its host
+    // acknowledgement and remain true throughout the correlated transaction.
+    const row={previousReadEnd:state.previousEnd,readStart,readEnd,timeOrigin:performance.timeOrigin,changed:signature!==state.signature,...value};
+    if(state.rows.length<1024)state.rows.push(row);else state.dropped++;
+    state.signature=signature;
     state.previousEnd=readEnd;
   };
   take();state.interval=setInterval(take,50);
@@ -107,7 +107,7 @@ export function collectReloadObserver() {
 
 export async function reloadStageDiagnostic(peers,report,viewOf,sleep) {
   report.scope='bounded safe-shot/reload stage diagnostic, not soak acceptance';
-  report.observationPolicy='50ms sampled transitions are brackets, not exact apply times; protocol stamps keep local clock domains; 25s observer expiry and1024-row cap';
+  report.observationPolicy='Every 50ms sampled read is retained, including unchanged states; brackets are not exact apply times; protocol stamps keep local clock domains; 25s observer expiry and1024-row cap';
   report.guests={};
   const read=async()=>Object.fromEntries(await Promise.all(V2_PEERS.map(async role=>{
     const nodeBefore=Date.now(),view=await viewOf(peers[role].page);

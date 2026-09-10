@@ -3,6 +3,7 @@
 
 import { evaluateMpSoakV21 } from './mp-soak-v21-life.mjs';
 import { clockEnvelope } from './health-latency-v2.mjs';
+import { evaluateCanonicalDeathReplay } from './mp-canonical-replay-consumer.mjs';
 
 export const V22_PEERS = Object.freeze(['host', 'guestA', 'guestB']);
 export const SOAK_V22_CONTRACT = 'mp-soak-gate-v2.2';
@@ -28,6 +29,16 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const integer = (value) => Number.isSafeInteger(value);
 const identity = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,160}$/.test(value);
 const object = (value) => value !== null && typeof value === 'object';
+
+// Equal raw timestamps occur when a cheap read fits within the browser clock's
+// precision. Enclose it with the previous read instead of inventing precision.
+// This widens uncertainty: the ENTIRE bracket must still fit the transaction.
+export function reloadReadEnvelope(row) {
+  if (!finite(row?.readStart) || !finite(row?.readEnd) || row.readEnd < row.readStart) return null;
+  if (row.readEnd > row.readStart) return { low: row.readStart, high: row.readEnd };
+  if (!finite(row.previousReadEnd) || row.previousReadEnd >= row.readStart) return null;
+  return { low: row.previousReadEnd, high: row.readEnd };
+}
 
 function reason(result, value) {
   if (value) result.reasons.push(value);
@@ -283,7 +294,7 @@ function transactionResult(report) {
       // Start is compared in the observer's own page clock. Completion is
       // compared across calibrated clock envelopes, never by midpoint.
       && finite(startAt) && finite(commitAt) && finite(row.readStart) && finite(row.readEnd)
-      && row.readEnd > row.readStart && row.readStart >= startAt
+      && reloadReadEnvelope(row) !== null && reloadReadEnvelope(row).low >= startAt
       && clockEnvelope(calibration.before?.[role], calibration.after?.[role], {
         atMs: row.readEnd, timeOriginMs: row.timeOrigin,
       }).verdict === 'MAPPED'
@@ -411,8 +422,15 @@ function causalDeathResult(report) {
   // field and never infer causality from a bare HP value.
   const hostPublishExact = hostHealth.filter((row) => row.stage === 'publish' && samePublication(row)
     && row.subjectId === subjectId && row.matchEpoch === epoch && row.continuity === oldLife && row.hp === 0);
-  if (hostPublishExact.length !== 1) reason(result, hostPublishExact.length === 0
-    ? 'missing-host-lethal-health-publication' : 'duplicate-host-lethal-health-publication');
+  if (hostPublishExact.length === 0) reason(result, 'missing-host-lethal-health-publication');
+  // Identical health retransmissions are not additional deaths. Require the
+  // independently captured counter increment and complete canonical identity;
+  // conflicting copies, extra lethal revisions and missing evidence stay red.
+  const canonicalDeath = evaluateCanonicalDeathReplay({
+    traceScope: 'multi', expected: publication, baselineDeathCount: oldDeaths,
+    trigger: report.trigger, healthRows: hostHealth, deathEvents: report.deathEvents,
+  });
+  if (!canonicalDeath.pass) for (const entry of canonicalDeath.reasons) reason(result, `canonical-death-${entry}`);
   for (const role of ['guestA', 'guestB']) {
     const health = sampleRows(traces[role]?.health);
     const applied = health.filter((row) => row.stage === 'apply' && samePublication(row)
@@ -436,6 +454,7 @@ function causalDeathResult(report) {
     stageSummary,
     nonAtomicDeadTupleAllowed: true,
     hostLethalPublicationCount: hostPublishExact.length,
+    canonicalDeath: canonicalDeath.evidence,
     publicationKey: publication ?? null,
     asyncOrderingCaptured: report.ordering?.captured === true,
   };

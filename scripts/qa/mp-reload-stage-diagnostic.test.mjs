@@ -15,6 +15,9 @@ test('observer checks parity once and never polls the full scene snapshot',()=>{
   for(let n=0;n<20;n++)tick();
   assert.equal(snapshots,1);
   assert.equal(context.window.__AA_RELOAD_OBSERVER__.samples,21);
+  assert.equal(context.window.__AA_RELOAD_OBSERVER__.rows.length,21);
+  assert.equal(context.window.__AA_RELOAD_OBSERVER__.rows[0].changed,true);
+  assert.equal(context.window.__AA_RELOAD_OBSERVER__.rows[20].changed,false);
   delete context.window.__AA_RELOAD_OBSERVER__;
   debug.sampleReloadSubject=()=>({value:{...value,ammo:29},shotProtocol:{}});
   assert.throws(()=>runInNewContext(`(${installReloadObserver.toString()})({id:'a'})`,context),/parity failed/);
