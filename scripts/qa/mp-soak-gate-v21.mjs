@@ -34,6 +34,7 @@ import { rejoinV2, damageBoundaryV2, verifyLiveArtifact } from './mp-soak-v2-sce
 import { evaluateMpSoakV21, naturalDeathRespawnMapped, SOAK_CONTRACT } from './mp-soak-v21-life.mjs';
 import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
+import { finalizationWriter } from './mp-soak-finalization.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORTS = Object.freeze({
@@ -66,6 +67,10 @@ const distPath = resolve(REPO_ROOT, arg('--dist', 'dist'));
 if(!/^[0-9a-f]{40}$/.test(sourceSha??''))throw Error('Exact immutable source --sha required');
 if(existsSync(join(outDir, `${label}-bundle.json`)))throw Error('Never overwrite prior MP evidence');
 if(menuDiagnostic&&existsSync(join(outDir,`${label}-menu-diagnostic.json`)))throw Error('Never overwrite menu evidence');
+if(existsSync(join(outDir,`${label}-finalization.json`)))throw Error('Never overwrite finalization evidence');
+const driverSha=spawnSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8',windowsHide:true,timeout:3000}).stdout?.trim();
+if(!/^[0-9a-f]{40}$/.test(driverSha??''))throw Error('Exact test-driver revision required');
+const recordFinalization=finalizationWriter(join(outDir,`${label}-finalization.json`),{runtimeSha:sourceSha,driverSha,label});
 const TSX_CLI = resolve(REPO_ROOT, 'node_modules/tsx/dist/cli.mjs');
 const ARENA_ROSTER_SCRIPT = resolve(REPO_ROOT, 'scripts/qa/mp-lab/arena-roster.mts');
 
@@ -77,6 +82,7 @@ const startedAtEpochMs = Date.now();
 const bundle = {
   contract: SOAK_CONTRACT,
   sourceSha,
+  driverSha,
   productBase: '966dffb75b13ae35e2f29c44aee454ab18c87ca0',
   diagnosticBase: '566cad49238e6661d18fe69fbed4ba34ea21d401',
   scope: 'same-machine impaired three-peer QA, not WAN acceptance; v1 FAIL preserved',
@@ -408,7 +414,9 @@ async function scriptedPlay(playStart) {
   }
 }
 
-function terminateOwnedRun(code) {
+function terminateOwnedRun(code, reason='hard browser ceiling') {
+  try { recordFinalization({cleanup:'forced',reason,requestedExitCode:code,browserCount:browsers.length,gatePass:bundle.gate?.pass??null}); }
+  catch(error) { console.error(`finalization receipt failed: ${error.message}`); }
   // This dedicated Node driver owns the server and every browser descendant.
   // Playwright Browser has no public process() API. Never enumerate/kill by
   // executable name or affect an owner's unrelated Chrome processes.
@@ -448,7 +456,7 @@ function formatAdmissionSection() {
 async function writeEvidence() {
   if(menuDiagnostic) {
     const result={schema:'menu-lifecycle-diagnostic-v1',runtimeSha:sourceSha,
-      driverSha:spawnSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8',windowsHide:true}).stdout.trim(),
+      driverSha,
       scope:'early headless pause-input diagnostic, not multiplayer acceptance',failure:bundle.failure,
       observed:bundle.menuOpening??[],liveArtifact:bundle.liveArtifact,
       menuVisible:bundle.menuOpening?.at(-1)?.label==='visible-menu'};
@@ -487,7 +495,7 @@ async function hardStop() {
   bundle.failure = `run incomplete; finalization reserve before hard ${HARD_TIMEOUT_MS}ms browser ceiling`;
   bundle.completed = false;
   await boundedStep(writeEvidence,2000,'timeout evidence').catch(error=>console.error(error.message));
-  terminateOwnedRun(124);
+  terminateOwnedRun(124,bundle.failure);
 }
 
 async function main() {
@@ -581,11 +589,13 @@ try {
   process.exitCode = 1;
 } finally {
   cancellation.abort();
+  if (bundle.gate && !bundle.gate.pass) process.exitCode = 1;
   if (!stopping) {
     try { await closeOwnedBrowsers(); }
-    catch(error) { console.error(error.message); terminateOwnedRun(process.exitCode||1); }
+    catch(error) { console.error(error.message); terminateOwnedRun(process.exitCode||1,error.message); }
     peerServer?.kill();
     server?.close();
+    recordFinalization({cleanup:'normal',browsersClosed:true,serverStopRequested:true,requestedExitCode:process.exitCode||0,gatePass:bundle.gate?.pass??null});
     if (hardStopTimer) clearTimeout(hardStopTimer);
     if (hardKillTimer) clearTimeout(hardKillTimer);
   }
