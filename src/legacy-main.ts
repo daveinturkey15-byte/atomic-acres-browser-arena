@@ -5759,7 +5759,7 @@ const localArenaSwitchQaDelayMs = localMultiplayerQa
   ? Math.min(1_000, Math.max(0, Number(new URLSearchParams(window.location.search).get('arenaSwitchQaDelayMs')) || 0))
   : 0;
 const matchDiagnosticUploader = new MatchDiagnosticUploader(
-  MATCH_DIAGNOSTICS_ENDPOINT,
+  leaderboardNetworkEnabled(window.location.search) ? MATCH_DIAGNOSTICS_ENDPOINT : '',
   clientPersistentStorage(),
   window.fetch.bind(window),
   navigator.sendBeacon?.bind(navigator),
