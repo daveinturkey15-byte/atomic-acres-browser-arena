@@ -25,15 +25,16 @@ export function commonAliveLife(players, roles) {
 
 // A prerequisite, not an acceptance exclusion: all timed replication samples
 // continue throughout this wait. Never mutate HP/life to manufacture a baseline.
-export async function settledLife(read, roles, { timeoutMs = 6000, stableMs = 250, pollMs = 50 } = {}) {
+export async function settledLife(read, roles, { timeoutMs = 6000, stableMs = 250, pollMs = 50, accept = commonAliveLife } = {}) {
   const startedAt = Date.now(), observations = [];
   let stableSince = null, life = null, last = null;
   while (Date.now() - startedAt < timeoutMs) {
     last = await boundedStep(read, Math.max(1, timeoutMs - (Date.now() - startedAt)), 'life baseline read');
     const atEpochMs = Date.now();
-    const common = commonAliveLife(last, roles), current = last?.[roles[0]]?.continuity;
+    const common = accept(last, roles), current = last?.[roles[0]]?.continuity;
     observations.push({ atEpochMs, players: Object.fromEntries(roles.map(role => [role, {
       hp: last?.[role]?.hp ?? null, alive: last?.[role]?.alive ?? null, continuity: last?.[role]?.continuity ?? null,
+      supportLife: last?.[role]?.supportLife ?? null, deathCount: last?.[role]?.deathCount ?? null,
     }])) });
     if (!common) { stableSince = null; life = null; }
     else if (stableSince === null || current !== life) { stableSince = atEpochMs; life = current; }
