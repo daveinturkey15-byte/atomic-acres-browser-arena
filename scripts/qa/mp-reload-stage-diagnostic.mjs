@@ -50,6 +50,7 @@ export function installReloadObserver({id}) {
   const state={id,rows:[],dropped:0,samples:0,previousEnd:null,signature:null};
   const take=()=>{
     const readStart=performance.now(),s=window.__ATOMIC_ACRES_DEBUG__.snapshot(),self=s.player.id===id;
+    if(state.samples===0)state.shotProtocolBefore={...s.networkSync?.shotProtocol};
     const p=self?s.player:s.remotePlayers.find(p=>p.id===id);
     const value={hp:p?.hp,alive:self?p?.alive:p?.hp>0,continuity:self?s.networkSync.localContinuity:p?.continuity,
       supportLife:s.killstreak?.actors?.find(a=>a.actorId===id)?.lifeId,
@@ -79,6 +80,15 @@ export function collectReloadObserver() {
     protocol:s.reloadAuthority.protocolTrace.filter(p=>p.actorId===o.id),
     protocolCapacity:128,protocolAtCapacity:s.reloadAuthority.protocolTrace.length>=128,
     healthTrace:window.__ATOMIC_ACRES_DEBUG__.sampleHealthAuthorityTrace(),
+    shotEvidence:{
+      scope:'peer-wide counters and last16 host resolutions; resolution rows lack actor IDs and cannot alone establish actor attribution',
+      protocolBefore:o.shotProtocolBefore??null,
+      protocolAfter:s.networkSync?.shotProtocol??null,
+      timeline:s.networkSync?.shotTimeline??null,
+      localContinuity:s.networkSync?.localContinuity??null,
+      localHistory:s.networkSync?.localHistory??null,
+      remoteReadiness:s.remotePlayers.filter(p=>p.id===o.id).map(p=>({id:p.id,continuity:p.continuity,authoritativeReady:p.authoritativeReady,position:p.position,authoritativePosition:p.authoritativePosition,historyFirst:p.historyFirst,historyLatest:p.historyLatest})),
+    },
     fireBlock:s.fireBlock,atMs:performance.now(),origin:performance.timeOrigin};
   delete window.__AA_RELOAD_OBSERVER__;
   return result;
