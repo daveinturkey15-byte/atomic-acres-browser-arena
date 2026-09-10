@@ -13,6 +13,7 @@ describe('clean vehicle material boundaries', () => {
       expect(paint.transmission).toBe(0);
       expect(paint.side).toBe(THREE.FrontSide);
       expect(paint.metalness).toBe(0);
+      expect(paint.specularIntensity).toBe(1);
       expect(paint.color.getHex(THREE.SRGBColorSpace)).toBe(color);
       expect(paint.colorNode).toMatchObject({ isUniformNode: true });
       expect(paint.clearcoat).toBe(0.8);
@@ -28,6 +29,7 @@ describe('clean vehicle material boundaries', () => {
     expect(clean.clearcoatRoughness).toBe(0.23);
     const worn = createForgePaintMaterial({ name: 'worn', color: 0x173451, finish: 'weathered' });
     expect(worn.userData.forgeFinish).toBe('weathered');
+    expect(worn.specularIntensity).toBe(0.08);
     expect(worn.colorNode).not.toMatchObject({ isUniformNode: true });
   });
 
@@ -53,6 +55,8 @@ describe('clean vehicle material boundaries', () => {
 
   it('keeps alpha blending exclusively in the glass bucket', () => {
     const materials = createForgeMaterialSet(0x173451, 'bucket-proof');
+    expect(materials.paint).toMatchObject({ roughness: 0.2 });
+    expect(materials.accent).toMatchObject({ roughness: 0.2 });
     expect(Object.entries(materials).filter(([, material]) => material.transparent).map(([bucket]) => bucket)).toEqual(['glass']);
     expect(Object.values(materials)).toHaveLength(9);
   });

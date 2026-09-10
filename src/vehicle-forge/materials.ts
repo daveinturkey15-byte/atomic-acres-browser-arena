@@ -340,6 +340,11 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
     const pigment = TSL.uniform(new THREE.Vector3(base.r, base.g, base.b));
     const enamel = valueNoise2(vec2(positionWorld.x.add(positionWorld.z).mul(700), positionWorld.y.mul(700)));
     material.userData.forgeFinish = 'clean';
+    // Restore the normal dielectric reflection for intact enamel. The worn
+    // branch's 0.08 multiplier suppresses both normal and grazing specular
+    // response in r185 MeshPhysicalNodeMaterial.setupSpecular(). Keep the
+    // caller's roughness (including the parked-car SSR admission) unchanged.
+    material.specularIntensity = 1;
     material.colorNode = pigment;
     material.roughnessNode = float(baseRoughness);
     material.clearcoat = options.clearcoat ?? 0.8;
