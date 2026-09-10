@@ -219,31 +219,26 @@ function sharedConcreteGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketow
   // Maintained CMU uses its own 400x200 mm courses, not a second brick
   // texture's joints, spalls and algae. Keep the existing slab/kerb graph
   // below unchanged, including its texture-availability fallbacks.
-  const concreteAlbedo = concreteSamples?.albedo ?? white;
-  const concreteRoughness = concreteSamples?.roughness ?? float(0.5);
   const blockBase = uniforms.baseColor.mul(wear.albedoMul).mul(float(1).add(blockUnit));
   const blockDamped = blockBase.mul(float(1).sub(damp.mul(float(0.20))));
-  const blockColor = mix(blockDamped, blockDamped.mul(float(0.82)), blockJoint).mul(concreteAlbedo);
+  const blockColor = mix(blockDamped, blockDamped.mul(float(0.82)), blockJoint);
   const blockRoughProc = clamp(
     wear.roughness.add(blockJoint.mul(float(0.05))).sub(damp.mul(float(0.14))),
     float(0.25), float(1.0),
   );
-  const blockRoughness = concreteSamples !== null
-    ? clamp(blockRoughProc.mul(float(0.72)).add(concreteRoughness.mul(float(0.28))), float(0.25), float(1.0))
-    : blockRoughProc;
   const blockHeight = blockJoint.mul(float(MORTAR_RECESS_M))
     .add(blockUnit.mul(float(0.004)))
     .add(wear.grain.mul(float(0.0006)));
   const blockReliefNode = reliefNormal(blockHeight);
-  const blockNormal = concreteSamples !== null
-    ? mix(blockReliefNode, concreteSamples.normal, float(0.68)).normalize()
-    : blockReliefNode;
+  // The imported concrete maps also contain coarse, baked surface marks.
+  // A matched browser capture rejected those on the maintained block face.
+  // Fine aggregate and mortar relief come from the procedural field alone.
   concreteGraphs.set(textureBridge, {
     colorNode: isBlock.select(blockColor, weathered.mul(mapAlbedo)),
-    roughnessNode: isBlock.select(blockRoughness, hasTexture
+    roughnessNode: isBlock.select(blockRoughProc, hasTexture
       ? clamp(proceduralRoughness.mul(float(0.72)).add(mapRoughness.mul(float(0.28))), float(0.25), float(1.0))
       : proceduralRoughness),
-    normalNode: isBlock.select(blockNormal, hasTexture ? mix(reliefNormalNode, mapNormal, float(0.68)).normalize() : reliefNormalNode),
+    normalNode: isBlock.select(blockReliefNode, hasTexture ? mix(reliefNormalNode, mapNormal, float(0.68)).normalize() : reliefNormalNode),
   });
   return concreteGraphs.get(textureBridge)!;
 }
