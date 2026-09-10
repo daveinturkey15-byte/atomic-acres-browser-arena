@@ -123,9 +123,9 @@ function forgeLiningSpec(): Nuketown2MaterialSpec {
  */
 export const VEHICLE_ANCHOR_QUANTUM_M = 0.001;
 export const VEHICLE_PAINT_SATURATION_LOSS_MIN = 0.08;
-export const VEHICLE_PAINT_SATURATION_LOSS_MAX = 0.15;
+export const VEHICLE_PAINT_SATURATION_LOSS_MAX = 0.12;
 export const VEHICLE_PAINT_VALUE_LIFT_MIN = 0.03;
-export const VEHICLE_PAINT_VALUE_LIFT_MAX = 0.08;
+export const VEHICLE_PAINT_VALUE_LIFT_MAX = 0.05;
 export const VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MIN = 0.25;
 export const VEHICLE_CLEARCOAT_UPPER_ROUGHNESS_MAX = 0.35;
 export const VEHICLE_CLEARCOAT_FLANK_ROUGHNESS_MIN = 0.5;
@@ -347,7 +347,7 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   const pigmentLuma = dot(baseUniform, vec3(0.2126, 0.7152, 0.0722));
   const bleachedPigment = mix(baseUniform, vec3(pigmentLuma, pigmentLuma, pigmentLuma), saturationLoss)
     .mul(float(1).add(valueLift));
-  const upperPanel = smoothstep(float(0.58), float(0.88), normalWorld.y);
+  const upperPanel = smoothstep(float(0.68), float(0.92), normalWorld.y);
   const fadedEnamel = mix(baseUniform, bleachedPigment, upperPanel);
 
   // The 350 mm road-dust band is broad and stable; only its 20-60 mm spatter
@@ -373,7 +373,7 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
   // A uniform is intentional: every forge paint shares one graph shape and
   // the dark-blue saloon remains dark blue. Wear is visible in albedo first,
   // then in the physical roughness response.
-  material.colorNode = mix(grimeEnamel, vec3(0.58, 0.56, 0.52), (dust as any).mul(float(0.30)));
+  material.colorNode = mix(grimeEnamel, vec3(0.58, 0.56, 0.52), (dust as any).mul(float(0.22)));
   material.roughnessNode = mix(
     float(baseRoughness).add((dust as any).mul(float(0.20))),
     float(VEHICLE_DUST_BAND_ROUGHNESS),
@@ -440,14 +440,14 @@ export function createForgeGlassMaterial(name: string, tintHex = 0x243036): Mesh
   // Three0.185.1 normalView already handles DoubleSide back-face orientation.
   const cosine = saturate(normalView.dot(positionViewDirection));
   const fresnel = pow(float(1).sub(cosine), float(5));
-  const a0 = float(0.14);
+  const a0 = float(0.12);
   material.colorNode = vec3(tint.r, tint.g, tint.b);
   // Bounded coach-only tonal breakup, not a new reflection or emissive fill.
   // Every other vehicle carries an explicit zero through the shared merge.
   const coachFlag = attribute('forgeCoachShade', 'float');
   const coachSheen = valueNoise2(vec2(positionWorld.z.mul(1.7), positionWorld.y.mul(2.3))).mul(coachFlag);
   const coachVariation = coachSheen.sub(float(0.5).mul(coachFlag)).mul(float(0.08));
-  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.34)).add(coachVariation));
+  material.opacityNode = saturate(a0.add(float(1).sub(a0).mul(fresnel)).add(float(0.22)).add(coachVariation));
   material.roughnessNode = float(0.06).add(coachSheen.mul(float(0.05)));
   return material;
 }

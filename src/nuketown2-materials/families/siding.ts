@@ -128,7 +128,7 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2
   );
   const wainscotBase = mix(uniforms.sidingWainscotColor, uniforms.baseColor, isUpper);
   const base = (uniforms.sidingWainscot as any).greaterThan(float(0.5)).select(wainscotBase, uniforms.baseColor);
-  const sunFade = smoothstep(float(1.2), float(5.2), p.y).mul(float(0.09));
+  const sunFade = smoothstep(float(1.2), float(5.2), p.y).mul(float(0.06));
   const splash = smoothstep(float(0.55), float(0.02), p.y).mul(float(0.16));
   const painted = base.mul(wear.albedoMul).mul(float(1).add(sunFade)).mul(float(1).sub(splash)).mul(float(1).add(boardTone));
   // Primer grey, not a darkening: paint failure on a saturated wall LIGHTENS
@@ -136,7 +136,7 @@ function sharedSidingGraph(uniforms: Nuketown2Uniforms, textureBridge: Nuketown2
   // undercoat rather than as dirt.
   const failed = mix(painted, linearSwatch(0x9b9384).mul(wear.albedoMul), buttFailure.mul(float(0.55)));
   const shadowed = mix(failed, failed.mul(vec3(0.46, 0.44, 0.40)), max(dripShadow, joint.mul(float(0.7))));
-  const lit = mix(shadowed, shadowed.mul(float(1.12)), topCatch.mul(float(0.6)));
+  const lit = mix(shadowed, shadowed.mul(float(1.07)), topCatch.mul(float(0.5)));
   // RELIEF. The lap is a sawtooth in height: full proud at the butt
   // (withinCourse -> 0), milled away to nothing at the top edge
   // (withinCourse -> 1), then the next board's butt starts again. The constant
