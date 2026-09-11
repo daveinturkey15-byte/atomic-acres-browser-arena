@@ -50,6 +50,7 @@ import { createOceanTslWater, oceanAmplitudeForBody } from '../water/ocean-tsl';
 import { sharedWaterBodyForArena } from '../water/water-authoring';
 import {
   applyArenaEnvironmentIbl,
+  disposeArenaIbl,
   observeArenaEnvironment,
   type ArenaEnvironmentObservation,
   type ArenaIblState,
@@ -1578,8 +1579,7 @@ export function createPass64TslSceneSystems(
         if (scene.environment === activeIblState.environmentTexture) {
           scene.environment = null;
         }
-        activeIblState.environmentTexture.dispose();
-        activeIblState.pmremTarget?.dispose();
+        disposeArenaIbl(activeIblState);
       }
       disposeRoot(root);
       hdr.dispose();

@@ -223,6 +223,26 @@ describe('arena-environment-ibl', () => {
     expect(scene.environment).toBe(back.environmentTexture);
   });
 
+  it('detaches retained old vehicle materials before disposing on an arena switch or teardown', async () => {
+    const scene = sceneWithBackdrop();
+    const glass = new THREE.MeshPhysicalMaterial();
+    glass.userData.forgeRole = 'glass';
+    const vehicle = new THREE.Mesh(new THREE.BoxGeometry(), glass);
+    scene.add(vehicle);
+    const state = await applyArenaEnvironmentIbl(renderer, scene, 'nuketown2', 'high', 1, 1, emptyState());
+    scene.remove(vehicle); // retained old arena is no longer reachable through scene.traverse
+    const disposal = vi.spyOn(state.environmentTexture!, 'dispose').mockImplementation(() => {
+      expect(glass.envMap).toBeNull();
+    });
+    await applyArenaEnvironmentIbl(renderer, scene, 'test2', 'high', 1, 1, state);
+    expect(disposal).toHaveBeenCalledOnce();
+    expect(glass.envMap).toBeNull();
+    scene.add(vehicle);
+    const next = await applyArenaEnvironmentIbl(renderer, scene, 'nuketown2', 'high', 1, 1, emptyState());
+    disposeArenaIbl(next);
+    expect(glass.envMap).toBeNull();
+  });
+
   it('updates intensity in place without touching the texture', async () => {
     const scene = sceneWithBackdrop();
     const state = await applyArenaEnvironmentIbl(renderer, scene, 'farcrysis', 'low', 1, 1, emptyState());

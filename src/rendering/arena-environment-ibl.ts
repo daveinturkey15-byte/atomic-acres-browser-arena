@@ -15,7 +15,7 @@ import { PMREMGenerator, type WebGPURenderer } from 'three/webgpu';
 import type { ArenaId } from '../map-selection';
 import { arenaEnvironmentScale } from '../graphics-refinement';
 import { skyBackdropPreset } from './sky-backdrop';
-import { createNuketownReflectionProxy, bindNuketownVehicleReflections } from './nuketown-reflection-proxy';
+import { createNuketownReflectionProxy, bindNuketownVehicleReflections, releaseNuketownVehicleReflections } from './nuketown-reflection-proxy';
 
 export { skyBackdropPreset };
 
@@ -173,6 +173,7 @@ export async function generateArenaEnvironmentMap(
  */
 export function disposeArenaIbl(state: ArenaIblState): void {
   if (state.environmentTexture) {
+    releaseNuketownVehicleReflections(state.environmentTexture);
     state.environmentTexture.dispose();
   }
   if (state.pmremTarget) {

@@ -51,6 +51,20 @@ export function createNuketownReflectionProxy(background: THREE.Texture): {
   };
 }
 
+const boundSurfaces = new WeakMap<THREE.Texture, Set<THREE.MeshStandardMaterial>>();
+
+/** IBL teardown must detach retained arena materials before destroying their texture. */
+export function releaseNuketownVehicleReflections(texture: THREE.Texture): void {
+  for (const surface of boundSurfaces.get(texture) ?? []) {
+    if (surface.envMap === texture) {
+      surface.envMap = null;
+      surface.envMapIntensity = 0;
+      surface.needsUpdate = true;
+    }
+  }
+  boundSurfaces.delete(texture);
+}
+
 /** Explicit local IBL on the automotive surfaces, without lifting every matte wall. */
 export function bindNuketownVehicleReflections(scene: THREE.Scene, texture: THREE.Texture | null, scale: number): void {
   const visited = new Set<THREE.Material>();
@@ -61,8 +75,14 @@ export function bindNuketownVehicleReflections(scene: THREE.Scene, texture: THRE
       visited.add(material);
       const surface = material as THREE.MeshStandardMaterial;
       if (surface.envMap !== texture) {
+        if (surface.envMap) boundSurfaces.get(surface.envMap)?.delete(surface);
         surface.envMap = texture;
         surface.needsUpdate = true;
+      }
+      if (texture) {
+        let surfaces = boundSurfaces.get(texture);
+        if (!surfaces) boundSurfaces.set(texture, surfaces = new Set());
+        surfaces.add(surface);
       }
       surface.envMapIntensity = (material.userData.forgeRole === 'glass' ? 1.2 : 0.7) * scale;
     }
