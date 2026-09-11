@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "registerId": "atomic-acres-owner-feedback-continuation",
+  "scope": "New owner feedback from 2026-09-11; historical HF-315 through HF-565 coverage remains open",
+  "grantsAcceptance": false,
+  "source": "docs/OWNER_FEEDBACK_2026-09-11.md",
+  "requirements": [
+    {
+      "id": "LOBBY-LIFETIME-001",
+      "feedbackId": "HF-566",
+      "owner": "delivery-integration-20260911 / Codex integrator",
+      "state": "OPEN",
+      "outcomes": [
+        "A fresh lobby receives a fresh random identity and cannot reclaim a remembered closed-lobby code",
+        "Closing or expiring a lobby invalidates and clears associated host, game and resume-key mappings",
+        "Recovery and succession of a still-live lobby remain bounded and functional"
+      ],
+      "tests": [
+        "src/lobby-lifetime-storage.test.ts",
+        "src/network-lobby-lifetime.test.ts",
+        "src/lobby-lifetime-main.test.ts"
+      ],
+      "evidence": []
+    }
+  ]
+}
