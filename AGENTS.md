@@ -58,6 +58,25 @@ The no-new-root, current-main containment and exact acceptance rules remain enfo
 - Solo skirmish starts with exactly one enemy bot on every bot-enabled arena. Hosted-lobby choices, arena-specific reinforcements and hard caps remain separate catalog values; graphics profiles never change gameplay counts.
 - Smoke colour, lifetime, radius, shot corridors, human LOS and bot perception are projections of one host-authoritative volume contract. Glass presentation, collision, damage state and projectile aperture are likewise one authoritative lifecycle in every graphics profile.
 
+## Project routing (2026-09-11)
+
+- The project has one stable identity, `atomic-acres-browser-arena`, in
+  `.github/project-identity.json`. Which Git database, worktrees, integration ref, inspected
+  preview, production and rollback that identity means **on this machine** is a gitignored
+  machine record with a versioned schema (`docs/PROJECT_ROUTING.example.json`), an installer
+  and a readback (`node scripts/release/project-routing.mjs init|show`). Never commit that
+  record and never replace it with a pass-numbered pointer in prose.
+- Launch through the guard with identity:
+  `npm run pipeline:preflight -- --machine <m> --harness <h> --project atomic-acres-browser-arena --lane <id>`.
+  It fails closed on a wrong worktree path, wrong branch, wrong Git database, stale base or
+  head, dirty state, expired or closed lane, protected checkout, or a change outside the
+  lane's allowed paths. A call without `--project/--lane` is **legacy**: it is stamped
+  `routing.mode: "legacy"` and warns until root flips enforcement to `refuse`, after which it
+  is refused. Do not describe a legacy receipt as proof of routing.
+- A lane closes only as `integrated` or `rejected` with verified preservation
+  (`npm run pipeline:lane-close`). The guard never deletes a tree, moves a ref or marks an
+  artifact accepted. Full contract and root cutover steps: `docs/PROJECT_ROUTING.md`.
+
 ## Multi-agent discipline (all harnesses)
 
 **Read `docs/MULTI_AGENT_REPO_DISCIPLINE.md` before writing anything in this repository.**

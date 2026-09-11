@@ -4,6 +4,16 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readCompleteAncestry } from './ancestry-inventory.mjs';
+import {
+  REQUIRED_ENV as ROUTING_REQUIRED_ENV,
+  createGitProbe,
+  evaluateLaneClosure,
+  evaluateLaneRoute,
+  loadRegistry,
+  observeWorktree,
+  readProjectIdentity,
+  resolveRegistryPath,
+} from './project-routing.mjs';
 
 const ANCESTRY_ROOTS_RELATIVE_PATH = '.github/ancestry-roots.json';
 const SHA40 = /^[0-9a-f]{40}$/;
@@ -124,9 +134,51 @@ function writeReceipt(repo, kind, receipt) {
   return path;
 }
 
+// Project routing (2026-09-11). `contribute --project <id> --lane <id>` binds
+// the launch to the committed project identity and the machine-local registry
+// (docs/PROJECT_ROUTING.md). Without those flags the call is LEGACY: accepted
+// while enforcement is `warn`, stamped as legacy in the receipt and on stderr,
+// refused once root sets registry enforcement to `refuse` or exports
+// ATOMIC_ACRES_ROUTING_REQUIRED=1. `lane-close` verifies an explicit
+// integrated/rejected closure record with preservation proof and removes nothing.
+function routingIdentityRequested(values) {
+  return values.project !== undefined || values.lane !== undefined;
+}
+
+function legacyRoutingDecision(values) {
+  let registry = null;
+  let registryError = null;
+  try {
+    registry = loadRegistry(resolveRegistryPath(), readProjectIdentity(repo));
+  } catch (error) {
+    registryError = error instanceof Error ? error.message : String(error);
+  }
+  const required = process.env[ROUTING_REQUIRED_ENV] === '1' || registry?.enforcement.legacyContribute === 'refuse';
+  return {
+    mode: 'legacy',
+    required,
+    registryPresent: registry !== null,
+    registryError,
+    warning: 'LEGACY ROUTE: no --project/--lane identity was supplied, so this run was NOT checked against the machine routing registry (worktree, branch, Git database, base/head, scope, lane lifetime). It proves only branch shape and ancestry. See docs/PROJECT_ROUTING.md.',
+  };
+}
+
+function resolveRoute(values, machine, harness) {
+  if (typeof values.project !== 'string' || typeof values.lane !== 'string') {
+    throw new Error('Routed contribution needs both --project <id> and --lane <id>; omit both for a legacy call');
+  }
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  const observed = observeWorktree(repo);
+  return evaluateLaneRoute({
+    registry, identity, projectId: values.project, laneId: values.lane, machine, harness,
+    observed, probe: createGitProbe(repo), originMainSha: receipt.originMainSha,
+  });
+}
+
 const { mode, values } = parseArgs(process.argv.slice(2));
-if (!['doctor', 'contribute', 'release'].includes(mode)) {
-  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|release> [options]');
+if (!['doctor', 'contribute', 'release', 'lane-close'].includes(mode)) {
+  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|release|lane-close> [options]');
 }
 
 const repo = run('git', ['rev-parse', '--show-toplevel']).stdout;
@@ -179,7 +231,10 @@ if (mode !== 'doctor') {
   // Was recorded but never enforced, and enforced only in `contribute`. A line
   // that does not contain origin/main must not reach ANY non-doctor mode:
   // publishing from one is how 21 passes shipped without main ever moving.
-  if (!receipt.containsOriginMain) {
+  // `lane-close` is the one exception: a REJECTED lane is by definition allowed
+  // to be behind main, and closing it (with preservation proof) is how it stops
+  // being a trap. It still cannot contribute or release from here.
+  if (!receipt.containsOriginMain && mode !== 'lane-close') {
     throw new Error(`Refusing ${mode}: HEAD ${headSha} does not contain current origin/main ${receipt.originMainSha}; reconcile through a pull request into main and rerun checks`);
   }
 
@@ -209,6 +264,29 @@ if (mode === 'contribute') {
   // containsOriginMain is now enforced above for every non-doctor mode.
   receipt.machine = machine;
   receipt.harness = harness;
+  if (routingIdentityRequested(values)) {
+    receipt.routing = resolveRoute(values, machine, harness);
+  } else {
+    receipt.routing = legacyRoutingDecision(values);
+    if (receipt.routing.required) {
+      throw new Error(`Refusing contribute: project routing is required on this machine (${receipt.routing.registryPresent ? 'registry enforcement=refuse' : `${ROUTING_REQUIRED_ENV}=1`}) but no --project/--lane identity was supplied. ${receipt.routing.registryError ?? ''}`.trim());
+    }
+    console.error(`WARNING: ${receipt.routing.warning}`);
+  }
+}
+
+if (mode === 'lane-close') {
+  if (typeof values.project !== 'string' || typeof values.lane !== 'string') {
+    throw new Error('lane-close needs --project <id> and --lane <id>');
+  }
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  receipt.closure = evaluateLaneClosure({
+    registry, identity, projectId: values.project, laneId: values.lane,
+    observed: observeWorktree(repo), probe: createGitProbe(repo), originMainSha: receipt.originMainSha,
+  });
+  receipt.grantsAcceptance = false;
+  receipt.removedAnything = false;
 }
 
 if (mode === 'release') {

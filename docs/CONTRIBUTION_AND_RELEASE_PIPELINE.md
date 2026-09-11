@@ -41,8 +41,17 @@ The machine name identifies where the bytes originated; the harness identifies w
    ```bash
    npx --yes npm@10.9.8 ci --ignore-scripts
    npm run qa:lockfile
-   npm run pipeline:preflight -- --machine <machine> --harness <harness>
+   npm run pipeline:preflight -- --machine <machine> --harness <harness> --project atomic-acres-browser-arena --lane <lane-id>
    ```
+
+   `--project` and `--lane` (added 2026-09-11) bind the run to the committed project identity
+   and to a lane in this machine's routing registry; the guard then refuses a wrong worktree,
+   branch, Git database, stale base/head, expired lane, protected checkout or out-of-scope
+   change. Omitting them is a **legacy** call: accepted with a stderr warning and a
+   `routing.mode: "legacy"` receipt stamp while enforcement is `warn`, refused once root sets
+   enforcement to `refuse` or `ATOMIC_ACRES_ROUTING_REQUIRED=1`. A legacy receipt proves
+   nothing about routing. Registry install, readback, lane closure and the root cutover steps
+   are in `docs/PROJECT_ROUTING.md`.
 
 4. Implement one bounded outcome. Do not share the worktree with another task.
 5. Run focused checks, then the relevant repository gates. Rendering changes require browser evidence.
@@ -100,6 +109,15 @@ A reconciliation PR classifies as `runtime` and runs the full Windows + Linux br
 matrix. Do not add a reconciliation short-circuit to `change-impact.mjs`: for a line that
 bypassed CI, this is the first time the tree faces the required checks, and that is the
 point of doing it.
+
+### Lane closure
+
+A contribution lane ends in exactly one of two recorded outcomes — `integrated` (its head is
+reachable from `origin/main`) or `rejected` (its unique commits are preserved in a verified ref
+or bundle). `npm run pipeline:lane-close -- --project atomic-acres-browser-arena --lane <id>`
+verifies the closure record in the routing registry, refuses a dirty tree, records
+`grantsAcceptance: false` and `removedAnything: false`, and deletes nothing. Only after that
+receipt may the worktree be retired, following §1 of `docs/MULTI_AGENT_REPO_DISCIPLINE.md`.
 
 ### Bounded divergence
 
