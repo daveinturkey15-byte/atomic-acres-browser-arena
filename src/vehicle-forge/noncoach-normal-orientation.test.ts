@@ -39,7 +39,9 @@ describe('noncoach triangle-local orientation correction',()=>{
         }
       }
     }
-    expect(changes).toEqual(spec.id===TRUCK_CAB_SPEC.id?{body:0,glass:0,groove:0,lining:2}:{body:2,glass:0,groove:0,lining:22});
+    // Rounded 2026-09-11 sedan: four opposed body triangles, no opposed lining.
+    // Every changed face above still proves exact vertex-set retention and a sign flip.
+    expect(changes).toEqual(spec.id===TRUCK_CAB_SPEC.id?{body:0,glass:0,groove:0,lining:2}:{body:4,glass:0,groove:0,lining:0});
   });
   for(const radius of [.42,.47])it(`preserves every coach loft byte at wheel radius${radius}`,()=>{
     const spec={...COACH_SPEC,wheelRadius:radius},a=loftBody(spec),b=loftBody({...spec,id:'legacy-reference'});

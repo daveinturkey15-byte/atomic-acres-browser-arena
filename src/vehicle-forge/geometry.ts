@@ -94,6 +94,8 @@ export interface VehicleSpec {
   readonly beltY: number;
   /** Radius rolled onto the sill edge. */
   readonly sillRadius: number;
+  /** Minimum hood/deck shoulder depth, allowing the authored rolled edge. */
+  readonly shoulderDepthM?: number;
   readonly wheelRadius: number;
   readonly tyreHalfWidth: number;
   /** |x| of a wheel's centre plane. */
@@ -340,8 +342,9 @@ function ringNormals(points: readonly Vec2[], centreY: number): Vec2[] {
  */
 export function crownSurfaceY(spec: VehicleSpec, z: number, x: number): number {
   const top = topAt(spec, z);
-  const yBelt = Math.min(spec.beltY, top.yTop - 0.03);
-  const hwBelt = flankHalfWidth(spec, yBelt);
+  const yBelt = Math.min(spec.beltY, top.yTop - (spec.shoulderDepthM ?? 0.03));
+  // Preserve the globally anchored body width when rolling the shoulder lower.
+  const hwBelt = flankHalfWidth(spec, Math.min(spec.beltY, top.yTop - 0.03));
   const hwTop = Math.min(top.halfWidthTop, hwBelt);
   const rTop = Math.max(0.005, Math.min(top.topRadius, (top.yTop - yBelt) * 0.9, hwTop * 0.5));
   const crown = spec.roofCrownM ?? 0;
@@ -362,9 +365,10 @@ export function stationRing(spec: VehicleSpec, z: number): Ring {
   // Over the hood and the deck the top is BELOW the belt. An unclamped belt
   // ring then sits above the top ring, the skin folds outward, and its
   // underside reads as a black lip a few centimetres wide along the far edge.
-  const yBelt = Math.min(spec.beltY, yTop - 0.03);
+  const yBelt = Math.min(spec.beltY, yTop - (spec.shoulderDepthM ?? 0.03));
   const yLow = Math.min(yLowRaw, yBelt - 0.06);
-  const hwBelt = flankHalfWidth(spec, yBelt);
+  // Preserve the globally anchored body width when rolling the shoulder lower.
+  const hwBelt = flankHalfWidth(spec, Math.min(spec.beltY, top.yTop - 0.03));
   // Tumblehome. A body whose flanks are vertical to the roof reads as a box.
   const hwTop = Math.min(top.halfWidthTop, hwBelt);
   const rSill = Math.max(0.002, Math.min(spec.sillRadius, (yBelt - yLow) * 0.35, spec.sillHalfWidth * 0.4));

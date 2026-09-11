@@ -28,6 +28,7 @@ import {
   roofRail,
   surfaceBandAtHeights,
   stripAtHeight,
+  stationRing,
 } from './geometry';
 import { type WheelStyle, hubcapDome, lampParts, wheelParts } from './wheels';
 import {
@@ -707,6 +708,25 @@ function reliefRearBox(
  * by scaling x by -1. A negative scale reverses triangle winding, and every
  * mirrored part then culls to black on the side of the car a player walks past.
  */
+/** Reflect an already positioned asymmetric trim part, preserving outward winding. */
+function reflectedAcrossCentre(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  geometry.scale(-1, 1, 1);
+  // chamferedBar is non-indexed. Swap complete vertex records so normals/UVs
+  // stay attached, and the negative determinant never turns trim inside out.
+  for (const attribute of Object.values(geometry.attributes)) {
+    for (let triangle = 0; triangle < attribute.count; triangle += 3) {
+      for (let axis = 0; axis < attribute.itemSize; axis += 1) {
+        const a = (triangle + 1) * attribute.itemSize + axis;
+        const b = (triangle + 2) * attribute.itemSize + axis;
+        const value = attribute.array[a]!;
+        attribute.array[a] = attribute.array[b]!;
+        attribute.array[b] = value;
+      }
+    }
+  }
+  return geometry;
+}
+
 function mirroredToLeft(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   geometry.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
   return geometry;
@@ -1152,14 +1172,36 @@ export function buildForgedVehicle(
     parts.chrome.push(translated(chamferedBar(0.045, 0.03, 0.045, 0.008), 0, y1 + 0.02, z));
   }
   if (dressing.gutters) {
-    const { x, y, z0, z1 } = dressing.gutters;
+    const { x, y } = dressing.gutters;
+    // The sedan's rolled greenhouse is narrower than the legacy fixed bars.
+    // Keep the two existing bars per side on the roof plateau and take their
+    // endpoints from the actual arc, preserving geometry/draw allocation.
+    const sedanRoof = spec.id === 'nuketown2-sedan';
+    const plateau = spec.top.filter(point => point.yTop >= 1.79);
+    const z0 = sedanRoof ? Math.max(dressing.gutters.z0, plateau[0]!.z) : dressing.gutters.z0;
+    const z1 = sedanRoof ? Math.min(dressing.gutters.z1, plateau.at(-1)!.z) : dressing.gutters.z1;
     const midZ = (z0 + z1) / 2;
     const half = (z1 - z0) / 4;
     for (const side of [1, -1] as const) {
       for (const gutterZ of [midZ - half, midZ + half]) {
-        const bar = chamferedBar(half - 0.01, 0.012, 0.012, 0.004);
-        bar.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
-        parts.chrome.push(translated(bar, side * x, y, gutterZ));
+        if (sedanRoof) {
+          const endpoint = (z: number): THREE.Vector3 => {
+            const arc = stationRing(spec, z).points[10]!;
+            return new THREE.Vector3(arc[0] + 0.009, arc[1] + 0.009, z);
+          };
+          const a = endpoint(gutterZ - half + 0.01);
+          const b = endpoint(gutterZ + half - 0.01);
+          const direction = b.clone().sub(a);
+          const bar = chamferedBar(direction.length() / 2, 0.012, 0.012, 0.004);
+          bar.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize()));
+          const centre = a.add(b).multiplyScalar(0.5);
+          const placed = translated(bar, centre.x, centre.y, centre.z);
+          parts.chrome.push(markPart(side === 1 ? placed : reflectedAcrossCentre(placed), 'detail.saloon.roof-gutter'));
+        } else {
+          const bar = chamferedBar(half - 0.01, 0.012, 0.012, 0.004);
+          bar.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+          parts.chrome.push(translated(bar, side * x, y, gutterZ));
+        }
       }
     }
   }
