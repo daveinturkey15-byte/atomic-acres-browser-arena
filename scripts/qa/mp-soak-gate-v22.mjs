@@ -409,7 +409,7 @@ async function captureCausalNaturalLife(role) {
   if (!Number.isSafeInteger(baseline.epoch) || !Number.isSafeInteger(baseline.lifeId) || !Number.isSafeInteger(baseline.deathCount)) throw Error('causal baseline identity missing');
   if (!PEERS.every((peer) => before[peer]?.subjectId === subjectId && before[peer]?.hp === 100 && before[peer]?.alive === true
     && before[peer]?.epoch === baseline.epoch && before[peer]?.renderLife === baseline.lifeId
-    && before[peer]?.supportLife === baseline.lifeId && before[peer]?.deathCount === baseline.deathCount)) throw Error('causal baseline not commonly settled');
+    && before[peer]?.supportLife === baseline.lifeId && before[peer]?.deathCount === baseline.deathCount)) throw Error(`causal baseline not commonly settled: ${JSON.stringify(before)}`);
   const traceStarts = Object.fromEntries(await Promise.all(PEERS.map(async peer => [peer,
     await peers[peer].page.evaluate(() => {
       const cursor = trace => ({ enabled: trace.enabled, recorded: trace.recorded, dropped: trace.dropped });
