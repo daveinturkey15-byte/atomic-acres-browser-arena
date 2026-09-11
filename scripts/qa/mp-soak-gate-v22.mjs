@@ -57,6 +57,7 @@ const positionBoundM = MP_SOAK_THRESHOLDS.positionBoundM;
 const QA_SEED = 'hf499-mp-soak-20260904';
 const argv = process.argv.slice(2);
 const menuDiagnostic=argv.includes('--menu-diagnostic');
+const lifeDiagnostic=argv.includes('--life-diagnostic');
 const arg = (name, fallback) => {
   const index = argv.indexOf(name);
   return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
@@ -71,6 +72,7 @@ const distPath = resolve(REPO_ROOT, arg('--dist', 'dist'));
 if(!/^[0-9a-f]{40}$/.test(sourceSha??''))throw Error('Exact immutable source --sha required');
 if(existsSync(join(outDir, `${label}-bundle.json`)))throw Error('Never overwrite prior MP evidence');
 if(menuDiagnostic&&existsSync(join(outDir,`${label}-menu-diagnostic.json`)))throw Error('Never overwrite menu evidence');
+if(lifeDiagnostic&&existsSync(join(outDir,`${label}-life-diagnostic.json`)))throw Error('Never overwrite life evidence');
 if(existsSync(join(outDir,`${label}-finalization.json`)))throw Error('Never overwrite finalization evidence');
 const driverSha=spawnSync('git',['rev-parse','HEAD'],{cwd:REPO_ROOT,encoding:'utf8',windowsHide:true,timeout:3000}).stdout?.trim();
 if(!/^[0-9a-f]{40}$/.test(driverSha??''))throw Error('Exact test-driver revision required');
@@ -786,6 +788,15 @@ function formatAdmissionSection() {
 }
 
 async function writeEvidence() {
+  if(lifeDiagnostic) {
+    const result={schema:'causal-life-diagnostic-v1',runtimeSha:sourceSha,driverSha,
+      scope:'isolated causal life observation, not full multiplayer acceptance',
+      failure:bundle.failure,liveArtifact:bundle.liveArtifact,guests:bundle.lifeDiagnostic??{}};
+    mkdirSync(outDir,{recursive:true});
+    await writeFile(join(outDir,`${label}-life-diagnostic.json`),JSON.stringify(result,null,2)+'\n');
+    console.log(JSON.stringify({schema:result.schema,failure:result.failure,guests:Object.keys(result.guests)}));
+    return;
+  }
   if(menuDiagnostic) {
     const result={schema:'menu-lifecycle-diagnostic-v1',runtimeSha:sourceSha,
       driverSha,
@@ -881,6 +892,16 @@ async function main() {
   await peers.host.page.click('#lobby-start');
   await Promise.all(PEERS.map((role) => peers[role].page.waitForFunction(() => window.__ATOMIC_ACRES_DEBUG__?.snapshot().gameStarted === true && window.__ATOMIC_ACRES_DEBUG__?.snapshot().matchPhase === 'active' && window.__ATOMIC_ACRES_DEBUG__?.snapshot().remotes === 2, undefined, { timeout: 180_000 })));
 
+  if(lifeDiagnostic) {
+    bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
+    bundle.lifeDiagnostic={};
+    for(const role of ['guestA','guestB']) {
+      const result=await captureCausalNaturalLife(role);
+      bundle.lifeDiagnostic[role]=result;
+      await writeEvidence();
+    }
+    return;
+  }
   if(menuDiagnostic) {
     bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
     bundle.menuOpening=[];
