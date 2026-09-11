@@ -36,6 +36,7 @@ import { boundedStep, waitOrStop } from './mp-soak-v2-runtime.mjs';
 import { captureReloadTrigger } from './reload-trigger-identity.mjs';
 import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 import { finalizationWriter } from './mp-soak-finalization.mjs';
+import { traceWindow, deathPublicationCandidates } from './trace-window.mjs';
 import { safeSkyShotEvidence, ammoAcknowledged, installReloadObserver, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -452,6 +453,14 @@ async function captureCausalNaturalLife(role) {
   if (!PEERS.every((peer) => before[peer]?.subjectId === subjectId && before[peer]?.hp === 100 && before[peer]?.alive === true
     && before[peer]?.epoch === baseline.epoch && before[peer]?.renderLife === baseline.lifeId
     && before[peer]?.supportLife === baseline.lifeId && before[peer]?.deathCount === baseline.deathCount)) throw Error('causal baseline not commonly settled');
+  const traceStarts = Object.fromEntries(await Promise.all(PEERS.map(async peer => [peer,
+    await peers[peer].page.evaluate(() => {
+      const cursor = trace => ({ enabled: trace.enabled, recorded: trace.recorded, dropped: trace.dropped });
+      return { origin: performance.timeOrigin,
+        health: cursor(window.__ATOMIC_ACRES_DEBUG__.sampleHealthAuthorityTrace()),
+        message: cursor(window.__ATOMIC_ACRES_DEBUG__.sampleMessageTrace()) };
+    }),
+  ])));
   await Promise.all(PEERS.map((peer) => peers[peer].page.evaluate(installCausalDeathObserver, { id: subjectId })));
   let trigger;
   let finalObserved = false;
@@ -495,38 +504,22 @@ async function captureCausalNaturalLife(role) {
   const traces = Object.fromEntries(await Promise.all(PEERS.map(async (peer) => [
     peer,
     await peers[peer].page.evaluate(() => ({
+      origin: performance.timeOrigin,
       health: window.__ATOMIC_ACRES_DEBUG__.sampleHealthAuthorityTrace(),
       message: window.__ATOMIC_ACRES_DEBUG__.sampleMessageTrace(),
     })),
   ])));
-  const healthCandidates = (traces.host?.health?.rows ?? []).filter((row) => row.stage === 'publish'
-    && row.subjectId === subjectId && row.matchEpoch === baseline.epoch && row.continuity === baseline.lifeId
-    && row.hp === 0 && Number.isSafeInteger(row.revision) && row.atMs >= trigger.atMs
-    && row.timeOriginMs === trigger.origin);
-  const deathPublication = healthCandidates[0] ?? null;
-  const publicationKey = deathPublication && {
-    subjectId,
-    revision: deathPublication.revision,
-    continuity: deathPublication.continuity,
-    matchEpoch: deathPublication.matchEpoch,
-    authorId: deathPublication.authorId,
-  };
-  const scopedHealth = (trace) => trace && {
-    ...trace,
-    rows: (trace.rows ?? []).filter((row) => publicationKey
-      && row.subjectId === publicationKey.subjectId && row.revision === publicationKey.revision
-      && row.continuity === publicationKey.continuity && row.matchEpoch === publicationKey.matchEpoch
-      && row.authorId === publicationKey.authorId),
-  };
-  const scopedMessage = (trace) => trace && {
-    ...trace,
-    entries: (trace.entries ?? []).filter((entry) => entry.subjectId === subjectId
-      && entry.atMs >= trigger.atMs && (entry.type === 'death' || entry.type === 'health-authority')),
-  };
-  const scopedTraces = Object.fromEntries(PEERS.map((peer) => [peer, {
-    health: scopedHealth(traces[peer]?.health),
-    message: scopedMessage(traces[peer]?.message),
-  }]));
+  // Retain every row in each peer's own cursor window. Never discard a
+  // conflicting health key before the independent canonical verifier sees it.
+  const scopedTraces = Object.fromEntries(PEERS.map(peer => [peer,
+    Object.fromEntries(['health', 'message'].map(kind => [kind, traceWindow(
+      { origin: traceStarts[peer].origin, trace: traceStarts[peer][kind] },
+      { ...traces[peer][kind], origin: traces[peer].origin },
+      kind === 'health' ? 'rows' : 'entries',
+    )])),
+  ]));
+  const candidateScope = deathPublicationCandidates(scopedTraces.host.health.rows, baseline);
+  const publicationKey = candidateScope.publication;
   const deathEntries = (scopedTraces.host?.message?.entries ?? []).filter((entry) => entry.type === 'death'
     && entry.subjectId === subjectId && entry.direction === 'out');
   const report = {
@@ -539,7 +532,7 @@ async function captureCausalNaturalLife(role) {
       rows: observers[peer]?.rows ?? [], samples: observers[peer]?.samples ?? 0, dropped: observers[peer]?.dropped ?? null,
     }])),
     traces: scopedTraces,
-    traceScope: { publication: publicationKey, hostCandidateCount: healthCandidates.length },
+    traceScope: candidateScope,
     // The host broadcasts one canonical death to both guests, so the QA message
     // trace can contain one outgoing row per recipient. Collapse only those
     // transport copies; the health publication/revision remains the uniqueness

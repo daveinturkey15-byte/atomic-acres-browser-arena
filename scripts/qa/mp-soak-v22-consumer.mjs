@@ -338,6 +338,7 @@ function deathRows(report, role) {
 
 function traceEnabledAndComplete(trace) {
   return object(trace) && trace.enabled === true && trace.dropped === 0
+    && (!trace.window || trace.window.complete === true)
     && Array.isArray(trace.rows ?? trace.entries)
     && integer(trace.recorded) && trace.recorded >= (trace.rows ?? trace.entries).length;
 }
