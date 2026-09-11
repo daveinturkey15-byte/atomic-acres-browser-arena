@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // IS part of the contract.
 const pmremInstances: Array<{
   fromEquirectangular: ReturnType<typeof vi.fn>;
+  fromScene: ReturnType<typeof vi.fn>;
   compileEquirectangularShader: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
 }> = [];
@@ -31,6 +32,8 @@ vi.mock('three/webgpu', async (importOriginal) => {
       const target = { texture, height: 256, dispose: vi.fn() };
       return target as unknown as THREE.WebGLRenderTarget;
     });
+
+    fromScene = vi.fn(() => ({ texture: new THREE.Texture(), height: 256, dispose: vi.fn() }));
 
     constructor() {
       pmremInstances.push(this);
@@ -133,6 +136,24 @@ describe('arena-environment-ibl', () => {
     expect(pmremInstances[0].dispose).toHaveBeenCalledTimes(1);
     expect(scene.environment).toBe(state.environmentTexture);
     expect(state.sourceTexture).toBe(scene.background);
+  });
+
+  it('bakes Nuketown once from its finite static proxy, never the live dynamic scene', async () => {
+    const scene = sceneWithBackdrop();
+    const glass = new THREE.MeshPhysicalMaterial();
+    glass.userData.forgeRole = 'glass';
+    scene.add(new THREE.Mesh(new THREE.BoxGeometry(), glass));
+    const state = await applyArenaEnvironmentIbl(renderer, scene, 'nuketown2', 'high', 1, 1, emptyState());
+    expect(pmremInstances[0].fromScene).toHaveBeenCalledOnce();
+    expect(pmremInstances[0].fromScene.mock.calls[0][0]).not.toBe(scene);
+    expect(pmremInstances[0].fromEquirectangular).not.toHaveBeenCalled();
+    expect(glass.envMap).toBe(state.environmentTexture);
+    const held = await applyArenaEnvironmentIbl(renderer, scene, 'nuketown2', 'high', 1, 0.5, state);
+    expect(pmremInstances).toHaveLength(1);
+    expect(glass.envMapIntensity).toBeCloseTo(0.6);
+    await applyArenaEnvironmentIbl(renderer, scene, 'nuketown2', 'off', 1, 1, held);
+    expect(glass.envMap).toBeNull();
+    expect(scene.environment).toBeNull();
   });
 
   it('refuses to run without an applied sky backdrop', async () => {

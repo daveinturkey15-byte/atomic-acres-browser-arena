@@ -1,3 +1,4 @@
+import { applyNuketownArchitecturalProfiles } from './forge-kit/architectural-profiles';
 /**
  * NUKETOWN2: Nuke Town Rebuild (PREVIEW) — HF-407, owner 2026-09-02 ~16:10 BST,
  * RE-PROPORTIONED under HF-426, owner 2026-09-03 07:00 BST.
@@ -5007,6 +5008,7 @@ export function buildNuketown2(scene: THREE.Scene): ArenaMap {
   // HF-536 night-gemini15: utility pole power lines, catenary spans, eaves drops, pole transformer
   buildNuketown2PowerLines(builder, m);
 
+  applyNuketownArchitecturalProfiles(builder.root);
   batchPresentationOnlyBoxes(builder.root, 'nuketown2-presentation');
   buildNuketown2Rooflines(builder, {
     roof: m.roof,

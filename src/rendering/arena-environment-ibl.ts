@@ -15,6 +15,7 @@ import { PMREMGenerator, type WebGPURenderer } from 'three/webgpu';
 import type { ArenaId } from '../map-selection';
 import { arenaEnvironmentScale } from '../graphics-refinement';
 import { skyBackdropPreset } from './sky-backdrop';
+import { createNuketownReflectionProxy, bindNuketownVehicleReflections } from './nuketown-reflection-proxy';
 
 export { skyBackdropPreset };
 
@@ -124,7 +125,22 @@ export async function generateArenaEnvironmentMap(
   // depend on whatever happened to be in the scene at switch time. The sky
   // backdrop IS the arena's authored environment; sampling it directly renders
   // zero scene meshes, so that NaN class cannot exist here.
-  const pmremTarget = pmrem.fromEquirectangular(backgroundTexture);
+  // Nuketown uses a small, light-free proxy of its actual house placement.
+  // Never capture the live scene: dynamic/empty placeholder geometry remains
+  // excluded. Other arenas retain their established sky-only path.
+  let pmremTarget: THREE.RenderTarget;
+  if (arenaId === 'nuketown2') {
+    const proxy = createNuketownReflectionProxy(backgroundTexture);
+    try {
+      pmremTarget = pmrem.fromScene(proxy.scene, 0, 0.1, 250, {
+        size: resolution, position: new THREE.Vector3(0, 1.5, 0),
+      });
+    } finally {
+      proxy.dispose();
+    }
+  } else {
+    pmremTarget = pmrem.fromEquirectangular(backgroundTexture);
+  }
   const environmentTexture = pmremTarget.texture;
   environmentTexture.name = `pass64-arena-environment-${arenaId}-${resolution}`;
   // Deliberately NO mapping/colorSpace overrides: PMREM output carries its own
@@ -134,6 +150,7 @@ export async function generateArenaEnvironmentMap(
   // Apply to scene.environment with combined intensity
   scene.environment = environmentTexture;
   scene.environmentIntensity = budgetEnvironmentIntensity * arenaScale * reflectionScale;
+  if (arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, environmentTexture, reflectionScale);
 
   pmrem.dispose();
 
@@ -178,6 +195,7 @@ export function updateArenaEnvironmentIntensity(
   }
   const newIntensity = budgetEnvironmentIntensity * state.arenaEnvironmentScale * reflectionScale;
   scene.environmentIntensity = newIntensity;
+  if (state.arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, state.environmentTexture, reflectionScale);
   return Object.freeze({
     ...state,
     budgetEnvironmentIntensity,
@@ -229,6 +247,7 @@ export async function applyArenaEnvironmentIbl(
 ): Promise<ArenaIblState> {
   // If reflection quality is off, clear environment and return empty state
   if (reflectionQuality === 'off') {
+    if (arenaId === 'nuketown2') bindNuketownVehicleReflections(scene, null, 0);
     if (scene.environment === currentIblState.environmentTexture) {
       scene.environment = null;
     }
