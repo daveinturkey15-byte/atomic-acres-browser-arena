@@ -10,6 +10,7 @@ import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { captureCausalDeathTrigger } from './causal-death-trigger.mjs';
 import {
   ACK_BUDGET_MS,
   PEERS,
@@ -423,26 +424,7 @@ async function captureCausalNaturalLife(role) {
   let finalObserved = false;
   let observers = {};
   try {
-    trigger = await peers.host.page.evaluate((id) => {
-      const project = () => {
-        const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-        const player = snapshot.remotePlayers?.find((candidate) => candidate.id === id);
-        return {
-          subjectId: id,
-          epoch: snapshot.killstreak?.matchEpoch ?? null,
-          hp: player?.hp ?? null,
-          alive: (player?.hp ?? 0) > 0,
-          renderLife: player?.continuity ?? null,
-          supportLife: snapshot.killstreak?.actors?.find((actor) => actor.actorId === id)?.lifeId ?? null,
-          deathCount: snapshot.privateMatch?.scores?.find((score) => score.id === id)?.deaths ?? null,
-        };
-      };
-      const before = project();
-      const atMs = performance.now();
-      const applied = window.__ATOMIC_ACRES_DEBUG__.damageRemoteAuthoritatively(500, id);
-      const after = project();
-      return { before, after, applied, atMs, afterAtMs: performance.now(), origin: performance.timeOrigin };
-    }, subjectId);
+    trigger = await peers.host.page.evaluate(captureCausalDeathTrigger, subjectId);
     const nextLife = baseline.lifeId + 1;
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline) {

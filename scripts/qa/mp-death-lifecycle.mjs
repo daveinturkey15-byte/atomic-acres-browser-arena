@@ -1,5 +1,6 @@
 import { evaluateCanonicalDeathReplay } from './mp-canonical-replay-consumer.mjs';
 const finite = Number.isFinite;
+const natural = value => Number.isSafeInteger(value) && value >= 0;
 const key = r => JSON.stringify([r.subjectId, r.revision, r.continuity, r.matchEpoch, r.authorId]);
 
 // Explicit lifecycle proof; the strict single-fact verifier stays unchanged.
@@ -13,7 +14,18 @@ export function evaluateCanonicalDeathLifecycle(input) {
   const e = input.expected, next = e.continuity + 1, origin = input.trigger.origin;
   const trace = input.hostStageTrace;
   const rows = input.healthRows.filter(r => r.subjectId === e.subjectId);
-  if (input.healthWindow?.complete !== true || !finite(origin)) fail('lifecycle-window-unproven');
+  const health = input.hostHealthTrace, window = health?.window;
+  const start = window?.before, end = window?.after;
+  if (!finite(origin) || health?.enabled !== true || health.origin !== origin
+    || health.rows !== input.healthRows || health.recorded !== input.healthRows.length || health.dropped !== 0
+    || window?.complete !== true || window.origin !== origin || window.missingRows !== 0
+    || !Array.isArray(window.errors) || window.errors.length !== 0
+    || ![start?.recorded,start?.dropped,end?.recorded,end?.dropped,end?.retained].every(natural)
+    || start.dropped > start.recorded || end.dropped < start.dropped || end.dropped > end.recorded
+    || end.recorded - start.recorded !== input.healthRows.length
+    || end.recorded - end.dropped !== end.retained || end.retained < input.healthRows.length
+    || input.healthRows.some((row, index) => row.ordinal !== start.recorded + index + 1))
+    fail('lifecycle-window-unproven');
   if (!trace || trace.dropped !== 0 || !Array.isArray(trace.rows)
     || !Number.isSafeInteger(trace.samples) || trace.samples !== trace.rows.length) fail('lifecycle-stage-trace-incomplete');
   const pubs = rows.filter(r => r.stage === 'publish');
@@ -60,6 +72,11 @@ export function evaluateCanonicalDeathLifecycle(input) {
   // sample inside that call: its actual before/after reads are separate anchors,
   // never invented timer rows. Publication zero must occur within that call.
   const trigger = input.trigger;
+  const validRead = r => r && finite(r.readStart) && finite(r.readEnd)
+    && r.readEnd >= r.readStart && r.origin === origin;
+  if (!validRead(trigger.before) || !validRead(trigger.after)
+    || !(trigger.before.readEnd <= trigger.atMs && trigger.atMs <= trigger.after.readStart
+      && trigger.after.readEnd <= trigger.afterAtMs)) fail('lifecycle-trigger-read-clock');
   if (statePhaseOf(trigger.before) !== 0 || statePhaseOf(trigger.after) !== 1)
     fail('lifecycle-trigger-state-conflict');
   if (!finite(trigger.atMs) || !finite(trigger.afterAtMs) || trigger.afterAtMs < trigger.atMs
@@ -90,5 +107,5 @@ export function evaluateCanonicalDeathLifecycle(input) {
     evidence: { ...strict.evidence, strictReasons: strict.reasons,
       canonicalDeathCount: reasons.length === 0 ? 1 : null,
       heldDeadKey: held.length === 1 ? key(held[0]) : null,
-      publicationPhases: [...seen], observedPhases: [...observed] } };
+      publicationPhases: [...seen], observedPhases: [...observed], heldWitness, aliveWitness } };
 }

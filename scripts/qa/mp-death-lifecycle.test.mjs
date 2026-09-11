@@ -7,12 +7,15 @@ function fixture() {
   const expected = { subjectId:'a', revision:2, continuity:3, matchEpoch:7, authorId:'host' };
   const row = (revision, continuity, hp, atMs, stage='publish') => ({ ...expected,revision,continuity,hp,atMs,stage,timeOriginMs:1000 });
   const state = (atMs,hp,renderLife,supportLife,deathCount) => ({subjectId:'a',epoch:7,origin:1000,atMs,readStart:atMs,readEnd:atMs,hp,alive:hp>0,renderLife,supportLife,deathCount});
-  return {traceScope:'multi',expected,baselineDeathCount:0,
+  const f = {traceScope:'multi',expected,baselineDeathCount:0,
     trigger:{origin:1000,atMs:8,afterAtMs:12,before:state(8,100,3,3,0),after:state(12,0,3,4,1),applied:{targetId:'a',storedBefore:100,storedAfter:0}},
     healthRows:[row(2,3,0,10),row(3,4,0,20),row(2,3,0,25,'send-call'),row(4,4,100,30)],
-    healthWindow:{complete:true},
     deathEvents:[{...expected,kind:'canonical-death',transportCopies:2}],
     hostStageTrace:{dropped:0,samples:4,rows:[state(5,100,3,3,0),state(15,0,3,4,1),state(25,0,4,4,1),state(35,100,4,4,1)]}};
+  f.healthRows.forEach((r,i)=>r.ordinal=i+1);
+  f.healthWindow={complete:true,origin:1000,missingRows:0,errors:[],before:{recorded:0,dropped:0},after:{recorded:4,dropped:0,retained:4}};
+  f.hostHealthTrace={rows:f.healthRows,enabled:true,origin:1000,recorded:4,dropped:0,window:f.healthWindow};
+  return f;
 }
 test('held-dead lifecycle is separately proven without changing strict single-fact rejection',()=>{
   const f=fixture();
@@ -55,6 +58,18 @@ test('lifecycle rejects conflicting identities, second deaths, missing and unord
     initialSupportNotAdvanced:f=>{f.trigger.after.supportLife=3;},
     initialAlive:f=>{f.trigger.after.alive=true;},
     missingTriggerClock:f=>{delete f.trigger.afterAtMs;},
+    foreignTriggerRead:f=>{f.trigger.after.origin=9999;},
+    missingTriggerRead:f=>{delete f.trigger.before.readStart;},
+    reverseTriggerRead:f=>{f.trigger.after.readEnd=11;},
+    futureTriggerRead:f=>{f.trigger.after.readStart=13;f.trigger.after.readEnd=13;},
+    beforeReadOverlapsDamage:f=>{f.trigger.before.readEnd=9;},
+    forgedCompleteFlag:f=>{f.healthWindow.errors=['window-overflow'];},
+    lostRow:f=>{f.healthRows.splice(2,1);},
+    ordinalGap:f=>{f.healthRows[1].ordinal=9;},
+    foreignWindow:f=>{f.healthWindow.origin=1001;},
+    scopedDropped:f=>{f.hostHealthTrace.dropped=1;},
+    badRetained:f=>{f.healthWindow.after.retained=3;},
+    absentWindow:f=>{delete f.hostHealthTrace.window;},
     reverseTrigger:f=>{f.trigger.afterAtMs=7;},
     publicationOutsideTrigger:f=>{f.trigger.afterAtMs=9;},
     unaccountedSample:f=>{f.hostStageTrace.samples++;},
