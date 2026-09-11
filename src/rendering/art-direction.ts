@@ -840,36 +840,12 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     saturationScale: 1.06,
     contrastScale: 1.06,
     crosstalkDelta: -0.13,
-    // HF-536 night-lighting, 2026-09-06. Re-hued for the golden hour this arena
-    // was RE-LIT to in HF-426 Job 3, which the row above deliberately did not
-    // follow. Split toning is exactly luminance preserving (the chain
-    // renormalises back to the incoming Rec.709 luma), so this pair moves hue
-    // and cannot move visibility - it is the one grade axis with no readability
-    // cost at all, which is why the golden-hour correction is taken here rather
-    // than in gain/gamma (untouched above: the distinctiveness search that set
-    // them is not re-run by this lane).
-    //
-    // MEASURED reason (root-captures/forge-final, score-stations): the shaded
-    // road, the mountains and the car body all came back with a hue angle of
-    // 237-278 deg - violet - against a sun at 0xfff1ce. Warm key with violet
-    // shade is a magenta cast, not golden hour; warm key with COOL shade is.
-    //
-    // HF-536 look-2a, 2026-09-06 — the hue pair above was RIGHT and too QUIET
-    // to reach the frame. night-lighting shipped it at strengthScale 1.0 and
-    // then measured the shade still at hue 270 deg (it moved 2 degrees), which
-    // is the honest signature of a correct tint applied at a third of the
-    // authority the picture needed. Split toning is exactly luminance
-    // preserving — the chain renormalises back to the incoming Rec.709 luma —
-    // so this is the ONE axis on which warm/cool separation can be bought with
-    // ZERO readability cost, and it is therefore where a lane told "the frame
-    // reads pale, cool and flat" should spend first. 1.45 of a 1.6 bound.
-    // highlightTint deepens 0xffd9a8 -> 0xffd096: R-B 87 -> 105, which is the
-    // measured 13.8-point sunlit R-B deficit paid back on the highlight side
-    // where the sun actually is, rather than smeared across the whole frame.
     splitTone: {
-      shadowTint: 0x2b4258,      // cool slate-blue shade under a warm low sun
-      highlightTint: 0xffd096,   // deeper amber: the last hour, not mid-afternoon
-      strengthScale: 1.45,
+      // A restrained warm key / blue shade lets the house paint and foliage
+      // retain their own colour; the previous strong amber grade browned both.
+      shadowTint: 0x496c87,
+      highlightTint: 0xfff0d5,
+      strengthScale: 0.55,
       shadowBalance: 0.52,
       highlightBalance: 0.42,
     },

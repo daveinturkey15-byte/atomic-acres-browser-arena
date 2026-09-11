@@ -268,7 +268,11 @@ export const NUKETOWN2_SHADOW_FLOOR_MINIMUM_FILL_INTENSITY = 0.16;
 
 const NUKETOWN2_SHADOW_FLOOR: Readonly<Partial<ArenaLightingProfile>> = Object.freeze({
   ambientIntensity: 0.12,
-  hemisphereIntensity: 0.18,
+  // Open-sky fill must describe the clean painted forms as well as the baked
+  // local bounce. Keep the directional shadow-side floor and light set fixed.
+  hemisphereIntensity: 0.6,
+  hemisphereSky: 0xbdd7ee,
+  hemisphereGround: 0xa8ad8c,
   fillIntensity: NUKETOWN2_SHADOW_SIDE_FILL_INTENSITY,
 });
 
