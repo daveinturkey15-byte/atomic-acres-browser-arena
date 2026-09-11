@@ -30,3 +30,33 @@ The planning requirement is `LOBBY-LIFETIME-001` in `OWNER_FEEDBACK_CONTINUATION
 `src/lobby-lifetime-main.test.ts`: execute the actual host/create/close integration boundary with synthetic dependencies; verify clearing order and stale-credential handling. A source-string check alone does not prove runtime lifecycle behavior.
 
 Retain existing network connection-attempt, lifecycle, host recovery, migration and private-match checks. Boot the exact built candidate in a headless browser and exercise the lobby lifecycle. Preserve established netcode benchmarks; same-machine tests do not establish WAN behavior. Runtime/owner acceptance stays OPEN until actual receipts exist.
+
+## Scheduling correction from Dave
+
+VERIFIED owner clarification on 11 September: the multiplayer and chat feedback is notes for fixing later. The original overnight delivery repair remains the priority. HF-566 staged work is preserved but not installed; HF-567 through HF-569 are follow-up obligations. OPEN means owed, not accepted or scheduled into tonight.
+
+### HF-567 — LOBBY-START-READY-001
+
+| ID | Priority | Expected result | Owner | Falsifier | Scope | State |
+| --- | --- | --- | --- | --- | --- | --- |
+| HF-567 | P1 | Do not start the multiplayer game or match timer until every expected player is confirmed joined and ready. | delivery-integration-20260911 / Codex integrator | A delayed, loading, disconnected or unready expected player permits the game or timer to start. | Multiplayer, all maps; follow-up | OPEN |
+
+Required future evidence: exercise the actual host/guest browser path and the planned test target `src/lobby-start-readiness.test.ts`. The target is an obligation, not an existing test or receipt.
+
+### HF-568 — MULTIPLAYER-MOVEMENT-001
+
+| ID | Priority | Expected result | Owner | Falsifier | Scope | State |
+| --- | --- | --- | --- | --- | --- | --- |
+| HF-568 | P2 | Investigate players unable to move until everyone joins and they have been killed; test later as Dave requested. | delivery-integration-20260911 / Codex integrator | A guest cannot move after admission, or death/respawn unexpectedly clears the lock. | Multiplayer, all maps; follow-up | OPEN |
+
+Required future evidence: exercise the actual host/guest browser path and the planned test target `src/multiplayer-movement-admission.test.ts`. The target is an obligation, not an existing test or receipt.
+
+### HF-569 — REMOVE-TEXT-CHAT-001
+
+| ID | Priority | Expected result | Owner | Falsifier | Scope | State |
+| --- | --- | --- | --- | --- | --- | --- |
+| HF-569 | P2 | Remove text chat options from both the multiplayer lobby and in-game UI. | delivery-integration-20260911 / Codex integrator | Lobby or in-game chat controls, typing shortcuts or chat entry remain available. | Multiplayer, all maps; follow-up | OPEN |
+
+Required future evidence: exercise the actual host/guest browser path and the planned test target `src/text-chat-removal.test.ts`. The target is an obligation, not an existing test or receipt.
+
+HF-567 diagnosis is OPEN: the existing ready predicate already rejects pending guests, disconnected reservations and unready members; the start clock is assigned before asynchronous arena admission completes. A delayed-guest reproduction is still needed. HF-568 is owner-reported, not locally reproduced. HF-569 covers text chat, not voice or unrelated multiplayer controls.

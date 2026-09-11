@@ -20,6 +20,49 @@
         "src/network-lobby-lifetime.test.ts",
         "src/lobby-lifetime-main.test.ts"
       ],
+      "evidence": [],
+      "schedule": "follow-up; deferred from the overnight delivery repair by owner clarification on 2026-09-11"
+    },
+    {
+      "id": "LOBBY-START-READY-001",
+      "feedbackId": "HF-567",
+      "owner": "delivery-integration-20260911 / Codex integrator",
+      "state": "OPEN",
+      "schedule": "follow-up; owner explicitly clarified these were notes for later",
+      "outcomes": [
+        "Do not start the multiplayer game or match timer until every expected player is confirmed joined and ready."
+      ],
+      "tests": [
+        "src/lobby-start-readiness.test.ts"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "MULTIPLAYER-MOVEMENT-001",
+      "feedbackId": "HF-568",
+      "owner": "delivery-integration-20260911 / Codex integrator",
+      "state": "OPEN",
+      "schedule": "follow-up; owner explicitly clarified these were notes for later",
+      "outcomes": [
+        "Investigate players unable to move until everyone joins and they have been killed; test later as Dave requested."
+      ],
+      "tests": [
+        "src/multiplayer-movement-admission.test.ts"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "REMOVE-TEXT-CHAT-001",
+      "feedbackId": "HF-569",
+      "owner": "delivery-integration-20260911 / Codex integrator",
+      "state": "OPEN",
+      "schedule": "follow-up; owner explicitly clarified these were notes for later",
+      "outcomes": [
+        "Remove text chat options from both the multiplayer lobby and in-game UI."
+      ],
+      "tests": [
+        "src/text-chat-removal.test.ts"
+      ],
       "evidence": []
     }
   ]
