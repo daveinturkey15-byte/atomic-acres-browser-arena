@@ -3,6 +3,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { verifyRevision } from './verify-asset-provenance.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const manifestPath = path.join(root, 'assets.manifest.json');
@@ -93,6 +94,18 @@ for (const asset of manifest.assets) {
         if (!(await stat(path.join(root, asset[pathField]))).isFile()) failures.push(`${asset.id}.${pathField} is not a file`);
       } catch {
         failures.push(`${asset.id}.${pathField} missing: ${asset[pathField]}`);
+      }
+      // A declared sourceScriptRevision pins the generator revision that coexisted with unchanged media,
+      // so the live file is not the pinned object. This command does not skip the generator: it runs the
+      // same historical-object validation as scripts/qa/verify-asset-provenance.mjs (real ancestor commit,
+      // safe path equal to sourceScript, blob digest equal to the pin, every pinned media blob present at
+      // that commit with its pinned digest, commit touched the generator or the media). Coexistence at a
+      // commit is origin evidence, not proof of which process produced the bytes; the family receipt is.
+      if (pathField === 'sourceScript' && Object.hasOwn(asset, 'sourceScriptRevision')) {
+        const revisionErrors = [];
+        verifyRevision(root, asset, asset.id ?? '<missing id>', revisionErrors);
+        failures.push(...revisionErrors);
+        continue;
       }
       await verifyHash(asset[pathField], asset[hashField], `${asset.id}.${pathField}`, failures);
     }

@@ -626,7 +626,13 @@
         }
       ],
       "sourceScript": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
-      "sourceScriptSha256": "80194703903c5c8381ac7ac706b117540885b950242a9293189f224153032d15",
+      "sourceScriptSha256": "6579f04ced1e266bdb6065bb788eadd249e217ab63a33e9fa461a9b520101a26",
+      "sourceScriptRevision": {
+        "commit": "db35200673f1995aaec0d3331c73a3abd4205e3e",
+        "path": "scripts/assets/generate-pass65-runtime-menu-previews.ts",
+        "crlfSha256": "396f80f1d2aeb654eacfb3530e0376d7106618aa5260fa7e60a9ae052ff114ca",
+        "reason": "Bound 2026-09-11 to db35200 (2026-08-11, 'finalize menu preview v15 evidence'): the commit at which all twelve pinned media bytes and this generator revision coexist, and whose capture receipt source-assets/menu/pass65-preview-masters/provenance.json records generator sha256 6579f04c. The 2026-08-30 repin recorded 80194703, which is the CRLF-checkout digest of the 5ac48931 generator (LF digest 840c8a1c per source-assets/menu/capture-generator-lineage.json), a version that never captured this family and that no Git object hashes to under the gate's LF rule; it is kept below as history. Later generator edits (HF-374 2026-08-23, the pass84/85/87 roster additions, HF-495 map order 2026-09-04) touched none of these bytes."
+      },
       "sourceProvenance": "source-assets/menu/pass65-preview-masters/provenance.json",
       "sourceProvenanceSha256": "74eeb6b24b909c5367d2038d8d4be0fbb2b010be02dc7890d9e7619be163632b",
       "format": "Four distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as high-bitrate VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus deterministic five-frame review evidence",
@@ -699,6 +705,11 @@
       ],
       "sourceScript": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
       "sourceScriptSha256": "b49121349ed7141b080c86f4af36e62db8374a06e920a73d6c3c0f3efcb85e50",
+      "sourceScriptRevision": {
+        "commit": "b96e145d76fb9f5b7f25a48ad67bcd798a936ded",
+        "path": "tests/e2e/pass66-gun-range-killstreak-demo-capture.spec.ts",
+        "reason": "Bound 2026-09-11 to b96e145d (2026-08-30), the --mute-audio re-pin already described in sourceScriptRepin, at which all twelve pinned posters and the capture receipt were unchanged since their capture at 4b43704e (2026-08-02). 02d9058f (2026-08-31) moved the QA browser off the owner screen: another launch flag that cannot change an output byte, so nothing was recaptured and the pin stays on the last revision reviewed under that no-byte-change rule."
+      },
       "sourceSpec": "scripts/qa/finalize-pass66-killstreak-demo-media.ts",
       "sourceSpecSha256": "1cb7311b1bf7889d590c35a520e9fd5248db995ca3fed3446a6dfbf94d862051",
       "sourceProvenance": "source-assets/killstreak-demo/pass66-real-test-bay-capture-receipt.json",
@@ -818,6 +829,11 @@
       ],
       "sourceScript": "scripts/assets/finalize-pass77-arena-menu-previews.mjs",
       "sourceScriptSha256": "8106aaad36be5ba65695b440f56aa770b8c9b5d11895156900d6162b7fed69b3",
+      "sourceScriptRevision": {
+        "commit": "3b79d9a2c72145a0230a9d24fe8b6ba253034f2e",
+        "path": "scripts/assets/finalize-pass77-arena-menu-previews.mjs",
+        "reason": "Bound 2026-09-11 to 3b79d9a2 (2026-08-23, HF-374), the commit that captured and finalized both arenas; the family receipt source-assets/menu/pass77-arena-previews/provenance.json records finalizer sha256 8106aaad. 09980a5a (2026-09-04, HF-495 map order) renamed a roster constant in this finalizer without recapturing; all six media bytes are unchanged since 3b79d9a2."
+      },
       "sourceProvenance": "source-assets/menu/pass77-arena-previews/provenance.json",
       "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
       "modifications": "Captured offline from the actual authoritative Farcrysis and High Seas runtime arenas with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. High Seas was captured on the WebGPU route; Farcrysis was captured on the WebGL2 compat route because it cannot currently complete a WebGPU prewarm (HF-374), which its provenance records and which requires a WebGPU re-capture once that is fixed. No downloaded or sampled art is used.",
@@ -943,6 +959,11 @@
       ],
       "sourceScript": "scripts/assets/finalize-pass79-test-arena-menu-previews.mjs",
       "sourceScriptSha256": "de82cdc761f0cb2bb7587888ce4ce81ed43e1517b8c83f2de852fd5da9bed655",
+      "sourceScriptRevision": {
+        "commit": "f083aaa587d07a443df1128ba12f418e4d0f6382",
+        "path": "scripts/assets/finalize-pass79-test-arena-menu-previews.mjs",
+        "reason": "Bound 2026-09-11 to f083aaa5 (2026-08-31), the re-capture commit that produced all six pinned media; the finalizer there is the de82cdc7 revision introduced at 5ac48931 and recorded by source-assets/menu/pass79-test-arena-previews/provenance.json. 09980a5a (2026-09-04, HF-495 map order) later renamed a roster constant in this finalizer without recapturing."
+      },
       "sourceProvenance": "source-assets/menu/pass79-test-arena-previews/provenance.json",
       "format": "Two distinct 2560x1440 eight-second 30 FPS selected-map runtime captures, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and full-resolution static WebP posters, plus five-frame review sheets",
       "modifications": "Captured offline from the actual authoritative Test1 and Test2 runtime arenas on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. These files replace placeholder stubs that were byte-identical copies of the gun-range and high-seas previews. No downloaded or sampled art is used.",
@@ -959,7 +980,13 @@
       "sourceProvenance": "source-assets/loading/pass79-test-arena-loading/provenance.json",
       "sourceProvenanceSha256": "ea83159806b78da53dd2745d1bb4a85667be8642293355b74513b914d2f98b29",
       "sourceScript": "scripts/assets/finalize_pass79_test_arena_loading_backdrops.py",
-      "sourceScriptSha256": "7612170305b47c70a08aafe9079b2b50d3c72f6734364bd9fde63829cfc2148d",
+      "sourceScriptSha256": "8f9bbd8803fb9dde889799d29881ab68768960670aabf5305409d0dd6b874fd3",
+      "sourceScriptRevision": {
+        "commit": "f083aaa587d07a443df1128ba12f418e4d0f6382",
+        "path": "scripts/assets/finalize_pass79_test_arena_loading_backdrops.py",
+        "crlfSha256": "7612170305b47c70a08aafe9079b2b50d3c72f6734364bd9fde63829cfc2148d",
+        "reason": "This finalizer has exactly one revision, introduced at f083aaa5 (2026-08-31) in the same commit as both backdrops. The previous pin 76121703 was the CRLF-checkout digest of that same blob; the gate normalises to LF, so it never matched any object. The family receipt source-assets/loading/pass79-test-arena-loading/provenance.json records the CRLF form, which crlfSha256 binds to the identical object. No byte of the generator or the media moved."
+      },
       "files": [
         {
           "path": "public/assets/original/loading/test1-loading.webp",
@@ -1091,20 +1118,60 @@
         {
           "path": "public/assets/original/menu-previews/map3.webm",
           "sha256": "77846e8b6a4b4f47c37b9c790eb79e7711a9d88d6f846228cac5b466207cad28"
-        },
-        {
-          "path": "public/assets/original/menu-previews/map3.webp",
-          "sha256": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9"
         }
       ],
+      "retiredPoster": {
+        "file": "public/assets/original/menu-previews/map3.webp",
+        "digest": "3c77b3f08f1517d4b9f9af4c7724e00cea9d01720515a00327001b99bb450ec9",
+        "capturedAt": "c25f5e3234e8966aec5d644c3789c8b09f86cad9",
+        "replacedAt": "dcdf0bda4609c5e7a22cb50e82b42a59687e9246",
+        "replacedBy": "atomic-acres-hf561-map3-loading-poster-2026-09-08",
+        "note": "The flyover's original static poster was overwritten in place on 2026-09-08 by the HF-561 code-derived loading poster, which has a different generator and its own sidecar receipt; it is recorded in its own entry rather than claimed by this capture family."
+      },
       "contactSheet": [
         "docs/assets/pass84-menu-previews/map3-review-frames.webp"
       ],
       "sourceScript": "scripts/assets/finalize-pass84-map3-menu-preview.mjs",
       "sourceScriptSha256": "5cd6bfbd6132562bc95aff654930a2880f803951e0596b94e9e2639b53dbb4e3",
+      "sourceScriptRevision": {
+        "commit": "c25f5e3234e8966aec5d644c3789c8b09f86cad9",
+        "path": "scripts/assets/finalize-pass84-map3-menu-preview.mjs",
+        "reason": "Bound 2026-09-11 to c25f5e32 (2026-09-02), the commit that captured and finalized the Map 3 flyover; the family receipt source-assets/menu/pass84-map3-preview/provenance.json records finalizer sha256 5cd6bfbd. 09980a5a (2026-09-04, HF-495 map order) renamed a roster constant in this finalizer without recapturing; the mp4/webm bytes are unchanged since c25f5e32."
+      },
       "sourceProvenance": "source-assets/menu/pass84-map3-preview/provenance.json",
-      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
-      "modifications": "Captured offline from the actual authoritative Map 3 runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM and H.264 High Level 5.0/AAC MP4, plus a five-frame review sheet; the original full-resolution static WebP poster is retired (see retiredPoster)",
+      "modifications": "Captured offline from the actual authoritative Map 3 runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used. The poster slot is now served by the HF-561 derived loading poster recorded separately.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-hf561-map3-loading-poster-2026-09-08",
+      "kind": "original-project-code-derived-authoritative-runtime-loading-poster",
+      "creator": "Atomic Acres project",
+      "source": "scripts/generate-loading-poster.mjs",
+      "generatedAsOf": "2026-09-08",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/map3.webp",
+          "sha256": "b9f0a58f35743c47d716e29b3bb142ea8a8859ae47fdb23786858a69b957595d"
+        }
+      ],
+      "provenanceFile": "public/assets/original/menu-previews/map3.loading-provenance.json",
+      "sourceProvenance": "public/assets/original/menu-previews/map3.loading-provenance.json",
+      "sourceProvenanceSha256": "b41f4b6ca6ce1cabd8525b9768f4a98b1a34ed40c827b33b7e487479e35eee73",
+      "sourceScript": "scripts/generate-loading-poster.mjs",
+      "sourceScriptSha256": "6b4d720e047767e8e52ffc984dcb7273941e5f84b23eeae76abfcadbb75f07f9",
+      "sourceScriptRevision": {
+        "commit": "dcdf0bda4609c5e7a22cb50e82b42a59687e9246",
+        "path": "scripts/generate-loading-poster.mjs",
+        "reason": "Bound 2026-09-11 to dcdf0bda4 (2026-09-08, 'HF-561 map3 loading poster derived from the current build'), the install commit whose poster blob and generator blob equal these pins and whose sidecar records generatorScript sha256 6b4d720e and output sha256 b9f0a58f. The sidecar's sourceSha f848cb32 is the Muse-line build the frame was rendered from; it is not an ancestor of this line, so the binding is to the cherry-picked install commit."
+      },
+      "renderedFromSourceSha": "f848cb320c6a6218385f40a6ab722c66e2d12db2",
+      "camera": "map3-hub-vista",
+      "owner": "src/ui/menu-preview-video.ts poster slot painted by the deployment loading surface; freshness gate scripts/check-loading-art-freshness.mjs",
+      "placeholderStatus": "production",
+      "format": "2560x1440 single-frame libwebp quality 88, 55918 bytes, encoded from the PASS-verdict capture frame (sha256 c8ec146f8ca93d01de9fb7f67239dbfd6b2aa1f93253e49d0afb7947f7ecd105) of the map3-hub-vista review camera",
+      "modifications": "Derived from the current build by scripts/generate-loading-poster.mjs under owner direction HF-561 (2026-09-08: loading art must match the current map every pass), replacing the pass84 flyover poster 3c77b3f0 retired by atomic-acres-pass84-map3-menu-preview. The sibling map3.mp4/webm flyover keeps its own capture-family provenance; this poster has a different origin and is recorded separately. No downloaded or sampled art is used.",
       "attributionRequired": false
     },
     {
@@ -1145,20 +1212,60 @@
         {
           "path": "public/assets/original/menu-previews/nuketown2.webm",
           "sha256": "745c8075eed2b84b7e225503d5fa268617b38fe2dd9a0dec7f39fda4e29fd897"
-        },
-        {
-          "path": "public/assets/original/menu-previews/nuketown2.webp",
-          "sha256": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7"
         }
       ],
+      "retiredPoster": {
+        "file": "public/assets/original/menu-previews/nuketown2.webp",
+        "digest": "b9649f00d884a650ffcd9ab6fe2c610deb91a496159e464508b23ee9c29186a7",
+        "capturedAt": "ea27a32677d8abd61782ce18244fd71ed91f2c7b",
+        "replacedAt": "c87b1d193d95cc627d80dfea09f0cb29e849f7d3",
+        "replacedBy": "atomic-acres-hf561-nuketown2-loading-poster-2026-09-08",
+        "note": "The flyover's original static poster was overwritten in place on 2026-09-08 by the HF-561 code-derived loading poster, which has a different generator and its own sidecar receipt; it is recorded in its own entry rather than claimed by this capture family."
+      },
       "contactSheet": [
         "docs/assets/pass85-menu-previews/nuketown2-review-frames.webp"
       ],
       "sourceScript": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
       "sourceScriptSha256": "e58b41dfb042db6b0961ab82a57e7d7bdde166fcc92225cc72add56bd66c7f8d",
+      "sourceScriptRevision": {
+        "commit": "ea27a32677d8abd61782ce18244fd71ed91f2c7b",
+        "path": "scripts/assets/finalize-pass85-nuketown2-menu-preview.mjs",
+        "reason": "Bound 2026-09-11 to ea27a326 (2026-09-03), the Job 3 re-capture commit that produced the pinned mp4/webm; the finalizer there is the e58b41df revision introduced at a4b56ec7 and recorded by source-assets/menu/pass85-nuketown2-preview/provenance.json. 09980a5a (2026-09-04, HF-495 map order) later renamed a roster constant in this finalizer without recapturing."
+      },
       "sourceProvenance": "source-assets/menu/pass85-nuketown2-preview/provenance.json",
-      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
-      "modifications": "Captured offline from the actual authoritative Nuke Town Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
+      "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM and H.264 High Level 5.0/AAC MP4, plus a five-frame review sheet; the original full-resolution static WebP poster is retired (see retiredPoster)",
+      "modifications": "Captured offline from the actual authoritative Nuke Town Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used. The poster slot is now served by the HF-561 derived loading poster recorded separately.",
+      "attributionRequired": false
+    },
+    {
+      "id": "atomic-acres-hf561-nuketown2-loading-poster-2026-09-08",
+      "kind": "original-project-code-derived-authoritative-runtime-loading-poster",
+      "creator": "Atomic Acres project",
+      "source": "scripts/generate-loading-poster.mjs",
+      "generatedAsOf": "2026-09-08",
+      "license": "Original project work",
+      "files": [
+        {
+          "path": "public/assets/original/menu-previews/nuketown2.webp",
+          "sha256": "7e115967cb62d85e23c1f51edd82533ba2714f028f1e77a2b35c5c7b758c5f34"
+        }
+      ],
+      "provenanceFile": "public/assets/original/menu-previews/nuketown2.loading-provenance.json",
+      "sourceProvenance": "public/assets/original/menu-previews/nuketown2.loading-provenance.json",
+      "sourceProvenanceSha256": "46f71c67d6ce698484f1d5e4ece246e5d662deb267f1dfbd1b35b9f72a0d0dba",
+      "sourceScript": "scripts/generate-loading-poster.mjs",
+      "sourceScriptSha256": "6b4d720e047767e8e52ffc984dcb7273941e5f84b23eeae76abfcadbb75f07f9",
+      "sourceScriptRevision": {
+        "commit": "c87b1d193d95cc627d80dfea09f0cb29e849f7d3",
+        "path": "scripts/generate-loading-poster.mjs",
+        "reason": "Bound 2026-09-11 to c87b1d19 (2026-09-08, 'HF-561 loading art derived from the current build, with a staleness gate'), the commit that introduced this generator, the freshness gate and this poster together; its poster blob and generator blob equal these pins and its sidecar records generatorScript sha256 6b4d720e and output sha256 7e115967. The sidecar's sourceSha fca74423 is the Muse-line build the frame was rendered from; it is not an ancestor of this line, so the binding is to the cherry-picked install commit."
+      },
+      "renderedFromSourceSha": "fca74423b89025cc6b2c3bc755000a29bd4d7058",
+      "camera": "nuketown2-street-centre",
+      "owner": "src/ui/menu-preview-video.ts poster slot painted by the deployment loading surface; freshness gate scripts/check-loading-art-freshness.mjs",
+      "placeholderStatus": "production",
+      "format": "2560x1440 single-frame libwebp quality 88, 556302 bytes, encoded from the PASS-verdict capture frame (sha256 674b587e0df9b8256e2cbcb31744eec2c4280006a700551b114d812d6d25a43f) of the nuketown2-street-centre review camera",
+      "modifications": "Derived from the current build by scripts/generate-loading-poster.mjs under owner direction HF-561 (2026-09-08: loading art must match the current map every pass), replacing the pass85 flyover poster b9649f00 retired by atomic-acres-pass85-nuketown2-menu-preview. The sibling nuketown2.mp4/webm flyover keeps its own capture-family provenance; this poster has a different origin and is recorded separately. No downloaded or sampled art is used.",
       "attributionRequired": false
     },
     {
@@ -1210,6 +1317,11 @@
       ],
       "sourceScript": "scripts/assets/finalize-pass87-raid2-menu-preview.mjs",
       "sourceScriptSha256": "2759775cc61100cc435e8b81dda411ebb068ba37378ca0082821562dc496b87b",
+      "sourceScriptRevision": {
+        "commit": "c1e31bb838091de1366bc3515aa4074642a06e1d",
+        "path": "scripts/assets/finalize-pass87-raid2-menu-preview.mjs",
+        "reason": "Bound 2026-09-11 to c1e31bb8 (2026-09-03), the commit that captured and finalized the Raid Rebuild flyover; the family receipt source-assets/menu/pass87-raid2-preview/provenance.json records finalizer sha256 2759775c. 09980a5a (2026-09-04, HF-495 map order) renamed a roster constant in this finalizer without recapturing; all three media bytes are unchanged since c1e31bb8."
+      },
       "sourceProvenance": "source-assets/menu/pass87-raid2-preview/provenance.json",
       "format": "One distinct 2560x1440 eight-second 30 FPS selected-map runtime capture, shipped as VP9/Opus WebM, H.264 High Level 5.0/AAC MP4 and a full-resolution static WebP poster, plus a five-frame review sheet",
       "modifications": "Captured offline from the actual authoritative Raid Rebuild runtime arena on the canonical WebGPU route with the deterministic Pass 66 camera recipe, visual time and baked cockpit overlay, then encoded with the Pass 66 profiles and budgets. No downloaded or sampled art is used.",
