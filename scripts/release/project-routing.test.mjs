@@ -34,6 +34,33 @@ const PAST = '2000-01-01T00:00:00.000Z';
 
 const git = (cwd, ...args) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', windowsHide: true }).trim();
 
+test('native resolver refuses missing identity, unknown lane and wrong launch directory before dispatch', () => {
+  const project = makeProject();
+  try {
+    const registryPath = join(project.root, 'routing.json');
+    writeFileSync(registryPath, JSON.stringify(project.registry));
+    const common = ['resolve', '--project', PROJECT, '--machine', 'dave-gaming-pc', '--harness', 'claude'];
+    const cases = [
+      [common, /resolve requires --lane/],
+      [[...common, '--lane', 'unregistered'], /lane unregistered is not registered/],
+      [[...common, '--lane', 'fix', '--worktree', '.'], /must be an absolute path/],
+      [[...common, '--lane', 'fix', '--worktree', project.main], /requested launch directory differs/],
+    ];
+    for (const [args, reason] of cases) {
+      const result = spawnSync(process.execPath, [join(REPOSITORY_ROOT, 'scripts/release/project-routing.mjs'), ...args], {
+        cwd: project.root, encoding: 'utf8', windowsHide: true,
+        env: { ...process.env, ATOMIC_ACRES_ROUTING_REGISTRY: registryPath },
+      });
+      assert.equal(result.status, 1, result.stdout);
+      assert.match(result.stderr, reason);
+    }
+    assert.equal(git(project.laneTree, 'rev-parse', 'HEAD'), project.base);
+    assert.equal(git(project.laneTree, 'status', '--porcelain'), '');
+  } finally {
+    project.cleanup();
+  }
+});
+
 function commit(repo, relative, content, message) {
   mkdirSync(join(repo, relative, '..'), { recursive: true });
   writeFileSync(join(repo, relative), content);

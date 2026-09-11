@@ -12,7 +12,8 @@
 // its base, dispatch head, owner and allowed scope, the integration
 // destination, the inspected preview, production and rollback.
 //
-// Everything here is read-only against the repository. `init` writes the
+// `show` is read-only. `resolve` runs the contribution preflight (fetch plus receipt).
+// `init` writes the
 // machine record once and refuses to overwrite; nothing deletes a tree, moves
 // a ref, or marks an artifact accepted. See docs/PROJECT_ROUTING.md.
 
@@ -541,11 +542,38 @@ function showRegistry() {
   };
 }
 
+/** Resolve a registered lane, then run the current guard from its actual checkout. */
+function resolveLaunch(values) {
+  for (const key of ['project', 'lane', 'machine', 'harness']) {
+    if (!SLUG.test(values[key] ?? '')) throw new Error(`resolve requires --${key} <lowercase-slug>`);
+  }
+  const identity = readProjectIdentity();
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  if (values.project !== identity.projectId) throw refusal('wrong-project', 'requested project differs from the routing authority');
+  if (registry.machine !== values.machine) throw refusal('wrong-machine', 'requested machine differs from the registry');
+  const lane = registry.lanes[values.lane];
+  if (!lane) throw refusal('unknown-lane', `lane ${values.lane} is not registered`);
+  if (values.worktree !== undefined) {
+    expectAbsolutePath(values.worktree, '--worktree');
+    if (!samePath(values.worktree, lane.worktree)) throw refusal('wrong-worktree', 'requested launch directory differs from the registered lane');
+  }
+  // Use this stable, reviewed guard rather than a script picked from an old lane.
+  // The guard re-reads target identity, HEAD, ownership, scope and freshly fetched main.
+  const output = execFileSync(process.execPath, [join(REPOSITORY_ROOT, 'scripts/release/pipeline-guard.mjs'),
+    'contribute', '--project', values.project, '--lane', values.lane,
+    '--machine', values.machine, '--harness', values.harness], {
+    cwd: lane.worktree, encoding: 'utf8', windowsHide: true, stdio: 'pipe',
+  });
+  const result = JSON.parse(output);
+  if (result.ok !== true || result.routing?.mode !== 'routed') throw new Error('Contribution guard did not return a routed receipt');
+  return result;
+}
+
 if (process.argv[1] && samePath(process.argv[1], fileURLToPath(import.meta.url))) {
   const { command, values } = parseArgs(process.argv.slice(2));
-  const commands = { init: () => initRegistry(values), show: showRegistry };
+  const commands = { init: () => initRegistry(values), show: showRegistry, resolve: () => resolveLaunch(values) };
   if (!commands[command]) {
-    console.error('Usage: project-routing.mjs <init --machine <tag> [--enforce warn|refuse] | show>');
+    console.error('Usage: project-routing.mjs <init --machine <tag> [--enforce warn|refuse] | show | resolve --project <id> --lane <id> --machine <tag> --harness <tag> [--worktree <absolute-path>]>');
     process.exit(2);
   }
   try {

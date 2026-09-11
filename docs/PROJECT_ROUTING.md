@@ -115,7 +115,18 @@ node scripts/release/project-routing.mjs init --machine dave-gaming-pc --enforce
 
 # readback: path, validity, integration staleness against the LOCAL remote ref, every lane
 node scripts/release/project-routing.mjs show      # or: npm run pipeline:routing -- show
+
+# Native launchers call the stable integration script, from any current directory.
+# A successful response contains the actual worktree and exact HEAD in a routed receipt.
+node C:/Users/david/projects/atomic-acres-integration/scripts/release/project-routing.mjs resolve --project atomic-acres-browser-arena --lane <registered-id> --machine dave-gaming-pc --harness <owner> --worktree <absolute-path>
 ```
+
+`resolve` requires an existing lane, binds an optional requested directory to it, and runs
+the reviewed central contribution guard inside that lane. The guard fetches main, verifies
+the target checkout and writes its ordinary receipt. No model is launched. A native launcher
+must refuse a failed check; it must not choose another directory or register itself as a fallback.
+Historical checkouts missing the project identity are refused. New lane creation and registration
+are explicit integrator steps before dispatch; the resolver does not create worktrees.
 
 `init` uses the example's schema, replaces `gitCommonDir`, `integration.expectedSha`, `machine`
 and timestamps with observed values, empties `lanes`, initializes preview/production/rollback
