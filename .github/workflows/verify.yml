@@ -60,6 +60,15 @@ jobs:
       - run: npm run verify:gameplay-contract
       - run: npm run verify:provenance
       - run: npm run verify:killstreak-catalog
+      # src/audio-offline-render-browser.test.ts launches Playwright's headless
+      # Chromium shell under `npm test`, and `npm ci --ignore-scripts` never
+      # fetches a browser: CI 34643597692 failed on both matrix rows with
+      # "Executable doesn't exist ... chromium_headless_shell-1228". Install
+      # exactly the shell build pinned by the installed playwright package.
+      # The full Chromium provision stays owned by the bounded browser jobs.
+      # Guarded by src/ci-unit-browser-probe-provision.test.ts.
+      - name: Provision Playwright headless Chromium shell for the unit-level audio probe
+        run: npx playwright install --with-deps chromium-headless-shell
       - run: npm test
       - name: Verify Pass 73 required browser-group wiring
         run: npm run qa:pass73:ci-wiring-contract

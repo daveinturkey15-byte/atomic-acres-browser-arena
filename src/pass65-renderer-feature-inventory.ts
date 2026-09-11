@@ -142,7 +142,9 @@ export const PASS65_RENDERER_FEATURES: readonly RendererFeatureDefinition[] = Ob
   feature({
     id: 'aces-grade-exposure', title: 'ACES output, deterministic grade and arena exposure', availability: 'active', owner: 'src/rendering/pass64-tsl-scene.ts + ArenaVisualDefinition',
     sourceProbes: [
-      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'const contrasted = saturated.sub(0.5).mul(contrast).add(0.5)' },
+      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'const legacyContrasted = saturated.sub(0.5).mul(contrast).add(0.5)' },
+      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'const contrasted = useNuketown2LinearContrast.select(' },
+      { path: 'src/rendering/pass64-tsl-scene.ts', symbol: 'sceneLinearContrastNode(saturated, contrast), legacyContrasted' },
       { path: 'src/rendering/arena-visual-definition.ts', symbol: "toneMap: 'aces-filmic'" },
     ], pipelineIds: ['pass64.hdr-grade-grain.tsl.v1'],
     control: control('setting', ['graphics.exposure', 'graphics.toneMapping', 'graphics.filmGrain', 'graphics.vignette'], 'Arena-authored base exposure with 0.75-1.25 multiplier, ACES/AgX/Neutral output, and bounded TSL grain/vignette', 'Every selector is compiled or applied by the active renderer and deterministic review telemetry records the requested runtime values.'),

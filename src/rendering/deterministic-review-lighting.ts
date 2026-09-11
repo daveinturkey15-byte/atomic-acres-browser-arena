@@ -13,7 +13,7 @@
  *     17:36 golden hour        -> 26.87%
  *
  * within one hour (7 sessions, `artifacts/blackroad/race/`). Every viewpoint
- * diff and every "the fix relocated the black onto the road" verdict taken
+ * diff and every "the fix relocated the black onto the road" decision taken
  * against a single stored baseline was reading that dice roll. The review
  * camera already pins position, target, fov, near/far, exposure, the TSL
  * animation time and the TSL seed; the SUN was the one input it left to chance.

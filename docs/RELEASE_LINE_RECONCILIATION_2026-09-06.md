@@ -1,5 +1,9 @@
 # Release-line reconciliation — 2026-09-06
 
+> **Historical evidence; ancestry diagnosis superseded.** Read [Complete-history reconciliation correction](ANCESTRY_RECOVERY_2026-09-09.md) before using this record. The orphan/root-import diagnosis below came from shallow boundaries. The raw commit objects have parents; complete available history has one actual root. The 2026-09-09 correction preserves the original evidence and does not grant release acceptance.
+>
+> VERIFIED again on 2026-09-11 in the complete integration repository: `git --no-replace-objects rev-parse --is-shallow-repository` returned `false`; `git --no-replace-objects rev-list --max-parents=0 HEAD` returned only `f7efdafc3ea9ff3d49f142ac39f52e1fe619f35a`; the raw object for `13addcbab123f7b74f5ef3308a8d08eae3b4d38d` names parent `28b49446d55c711442fd4138e93c035191eab1a4`. The current contribution contains main `0dd95943e5eb4ac9cc0dd7c3a47baa2b338c7a88`. Do not manufacture a severed-ancestry merge from the superseded diagnosis. Follow the live [contribution contract](CONTRIBUTION_AND_RELEASE_PIPELINE.md) and [project routing](PROJECT_ROUTING.md); the dated commands below describe their original snapshot.
+
 Status: evidence record for the main-line reconciliation ordered by the owner (HF-536).
 Every claim below is followed by the git command that produced it. Per
 `docs/MULTI_AGENT_REPO_DISCIPLINE.md` §6, a provenance claim without its command is not

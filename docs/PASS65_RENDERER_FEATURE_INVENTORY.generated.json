@@ -905,7 +905,7 @@
           "enabled": true,
           "resolutionScale": 0.5,
           "samples": 12,
-          "radius": 0.22,
+          "radius": 1.4,
           "strength": 0.52,
           "denoise": true
         },
@@ -918,8 +918,8 @@
             "enabled": true,
             "probeSpacingM": 3,
             "raysPerProbe": 48,
-            "bounces": 1,
-            "composite": 0.38
+            "bounces": 2,
+            "composite": 0.55
           },
           "godrays": {
             "quality": "low",
@@ -1124,7 +1124,7 @@
           "enabled": true,
           "resolutionScale": 0.75,
           "samples": 16,
-          "radius": 0.25,
+          "radius": 1.6,
           "strength": 0.62,
           "denoise": true
         },
@@ -1138,7 +1138,7 @@
             "probeSpacingM": 2,
             "raysPerProbe": 128,
             "bounces": 2,
-            "composite": 0.5
+            "composite": 0.55
           },
           "godrays": {
             "quality": "high",
@@ -1561,7 +1561,15 @@
       "sourceProbes": [
         {
           "path": "src/rendering/pass64-tsl-scene.ts",
-          "symbol": "const contrasted = saturated.sub(0.5).mul(contrast).add(0.5)"
+          "symbol": "const legacyContrasted = saturated.sub(0.5).mul(contrast).add(0.5)"
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "const contrasted = useNuketown2LinearContrast.select("
+        },
+        {
+          "path": "src/rendering/pass64-tsl-scene.ts",
+          "symbol": "sceneLinearContrastNode(saturated, contrast), legacyContrasted"
         },
         {
           "path": "src/rendering/arena-visual-definition.ts",
@@ -2382,5 +2390,5 @@
     "adjustable": 28,
     "fixedWithRationale": 7
   },
-  "inventorySha256": "85a6de44d54bda18ad5243fe29968220325af4395e64adbd86ec5f137fe25ca7"
+  "inventorySha256": "93fe4d97b93f58d5ba2fb92eef7fd4a5893e62210bce4d78682c7a9bb5140566"
 }

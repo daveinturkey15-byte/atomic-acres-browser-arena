@@ -34,10 +34,10 @@
  * snapshots kill the guest at spawn", HF-347/HF-322). This module gives the
  * resume path the same protection.
  *
- * FAIL-CLOSED. Every predicate here narrows behaviour or delays a verdict:
+ * FAIL-CLOSED. Every predicate here narrows behaviour or delays a decision:
  *   - `canSpendReconnectRepairAttempt` only ever REFUSES a send 477c3ab6 would
  *     have made. It never admits a new one.
- *   - `shouldDeclareResumeTimeout` only ever DELAYS a terminal verdict
+ *   - `shouldDeclareResumeTimeout` only ever DELAYS a terminal decision
  *     477c3ab6 would have reached sooner. The hp-0 posture it guards is
  *     unchanged, and `CLIENT_WORLD_REPAIR_ARMING_CAP_MS` (60 s) is still the
  *     absolute backstop.
@@ -61,7 +61,7 @@ export const RECONNECT_REPAIR_MIN_SPACING_MS = 1_000;
 
 /**
  * How long the FINAL attempt gets to be answered before a terminal local
- * verdict may be declared.
+ * decision may be declared.
  *
  * 2.5 s is the guest's own `scheduleGuestResumeWorldTimeout` window, i.e. the
  * longest the guest is already willing to wait on one leg of this handshake.
@@ -133,7 +133,7 @@ export type ResumeAuthorityReadmission = Readonly<{
   awaitingCanonicalGuestAuthority: boolean;
   /** Set by `handleGuestResumeTimeout`; cleared by any lobby/match reset. */
   timedOutLocally: boolean;
-  /** Set by `acceptGuestResumeFailure`. The host's verdict is final. */
+  /** Set by `acceptGuestResumeFailure`. The host's decision is final. */
   hostDeclaredFailure: boolean;
   messageConnectionEpoch: string;
   localConnectionEpoch: string;

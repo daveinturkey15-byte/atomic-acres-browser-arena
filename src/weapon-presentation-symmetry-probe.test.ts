@@ -1,5 +1,11 @@
 // Temporary HF-340 probe — measures pole/solver bend geometry to pin the
 // symmetry-regression tolerances. DELETE after measurements are collected.
+// The measurement rows are written to a test-owned mkdtemp directory (never a
+// machine-specific path: CI 34643597692 failed with ENOENT on a hardcoded
+// scratchpad) and the directory is removed once the artifact has been checked.
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,8 +16,14 @@ import {
 } from './weapon-presentation-pose-profiles';
 import { solveTwoBoneElbow } from './ik';
 
+interface ProbeRow {
+  label: string;
+  offsetYDeg: number;
+  offsetXDeg: number;
+  interiorDeg: number;
+}
 
-function measure(label: string, shoulder: THREE.Vector3, target: THREE.Vector3, pole: THREE.Vector3, out: unknown[]) {
+function measure(label: string, shoulder: THREE.Vector3, target: THREE.Vector3, pole: THREE.Vector3, out: ProbeRow[]) {
   const upper = 0.34;
   const lower = 0.30;
   const elbow = solveTwoBoneElbow(shoulder, target, upper, lower, pole);
@@ -33,7 +45,7 @@ function measure(label: string, shoulder: THREE.Vector3, target: THREE.Vector3, 
 
 describe('HF-340 pole symmetry probe', () => {
   it('measures', async () => {
-    const rows: unknown[] = [];
+    const rows: ProbeRow[] = [];
     // Mirrored chains: production-like firing (right) shoulder low-right off-frame
     // aiming at a centre-right grip; support (left) is the x-negated mirror.
     const rightShoulder = new THREE.Vector3(0.62, -0.66, -0.18);
@@ -52,11 +64,22 @@ describe('HF-340 pole symmetry probe', () => {
       const pole = firstPersonFiringElbowPole('long-gun', blend, new THREE.Vector3());
       measure(`right/long-gun@${blend}`, rightShoulder, rightTarget, pole, rows);
     }
-    const fs = await import('node:fs');
-    fs.writeFileSync(
-      'C:/Users/david/AppData/Local/Temp/claude/C--Users-david-Desktop-stuff/51a3bc77-45cc-4dd5-a1a1-cb32efb10af8/scratchpad/hf340-pole-probe.json',
-      JSON.stringify(rows, null, 2),
-    );
-    expect(rows.length).toBeGreaterThan(0);
+    const directory = await mkdtemp(join(tmpdir(), 'hf340-pole-probe-'));
+    try {
+      const artifact = join(directory, 'hf340-pole-probe.json');
+      await writeFile(artifact, JSON.stringify(rows, null, 2));
+      const persisted = JSON.parse(await readFile(artifact, 'utf8')) as ProbeRow[];
+      expect(rows.length).toBeGreaterThan(0);
+      expect(persisted).toHaveLength(rows.length);
+      for (const row of persisted) {
+        expect(Number.isFinite(row.offsetYDeg)).toBe(true);
+        expect(Number.isFinite(row.offsetXDeg)).toBe(true);
+        expect(Number.isFinite(row.interiorDeg)).toBe(true);
+      }
+    } finally {
+      // Delete only the resolved temporary directory this test created.
+      if (dirname(resolve(directory)) !== resolve(tmpdir())) throw new Error('Probe cleanup escaped the temporary root');
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

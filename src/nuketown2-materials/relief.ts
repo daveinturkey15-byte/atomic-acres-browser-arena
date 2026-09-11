@@ -1,7 +1,7 @@
 /**
  * nuketown2-materials/relief.ts — the dimension every family was missing.
  *
- * WHY THIS FILE EXISTS. The owner's verdict on the 2026-09-06 build was that
+ * WHY THIS FILE EXISTS. The owner's decision on the 2026-09-06 build was that
  * the map "looks very poor, more like Roblox or something 20 years old". The
  * families in this directory were not short of DETAIL: asphalt already had tar
  * seams and wheel paths, siding already had lap courses and drip shadows,
