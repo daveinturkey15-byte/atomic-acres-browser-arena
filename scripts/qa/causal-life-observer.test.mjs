@@ -23,12 +23,24 @@ test('local and remote parity covers reserve/primary/life and does not poll the 
     h.value.hp=100;h.value.alive=true;h.tick();
     const result=runInNewContext(`(${collectCausalDeathObserver})()`,h.context);
     assert.equal(h.snapshots(),1);
-    assert.equal(result.rows.length,4);
-    assert.deepEqual(Array.from(result.rows,r=>r.hp),[100,0,0,100]);
+    assert.equal(result.rows.length,5);
+    assert.deepEqual(Array.from(result.rows,r=>r.hp),[100,0,0,100,100]);
     assert.ok(result.rows.every(r=>r.readEnd>=r.readStart && r.atMs===r.readStart));
     assert.ok(result.readCostMs.max<0.02);
     assert.equal(h.context.window.__AA_V22_DEATH_OBSERVER__,undefined);
   }
+});
+test('closing read retains a respawn that occurred after the final timer tick',()=>{
+  const h=harness();
+  runInNewContext(`(${installCausalDeathObserver})({id:'a'})`,h.context);
+  h.value.hp=0;h.value.alive=false;h.value.renderLife=4;h.value.supportLife=4;h.value.deathCount=1;h.tick();
+  h.value.hp=100;h.value.alive=true; // No timer tick after this state change.
+  const result=runInNewContext(`(${collectCausalDeathObserver})()`,h.context);
+  assert.deepEqual(Array.from(result.rows,r=>r.hp),[100,0,100]);
+  assert.equal(result.samples,result.rows.length);
+  assert.ok(result.rows[2].readStart>result.rows[1].readEnd);
+  assert.equal(result.rows[2].deathCount,1);
+  assert.equal(h.snapshots(),1);
 });
 test('observer refuses missing thin reader and parity drift instead of silently dropping fields',()=>{
   for(const field of ['reserve','primary','epoch','renderLife','supportLife','deathCount']){

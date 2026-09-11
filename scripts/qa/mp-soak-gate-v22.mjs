@@ -644,13 +644,10 @@ async function reloadAfterNaturalLife(role, naturalLife) {
 
 async function runGuestScenarios(role) {
   const guest = peers[role];
-  const other = role === 'guestA' ? peers.guestB : peers.guestA;
   const host = peers.host;
   await runScenario(role, 'pickup', () => scenarioPickup(guest, host, peers, role));
   await runScenario(role, 'reloadBeforeDeath', () => scenarioReload(guest, host, peers, role));
   await runScenario(role, 'swap', () => scenarioSwap(guest, peers, role));
-  await runScenario(role, 'fireAtHost', () => scenarioFire(guest, host, role, 'host'));
-  await runScenario(role, 'fireAtOtherGuest', () => scenarioFire(guest, other, role, 'other-guest'));
   const life = await runScenario(role, 'causalNaturalLife', () => captureCausalNaturalLife(role));
   const naturalLife = life?.report ?? life;
   bundle.scenarios.guests[role].naturalLife = naturalLife;
@@ -705,6 +702,16 @@ async function scriptedPlay(playStart) {
   for(const role of ['guestA','guestB']) {
     if(cancellation.signal.aborted)return;
     await runGuestScenarios(role);
+  }
+  // Safe-sky-shot evidence requires every peer at full health. Earlier combat
+  // intentionally left the host at54 HP, making both later reload probes
+  // impossible before they fired. Keep all combat probes, after BOTH guests'
+  // causal life/reload checks, with no healing or relaxed prerequisites.
+  for (const role of ['guestA','guestB']) {
+    if(cancellation.signal.aborted)return;
+    const guest=peers[role], other=role==='guestA'?peers.guestB:peers.guestA;
+    await runScenario(role,'fireAtHost',()=>scenarioFire(guest,peers.host,role,'host'));
+    await runScenario(role,'fireAtOtherGuest',()=>scenarioFire(guest,other,role,'other-guest'));
   }
   let rejoined = false;
   let lastPulse = Date.now();

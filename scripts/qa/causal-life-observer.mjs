@@ -27,6 +27,7 @@ export function installCausalDeathObserver({ id }) {
     state.readCostMaxMs=Math.max(state.readCostMaxMs,readEnd-readStart);
     if(state.rows.length<2048)state.rows.push(row);else state.dropped++;
   };
+  state.take=take;
   take();state.interval=setInterval(take,20);
   state.expiry=setTimeout(()=>clearInterval(state.interval),10000);
   window.__AA_V22_DEATH_OBSERVER__=state;
@@ -37,6 +38,10 @@ export function collectCausalDeathObserver() {
   const state=window.__AA_V22_DEATH_OBSERVER__;
   if(!state)return null;
   clearInterval(state.interval);clearTimeout(state.expiry);
+  // The completion poll can observe respawn between 20 ms timer ticks.
+  // Capture the actual closing state before discarding the observer; never
+  // copy the completion poll's value or invent a successful final sample.
+  state.take();
   delete window.__AA_V22_DEATH_OBSERVER__;
   return {rows:state.rows,samples:state.samples,dropped:state.dropped,
     readCostMs:{mean:state.samples?state.readCostTotalMs/state.samples:null,max:state.readCostMaxMs}};
