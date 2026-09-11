@@ -56,6 +56,7 @@ Every refusal starts `Refusing route:` and carries an error `code`. In order:
 | code | condition |
 |---|---|
 | `wrong-project` | `--project` differs from `.github/project-identity.json`, or the registry belongs to another project |
+| `wrong-machine` | registry machine identity differs from the caller |
 | `protected-checkout` | the current tree is listed in `protectedCheckouts` (checked before the lane, so a lane cannot launder one) |
 | `wrong-git-database` | `git rev-parse --git-common-dir` is not the registry's `gitCommonDir` |
 | `unknown-lane` / `closed-lane` / `expired-lane` | the lane is unregistered, already closed, or past `expiresAt` |
@@ -73,16 +74,17 @@ The existing checks are unchanged and still run first: branch shape, clean tree,
 
 ## Legacy calls stay visibly legacy
 
-`contribute` without `--project/--lane` is still accepted while enforcement is `warn`. It prints
+An older, non-enforcing identity can accept `contribute` without `--project/--lane` only when
+no committed, registry or environment control requires routing. Such a call prints
 `WARNING: LEGACY ROUTE …` on stderr and stamps `routing: { mode: "legacy", … }` into the
-receipt so nobody can read a legacy receipt as a routed one. It is refused when **either**
-the registry's `enforcement.legacyContribute` is `refuse` **or** the environment has
-`ATOMIC_ACRES_ROUTING_REQUIRED=1`. The environment form works even where no registry is
-installed, so a launcher cannot escape by deleting the record.
+receipt so nobody can read a legacy receipt as a routed one. This candidate commits
+`routingRequired: true`, so it refuses legacy contribution regardless of environment or
+registry availability. Registry `enforcement.legacyContribute: refuse` and environment
+`ATOMIC_ACRES_ROUTING_REQUIRED=1` also require routing. An explicitly selected missing record
+or an unreadable existing record fails closed.
 
-Until root performs the cutover below, **routing is optional and proves nothing about
-launches that do not opt in.** A green legacy preflight is exactly as strong as it was
-before this change.
+Older checkouts do not gain this behavior automatically. Until the launcher cutover below,
+a legacy preflight from an old checkout proves no routing identity.
 
 ## Lane closure (`lane-close --project <id> --lane <id>`)
 
@@ -93,8 +95,8 @@ guard verifies the record it is given:
   `closure.integratedIntoSha`, which must be reachable from the integration ref. A merge
   commit that never reached `origin/main` is not integration.
 - **rejected** — `closure.reason` plus at least one verified preservation proof: a `refs/…`
-  ref that resolves to the lane head, or a bundle that `git bundle list-heads` shows carrying
-  it. Both are checked, not trusted.
+  ref that resolves to the lane head, or a standalone bundle that restores the advertised
+  commits into a temporary repository and passes object checks. Both are checked, not trusted.
 
 In both cases a dirty tree is refused (uncommitted work is the only copy, DS-3), the receipt
 records `grantsAcceptance: false`, `removedAnything: false` and the count of ignored paths
