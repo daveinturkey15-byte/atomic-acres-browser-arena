@@ -96,6 +96,8 @@ export interface VehicleSpec {
   readonly sillRadius: number;
   /** Minimum hood/deck shoulder depth, allowing the authored rolled edge. */
   readonly shoulderDepthM?: number;
+  /** Correct individual face winding without coupling geometry to the display id. */
+  readonly orientPerTriangle?: boolean;
   readonly wheelRadius: number;
   readonly tyreHalfWidth: number;
   /** |x| of a wheel's centre plane. */
@@ -613,7 +615,7 @@ function needsFlip(positions: readonly Vec3[], reference: Vec3): boolean {
  * dark lining is what makes a window look like a hole.
  */
 export function loftBody(spec: VehicleSpec): LoftResult {
-  const orientPerTriangle = spec.id === 'nuketown2-truck-cab' || spec.id === 'nuketown2-sedan';
+  const orientPerTriangle = spec.orientPerTriangle === true;
   const stations = collectStations(spec);
   const rings = stations.map((z) => stationRing(spec, z));
   const body = emptySink();

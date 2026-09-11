@@ -84,6 +84,7 @@ export const COACH_SPEC: VehicleSpec = Object.freeze({
  */
 export const TRUCK_CAB_SPEC: VehicleSpec = Object.freeze({
   id: 'nuketown2-truck-cab',
+  orientPerTriangle: true,
   length: 5.2,
   halfWidth: 1.3,
   sillHalfWidth: 1.14,
@@ -121,6 +122,7 @@ export const TRUCK_CAB_SPEC: VehicleSpec = Object.freeze({
  */
 export const SEDAN_SPEC: VehicleSpec = Object.freeze({
   id: 'nuketown2-sedan',
+  orientPerTriangle: true,
   length: 4.4,
   halfWidth: 0.95,
   sillHalfWidth: 0.8,

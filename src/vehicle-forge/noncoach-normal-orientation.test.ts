@@ -18,7 +18,7 @@ function vertex(g:THREE.BufferGeometry,i:number) {
 }
 describe('noncoach triangle-local orientation correction',()=>{
   for(const spec of [TRUCK_CAB_SPEC,SEDAN_SPEC])it(`${spec.id}: fixes only measured opposing faces without altering shape, count or normal/UV attachment`,()=>{
-    const before=loftBody({...spec,id:'legacy-reference'}),after=loftBody(spec);
+    const before=loftBody({...spec,id:'legacy-reference',orientPerTriangle:false}),after=loftBody(spec);
     const changes:Record<string,number>={};
     for(const part of ['body','glass','groove','lining'] as const) {
       const a=before[part]!,b=after[part]!,count=a.getAttribute('position').count;
