@@ -274,3 +274,42 @@ remaining release gates stay OPEN until their own receipts establish them.
 Method provenance for this run: method observed in StarKnightt/morning-diner
 (Claude Fable,2026), shared by owner via https://x.com/prasenx/status/2095537643182563778;
 re-implemented from first principles. No source/shader/prose copied.
+
+## R-011 — Describe an elevation as openings and a style; never copy a wall's geometry by hand
+
+**Subject:** the house front and the garage front in Nuke Town. **Pass:** HF-536 forge-transfer
+lane, 2026-09-11, candidate `79161fd5`. **Files:** `src/forge-kit/facade-elevation.ts`
+(`facadeElevationParts`, `facadeElevationFlatParts`, `FACADE_LEAF_*`, `FACADE_SECTIONAL_COURSE_H`),
+`src/forge-kit/facade.ts` (`facadeOffset`), `src/nuketown2-arena.ts` (`house()`, `garage()`).
+
+**Method.** One call takes `extent`, `height`, `facing`, `wallThickness`, the `openings` cut through
+the wall (`window` with sill and head, `door` with head) and a `style` (siding role, course pitch
+and offset, window reveals on or off, door treatment `bare` | `parked-leaf` | `sectional-head`).
+It returns groups of parts, one group per prop, composed only from `lapSidingParts`,
+`windowRevealParts` and `panelDoorParts` and translated with `facadeOffset`. Anchor at along = 0
+and the arena's authored wall coordinates pass through unchanged, so the piers, liners and leaf
+that were five hand-placed `facadePair` calls become one data description. The two real
+consumers differ only in parameters: the house asks for `siding`, two windows with reveals and a
+30 mm trim leaf parked 100 mm east of the doorway; the garage asks for `garageSiding`, one 3.5 m
+bay, no reveals and a band of 200 mm `panel` courses over the bay head.
+
+**Contract, pinned by `src/forge-kit/facade-elevation.test.ts` and
+`src/nuketown2-facade-elevation-consumers.test.ts`:** deterministic and order-independent; every
+part finite, inside the extent, at most `FACADE_MAX_PROUD` proud and never deeper than the wall;
+boards only on piers, never across an opening; liners inside their own cut and the wall body;
+the leaf beside the doorway, never in it; malformed options throw before any part exists; the
+arena's piers keep their colliders and the emitted parts add no collider, shot surface or
+ballistic row and use registry materials only.
+
+**Cost:** +0 draws, +0 materials, same part list as the hand-placed version at this SHA (a
+behaviour-preserving extraction; it is NOT a visual change and claims no visual upgrade).
+
+**Gotchas.** `panelDoorParts` defaults to a 50 mm leaf whose rails then stand 63 mm proud, past
+the parity ceiling; the assembly defaults `leafThickness` to `FACADE_LEAF_T` (30 mm) instead.
+A `courseHeight` below `FACADE_BOARD_H` (216 mm) gives overlapping boards because the board
+height is a constant, not a fraction of the pitch - this is how the garage head band has always
+been authored (200 mm pitch, 216 mm boards), and `nuketown2-garage-door.test.ts` expects 200 mm
+there, so that retained test is red at this SHA independent of the extraction (OPEN for root).
+The house leaf, parked east of the door, laps the east window's cut by 150 mm in plan; also
+pre-existing, left for the owner's eye. Claim states: assembly/tests VERIFIED by focused Vitest and
+`tsc --noEmit` in the lane worktree; boot, captures and taste OPEN.

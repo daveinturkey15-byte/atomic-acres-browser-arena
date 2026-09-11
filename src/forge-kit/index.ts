@@ -14,6 +14,7 @@ export * from './gutter-run';
 export * from './kerb-course';
 export * from './interior/prefabs';
 export * from './facade';
+export * from './facade-elevation';
 export * from './yard';
 export * from './street-signs';
 export * from './street';

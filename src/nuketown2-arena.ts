@@ -231,8 +231,8 @@ import { type WindowPart, type WindowRole, windowDressing } from './forge-kit/wi
 import {
   type FacadePart,
   type FacadePartRole,
+  facadeElevationParts,
   lapSidingParts,
-  panelDoorParts,
   shingleRoofParts,
   windowRevealParts,
 } from './forge-kit';
@@ -1723,13 +1723,32 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   groundFrontRuns.forEach((run, index) => {
     pair(builder, `house front pier ${index}`,
       [(run[0] + run[1]) / 2, GROUND_H / 2, zFront], [run[1] - run[0], GROUND_H, WALL_T], siding);
-    // HF-536 night-facade-port: LAP COURSES on the pier, not a painted box.
-    // The board face stands 50 mm proud of the wall's outer plane and beds
-    // 10 mm into it - the parity ceiling exactly, and no coplanar face.
-    facadePair(builder, m, `house front siding ${index}`,
-      [(run[0] + run[1]) / 2, 0, HOUSE_FRONT_Z],
-      lapSidingParts({ run: run[1] - run[0], height: GROUND_H, facing: 'z+' }));
   });
+  // HF-536 night-facade-port, as ONE ELEVATION. The same openings the solid
+  // piers were cut around, handed to the facade assembly: lap courses on each
+  // pier (board face 50 mm proud of the wall's outer plane, bedded 10 mm into
+  // it - the parity ceiling exactly, no coplanar face); four reveal liners
+  // wholly INSIDE each window cut, so the opening gets real depth without
+  // hiding the room, which is the shot corridor; and the panelled leaf parked
+  // OPEN flat against the wall east of its doorway. Hanging the leaf IN the
+  // opening would be a lie - that doorway is a route every player uses every
+  // round - and any other angle needs a rotation `pair()` cannot mirror.
+  // Anchored at x = 0 so the authored wall coordinates pass through unchanged.
+  for (const group of facadeElevationParts({
+    id: 'house front',
+    extent: [HOUSE_X0 + WALL_T, HOUSE_X1 - WALL_T],
+    height: GROUND_H,
+    facing: 'z+',
+    wallThickness: WALL_T,
+    openings: [
+      { kind: 'window', along: FRONT_WINDOW_A, sill: 1.0, head: 2.1 },
+      { kind: 'door', along: FRONT_DOOR, head: DOOR_HEAD_Y },
+      { kind: 'window', along: FRONT_WINDOW_B, sill: 1.0, head: 2.1 },
+    ],
+    style: { door: 'parked-leaf', leafRole: 'trim', leafThickness: 0.03 },
+  })) {
+    facadePair(builder, m, group.prop, [0, 0, HOUSE_FRONT_Z], group.parts);
+  }
   // The 300 mm band between the ground storey's head and the upper piers is the
   // upper FLOOR SLAB's edge - `m.interior` drywall, outdoors, on the map's most
   // photographed elevation. Siding it is a defect fix as much as a facade one.
@@ -1796,13 +1815,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     // race); glass family untouched, no new material, no authority change.
     pair(builder, `house front interior glow strip ${index}`, [wx, 2.68, zFront + WALL_T / 2 + 0.02], [width - 0.10, 0.10, 0.05], m.warmLight,
       { solid: false, shots: false, cast: false });
-    // HF-536 night-facade-port: THE REVEAL. The opening is cut through 300 mm
-    // of wall and the inside of that cut was never surfaced, so the window
-    // read as a hole in card. Four liners, wholly INSIDE the wall body - which
-    // is also why they cannot open a see-through gap - give it real depth
-    // without hiding the room, which is the shot corridor.
-    facadePair(builder, m, `house front window reveal ${index}`, [wx, 1.55, zFront],
-      windowRevealParts({ width, height: 1.1, facing: 'z+', wallThickness: WALL_T }));
   }
   pair(builder, 'house front door lintel',
     [(FRONT_DOOR[0] + FRONT_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zFront],
@@ -1815,15 +1827,6 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     { solid: false, shots: false, cast: true });
   pair(builder, 'house front door casing 1', [FRONT_DOOR[1] + 0.04, DOOR_HEAD_Y / 2, -9.97], [0.08, DOOR_HEAD_Y, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
-  // HF-536 night-facade-port: A PANELLED LEAF, standing OPEN flat against the
-  // wall east of its own opening. Hanging it IN the opening would be a lie -
-  // that doorway is a route every player uses every round - and swinging it to
-  // any other angle would need a rotation, which `pair()` cannot mirror
-  // (rotation is copied, not reflected, so the south leaf would lean the wrong
-  // way). Flat, axis-aligned and beside the hole is the one placement that is
-  // both true and exactly symmetric. Max proud 43 mm.
-  facadePair(builder, m, 'house front door leaf', [FRONT_DOOR[1] + doorW / 2 + 0.10, 0, HOUSE_FRONT_Z],
-    panelDoorParts({ width: doorW, height: DOOR_HEAD_Y - 0.05, facing: 'z+', thickness: 0.03, role: 'trim' }));
   pair(builder, 'house front string course', [cx, GROUND_H, -9.97], [HOUSE_WIDTH + 0.08, 0.10, 0.06], m.trim,
     { solid: false, shots: false, cast: true });
   pair(builder, 'house front roof fascia', [cx, ROOF_Y0 + 0.06, -9.95], [HOUSE_WIDTH + 0.16, 0.12, 0.10], m.trim,
@@ -2705,21 +2708,27 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   [[GARAGE_X0 + WALL_T, DOOR[0]], [DOOR[1], GARAGE_X1 - WALL_T]].forEach((run, index) => {
     pair(builder, `garage front pier ${index}`,
       [(run[0]! + run[1]!) / 2, H / 2, zFront], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
-    facadePair(builder, m, `garage front siding ${index}`,
-      [(run[0]! + run[1]!) / 2, 0, GARAGE_FRONT_Z],
-      lapSidingParts({ run: run[1]! - run[0]!, height: H, facing: 'z+', role: 'garageSiding' }));
   });
   // The door LEAF, parked in its head: the shipped map's chrome, and the piece
   // that makes a 3.5 m hole read as a garage rather than as a missing wall.
   pair(builder, 'garage door head', [(DOOR[0] + DOOR[1]) / 2, H - 0.4, zFront], [DOOR[1] - DOOR[0], 0.8, WALL_T], m.garageDoor);
-  // HF-536 night-facade-port: the parked leaf is a SECTIONAL door, so it gets
-  // the panel joints a sectional door has. Same lap recipe as the walls at a
-  // 200 mm pitch - the reveal is what tells a player it is a door rather than
-  // a painted band over the opening.
-  facadePair(builder, m, 'garage door panels', [(DOOR[0] + DOOR[1]) / 2, H - 0.8, GARAGE_FRONT_Z],
-    lapSidingParts({
-      run: DOOR[1] - DOOR[0], height: 0.8, facing: 'z+', role: 'panel', courseHeight: 0.2,
-    }));
+  // HF-536 night-facade-port, as ONE ELEVATION: garage courses on both piers
+  // and, because the parked leaf is a SECTIONAL door, a band of 200 mm panel
+  // courses over its head - the reveal is what tells a player it is a door
+  // rather than a painted band over the opening. Same assembly as the house
+  // front with a different profile: garage siding role, one vehicle-door
+  // opening, no window reveals, sectional head instead of a parked leaf.
+  for (const group of facadeElevationParts({
+    id: 'garage front',
+    extent: [GARAGE_X0 + WALL_T, GARAGE_X1 - WALL_T],
+    height: H,
+    facing: 'z+',
+    wallThickness: WALL_T,
+    openings: [{ kind: 'door', along: DOOR, head: H - 0.8, prop: 'garage door panels' }],
+    style: { sidingRole: 'garageSiding', door: 'sectional-head' },
+  })) {
+    facadePair(builder, m, group.prop, [0, 0, GARAGE_FRONT_Z], group.parts);
+  }
   // HF-536 night-muse-garage: ONE row of four small panes in the second panel
   // from the top (course [3.0, 3.2], centre 3.1), each 0.45 x 0.25 m in the
   // house window-glass role for 0.45 m2 of door glazing per house (<= 0.6).

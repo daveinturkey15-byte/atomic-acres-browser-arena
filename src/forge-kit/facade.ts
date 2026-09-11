@@ -364,6 +364,18 @@ function place(
   }
 }
 
+/**
+ * The authored-frame offset of an ALONG/UP/OUT displacement for one facing.
+ * Exported so an assembly can translate finished parts along an elevation
+ * with the same axis convention `place()` authored them in.
+ */
+export function facadeOffset(
+  facing: FacadeFacing,
+  along: number, up: number, out: number,
+): readonly [number, number, number] {
+  return place(facing, along, up, out, 0, 0, 0).offset;
+}
+
 export interface LapSidingPartsOptions {
   /** Length of the wall run this elevation covers, metres. */
   readonly run: number;
