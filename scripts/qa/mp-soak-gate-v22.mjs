@@ -37,6 +37,7 @@ import { captureReloadTrigger } from './reload-trigger-identity.mjs';
 import { ensurePauseMenu } from './mp-soak-menu-state.mjs';
 import { finalizationWriter } from './mp-soak-finalization.mjs';
 import { traceWindow, deathPublicationCandidates } from './trace-window.mjs';
+import { installCausalDeathObserver, collectCausalDeathObserver } from './causal-life-observer.mjs';
 import { safeSkyShotEvidence, ammoAcknowledged, installReloadObserver, collectReloadObserver } from './mp-reload-stage-diagnostic.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -327,52 +328,6 @@ async function scenarioStairFire(role) {
   };
 }
 
-// QA-only browser observer for causal life staging. It records actual sampled
-// stages and never mutates the game. Unlike reload observers, these rows carry
-// an exact originating page timestamp because the callback takes the stamp in
-// the same browser turn as the snapshot.
-function installCausalDeathObserver({ id }) {
-  if (window.__AA_V22_DEATH_OBSERVER__) throw Error('causal death observer already installed');
-  const state = { id, rows: [], dropped: 0, samples: 0 };
-  const take = () => {
-    const atMs = performance.now();
-    const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-    const self = snapshot.player?.id === id;
-    const player = self ? snapshot.player : snapshot.remotePlayers?.find((candidate) => candidate.id === id);
-    const row = {
-      subjectId: id,
-      atMs,
-      origin: performance.timeOrigin,
-      epoch: snapshot.killstreak?.matchEpoch ?? null,
-      hp: player?.hp ?? null,
-      alive: self ? player?.alive ?? false : (player?.hp ?? 0) > 0,
-      renderLife: self ? snapshot.networkSync?.localContinuity ?? null : player?.continuity ?? null,
-      supportLife: snapshot.killstreak?.actors?.find((actor) => actor.actorId === id)?.lifeId ?? null,
-      deathCount: snapshot.privateMatch?.scores?.find((score) => score.id === id)?.deaths ?? null,
-      weapon: player?.weapon ?? null,
-      primary: self ? player?.primaryWeapon ?? null : player?.primary ?? null,
-      ammo: self ? player?.ammo ?? null : player?.combatInventory?.ammo?.[player?.weapon],
-      reserve: self ? player?.reserve ?? null : player?.combatInventory?.reserve?.[player?.weapon],
-    };
-    state.samples += 1;
-    if (state.rows.length < 2048) state.rows.push(row); else state.dropped += 1;
-  };
-  take();
-  state.interval = setInterval(take, 20);
-  state.expiry = setTimeout(() => clearInterval(state.interval), 10_000);
-  window.__AA_V22_DEATH_OBSERVER__ = state;
-  return { installedAt: performance.now(), origin: performance.timeOrigin };
-}
-
-function collectCausalDeathObserver() {
-  const state = window.__AA_V22_DEATH_OBSERVER__;
-  if (!state) return null;
-  clearInterval(state.interval);
-  clearTimeout(state.expiry);
-  delete window.__AA_V22_DEATH_OBSERVER__;
-  return { rows: state.rows, samples: state.samples, dropped: state.dropped };
-}
-
 async function targetLifeRows(subjectId) {
   return Object.fromEntries(await Promise.all(PEERS.map(async (role) => [
     role, await peers[role].page.evaluate(v22LifeInPage, { id: subjectId }),
@@ -489,7 +444,11 @@ async function captureCausalNaturalLife(role) {
     const nextLife = baseline.lifeId + 1;
     const deadline = Date.now() + 10_000;
     while (Date.now() < deadline) {
-      const latest = await targetLifeRows(subjectId);
+      // Installation checked full-snapshot parity on every peer. Do not add
+      // another full scene census beside the lightweight periodic observer.
+      const latest = Object.fromEntries(await Promise.all(PEERS.map(async peer => [peer,
+        await peers[peer].page.evaluate(id => window.__ATOMIC_ACRES_DEBUG__.sampleCausalLifeSubject(id), subjectId),
+      ])));
       finalObserved = PEERS.every((peer) => latest[peer]?.hp === 100 && latest[peer]?.alive === true
         && latest[peer]?.renderLife === nextLife && latest[peer]?.supportLife === nextLife);
       if (finalObserved) break;
@@ -529,7 +488,7 @@ async function captureCausalNaturalLife(role) {
     baseline,
     trigger,
     stages: Object.fromEntries(PEERS.map((peer) => [peer, {
-      rows: observers[peer]?.rows ?? [], samples: observers[peer]?.samples ?? 0, dropped: observers[peer]?.dropped ?? null,
+      rows: observers[peer]?.rows ?? [], samples: observers[peer]?.samples ?? 0, dropped: observers[peer]?.dropped ?? null, readCostMs: observers[peer]?.readCostMs ?? null,
     }])),
     traces: scopedTraces,
     traceScope: candidateScope,

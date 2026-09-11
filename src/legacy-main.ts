@@ -32719,6 +32719,8 @@ const debugWindow = window as Window & {
   __ATOMIC_ACRES_DEBUG__?: {
     /** Bounded reload observer: no rig, renderer, material or scene census. */
     sampleReloadSubject: (id: string) => Record<string, unknown>;
+    /** Read-only lifecycle observation without a scene or rig census. */
+    sampleCausalLifeSubject: (id: string) => Record<string, unknown>;
     // MP-LAB: the cheap pose read for movement probes. The full snapshot walks every
     // rigged actor's skinned meshes and costs ~60 ms per call (measured
     // 2026-09-02), so a driver polling it at 20 Hz starves the frame loop
@@ -34115,6 +34117,26 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   sampleBodyStancePose,
   sampleGrenadeColdPathTelemetry,
   // MP-LAB: see the type; nothing here allocates beyond the returned object.
+  sampleCausalLifeSubject: (id: string) => {
+    const self = player.id === id;
+    const remote = remotes.get(id);
+    const weapon = self ? player.weapon : remote?.snapshot.weapon;
+    const inventory = remoteCombatInventories.get(id);
+    const hp = self ? player.hp : remote?.snapshot.hp;
+    return {
+      subjectId: id,
+      epoch: killstreakSnapshot.matchEpoch ?? null,
+      hp: hp ?? null,
+      alive: self ? player.alive : (hp ?? 0) > 0,
+      renderLife: self ? localContinuity : remote?.continuity ?? null,
+      supportLife: killstreakSnapshot.actors.find(actor => actor.actorId === id)?.lifeId ?? null,
+      deathCount: privateLobbySnapshot ? authoritativeScores.get(id)?.deaths ?? null : null,
+      weapon: weapon ?? null,
+      primary: self ? player.primaryWeapon : remote?.snapshot.primary ?? null,
+      ammo: self ? player.ammo[player.weapon] : weapon && isOrdinaryWeapon(weapon) ? inventory?.ammo[weapon] : undefined,
+      reserve: self ? player.reserve[player.weapon] : weapon && isOrdinaryWeapon(weapon) ? inventory?.reserve[weapon] : undefined,
+    };
+  },
   sampleReloadSubject: (id: string) => {
     const self = player.id === id;
     const remote = remotes.get(id);
