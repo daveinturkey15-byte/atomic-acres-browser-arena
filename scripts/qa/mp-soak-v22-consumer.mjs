@@ -3,7 +3,7 @@
 
 import { evaluateMpSoakV21 } from './mp-soak-v21-life.mjs';
 import { clockEnvelope } from './health-latency-v2.mjs';
-import { evaluateCanonicalDeathReplay } from './mp-canonical-replay-consumer.mjs';
+import { evaluateCanonicalDeathLifecycle } from './mp-death-lifecycle.mjs';
 
 export const V22_PEERS = Object.freeze(['host', 'guestA', 'guestB']);
 export const SOAK_V22_CONTRACT = 'mp-soak-gate-v2.2';
@@ -427,9 +427,10 @@ function causalDeathResult(report) {
   // Identical health retransmissions are not additional deaths. Require the
   // independently captured counter increment and complete canonical identity;
   // conflicting copies, extra lethal revisions and missing evidence stay red.
-  const canonicalDeath = evaluateCanonicalDeathReplay({
+  const canonicalDeath = evaluateCanonicalDeathLifecycle({
     traceScope: 'multi', expected: publication, baselineDeathCount: oldDeaths,
     trigger: report.trigger, healthRows: hostHealth, deathEvents: report.deathEvents,
+    hostHealthTrace: traces.host?.health, hostStageTrace: report.stages?.host,
   });
   if (!canonicalDeath.pass) for (const entry of canonicalDeath.reasons) reason(result, `canonical-death-${entry}`);
   for (const role of ['guestA', 'guestB']) {
