@@ -29,9 +29,15 @@ describe('existing coach detail is exposed rather than buried',()=>{
     expect(skirts).toHaveLength(2);
     for(const part of skirts){expect(part.triangles).toBe(12);expect(part.min[2]).toBeCloseTo(2.25,6);expect(part.max[2]).toBeCloseTo(6.85,6);}
   });
-  it('leaves the non-coach grille placement unchanged',()=>{
+  it('exposes the sedan grille outside its opaque nose with dark backing',()=>{
     const sedan=buildForgedVehicle(SEDAN_SPEC,{wheelStyle:'cover',grille},materials);
     const points=positions('chrome',sedan).filter(([,y,z])=>Math.abs(y-1.08)<.17&&z<.2);
-    expect(Math.min(...points.map(p=>p[2]))).toBeCloseTo(.008,6);
+    expect(Math.min(...points.map(p=>p[2]))).toBeCloseTo(-.022,6);
+    const backing=sedan.partBounds.find(part=>part.part==='detail.grille-mouth');
+    expect(backing?.min[2]).toBeCloseTo(-.012,6);
+    // A sightline between bars must reach the grille backing before the paint.
+    sedan.group.updateMatrixWorld(true);
+    const hits=new THREE.Raycaster(new THREE.Vector3(.1,1.08,-1),new THREE.Vector3(0,0,1)).intersectObject(sedan.group,true);
+    expect(hits[0].object.userData.forgeBucket).toBe('lining');
   });
 });

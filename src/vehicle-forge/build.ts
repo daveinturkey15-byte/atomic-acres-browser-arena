@@ -1007,24 +1007,23 @@ export function buildForgedVehicle(
   if (dressing.grille) {
     const { y, width, height, depth, barCount = 5 } = dressing.grille;
     const grilleDepth = depth / 2;
-    // The coach end cap is z=0: positive front depth buried the grille in it.
-    // Expose the existing parts; unrelated vehicle dressing stays unchanged.
+    // Every forged nose is capped at z=0. A positive front depth buries the
+    // grille behind opaque paint; keep its backing and bars just outside it.
     const coachGrille = spec.id === 'nuketown2-coach';
-    const grilleFront = coachGrille ? -0.012 : 0.008;
+    const grilleFront = -0.012;
     const grilleMouth = translated(
       chamferedBar(width / 2, height / 2, grilleDepth, Math.min(0.03, height * 0.18, grilleDepth * 0.45)),
       0, y, grilleDepth + grilleFront,
     );
     // Preserve the already-exposed chrome bars; their dark backing prevents
     // the entire lower front becoming one specular white rectangle.
-    if (coachGrille) parts.lining.push(markPart(grilleMouth, 'detail.coach.grille-mouth', 0.012));
-    else parts.chrome.push(grilleMouth);
+    parts.lining.push(markPart(grilleMouth, coachGrille ? 'detail.coach.grille-mouth' : 'detail.grille-mouth', 0.012));
     const count = Math.max(1, Math.floor(barCount));
     for (let index = 0; index < count; index += 1) {
       const x = count === 1 ? 0 : -width * 0.38 + (width * 0.76 * index) / (count - 1);
       const bar = chamferedBar(height / 2, 0.018, grilleDepth * 0.92, 0.006);
       bar.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
-      parts.chrome.push(translated(bar, x, y, coachGrille ? grilleFront - 0.010 + grilleDepth * 0.92 : grilleDepth + 0.018));
+      parts.chrome.push(translated(bar, x, y, grilleFront - 0.010 + grilleDepth * 0.92));
     }
   }
 

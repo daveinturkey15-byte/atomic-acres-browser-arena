@@ -3441,6 +3441,7 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
     headLamps: { x: 0.66, y: 0.84, radius: 0.115 },
     tailLamps: { x: 0.68, y: 0.86, radius: 0.105 },
     bumperY: 0.46,
+    grille: { y: 0.70, width: 1.02, height: 0.20, depth: 0.10, barCount: 3 },
     mirrors: doorMirrors,
     // HF-536 detail pass (Muse): door pulls, hub-nut hint, plates, indicators, roof gutters, boot shut (mirror placement kept from night-kit).
     doorHandles: { y: 0.95, z: [1.9, 3.0] },
