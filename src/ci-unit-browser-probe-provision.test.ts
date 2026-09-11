@@ -13,7 +13,8 @@ import { describe, expect, it } from 'vitest';
  * Modelled on scripts/qa/pass84-gamepad-wiring-contract.mjs: assert the CI
  * wiring, not the mere existence of the probe.
  */
-const PROVISION_COMMAND = 'npx playwright install --with-deps chromium-headless-shell';
+const PROVISION_COMMAND = 'npx playwright install chromium-headless-shell';
+const LINUX_DEPS_COMMAND = 'npx playwright install-deps chromium-headless-shell';
 const UNIT_TEST_COMMAND = '- run: npm test';
 const INSTALL_COMMAND = '- run: npm ci --ignore-scripts';
 
@@ -60,5 +61,13 @@ describe('static-and-unit provisions the headless Chromium shell the audio probe
   it('matches the probe, which still launches headless Chromium from the playwright package', () => {
     expect(audioProbe).toContain("from 'playwright'");
     expect(audioProbe).toContain('chromium.launch({ headless: true })');
+  });
+
+  it('provisions native libraries on Linux without installing Windows server features', () => {
+    const dependencies = section.indexOf(LINUX_DEPS_COMMAND);
+    expect(dependencies).toBeGreaterThan(section.indexOf(INSTALL_COMMAND));
+    expect(dependencies).toBeLessThan(section.indexOf(PROVISION_COMMAND));
+    expect(stepContaining(section, LINUX_DEPS_COMMAND)).toContain("if: runner.os == 'Linux'");
+    expect(stepContaining(section, PROVISION_COMMAND)).not.toContain('--with-deps');
   });
 });

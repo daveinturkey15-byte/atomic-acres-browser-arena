@@ -65,6 +65,8 @@ describe('HF-340 pole symmetry probe', () => {
       measure(`right/long-gun@${blend}`, rightShoulder, rightTarget, pole, rows);
     }
     const directory = await mkdtemp(join(tmpdir(), 'hf340-pole-probe-'));
+    // Validate the owned cleanup target before any assertion can fail in the body.
+    if (dirname(resolve(directory)) !== resolve(tmpdir())) throw new Error('Probe cleanup escaped the temporary root');
     try {
       const artifact = join(directory, 'hf340-pole-probe.json');
       await writeFile(artifact, JSON.stringify(rows, null, 2));
@@ -77,8 +79,6 @@ describe('HF-340 pole symmetry probe', () => {
         expect(Number.isFinite(row.interiorDeg)).toBe(true);
       }
     } finally {
-      // Delete only the resolved temporary directory this test created.
-      if (dirname(resolve(directory)) !== resolve(tmpdir())) throw new Error('Probe cleanup escaped the temporary root');
       await rm(directory, { recursive: true, force: true });
     }
   });

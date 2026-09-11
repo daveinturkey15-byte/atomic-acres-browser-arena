@@ -67,8 +67,11 @@ jobs:
       # exactly the shell build pinned by the installed playwright package.
       # The full Chromium provision stays owned by the bounded browser jobs.
       # Guarded by src/ci-unit-browser-probe-provision.test.ts.
+      - name: Provision Linux native libraries for the unit-level audio probe
+        if: runner.os == 'Linux'
+        run: npx playwright install-deps chromium-headless-shell
       - name: Provision Playwright headless Chromium shell for the unit-level audio probe
-        run: npx playwright install --with-deps chromium-headless-shell
+        run: npx playwright install chromium-headless-shell
       - run: npm test
       - name: Verify Pass 73 required browser-group wiring
         run: npm run qa:pass73:ci-wiring-contract
