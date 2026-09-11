@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // @ts-expect-error - QA instrument, plain ESM with no type declarations.
 import { isSafeRepoPath, verifyAssetProvenance } from '../scripts/qa/verify-asset-provenance.mjs';
@@ -35,7 +36,7 @@ interface Fixture {
 let fx: Fixture;
 
 function git(dir: string, ...args: string[]): string {
-  return execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test', '-c', 'core.autocrlf=false', ...args], { cwd: dir, encoding: 'utf8' }).trim();
+  return execFileSync('git', ['-c', 'user.name=test', '-c', 'user.email=test@test', '-c', 'core.autocrlf=false', ...args], { cwd: dir, encoding: 'utf8', windowsHide: true }).trim();
 }
 
 function write(dir: string, file: string, content: Buffer | string): void {
@@ -67,6 +68,9 @@ beforeAll(() => {
 });
 
 afterAll(() => {
+  if (path.dirname(fx.dir) !== path.resolve(tmpdir()) || !path.basename(fx.dir).startsWith('provenance-revision-')) {
+    throw new Error('Refusing cleanup outside the owned temporary fixture');
+  }
   rmSync(fx.dir, { recursive: true, force: true });
 });
 
@@ -120,6 +124,23 @@ describe('sourceScriptRevision binding', () => {
 });
 
 describe('editing digits in the manifest cannot fabricate the origin relation', () => {
+  it.each([{ path: POSTER }, null, { path: POSTER, sha256: 'bad' }])('rejects one malformed media record among otherwise valid records: %j', async (malformed) => {
+    const errors = await verify(baseEntry({ files: [{ path: POSTER, sha256: sha(BYTES_A) }, malformed] }));
+    expect(errors.join('\n')).toMatch(/files\[1\].*valid path and sha256/);
+  });
+
+  it('uses original Git objects even when a local replace ref substitutes the generator blob', async () => {
+    const original = git(fx.dir, 'rev-parse', `${fx.c1}:${GEN}`);
+    const replacement = git(fx.dir, 'rev-parse', `${fx.c2}:${GEN}`);
+    git(fx.dir, 'replace', original, replacement);
+    try {
+      expect(await verify(baseEntry())).toEqual([]);
+      expect((await verify(baseEntry({ sourceScriptSha256: sha(V2) }))).join('\n')).toMatch(/manifest pins/);
+    } finally {
+      git(fx.dir, 'replace', '-d', original);
+    }
+  });
+
   it('rejects re-pinning the generator digest to the live file while keeping the historical commit', async () => {
     const errors = await verify(baseEntry({ sourceScriptSha256: sha(V2) }));
     expect(errors.join('\n')).toMatch(/generator at .* digests to .*, manifest pins/);
@@ -159,6 +180,38 @@ describe('editing digits in the manifest cannot fabricate the origin relation', 
   it('rejects an entry that pins no media, so a revision cannot float free of any asset', async () => {
     const errors = await verify(baseEntry({ files: 'public/assets/original/fixture/*' }));
     expect(errors.join('\n')).toMatch(/pins no media files/);
+  });
+});
+
+describe('actual verifier entry points', () => {
+  it('executes the CLI through a directory junction and reports the verified revision', async () => {
+    await verify(baseEntry());
+    const alias = path.join(fx.dir, 'qa-alias');
+    symlinkSync(fileURLToPath(new URL('../scripts/qa/', import.meta.url)), alias, 'junction');
+    try {
+      const output = execFileSync(process.execPath, [path.join(alias, 'verify-asset-provenance.mjs')], {
+        cwd: fx.dir, encoding: 'utf8', windowsHide: true,
+      });
+      expect(JSON.parse(output)).toMatchObject({ provenance: 'ok', verifiedRevisions: 1 });
+    } finally {
+      unlinkSync(alias);
+    }
+  });
+
+  it('the public verifier rejects a declared revision without its sourceScript', async () => {
+    const qa = path.join(fx.dir, 'scripts/qa');
+    mkdirSync(qa, { recursive: true });
+    for (const name of ['verify-asset-provenance.mjs', 'verify-public-asset-provenance.mjs']) {
+      copyFileSync(fileURLToPath(new URL(`../scripts/qa/${name}`, import.meta.url)), path.join(qa, name));
+    }
+    const command = path.join(qa, 'verify-public-asset-provenance.mjs');
+    const run = () => execFileSync(process.execPath, [command], { cwd: fx.dir, encoding: 'utf8', windowsHide: true, stdio: 'pipe' });
+    await verify(baseEntry());
+    expect(run()).toMatch(/1\/1 public assets covered/);
+    const malformed = baseEntry();
+    delete malformed.sourceScript;
+    await verify(malformed);
+    expect(run).toThrow(/does not name the entry's sourceScript/);
   });
 });
 

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +25,7 @@ export function crlfDigestFor(path, bytes) {
 }
 
 function git(root, args) {
-  const result = spawnSync('git', args, { cwd: root, windowsHide: true, maxBuffer: 256 * 1024 * 1024 });
+  const result = spawnSync('git', ['--no-replace-objects', ...args], { cwd: root, windowsHide: true, maxBuffer: 256 * 1024 * 1024 });
   return { ok: result.status === 0, stdout: result.stdout ?? Buffer.alloc(0), stderr: (result.stderr ?? '').toString() };
 }
 
@@ -104,9 +105,17 @@ export function verifyRevision(root, entry, source, errors) {
     errors.push(`${label}: crlfSha256 does not match the CRLF form of ${commit}:${path}`);
     ok = false;
   }
-  const media = Array.isArray(entry.files)
-    ? entry.files.filter((file) => file && typeof file === 'object' && typeof file.path === 'string' && typeof file.sha256 === 'string')
-    : [];
+  const media = [];
+  if (Array.isArray(entry.files)) {
+    entry.files.forEach((file, index) => {
+      if (!file || typeof file !== 'object' || !isSafeRepoPath(file.path) || typeof file.sha256 !== 'string' || !DIGEST.test(file.sha256)) {
+        errors.push(`${label}: files[${index}] must have a valid path and sha256`);
+        ok = false;
+      } else {
+        media.push(file);
+      }
+    });
+  }
   if (media.length === 0) {
     errors.push(`${label}: entry pins no media files, so there is nothing to bind the revision to`);
     ok = false;
@@ -207,7 +216,7 @@ export async function verifyAssetProvenance(root) {
   return { errors, verifiedDigests: expected.size, verifiedRevisions: revisions.length };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const { errors, verifiedDigests, verifiedRevisions } = await verifyAssetProvenance(resolve(process.cwd()));
   if (errors.length > 0) {
     console.error(errors.join('\n'));

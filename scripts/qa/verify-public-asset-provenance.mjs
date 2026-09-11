@@ -82,6 +82,10 @@ for (const asset of manifest.assets) {
       }
     }
   }
+  // Validate every declared revision, including malformed entries without sourceScript.
+  // Checking only inside the string-valued path loop would silently omit those entries.
+  const hasRevision = Object.hasOwn(asset, 'sourceScriptRevision');
+  if (hasRevision) verifyRevision(root, asset, asset.id ?? '<missing id>', failures);
   for (const [pathField, hashField] of [
     ['sourceBlend', 'sourceBlendSha256'],
     ['sourceSpec', 'sourceSpecSha256'],
@@ -101,12 +105,7 @@ for (const asset of manifest.assets) {
       // safe path equal to sourceScript, blob digest equal to the pin, every pinned media blob present at
       // that commit with its pinned digest, commit touched the generator or the media). Coexistence at a
       // commit is origin evidence, not proof of which process produced the bytes; the family receipt is.
-      if (pathField === 'sourceScript' && Object.hasOwn(asset, 'sourceScriptRevision')) {
-        const revisionErrors = [];
-        verifyRevision(root, asset, asset.id ?? '<missing id>', revisionErrors);
-        failures.push(...revisionErrors);
-        continue;
-      }
+      if (pathField === 'sourceScript' && hasRevision) continue;
       await verifyHash(asset[pathField], asset[hashField], `${asset.id}.${pathField}`, failures);
     }
   }
