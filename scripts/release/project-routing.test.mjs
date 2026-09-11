@@ -9,7 +9,7 @@
 // Synthetic repositories are built with real git so ancestry and worktree
 // semantics are genuine, not mocked.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -321,6 +321,60 @@ test('closure: rejected requires verified preservation and refuses a dirty tree'
     assert.ok(existsSync(project.laneTree), 'verification never removes the worktree');
   } finally {
     project.cleanup();
+  }
+});
+
+// ------------------------------------------------- installer and readback
+
+test('init writes a machine record from observed values, show reads it back, init never overwrites', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aa-routing-registry-'));
+  const registryPath = join(dir, 'registry.json');
+  const cli = (...args) => spawnSync(process.execPath, [join(REPOSITORY_ROOT, 'scripts', 'release', 'project-routing.mjs'), ...args], {
+    cwd: REPOSITORY_ROOT, encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, ATOMIC_ACRES_ROUTING_REGISTRY: registryPath, ATOMIC_ACRES_ROUTING_REQUIRED: '' },
+  });
+  try {
+    // The real repository must expose origin/main for init to pin the integration SHA.
+    const originMain = git(REPOSITORY_ROOT, 'rev-parse', 'refs/remotes/origin/main');
+    const commonDir = git(REPOSITORY_ROOT, 'rev-parse', '--git-common-dir');
+
+    const missing = cli('show');
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /No project routing registry/);
+
+    const init = cli('init', '--machine', 'dave-gaming-pc');
+    assert.equal(init.status, 0, init.stderr);
+    const initReceipt = JSON.parse(init.stdout);
+    assert.equal(initReceipt.registryPath, registryPath);
+    assert.equal(initReceipt.integrationSha, originMain);
+    assert.equal(initReceipt.enforcement, 'warn');
+    assert.equal(initReceipt.lanes, 0);
+
+    const written = JSON.parse(readFileSync(registryPath, 'utf8'));
+    validateRegistry(written, IDENTITY);
+    assert.equal(written.machine, 'dave-gaming-pc');
+    assert.deepEqual(written.lanes, {});
+    assert.equal(written.integration.expectedSha, originMain);
+    assert.ok(commonDir.replace(/\\/g, '/').endsWith('.git'));
+    assert.equal(written.gitCommonDir.toLowerCase(), resolve(REPOSITORY_ROOT, commonDir).replace(/\\/g, '/').toLowerCase());
+
+    const show = cli('show');
+    assert.equal(show.status, 0, show.stderr);
+    const readback = JSON.parse(show.stdout);
+    assert.equal(readback.registryPath, registryPath);
+    assert.equal(readback.integration.matchesLocalRef, true);
+    assert.equal(readback.routingRequiredByEnv, false);
+    assert.deepEqual(readback.lanes, {});
+
+    const again = cli('init', '--machine', 'dave-gaming-pc', '--enforce', 'refuse');
+    assert.equal(again.status, 1);
+    assert.match(again.stderr, /never overwrites/);
+    assert.equal(JSON.parse(readFileSync(registryPath, 'utf8')).enforcement.legacyContribute, 'warn', 'a refused init leaves the record untouched');
+
+    const badMachine = cli('init', '--machine', 'Not A Slug');
+    assert.equal(badMachine.status, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
