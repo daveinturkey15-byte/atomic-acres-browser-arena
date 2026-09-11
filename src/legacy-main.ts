@@ -14,12 +14,17 @@ import {
 import {
   DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS,
   DOMINATION_TEAM_COLORS,
+  createTimedMapWeaponAudit,
   createWeaponCapacityRegistry as createWeaponCapacityRegistryPure,
+  deriveWeatherMatchSeed,
+  disabledTimedMapWeaponStates,
+  interpolatePlayerSnapshot,
   isTimedCombatMessage,
   majorDebrisDefinitionFromSnapshot,
   recoveryRemainingMs,
   stanceEyeHeight,
   verifiedStickyAttachment,
+  worldVertex,
 } from './legacy-pure-helpers-2'; // HF-355 round 2
 // HF-412: the Black Ops 2 drop shot - a fixed-duration prone transition that
 // never takes the trigger away. Every timing constant lives in that module.
@@ -802,7 +807,6 @@ import {
   stateBroadcastWakeIntervalMs,
   updateInterpolationDelay,
   updateSnapshotRate,
-  shortestYaw,
   type InterpolationDelayState,
   type SnapshotRateState,
 } from './network-sync';
@@ -5012,14 +5016,6 @@ let weatherOverrideState = (() => {
     ? requested as WeatherState
     : null;
 })();
-function deriveWeatherMatchSeed(hostIdentity: string, matchEpochMs: number): number {
-  let hash = 0x811c9dc5;
-  for (const character of `${hostIdentity}:${matchEpochMs}`) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash >>> 0;
-}
 const rainPresentation = new RainPresentation({
   profile: renderProfile,
   rendererLabel,
@@ -6066,28 +6062,9 @@ let railgunAdsResetRequired = false;
 let railgunRechamberPresentationActive = false;
 const RAILGUN_PICKUP_RANGE = 2.65;
 const TIMED_MAP_WEAPON_PICKUP_RANGE = 2.65;
-function disabledTimedMapWeaponStates(generation = 0): Readonly<Record<TimedMapWeaponId, TimedMapWeaponAuthorityState>> {
-  return Object.freeze(Object.fromEntries(TIMED_MAP_WEAPON_IDS.map((weaponId) => [
-    weaponId,
-    createTimedMapWeaponAuthority(weaponId, 'disabled', 0, 0, generation),
-  ])) as Record<TimedMapWeaponId, TimedMapWeaponAuthorityState>);
-}
 let timedMapWeaponStates = disabledTimedMapWeaponStates();
 const localTimedMapWeaponPendingUntil = new Map<TimedMapWeaponId, number>();
 let lastTimedMapWeaponStateBroadcastAt = Number.NEGATIVE_INFINITY;
-const createTimedMapWeaponAudit = () => ({
-  claimsReceived: 0,
-  claimsAccepted: 0,
-  claimsRejected: 0,
-  shotsAccepted: 0,
-  shotsRejected: 0,
-  announcements: 0,
-  drops: 0,
-  flareImpacts: 0,
-  flareBurnPulses: 0,
-  flareDamage: 0,
-  lastReason: null as string | null,
-});
 let timedMapWeaponAudit = createTimedMapWeaponAudit();
 type PendingFlareShotRequest = Readonly<{
   request: ShotRequestMessage;
@@ -11786,31 +11763,6 @@ function currentViewmodelSurfaceRetreat(): number {
 // spawn names its geometry instead of staying invisible. Read-only; never
 // referenced by gameplay.
 /**
- * One mesh vertex in WORLD space, honouring skinning.
- *
- * THE ARMS ARE A SKINNED MESH, and reading their position attribute directly is
- * meaningless: those are BIND-POSE vertices, and the pose the player sees is
- * produced by the skeleton at draw time. Measuring the raw attribute reported
- * arm geometry 2.17 m below the camera on flat ground - anatomy that does not
- * exist - and made the arms look like the worst offender in every wall
- * measurement. `applyBoneTransform` is what the GPU does, so it is what a
- * measurement of what the player sees has to do too.
- */
-function worldVertex(
-  mesh: THREE.Mesh,
-  position: THREE.BufferAttribute,
-  index: number,
-  target: THREE.Vector3,
-): THREE.Vector3 {
-  target.fromBufferAttribute(position, index);
-  const skinned = mesh as THREE.SkinnedMesh;
-  if ((skinned as { isSkinnedMesh?: boolean }).isSkinnedMesh && skinned.skeleton) {
-    skinned.applyBoneTransform(index, target);
-  }
-  return target.applyMatrix4(mesh.matrixWorld);
-}
-
-/**
  * HOW FAR THE WEAPON IS INSIDE THE WORLD, in metres, right now.
  *
  * The owner has reported "gun goes through walls and floor" repeatedly, and
@@ -12333,18 +12285,6 @@ function sampleFireAdmissionDiagnostics(): Record<string, unknown> {
     contactEnvelope: weaponView.contactProbeEnvelope(),
     contactFold: weaponView.contactFoldState(),
     presentationProbes: describePresentationContactProbes(),
-  };
-}
-
-function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
-  return {
-    ...after,
-    x: before.x + (after.x - before.x) * alpha,
-    y: before.y + (after.y - before.y) * alpha,
-    z: before.z + (after.z - before.z) * alpha,
-    yaw: shortestYaw(before.yaw, after.yaw, alpha),
-    pitch: before.pitch + (after.pitch - before.pitch) * alpha,
-    stance: alpha < 0.5 ? before.stance : after.stance,
   };
 }
 

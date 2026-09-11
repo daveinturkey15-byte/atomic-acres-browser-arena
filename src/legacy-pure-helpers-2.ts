@@ -1,11 +1,10 @@
 /**
- * Pure helpers extracted verbatim from src/legacy-main.ts (HF-355 round 2).
+ * Self-contained helpers extracted verbatim from src/legacy-main.ts (HF-355).
  *
- * Every function here is a pure move: it reads only its parameters and
- * `THREE.MathUtils` (an imported namespace). No closure capture over module
- * state, no DOM access, no network. Behaviour is unchanged — legacy-main.ts
- * still owns the deletion; this module becomes the canonical home once the
- * orchestrator rewires imports.
+ * These helpers use their arguments and imported dependencies, without capturing
+ * legacy-main state. worldVertex updates its supplied scratch target, and
+ * recoveryRemainingMs defaults to the current clock when no time is supplied.
+ * The caller retains ownership of game state and lifecycle side effects.
  */
 
 import type { PlayerSnapshot } from './protocol';
@@ -14,6 +13,14 @@ import type { StickyAttachmentRecord } from './remote-sticky-attachment-authorit
 import type { HostVerifiedStickyAttachment } from './protocol';
 import type { MajorDebrisBodyDefinition, MajorDebrisBodySnapshot } from './physics';
 import type { HostMatchCheckpoint } from './host-match-checkpoint';
+import type * as THREE from 'three';
+import { shortestYaw } from './network-sync';
+import {
+  TIMED_MAP_WEAPON_IDS,
+  createTimedMapWeaponAuthority,
+  type TimedMapWeaponAuthorityState,
+  type TimedMapWeaponId,
+} from './timed-map-weapon-authority';
 
 /**
  * REJECTED FROM THIS MODULE: disposeDetachedRootResources.
@@ -114,3 +121,90 @@ export const DEBUG_RIGGED_EVIDENCE_SENTINEL_DEFINITIONS = Object.freeze([
   Object.freeze({ name: 'wrist-left', aliases: Object.freeze(['WristL', 'Wrist.L']) }),
   Object.freeze({ name: 'wrist-right', aliases: Object.freeze(['WristR', 'Wrist.R']) }),
 ] as const);
+
+// ---------------------------------------------------------------------------
+// HF-355 round 3 (2026-09-11): five self-contained helpers moved from
+// src/legacy-main.ts at d885af5. Each reads only its parameters and the
+// imported constants/helpers above; no closure over legacy-main state, no
+// global DOM/scene/network state. worldVertex mutates its supplied target.
+// Line refs are the pre-move legacy-main lines.
+// ---------------------------------------------------------------------------
+
+/**
+ * legacy-main.ts:5015-5022 - FNV-1a seed for the shared weather stream.
+ */
+export function deriveWeatherMatchSeed(hostIdentity: string, matchEpochMs: number): number {
+  let hash = 0x811c9dc5;
+  for (const character of `${hostIdentity}:${matchEpochMs}`) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/**
+ * legacy-main.ts:6069-6074 - every timed map weapon in the disabled state.
+ */
+export function disabledTimedMapWeaponStates(generation = 0): Readonly<Record<TimedMapWeaponId, TimedMapWeaponAuthorityState>> {
+  return Object.freeze(Object.fromEntries(TIMED_MAP_WEAPON_IDS.map((weaponId) => [
+    weaponId,
+    createTimedMapWeaponAuthority(weaponId, 'disabled', 0, 0, generation),
+  ])) as Record<TimedMapWeaponId, TimedMapWeaponAuthorityState>);
+}
+
+/**
+ * legacy-main.ts:6078-6090 - zeroed timed-map-weapon audit counters.
+ */
+export const createTimedMapWeaponAudit = () => ({
+  claimsReceived: 0,
+  claimsAccepted: 0,
+  claimsRejected: 0,
+  shotsAccepted: 0,
+  shotsRejected: 0,
+  announcements: 0,
+  drops: 0,
+  flareImpacts: 0,
+  flareBurnPulses: 0,
+  flareDamage: 0,
+  lastReason: null as string | null,
+});
+
+/**
+ * One mesh vertex in WORLD space, honouring skinning.
+ *
+ * THE ARMS ARE A SKINNED MESH, and reading their position attribute directly is
+ * meaningless: those are BIND-POSE vertices, and the pose the player sees is
+ * produced by the skeleton at draw time. Measuring the raw attribute reported
+ * arm geometry 2.17 m below the camera on flat ground - anatomy that does not
+ * exist - and made the arms look like the worst offender in every wall
+ * measurement. `applyBoneTransform` is what the GPU does, so it is what a
+ * measurement of what the player sees has to do too.
+ */
+export function worldVertex(
+  mesh: THREE.Mesh,
+  position: THREE.BufferAttribute,
+  index: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  target.fromBufferAttribute(position, index);
+  const skinned = mesh as THREE.SkinnedMesh;
+  if ((skinned as { isSkinnedMesh?: boolean }).isSkinnedMesh && skinned.skeleton) {
+    skinned.applyBoneTransform(index, target);
+  }
+  return target.applyMatrix4(mesh.matrixWorld);
+}
+
+/**
+ * legacy-main.ts:12339-12349 - snapshot lerp used by SnapshotInterpolationBuffer.
+ */
+export function interpolatePlayerSnapshot(before: PlayerSnapshot, after: PlayerSnapshot, alpha: number): PlayerSnapshot {
+  return {
+    ...after,
+    x: before.x + (after.x - before.x) * alpha,
+    y: before.y + (after.y - before.y) * alpha,
+    z: before.z + (after.z - before.z) * alpha,
+    yaw: shortestYaw(before.yaw, after.yaw, alpha),
+    pitch: before.pitch + (after.pitch - before.pitch) * alpha,
+    stance: alpha < 0.5 ? before.stance : after.stance,
+  };
+}
