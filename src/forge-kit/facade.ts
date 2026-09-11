@@ -413,20 +413,22 @@ export function lapSidingParts(options: LapSidingPartsOptions): FacadePart[] {
   const courses = Math.max(1, Math.ceil(height / pitch));
   for (let index = 0; index < courses; index += 1) {
     const y0 = index * pitch;
-    const boardH = Math.min(FACADE_BOARD_H, height - y0);
+    // Narrow sectional courses must fit their pitch; the house's normal
+    // lap courses retain their original board height and recessed gap.
+    const boardH = Math.min(FACADE_BOARD_H, pitch, height - y0);
     if (boardH <= 0.02) continue;
     parts.push({
       suffix: `board ${base + index}`,
       role,
       ...place(facing, 0, y0 + boardH / 2, boardOut, run, boardH, FACADE_BOARD_T),
     });
-    const jointY = y0 + FACADE_BOARD_H;
+    const jointY = y0 + boardH;
     if (jointY + 0.01 >= height) continue;
     parts.push({
       suffix: `reveal ${base + index}`,
       role: 'reveal',
-      ...place(facing, 0, jointY + (pitch - FACADE_BOARD_H) / 2, revealOut,
-        run - 0.004, (pitch - FACADE_BOARD_H) + 0.04, FACADE_REVEAL_T),
+      ...place(facing, 0, jointY + (pitch - boardH) / 2, revealOut,
+        run - 0.004, (pitch - boardH) + 0.04, FACADE_REVEAL_T),
     });
   }
   return parts;

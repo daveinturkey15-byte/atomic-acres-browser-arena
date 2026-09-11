@@ -219,6 +219,18 @@ describe('HF-536 facade elevation assembly', () => {
     expect(facadeElevationFlatParts(house).length).not.toBe(facadeElevationFlatParts(garage).length);
   });
 
+  it('keeps narrow sectional courses non-overlapping with positive reveal geometry', () => {
+    const parts = lapSidingParts({ run: 3.5, height: 0.8, facing: 'z+', courseHeight: 0.1, role: 'panel' });
+    const boards = parts.filter((part) => part.suffix.startsWith('board '));
+    expect(boards.length).toBeGreaterThan(1);
+    for (const part of parts) expect(part.size.every((dimension) => Number.isFinite(dimension) && dimension > 0)).toBe(true);
+    for (let i = 1; i < boards.length; i += 1) {
+      const previous = boards[i - 1]!;
+      const current = boards[i]!;
+      expect(previous.offset[1] + previous.size[1] / 2).toBeLessThanOrEqual(current.offset[1] - current.size[1] / 2 + 1e-9);
+    }
+  });
+
   it('rejects malformed options before authoring any part', () => {
     const bad: Array<[string, () => unknown]> = [
       ['empty id', () => facadeElevationParts({ ...HOUSE, id: ' ' })],

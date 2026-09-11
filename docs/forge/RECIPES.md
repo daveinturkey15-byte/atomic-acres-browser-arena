@@ -278,7 +278,7 @@ re-implemented from first principles. No source/shader/prose copied.
 ## R-011 — Describe an elevation as openings and a style; never copy a wall's geometry by hand
 
 **Subject:** the house front and the garage front in Nuke Town. **Pass:** HF-536 forge-transfer
-lane, 2026-09-11, candidate `79161fd5`. **Files:** `src/forge-kit/facade-elevation.ts`
+lane, 2026-09-11, extracted from baseline `79161fd5`. **Files:** `src/forge-kit/facade-elevation.ts`
 (`facadeElevationParts`, `facadeElevationFlatParts`, `FACADE_LEAF_*`, `FACADE_SECTIONAL_COURSE_H`),
 `src/forge-kit/facade.ts` (`facadeOffset`), `src/nuketown2-arena.ts` (`house()`, `garage()`).
 
@@ -293,7 +293,7 @@ consumers differ only in parameters: the house asks for `siding`, two windows wi
 30 mm trim leaf parked 100 mm east of the doorway; the garage asks for `garageSiding`, one 3.5 m
 bay, no reveals and a band of 200 mm `panel` courses over the bay head.
 
-**Contract, pinned by `src/forge-kit/facade-elevation.test.ts` and
+**Contract for the two tested profiles, pinned by `src/forge-kit/facade-elevation.test.ts` and
 `src/nuketown2-facade-elevation-consumers.test.ts`:** deterministic and order-independent; every
 part finite, inside the extent, at most `FACADE_MAX_PROUD` proud and never deeper than the wall;
 boards only on piers, never across an opening; liners inside their own cut and the wall body;
@@ -301,15 +301,17 @@ the leaf beside the doorway, never in it; malformed options throw before any par
 arena's piers keep their colliders and the emitted parts add no collider, shot surface or
 ballistic row and use registry materials only.
 
-**Cost:** +0 draws, +0 materials, same part list as the hand-placed version at this SHA (a
-behaviour-preserving extraction; it is NOT a visual change and claims no visual upgrade).
+**Cost:** the extraction adds no draws or materials and preserves the hand-placed parts.
+The subsequent root repair below changes the garage board heights while retaining its
+part count and material roles; the extraction itself claims no visual upgrade.
 
 **Gotchas.** `panelDoorParts` defaults to a 50 mm leaf whose rails then stand 63 mm proud, past
 the parity ceiling; the assembly defaults `leafThickness` to `FACADE_LEAF_T` (30 mm) instead.
-A `courseHeight` below `FACADE_BOARD_H` (216 mm) gives overlapping boards because the board
-height is a constant, not a fraction of the pitch - this is how the garage head band has always
-been authored (200 mm pitch, 216 mm boards), and `nuketown2-garage-door.test.ts` expects 200 mm
-there, so that retained test is red at this SHA independent of the extraction (OPEN for root).
+A `courseHeight` below `FACADE_BOARD_H` (216 mm) used to produce overlapping boards and,
+at a sufficiently small pitch, negative reveal dimensions. Root reproduced the existing
+garage failure on baseline `79161fd5`: 216 mm boards on the specified 200 mm pitch.
+The repair caps board height at its pitch and derives the reveal from that actual height.
+The existing garage expectation remains 200 mm; the default house courses are unchanged.
 The house leaf, parked east of the door, laps the east window's cut by 150 mm in plan; also
 pre-existing, left for the owner's eye. Claim states: assembly/tests VERIFIED by focused Vitest and
 `tsc --noEmit` in the lane worktree; boot, captures and taste OPEN.
