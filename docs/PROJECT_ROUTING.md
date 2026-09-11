@@ -115,8 +115,9 @@ node scripts/release/project-routing.mjs init --machine dave-gaming-pc --enforce
 node scripts/release/project-routing.mjs show      # or: npm run pipeline:routing -- show
 ```
 
-`init` copies the example, replaces `gitCommonDir`, `integration.expectedSha`, `machine`
-and timestamps with observed values, empties `lanes`, and **refuses to overwrite** an existing
+`init` uses the example's schema, replaces `gitCommonDir`, `integration.expectedSha`, `machine`
+and timestamps with observed values, empties `lanes`, initializes preview/production/rollback
+as unknown (never copied as facts from the example), and **refuses to overwrite** an existing
 record. Lanes are added by editing the JSON (the example shows the shape); every edit is
 re-validated on the next guard run. Point `ATOMIC_ACRES_ROUTING_REGISTRY` at another file to
 test a record without touching the machine's.
@@ -139,9 +140,12 @@ has a readback; do not report cutover on the strength of the previous step.
 4. **Run one routed preflight per lane** from inside that lane:
    `npm run pipeline:preflight -- --machine dave-gaming-pc --harness <h> --project atomic-acres-browser-arena --lane <id>`.
    A refusal here is a real routing defect to fix in the record or the tree, not in the guard.
-5. **Flip enforcement.** Set `enforcement.legacyContribute` to `refuse` in the record **and**
-   export `ATOMIC_ACRES_ROUTING_REQUIRED=1` machine-wide (`setx`), so a launcher without the
-   record is also refused. Re-run a legacy preflight and confirm it is refused.
+5. **Enforce identity.** This candidate commits `routingRequired: true` in
+   `.github/project-identity.json`. Missing, corrupt or misplaced machine records therefore
+   cannot silently restore legacy contribution permission. Set `enforcement.legacyContribute`
+   to `refuse` in the record too. `ATOMIC_ACRES_ROUTING_REQUIRED=1` is an additional launcher
+   control, not the sole protection. Re-run a legacy preflight with no registry or environment
+   override and confirm it is refused. Older checkouts still require the launcher cutover below.
 6. **Update every launcher** (Codex launcher generator, the OMP wrapper, Hermes skill start
    card, Claude lane prompts) to pass `--project` and `--lane`, and replace the pass-numbered
    global starting pointer with "resolve the lane from the registry". Those files live outside
@@ -149,7 +153,14 @@ has a readback; do not report cutover on the strength of the previous step.
 7. **After every integration**, re-point `integration.expectedSha` (or re-run `init` to a new
    path and swap) — the guard refuses stale records on purpose.
 
-Until step 5 is done, treat every "routing is enforced" claim as false.
+The repository guard is enforced in this candidate; cross-harness cutover remains incomplete
+until every active launcher resolves and verifies the assigned lane through it.
+
+All machine, worktree, preview, protected-checkout and bundle paths must be absolute. Registry
+machine identity must match the caller. Rejected-lane bundle evidence must restore independently
+into a temporary bare repository and pass object checks; a header, `list-heads`, or even
+`bundle verify` alone can accept a missing pack. Thin bundles needing unstored prerequisites
+are not standalone preservation. Verification never changes the source worktree or its refs.
 
 ## Falsifiers
 

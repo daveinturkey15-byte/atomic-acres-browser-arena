@@ -16,8 +16,8 @@
 // machine record once and refuses to overwrite; nothing deletes a tree, moves
 // a ref, or marks an artifact accepted. See docs/PROJECT_ROUTING.md.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +77,7 @@ export function readProjectIdentity(repositoryRoot = REPOSITORY_ROOT) {
   if (typeof document.repository !== 'string' || !/^[^/\s]+\/[^/\s]+$/.test(document.repository)) {
     throw new Error(`${IDENTITY_RELATIVE_PATH} repository must be owner/name`);
   }
+  if (document.routingRequired !== undefined && typeof document.routingRequired !== 'boolean') throw new Error(`${IDENTITY_RELATIVE_PATH} routingRequired must be boolean`);
   return document;
 }
 
@@ -93,6 +94,19 @@ function expectNullableSha(value, label) {
   return expectString(value, label, SHA40);
 }
 
+function expectAbsolutePath(value, label) {
+  expectString(value, label);
+  // Accept portable records for Windows and POSIX, but never cwd-relative or
+  // drive-relative paths such as '.' or 'C:work'.
+  if (!((process.platform !== 'win32' && value.startsWith('/')) || /^[a-zA-Z]:[\\/]/.test(value) || /^[\\/]{2}[^\\/]+[\\/][^\\/]+/.test(value))) {
+    throw new Error(`${label} must be an absolute path`);
+  }
+}
+
+function expectNullablePass(value, label) {
+  if (value !== null) expectString(value, label, /^PASS [1-9][0-9]*$/);
+}
+
 function expectIsoDate(value, label) {
   expectString(value, label);
   if (Number.isNaN(Date.parse(value))) throw new Error(`${label} must be an ISO-8601 timestamp`);
@@ -103,7 +117,7 @@ function validateLane(id, lane) {
   const label = `lanes.${id}`;
   if (!SLUG.test(id)) throw new Error(`${label}: lane id must be a lowercase slug`);
   if (!lane || typeof lane !== 'object') throw new Error(`${label} must be an object`);
-  expectString(lane.worktree, `${label}.worktree`);
+  expectAbsolutePath(lane.worktree, `${label}.worktree`);
   expectString(lane.branch, `${label}.branch`, /^contrib\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+$/);
   if (!lane.owner || typeof lane.owner !== 'object') throw new Error(`${label}.owner must be an object`);
   expectString(lane.owner.machine, `${label}.owner.machine`, SLUG);
@@ -136,6 +150,7 @@ function validateLane(id, lane) {
     const preservation = closure.preservation;
     const hasRef = typeof preservation?.ref === 'string' && preservation.ref.startsWith('refs/');
     const hasBundle = typeof preservation?.bundlePath === 'string' && preservation.bundlePath.length > 0;
+    if (hasBundle) expectAbsolutePath(preservation.bundlePath, `${label}.closure.preservation.bundlePath`);
     if (!hasRef && !hasBundle) {
       throw new Error(`${label}.closure.preservation must name a refs/ ref or a bundlePath; a rejected lane is never closed without preservation proof`);
     }
@@ -155,27 +170,28 @@ export function validateRegistry(registry, identity = null) {
   if (!registry.enforcement || !ENFORCEMENT.has(registry.enforcement.legacyContribute)) {
     throw new Error('registry.enforcement.legacyContribute must be warn or refuse');
   }
-  expectString(registry.gitCommonDir, 'registry.gitCommonDir');
+  expectAbsolutePath(registry.gitCommonDir, 'registry.gitCommonDir');
   if (!registry.integration || typeof registry.integration !== 'object') throw new Error('registry.integration must be an object');
   expectString(registry.integration.ref, 'registry.integration.ref', /^refs\//);
   expectString(registry.integration.expectedSha, 'registry.integration.expectedSha', SHA40);
   expectString(registry.integration.destination, 'registry.integration.destination');
   if (!registry.inspectedPreview || typeof registry.inspectedPreview !== 'object') throw new Error('registry.inspectedPreview must be an object');
   expectNullableSha(registry.inspectedPreview.sha, 'registry.inspectedPreview.sha');
+  if (registry.inspectedPreview.worktree != null) expectAbsolutePath(registry.inspectedPreview.worktree, 'registry.inspectedPreview.worktree');
   expectString(registry.inspectedPreview.status, 'registry.inspectedPreview.status');
   if (/^(accepted|approved)$/i.test(registry.inspectedPreview.status)) {
     throw new Error('registry.inspectedPreview.status may not assert acceptance; approval lives in the acceptance manifest, not the routing record');
   }
   if (!registry.production || typeof registry.production !== 'object') throw new Error('registry.production must be an object');
-  expectString(registry.production.pass, 'registry.production.pass', /^PASS [1-9][0-9]*$/);
+  expectNullablePass(registry.production.pass, 'registry.production.pass');
   expectNullableSha(registry.production.sourceSha, 'registry.production.sourceSha');
   expectNullableSha(registry.production.pagesSha, 'registry.production.pagesSha');
   if (!registry.rollback || typeof registry.rollback !== 'object') throw new Error('registry.rollback must be an object');
-  expectString(registry.rollback.pass, 'registry.rollback.pass', /^PASS [1-9][0-9]*$/);
+  expectNullablePass(registry.rollback.pass, 'registry.rollback.pass');
   expectNullableSha(registry.rollback.sourceSha, 'registry.rollback.sourceSha');
   if (!Array.isArray(registry.protectedCheckouts)) throw new Error('registry.protectedCheckouts must be an array');
   registry.protectedCheckouts.forEach((entry, index) => {
-    expectString(entry?.path, `registry.protectedCheckouts[${index}].path`);
+    expectAbsolutePath(entry?.path, `registry.protectedCheckouts[${index}].path`);
     expectString(entry?.reason, `registry.protectedCheckouts[${index}].reason`);
   });
   if (!registry.lanes || typeof registry.lanes !== 'object' || Array.isArray(registry.lanes)) throw new Error('registry.lanes must be an object keyed by lane id');
@@ -205,6 +221,18 @@ export function loadRegistry(path, identity = null) {
     throw new Error(`Cannot parse routing registry ${path}: ${error instanceof Error ? error.message : String(error)}`);
   }
   return validateRegistry(parsed, identity);
+}
+
+/** A damaged or explicitly configured missing registry never enables legacy work. */
+export function legacyRoutingPolicy(identity, { path = resolveRegistryPath(), env = process.env } = {}) {
+  const requiredByConfig = identity.routingRequired === true || env[REQUIRED_ENV] === '1' || Boolean(env[REGISTRY_ENV]);
+  if (!existsSync(path)) {
+    return { required: requiredByConfig, registryPresent: false, registryError: `No project routing registry at ${path}` };
+  }
+  // Intentionally propagate parsing/schema/identity errors rather than falling
+  // through to a weaker legacy path.
+  const registry = loadRegistry(path, identity);
+  return { required: requiredByConfig || registry.enforcement.legacyContribute === 'refuse', registryPresent: true, registryError: null };
 }
 
 // --------------------------------------------------------------- globbing
@@ -254,9 +282,25 @@ export function createGitProbe(repositoryPath) {
     },
     changedPaths: (base, head) => git('diff', '--name-only', '--no-renames', base, head).split(/\r?\n/).filter(Boolean),
     bundleHeads: (bundlePath) => {
+      if (!tryGit('bundle', 'verify', bundlePath).ok) return null;
       const result = tryGit('bundle', 'list-heads', bundlePath);
       if (!result.ok) return null;
-      return result.stdout.split(/\r?\n/).filter(Boolean).map((line) => line.split(/\s+/)[0]);
+      const heads = result.stdout.split(/\r?\n/).filter(Boolean).map((line) => line.split(/\s+/)[0]);
+      // bundle verify/list-heads can accept a header with a missing pack. A
+      // preservation bundle must restore independently, including its objects.
+      const scratch = mkdtempSync(join(tmpdir(), 'aa-bundle-verify-'));
+      const restored = join(scratch, 'restored.git');
+      try {
+        execFileSync('git', ['clone', '--bare', '--quiet', '--', bundlePath, restored], { windowsHide: true, stdio: 'pipe' });
+        execFileSync('git', ['--no-replace-objects', '-C', restored, 'fsck', '--full', '--strict'], { windowsHide: true, stdio: 'pipe' });
+        for (const head of heads) execFileSync('git', ['--no-replace-objects', '-C', restored, 'cat-file', '-e', `${head}^{commit}`], { windowsHide: true, stdio: 'pipe' });
+        return heads;
+      } catch {
+        return null;
+      } finally {
+        if (resolve(dirname(scratch)) !== resolve(tmpdir())) throw new Error('Unexpected bundle verification scratch location');
+        rmSync(scratch, { recursive: true, force: true, maxRetries: 5 });
+      }
     },
   };
 }
@@ -296,6 +340,8 @@ function refusal(code, message) {
 export function evaluateLaneRoute({ registry, identity, projectId, laneId, machine, harness, observed, probe, originMainSha, now = new Date() }) {
   if (projectId !== identity.projectId) throw refusal('wrong-project', `--project ${projectId} is not this repository's project id ${identity.projectId}`);
   if (registry.projectId !== projectId) throw refusal('wrong-project', `registry belongs to project ${registry.projectId}, not ${projectId}`);
+  validateRegistry(registry, identity);
+  if (registry.machine !== machine) throw refusal('wrong-machine', `registry belongs to ${registry.machine}, not ${machine}`);
 
   const protectedHit = registry.protectedCheckouts.find((entry) => samePath(entry.path, observed.toplevel));
   if (protectedHit) throw refusal('protected-checkout', `${observed.toplevel} is a protected checkout (${protectedHit.reason}); it is never a contribution worktree`);
@@ -359,11 +405,13 @@ export function evaluateLaneRoute({ registry, identity, projectId, laneId, machi
  */
 export function evaluateLaneClosure({ registry, identity, projectId, laneId, observed, probe, originMainSha }) {
   if (projectId !== identity.projectId || registry.projectId !== projectId) throw refusal('wrong-project', `project id mismatch (${projectId})`);
+  validateRegistry(registry, identity);
   const lane = registry.lanes[laneId];
   if (!lane) throw refusal('unknown-lane', `lane ${laneId} is not registered`);
   if (lane.status !== 'closed' || !lane.closure) throw refusal('lane-not-closed', `lane ${laneId} has no closure record; closure is an explicit integrated/rejected decision, never inferred`);
   if (!samePath(registry.gitCommonDir, observed.gitCommonDir)) throw refusal('wrong-git-database', `this tree belongs to ${observed.gitCommonDir}, not ${registry.gitCommonDir}`);
   if (!samePath(lane.worktree, observed.toplevel)) throw refusal('wrong-worktree', `lane ${laneId} is bound to ${lane.worktree}; you are in ${observed.toplevel}`);
+  if (observed.branch !== lane.branch) throw refusal('wrong-branch', `lane ${laneId} is bound to ${lane.branch}; current branch is ${observed.branch}`);
   if (observed.dirtyPaths.length > 0) {
     throw refusal('dirty-worktree', `${observed.dirtyPaths.length} uncommitted path(s) are the only copy of their content; a dirty lane is never closable (DS-3)`);
   }
@@ -451,6 +499,9 @@ function initRegistry(values) {
     enforcement: { legacyContribute: values.enforce === 'refuse' ? 'refuse' : 'warn' },
     gitCommonDir: observed.gitCommonDir.replace(/\\/g, '/'),
     integration: { ...example.integration, expectedSha: originMain },
+    inspectedPreview: { sha: null, worktree: null, branch: null, status: 'not-recorded' },
+    production: { pass: null, sourceSha: null, pagesSha: null, verification: 'not-recorded' },
+    rollback: { pass: null, sourceSha: null, verification: 'not-recorded' },
     lanes: {},
   };
   delete registry.enforcement._comment;

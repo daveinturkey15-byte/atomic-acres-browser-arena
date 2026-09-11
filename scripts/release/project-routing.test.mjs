@@ -19,6 +19,7 @@ import {
   evaluateLaneClosure,
   evaluateLaneRoute,
   globToRegExp,
+  legacyRoutingPolicy,
   observeWorktree,
   pathsOutsideScope,
   validateRegistry,
@@ -171,7 +172,7 @@ test('wrong branch and wrong owner are refused', () => {
     project.refuses('wrong-branch');
     git(project.laneTree, 'checkout', '-q', 'contrib/dave-gaming-pc/claude/fix');
     project.refuses('wrong-owner', { harness: 'codex' });
-    project.refuses('wrong-owner', { machine: 'jigglyclaw-wsl' });
+    project.refuses('wrong-machine', { machine: 'jigglyclaw-wsl' });
   } finally {
     project.cleanup();
   }
@@ -354,6 +355,10 @@ test('init writes a machine record from observed values, show reads it back, ini
     validateRegistry(written, IDENTITY);
     assert.equal(written.machine, 'dave-gaming-pc');
     assert.deepEqual(written.lanes, {});
+    assert.equal(written.inspectedPreview.sha, null, 'init must not invent an inspected candidate from example data');
+    assert.equal(written.inspectedPreview.status, 'not-recorded');
+    assert.equal(written.production.pass, null, 'init has not verified any production pass');
+    assert.equal(written.rollback.pass, null, 'init has not verified a rollback');
     assert.equal(written.integration.expectedSha, originMain);
     assert.ok(commonDir.replace(/\\/g, '/').endsWith('.git'));
     assert.equal(written.gitCommonDir.toLowerCase(), resolve(REPOSITORY_ROOT, commonDir).replace(/\\/g, '/').toLowerCase());
@@ -379,6 +384,67 @@ test('init writes a machine record from observed values, show reads it back, ini
 });
 
 // ------------------------------------------------------- schema and globs
+
+test('absolute identity paths are required even when the relative path would resolve here', () => {
+  for (const mutate of [
+    (r) => { r.gitCommonDir = '.git'; },
+    (r) => { r.lanes['routing-repair-20260911'].worktree = '.'; },
+    (r) => { r.lanes['routing-repair-20260911'].worktree = 'C:work'; },
+    (r) => { r.protectedCheckouts[0].path = '../benchmark'; },
+    (r) => { r.inspectedPreview.worktree = 'current'; },
+    (r) => { r.lanes['example-closed-rejected'].closure.preservation.bundlePath = 'saved.bundle'; },
+  ]) {
+    const registry = structuredClone(EXAMPLE);
+    mutate(registry);
+    assert.throws(() => validateRegistry(registry, IDENTITY), /must be an absolute path/);
+  }
+});
+
+test('the machine on the registry cannot be borrowed for another machine', () => {
+  const project = makeProject();
+  try {
+    project.registry.machine = 'foreign-machine';
+    project.refuses('wrong-machine');
+  } finally { project.cleanup(); }
+});
+
+test('damaged or explicitly missing routing state never restores legacy permission', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'aa-routing-policy-'));
+  const path = join(dir, 'registry.json');
+  const legacyIdentity = { ...IDENTITY, routingRequired: false };
+  try {
+    assert.equal(legacyRoutingPolicy(legacyIdentity, { path, env: {} }).required, false);
+    assert.equal(legacyRoutingPolicy({ ...IDENTITY, routingRequired: true }, { path, env: {} }).required, true, 'committed enforcement survives losing the file and environment');
+    assert.equal(legacyRoutingPolicy(IDENTITY, { path, env: { ATOMIC_ACRES_ROUTING_REQUIRED: '1' } }).required, true);
+    assert.equal(legacyRoutingPolicy(IDENTITY, { path, env: { ATOMIC_ACRES_ROUTING_REGISTRY: path } }).required, true);
+    writeFileSync(path, JSON.stringify(EXAMPLE));
+    assert.equal(legacyRoutingPolicy(legacyIdentity, { path, env: {} }).required, false);
+    writeFileSync(path, '{ damaged');
+    assert.throws(() => legacyRoutingPolicy(IDENTITY, { path, env: {} }), /Cannot parse/);
+    const malformed = structuredClone(EXAMPLE);
+    malformed.enforcement = {};
+    writeFileSync(path, JSON.stringify(malformed));
+    assert.throws(() => legacyRoutingPolicy(IDENTITY, { path, env: {} }), /enforcement/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a bundle header without its object pack cannot certify preservation', () => {
+  const project = makeProject();
+  try {
+    const head = commit(project.laneTree, 'docs/b.md', 'preserved\n', 'lane');
+    const bundle = join(project.root, 'real.bundle');
+    git(project.laneTree, 'bundle', 'create', bundle, 'HEAD');
+    const probe = createGitProbe(project.laneTree);
+    assert.ok(probe.bundleHeads(bundle)?.includes(head));
+    const bytes = readFileSync(bundle);
+    const pack = bytes.indexOf(Buffer.from('PACK'));
+    assert.ok(pack > 0);
+    const truncated = join(project.root, 'header-only.bundle');
+    writeFileSync(truncated, bytes.subarray(0, pack));
+    assert.ok(git(project.laneTree, 'bundle', 'list-heads', truncated).includes(head), 'header looks valid to the old verifier');
+    assert.equal(probe.bundleHeads(truncated), null);
+  } finally { project.cleanup(); }
+});
 
 test('the registry schema refuses the shapes that would let routing lie', () => {
   const valid = structuredClone(EXAMPLE);

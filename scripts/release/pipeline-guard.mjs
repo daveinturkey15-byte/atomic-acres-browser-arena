@@ -5,11 +5,11 @@ import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readCompleteAncestry } from './ancestry-inventory.mjs';
 import {
-  REQUIRED_ENV as ROUTING_REQUIRED_ENV,
   createGitProbe,
   evaluateLaneClosure,
   evaluateLaneRoute,
   loadRegistry,
+  legacyRoutingPolicy,
   observeWorktree,
   readProjectIdentity,
   resolveRegistryPath,
@@ -146,19 +146,9 @@ function routingIdentityRequested(values) {
 }
 
 function legacyRoutingDecision(values) {
-  let registry = null;
-  let registryError = null;
-  try {
-    registry = loadRegistry(resolveRegistryPath(), readProjectIdentity(repo));
-  } catch (error) {
-    registryError = error instanceof Error ? error.message : String(error);
-  }
-  const required = process.env[ROUTING_REQUIRED_ENV] === '1' || registry?.enforcement.legacyContribute === 'refuse';
   return {
     mode: 'legacy',
-    required,
-    registryPresent: registry !== null,
-    registryError,
+    ...legacyRoutingPolicy(readProjectIdentity(repo)),
     warning: 'LEGACY ROUTE: no --project/--lane identity was supplied, so this run was NOT checked against the machine routing registry (worktree, branch, Git database, base/head, scope, lane lifetime). It proves only branch shape and ancestry. See docs/PROJECT_ROUTING.md.',
   };
 }
