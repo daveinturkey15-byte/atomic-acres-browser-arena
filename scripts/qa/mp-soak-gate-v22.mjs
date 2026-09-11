@@ -896,6 +896,11 @@ async function main() {
     bundle.liveArtifact=await verifyLiveArtifact(peers,PORTS.dist,distPath);
     bundle.lifeDiagnostic={};
     for(const role of ['guestA','guestB']) {
+      // Match-active/remotes-present can precede the first admitted pose on
+      // another guest. Reuse the existing 250 ms common-life prerequisite,
+      // bounded by its unchanged 4 s deadline, before this isolated probe.
+      const subjectId=(await viewOf(peers[role].page)).selfId;
+      await stableReloadBaseline(subjectId);
       const result=await captureCausalNaturalLife(role);
       bundle.lifeDiagnostic[role]=result;
       await writeEvidence();
