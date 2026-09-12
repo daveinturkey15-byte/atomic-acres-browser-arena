@@ -62,6 +62,33 @@ function makeBloomNode(strength = 0.14): TunableBloomNode {
   } as unknown as TunableBloomNode;
 }
 
+interface InspectableNode {
+  getChildren(): Iterable<InspectableNode>;
+}
+
+// TSL graphs share subexpressions. Node.traverse revisits every path through
+// them, although this audit needs each reachable node exactly once. Keep the
+// same public child relation and reject cycles rather than silently pruning one.
+function collectReachableNodes(root: InspectableNode): InspectableNode[] {
+  const seen = new Set<InspectableNode>();
+  const active = new Set<InspectableNode>();
+  const pending = [{ node: root, leaving: false }];
+  while (pending.length > 0) {
+    const { node, leaving } = pending.pop()!;
+    if (leaving) { active.delete(node); continue; }
+    if (active.has(node)) throw new Error('cycle in shader graph');
+    if (seen.has(node)) continue;
+    seen.add(node);
+    active.add(node);
+    pending.push({ node, leaving: true });
+    const children = [...node.getChildren()];
+    for (let i = children.length - 1; i >= 0; i--) {
+      pending.push({ node: children[i], leaving: false });
+    }
+  }
+  return [...seen];
+}
+
 describe('HF-362 filmic grade chain order', () => {
   it('builds exactly the frozen GRADE_CHAIN_STAGES order', () => {
     const uniforms = createFilmicGradeUniforms();
@@ -162,13 +189,7 @@ describe('HF-362 filmic grade chain order', () => {
     const uniforms = createFilmicGradeUniforms();
     const build = buildFilmicGradeChain(vec4(0.5, 0.5, 0.5, 1) as unknown as Node<'vec4'>, uniforms);
 
-    const collect = (root: unknown): unknown[] => {
-      const seen: unknown[] = [];
-      (root as { traverse(callback: (node: unknown) => void): void }).traverse((node) => {
-        if (!seen.includes(node)) seen.push(node);
-      });
-      return seen;
-    };
+    const collect = collectReachableNodes;
     const isRenderOutput = (node: unknown): boolean =>
       (node as { isRenderOutputNode?: boolean } | null)?.isRenderOutputNode === true;
 
@@ -200,6 +221,21 @@ describe('HF-362 filmic grade chain order', () => {
       expect(beforeToneMap).not.toContain(displayUniform);
       expect(wholeGraph).toContain(displayUniform);
     }
+  });
+
+  it('retains the public traversal reachability and order for shared TSL subgraphs', () => {
+    let root: Node<'vec4'> = vec4(0.25, 0.5, 0.75, 1);
+    for (let i = 0; i < 8; i++) root = root.add(root);
+    const original: InspectableNode[] = [];
+    root.traverse(node => { if (!original.includes(node)) original.push(node); });
+    const collected = collectReachableNodes(root);
+    expect(collected.length).toBe(original.length);
+    for (let i = 0; i < original.length; i++) expect(collected[i]).toBe(original[i]);
+  });
+
+  it('rejects a cycle instead of hiding it as an already visited expression', () => {
+    const root: InspectableNode = { getChildren: () => [root] };
+    expect(() => collectReachableNodes(root)).toThrow('cycle in shader graph');
   });
 });
 
