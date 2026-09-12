@@ -246,7 +246,7 @@ const PIPELINE = Object.freeze({
 
 type AtmosphereReviewLayout = Readonly<{
   mist: readonly (readonly [number, number, number, number])[];
-  smoke: readonly (readonly [number, number, number, number])[];
+  smoke: readonly (readonly [number, number, number, number, number?])[];
   dust: Readonly<{ count: number; minX: number; maxX: number; minZ: number; maxZ: number }>;
 }>;
 
@@ -260,7 +260,8 @@ function atmosphereLayout(
 
 const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], AtmosphereReviewLayout>> = Object.freeze({
   'world-studio': atmosphereLayout(
-    [[0, -28, 14, 3.2], [0, 28, 14, 3.2]], [],
+    [[0, -28, 14, 3.2], [0, 28, 14, 3.2]],
+    [[-20.7, -9.55, 0.8, 2.2, 9.42], [20.7, -9.55, 0.8, 2.2, 9.42]],
     { count: 40, minX: -36, maxX: 36, minZ: -30, maxZ: 30 },
   ),
   'atomic-acres': atmosphereLayout(
@@ -600,9 +601,9 @@ function makeSmoke(definition: ArenaVisualDefinition): THREE.Group {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  for (const [x, z, width, height] of ATMOSPHERE_LAYOUTS[definition.id].smoke) {
+  for (const [x, z, width, height, baseY = 0.15] of ATMOSPHERE_LAYOUTS[definition.id].smoke) {
     const puff = new THREE.Points(geometry, material);
-    puff.position.set(x, height * 0.5 + 0.15, z);
+    puff.position.set(x, height * 0.5 + baseY, z);
     puff.scale.set(width, height, width);
     root.add(puff);
   }
@@ -691,8 +692,8 @@ function applyArenaSystemLayout(
     const placement = layout.smoke[index];
     node.visible = placement !== undefined && index < visibleSmokeLayers;
     if (placement) {
-      const [x, z, width, height] = placement;
-      node.position.set(x, height * 0.5 + 0.15, z);
+      const [x, z, width, height, baseY = 0.15] = placement;
+      node.position.set(x, height * 0.5 + baseY, z);
       node.scale.set(width, height, width);
     }
   });

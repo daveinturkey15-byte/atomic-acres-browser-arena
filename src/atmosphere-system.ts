@@ -32,14 +32,14 @@ export function atmosphereBypassReason(profile: RenderProfile, rendererLabel: st
 }
 
 type MistCard = readonly [number, number, number, number];
-type SmokeCard = readonly [number, number, number, number, number];
+type SmokeCard = readonly [number, number, number, number, number, number?];
 type AtmosphereLayout = Readonly<{ mist: readonly MistCard[]; smoke: readonly SmokeCard[] }>;
 type DustLayout = Readonly<{ count: number; minX: number; maxX: number; minZ: number; maxZ: number; color: number; opacity: number }>;
 
 const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.freeze({
   'world-studio': Object.freeze({
     mist: Object.freeze([[0, -28, 14, 3.2], [0, 28, 14, 3.2]] as MistCard[]),
-    smoke: Object.freeze([] as SmokeCard[]),
+    smoke: Object.freeze([[-20.7, -9.55, 0.8, 2.2, 0.3, 9.42], [20.7, -9.55, 0.8, 2.2, 1.7, 9.42]] as SmokeCard[]),
   }),
   'atomic-acres': Object.freeze({
     mist: Object.freeze([
@@ -442,8 +442,8 @@ export class AtmosphereSystem {
     smokeMesh.userData.blocksShots = false;
     smokeMesh.count = initialLayout.smoke.length;
     for (let index = 0; index < initialLayout.smoke.length; index += 1) {
-      const [x, z, width, height] = initialLayout.smoke[index];
-      matrix.compose(new THREE.Vector3(x, height / 2 + 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
+      const [x, z, width, height, , baseY = 0.15] = initialLayout.smoke[index];
+      matrix.compose(new THREE.Vector3(x, height / 2 + baseY, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
       smokeMesh.setMatrixAt(index, matrix);
     }
     smokeMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
@@ -548,8 +548,8 @@ export class AtmosphereSystem {
     const smokeCount = Math.max(1, Math.round(layout.smoke.length * this.densityScale));
     this.smokeMesh.count = smokeCount;
     for (let index = 0; index < smokeCount; index += 1) {
-      const [x, z, width, height] = layout.smoke[index];
-      matrix.compose(new THREE.Vector3(x, height / 2 + 0.15, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
+      const [x, z, width, height, , baseY = 0.15] = layout.smoke[index];
+      matrix.compose(new THREE.Vector3(x, height / 2 + baseY, z), new THREE.Quaternion(), new THREE.Vector3(width, height, 1));
       this.smokeMesh.setMatrixAt(index, matrix);
     }
     this.smokeMesh.instanceMatrix.needsUpdate = true;

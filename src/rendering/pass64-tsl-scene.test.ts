@@ -14,6 +14,20 @@ import { OCEAN_WAVES, RUSTWORKS_OCEAN_AMPLITUDE, RUSTWORKS_OCEAN_AUTHORITY_ID } 
 import { arenaEnvironmentScale } from '../graphics-refinement';
 
 describe('Pass 64 authored TSL pipeline set', () => {
+  it('boots the new world with real chimney smoke and every required TSL owner', async () => {
+    const scene = new THREE.Scene();
+    const definition = (await ARENA_VISUAL_REGISTRY['world-studio']()).definition;
+    const systems = createPass64TslSceneSystems(scene, new THREE.PerspectiveCamera(), { outputNode: null } as unknown as RenderPipeline, definition);
+    expect(() => assertRuntimeTslTraversal(auditRuntimeTslTraversal(scene, systems.compiledPipelineIds))).not.toThrow();
+    const smoke = systems.root.getObjectByName('Pass 64 TSL smoke')!;
+    expect(smoke.children).toHaveLength(2);
+    for (const plume of smoke.children) {
+      expect(plume.position.y - plume.scale.y / 2).toBeCloseTo(9.42);
+      expect(Math.abs(plume.position.x)).toBeCloseTo(20.7);
+      expect(plume.position.z).toBeCloseTo(-9.55);
+    }
+    systems.dispose();
+  });
   it('has stable unique SHA-256 descriptors for all seven former GLSL owners', async () => {
     const descriptors = TSL_MIGRATION_INVENTORY.map(canonicalTslDescriptor);
     const hashes = await Promise.all(TSL_MIGRATION_INVENTORY.map(tslDescriptorSha256));
