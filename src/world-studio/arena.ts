@@ -9,6 +9,7 @@ import { STUDIO_ENVIRONMENTS, type StudioEnvironment } from './environment';
 import { createStudioSnow } from './snow';
 import { createStudioVehicles } from './vehicles';
 import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
+import { createStudioGardens } from './gardens';
 
 /** A new arena with one authority root; never aliases or wraps an old map builder. */
 export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
@@ -19,12 +20,13 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
   const snow = createStudioSnow();
   const vehicles = createStudioVehicles();
   const interiors = createStudioInteriors(architecture.root.userData.furnitureAnchors as StudioInteriorAnchor[]);
-  root.add(ground.root, architecture.root, nature.root, snow.root, vehicles.root, interiors.root);
+  const gardens = createStudioGardens();
+  root.add(ground.root, architecture.root, nature.root, snow.root, vehicles.root, interiors.root, gardens.root);
   root.userData.verticalNavigation = architecture.verticalNavigation;
   root.userData.worldStudioEnvironment = STUDIO_ENVIRONMENTS[0];
-  root.userData.worldStudioReviewPoints = [...STUDIO_REVIEW_CAMERAS, ...(architecture.reviewPoints ?? [])];
+  root.userData.worldStudioReviewPoints = [...STUDIO_REVIEW_CAMERAS, ...(architecture.reviewPoints ?? []), ...gardens.reviewPoints];
   root.userData.furnitureAnchors = architecture.root.userData.furnitureAnchors;
-  const solids: StudioSolid[] = [...ground.solids, ...architecture.solids, ...vehicles.solids, ...interiors.solids];
+  const solids: StudioSolid[] = [...ground.solids, ...architecture.solids, ...vehicles.solids, ...interiors.solids, ...gardens.solids];
   const breakableWindows: BreakableWindow[] = [];
   const shotSurfaces = solids.map((solid) => {
     const windowId = solid.material === 'glass' ? `world-studio-window:${solid.id.toLowerCase()}` : undefined;
@@ -51,7 +53,7 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
   root.userData.worldStudioBuild = Object.freeze({
     id: 'world-studio', version: '20260912-first-slice', solidCount: solids.length,
-    architecture: architecture.root.userData.worldStudioArchitecture, nature: nature.stats,
+    architecture: architecture.root.userData.worldStudioArchitecture, nature: nature.stats, gardens: gardens.stats,
   });
   let lastEnvironment: StudioEnvironment | undefined;
   const white = new THREE.Color(0xe8edf0);

@@ -144,6 +144,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <section id="map-selector" class="map-selector" aria-label="Choose map">
         <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${SELECTABLE_ARENAS.length} deployable spaces · choose before launch</small></div>
         <div class="map-card-grid">${mapCardsMarkup()}</div>
+        <p><a id="technique-showcase" href="./map3.html?lab=techniques" style="color:inherit;font-weight:700">TECHNIQUE SHOWCASE · EXPLORE THE 50 SOURCE REFERENCES ↗</a></p>
       </section>
     </section>
     <aside class="deployment-manifest" aria-label="Deployment manifest">
