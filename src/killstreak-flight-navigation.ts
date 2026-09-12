@@ -38,6 +38,9 @@ const definition = (
  * to it is clear, so presentation meshes can never become flight authority.
  */
 export const PASS65_FLIGHT_NAVIGATION: Readonly<Record<ArenaId, ArenaFlightNavigationDefinition>> = Object.freeze({
+  'world-studio': definition('world-studio', 63, [
+    { id: 'world-studio-street-overflight', xQ: 0, zQ: 0, altitudeM: 22 },
+  ]),
   'atomic-acres': definition('atomic-acres', 42, [
     { id: 'north-street-air-gap', xQ: 0, zQ: -0.72, altitudeM: 7.5 },
     { id: 'south-street-air-gap', xQ: 0, zQ: 0.72, altitudeM: 7.5 },

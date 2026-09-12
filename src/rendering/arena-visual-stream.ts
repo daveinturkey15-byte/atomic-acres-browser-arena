@@ -8,6 +8,7 @@ export type ArenaVisualImporter = () => Promise<ArenaVisualModule>;
 export type ArenaVisualRegistry = Readonly<Record<ArenaId, ArenaVisualImporter>>;
 
 export const ARENA_VISUAL_REGISTRY: ArenaVisualRegistry = Object.freeze({
+  'world-studio': () => import('./arenas/world-studio'),
   'atomic-acres': () => import('./arenas/atomic-acres'),
   'rustworks-1v1': () => import('./arenas/rustworks-1v1'),
   'gun-range': () => import('./arenas/gun-range'),

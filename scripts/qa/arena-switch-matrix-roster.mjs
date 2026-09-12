@@ -22,9 +22,12 @@ export function selectableArenaIdsFromSource(source) {
   for (let index = 0; index < entries.length; index += 1) {
     const start = entries[index].index;
     const end = index + 1 < entries.length ? entries[index + 1].index : source.length;
-    if (!source.slice(start, end).includes('selectable: false,')) selectable.push(entries[index][1]);
+    if (!/^\s*selectable: false,/mu.test(source.slice(start, end))) selectable.push(entries[index][1]);
   }
-  if (selectable.length < 6) throw new Error(`selectable-arena derivation collapsed to ${selectable.length} ids`);
+  // Owner 2026-09-12: one offered arena is valid. Exact catalog equality is
+  // asserted by the roster contract; an empty or duplicate derivation still fails.
+  if (new Set(entries.map((entry) => entry[1])).size !== entries.length) throw new Error('duplicate arena derivation');
+  if (selectable.length === 0) throw new Error(`selectable-arena derivation collapsed to ${selectable.length} ids`);
   return selectable;
 }
 

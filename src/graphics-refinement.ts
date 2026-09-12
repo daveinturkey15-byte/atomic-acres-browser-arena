@@ -25,6 +25,7 @@ export type ArenaShadowVolume = Readonly<{
 }>;
 
 const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.freeze({
+  'world-studio': Object.freeze({ halfWidth: 44, halfHeight: 38, near: 4, far: 196 }),
   'atomic-acres': Object.freeze({ halfWidth: 54, halfHeight: 60, near: 4, far: 176 }),
   'rustworks-1v1': Object.freeze({ halfWidth: 41, halfHeight: 48, near: 4, far: 180 }),
   'gun-range': Object.freeze({ halfWidth: 38, halfHeight: 66, near: 4, far: 188 }),
@@ -69,6 +70,7 @@ const SHADOW_VOLUMES: Readonly<Record<ArenaId, ArenaShadowVolume>> = Object.free
 // The authored directional and practical lights must remain the dominant
 // modelling source or roofs, weapons and interiors lose their shadow shape.
 const ARENA_ENVIRONMENT_SCALES: Readonly<Record<ArenaId, number>> = Object.freeze({
+  'world-studio': 0.22,
   'atomic-acres': 0.24,
   'rustworks-1v1': 0.14,
   'gun-range': 0.1,

@@ -77,10 +77,12 @@ test('the registry declares arenas and the parser sees them', () => {
 
 test('arena-roster.mts derives from src/map-selection.ts and filters on multiplayer', () => {
   assert.match(rosterSource, /from '\.\.\/\.\.\/\.\.\/src\/map-selection'/, 'roster must import the real registry module');
-  assert.match(rosterSource, /SELECTABLE_ARENAS/, 'roster must start from the selectable set');
-  assert.match(rosterSource, /\.filter\(\(entry\) => entry\.multiplayer\)/, 'roster must filter on the multiplayer flag');
+  const rosterFunction = rosterSource.match(/export function multiplayerArenaRoster\(\)[^{]*\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(rosterFunction, 'the roster function must be present');
+  assert.match(rosterFunction, /SELECTABLE_ARENAS/, 'roster must start from the selectable set');
+  assert.match(rosterFunction, /\.filter\(\(entry\) => entry\.multiplayer\)/, 'roster must filter on the multiplayer flag');
   for (const arena of registryArenas()) {
-    assert.ok(!rosterSource.includes(`'${arena.id}'`), `arena-roster.mts must not name ${arena.id}`);
+    assert.ok(!rosterFunction.includes(`'${arena.id}'`), `arena-roster.mts must not name ${arena.id}`);
   }
 });
 
@@ -98,7 +100,8 @@ test('the computed roster equals the registry multiplayer + selectable set in re
   const computed = harness.multiplayerArenaRoster().map((arena) => arena.id);
   const expected = registryArenas().filter((arena) => arena.multiplayer && arena.selectable).map((arena) => arena.id);
   assert.deepEqual(computed, expected);
-  assert.ok(computed.length >= 5, `expected at least five multiplayer arenas, got ${computed.length}`);
+  // Owner 2026-09-12: exactly the current canonical roster, even when only one map is offered.
+  assert.ok(computed.length > 0, 'the multiplayer roster must not be empty');
   // HF-423 un-hid farcrysis as a PREVIEW card, but shipped it `multiplayer:
   // false` - solo only until it has been played. So it must STILL be absent
   // here, and now for the reason the roster actually computes rather than

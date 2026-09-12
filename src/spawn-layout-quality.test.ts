@@ -79,6 +79,7 @@ const SPAWN_LAYOUT_FLOORS: Readonly<Record<ArenaId, Readonly<{
   'test1': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 4.5 },
   'test2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 6 },
   'map3': { minPointsPerTeam: 5, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 8 },
+  'world-studio': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'nuketown2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
   'raid2': { minPointsPerTeam: 8, minSpreadFraction: 0.18, minMeanNearestNeighbourM: 7 },
 });

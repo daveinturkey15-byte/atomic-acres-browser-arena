@@ -30,14 +30,7 @@ describe('Pass 66 command shell', () => {
     // HF-495 (owner, 2026-09-04): rebuild preview order is load-bearing, so pin
     // the offered sequence explicitly too.
     expect([...markup.matchAll(/data-arena-route="([^"]+)"/g)].map((match) => match[1])).toEqual([
-      'nuke-town-rebuild',
-      'raid-rebuild',
-      'terminal',
-      'rustrig',
-      'gun-range',
-      'high-seas',
-      'test1',
-      'map3',
+      'world-studio',
     ]);
     // HF-429 (owner, 2026-09-03): farcrysis is PARKED, so it is not rendered.
     // This pin has now swung three times - absent, present-and-PREVIEW, absent
@@ -173,11 +166,13 @@ expect(value, 'only browser modes are selectable')
     expect(markup).toContain('Turning this off stops future submissions and forgets this browser ID');
   });
 
-  it('ships a prerecorded menu preview surface instead of renderer-owned showcase geometry', () => {
+  it('keeps the new preview in honest standby without renderer-owned showcase geometry', () => {
     const markup = renderPass64Shell(createPass64ShellViewModel('Operator'));
     expect(markup).toContain('id="menu-preview-video"');
     expect(markup).toContain('id="menu-preview-poster"');
-    expect(markup).toContain('autoplay loop muted playsinline preload="metadata"');
+    expect(markup).toContain('autoplay loop muted playsinline preload="none"');
+    expect(markup).toContain('data-arena="world-studio"');
+    expect(markup).toContain('PREVIEW STANDBY');
     expect(markup).toContain('data-renderer-submissions="0"');
     expect(markup).toContain('<div id="match-pause-backdrop"');
     expect(markup).toContain('data-contract="game-canvas-css-compositor-v1"');

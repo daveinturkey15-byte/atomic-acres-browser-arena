@@ -207,6 +207,7 @@ const arenaProfile = (
 });
 
 export const ARENA_WEATHER_PROFILES: Readonly<Record<ArenaId, ArenaWeatherProfile>> = Object.freeze({
+  'world-studio': arenaProfile('world-studio', 'new-world-variable-weather', false, ['clear', 'overcast', 'light-rain', 'heavy-rain', 'storm']),
   // Summer suburb: it showers, it does not gale. No storm rung.
   'atomic-acres': arenaProfile('atomic-acres', 'suburban-summer-showers', false, ['clear', 'overcast', 'light-rain', 'heavy-rain']),
   // Half the fight is under the concourse canopy, so downpours stay bounded.

@@ -23,6 +23,7 @@ describe('opening arena selection', () => {
   // silently, and the roster below is the assertion that matters.
   it('publishes a unique, fully described map for every registered arena', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toEqual([
+      'world-studio',
       'nuketown2',
       'raid2',
       'atomic-acres',
@@ -40,15 +41,14 @@ describe('opening arena selection', () => {
     // 'Nuke Town'; HF-495 now puts the rebuild first while keeping the names
     // unambiguous when both are resolved from the catalog.
     // HF-408: Raid Rebuild added, on the same rule against 'Raid'.
-    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
+    expect(ARENA_SELECTIONS.map((entry) => entry.displayName)).toEqual(['Nuke Town · New World', 'Nuketown', 'Raid Rebuild', 'Nuke Town', 'Terminal', 'RustRig', 'Gun Range', 'Farcrysis', 'High Seas', 'Firing Range', 'Raid', 'Map 3']);
     // HF-495 (owner, 2026-09-04): selectability derives the menu order from
     // this catalog; the retired original Raid is absent without a second list.
     expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toEqual([
-      'nuketown2', 'raid2', 'skyline-terminal', 'rustworks-1v1', 'gun-range',
-      'high-seas', 'test1', 'map3',
+      'world-studio',
     ]);
-    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(11);
-    expect(ARENA_SELECTIONS.length).toBe(11);
+    expect(new Set(ARENA_SELECTIONS.map((entry) => entry.displayName)).size).toBe(12);
+    expect(ARENA_SELECTIONS.length).toBe(12);
     for (const entry of ARENA_SELECTIONS) {
       expect(entry.selectorLabel.length).toBeGreaterThan(3);
       expect(entry.summary.length).toBeGreaterThan(12);
@@ -154,6 +154,7 @@ describe('opening arena selection', () => {
   it('states truthfully, per map, whether the arena is imported art or generated code', () => {
     const byId = Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.authoring]));
     expect(byId).toEqual({
+      'world-studio': 'code',
       'atomic-acres': 'import',
       'skyline-terminal': 'code',
       'rustworks-1v1': 'code',
@@ -200,8 +201,9 @@ describe('opening arena selection', () => {
       // HF-408 (Lane AQ): raid2 is an eleventh entry on MATCH_DURATION_MS, like test2.
       // HF-495: catalog order is Nuke Town Rebuild, Raid Rebuild, then the
       // retained rows; the duration values remain bound to each row.
-      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
+      .toEqual([300_000, 300_000, 300_000, 300_000, 300_000, 300_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000]);
     expect(ARENA_SELECTIONS.map((selection) => arenaCanvasLabel(selection))).toEqual([
+      'Nuke Town · New World multiplayer arena',
       'Nuketown multiplayer arena',
       'Raid Rebuild multiplayer arena',
       'Nuke Town multiplayer arena',
@@ -220,6 +222,7 @@ describe('opening arena selection', () => {
   it('enables support presentation in every arena, including Gun Range training stations', () => {
     // HF-359: farcrysis has fieldSupport disabled
     expect(Object.fromEntries(ARENA_SELECTIONS.map((entry) => [entry.id, entry.fieldSupport]))).toEqual({
+      'world-studio': true,
       'atomic-acres': true,
       'skyline-terminal': true,
       'rustworks-1v1': true,
@@ -327,6 +330,7 @@ describe('opening arena selection', () => {
   it('derives the solo launch label from the canonical arena catalog', () => {
     // HF-359: farcrysis has 2-bot solo skirmish launch label
     expect(ARENA_SELECTIONS.map(soloLaunchLabel)).toEqual([
+      '2 BOTS SKIRMISH',
       // HF-495: first two cards are the rebuild previews. HF-533/HF-534 pins
       // the Nuke Town Rebuild at exactly two bots.
       '2 BOTS SKIRMISH',
@@ -353,11 +357,11 @@ describe('opening arena selection', () => {
   // because the card launched the authored stone gallery rather than the
   // corridor showcase, and is offered again now that the showcase IS the arena.
   // It comes back as an EXPLORE arena, which is a declared registry kind.
-  it('offers Map 3 as an explore arena, with no lobby, no bots and no clock pressure', () => {
+  it('retains hidden Map 3 as an explore arena, with no lobby, no bots and no clock pressure', () => {
     const map3 = arenaSelection('map3');
     expect(map3.id).toBe('map3');
-    expect(map3.selectable).toBe(true);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    expect(map3.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('map3');
     // The kind is the thing every gate reads; it is not a list of ids.
     expect(map3.kind).toBe('explore');
     // ...and it is the ONLY explore arena, so a team arena silently acquiring
@@ -415,11 +419,11 @@ describe('opening arena selection', () => {
   // that would make the A/B meaningless: the rebuild being registered but not
   // offered ("published but unselectable"), and the two Nuke Towns being
   // indistinguishable in the menu.
-  it('offers the Nuke Town Rebuild as the first selectable hosted preview', () => {
+  it('retains the hidden Nuke Town Rebuild hosted contract', () => {
     const rebuild = arenaSelection('nuketown2');
     expect(rebuild.id).toBe('nuketown2');
-    expect(rebuild.selectable).toBe(true);
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('nuketown2');
+    expect(rebuild.selectable).toBe(false);
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('nuketown2');
     // The owner's three kept features, as far as the registry can carry them.
     expect(rebuild.multiplayer).toBe(true);
     expect(rebuild.fieldSupport).toBe(true);

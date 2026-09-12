@@ -1,5 +1,5 @@
 import type { Team } from './protocol';
-import { isArenaId, type ArenaId } from './arena-identity';
+import { DEFAULT_ARENA_ID, isArenaId, type ArenaId } from './arena-identity';
 import { isHostedBotCount, type HostedBotCount } from './hosted-bots';
 import { isDhv, type Dhv } from './handicap';
 import {
@@ -122,7 +122,7 @@ export type LobbySnapshot = Readonly<{
 }>;
 
 export const DEFAULT_PRIVATE_MATCH_CONFIG: PrivateMatchConfig = Object.freeze({
-  arenaId: 'atomic-acres',
+  arenaId: DEFAULT_ARENA_ID,
   // FFA is the least surprising lobby default. Team Deathmatch remains an
   // explicit host selection and still owns team balancing/colour semantics.
   mode: 'ffa',

@@ -77,6 +77,7 @@ const EXPECTED_CACHE_KEYS: Readonly<Record<string, string>> = Object.freeze({
 // is the rule this list is written to enforce. The list is empty again, and
 // should stay empty.
 const MEDIA_PENDING_ARENAS: ReadonlySet<string> = new Set<string>([
+  'world-studio', // Owner-authorized fresh arena; capture has not happened.
   // RAID2 (HF-408) sat here for one pass and has been REMOVED by capturing the
   // flyover, exactly as map3 was before it. That is the mechanism working: a
   // newly registered arena gets an honest place to stand, and it leaves by

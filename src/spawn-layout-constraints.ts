@@ -59,6 +59,7 @@ import { buildMap3 } from './map3-arena';
 import { buildNuketown2 } from './nuketown2-arena';
 // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink.
 import { buildRaid2 } from './raid2-arena';
+import { buildWorldStudio } from './world-studio/arena';
 import { isBlocked, pointInsideBounds, segmentIntersectsBox, type Box2, type Point3 } from './collision';
 import { validArenaSpawnPoint } from './spawn-safety';
 
@@ -71,6 +72,7 @@ export type ArenaBuilder = (scene: THREE.Scene) => ArenaMap;
  * DERIVED from the registry's own `selectable` flag - never a hand-kept list.
  */
 export const ARENA_BUILDERS: Readonly<Record<ArenaId, ArenaBuilder>> = Object.freeze({
+  'world-studio': buildWorldStudio,
   'atomic-acres': buildArena as ArenaBuilder,
   'rustworks-1v1': buildRustworks1v1 as ArenaBuilder,
   'gun-range': buildGunRange as ArenaBuilder,

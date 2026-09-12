@@ -217,6 +217,12 @@ const arena = (
  * two tables describe the same air and are read side by side.
  */
 export const ARENA_PARTICLE_PROFILES: Readonly<Record<ArenaId, ArenaParticleProfile>> = Object.freeze({
+  'world-studio': arena(
+    'world-studio', 'neighbourhood-pollen-and-leaves',
+    { density: 0.5, colorWarm: 0xffeec6, colorCool: 0xd6dcd8, radiusM: 0.015, riseMps: 0.05, swirlMps: 0.17, windPull: 0.6, opacity: 0.08 },
+    { density: 0.4, kind: 'seed', colorWarm: 0xf2e8c0, colorCool: 0xc0c4a8, radiusM: 0.044, fallMps: 0.25, windPull: 0.75, flutterMps: 0.56, spinRadiansPerSecond: 1.45, opacity: 0.10 },
+    0.7, 24, 14, 4,
+  ),
   // Suburban summer: pollen, lawn dust, a few burnt flakes off the reactor haze.
   // Pass 79 enrichment: denser ambient populations across every arena so the
   // air reads as air at a glance; capacities and readability ceilings unchanged.

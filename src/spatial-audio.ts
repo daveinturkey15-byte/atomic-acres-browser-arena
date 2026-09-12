@@ -236,6 +236,12 @@ export type ArenaAudioDefinition = Readonly<{
 }>;
 
 export const ARENA_AUDIO_DEFINITIONS: Readonly<Record<ArenaId, ArenaAudioDefinition>> = Object.freeze({
+  'world-studio': Object.freeze({
+    arenaId: 'world-studio', identity: 'new-world-street-and-gardens', source: 'repository-procedural-original',
+    continuousVoices: 2, bedFrequencyHz: 48, airFrequencyHz: 180, airLowpassHz: 720, airQ: 1.7, airGain: 0.006,
+    modulationHz: 0.078, modulationDepth: 0.085,
+    bedPosition: Object.freeze({ x: 0, y: 3, z: -28 }), airPosition: Object.freeze({ x: 0, y: 5, z: 28 }),
+  }),
   'atomic-acres': Object.freeze({
     arenaId: 'atomic-acres', identity: 'suburban-wind-and-distant-grid-hum', source: 'repository-procedural-original',
     continuousVoices: 2, bedFrequencyHz: 58, airFrequencyHz: 196, airLowpassHz: 720, airQ: 1.8, airGain: 0.007,

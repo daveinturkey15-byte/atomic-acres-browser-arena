@@ -54,6 +54,15 @@ const WEBM_MIME_TYPE = 'video/webm; codecs="vp9,opus"';
 const MP4_MIME_TYPE = 'video/mp4; codecs="avc1.640032,mp4a.40.2"';
 
 export const MENU_PREVIEW_VIDEO_DEFINITIONS = Object.freeze({
+  // No new-arena footage has been captured. Standby never borrows older map bytes.
+  'world-studio': Object.freeze({
+    arenaId: 'world-studio', frame: 'helicopter',
+    label: 'PREVIEW STANDBY // NUKE TOWN · NEW WORLD',
+    motionLabel: 'NEW WORLD PREVIEW PENDING', reducedMotionLabel: 'PREVIEW STANDBY',
+    presentationId: 'menu-video-runtime-helo-world-studio-v1',
+    mediaAvailable: false, webm: '', mp4: '', poster: '',
+    durationSeconds: 8, width: 2560, height: 1440,
+  }),
   'atomic-acres': Object.freeze({
     arenaId: 'atomic-acres',
     frame: 'helicopter',

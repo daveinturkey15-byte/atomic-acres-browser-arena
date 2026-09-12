@@ -874,6 +874,7 @@ export async function loadArenaFactories(): Promise<ArenaFactories> {
         // RAID2 (owner 2026-09-02, HF-408): the Raid layout rethink joins the audit
         // from its first commit, so it can never ship un-audited.
         raid2: { build: buildRaid2 },
+        'world-studio': { build: (await import('../../src/world-studio/arena')).buildWorldStudio },
       } satisfies ArenaFactories;
     })();
   }

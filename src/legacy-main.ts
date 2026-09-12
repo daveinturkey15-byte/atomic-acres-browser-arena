@@ -199,6 +199,7 @@ import {
 } from './additional-maps';
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
+import { buildWorldStudio } from './world-studio/arena';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
 // imported here: Map 3 is the one lazily loaded arena (HF-409, see
@@ -512,6 +513,8 @@ import {
   activeSoloBotTarget, initialSoloBotCount,
   arenaCanvasLabel,
   arenaSelection,
+  menuArenaSelection,
+  isMenuMultiplayerArenaId,
   hostedArenaDurationMs,
   soloLaunchLabel,
   ARENA_SELECTIONS,
@@ -1975,7 +1978,7 @@ const rendererConstructionGraphics = Object.freeze({
 const atomicLighting = arenaLightingProfile(renderProfile, 'atomic-acres');
 let activeLighting = arenaLightingProfile(
   renderProfile,
-  arenaSelection(new URLSearchParams(window.location.search).get('map')).id,
+  menuArenaSelection(new URLSearchParams(window.location.search).get('map')).id,
 );
 const reducedRenderMode = activeRenderConfig.reducedPresentationDetail;
 const reducedWorldDetail = activeRenderConfig.reducedWorldDetail;
@@ -3453,7 +3456,7 @@ let ambientLight: THREE.AmbientLight;
 let sunLight: THREE.DirectionalLight;
 let fillLight: THREE.DirectionalLight; let nuketown2ClusteredLightRig: Nuketown2ClusteredLightRig | null = null;
 buildSky();
-let selectedArena: ArenaSelection = arenaSelection(new URLSearchParams(window.location.search).get('map'));
+let selectedArena: ArenaSelection = menuArenaSelection(new URLSearchParams(window.location.search).get('map'));
 audio.setArena(selectedArena.id);
 /**
  * MAP3 (HF-409): the arena builders, eight EAGER and one LAZY.
@@ -3472,6 +3475,7 @@ audio.setArena(selectedArena.id);
  * broken, which is the failure mode worth being loud about.
  */
 const arenaFactories = createArenaFactoryRegistry<ArenaMap, THREE.Scene, ArenaId>({
+  'world-studio': eagerArena(buildWorldStudio),
   'atomic-acres': eagerArena(buildArena),
   'rustworks-1v1': eagerArena(buildRustworks1v1),
   'gun-range': eagerArena(buildGunRange),
@@ -30465,7 +30469,7 @@ async function performArenaSelectionWithColdFenceRetry(
 
 function stageMenuArenaSelection(id: ArenaId): void {
   if (gameStarted || matchStartPreparing || !arenaSelectionReady || network.role !== 'offline' || privateLobbySnapshot) return;
-  const nextSelection = arenaSelection(id);
+  const nextSelection = menuArenaSelection(id);
   if (nextSelection.id === selectedArena.id) return;
   selectedArena = nextSelection;
   clearDebugRiggedEvidenceCaptureTargets();
@@ -30919,7 +30923,7 @@ const parsedLobbyKillLimit = (value: string): number | null => {
 const updateLobbyConfigFromUi = (): void => {
   if (network.role !== 'host') return;
   const requestedArena = element<HTMLSelectElement>('#lobby-arena').value as ArenaId;
-  const arenaId: ArenaId = ARENA_SELECTIONS.some((entry) => entry.id === requestedArena) ? requestedArena : privateMatchConfig.arenaId;
+  const arenaId: ArenaId = isMenuMultiplayerArenaId(requestedArena) ? requestedArena : privateMatchConfig.arenaId;
   const rangeLobby = arenaId === 'gun-range';
   const mode: MatchMode = rangeLobby || element<HTMLSelectElement>('#lobby-mode').value === 'ffa' ? 'ffa' : 'tdm';
   const capacity = element<HTMLSelectElement>('#lobby-capacity').value === '6' ? 6 : 4;

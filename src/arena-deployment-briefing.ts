@@ -29,6 +29,11 @@ export type ArenaDeploymentBriefing = Readonly<{
 }>;
 
 const BRIEFINGS: Readonly<Record<ArenaId, ArenaDeploymentBriefing>> = Object.freeze({
+  'world-studio': Object.freeze({
+    arenaId: 'world-studio', kicker: 'NEW NEIGHBOURHOOD',
+    briefing: 'Two-storey homes face the street. Use the side routes to reach the upper rooms and break the opposing sightline.',
+    approach: 'GROUND MOVE · STREET AND SIDE ROUTES',
+  }),
   // SALVAGE 2026-09-06 (HF-536 S1). ccfeec86 deleted this module while ARENA_IDS
   // held six ids; HEAD's canonical catalog holds eleven (HF-495 opened it with
   // Nuke Town Rebuild and Raid Rebuild, HF-405 added Map 3). The inventory

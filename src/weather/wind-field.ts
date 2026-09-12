@@ -207,6 +207,7 @@ const profile = (
  * sideways per metre of fall at storm fall speeds).
  */
 export const WIND_PROFILES: Readonly<Record<ArenaId, WindProfile>> = Object.freeze({
+  'world-studio': profile('world-studio', 'new-world-street-breeze', 0.6, 2.2, 1.8, 24, 1.0, false),
   // Backyard air between two fences: slow, wandering, easily blocked.
   'atomic-acres': profile('atomic-acres', 'sheltered-suburban-drift', 0.62, 2.4, 2.1, 16, 1.0, false),
   // Apron wind funnelled between terminal and hangar: fast, narrow, directional.

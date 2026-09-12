@@ -37,6 +37,10 @@ type AtmosphereLayout = Readonly<{ mist: readonly MistCard[]; smoke: readonly Sm
 type DustLayout = Readonly<{ count: number; minX: number; maxX: number; minZ: number; maxZ: number; color: number; opacity: number }>;
 
 const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaId, AtmosphereLayout>> = Object.freeze({
+  'world-studio': Object.freeze({
+    mist: Object.freeze([[0, -28, 14, 3.2], [0, 28, 14, 3.2]] as MistCard[]),
+    smoke: Object.freeze([] as SmokeCard[]),
+  }),
   'atomic-acres': Object.freeze({
     mist: Object.freeze([
       [-27, -18, 17, 5.2], [-25, 13, 14, 4.4], [-17, 29, 12, 4.2],

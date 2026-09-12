@@ -70,10 +70,10 @@ describe('arena selectability', () => {
   // instead of the corridor showcase the owner asked for. The showcase IS the
   // arena now, so the card is offered again - as an EXPLORE arena, which is a
   // declared registry kind and not a special case.
-  it('offers map3 as an explore arena and still decodes its id', () => {
+  it('retains hidden map3 as an explore arena and still decodes its id', () => {
     expect(ARENA_SELECTIONS.map((entry) => entry.id)).toContain('map3');
     expect(decodeArenaId('map3')).toBe('map3');
-    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).toContain('map3');
+    expect(SELECTABLE_ARENAS.map((entry) => entry.id)).not.toContain('map3');
     const map3 = ARENA_SELECTIONS.find((entry) => entry.id === 'map3');
     expect(map3?.kind).toBe('explore');
     expect(map3?.multiplayer).toBe(false);
@@ -82,8 +82,8 @@ describe('arena selectability', () => {
 
   it('offers exactly the rows the registry flags as selectable, and hides exactly the rest', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
-    // The owner asked for Hijacked (high-seas) kept, explicitly.
-    expect(offered).toContain('high-seas');
+    // Owner 2026-09-12 retains the older identities but offers only New World.
+    expect(offered).toEqual(['world-studio']);
     // DERIVED on both sides. This replaces "the menu list IS the registry",
     // which was only true on the days nothing was parked and had to be
     // rewritten every time one was. Both partitions are computed from the flag,
@@ -118,9 +118,9 @@ describe('arena selectability', () => {
 
   // owner 2026-08-30: Test1/Test2 arenas added. HF-495 (owner, 2026-09-04):
   // Test1 remains offered while the original Raid/Test2 is parked.
-  it('offers Test1 and parks the original Raid/Test2 arena', () => {
+  it('parks Test1 and the original Raid/Test2 arena', () => {
     const offered = SELECTABLE_ARENAS.map((entry) => entry.id);
-    expect(offered).toContain('test1');
+    expect(offered).not.toContain('test1');
     expect(offered).not.toContain('test2');
   });
 

@@ -6,6 +6,7 @@
  * partially constructed module cycle.
  */
 export const ARENA_IDS = Object.freeze([
+  'world-studio',
   // HF-495 (owner, 2026-09-04): the canonical arena catalog now opens with
   // Nuke Town Rebuild and Raid Rebuild; the remaining stable ids retain order.
   'nuketown2',
@@ -25,6 +26,9 @@ export const ARENA_IDS = Object.freeze([
 ] as const);
 
 export type ArenaId = typeof ARENA_IDS[number];
+
+/** Current menu default; retained IDs remain valid wire identities. */
+export const DEFAULT_ARENA_ID: ArenaId = 'world-studio';
 
 const CURRENT_ARENA_IDS: ReadonlySet<string> = new Set(ARENA_IDS);
 

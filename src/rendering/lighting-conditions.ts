@@ -203,6 +203,7 @@ const profile = (
  * requirement is enforced rather than remembered.
  */
 export const ARENA_DAYLIGHT_PROFILES: Readonly<Record<ArenaId, ArenaDaylightProfile>> = Object.freeze({
+  'world-studio': profile('world-studio', 'new-world-preview-pinned', true, 12, [12, 12], [6, 20], [18, 62], 46, 6),
   // Warm pastoral americana, a heartbeat before the test. Afternoon into dusk;
   // it never goes dark, because a 1950s postcard suburb at midnight is a
   // different map, not the same map later.

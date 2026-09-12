@@ -5,6 +5,7 @@ import testArenasChoreographyJson from '../../source-assets/menu/pass79-test-are
 import map3ChoreographyJson from '../../source-assets/menu/pass84-map3-preview/choreography.json';
 import nuketown2ChoreographyJson from '../../source-assets/menu/pass85-nuketown2-preview/choreography.json';
 import raid2ChoreographyJson from '../../source-assets/menu/pass87-raid2-preview/choreography.json';
+import worldStudioChoreographyJson from '../../source-assets/menu/world-studio-preview/choreography.json';
 import type { ArenaId } from '../map-selection';
 
 // Deterministic evaluator for authoring/tests only. The menu runtime consumes
@@ -175,6 +176,9 @@ const RAID2_CHOREOGRAPHY = raid2ChoreographyJson as unknown as Readonly<{
   recipeId: string;
   arenas: Readonly<{ raid2: HelicopterRecipe }>;
 }>;
+const WORLD_STUDIO_CHOREOGRAPHY = worldStudioChoreographyJson as unknown as Readonly<{
+  arenas: Readonly<{ 'world-studio': HelicopterRecipe }>;
+}>;
 const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
   ...RETAINED_CHOREOGRAPHY,
   arenas: Object.freeze({
@@ -188,6 +192,7 @@ const CHOREOGRAPHY: ChoreographyRecipe = Object.freeze({
     ...MAP3_CHOREOGRAPHY.arenas,
     ...NUKETOWN2_CHOREOGRAPHY.arenas,
     ...RAID2_CHOREOGRAPHY.arenas,
+    ...WORLD_STUDIO_CHOREOGRAPHY.arenas,
   }),
 });
 const DURATION_MS = CHOREOGRAPHY.durationSeconds * 1_000;

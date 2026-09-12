@@ -1053,6 +1053,7 @@ const events: SoundEventInventoryEntry[] = [
     id: 'ambience.arena-bed', family: 'arena-ambience', bus: 'ambience', delivery: 'world-spatial',
     spatialProfileId: 'arena-ambience-bed-v1',
     variants: [
+      'world-studio.street-bed', 'world-studio.garden-air',
       'atomic-acres.wind', 'atomic-acres.grid-hum',
       'skyline-terminal.hvac', 'skyline-terminal.engine-wash',
       'rustworks-1v1.duct', 'rustworks-1v1.stressed-metal',
@@ -1092,6 +1093,7 @@ const events: SoundEventInventoryEntry[] = [
       'nuketown2.test-town',
       // RAID2 (owner 2026-09-02, HF-408).
       'raid2.open-terrace',
+      'world-studio.neighbourhood',
     ],
     emitterSymbols: ['setArena'], contractRefs: ['R304', 'R307', 'R308'], concurrency: WORLD_TRANSIENT, lifecycleOwner: 'arena-generation',
     coverageDetail: 'Pass 75: sparse intermittent one-shots layered above the two continuous beds, giving each arena a sense of place rather than a drone. Every event is a repository-procedural recipe (oscillator sweep, or the shared noise buffer through a band-pass) - no sampled audio. Placed on a random bearing at an authored distance around the live listener, scheduled on a randomised per-arena gap so the layer never develops an audible period, and skipped entirely when the shared spatial-voice budget is full so ambience can never crowd out combat.',
@@ -1113,7 +1115,7 @@ const events: SoundEventInventoryEntry[] = [
     // owner 2026-09-02 (HF-405): Map 3 added.
     // owner 2026-09-02 (HF-407): Nuke Town Rebuild added.
     // owner 2026-09-03 (HF-408): the Raid rebuild added.
-    variants: ['atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'],
+    variants: ['world-studio', 'atomic-acres', 'skyline-terminal', 'rustworks-1v1', 'gun-range', 'farcrysis', 'high-seas', 'test1', 'test2', 'map3', 'nuketown2', 'raid2'],
     contractRefs: ['R303', 'R304', 'R307', 'R308'], concurrency: GAME_MUSIC_LOOP, lifecycleOwner: 'arena-generation',
     coverageDetail: 'In-game music is arena-generation-owned, independently controlled, and fully manifested before runtime use.',
   }),
@@ -1131,7 +1133,7 @@ export const SOUND_EVENT_INVENTORY_DOCUMENT = Object.freeze({
 // owner 2026-09-03 (HF-408): recomputed once more over the MERGED inventory -
 // neither branch's pin is correct once both the Nuke Town Rebuild's and the
 // Raid Rebuild's bed, event and music rows are present.
-export const SOUND_EVENT_INVENTORY_SHA256 = '8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a';
+export const SOUND_EVENT_INVENTORY_SHA256 = '478988fe83501a00beeb2764a90e43b34c805fc7f0b2177ac59f1e5fc6fc996c';
 
 export type SoundEventInventoryVerificationOptions = Readonly<{
   observedRuntimeEmitterSymbols?: readonly string[];

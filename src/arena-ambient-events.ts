@@ -78,6 +78,12 @@ const event = (
 ): ArenaAmbientEvent => Object.freeze({ id, shape, weight, sweepHz: Object.freeze(sweepHz), durationSeconds, gain, noiseQ, distanceM });
 
 export const ARENA_AMBIENT_PROFILES: Readonly<Record<ArenaId, ArenaAmbientProfile>> = Object.freeze({
+  'world-studio': profile('world-studio', 'new-world-neighbourhood-air', [8, 17], [
+    event('ws.garden-bird', 'chirp', 5, [2_500, 3_200], 0.10, 0.020, 0, 28),
+    event('ws.street-breeze', 'whoosh', 5, [320, 140], 1.6, 0.015, 0.9, 22),
+    event('ws.garden-rustle', 'rustle', 4, [2_100, 1_350], 1.2, 0.013, 1.5, 16),
+    event('ws.gate-tap', 'clank', 2, [1_500, 1_180], 0.13, 0.012, 0, 29),
+  ]),
   'atomic-acres': profile('atomic-acres', 'suburban-yard-life', [7, 17], [
     event('aa.bird', 'chirp', 5, [2_100, 2_650], 0.11, 0.030, 0, 26),
     event('aa.dog-bark', 'call', 2, [420, 300], 0.20, 0.026, 0, 40),

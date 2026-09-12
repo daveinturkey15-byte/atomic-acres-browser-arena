@@ -259,6 +259,10 @@ function atmosphereLayout(
 }
 
 const ATMOSPHERE_LAYOUTS: Readonly<Record<ArenaVisualDefinition['id'], AtmosphereReviewLayout>> = Object.freeze({
+  'world-studio': atmosphereLayout(
+    [[0, -28, 14, 3.2], [0, 28, 14, 3.2]], [],
+    { count: 40, minX: -36, maxX: 36, minZ: -30, maxZ: 30 },
+  ),
   'atomic-acres': atmosphereLayout(
     [[-27, -18, 17, 5.2], [27, -23, 15, 4.8], [-8, -35, 13, 3.5]],
     [[-1.7, 13.4, 2.5, 4.4], [-4.2, -31.2, 2.6, 4.8], [29.8, -14.2, 2.4, 4.2]],

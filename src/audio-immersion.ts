@@ -108,6 +108,7 @@ export const ACOUSTIC_PROFILES: Readonly<Record<AcousticSpace, AcousticProfile>>
  * RustRig is enclosed steel, High Seas is deck over open water.
  */
 export const ARENA_ACOUSTIC_SPACES: Readonly<Record<ArenaId, AcousticSpace>> = Object.freeze({
+  'world-studio': 'urban-yard',
   'atomic-acres': 'open-field',
   'skyline-terminal': 'industrial-hall',
   'rustworks-1v1': 'urban-yard',

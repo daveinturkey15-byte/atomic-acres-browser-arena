@@ -78,4 +78,13 @@ describe('arena switch matrix roster', () => {
     expect(eulerianPairWalk([])).toEqual([]);
     expect(eulerianPairWalk(['solo'])).toEqual([]);
   });
+
+  it('accepts one explicit offered arena and rejects duplicate source identities', () => {
+    const fixture = ARENA_IDS.map((id, index) =>
+      `  id: '${id}' as const,\n    selectable: ${index === 0 ? 'true' : 'false'},\n`,
+    ).join('');
+    expect(selectableArenaIdsFromSource(fixture)).toEqual([ARENA_IDS[0]]);
+    expect(() => selectableArenaIdsFromSource(`${fixture}\n  id: '${ARENA_IDS[0]}' as const,\n`))
+      .toThrow(/duplicate arena derivation/);
+  });
 });

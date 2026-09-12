@@ -2,7 +2,7 @@ import { WEAPONS } from '../gameplay';
 import { FIELD_KITS } from '../loadout';
 import { WEAPON_CATALOG } from '../combat/weapon-catalog';
 import { GRENADE_CATALOG } from '../combat/grenade-catalog';
-import { ARENA_SELECTIONS, SELECTABLE_ARENAS, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
+import { SELECTABLE_ARENAS, menuArenaSelection, arenaCanvasLabel, soloLaunchLabel } from '../map-selection';
 import {
   DEFAULT_LIGHTING_TIME_CHOICE,
   LIGHTING_TIME_CHOICES,
@@ -138,7 +138,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       </header>
       <aside id="menu-showcase" aria-hidden="true">
         <canvas id="match-pause-frame-fallback" aria-hidden="true" hidden width="1" height="1"></canvas>
-        ${menuPreviewVideoMarkup()}
+        ${menuPreviewVideoMarkup(menuArenaSelection(null).id)}
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
@@ -163,7 +163,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       <div class="menu-actions">
         <button id="resume" class="primary" hidden>RETURN TO MATCH</button>
         <button id="main-menu" hidden>MAIN MENU · CHANGE MAP</button>
-        <button id="solo" class="primary" disabled>${soloLaunchLabel(ARENA_SELECTIONS[0]!)}</button>
+        <button id="solo" class="primary" disabled>${soloLaunchLabel(menuArenaSelection(null))}</button>
         <button id="host" disabled>HOST LOBBY</button>
       </div>
       <div class="join-row"><input id="room-input" placeholder="Paste room code" autocomplete="off" disabled><button id="join" disabled>JOIN</button></div>
@@ -642,7 +642,7 @@ export function operatorPreview(): ReturnType<typeof mountOperatorPreview> {
 
 export function renderPass64Shell(model: Pass64ShellViewModel): string {
   scheduleOperatorPreviewMount();
-  return `<canvas id="game" aria-label="${arenaCanvasLabel(ARENA_SELECTIONS[0]!)}"></canvas>
+  return `<canvas id="game" aria-label="${arenaCanvasLabel(menuArenaSelection(null))}"></canvas>
     <div id="match-pause-backdrop" class="match-pause-backdrop" aria-hidden="true" hidden data-frame-provenance="game-canvas-css-compositor" data-capture-status="empty" data-contract="game-canvas-css-compositor-v1" data-periodic-readback-count="0" data-source-capture-attempt-count="0" data-source-capture-count="0" data-presentation-count="0" data-fallback-count="0"></div>
     <div id="color-grade"></div><div id="film-grain"></div>
     <div id="vignette"></div><div id="low-health-vignette" aria-hidden="true"></div><div id="damage-flash"></div><div id="damage-direction" aria-hidden="true"></div><div id="ordnance-flash" hidden></div><div id="taser-shock" hidden aria-hidden="true"></div><div id="killstreak-logo-flash" hidden></div>

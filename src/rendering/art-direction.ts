@@ -270,6 +270,15 @@ function frozen(direction: ArenaArtDirection): ArenaArtDirection {
  * as one arena. Every entry stays inside the safety bounds above.
  */
 export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> = Object.freeze({
+  'world-studio': frozen({
+    id: 'world-studio', brief: 'A fresh neighbourhood in clear daylight, with readable shaded rooms and natural paint colours.',
+    cdl: { gain: [1.02, 1.01, 0.98], lift: [0.004, 0.004, 0.004], gamma: [1.02, 1.02, 1.02] },
+    saturationScale: 1.0, contrastScale: 1.02, crosstalkDelta: 0,
+    splitTone: { shadowTint: 0x536b86, highlightTint: 0xfff1d9, strengthScale: 0.9, shadowBalance: 0.5, highlightBalance: 0.45 },
+    midtoneContrastDelta: 0, vignette: { base: 0.06, settingScale: 1 },
+    bloom: { intensityScale: 1, thresholdScale: 1 },
+    atmosphere: { mistNear: 0xcbd8df, mistFar: 0xeaf4fa, smokeNear: 0x38414a, smokeFar: 0x8fa0ad, dustNear: 0xd8dcd4, dustFar: 0xf4f8f4, density: 0.62 },
+  }),
   // Far Cry 1 brief: cyan sea, hot white sun, lush oversaturated green.
   // The island must look like a postcard the second the deploy fades.
   'farcrysis': frozen({

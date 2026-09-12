@@ -299,7 +299,9 @@ describe('Pass 65 sound-event inventory', () => {
     // (HF-509, 2026-09-05): recomputed over the killstreak-awareness rows -
     // one new announce event and four planned support loops/bomb events that
     // now have real emitters (syncSupportFlightLoops, bombRelease).
-    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('8d70c0a31bb5745c5de416061d3a8adc4e75a423dfa8b6d577021aa460ebea4a');
+    // Owner 2026-09-12: four New World variants added (two beds, one event, planned music).
+    // Existing emitter contracts and all retained variants are unchanged.
+    expect(SOUND_EVENT_INVENTORY_SHA256).toBe('478988fe83501a00beeb2764a90e43b34c805fc7f0b2177ac59f1e5fc6fc996c');
     expect(digest).toBe(SOUND_EVENT_INVENTORY_SHA256);
   });
 });

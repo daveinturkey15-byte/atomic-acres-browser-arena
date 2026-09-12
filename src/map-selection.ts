@@ -1,11 +1,11 @@
 import { MATCH_DURATION_MS, type MatchRules } from './gameplay';
 import { MAX_SOLO_BOTS, SOLO_BOT_COUNT, soloBotTargetForDeaths } from './bot-ai';
 import { GUN_RANGE_ROUND_MS } from './gun-range-rules';
-import type { ArenaId } from './arena-identity';
+import { DEFAULT_ARENA_ID, type ArenaId } from './arena-identity';
 
 export { ARENA_IDS, isArenaId, type ArenaId } from './arena-identity';
 
-export type ArenaRouteId = 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild'
+export type ArenaRouteId = 'world-studio' | 'nuke-town' | 'terminal' | 'rustrig' | 'gun-range' | 'farcrysis' | 'high-seas' | 'test1' | 'test2' | 'map3' | 'nuke-town-rebuild'
   // RAID2 (HF-408): a descriptive route, not `raid2`, so a shared link says
   // what it opens. `test2` keeps `test2`; nothing about the shipped Raid moves.
   | 'raid-rebuild';
@@ -136,11 +136,35 @@ export const NUKETOWN_DISPLAY_NAME = 'Nuketown' as const;
  * replay, storage and asset boundary; route IDs and labels may evolve.
  */
 export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
+  // Owner 2026-09-12: one fresh arena is offered; every older ID stays registered.
+  Object.freeze({
+    id: 'world-studio' as const,
+    routeId: 'world-studio' as const,
+    selectable: true,
+    kind: 'team' as const,
+    legacyAliases: Object.freeze([]),
+    selectorLabel: 'NUKE TOWN · NEW WORLD · PREVIEW',
+    displayName: 'Nuke Town · New World',
+    titleLead: 'NUKE TOWN',
+    titleAccent: 'NEW WORLD',
+    menuLede: 'A new neighbourhood arena. Cross the street between two-storey homes, use the side routes, and defend the upper rooms.',
+    summary: 'New neighbourhood · two-storey homes · street combat',
+    rulesLabel: '5 MIN · HOST UP TO 6 · 2 BOTS SOLO',
+    soloBotCount: 2,
+    maximumSoloBots: 2,
+    multiplayer: true,
+    fieldSupport: true,
+    overdrive: false,
+    authoring: 'code' as const,
+    authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
+    matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
+  }),
   // HF-495 (owner, 2026-09-04): Nuke Town Rebuild is the first selectable
   // card, followed by the Raid Rebuild preview. Every other row retains its
   // relative order below these two moved previews.
   Object.freeze({
     id: 'nuketown2' as const,
+    selectable: false,
     routeId: 'nuke-town-rebuild' as const,
     // NUKETOWN2 is a team arena like the shipped Nuke Town; only Map 3 is the explore kind.
     kind: 'team' as const,
@@ -163,7 +187,6 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: true,
-    selectable: true,
     // HF-407: no Blender bake, no GLB, no imported mesh/image/font/LUT. This is
     // the whole point of the rejig - the shipped Nuke Town is the only
     // `authoring: 'import'` arena in the game.
@@ -175,6 +198,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   // card and keeps its explicit PREVIEW label.
   Object.freeze({
     id: 'raid2' as const,
+    selectable: false,
     routeId: 'raid-rebuild' as const,
     // RAID2 is a team arena like the shipped Raid; only Map 3 is the explore kind.
     kind: 'team' as const,
@@ -191,13 +215,13 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     multiplayer: true,
     fieldSupport: true,
     overdrive: false,
-    selectable: true,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
     id: 'atomic-acres' as const,
+    selectable: false,
     routeId: 'nuke-town' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze(['nuketown']),
@@ -216,13 +240,13 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // HF-466 (owner, 2026-09-04): park the original Nuketown from the menu.
     // The stable id remains registered for compatibility and build coverage;
     // only the player-facing selectable roster changes.
-    selectable: false,
     authoring: 'import' as const,
     authoringNote: 'IMPORTED ASSETS',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
   }),
   Object.freeze({
     id: 'skyline-terminal' as const,
+    selectable: false,
     routeId: 'terminal' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
@@ -244,6 +268,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'rustworks-1v1' as const,
+    selectable: false,
     routeId: 'rustrig' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze(['rustworks', 'rust-rig']),
@@ -265,6 +290,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'gun-range' as const,
+    selectable: false,
     routeId: 'gun-range' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
@@ -293,6 +319,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   // only and are never emitted as current UI text.
   Object.freeze({
     id: 'farcrysis' as const,
+    selectable: false,
     routeId: 'farcrysis' as const,
     kind: 'team' as const,
     // HIDDEN 2026-08-28, owner request: "remove farcrysis for now its not ready".
@@ -344,7 +371,6 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     rows and their measured numbers. Farcrysis stays measured; it is
     //     hidden, not withdrawn, and deleting the measurements would lose the
     //     evidence that got it this far.
-    selectable: false,
     legacyAliases: Object.freeze(['f4rcry515', 'farcry', 'f4rcry']),
     prototype: true,
     selectorLabel: 'FARCrySIS',
@@ -369,6 +395,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'high-seas' as const,
+    selectable: false,
     routeId: 'high-seas' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
@@ -390,6 +417,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'test1' as const,
+    selectable: false,
     routeId: 'test1' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
@@ -411,6 +439,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   }),
   Object.freeze({
     id: 'test2' as const,
+    selectable: false,
     routeId: 'test2' as const,
     kind: 'team' as const,
     legacyAliases: Object.freeze([]),
@@ -429,7 +458,6 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     // HF-495 (owner, 2026-09-04): park the original Raid like HF-466 parked
     // the original Nuketown. Its stable id, route, aliases, links and arena
     // implementation remain registered for in-flight rooms and history.
-    selectable: false,
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
     matchRules: Object.freeze({ durationMs: MATCH_DURATION_MS, scoreLimit: null }),
@@ -452,6 +480,7 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
   // promoting it later is one field.
   Object.freeze({
     id: 'map3' as const,
+    selectable: false,
     routeId: 'map3' as const,
     kind: 'explore' as const,
     legacyAliases: Object.freeze([]),
@@ -505,7 +534,6 @@ export const ARENA_SELECTIONS: readonly ArenaSelection[] = Object.freeze([
     //     withdrawn; a floor is a collapsed-scrape alarm and must equal the
     //     real roster), and `docs/eye-clearance/ledger.json` carries a MEASURED
     //     map3 ceiling from the headless sweep, not the unmeasured sentinel.
-    selectable: true,
     // HF-405: Map 3 is entirely procedural (no imported mesh, image, font or LUT).
     authoring: 'code' as const,
     authoringNote: 'ALL CODE BUILD, NO ASSET IMPORT',
@@ -522,6 +550,20 @@ export const SELECTABLE_ARENAS: readonly ArenaSelection[] = Object.freeze(
   ARENA_SELECTIONS.filter((entry) => entry.selectable !== false),
 );
 
+/** Selection-only boundary. Hidden IDs still decode in network/replay callers. */
+export function menuArenaSelection(value: string | null | undefined): ArenaSelection {
+  const decoded = arenaSelection(value);
+  if (decoded.selectable !== false) return decoded;
+  const fallback = SELECTABLE_ARENAS.find((entry) => entry.id === DEFAULT_ARENA_ID);
+  if (!fallback) throw new Error('Default arena must be selectable');
+  return fallback;
+}
+
+/** Host controls offer only currently selectable multiplayer arenas. */
+export function isMenuMultiplayerArenaId(value: unknown): value is ArenaId {
+  return SELECTABLE_ARENAS.some((entry) => entry.id === value && entry.multiplayer);
+}
+
 const ARENA_COMPATIBILITY_DECODER = new Map<string, ArenaId>(ARENA_SELECTIONS.flatMap((entry) => [
   [entry.id, entry.id] as const,
   [entry.routeId, entry.id] as const,
@@ -530,12 +572,14 @@ const ARENA_COMPATIBILITY_DECODER = new Map<string, ArenaId>(ARENA_SELECTIONS.fl
 
 export function decodeArenaId(value: string | null | undefined): ArenaId {
   const normalized = value?.trim().toLowerCase();
-  return (normalized && ARENA_COMPATIBILITY_DECODER.get(normalized)) || ARENA_SELECTIONS[0]!.id;
+  // Retain the historical compatibility fallback. Fresh UI defaults use
+  // menuArenaSelection, so hiding maps never rewrites protocol/replay identity.
+  return (normalized && ARENA_COMPATIBILITY_DECODER.get(normalized)) || 'nuketown2';
 }
 
 export function arenaSelection(id: string | null | undefined): ArenaSelection {
   const decoded = decodeArenaId(id);
-  return ARENA_SELECTIONS.find((entry) => entry.id === decoded) ?? ARENA_SELECTIONS[0]!;
+  return ARENA_SELECTIONS.find((entry) => entry.id === decoded) ?? ARENA_SELECTIONS.find((entry) => entry.id === 'nuketown2')!;
 }
 
 /** The menu copy and every hosted authority path share this one round clock. */

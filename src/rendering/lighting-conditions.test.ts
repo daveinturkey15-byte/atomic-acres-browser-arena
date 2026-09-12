@@ -67,7 +67,7 @@ describe('arena daylight catalog', () => {
     // exactly so that promoting a preview out of PREVIEW cannot silently leave
     // it pinned, and so that adding a pin needs a reason written down.
     const pinned = ARENA_IDS.filter((id) => ARENA_DAYLIGHT_PROFILES[id].pinned);
-    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2', 'raid2']);
+    expect([...pinned].sort()).toEqual(['gun-range', 'map3', 'nuketown2', 'raid2', 'world-studio']);
   });
 
   it('gives rustworks-1v1 the narrowest outdoor band (its night is the safety datum)', () => {
@@ -410,6 +410,7 @@ describe('band ends are the measured safe interval, not a chosen one', () => {
    * +3.96 points that thirteen paired scan samples then measured at +0.28.
    */
   const MEASURED_SAFE_BAND: Record<ArenaId, readonly [number, number] | null> = {
+    'world-studio': null, // Generic daylight stays pinned until the fresh-map preset evidence exists.
     'atomic-acres': [15, 18.2],
     'skyline-terminal': [6.8, 10.5],
     'rustworks-1v1': [20, 22],

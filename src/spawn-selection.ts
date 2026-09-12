@@ -142,6 +142,7 @@ export function spawnDistanceReward(distanceM: number, engagementM: number | nul
   return engagementM * engagementM - SPAWN_ENGAGEMENT_OVERSHOOT_WEIGHT * (distanceM - engagementM) ** 2;
 }
 export const MAP_TRAP_RADIUS: Readonly<Record<ArenaId, number>> = Object.freeze({
+  'world-studio': 7,
   'atomic-acres': 9,
   'rustworks-1v1': 7,
   'gun-range': 8,
