@@ -60,3 +60,13 @@ Required future evidence: exercise the actual host/guest browser path and the pl
 Required future evidence: exercise the actual host/guest browser path and the planned test target `src/text-chat-removal.test.ts`. The target is an obligation, not an existing test or receipt.
 
 HF-567 diagnosis is OPEN: the existing ready predicate already rejects pending guests, disconnected reservations and unready members; the start clock is assigned before asynchronous arena admission completes. A delayed-guest reproduction is still needed. HF-568 is owner-reported, not locally reproduced. HF-569 covers text chat, not voice or unrelated multiplayer controls.
+
+## HF-570 — Inspectable current Nuke Town visual slice
+
+VERIFIED direct owner scope amendment on12September: while away for2–3hours, continue the routing/rebase work and add a nice inspectable slice of the current Nuke Town map using the upgraded, integrated code-only visual method, targeting13:15UK if possible. This reopens bounded visual work; HF566–569 andWASM remain deferred.
+
+| ID | Priority | Expected result | Owner | Falsifier | Scope | State |
+| --- | --- | --- | --- | --- | --- | --- |
+| HF-570 | P1 | A visibly improved, reusable code-only house/garage street-front slice runs inside the current Nuke Town game; one exact-source preview and before/after evidence make it inspectable. | delivery-integration-20260911 / Codex integrator | The slice exists only in a separate mock scene; an opening or authority changes; fixed-view pixels regress; budgets increase; a consumer or evidence pin is stale; the user cannot open the built candidate. | Nuke Town house/garage frontage, Performance and High; bounded13:15UK target | OPEN |
+
+Planning requirement: `NUKETOWN-INSPECTABLE-SLICE-001` in the linked continuation register. Design, frozen baseline, scorecard, ownership and timeboxes: `docs/forge/NUKETOWN_INSPECTABLE_SLICE_2026-09-12.md`. Actual owner taste and release acceptance remain separate. Existing vehicle-budget and multiplayer-soak failures stay visible.

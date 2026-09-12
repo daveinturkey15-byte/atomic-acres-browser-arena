@@ -64,6 +64,27 @@
         "src/text-chat-removal.test.ts"
       ],
       "evidence": []
+    },
+    {
+      "id": "NUKETOWN-INSPECTABLE-SLICE-001",
+      "feedbackId": "HF-570",
+      "owner": "delivery-integration-20260911 / Codex integrator",
+      "state": "OPEN",
+      "schedule": "Owner12September bounded visual scope amendment; target2026-09-12T13:15:00+01:00",
+      "outcomes": [
+        "Improve a coherent house/garage frontage in the actual current Nuke Town map using the evaluated shared code-only procedural method and a distinct real second use.",
+        "Preserve authority, openings, existing budgets and fixed-camera staging in Performance and High.",
+        "Deliver an exact-source inspectable preview, actual before/after captures, independent review and current capability handoff."
+      ],
+      "tests": [
+        "src/forge-kit/facade-elevation.test.ts",
+        "src/nuketown2-facade-elevation-consumers.test.ts",
+        "src/nuketown2-maintained-facade.test.ts",
+        "src/nuketown2-review-camera.test.ts",
+        "scripts/qa/profile-capture-staging.test.mjs"
+      ],
+      "evidence": [],
+      "spec": "docs/forge/NUKETOWN_INSPECTABLE_SLICE_2026-09-12.md"
     }
   ]
 }
