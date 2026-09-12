@@ -14,8 +14,10 @@ import { createDemo as createSource18 } from './source-18';
 import { createDemo as createSource19 } from './source-19';
 import { createDemo as createSource23 } from './source-23';
 import { createDemo as createSource26 } from './source-26';
+import { createDemo as createSource20 } from './source-20';
 import { createDemo as createSource33 } from './source-33';
-
+import { createDemo as createSource31 } from './source-31';
+import { createDemo as createSource34 } from './source-34';
 import type { Demo, DemoContext } from './types';
 
 export type { Adaptation, Demo, DemoContext, DemoFactory, DemoMetadata, ManifestEntry } from './types';
@@ -66,6 +68,25 @@ export const manifest: ManifestEntry[] = [
       'Traced on the CPU at 160x120 into a DataTexture, not in the source\'s WebGL2 fragment '
       + 'shader; no BVH, no depth of field, no frame-rate claim, and no diffuse GI.',
     createDemo: createSource19,
+  },
+  {
+    sourceId: 20,
+    title: 'Engine-free Three.js armour, ballistics and destructible battlefields (Claude of Tanks)',
+    method:
+      'Shell segments localized into four rigid frames (hull/turret/gun/barrel), resolved against '
+      + 'convex quad plates front-face-only plus AABB module boxes in ordered t order, with '
+      + 'penetration linearly interpolated against true flight distance and 2-sigma-clamped '
+      + 'Gaussian dispersion.',
+    adaptation: 'adapted',
+    sources: [
+      'https://cot.kevinliu.studio/',
+      'https://github.com/Kevin-Liu-01/Claude-of-Tanks',
+    ],
+    limitation:
+      'MIT source read in full at 9004ce6; independent implementation. Damage normalization '
+      + 'tables, module rolls, ERA spend and track prisms are NOT modelled - resolution here is '
+      + 'thickness/cos(impact angle) vs pen@distance. No spotting, physics or destructibles.',
+    createDemo: createSource20,
   },
   {
     // Row 21 is a numbered stub that aliases row 19. It delegates to the same factory inside
@@ -163,6 +184,21 @@ export const manifest: ManifestEntry[] = [
       + 'its own.',
   },
   {
+    sourceId: 31,
+    title: 'Rigged first-person arms, CC0 (para / OpenGameArt)',
+    method:
+      'Analytic two-bone IK solved by the law of cosines against a moving handle target with a '
+      + 'fixed pole, plus one curl parameter rotating finger joints through per-joint weights '
+      + '- the handle-bone posing and finger-curl workflow the shipped rig describes.',
+    adaptation: 'adapted',
+    sources: ['https://opengameart.org/content/fps-arms-rigged-only'],
+    limitation:
+      'CC0 asset page read; the author\u2019s .blend/.fbx mesh (MakeHuman-derived, ~8k tris) is '
+      + 'NOT vendored - bones carry rigid capsules, not a weighted smooth skin. The IK is our '
+      + 'own analytic implementation of the described handle-bone workflow.',
+    createDemo: createSource31,
+  },
+  {
     sourceId: 32,
     title: 'WAN 2.2 - local text-to-video and image-to-video, Apache 2.0',
     method:
@@ -193,6 +229,24 @@ export const manifest: ManifestEntry[] = [
       + 'persistence or export.',
     createDemo: createSource33,
   },
+  {
+    sourceId: 34,
+    title: 'Claude-of-Duty - full-procedural FPS from a subsystem-contract prompt',
+    method:
+      'Single-owner subsystems communicating only through a typed cross-subsystem event '
+      + 'vocabulary with declared producers and consumers, visualized against uncontracted '
+      + 'broadcast delivery, with the source quadratic damage falloff riding each pulse.',
+    adaptation: 'adapted',
+    sources: [
+      'https://github.com/mshumer/Claude-of-Duty',
+      'https://x.com/mattshumer_/status/2081054356405731740',
+    ],
+    limitation:
+      'MIT README and ballistics.js read at d9b237b; an architecture scale model, not the '
+      + 'game: no render pipeline, physics, weapons or AI behaviour, six named boxes in place '
+      + 'of eleven subsystems, and a three-event illustration of the vocabulary.',
+    createDemo: createSource34,
+  },
 ];
 
 /**
@@ -202,6 +256,6 @@ export const manifest: ManifestEntry[] = [
  * honest demo is possible, and that is not true of these. Their research is complete in
  * docs/technique-lab/group-b/SOURCE_RESEARCH.json.
  */
-export const notDeliveredSourceIds: readonly number[] = [20, 27, 28, 29, 31, 34];
+export const notDeliveredSourceIds: readonly number[] = [27, 28, 29];
 
 export default manifest;

@@ -79,6 +79,67 @@ describe('technique-lab group B manifest', () => {
     expect(nineteen, 'row 21 may only alias a row 19 that exists').toBeDefined();
   });
 
+  it('source 20 resolves ordered plate hits with distance-interpolated penetration', () => {
+    const entry = manifest.find((row) => row.sourceId === 20)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      shellsFired: number;
+      plateHits: number;
+      penetrations: number;
+      bounces: number;
+      lastResolution: string;
+    };
+    const penAtDistanceMm = demo.root.userData.penAtDistanceMm as (dist: number) => number;
+    // pen curve clamps outside 100-1000 m exactly as the source interpolation states.
+    expect(penAtDistanceMm(0)).toBeCloseTo(180, 5);
+    expect(penAtDistanceMm(100)).toBeCloseTo(180, 5);
+    expect(penAtDistanceMm(550)).toBeCloseTo(160, 5);
+    expect(penAtDistanceMm(1000)).toBeCloseTo(140, 5);
+    expect(penAtDistanceMm(5000)).toBeCloseTo(140, 5);
+
+    for (let frame = 0; frame < 600; frame += 1) demo.update?.(frame / 60, 1 / 60);
+    expect(stats.shellsFired).toBeGreaterThanOrEqual(4);
+    expect(stats.plateHits).toBeGreaterThan(0);
+    expect(stats.lastResolution).toMatch(/^(glacis|rear|turretFront|turretSide):(pen|bounce)@\d+deg$|^ammo:module$/);
+    expect(stats.penetrations + stats.bounces).toBeLessThanOrEqual(stats.shellsFired);
+    demo.dispose();
+  });
+
+  it('source 31 keeps the IK chain on its handle target with a bounded curl', () => {
+    const entry = manifest.find((row) => row.sourceId === 31)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      lastReachRatio: number;
+      lastCurl: number;
+      ikSolvedFrames: number;
+    };
+    for (let frame = 0; frame <= 120; frame += 1) demo.update?.(frame / 30, 1 / 30);
+    expect(stats.ikSolvedFrames).toBe(121);
+    // Handle path stays inside the solvable annulus: finite ratio, never over-extended.
+    expect(stats.lastReachRatio).toBeGreaterThan(0.2);
+    expect(stats.lastReachRatio).toBeLessThan(0.95);
+    expect(stats.lastCurl).toBeGreaterThanOrEqual(0);
+    expect(stats.lastCurl).toBeLessThanOrEqual(1);
+    demo.dispose();
+  });
+
+  it('source 34 delivers every event to exactly its contracted consumers, not everyone', () => {
+    const entry = manifest.find((row) => row.sourceId === 34)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      eventsEmitted: number;
+      contractedDeliveries: number;
+      broadcastDeliveries: number;
+    };
+    for (let frame = 0; frame < 180; frame += 1) demo.update?.(frame / 60, 1 / 60);
+    expect(stats.eventsEmitted).toBeGreaterThanOrEqual(2);
+    // 3 events per shot with 2+3+2 declared consumers; broadcast would be 3 x 5 receivers.
+    expect(stats.contractedDeliveries).toBe(stats.eventsEmitted * 7);
+    expect(stats.broadcastDeliveries).toBe(stats.eventsEmitted * 15);
+    expect(stats.broadcastDeliveries).toBeGreaterThan(stats.contractedDeliveries);
+    demo.dispose();
+  });
+
   for (const entry of manifest.filter((row) => row.createDemo)) {
     it(`source ${entry.sourceId} builds, advances, stays finite and disposes`, () => {
       const factory = entry.createDemo!;
