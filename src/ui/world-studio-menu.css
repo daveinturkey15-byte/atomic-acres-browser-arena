@@ -141,8 +141,8 @@ body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018
 #menu #menu-panel-streaks .kit-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 #menu #menu-panel-streaks .kit-heading>div { display: grid; gap: 8px; }
 #menu #streak-defaults { color: var(--menu-orange) !important; border: 1px solid #ffb06b66; border-radius: 5px; padding: 10px 14px; white-space: nowrap; }
-#menu #menu-panel-streaks .killstreak-slot-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 12px; }
-#menu #menu-panel-streaks .killstreak-slot-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 10px; border: 1px solid var(--menu-line); border-radius: 8px; min-width: 0; }
+#menu #menu-panel-streaks .killstreak-slot-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)) !important; gap: 12px; }
+#menu #menu-panel-streaks .killstreak-slot-card { grid-column: auto !important; display: flex; flex-direction: column; gap: 12px; padding: 14px 10px; border: 1px solid var(--menu-line); border-radius: 8px; min-width: 0; }
 #menu #menu-panel-streaks .killstreak-slot-card>span { color: var(--menu-orange) !important; font: 700 11px/1.4 Inter,sans-serif; letter-spacing: .06em; }
 #menu .streak-choices { display: grid; gap: 8px; }
 #menu .streak-choice { position: relative; display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 4px 8px; min-height: 70px; padding: 10px 8px; border: 1px solid var(--menu-line); border-radius: 5px; text-align: left; cursor: pointer; }
@@ -156,9 +156,13 @@ body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018
 #menu .killstreak-slot-card>small { font: 400 11px/1.6 Inter,sans-serif; }
 #menu .streak-choice:disabled { opacity: .65; cursor: default; }
 @media(max-width:1350px) {
-  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
 }
 @media(max-width:800px) {
-  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
   #menu #menu-panel-streaks .kit-heading { align-items: flex-start; flex-direction: column; }
 }
+#menu #menu-panel-options :is(.kit-heading strong,.kit-heading b,.settings-heading strong,.settings-heading b,.advanced-settings>summary) { color: var(--menu-yellow) !important; }
+#menu #menu-panel-kit :is(.kit-heading strong,.kit-heading b) { color: var(--menu-purple) !important; }
+#menu #menu-panel-operator :is(.kit-heading strong,.kit-heading b) { color: var(--menu-green) !important; }
+#menu #menu-panel-deploy .manifest-heading strong { color: var(--menu-green) !important; }

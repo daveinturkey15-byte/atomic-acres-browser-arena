@@ -1026,13 +1026,6 @@ function addProblem(record: ResolvedRecord, message: string, alert = false): voi
   if (alert) record.alerts += 1;
 }
 
-/** Informational notice: visible in the detail panel, never an error badge. */
-function addNotice(record: ResolvedRecord, message: string): void {
-  if (record.notices.includes(message)) return;
-  record.notices.push(message);
-}
-
-
 function refreshMetrics(state: LabState): void {
   const info = state.renderer?.info?.render as
     | { drawCalls?: number; calls?: number; triangles?: number }
