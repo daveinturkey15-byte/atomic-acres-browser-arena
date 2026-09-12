@@ -20,6 +20,17 @@ function pointInTriangleXZ(px: number, pz: number, a: THREE.Vector3, b: THREE.Ve
 }
 
 describe('world-studio ground repair', () => {
+  it('keeps the lawn top out of the road depth layer while preserving yard support', () => {
+    ground.root.updateMatrixWorld(true);
+    const lawn = ground.root.getObjectByName('supported-playable-ground') as THREE.Mesh;
+    const ray = new THREE.Raycaster();
+    for (const z of [-30, -12, 0, 15, 30]) {
+      ray.set(new THREE.Vector3(0, 5, z), new THREE.Vector3(0, -1, 0));
+      expect(ray.intersectObject(lawn).some(hit => hit.point.y > -.01)).toBe(false);
+      ray.set(new THREE.Vector3(35, 5, z), new THREE.Vector3(0, -1, 0));
+      expect(ray.intersectObject(lawn)[0]?.point.y).toBeCloseTo(0, 5);
+    }
+  });
   it('lawns use a dedicated grass surface with a neutral material base, not tinted soil', () => {
     const lawn = ground.root.getObjectByName('supported-playable-ground') as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
     const grass = lawn.material;

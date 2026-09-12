@@ -10,6 +10,8 @@ import { createStudioSnow } from './snow';
 import { createStudioVehicles } from './vehicles';
 import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
 import { createStudioGardens } from './gardens';
+import { createStudioBlenderAssets } from './blender-assets';
+import { createStudioLighting } from './lighting';
 
 /** A new arena with one authority root; never aliases or wraps an old map builder. */
 export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
@@ -26,6 +28,8 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
   root.userData.worldStudioEnvironment = STUDIO_ENVIRONMENTS[0];
   root.userData.worldStudioReviewPoints = [...STUDIO_REVIEW_CAMERAS, ...(architecture.reviewPoints ?? []), ...gardens.reviewPoints];
   root.userData.furnitureAnchors = architecture.root.userData.furnitureAnchors;
+  const lighting = createStudioLighting({ root, scene: root,
+    anchors: architecture.root.userData.furnitureAnchors as StudioInteriorAnchor[], mode: 'presentation' });
   const solids: StudioSolid[] = [...ground.solids, ...architecture.solids, ...vehicles.solids, ...interiors.solids, ...gardens.solids];
   const breakableWindows: BreakableWindow[] = [];
   const shotSurfaces = solids.map((solid) => {
@@ -51,6 +55,32 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
     .filter(solid => /-house-(?:ext-)?stair-\d+$/.test(solid.id))
     .map(solid => solid.bounds));
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
+  if (typeof window !== 'undefined') {
+    const heroes = createStudioBlenderAssets({ headingRadians: Math.PI });
+    root.userData.worldStudioBlenderStatus = 'loading';
+    void heroes.ready.then(() => {
+      if (root.parent !== scene) { heroes.dispose(); return; }
+      // The procedural contract uses a -Z bus nose and +Z truck nose. The
+      // Blender exports use +Z locally; center the truck's authored asymmetric
+      // frame on its existing road envelope without changing physics.
+      const truck = heroes.root.getObjectByName('world-studio-hero-truck');
+      if (truck) { truck.rotation.y = 0; truck.position.z = -2.41375; }
+      root.add(heroes.root);
+      heroes.root.traverse(object => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.castShadow = true; object.receiveShadow = true;
+        raycastMeshes.push(object);
+      });
+      vehicles.root.traverse(object => {
+        if (object.userData.studioVehicle === 'bus' || object.userData.studioVehicle === 'truck') object.visible = false;
+      });
+      root.userData.worldStudioBlenderStatus = 'ready';
+    }).catch(error => {
+      heroes.dispose();
+      root.userData.worldStudioBlenderStatus = `failed: ${String(error)}`;
+      console.error('World Studio Blender assets failed to load', error);
+    });
+  }
   root.userData.worldStudioBuild = Object.freeze({
     id: 'world-studio', version: '20260912-first-slice', solidCount: solids.length,
     architecture: architecture.root.userData.worldStudioArchitecture, nature: nature.stats, gardens: gardens.stats,
@@ -73,6 +103,7 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
     bounds: { ...STUDIO_BOUNDS }, physicsSafetyFloorY: 0,
     houseTelemetry: { houses: 2, groundRooms: 8, upperRooms: 8, doors: 12, windows: breakableWindows.length, ramps: architecture.verticalNavigation.ramps.length, wallMaterialVariants: 6, pbrMaterialFamilies: 10 },
     update(elapsed, dt, context) {
+      lighting.update();
       const environment = (root.userData.worldStudioEnvironment ?? STUDIO_ENVIRONMENTS[0]) as StudioEnvironment;
       nature.update(elapsed, dt, context.cameraPosition, environment);
       snow.update(elapsed, context.cameraPosition, environment.snow, environment.wind);

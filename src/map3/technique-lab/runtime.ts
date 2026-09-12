@@ -454,7 +454,7 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   if (record.group) meta.append(metaRow('Demo group', record.group));
   d.append(meta);
 
-  d.append(text('h2', 'tl-section-title', 'Sources (links only, never fetched)'));
+  d.append(text('h2', 'tl-section-title', 'Original source links'));
   const list = document.createElement('ul');
   list.className = 'tl-sources';
   if (record.sources.length === 0) {
@@ -857,11 +857,8 @@ async function refreshGroups(state: LabState, gen: number): Promise<void> {
       seen.set(entry.sourceId, group);
       record.entry = entry;
       record.group = group;
-      if (record.title !== entry.title) {
-        record.problems.push(
-          `Demo title differs from public record; showing demo title.`,
-        );
-      }
+      // An adapted technique can have a more specific demonstration title.
+      // Identity is bound to sourceId, not text equality with the source title.
       record.title = entry.title;
       record.sources = [...entry.sources];
     }

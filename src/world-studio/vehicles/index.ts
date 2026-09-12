@@ -218,7 +218,20 @@ export function createStudioVehicles(): StudioVehicles {
   wheelSolids(pending, 'car', car, carMaterials.paint, CAR_SPEC.wheelZ, CAR_SPEC.trackHalfWidth, CAR_SPEC.tyreHalfWidth + 0.015, CAR_SPEC.wheelRadius);
 
   // ---- Bake and merge: one mesh per material, world space ----
-  const merged = mergeForgedPlacements(placements, 'world-studio-vehicles');
+  // Retain independently replaceable hero presentations while preserving the
+  // authored collider records and the classic car. Shared glass used to merge
+  // all three vehicles into a single mesh, preventing an atomic asset swap.
+  const batches = [bus, truck, car].map((placement, index) => {
+    const batch = mergeForgedPlacements(placements.filter(item => item.x === placement.centreX), 'world-studio-vehicles');
+    batch.meshes.forEach(mesh => { mesh.userData.studioVehicle = ['bus', 'truck', 'car'][index]; });
+    return batch;
+  });
+  const merged = {
+    meshes: batches.flatMap(batch => batch.meshes),
+    drawCalls: batches.reduce((sum, batch) => sum + batch.drawCalls, 0),
+    triangles: batches.reduce((sum, batch) => sum + batch.triangles, 0),
+    skins: batches.flatMap(batch => batch.skins),
+  };
   for (const mesh of merged.meshes) root.add(mesh);
   const meshByMaterial = new Map<THREE.Material, THREE.Mesh>();
   for (const mesh of merged.meshes) meshByMaterial.set(mesh.material as THREE.Material, mesh);

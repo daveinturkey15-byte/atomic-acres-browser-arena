@@ -129,7 +129,7 @@ export interface StudioLightingInput {
   /** The world-studio arena root; read for `worldStudioEnvironment` + fallback. */
   readonly root: THREE.Object3D;
   /** Scene that receives the presentation-only rig (and loses it on dispose). */
-  readonly scene: THREE.Scene;
+  readonly scene: THREE.Object3D;
   /** `root.userData.furnitureAnchors` — world-space room anchors per house. */
   readonly anchors: readonly StudioInteriorAnchor[];
   /** `presentation` (shadowed keys) or `preview` (no shadow maps at all). */

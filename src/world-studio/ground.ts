@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box2 } from '../collision';
 import type { BallisticMaterialId } from '../ballistics';
 import { createStudioSurface } from './materials';
@@ -109,7 +110,31 @@ export function createStudioGround(): { root: THREE.Group; solids: StudioSolid[]
     else { mesh.userData.presentationOnly = true; mesh.userData.blocksShots = false; }
     return mesh;
   }
-  box('supported-playable-ground', [80, .3, 68], [0, -.15, 0], grass, 'earth');
+  const foundation: THREE.Mesh = box('supported-playable-ground', [80, .3, 68], [0, -.15, 0], grass, 'earth');
+  // Grass must not continue under the road: the 14 mm layered surfaces fight
+  // in the distant review camera's depth buffer. Keep the physical foundation
+  // and its sides, and author the two lawn tops around the actual road ribbon.
+  const shell = foundation.geometry;
+  const shellIndex = shell.getIndex()!;
+  const shellNormals = shell.getAttribute('normal');
+  const retained: number[] = [];
+  for (let i = 0; i < shellIndex.count; i += 3) {
+    if (shellNormals.getY(shellIndex.getX(i)) < .99)
+      retained.push(shellIndex.getX(i), shellIndex.getX(i + 1), shellIndex.getX(i + 2));
+  }
+  shell.setIndex(retained);
+  const lawnTops = [-1, 1].map(side => {
+    const geometry = ribbon(side, 0, 1, .15);
+    const positions = geometry.getAttribute('position');
+    const uv = geometry.getAttribute('uv');
+    for (let i = 0; i < positions.count; i += 1) {
+      if (i % 2 === 1) positions.setX(i, side * 40);
+      uv.setXY(i, positions.getX(i) / 2, positions.getZ(i) / 2);
+    }
+    return geometry;
+  });
+  foundation.geometry = mergeGeometries([shell, ...lawnTops])!;
+  shell.dispose(); lawnTops.forEach(geometry => geometry.dispose());
   // Only bridge to the terrain ring: a giant flat plate would bury the coastal water.
   const apronGeometry = new THREE.CircleGeometry(57, 96);
   apronGeometry.rotateX(-Math.PI / 2);
