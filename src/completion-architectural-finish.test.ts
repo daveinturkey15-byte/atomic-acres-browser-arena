@@ -14,6 +14,15 @@ const BASELINE = {
   instances: 'f7f8c9ad5c56db234cf1f354c0e3ea6b2cf97c035786630e5ecbb7fb43a03acb',
   materialNames: 'ea587261b5171ce432280ad3b5a17eef8f3d88e55afaaf8ee4e84d6ca7df5e7b',
 };
+// Independently rebuilt from the same pre-finish c710 baseline on Node 22.19.0
+// and 24.12.0. Math.pow differs in 748 mountain userData doubles by <= 7.11e-15;
+// every geometry attribute/index/transform and all other digests are identical.
+// Keep exact metadata checks: no rounding, ignored fields or any-runtime allowlist.
+// Provenance: docs/forge/architectural-finish-fingerprint-provenance.json.
+const SOURCE_GEOMETRY_BY_NODE_MAJOR: Readonly<Record<string, string>> = {
+  '22': '60128e066793dce27b67ded206c6f2c391213997d07088403bacb3d345e90292',
+  '24': BASELINE.sourceGeometry,
+};
 const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 function geometryRecord(g: THREE.BufferGeometry) {
@@ -151,7 +160,9 @@ describe('architectural finish: unchanged structure, reusable material roles', (
     expect(digest(authority)).toBe(BASELINE.authority);
     const authored = meshes.filter((m) => !(m.userData.staticBatchRendered && typeof m.userData.sourceMeshes === 'number'));
     expect(authored.length).toBe(3803);
-    expect(digest(authored.map(objectRecord))).toBe(BASELINE.sourceGeometry);
+    const sourceGeometryBaseline = SOURCE_GEOMETRY_BY_NODE_MAJOR[process.versions.node.split('.')[0]!];
+    expect(sourceGeometryBaseline, `Node ${process.versions.node}: reconstruct the unchanged pre-finish baseline before adding runtime support`).toBeDefined();
+    expect(digest(authored.map(objectRecord))).toBe(sourceGeometryBaseline);
     expect(renderedTriangleRecord(map.root)).toEqual({ count: 148028, digest: BASELINE.renderedTriangles });
     expect(map.update).toBeUndefined();
     // Instanced meshes share geometry; additionally pin every instance transform
