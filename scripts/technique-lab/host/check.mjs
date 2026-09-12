@@ -160,6 +160,44 @@ check(
   'status filter exposes the blocked state',
   /'pending',\s*'loaded',\s*'manifest',\s*'blocked',\s*'error'/s.test(runtime),
 );
+check(
+  'sources heading is honest about host fetching',
+  runtime.includes('the host never fetches them') &&
+    !runtime.includes('never fetched'),
+);
+check(
+  'demo-title mismatch is an informational notice, never a load failure',
+  runtime.includes(
+    "addNotice(record, 'Demo title differs from public record; showing demo title.')",
+  ) &&
+    /function statusText[\s\S]*?record\.alerts > 0/.test(runtime),
+);
+check(
+  'research records load through an injectable seam with an honest empty fallback',
+  runtime.includes('options.researchLoaders ??') &&
+    runtime.includes('../../../docs/technique-lab/group-*/SOURCE_RESEARCH.json') &&
+    runtime.includes('No research records loadable in this tree'),
+);
+check(
+  'research claims are separated from machine-checked test receipts',
+  runtime.includes('not machine-checked test receipts') &&
+    runtime.includes('Result tested stays open until a machine-checked test receipt'),
+);
+check(
+  'stage framing fits visible geometry with a shape-adaptive angle',
+  runtime.includes('traverseVisible') &&
+    runtime.includes('elevationDeg') &&
+    runtime.includes('const FIT_MARGIN = 1.1'),
+);
+check(
+  'comparison legend comes only from validated demo metadata',
+  runtime.includes('function updateComparisonLegend(') &&
+    types.includes('DemoComparison'),
+);
+check(
+  'frame deltas clamp through a pure tested helper',
+  runtime.includes('export function clampDelta'),
+);
 
 // Types: frozen factory contract.
 for (const piece of [

@@ -370,3 +370,56 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Owner-feedback increment: comparison legend + research/notice styling. */
+.tl-comparison {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tl-comparison[hidden] {
+  display: none;
+}
+
+.tl-comparison-cell {
+  background: rgba(6, 11, 12, 0.78);
+  border: 1px solid rgba(79, 191, 198, 0.4);
+  border-radius: 4px;
+  color: #d7e6e5;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.tl-fault {
+  color: #f0b8b4;
+}
+
+.tl-notice {
+  color: #e4d29b;
+}
+
+.tl-claim {
+  color: #cfd8dc;
+}
+
+.tl-research-summary,
+.tl-research-note,
+.tl-stage-note {
+  color: #9dbdbb;
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.tl-research-ignored,
+.tl-research-missing {
+  color: #e4d29b;
+  font-size: 12px;
+  margin: 4px 0;
+}

@@ -10,7 +10,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { LAB_SEED, mountTechniqueLab } from '../../../src/map3/technique-lab/runtime';
+import {
+  LAB_SEED,
+  boundedBoundingSphere,
+  clampDelta,
+  computeFrameFit,
+  mountTechniqueLab,
+} from '../../../src/map3/technique-lab/runtime';
 import type {
   DemoManifestEntry,
   GroupModule,
@@ -689,5 +695,318 @@ describe('technique lab host behaviour', () => {
     click(galleryButton(15) as FakeElement);
     expect(seeds).toEqual([LAB_SEED]);
     host.dispose();
+  });
+});
+
+describe('source evidence honesty', () => {
+  it('replaces the false never-fetched sources heading with the honest one', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost({ groupLoaders: {} }, renderer);
+    click(galleryButton(1) as FakeElement);
+    const detail = detailText();
+    expect(detail).toContain('the host never fetches them');
+    expect(detail).not.toContain('links only, never fetched');
+    expect(detail).toContain('No research records loadable in this tree');
+    host.dispose();
+  });
+
+  it('downgrades a demo-title mismatch to an informational notice, not a load issue', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {
+          './demos/group-x/index.ts': async () =>
+            groupModule([makeEntry(2, { createDemo: () => makeDemo(2) })]),
+        },
+      },
+      renderer,
+    );
+    click(galleryButton(2) as FakeElement);
+    expect(detailText()).toContain('Demo title differs from public record');
+    const status = container.querySelector('.tl-status')?.textContent ?? '';
+    expect(status).toContain('implementation loaded');
+    expect(status).not.toContain('load issue');
+    const badge = (galleryButton(2) as FakeElement).querySelector('.tl-badge');
+    expect(badge?.classes.has('is-error')).toBe(false);
+    host.dispose();
+  });
+
+  it('maps a group-a research record onto inspected/extracted stages with pin, sha and date', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {},
+        researchLoaders: {
+          '../../../docs/technique-lab/group-a/SOURCE_RESEARCH.json': async () => ({
+            group: 'group-a',
+            records: [
+              {
+                sourceId: 3,
+                title: 'Stylized water',
+                adaptation: 'adapted',
+                urls: [
+                  {
+                    url: 'https://example.com/a',
+                    outcome: 'ok',
+                    status: 200,
+                    readDepth: 'repository page read',
+                  },
+                ],
+                pin: '00dfd5385506022d533c84f6737a09f5f4392623 (resolves; committed 2026-08-18T13:22:54Z)',
+                licence: 'MIT read at the pinned revision',
+                methodExtracted: true,
+                cpuCheck: { passed: true, note: 'focused vitest' },
+              },
+            ],
+          }),
+        },
+      },
+      renderer,
+    );
+    click(galleryButton(3) as FakeElement);
+    const detail = detailText();
+    expect(detail).toContain('● Source inspected');
+    expect(detail).toContain('● Technique extracted');
+    expect(detail).toContain('○ Result tested');
+    expect(detail).toContain('00dfd5385506022d533c84f6737a09f5f4392623');
+    expect(detail).toContain('commit date: 2026-08-18');
+    expect(detail).toContain('MIT read at the pinned revision');
+    expect(detail).toContain('cpuCheck:');
+    expect(detail).toContain('not machine-checked test receipts');
+    host.dispose();
+  });
+
+  it('parses the heterogeneous group-b records[] and group-c rows[] shapes', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {},
+        researchLoaders: {
+          '../../../docs/technique-lab/group-b/SOURCE_RESEARCH.json': async () => ({
+            records: [
+              {
+                sourceId: 4,
+                title: 'Procedural grass',
+                status: 'demo',
+                canonical:
+                  'CK42BB/procedural-grass-threejs@26f072308df12caac68a474cb40300ef576793e1',
+                readDepth: 'SKILL.md read in full (22,187 bytes)',
+                method: 'Tapered triangle-strip blade swept along a quadratic Bezier',
+              },
+            ],
+          }),
+          '../../../docs/technique-lab/group-c/SOURCE_RESEARCH.json': async () => ({
+            rows: [
+              {
+                sourceId: 5,
+                registerTitle: 'gas-station-highway',
+                canonical:
+                  'Canonical:** `StarKnightt/gas-station-highway` @ `3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c`',
+                decision: 'one-page-brief pattern only, no code reuse',
+                carrierReadComplete: true,
+                renderedAcceptance: 'captured stills reviewed',
+              },
+            ],
+          }),
+        },
+      },
+      renderer,
+    );
+    click(galleryButton(4) as FakeElement);
+    expect(detailText()).toContain('● Source inspected');
+    expect(detailText()).toContain('● Technique extracted');
+    expect(detailText()).toContain('26f072308df12caac68a474cb40300ef576793e1');
+    click(galleryButton(5) as FakeElement);
+    expect(detailText()).toContain('● Source inspected');
+    expect(detailText()).toContain('● Technique extracted');
+    expect(detailText()).toContain('3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c');
+    expect(detailText()).toContain('renderedAcceptance: captured stills reviewed');
+    host.dispose();
+  });
+
+  it('tolerates malformed and failed research files without faking stages', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {},
+        researchLoaders: {
+          '../../../docs/technique-lab/group-x/SOURCE_RESEARCH.json': async () => ({
+            records: 'nope',
+          }),
+          '../../../docs/technique-lab/group-y/SOURCE_RESEARCH.json': () =>
+            Promise.reject(new Error('disk gone')),
+        },
+      },
+      renderer,
+    );
+    const detail = detailText();
+    expect(detail).toContain('unrecognized shape');
+    expect(detail).toContain('failed to load: disk gone');
+    expect(detail).toContain('0 file(s) read');
+    expect(detail).toContain('No research record for source 1');
+    expect(detail).toContain('○ Source inspected');
+    host.dispose();
+  });
+
+  it('counts research rows without a usable sourceId instead of guessing', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {},
+        researchLoaders: {
+          '../../../docs/technique-lab/group-a/SOURCE_RESEARCH.json': async () => ({
+            records: [{ title: 'no id here' }, 42, null],
+          }),
+        },
+      },
+      renderer,
+    );
+    const detail = detailText();
+    expect(detail).toContain('3 record(s) without usable sourceId');
+    expect(detail).toContain('No research record for source 1');
+    host.dispose();
+  });
+
+  it('renders the comparison legend only from validated demo metadata', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {
+          './demos/group-x/index.ts': async () =>
+            groupModule([
+              makeEntry(6, {
+                createDemo: () => makeDemo(6),
+                comparison: {
+                  control: 'Raw plane',
+                  technique: 'Deformed plane',
+                  controlPosition: 'right',
+                },
+              }),
+              makeEntry(7, { createDemo: () => makeDemo(7) }),
+            ]),
+        },
+      },
+      renderer,
+    );
+    click(galleryButton(6) as FakeElement);
+    const legend = container.querySelector('.tl-comparison') as FakeElement;
+    expect(legend.hidden).toBe(false);
+    expect(legend.textContent).toContain('Right — control: Raw plane');
+    expect(legend.textContent).toContain('Left — technique: Deformed plane');
+    click(galleryButton(7) as FakeElement);
+    expect(legend.hidden).toBe(true);
+    host.dispose();
+  });
+
+  it('rejects malformed comparison metadata instead of inventing labels', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost(
+      {
+        groupLoaders: {
+          './demos/group-x/index.ts': async () =>
+            groupModule([
+              makeEntry(8, {
+                createDemo: () => makeDemo(8),
+                comparison: { control: '', technique: 'x' },
+              } as Partial<DemoManifestEntry>),
+            ]),
+        },
+      },
+      renderer,
+    );
+    expect(errorText()).toContain('bad comparison');
+    click(galleryButton(8) as FakeElement);
+    expect(detailText()).toContain('Pending / Not yet delivered');
+    const legend = container.querySelector('.tl-comparison') as FakeElement;
+    expect(legend.hidden).toBe(true);
+    host.dispose();
+  });
+});
+
+describe('stage framing helpers', () => {
+  it('clamps non-finite, negative and oversized frame deltas', () => {
+    expect(clampDelta(Number.NaN)).toBe(0);
+    expect(clampDelta(-1)).toBe(0);
+    expect(clampDelta(Number.POSITIVE_INFINITY)).toBe(0);
+    expect(clampDelta(5)).toBe(0.1);
+    expect(clampDelta(0.016)).toBe(0.016);
+  });
+
+  it('frames planar bounds from above and tall bounds from lower down', () => {
+    const planar = new THREE.Box3(
+      new THREE.Vector3(-5, 0, -5),
+      new THREE.Vector3(5, 0.1, 5),
+    );
+    const tall = new THREE.Box3(
+      new THREE.Vector3(-0.5, 0, -0.5),
+      new THREE.Vector3(0.5, 10, 0.5),
+    );
+    const planarFit = computeFrameFit(planar, 45, 1.6);
+    const tallFit = computeFrameFit(tall, 45, 1.6);
+    expect(planarFit).not.toBeNull();
+    expect(tallFit).not.toBeNull();
+    const elevation = (fit: { position: THREE.Vector3; target: THREE.Vector3 }) => {
+      const run = Math.hypot(
+        fit.position.x - fit.target.x,
+        fit.position.z - fit.target.z,
+      );
+      return (Math.atan2(fit.position.y - fit.target.y, run) * 180) / Math.PI;
+    };
+    expect(elevation(planarFit!)).toBeGreaterThan(45);
+    expect(elevation(tallFit!)).toBeLessThan(30);
+  });
+
+  it('aims at the real centre of offset bounds and fits narrow aspects wider', () => {
+    const offset = new THREE.Box3(
+      new THREE.Vector3(8, 1, -6),
+      new THREE.Vector3(12, 3, -2),
+    );
+    const fit = computeFrameFit(offset, 45, 1.6);
+    expect(fit?.target.x).toBeCloseTo(10, 5);
+    expect(fit?.target.z).toBeCloseTo(-4, 5);
+    const box = new THREE.Box3(
+      new THREE.Vector3(-1, -1, -1),
+      new THREE.Vector3(1, 1, 1),
+    );
+    const narrow = computeFrameFit(box, 45, 0.5);
+    const wide = computeFrameFit(box, 45, 2);
+    expect(narrow).not.toBeNull();
+    expect(wide).not.toBeNull();
+    expect(narrow!.position.distanceTo(narrow!.target)).toBeGreaterThan(
+      wide!.position.distanceTo(wide!.target),
+    );
+  });
+
+  it('returns null for empty or non-finite bounds and clamps absurd radii finitely', () => {
+    expect(computeFrameFit(new THREE.Box3(), 45, 1.6)).toBeNull();
+    const nanBox = new THREE.Box3(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(Number.NaN, 2, 2),
+    );
+    expect(computeFrameFit(nanBox, 45, 1.6)).toBeNull();
+    const huge = new THREE.Box3(
+      new THREE.Vector3(-1e9, -1e9, -1e9),
+      new THREE.Vector3(1e9, 1e9, 1e9),
+    );
+    const fit = computeFrameFit(huge, 45, 1.6);
+    expect(fit).not.toBeNull();
+    expect(Number.isFinite(fit!.far)).toBe(true);
+    expect(fit!.far).toBeLessThan(1e7);
+  });
+
+  it('bounds only visible geometry and rejects empty or invisible roots', () => {
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)));
+    const hidden = new THREE.Group();
+    hidden.visible = false;
+    hidden.add(new THREE.Mesh(new THREE.BoxGeometry(1000, 1000, 1000)));
+    root.add(hidden);
+    const sphere = boundedBoundingSphere(root);
+    expect(sphere).not.toBeNull();
+    expect(sphere!.radius).toBeLessThan(5);
+    expect(boundedBoundingSphere(new THREE.Group())).toBeNull();
+    const invisibleOnly = new THREE.Group();
+    invisibleOnly.add(hidden);
+    expect(boundedBoundingSphere(invisibleOnly)).toBeNull();
   });
 });

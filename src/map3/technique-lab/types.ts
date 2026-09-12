@@ -12,6 +12,17 @@ import type * as THREE from 'three';
 /** How a demo relates to its public source. Set only by the demo author. */
 export type Adaptation = 'exact' | 'adapted' | 'blocked';
 
+/**
+ * Optional control-vs-technique legend for paired demos. Only demo-provided
+ * metadata may name the sides; the host never invents left/right meanings.
+ */
+export interface DemoComparison {
+  control: string;
+  technique: string;
+  /** Which side the control sits on in the demo's default view. */
+  controlPosition?: 'left' | 'right';
+}
+
 /** Context handed to every demo factory. Fixed deterministic seed. */
 export interface DemoContext {
   THREE: typeof import('three');
@@ -34,6 +45,8 @@ export interface DemoMetadata {
   adaptation: Adaptation;
   sources: string[];
   limitation?: string;
+  /** Optional paired-scene legend; absent means the host renders none. */
+  comparison?: DemoComparison;
 }
 
 /** Factory demos expose. Synchronous; the host guards throws. */
@@ -52,6 +65,7 @@ export interface DemoManifestEntry {
   sources: string[];
   limitation?: string;
   createDemo?: DemoFactory;
+  comparison?: DemoComparison;
 }
 
 /** Shape of a dynamically imported `./demos/group-N/index.ts` module. */
@@ -92,4 +106,11 @@ export interface LabHostOptions {
   groupLoaders?: Record<string, () => Promise<GroupModule>>;
   /** Renderer factory. Defaults to a real WebGPURenderer on the host canvas. */
   createRenderer?: (canvas: HTMLCanvasElement) => LabRendererLike;
+  /**
+   * Research-record loaders for the group SOURCE_RESEARCH.json files under
+   * docs/technique-lab (one per group-N directory). Defaults to the host's
+   * vite glob (empty in trees without group research); tests inject bounded
+   * real-shape fixtures. Absent records keep the research stages open.
+   */
+  researchLoaders?: Record<string, () => Promise<unknown>>;
 }

@@ -26,6 +26,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PUBLIC_RECORDS } from './manifest';
 import type {
   Adaptation,
+  DemoComparison,
   DemoFactory,
   DemoInstance,
   DemoManifestEntry,
@@ -64,6 +65,10 @@ export async function mountTechniqueLab(
     }
   });
   void refreshGroups(state, gen, options);
+  void loadResearch(state, gen, options).then(() => {
+    if (state.disposed || gen !== state.generation) return;
+    renderDetail(state, state.records[state.selectedId - 1]);
+  });
 
   return {
     dispose: () => disposeLab(state),
@@ -84,6 +89,8 @@ interface ResolvedRecord {
   entry: DemoManifestEntry | null;
   group: string | null;
   problems: string[];
+  /** Informational notices (alias, title difference): shown, never a fault. */
+  notices: string[];
   /** Operational problems that turn the gallery badge red (notices excluded). */
   alerts: number;
 }
@@ -119,6 +126,10 @@ interface LabState {
   fpsWindowStart: number;
   fps: number;
   active: ActiveDemo | null;
+  // Research records (group-authored SOURCE_RESEARCH.json), keyed by sourceId.
+  research: Map<number, ResearchEvidence>;
+  researchSummary: string;
+  researchIgnored: string[];
   // DOM refs.
   root: HTMLElement;
   list: HTMLOListElement;
@@ -132,6 +143,7 @@ interface LabState {
   errorBox: HTMLElement;
   detail: HTMLElement;
   statusLine: HTMLElement;
+  comparisonLegend: HTMLElement;
   resizeObserver: ResizeObserver | null;
   onFallbackResize: () => void;
   onWindowError: (event: ErrorEvent) => void;
@@ -141,7 +153,7 @@ interface LabState {
 function createState(container: HTMLElement): LabState {
   const canvas = document.createElement('canvas');
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a1113);
+  scene.background = new THREE.Color(0x22262c);
   const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
   camera.position.set(4, 3, 6);
   return {
@@ -156,6 +168,7 @@ function createState(container: HTMLElement): LabState {
       entry: null,
       group: null,
       problems: [],
+      notices: [],
       alerts: 0,
     })),
     selectedId: 1,
@@ -177,6 +190,9 @@ function createState(container: HTMLElement): LabState {
     fpsWindowStart: 0,
     fps: 0,
     active: null,
+    research: new Map(),
+    researchSummary: 'Research records: not loaded yet.',
+    researchIgnored: [],
     root: document.createElement('div'),
     list: document.createElement('ol'),
     count: document.createElement('p'),
@@ -189,6 +205,7 @@ function createState(container: HTMLElement): LabState {
     errorBox: document.createElement('div'),
     detail: document.createElement('aside'),
     statusLine: document.createElement('p'),
+    comparisonLegend: document.createElement('div'),
     resizeObserver: null,
     onFallbackResize: () => undefined,
     onWindowError: () => undefined,
@@ -283,6 +300,9 @@ function buildDom(state: LabState): void {
   s.empty.className = 'tl-empty';
   s.empty.textContent = 'Starting renderer…';
   s.wrap.append(s.empty);
+  s.comparisonLegend.className = 'tl-comparison';
+  s.comparisonLegend.hidden = true;
+  s.wrap.append(s.comparisonLegend);
   const toolbar = document.createElement('div');
   toolbar.className = 'tl-toolbar';
   const recenter = text('button', 'tl-btn', 'Recenter');
@@ -413,11 +433,14 @@ const STAGE_LABELS = [
   'Result tested',
 ] as const;
 
-function stagesFor(record: ResolvedRecord): Array<{ label: string; done: boolean }> {
+function stagesFor(
+  record: ResolvedRecord,
+  evidence: ResearchEvidence | undefined,
+): Array<{ label: string; done: boolean }> {
   return [
-    { label: STAGE_LABELS[0], done: true },
-    { label: STAGE_LABELS[1], done: false },
-    { label: STAGE_LABELS[2], done: false },
+    { label: STAGE_LABELS[0], done: record.sources.length > 0 },
+    { label: STAGE_LABELS[1], done: evidence?.inspected === true },
+    { label: STAGE_LABELS[2], done: evidence?.extracted === true },
     { label: STAGE_LABELS[3], done: record.entry?.createDemo != null },
     { label: STAGE_LABELS[4], done: false },
   ];
@@ -427,7 +450,7 @@ function statusText(record: ResolvedRecord): string {
   if (record.entry?.adaptation === 'blocked') {
     return `Source ${record.id} · blocked — no honest demo delivered; limitation recorded below.`;
   }
-  if (record.problems.length > 0) {
+  if (record.alerts > 0) {
     return `Source ${record.id} · load issue — see notices below.`;
   }
   if (record.entry?.createDemo) {
@@ -474,7 +497,17 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   if (record.group) meta.append(metaRow('Demo group', record.group));
   d.append(meta);
 
+<<<<<<< HEAD
   d.append(text('h2', 'tl-section-title', 'Original source links'));
+=======
+  d.append(
+    text(
+      'h2',
+      'tl-section-title',
+      'Sources (links only; the host never fetches them — research reads are recorded below where they exist)',
+    ),
+  );
+>>>>>>> d8d5196c7 (technique-lab host: wire real research records into stage evidence, honest notices, visible-geometry framing)
   const list = document.createElement('ul');
   list.className = 'tl-sources';
   if (record.sources.length === 0) {
@@ -503,7 +536,7 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   d.append(text('h2', 'tl-section-title', 'Stages'));
   const stages = document.createElement('ul');
   stages.className = 'tl-stages';
-  for (const stage of stagesFor(record)) {
+  for (const stage of stagesFor(record, state.research.get(record.id))) {
     const li = document.createElement('li');
     li.className = stage.done ? 'tl-stage-done' : 'tl-stage-open';
     li.textContent = `${stage.done ? '●' : '○'} ${stage.label}`;
@@ -511,15 +544,66 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   }
   d.append(stages);
 
-  if (record.problems.length > 0) {
+  d.append(text('h2', 'tl-section-title', 'Research records'));
+  d.append(text('p', 'tl-research-summary', state.researchSummary));
+  for (const line of state.researchIgnored) {
+    d.append(text('p', 'tl-research-ignored', line));
+  }
+  const evidence = state.research.get(record.id);
+  if (!evidence) {
+    d.append(
+      text(
+        'p',
+        'tl-research-missing',
+        `No research record for source ${record.id} in the loaded files — ` +
+          `Source inspected and Technique extracted stay open.`,
+      ),
+    );
+  } else {
+    const researchMeta = document.createElement('dl');
+    researchMeta.className = 'tl-meta';
+    researchMeta.append(metaRow('Record group', evidence.group));
+    for (const line of evidence.inspectedDetail) {
+      researchMeta.append(metaRow('Inspection evidence', line));
+    }
+    for (const line of evidence.extractedDetail) {
+      researchMeta.append(metaRow('Extraction record', line));
+    }
+    d.append(researchMeta);
+    if (evidence.claims.length > 0) {
+      d.append(
+        text(
+          'p',
+          'tl-research-note',
+          'Group-authored record assertions below — not machine-checked test receipts in this lane:',
+        ),
+      );
+      const claims = document.createElement('ul');
+      claims.className = 'tl-stages';
+      for (const claim of evidence.claims) {
+        claims.append(text('li', 'tl-claim', claim));
+      }
+      d.append(claims);
+    }
+  }
+  d.append(
+    text(
+      'p',
+      'tl-stage-note',
+      'Result tested stays open until a machine-checked test receipt matches ' +
+        'this source in this lane; visual/FPS acceptance stays with the owner.',
+    ),
+  );
+
+  if (record.problems.length > 0 || record.notices.length > 0) {
     d.append(text('h2', 'tl-section-title', 'Notices'));
     const probs = document.createElement('ul');
     probs.className = 'tl-stages';
     for (const problem of record.problems) {
-      const li = document.createElement('li');
-      li.className = 'tl-stage-open';
-      li.textContent = problem;
-      probs.append(li);
+      probs.append(text('li', 'tl-fault', problem));
+    }
+    for (const notice of record.notices) {
+      probs.append(text('li', 'tl-notice', notice));
     }
     d.append(probs);
   }
@@ -542,6 +626,31 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Stage overlay legend, rendered only from validated demo-provided metadata. */
+function updateComparisonLegend(state: LabState, record: ResolvedRecord): void {
+  const el = state.comparisonLegend;
+  const comparison = record.entry?.comparison;
+  if (!comparison) {
+    el.hidden = true;
+    el.replaceChildren();
+    return;
+  }
+  const controlLeft = (comparison.controlPosition ?? 'left') === 'left';
+  el.replaceChildren(
+    text(
+      'span',
+      'tl-comparison-cell',
+      `${controlLeft ? 'Left' : 'Right'} — control: ${comparison.control}`,
+    ),
+    text(
+      'span',
+      'tl-comparison-cell',
+      `${controlLeft ? 'Right' : 'Left'} — technique: ${comparison.technique}`,
+    ),
+  );
+  el.hidden = false;
 }
 
 /* ------------------------------------------------------------------ */
@@ -589,6 +698,7 @@ function mountSelection(state: LabState, id: number): void {
   const record = state.records[id - 1];
   teardownActive(state);
   renderDetail(state, record);
+  updateComparisonLegend(state, record);
   refreshGallery(state);
   writeUrlSelection(id);
 
@@ -729,6 +839,9 @@ function observeResize(state: LabState): void {
   const onResize = (): void => {
     if (state.disposed || !state.renderer) return;
     sizeToWrap(state, state.renderer);
+    // An aspect change can invalidate the horizontal fit — refit once per
+    // resize event (never per frame).
+    if (state.active) frameSelection(state);
   };
   state.onFallbackResize = onResize;
   if (typeof ResizeObserver !== 'undefined') {
@@ -746,10 +859,8 @@ function startLoop(state: LabState): void {
     if (state.disposed || !state.renderer) return;
     state.raf = requestAnimationFrame(tick);
     const now = performance.now() / 1000;
-    let dt = now - state.lastTime;
+    const dt = clampDelta(now - state.lastTime);
     state.lastTime = now;
-    if (!Number.isFinite(dt) || dt < 0) dt = 0;
-    if (dt > 0.1) dt = 0.1; // clamped delta
     state.elapsed += dt;
     state.controls?.update();
 
@@ -784,41 +895,100 @@ function startLoop(state: LabState): void {
 }
 
 /**
- * Frame the active demo once per mount / explicit Recenter. The fit satisfies
- * BOTH frustum extents (vertical fov and horizontal fov at the current aspect)
- * so flat planes and tall towers frame fully at any stage shape, and the
- * radius/centre are sanity-bounded against NaN and absurd scale.
+ * Frame the active demo once per mount / explicit Recenter. The fit
+ * satisfies BOTH frustum extents (vertical fov and horizontal fov at the
+ * current aspect), aims at the content's real centre, and the radius/centre
+ * are sanity-bounded against NaN and absurd scale.
  */
 function frameSelection(state: LabState): void {
   if (!state.controls) return;
   const active = state.active;
-  const sphere = active
-    ? boundedBoundingSphere(active.demo.root)
-    : null;
-  if (!sphere) {
+  const box = active ? visibleGeometryBox(active.demo.root) : null;
+  const fit = box ? computeFrameFit(box, state.camera.fov, state.camera.aspect) : null;
+  if (!fit) {
     homeCamera(state);
     return;
   }
-  const halfFov = THREE.MathUtils.degToRad(state.camera.fov / 2);
-  const vertical = sphere.radius / Math.tan(halfFov);
-  const aspect = Math.max(state.camera.aspect, 1e-3);
-  const horizontal = sphere.radius / (Math.tan(halfFov) * aspect);
-  const distance = Math.max(vertical, horizontal) * 1.2;
-  const dir = new THREE.Vector3(1, 0.6, 1).normalize();
-  state.camera.position.copy(sphere.center).addScaledVector(dir, distance);
-  state.camera.near = Math.max(distance / 1000, 0.01);
-  state.camera.far = Math.max(distance * 100, 10);
+  state.camera.position.copy(fit.position);
+  state.camera.near = fit.near;
+  state.camera.far = fit.far;
   state.camera.updateProjectionMatrix();
-  state.controls.target.copy(sphere.center);
+  state.camera.lookAt(fit.target);
+  state.controls.target.copy(fit.target);
   state.controls.update();
 }
 
+/** Clamps a frame delta to a finite, bounded, non-negative value. */
+export function clampDelta(dt: number): number {
+  if (!Number.isFinite(dt) || dt < 0) return 0;
+  if (dt > 0.1) dt = 0.1; // clamped delta
+  return dt;
+}
+
+/** A computed camera fit; positions/targets are in world space. */
+export interface FrameFit {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  near: number;
+  far: number;
+}
+
+/** Margin around the fitted sphere (was 1.2 — captures showed excess air). */
+const FIT_MARGIN = 1.1;
+
 /**
- * Bounding sphere of a demo root, or null when the root has no finite,
- * positive-volume bounds (empty scene graph, degenerate or NaN geometry).
+ * Pure framing math so focused tests exercise the exact fit: both frustum
+ * extents, a shape-adaptive viewing elevation (planar from above, tall from
+ * lower down) and finite, clamped near/far planes. Null when the bounds are
+ * empty, degenerate or non-finite — the caller must fall back to homeCamera.
  */
-function boundedBoundingSphere(root: THREE.Group): THREE.Sphere | null {
-  const box = new THREE.Box3().setFromObject(root);
+export function computeFrameFit(
+  box: THREE.Box3,
+  fovDeg: number,
+  aspect: number,
+): FrameFit | null {
+  if (box.isEmpty()) return null;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  if (!Number.isFinite(sphere.radius) || sphere.radius <= 0) return null;
+  if (
+    !Number.isFinite(sphere.center.x) ||
+    !Number.isFinite(sphere.center.y) ||
+    !Number.isFinite(sphere.center.z)
+  ) {
+    return null;
+  }
+  sphere.radius = Math.min(Math.max(sphere.radius, 1e-3), 1e4);
+  const halfFov = THREE.MathUtils.degToRad(fovDeg / 2);
+  const vertical = sphere.radius / Math.tan(halfFov);
+  const horizontal = sphere.radius / (Math.tan(halfFov) * Math.max(aspect, 1e-3));
+  const distance = Math.max(vertical, horizontal) * FIT_MARGIN;
+  const size = box.getSize(new THREE.Vector3());
+  const heightRatio = size.y / Math.max(size.x, size.z, 1e-6);
+  const elevationDeg = heightRatio < 0.15 ? 50 : heightRatio > 1.2 ? 25 : 35;
+  const elevation = THREE.MathUtils.degToRad(elevationDeg);
+  const dir = new THREE.Vector3(1, 0, 1)
+    .normalize()
+    .multiplyScalar(Math.cos(elevation));
+  dir.y = Math.sin(elevation);
+  dir.normalize();
+  return {
+    position: sphere.center.clone().addScaledVector(dir, distance),
+    target: sphere.center.clone(),
+    near: Math.max(distance / 1000, 0.01),
+    far: Math.max(distance * 100, 10),
+  };
+}
+
+/**
+ * Bounds over VISIBLE geometry only — invisible helper objects must not
+ * inflate the fit (captures showed small content lost in a huge stage).
+ * Null when the root has no finite, positive-volume visible bounds.
+ */
+function visibleGeometryBox(root: THREE.Object3D): THREE.Box3 | null {
+  const box = new THREE.Box3();
+  root.traverseVisible((obj) => {
+    if ('geometry' in obj) box.expandByObject(obj);
+  });
   if (box.isEmpty()) return null;
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   if (
@@ -830,8 +1000,13 @@ function boundedBoundingSphere(root: THREE.Group): THREE.Sphere | null {
   ) {
     return null;
   }
-  sphere.radius = Math.min(Math.max(sphere.radius, 1e-3), 1e4);
-  return sphere;
+  return box;
+}
+
+/** Bounding sphere of the visible geometry; null when unframeable. */
+export function boundedBoundingSphere(root: THREE.Group): THREE.Sphere | null {
+  const box = visibleGeometryBox(root);
+  return box ? box.getBoundingSphere(new THREE.Sphere()) : null;
 }
 
 /** Stable default framing used when there is nothing finite to frame. */
@@ -856,6 +1031,12 @@ function addProblem(record: ResolvedRecord, message: string, alert = false): voi
   if (record.problems.includes(message)) return;
   record.problems.push(message);
   if (alert) record.alerts += 1;
+}
+
+/** Informational notice: visible in the detail panel, never an error badge. */
+function addNotice(record: ResolvedRecord, message: string): void {
+  if (record.notices.includes(message)) return;
+  record.notices.push(message);
 }
 
 
@@ -961,8 +1142,16 @@ async function refreshGroups(
       }
       record.entry = entry;
       record.group = group;
+<<<<<<< HEAD
       // An adapted technique can have a more specific demonstration title.
       // Identity is bound to sourceId, not text equality with the source title.
+=======
+      if (record.title !== entry.title) {
+        // Informational, never a load failure: a nominal title difference is
+        // provenance detail; only a sourceId mismatch is an operational alert.
+        addNotice(record, 'Demo title differs from public record; showing demo title.');
+      }
+>>>>>>> d8d5196c7 (technique-lab host: wire real research records into stage evidence, honest notices, visible-geometry framing)
       record.title = entry.title;
       record.sources = [...entry.sources];
     }
@@ -1031,6 +1220,35 @@ function validateEntry(raw: unknown): { entry: DemoManifestEntry | null; problem
   ) {
     problems.push('bad createDemo');
   }
+  let comparison: DemoComparison | undefined;
+  const rawComparison = candidate.comparison;
+  if (rawComparison !== undefined) {
+    const position =
+      typeof rawComparison === 'object' &&
+      rawComparison !== null &&
+      'controlPosition' in rawComparison
+        ? rawComparison.controlPosition
+        : undefined;
+    if (
+      typeof rawComparison !== 'object' ||
+      rawComparison === null ||
+      !('control' in rawComparison) ||
+      !('technique' in rawComparison) ||
+      typeof rawComparison.control !== 'string' ||
+      rawComparison.control.trim() === '' ||
+      typeof rawComparison.technique !== 'string' ||
+      rawComparison.technique.trim() === '' ||
+      !(position === undefined || position === 'left' || position === 'right')
+    ) {
+      problems.push('bad comparison');
+    } else {
+      comparison = {
+        control: rawComparison.control.trim(),
+        technique: rawComparison.technique.trim(),
+        controlPosition: position,
+      };
+    }
+  }
   if (problems.length > 0) {
     return { entry: null, problems };
   }
@@ -1044,9 +1262,197 @@ function validateEntry(raw: unknown): { entry: DemoManifestEntry | null; problem
       limitation:
         typeof candidate.limitation === 'string' ? candidate.limitation : undefined,
       createDemo: (candidate.createDemo as DemoFactory | undefined) ?? undefined,
+      comparison,
     },
     problems,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Research records (group SOURCE_RESEARCH.json)                       */
+/* ------------------------------------------------------------------ */
+
+/** Validated, bounded evidence taken from one group's research record. */
+interface ResearchEvidence {
+  group: string;
+  inspected: boolean;
+  inspectedDetail: string[];
+  extracted: boolean;
+  extractedDetail: string[];
+  claims: string[];
+}
+
+function researchRows(data: unknown): unknown[] | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const candidate = data as { records?: unknown; rows?: unknown };
+  if (Array.isArray(candidate.records)) return candidate.records;
+  if (Array.isArray(candidate.rows)) return candidate.rows;
+  return null;
+}
+
+function nonEmpty(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+function printClaim(value: unknown): string {
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Absorb one heterogeneous research row (groups A/B use `records[]`, group C
+ * uses `rows[]`; field names differ per group schema). Only real recorded
+ * evidence moves a stage; nothing is inferred from a URL, an HTTP status or a
+ * loaded file alone. Rows without a usable sourceId are counted, never guessed.
+ */
+function absorbResearchRow(
+  row: unknown,
+  group: string,
+  into: Map<number, ResearchEvidence>,
+): 'absorbed' | 'duplicate' | 'unkeyed' {
+  if (typeof row !== 'object' || row === null) return 'unkeyed';
+  const r = row as Record<string, unknown>;
+  const id = r.sourceId;
+  if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || id > 50) {
+    return 'unkeyed';
+  }
+  if (into.has(id)) return 'duplicate';
+  const evidence: ResearchEvidence = {
+    group,
+    inspected: false,
+    inspectedDetail: [],
+    extracted: false,
+    extractedDetail: [],
+    claims: [],
+  };
+  // Pinned revision (group A `pin`, groups B/C `canonical`).
+  const pin = nonEmpty(r.pin) ?? nonEmpty(r.canonical);
+  if (pin) {
+    evidence.inspected = true;
+    evidence.inspectedDetail.push(`pin: ${truncate(pin, 200)}`);
+    const sha = pin.match(/[0-9a-f]{40}/i);
+    if (sha) evidence.inspectedDetail.push(`git sha: ${sha[0].toLowerCase()}`);
+    const committed = pin.match(/committed (\d{4}-\d{2}-\d{2})T/);
+    if (committed) evidence.inspectedDetail.push(`commit date: ${committed[1]}`);
+  }
+  // Recorded read depth (evidence kind: an actual read, not a saved link).
+  const readDepth = nonEmpty(r.readDepth);
+  if (readDepth) {
+    evidence.inspected = true;
+    evidence.inspectedDetail.push(`read depth: ${truncate(readDepth, 160)}`);
+  }
+  if (Array.isArray(r.urls)) {
+    const okReads = r.urls.filter((u) => {
+      if (typeof u !== 'object' || u === null || !('outcome' in u)) return false;
+      return u.outcome === 'ok';
+    }).length;
+    if (okReads > 0) {
+      evidence.inspected = true;
+      evidence.inspectedDetail.push(`${okReads} recorded source URL read(s)`);
+    }
+  }
+  if (Array.isArray(r.filesRead) && r.filesRead.length > 0) {
+    evidence.inspected = true;
+    evidence.inspectedDetail.push(`${r.filesRead.length} source file(s) read`);
+  }
+  if (r.carrierReadComplete === true) {
+    evidence.inspected = true;
+    evidence.inspectedDetail.push('carrier read recorded complete');
+  }
+  const licence = nonEmpty(r.licence);
+  if (licence) evidence.inspectedDetail.push(`licence: ${truncate(licence, 160)}`);
+  // Method extraction (the carrying field differs per group schema).
+  const method = nonEmpty(r.method);
+  const decision = nonEmpty(r.decision);
+  if (r.methodExtracted === true) evidence.extracted = true;
+  if (method) {
+    evidence.extracted = true;
+    evidence.extractedDetail.push(`method: ${truncate(method, 200)}`);
+  }
+  if (decision) {
+    evidence.extracted = true;
+    evidence.extractedDetail.push(`decision: ${truncate(decision, 200)}`);
+  }
+  if (nonEmpty(r.methodConsumer)) evidence.extracted = true;
+  // Group-authored claims — recorded assertions, never test receipts here.
+  for (const key of [
+    'cpuCheck',
+    'cpuChecks',
+    'pixelValidation',
+    'renderedAcceptance',
+  ]) {
+    const claim = r[key];
+    if (claim === undefined || claim === null) continue;
+    evidence.claims.push(`${key}: ${truncate(printClaim(claim), 160)}`);
+  }
+  into.set(id, evidence);
+  return 'absorbed';
+}
+
+/**
+ * Load group research records when the tree ships them (root cherry-picks the
+ * group lanes). An empty glob is the honest pending state; malformed or failed
+ * files are reported and the affected stages stay open. Snapshot provenance
+ * (private machine paths) is never displayed — only in-record pins/sha/dates.
+ */
+async function loadResearch(
+  state: LabState,
+  gen: number,
+  options: LabHostOptions,
+): Promise<void> {
+  const loaders =
+    options.researchLoaders ??
+    import.meta.glob<unknown>(
+      '../../../docs/technique-lab/group-*/SOURCE_RESEARCH.json',
+    );
+  const keys = Object.keys(loaders);
+  if (keys.length === 0) {
+    state.researchSummary =
+      'No research records loadable in this tree — Source inspected and ' +
+      'Technique extracted stay open (honest unknown).';
+    return;
+  }
+  let files = 0;
+  let ignored = 0;
+  let unkeyed = 0;
+  let duplicates = 0;
+  for (const key of keys.sort()) {
+    if (state.disposed || gen !== state.generation) return;
+    const name = key.replace(/^.*group-/, 'group-').replace(/\.json$/, '');
+    let data: unknown;
+    try {
+      data = await loaders[key]();
+    } catch (err) {
+      state.researchIgnored.push(
+        `Research file ${name} failed to load: ${toMessage(err)}; its stages stay open.`,
+      );
+      ignored += 1;
+      continue;
+    }
+    const rows = researchRows(data);
+    if (!rows) {
+      state.researchIgnored.push(
+        `Research file ${name} has an unrecognized shape (expected records[] or rows[]); ignored, nothing inferred.`,
+      );
+      ignored += 1;
+      continue;
+    }
+    files += 1;
+    for (const row of rows) {
+      const outcome = absorbResearchRow(row, name, state.research);
+      if (outcome === 'unkeyed') unkeyed += 1;
+      else if (outcome === 'duplicate') duplicates += 1;
+    }
+  }
+  if (state.disposed || gen !== state.generation) return;
+  state.researchSummary =
+    `Research records: ${files} file(s) read, ${state.research.size} source(s) ` +
+    `with records, ${unkeyed} record(s) without usable sourceId, ` +
+    `${duplicates} duplicate record(s) ignored, ${ignored} file(s) ignored.`;
 }
 
 /* ------------------------------------------------------------------ */
