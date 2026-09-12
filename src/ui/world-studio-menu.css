@@ -106,3 +106,59 @@ body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018
   #menu :is(.map-card,.technique-card)>span { font-size: 14px; }
   #menu :is(.map-card,.technique-card)>strong { display: none; }
 }
+
+/* Colour conveys the destination/action; body copy remains neutral. */
+#menu #menu-panel-deploy { --section-accent: var(--menu-blue); }
+#menu #menu-panel-kit { --section-accent: var(--menu-purple); }
+#menu #menu-panel-streaks { --section-accent: var(--menu-orange); }
+#menu #menu-panel-operator { --section-accent: var(--menu-green); }
+#menu #menu-panel-options { --section-accent: var(--menu-yellow); }
+#menu .menu-panel :is(h2,h3,h4,.kit-heading b,.settings-section>summary,.advanced-settings>summary,
+  .manifest-heading strong,.operator-group>h3,.loadout-manager>strong) { color: var(--section-accent) !important; }
+#menu .menu-panel :is(label>span:first-child,.settings-section>label,.settings-grid>label) { color: var(--section-accent) !important; }
+#menu .menu-panel :is([aria-pressed='true'],[aria-selected='true']) { border-color: var(--section-accent) !important; }
+#menu #menu-tab-operator :is(i,span), #menu .manifest-heading strong { color: var(--menu-green) !important; }
+#menu .menu-tabs button { border-left: 3px solid transparent !important; }
+#menu #menu-tab-deploy.active { border-left-color: var(--menu-blue) !important; }
+#menu #menu-tab-kit.active { border-left-color: var(--menu-purple) !important; }
+#menu #menu-tab-streaks.active { border-left-color: var(--menu-orange) !important; }
+#menu #menu-tab-operator.active { border-left-color: var(--menu-green) !important; }
+#menu #menu-tab-options.active { border-left-color: var(--menu-yellow) !important; }
+#menu .map-card.active>span { color: var(--menu-blue) !important; }
+#menu .controls b { color: var(--menu-yellow) !important; }
+#menu :is(.killstreak-loadout-status,.operator-appearance-status) { color: var(--menu-green) !important; }
+#menu .command-header { min-height: 46px; padding: 8px 20px; justify-content: flex-end; overflow: visible; }
+#menu-meta-actions, #text-chat { display: none !important; }
+#menu .build-stamp { position: relative; margin-left: auto; z-index: 20; }
+#menu .build-stamp>button { display: flex; align-items: center; gap: 14px; min-height: 30px; padding: 6px 10px; border: 0; background: transparent !important; font: 500 12px/1.4 Inter,sans-serif; }
+#menu .build-stamp b { color: var(--menu-blue) !important; }
+#menu .build-stamp time { color: var(--menu-muted); }
+#menu #build-changes { display: none; position: absolute; top: 100%; right: 0; width: min(320px,80vw); padding: 18px; background: var(--menu-panel); border: 1px solid var(--menu-line); border-radius: 8px; box-shadow: 0 12px 32px #0008; font: 400 13px/1.6 Inter,sans-serif; }
+#menu .build-stamp:is(:hover,:focus-within) #build-changes { display: block; }
+#menu #build-changes strong { color: var(--menu-blue) !important; }
+#menu #build-changes ul { padding-left: 18px; margin: 8px 0 0; }
+#menu #menu-panel-streaks .killstreak-loadout-layout { display: block; }
+#menu #menu-panel-streaks .kit-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#menu #menu-panel-streaks .kit-heading>div { display: grid; gap: 8px; }
+#menu #streak-defaults { color: var(--menu-orange) !important; border: 1px solid #ffb06b66; border-radius: 5px; padding: 10px 14px; white-space: nowrap; }
+#menu #menu-panel-streaks .killstreak-slot-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 12px; }
+#menu #menu-panel-streaks .killstreak-slot-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 10px; border: 1px solid var(--menu-line); border-radius: 8px; min-width: 0; }
+#menu #menu-panel-streaks .killstreak-slot-card>span { color: var(--menu-orange) !important; font: 700 11px/1.4 Inter,sans-serif; letter-spacing: .06em; }
+#menu .streak-choices { display: grid; gap: 8px; }
+#menu .streak-choice { position: relative; display: grid; grid-template-columns: 28px 1fr; align-items: center; gap: 4px 8px; min-height: 70px; padding: 10px 8px; border: 1px solid var(--menu-line); border-radius: 5px; text-align: left; cursor: pointer; }
+#menu .streak-icon { width: 24px; height: 24px; grid-row: span 2; color: var(--menu-orange); }
+#menu .streak-choice>span { font: 650 12px/1.3 Inter,sans-serif; }
+#menu .streak-choice>small { grid-column: 2; font: 500 10px/1.3 Inter,sans-serif; }
+#menu .streak-choice .streak-chosen { display: none; position: absolute; top: 3px; right: 5px; font-size: 10px; }
+#menu .streak-choice[aria-pressed='true'] { background: #ffb06b16 !important; border-color: var(--menu-orange) !important; }
+#menu .streak-choice[aria-pressed='true'] :is(span,.streak-chosen) { color: var(--menu-orange) !important; }
+#menu .streak-choice[aria-pressed='true'] .streak-chosen { display: block; }
+#menu .killstreak-slot-card>small { font: 400 11px/1.6 Inter,sans-serif; }
+#menu .streak-choice:disabled { opacity: .65; cursor: default; }
+@media(max-width:1350px) {
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:800px) {
+  #menu #menu-panel-streaks .killstreak-slot-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #menu #menu-panel-streaks .kit-heading { align-items: flex-start; flex-direction: column; }
+}

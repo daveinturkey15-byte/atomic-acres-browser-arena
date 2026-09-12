@@ -10,7 +10,7 @@ export const KILLSTREAK_LOADOUT_STORAGE_KEY = 'atomic-acres:killstreak-loadout:v
 
 export const DEFAULT_KILLSTREAK_LOADOUT: KillstreakLoadoutV1 = parseKillstreakLoadout({
   schemaVersion: 1,
-  slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'],
+  slots: ['care-package', 'piloted-drone', 'carpet-bomber', 'chopper', 'drone-swarm'],
 });
 
 export type KillstreakLoadoutStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -130,6 +130,13 @@ export class KillstreakLoadoutController {
       ? cloneLoadout(options.initialLoadout)
       : readKillstreakLoadout(storage).loadout;
     this.persistSelection = options.persist ?? null;
+    // Adopt the owner's new baseline for profiles still using the exact old
+    // default. Deliberately customized loadouts keep their saved choices.
+    if (this.editable.slots.join(',') === 'scout-sweep,yardhawk,tri-pass,chopper,nuke') {
+      const next = cloneLoadout(DEFAULT_KILLSTREAK_LOADOUT);
+      const saved = this.persistSelection ? this.persistSelection(next) : persistKillstreakLoadout(this.storage, next);
+      if (saved || (!this.persistSelection && !this.storage)) this.editable = next;
+    }
   }
 
   get selected(): KillstreakLoadoutV1 {

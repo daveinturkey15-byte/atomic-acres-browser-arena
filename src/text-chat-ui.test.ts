@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { createTextChatController, type TextChatHostContext } from './text-chat-controller';
 
 const mainSource = readFileSync(new URL('./legacy-main.ts', import.meta.url), 'utf8');
 // Render logic moved to the controller module (streamlining extraction); the
@@ -9,6 +10,22 @@ const shellSource = readFileSync(new URL('./ui/pass64-shell.ts', import.meta.url
 const styleSource = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
 
 describe('text chat UI contract', () => {
+  it('keeps disabled chat inert without touching network or gameplay controls', () => {
+    const root = { hidden: false, inert: false };
+    const input = { disabled: false };
+    const ctx = { enabled: false, elements: { root, input, log: {}, hint: {} },
+      get network() { throw new Error('disabled chat must not access the network'); },
+      clearGameplayInput() { throw new Error('must not capture input'); },
+      resumePointerLock() { throw new Error('must not steal pointer lock'); },
+    } as unknown as TextChatHostContext;
+    const chat = createTextChatController(ctx);
+    chat.open(); chat.render(); chat.submit(); chat.sendHistory('peer'); chat.close(true); chat.reset();
+    expect(chat.available()).toBe(false);
+    expect(chat.typing()).toBe(false);
+    expect(chat.debugSnapshot()).toEqual({ open: false, focused: false, entries: [] });
+    expect(root).toEqual({ hidden: true, inert: true });
+    expect(input.disabled).toBe(true);
+  });
   it('renders one shared room-chat surface outside the menu and HUD', () => {
     expect(shellSource.match(/id="text-chat"/g)).toHaveLength(1);
     expect(shellSource).toContain('id="text-chat-log" role="log" aria-live="polite"');

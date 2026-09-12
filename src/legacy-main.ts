@@ -7879,6 +7879,7 @@ function pendingClientWorldRepair(): boolean {
 // shared mutable state it reads as a live thunk/reference so behaviour stays
 // byte-identical with the pre-extraction inline implementation.
 const textChatController = createTextChatController({
+  enabled: false,
   elements: { root: textChatRoot, log: textChatLog, hint: textChatHint, input: textChatInput },
   network,
   appRoot: app,

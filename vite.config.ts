@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   base: './',
+  define: {
+    'import.meta.env.VITE_BUILD_DROPPED_AT': JSON.stringify(new Date().toISOString()),
+  },
   test: {
     include: ['src/**/*.test.ts', 'shared/**/*.test.ts', 'worker/src/**/*.test.ts'],
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],

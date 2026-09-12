@@ -15,6 +15,7 @@ import { AUDIO_BUS_IDS } from '../pass65-settings';
 import { PASS65_KILLSTREAK_CATALOG } from '../killstreak-catalog';
 import { DEFAULT_KILLSTREAK_LOADOUT } from '../killstreak-loadout';
 import { killstreakLoadoutPanelMarkup } from './killstreak-loadout-menu';
+import { buildStampMarkup } from './build-stamp';
 import { gamepadSettingsMarkup } from '../input/gamepad/settings-panel'; // PASS 84 Lane E
 import { projectMapButtonMarkup, projectMapDialogMarkup } from './project-map-dialog';
 import { releaseHistoryButtonMarkup, releaseHistoryDialogMarkup } from './release-history-dialog';
@@ -152,7 +153,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
       </section>
     </section>
     <aside class="deployment-manifest" aria-label="Deployment manifest">
-      <header class="manifest-heading"><small>DEPLOYMENT MANIFEST</small><strong>OPERATOR + SESSION</strong><span>Configure identity, kit and lobby channel.</span></header>
+      <header class="manifest-heading"><strong>READY TO PLAY</strong><span>Choose your name and start a game.</span></header>
       <div class="setup-grid">
         <label>CALLSIGN<input id="player-name" maxlength="16" autocomplete="nickname" required aria-describedby="player-name-error" placeholder="Enter callsign" value="${model.playerName}"><small id="player-name-error" class="input-error" hidden>Enter a callsign before deployment.</small></label>
         <label>SQUAD<select id="team"><option value="0">Aqua</option><option value="1">Coral</option></select></label>
@@ -358,7 +359,7 @@ function optionsPanelMarkup(): string {
         <p>Off by default. If enabled, completed streaks send your chosen callsign, streak, kills, deaths, build/season and a pseudonymous browser ID to the public leaderboard service. No account credentials are sent. Turning this off stops future submissions and forgets this browser ID; rows already published may remain public.</p>
       </div>
     </section>
-    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> selected grenade · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/grenade · <b>1/2</b> primary/sidearm · <b>TAB</b> roster · <b>ENTER</b> chat<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
+    <div class="controls"><b>WASD</b> move · <b>SHIFT</b> sprint · <b>C</b> crouch · <b>Z/CTRL</b> prone · <b>SPACE</b> jump · <b>RMB</b> ADS · <b>LMB</b> fire · <b>R</b> reload · <b>V</b> knife · <b>G</b> selected grenade · <b>F</b> weapon pickup · <b>WALK OVER DROPS</b> ammo/grenade · <b>1/2</b> primary/sidearm · <b>TAB</b> roster<br><b>PAD</b> left stick move · right stick aim · <b>LT/RT</b> ADS/fire · <b>A</b> jump · <b>B</b> crouch · <b>D-PAD DOWN</b> prone · <b>X</b> reload · <b>Y</b> switch · <b>RB</b> knife</div>
     <p class="legal">Fan-made original arena. No Activision assets, branding, code or ripped map geometry. Keyboard/mouse and standard gamepads supported.</p>
   </div>`;
 }
@@ -450,12 +451,11 @@ function operatorPanelMarkup(): string {
 function menuMarkup(model: Pass64ShellViewModel): string {
   return `<section id="menu" class="panel pass64-command-deck">
     <header class="command-header">
-      <div class="command-brand"><small>AA // ARENA COMMAND</small><strong>BLACKSITE NETWORK</strong><span>${model.releaseLabel}</span></div>
-      <div id="menu-meta-actions">${releaseHistoryButtonMarkup()}${projectMapButtonMarkup()}</div>
+      ${buildStampMarkup()}
+      <div id="menu-meta-actions" hidden inert>${releaseHistoryButtonMarkup()}${projectMapButtonMarkup()}</div>
     </header>
     <div class="command-body">
       <aside class="command-rail">
-        <div class="tactical-rail"><span>OPERATIONS</span><b>ONLINE</b></div>
         <nav class="menu-tabs" role="tablist" aria-label="Deployment menu">
           <button id="menu-tab-deploy" type="button" role="tab" data-menu-tab="deploy" class="active" aria-controls="menu-panel-deploy" aria-selected="true" tabindex="0"><i>01</i><span>DEPLOY</span><small>ARENA + LOBBY</small></button>
           <button id="menu-tab-kit" type="button" role="tab" data-menu-tab="kit" aria-controls="menu-panel-kit" aria-selected="false" tabindex="-1"><i>02</i><span>FIELD KIT</span><small>LOADOUT</small></button>
@@ -463,7 +463,6 @@ function menuMarkup(model: Pass64ShellViewModel): string {
           <button id="menu-tab-operator" type="button" role="tab" data-menu-tab="operator" aria-controls="menu-panel-operator" aria-selected="false" tabindex="-1"><i>04</i><span>OPERATOR</span><small>SKIN + ANIMATION</small></button>
           <button id="menu-tab-options" type="button" role="tab" data-menu-tab="options" aria-controls="menu-panel-options" aria-selected="false" tabindex="-1"><i>05</i><span>OPTIONS</span><small>INPUT + VIDEO</small></button>
         </nav>
-        <footer><span>SESSION</span><strong>SECURE / LOCAL</strong><small>${PASS66_RELEASE_IDENTITY.pass}</small></footer>
       </aside>
       <main class="command-workspace">
         ${deploymentPanelMarkup(model)}
@@ -487,7 +486,7 @@ function deploymentTransitionMarkup(): string {
       <div class="cockpit-instruments"><span><small>ALT</small><b>024 M</b></span><span><small>HDG</small><b>049</b></span><span><small>ROTOR</small><b>ARMED</b></span></div>
     </div>
     <div class="deployment-transition-console">
-      <small id="deployment-transition-kicker">${PASS66_RELEASE_IDENTITY.pass} // DEPLOYMENT STREAM</small>
+      <small id="deployment-transition-kicker">LOADING MAP</small>
       <strong id="deployment-transition-title">NUKE TOWN</strong>
       <span id="deployment-transition-status">Preparing authoritative arena state…</span>
       <progress id="deployment-transition-progress" max="100" value="0" aria-label="Map loading progress">0%</progress>

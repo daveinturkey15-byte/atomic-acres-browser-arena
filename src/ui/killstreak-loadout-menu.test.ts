@@ -20,10 +20,10 @@ describe('killstreak loadout menu projection', () => {
     for (const slot of PASS65_KILLSTREAK_SLOT_DEFINITIONS) {
       for (const id of slot.allowedIds) expect(html).toContain(`value="${id}"`);
     }
-    expect(html).toContain('Slots 3 and 4 must be different');
-    expect(html).toContain('Nuke and Drone Swarm share slot 5');
+    expect(html).toContain('id="streak-defaults"');
+    expect(html).toContain('data-streak-choice="care-package"');
     expect(html).toContain('class="killstreak-loadout-layout"');
-    expect(html).toContain('id="killstreak-demo-rail"');
+    expect(html).not.toContain('id="killstreak-demo-rail"');
     expect(html).not.toContain('<canvas');
   });
 
@@ -121,7 +121,7 @@ function bindFakeMenu(onChange?: (id: Pass65KillstreakId, slot: 1 | 2 | 3 | 4 | 
 describe('HF-316 killstreak loadout menu swap-on-conflict', () => {
   it('no longer disables the sibling heavy slot option anywhere', () => {
     const { root, controller } = bindFakeMenu();
-    // Default loadout: slot 3 = tri-pass, slot 4 = chopper — before HF-316 the
+    // Default loadout: slot 3 = carpet-bomber, slot 4 = chopper — before HF-316 the
     // sibling's pick was rendered disabled in each heavy select.
     for (const select of root.selects) {
       for (const option of select.options) expect(option.disabled).toBe(false);
@@ -137,13 +137,13 @@ describe('HF-316 killstreak loadout menu swap-on-conflict', () => {
   it('swaps slots 3/4 on a sibling conflict pick and announces the swap', () => {
     const changes: Array<[Pass65KillstreakId, number]> = [];
     const { root, controller } = bindFakeMenu((id, slot) => changes.push([id, slot]));
-    // Slot 4 currently holds chopper; picking slot 3's tri-pass must swap.
-    root.selects[3].pick('tri-pass');
-    expect(controller.selected.slots).toEqual(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']);
+    // Slot 4 currently holds chopper; picking slot 3's carpet-bomber must swap.
+    root.selects[3].pick('carpet-bomber');
+    expect(controller.selected.slots).toEqual(['care-package', 'piloted-drone', 'chopper', 'carpet-bomber', 'drone-swarm']);
     expect(root.selects[2].value).toBe('chopper');
-    expect(root.selects[3].value).toBe('tri-pass');
+    expect(root.selects[3].value).toBe('carpet-bomber');
     expect(root.status.textContent).toBe('SWAPPED WITH SLOT 3');
-    expect(changes).toEqual([['tri-pass', 4]]);
+    expect(changes).toEqual([['carpet-bomber', 4]]);
   });
 
   it('keeps the plain saved status for a non-conflicting pick', () => {

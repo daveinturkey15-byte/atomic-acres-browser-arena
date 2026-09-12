@@ -29,6 +29,18 @@ describe('Pass 65 killstreak loadout persistence', () => {
     ]);
   });
 
+  it('migrates the previous exact default through the canonical profile and preserves custom choices', () => {
+    const saved: unknown[] = [];
+    const oldDefault = { schemaVersion: 1 as const, slots: ['scout-sweep', 'yardhawk', 'tri-pass', 'chopper', 'nuke'] as const };
+    const migrated = new KillstreakLoadoutController(null, { initialLoadout: oldDefault, persist: value => { saved.push(value); return true; } });
+    expect(migrated.selected).toEqual(DEFAULT_KILLSTREAK_LOADOUT);
+    expect(saved).toEqual([DEFAULT_KILLSTREAK_LOADOUT]);
+    const custom = replaceKillstreakSlot(oldDefault, 1, 'adrenaline');
+    expect(new KillstreakLoadoutController(null, { initialLoadout: custom }).selected).toEqual(custom);
+    const failedSave = new KillstreakLoadoutController(null, { initialLoadout: oldDefault, persist: () => false });
+    expect(failedSave.selected).toEqual(oldDefault);
+  });
+
   it('repairs malformed or illegal persisted state without propagating free text', () => {
     const storage = new MemoryStorage();
     storage.setItem(KILLSTREAK_LOADOUT_STORAGE_KEY, JSON.stringify({
@@ -43,7 +55,7 @@ describe('Pass 65 killstreak loadout persistence', () => {
 
   it('rejects illegal slot families and duplicate slots 3/4', () => {
     expect(() => replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 1, 'yardhawk')).toThrow(/does not allow/);
-    expect(() => replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 4, 'tri-pass')).toThrow(/distinct|duplicate/);
+    expect(() => replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 4, 'carpet-bomber')).toThrow(/distinct|duplicate/);
     expect(() => replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 3, 'nuke')).toThrow(/does not allow/);
   });
 
@@ -68,7 +80,7 @@ describe('Pass 65 killstreak loadout persistence', () => {
     controller.select(5, 'drone-swarm');
     const editableBefore = controller.selected;
     controller.freezeAtMatchStart();
-    const hostLoadout = replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 1, 'care-package');
+    const hostLoadout = replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 1, 'scout-sweep');
     expect(controller.reconcileActiveMatchAuthority(hostLoadout)).toEqual(hostLoadout);
     expect(controller.activeMatch).toEqual(hostLoadout);
     expect(controller.selected).toEqual(editableBefore);
@@ -79,12 +91,12 @@ describe('Pass 65 killstreak loadout persistence', () => {
   // HF-316 owner correction: picking the sibling heavy slot's current reward
   // must swap the two slots instead of being blocked or throwing.
   it('swaps heavy slots 3 and 4 when the requested id is held by the sibling', () => {
-    // Default: slot 3 = tri-pass, slot 4 = chopper.
+    // Default: slot 3 = carpet-bomber, slot 4 = chopper.
     const swapInto3 = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 3, 'chopper');
-    expect(swapInto3.loadout.slots).toEqual(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']);
+    expect(swapInto3.loadout.slots).toEqual(['care-package', 'piloted-drone', 'chopper', 'carpet-bomber', 'drone-swarm']);
     expect(swapInto3.swappedSlot).toBe(4);
-    const swapInto4 = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 4, 'tri-pass');
-    expect(swapInto4.loadout.slots).toEqual(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']);
+    const swapInto4 = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 4, 'carpet-bomber');
+    expect(swapInto4.loadout.slots).toEqual(['care-package', 'piloted-drone', 'chopper', 'carpet-bomber', 'drone-swarm']);
     expect(swapInto4.swappedSlot).toBe(3);
     expect(Object.isFrozen(swapInto3)).toBe(true);
   });
@@ -93,7 +105,7 @@ describe('Pass 65 killstreak loadout persistence', () => {
     const withSwap = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 3, 'carpet-bomber');
     expect(withSwap.swappedSlot).toBeNull();
     expect(withSwap.loadout).toEqual(replaceKillstreakSlot(DEFAULT_KILLSTREAK_LOADOUT, 3, 'carpet-bomber'));
-    const rePick = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 3, 'tri-pass');
+    const rePick = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 3, 'carpet-bomber');
     expect(rePick.swappedSlot).toBeNull();
     expect(rePick.loadout).toEqual(DEFAULT_KILLSTREAK_LOADOUT);
     const nonHeavy = replaceKillstreakSlotWithSwap(DEFAULT_KILLSTREAK_LOADOUT, 1, 'care-package');
@@ -109,13 +121,13 @@ describe('Pass 65 killstreak loadout persistence', () => {
   it('routes controller.select through the swap so sibling conflicts persist swapped', () => {
     const storage = new MemoryStorage();
     const controller = new KillstreakLoadoutController(storage);
-    const result = controller.select(4, 'tri-pass');
+    const result = controller.select(4, 'carpet-bomber');
     expect(result.swappedSlot).toBe(3);
-    expect(result.loadout.slots).toEqual(['scout-sweep', 'yardhawk', 'chopper', 'tri-pass', 'nuke']);
+    expect(result.loadout.slots).toEqual(['care-package', 'piloted-drone', 'chopper', 'carpet-bomber', 'drone-swarm']);
     expect(controller.select(1, 'adrenaline').swappedSlot).toBeNull();
     // Persistence carries the swap: a fresh controller sees both heavy slots moved.
     expect(new KillstreakLoadoutController(storage).selected.slots).toEqual([
-      'adrenaline', 'yardhawk', 'chopper', 'tri-pass', 'nuke',
+      'adrenaline', 'piloted-drone', 'chopper', 'carpet-bomber', 'drone-swarm',
     ]);
     controller.freezeAtMatchStart();
     expect(() => controller.select(4, 'chopper')).toThrow(/frozen/);

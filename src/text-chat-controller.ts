@@ -38,6 +38,7 @@ export type TextChatNetwork = {
 };
 
 export type TextChatHostContext = {
+  enabled?: boolean;
   /** Chat surface nodes, resolved once by the host (missing node throws). */
   elements: {
     root: HTMLElement;
@@ -98,6 +99,18 @@ function requiredElement<T extends HTMLElement>(selector: string): T {
 
 export function createTextChatController(ctx: TextChatHostContext): TextChatController {
   const { root: textChatRoot, log: textChatLog, hint: textChatHint, input: textChatInput } = ctx.elements;
+  if (ctx.enabled === false) {
+    textChatRoot.hidden = true;
+    textChatRoot.inert = true;
+    textChatInput.disabled = true;
+    const noop = () => undefined;
+    return Object.freeze({ available: () => false, typing: () => false,
+      render: noop, markActivity: noop, showNotice: noop, open: noop, close: noop,
+      reset: noop, acceptEntry: noop, sendHistory: noop, admitHostSubmit: noop,
+      submit: noop, acceptHostMessage: noop, acceptHostHistory: noop, forgetPlayer: noop,
+      debugSnapshot: () => ({ open: false, focused: false, entries: [] }),
+    });
+  }
 
   let textChatHistory: ChatEntry[] = [];
   let localChatRateState: ChatRateState = [];
