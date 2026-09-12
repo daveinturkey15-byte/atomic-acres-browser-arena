@@ -13,7 +13,7 @@ describe('clean vehicle material boundaries', () => {
       expect(paint.transmission).toBe(0);
       expect(paint.side).toBe(THREE.FrontSide);
       expect(paint.metalness).toBe(0);
-      expect(paint.specularIntensity).toBe(1);
+      expect(paint.specularIntensity).toBe(0.08);
       expect(paint.color.getHex(THREE.SRGBColorSpace)).toBe(color);
       expect(paint.colorNode).toMatchObject({ isUniformNode: true });
       expect(paint.clearcoat).toBe(0.8);

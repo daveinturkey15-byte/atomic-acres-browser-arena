@@ -13,11 +13,14 @@
  * Three failures these values are chosen against, each of which is cheap to
  * reintroduce by "just darkening the colour":
  *
- *   - A DARK COLOUR UNDER A CLEARCOAT IS NOT A DARK SURFACE. The renderer sums
- *     the clearcoat Fresnel AND the base Fresnel, so a 4 %-red maroon measures
- *     blue-over-red on every shaded panel and reads lilac. The forge therefore
- *     keeps the authored pigment unchanged and drops `specularIntensity`
- *     rather than applying a channel lift that turns navy into purple.
+ *   - A DARK COLOUR UNDER A CLEARCOAT IS NOT A DARK SURFACE. The installed
+ *     renderer layers the coat over the base (`PhysicalLightingModel.js:860`:
+ *     base * (1 - clearcoat * Fcc) + coat * clearcoat), so the base lobe still
+ *     shows through wherever the coat Fresnel is small, and on a 4 %-red
+ *     maroon that blue-grey base highlight measures blue-over-red on every
+ *     shaded panel and reads lilac. The forge therefore keeps the authored
+ *     pigment unchanged and drops `specularIntensity` rather than applying a
+ *     channel lift that turns navy into purple.
  *   - `new THREE.Color(r, g, b)` WITH FLOATS IS LINEAR since r152. Authoring a
  *     "cream" swatch as floats gives a washed pastel. Swatches here are hex and
  *     go through `setHex(..., SRGBColorSpace)`.
@@ -340,11 +343,11 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
     const pigment = TSL.uniform(new THREE.Vector3(base.r, base.g, base.b));
     const enamel = valueNoise2(vec2(positionWorld.x.add(positionWorld.z).mul(700), positionWorld.y.mul(700)));
     material.userData.forgeFinish = 'clean';
-    // Restore the normal dielectric reflection for intact enamel. The worn
-    // branch's 0.08 multiplier suppresses both normal and grazing specular
-    // response in r185 MeshPhysicalNodeMaterial.setupSpecular(). Keep the
-    // caller's roughness (including the parked-car SSR admission) unchanged.
-    material.specularIntensity = 1;
+    // Keep the shared 0.08 base-lobe look on both finishes. Clean paint gets
+    // its smoother, stronger reflection from the coat below. This deliberate
+    // suppression is an art choice: Three's default 1 is physically valid and
+    // its clearcoat attenuates the base rather than double-counting Fresnel.
+    // Decision and conflicting pin history: docs/threejs-knowledge/material-contract-reconciliation.md.
     material.colorNode = pigment;
     material.roughnessNode = float(baseRoughness);
     material.clearcoat = options.clearcoat ?? 0.8;

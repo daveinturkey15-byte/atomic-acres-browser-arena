@@ -76,10 +76,13 @@ import { map3WeatherShared } from './weather-system';
  * colour ramp — is derived from this one number, so retuning the pace is a
  * one-line change and nothing can fall out of step with anything else.
  */
-// 40 s meant the sun crossed the entire sky every forty seconds - a time-lapse, not a sky, and
-// the first thing the owner would have asked about. 20 minutes reads as a moving sun during a
-// match without turning the arena into a stop-motion. The showcase page can still scrub time.
-export const ORBIT_PERIOD_SECONDS = 1200;
+// 40 s is the recorded ask above and the MAP3-SKY arena contract
+// (map3/map3-arena-sky.test.ts: ten seconds is a quarter turn). It was
+// authored at add3556ca and displaced to 1200 s by 7d76deb74, a revert of an
+// unrelated animation lane that carried this constant with it; no test or
+// owner note asked for the slower orbit. The elevation still only breathes
+// (SUN_ELEV_MID/SWING below), so the key never sets at any period.
+export const ORBIT_PERIOD_SECONDS = 40;
 
 /** Distance from the world origin to the sun body, in metres. */
 export const SUN_ORBIT_RADIUS = 190;

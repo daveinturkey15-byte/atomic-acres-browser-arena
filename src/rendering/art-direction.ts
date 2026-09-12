@@ -841,11 +841,13 @@ export const ARENA_ART_DIRECTIONS: Readonly<Record<ArenaId, ArenaArtDirection>> 
     contrastScale: 1.06,
     crosstalkDelta: -0.13,
     splitTone: {
-      // A restrained warm key / blue shade lets the house paint and foliage
-      // retain their own colour; the previous strong amber grade browned both.
-      shadowTint: 0x496c87,
-      highlightTint: 0xfff0d5,
-      strengthScale: 0.55,
+      // HF-536 look-2a: the measured warm/cool pair in docs/forge/tonal-gap.json.
+      // Retain the authored tonal-match contract while the final matched
+      // render awaits owner review. If amber reaches too far into house paint
+      // or foliage, highlightBalance controls where the highlight begins.
+      shadowTint: 0x2b4258,      // cool slate-blue shade under a warm low sun
+      highlightTint: 0xffd096,   // deeper amber: the last hour, not mid-afternoon
+      strengthScale: 1.45,
       shadowBalance: 0.52,
       highlightBalance: 0.42,
     },
