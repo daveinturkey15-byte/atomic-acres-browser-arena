@@ -101,6 +101,8 @@ describe('world-studio architecture contract', () => {
       ['yellow rear slider open leaf', 26.89, 1.4, -2.6],
       ['teal balcony door open leaf', -26.89, 4.2, -2.9],
       ['teal garage roof door open leaf', -22.5, 4.2, 8.89],
+      ['teal street balcony door open leaf', -13.11, 4.2, 4.95],
+      ['yellow street balcony door open leaf', 13.11, 4.2, 4.95],
       ['teal garage link', -24.05, 1.2, 8.89],
       ['yellow garage link', 24.05, 1.2, 8.89],
       ['teal garage vehicle door', -20, 1.5, 18.9],
@@ -183,6 +185,50 @@ describe('world-studio architecture contract', () => {
     }
     const upper = platforms.filter((platform) => Math.abs(platform.y - UPPER_FLOOR_Y) < 1e-6);
     expect(upper.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps the upper bedroom windows looking across the street', () => {
+    // Both master bedrooms glaze localZ -6.6..-4.6 on their street wall at 4.10..5.65.
+    const eyeY = 4.9;
+    const z = -5.6;
+    const blockers = new Set<string>();
+    for (let x = -13.6; x <= 13.6; x += 0.02) {
+      const solid = occupied(architecture.solids, x, eyeY, z);
+      if (solid) blockers.add(`${solid.id}:${solid.material}`);
+    }
+    // Glass is the only thing standing in the duel, and root's glass authority owns it.
+    for (const blocker of blockers) {
+      expect(blocker, 'only glass may interrupt the cross-street sightline').toMatch(/:glass$/);
+    }
+    expect(blockers.size, 'both panes are on the line').toBe(2);
+  });
+
+  it('keeps every published ramp clear of its own colliders', () => {
+    for (const ramp of architecture.verticalNavigation.ramps) {
+      for (let sample = 0; sample <= 24; sample++) {
+        const t = sample / 24;
+        const x = ramp.from[0] + (ramp.to[0] - ramp.from[0]) * t;
+        const y = ramp.from[1] + (ramp.to[1] - ramp.from[1]) * t;
+        const z = ramp.from[2] + (ramp.to[2] - ramp.from[2]) * t;
+        for (const height of [0.5, 1.1, 1.7]) {
+          const blocker = occupied(architecture.solids, x, y + height, z);
+          expect(blocker?.id ?? null, `${ramp.id} at t=${t.toFixed(2)} +${height} (blocked by ${blocker?.id})`).toBeNull();
+        }
+      }
+    }
+  });
+
+  it('opens the street balcony as a walkable upper position', () => {
+    const platforms = architecture.verticalNavigation.platforms.filter((platform) => platform.id.endsWith('-street-balcony'));
+    expect(platforms.length).toBe(2);
+    for (const platform of platforms) {
+      expect(platform.y).toBeCloseTo(UPPER_FLOOR_Y, 6);
+      const x = (platform.minX + platform.maxX) / 2;
+      const z = (platform.minZ + platform.maxZ) / 2;
+      expect(supportHeight(architecture.solids, x, z, UPPER_FLOOR_Y + 0.01), `${platform.id} deck`).toBeCloseTo(UPPER_FLOOR_Y, 5);
+      // Standing room above the deck, under the pergola.
+      expect(occupied(architecture.solids, x, UPPER_FLOOR_Y + 1.7, z)?.id ?? null).toBeNull();
+    }
   });
 
   it('stays inside the authored geometry budget', () => {

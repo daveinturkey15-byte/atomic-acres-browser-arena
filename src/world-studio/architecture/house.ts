@@ -424,7 +424,8 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     { id: 'hall-window', u0: 6.4, u1: 7.8, y0: 1, y1: 2.35, kind: 'window', mullions: 1 },
     { id: 'bedroom-street-a', u0: -6.6, u1: -4.6, y0: 4.1, y1: 5.65, kind: 'window', mullions: 1 },
     { id: 'bedroom-street-b', u0: -3.4, u1: -1.4, y0: 4.1, y1: 5.65, kind: 'window', mullions: 1 },
-    { id: 'landing-street', u0: 4, u1: 5.6, y0: 4.2, y1: 5.65, kind: 'window', mullions: 1 },
+    // Full-height slider onto the street balcony that roofs the porch.
+    { id: 'landing-balcony-door', u0: 3.6, u1: 5.4, y0: UPPER_FLOOR_Y, y1: 5.65, kind: 'slider', mullions: 1 },
   ];
 
   const rearOpenings: Opening[] = [
@@ -703,17 +704,50 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   box('porch-slab', 'foundation', 'concrete', PORCH_X0, PORCH_X1, 0, PORCH_Y, PORCH_Z0, PORCH_Z1, EXTERIOR_CONTACT);
   box('porch-step', 'foundation', 'concrete', PORCH_X1, PORCH_X1 + 0.45, 0, PORCH_Y - 0.08, PORCH_Z0 + 2.4, PORCH_Z1 - 1.4, EXTERIOR_CONTACT);
   box('porch-edge', 'trim', null, PORCH_X0, PORCH_X1 + 0.02, PORCH_Y - 0.05, PORCH_Y, PORCH_Z1, PORCH_Z1 + 0.02, EXTERIOR_CONTACT);
+  // Posts carry the street balcony, which roofs the porch the way the yellow-house
+  // reference does; the pergola then sits above the balcony rather than over the entry.
+  const balconyDeckY = UPPER_FLOOR_Y;
   for (const [index, z] of [1, 2.9, 5.1, 6.9].entries()) {
-    box(`porch-post-${index}`, 'trim', 'wood', PORCH_X1 - 0.22, PORCH_X1 - 0.08, PORCH_Y, 2.95, z - 0.07, z + 0.07, EXTERIOR_CONTACT, true);
+    box(`porch-post-${index}`, 'trim', 'wood', PORCH_X1 - 0.24, PORCH_X1 - 0.08, PORCH_Y, balconyDeckY - 0.12, z - 0.08, z + 0.08, EXTERIOR_CONTACT, true);
   }
-  box('porch-beam-outer', 'trim', null, PORCH_X1 - 0.26, PORCH_X1 - 0.04, 2.95, 3.15, PORCH_Z0, PORCH_Z1);
-  box('porch-beam-inner', 'trim', null, PORCH_X0 - 0.06, PORCH_X0 + 0.16, 2.95, 3.15, PORCH_Z0, PORCH_Z1);
-  for (let slat = 0; slat < 20; slat++) {
-    const z = PORCH_Z0 + 0.25 + slat * 0.33;
-    if (z > PORCH_Z1 - 0.1) break;
-    box(`porch-slat-${slat}`, 'trim', null, PORCH_X0 - 0.04, PORCH_X1 - 0.02, 3.15, 3.23, z - 0.03, z + 0.03);
-  }
+  box('porch-beam-outer', 'trim', null, PORCH_X1 - 0.28, PORCH_X1 - 0.04, balconyDeckY - 0.3, balconyDeckY - 0.12, PORCH_Z0, PORCH_Z1);
+  box('porch-beam-inner', 'trim', null, PORCH_X0 - 0.02, PORCH_X0 + 0.18, balconyDeckY - 0.3, balconyDeckY - 0.12, PORCH_Z0, PORCH_Z1);
+  box('porch-ceiling', 'trim', null, PORCH_X0, PORCH_X1 - 0.04, balconyDeckY - 0.12, balconyDeckY - 0.06, PORCH_Z0, PORCH_Z1);
   platforms.push({ id: `${id}-porch`, ...boundsOf(spanX(PORCH_X0, PORCH_X1), [PORCH_Z0, PORCH_Z1]), y: PORCH_Y });
+
+  // ---------------------------------------------------------------- street balcony
+
+  box('street-balcony-deck', 'door', 'wood', PORCH_X0, PORCH_X1, balconyDeckY - 0.06, balconyDeckY, PORCH_Z0, PORCH_Z1, EXTERIOR_CONTACT);
+  box('street-balcony-fascia', 'trim', null, PORCH_X1, PORCH_X1 + 0.05, balconyDeckY - 0.22, balconyDeckY + 0.02, PORCH_Z0 - 0.05, PORCH_Z1 + 0.05);
+  const streetRailTop = balconyDeckY + 1.02;
+  box('street-balcony-rail-outer', 'trim', 'wood', PORCH_X1 - 0.08, PORCH_X1, streetRailTop - 0.09, streetRailTop, PORCH_Z0, PORCH_Z1);
+  box('street-balcony-rail-a', 'trim', 'wood', PORCH_X0, PORCH_X1, streetRailTop - 0.09, streetRailTop, PORCH_Z0, PORCH_Z0 + 0.08);
+  box('street-balcony-rail-b', 'trim', 'wood', PORCH_X0, PORCH_X1, streetRailTop - 0.09, streetRailTop, PORCH_Z1 - 0.08, PORCH_Z1);
+  for (let baluster = 0; baluster < 52; baluster++) {
+    const z = PORCH_Z0 + 0.1 + baluster * 0.13;
+    if (z > PORCH_Z1 - 0.08) break;
+    box(`street-balcony-baluster-${baluster}`, 'trim', null, PORCH_X1 - 0.06, PORCH_X1 - 0.01, balconyDeckY, streetRailTop - 0.09, z - 0.025, z + 0.025);
+  }
+  for (const [index, z] of [PORCH_Z0 + 0.04, PORCH_Z1 - 0.09].entries()) {
+    for (let baluster = 0; baluster < 12; baluster++) {
+      const x = PORCH_X0 + 0.12 + baluster * 0.13;
+      if (x > PORCH_X1 - 0.1) break;
+      box(`street-balcony-end-baluster-${index}-${baluster}`, 'trim', null, x - 0.025, x + 0.025, balconyDeckY, streetRailTop - 0.09, z, z + 0.05);
+    }
+  }
+  // Pergola over the balcony: two outer posts and a wall ledger, slats running out from the
+  // house. Well above head height on the deck, so it carries no collider.
+  for (const [index, z] of [PORCH_Z0 + 0.5, PORCH_Z1 - 0.5].entries()) {
+    box(`pergola-post-${index}`, 'trim', 'wood', PORCH_X1 - 0.22, PORCH_X1 - 0.08, balconyDeckY, 6.15, z - 0.07, z + 0.07, undefined, true);
+  }
+  box('pergola-beam-outer', 'trim', null, PORCH_X1 - 0.26, PORCH_X1 - 0.04, 6.15, 6.33, PORCH_Z0, PORCH_Z1);
+  box('pergola-ledger', 'trim', null, PORCH_X0 - 0.02, PORCH_X0 + 0.16, 6.15, 6.33, PORCH_Z0, PORCH_Z1);
+  for (let slat = 0; slat < 22; slat++) {
+    const z = PORCH_Z0 + 0.2 + slat * 0.32;
+    if (z > PORCH_Z1 - 0.1) break;
+    box(`pergola-slat-${slat}`, 'trim', null, PORCH_X0 - 0.04, PORCH_X1 - 0.02, 6.33, 6.41, z - 0.03, z + 0.03);
+  }
+  platforms.push({ id: `${id}-street-balcony`, ...boundsOf(spanX(PORCH_X0, PORCH_X1), [PORCH_Z0, PORCH_Z1]), y: balconyDeckY });
 
   // ---------------------------------------------------------------- balcony and external stair
 
@@ -725,7 +759,9 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   const railTop = UPPER_FLOOR_Y + 1.02;
   box('balcony-rail-outer', 'trim', 'wood', BALCONY_X0, BALCONY_X0 + 0.08, railTop - 0.09, railTop, BALCONY_Z0, BALCONY_Z1);
   box('balcony-rail-north', 'trim', 'wood', BALCONY_X0, BALCONY_X1, railTop - 0.09, railTop, BALCONY_Z0, BALCONY_Z0 + 0.08);
-  box('balcony-rail-south', 'trim', 'wood', BALCONY_X0, BALCONY_X1 - 1.4, railTop - 0.09, railTop, BALCONY_Z1 - 0.08, BALCONY_Z1);
+  // The south rail stops short of the external stair head: the run starts at localX -9.25,
+  // so railing that end would stand a collider across the route it serves.
+  box('balcony-rail-south', 'trim', 'wood', BALCONY_X1 - 1.4, BALCONY_X1, railTop - 0.09, railTop, BALCONY_Z1 - 0.08, BALCONY_Z1);
   let balconyBaluster = 0;
   for (let step = 0; step < 46; step++) {
     const z = BALCONY_Z0 + 0.12 + step * 0.13;
@@ -811,6 +847,9 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     const y = 2.66 + panel * 0.16;
     box(`garage-door-panel-${panel}`, 'metal', null, -2.3, 2.3, y, y + 0.14, GARAGE_Z1 - 1.9, GARAGE_Z1 - 1.82);
   }
+  for (const [index, x] of [-2.32, 2.32].entries()) {
+    box(`garage-door-track-${index}`, 'metal', null, x - 0.05, x + 0.05, 3.2, 3.28, GARAGE_Z1 - 3.4, GARAGE_Z1 - 0.2);
+  }
   box('garage-door-head', 'trim', null, -2.45, 2.45, 2.55, 2.72, GARAGE_Z1 - 0.26, GARAGE_Z1 + 0.02);
   box('garage-door-jamb-a', 'trim', null, -2.45, -2.3, 0, 2.72, GARAGE_Z1 - 0.26, GARAGE_Z1 + 0.02, EXTERIOR_CONTACT, true);
   box('garage-door-jamb-b', 'trim', null, 2.3, 2.45, 0, 2.72, GARAGE_Z1 - 0.26, GARAGE_Z1 + 0.02, EXTERIOR_CONTACT, true);
@@ -863,12 +902,16 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
       [slopeLength, ROOF_THICKNESS, roofDepth],
       [0, 0, -sign * frontSign * ROOF_PITCH],
     );
-    // Fascia and gutter along the eave.
+    // Fascia, soffit and gutter along the eave. The fascia sits just outboard of the slab
+    // edge and the soffit closes the overhang, both clear of the sloped underside.
     const eaveLocalX = sign * ROOF_RUN;
-    box(`fascia-${sign > 0 ? 'front' : 'rear'}`, 'trim', null, eaveLocalX - sign * 0.08, eaveLocalX, EAVE_Y - 0.38, EAVE_Y - 0.02, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
-    box(`gutter-${sign > 0 ? 'front' : 'rear'}`, 'trim', null, eaveLocalX, eaveLocalX + sign * 0.11, EAVE_Y - 0.42, EAVE_Y - 0.28, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
-    for (const [index, z] of [-HOUSE_HALF_DEPTH - 0.2, HOUSE_HALF_DEPTH + 0.2].entries()) {
-      box(`downpipe-${sign > 0 ? 'front' : 'rear'}-${index}`, 'trim', null, eaveLocalX - sign * 0.02, eaveLocalX + sign * 0.08, 0.05, EAVE_Y - 0.42, z - 0.05, z + 0.05, EXTERIOR_CONTACT, true);
+    const face = sign > 0 ? 'front' : 'rear';
+    box(`soffit-${face}`, 'trim', null, sign * HOUSE_HALF_WIDTH, eaveLocalX, EAVE_Y - 0.33, EAVE_Y - 0.27, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
+    box(`fascia-${face}`, 'trim', null, eaveLocalX, eaveLocalX + sign * 0.09, EAVE_Y - 0.45, EAVE_Y - 0.06, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
+    box(`gutter-${face}`, 'trim', null, eaveLocalX + sign * 0.09, eaveLocalX + sign * 0.21, EAVE_Y - 0.44, EAVE_Y - 0.3, -HOUSE_HALF_DEPTH - RAKE_OVERHANG, HOUSE_HALF_DEPTH + RAKE_OVERHANG);
+    for (const [index, z] of [-HOUSE_HALF_DEPTH + 0.35, HOUSE_HALF_DEPTH - 0.35].entries()) {
+      box(`downpipe-${face}-${index}`, 'trim', null, sign * HOUSE_HALF_WIDTH, sign * (HOUSE_HALF_WIDTH + 0.09), 0.05, EAVE_Y - 0.46, z - 0.05, z + 0.05, EXTERIOR_CONTACT, true);
+      box(`downpipe-elbow-${face}-${index}`, 'trim', null, sign * HOUSE_HALF_WIDTH, eaveLocalX + sign * 0.15, EAVE_Y - 0.46, EAVE_Y - 0.37, z - 0.05, z + 0.05);
     }
     // Rake boards on both gable ends.
     for (const [index, z] of [-(HOUSE_HALF_DEPTH + RAKE_OVERHANG) + 0.06, HOUSE_HALF_DEPTH + RAKE_OVERHANG - 0.06].entries()) {
@@ -930,6 +973,8 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
     { id: `${id}-bedroom`, position: [wx(1.4), 4.95, -7.6], target: [wx(6.8), 4.8, -3] },
     { id: `${id}-backyard`, position: [wx(-16), 2.4, -7], target: [wx(-5), 3.6, 0] },
     { id: `${id}-stair`, position: [wx(4.6), 1.7, 7.8], target: [wx(0.6), 2.6, 3] },
+    { id: `${id}-street-balcony`, position: [wx(8.1), 4.9, 6.5], target: [wx(20), 3.4, -2] },
+    { id: `${id}-porch`, position: [wx(12), 1.7, 1.5], target: [wx(6.9), 1.9, 4.2] },
   );
 
   return { routes, ramps, platforms, anchors, reviewPoints };

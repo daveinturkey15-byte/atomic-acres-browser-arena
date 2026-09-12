@@ -19,8 +19,8 @@ const { root, solids, verticalNavigation, reviewPoints } = createStudioArchitect
   `rotation`, which `src/collision.ts` already supports.
 - `verticalNavigation` — `ArenaVerticalNavigation` with the interior stair, the external
   balcony stair and the garage-roof door as routes and ramps, plus walkable platforms.
-- `reviewPoints` — ten cameras (street, living room, bedroom, backyard, stair per house) for
-  root's render-and-critique pass.
+- `reviewPoints` — fourteen cameras (street, living room, bedroom, backyard, stair, street
+  balcony and porch per house) for root's render-and-critique pass.
 
 Extras published on `root.userData`:
 
@@ -37,9 +37,9 @@ Counted by `studio-architecture.test.ts`, not estimated:
 
 | metric | value | lane budget |
 | --- | --- | --- |
-| triangles | 17,928 | ≤ 100,000 |
+| triangles | 20,088 | ≤ 100,000 |
 | renderable draw groups | 24 | ≤ 80 |
-| solids (colliders) | 432 | — |
+| solids (colliders) | 444 | — |
 | generated texture families | 4 × 512² (albedo + normal + roughness) | "modest handful" |
 
 ## Layout
@@ -62,10 +62,16 @@ garage side. Teal is centred at X = −20 facing +X, yellow at X = +20 facing �
   full-height slider onto the garage roof deck.
 - **Vertical:** 16-tread interior stair in the hall (rise 0.201, going 0.281) through a real
   hole in the upper slab; a 16-tread external stair from the rear balcony to the yard.
+- **Balconies:** a street balcony at 3.30 roofing the porch, with a pergola above it, reached
+  by a full-height slider from the landing; a rear balcony over the back door, reached from
+  the study, with the external stair down to the yard.
 
 Routes through each house: street → porch → hall → living → dining → rear slider → yard;
-hall → kitchen → garage → side lane; landing → balcony → external stair → yard; bedroom two
-→ garage roof. The garage roof (3.50) is a published walkable platform.
+hall → kitchen → garage → side lane; landing → street balcony; study → rear balcony →
+external stair → yard; bedroom two → garage roof. The garage roof (3.50) and both balconies
+are published walkable platforms. The two master bedrooms glaze the same band of their
+street walls, so the cross-street window duel is a straight line interrupted only by glass —
+asserted, not assumed, in `studio-architecture.test.ts`.
 
 ## Method
 
@@ -98,21 +104,25 @@ interior furniture; those belong to other lanes and to root.
 
 1. **Porch depth.** The reference angle shows a deep verandah, but the contracted 14 m
    footprint leaves only 3 m between the front wall (X = ±13) and the road corridor
-   (X = ±10), so the porch is a 1.6 m entry with a pergola. Deliberate deviation from the
-   image in favour of the coordinate contract.
-2. **Solids share meshes.** Several solids point at the same merged mesh. If root needs a
+   (X = ±10), so the porch is a 1.6 m entry roofed by the street balcony. Deliberate
+   deviation from the image in favour of the coordinate contract.
+2. **Both houses carry the yellow house's street balcony.** The teal reference shows a
+   pergola-over-porch instead. Gameplay symmetry was ranked above per-house silhouette
+   variety: an upper street-facing firing position on one side only would not be a fair
+   Nuke Town loop. Palette, masonry and interior accent still differ per house.
+3. **Solids share meshes.** Several solids point at the same merged mesh. If root needs a
    mesh per collider — for per-panel destruction or per-pane glass breaking — that needs a
    second pass; the bucketing is a one-line change but would raise the draw-group count.
-3. **Glass panes** are listed as `glass` solids with correct bounds, but they are merged into
+4. **Glass panes** are listed as `glass` solids with correct bounds, but they are merged into
    one mesh per house, so they are not individually breakable as authored.
-4. **Stone veneer** is the `brick` family at a coarser tile with a stronger normal rather
+5. **Stone veneer** is the `brick` family at a coarser tile with a stronger normal rather
    than a dedicated stacked-stone generator. It reads as coursed masonry, not as the rubble
    stone in the yellow-house reference.
-5. **Carpet and terrazzo** are the `concrete` family retinted and rescaled. Plausible at
+6. **Carpet and terrazzo** are the `concrete` family retinted and rescaled. Plausible at
    player distance; a dedicated generator would be better and is cheap to add later.
-6. **Gable infill** above the attic ceiling is non-colliding: it is enclosed by the ceiling
+7. **Gable infill** above the attic ceiling is non-colliding: it is enclosed by the ceiling
    slab below and the roof slabs above, both of which do collide.
-7. **No lighting, renderer, rAF, listeners or window globals** are created here, per the
+8. **No lighting, renderer, rAF, listeners or window globals** are created here, per the
    brief. Materials respond to whatever environment and lights root installs.
-8. Renderer-side quality (FPS, draw calls after batching, mobile behaviour) is **not**
+9. Renderer-side quality (FPS, draw calls after batching, mobile behaviour) is **not**
    self-certified: root renders, inspects and critiques.
