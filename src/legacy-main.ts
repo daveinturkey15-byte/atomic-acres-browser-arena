@@ -3545,8 +3545,31 @@ function constructArena(arenaId: ArenaId, recordConstruction = true): ArenaMap {
     // Factory exceptions can occur after meshes have already been attached to
     // the staging scene. Retire all reachable partial construction behind the
     // same GPU fence instead of leaking or reusing a poisoned generation.
-    if (candidate) scheduleDeferredGpuRetirement(candidate.root);
-    for (const partialRoot of [...stagingScene.children]) scheduleDeferredGpuRetirement(partialRoot);
+    // World-studio (wave 3): explicit terminal retirement first; the staging
+    // detach above no longer disposes anything by itself.
+    if (candidate) {
+      const completedCandidate = candidate;
+      const worldStudioRetirement = typeof candidate.root.userData.worldStudioRetire === 'function';
+      candidate.root.userData.worldStudioRetire?.();
+      if (worldStudioRetirement) {
+        scheduleDeferredGpuRetirement(candidate.root, false, () => disposeRetiredArena(arenaId, completedCandidate));
+      } else {
+        scheduleDeferredGpuRetirement(candidate.root);
+      }
+    }
+    for (const partialRoot of [...stagingScene.children]) {
+      const worldStudioRetirement = typeof partialRoot.userData.worldStudioRetire === 'function';
+      partialRoot.userData.worldStudioRetire?.();
+      if (worldStudioRetirement) {
+        scheduleDeferredGpuRetirement(partialRoot, false, () => {
+          const finalize = partialRoot.userData.worldStudioRetire?.();
+          finalize?.();
+          disposeArenaPresentationRoot(partialRoot as THREE.Group);
+        });
+      } else {
+        scheduleDeferredGpuRetirement(partialRoot);
+      }
+    }
     throw error;
   }
 }
@@ -3566,6 +3589,11 @@ function ensureArenaConstructed(arenaId: ArenaId): ArenaMap {
 }
 
 function retireArenaAfterGpuFence(arenaId: ArenaId, candidate: ArenaMap): void {
+  // World-studio (wave 3): explicit terminal retirement behind the GPU fence. Ordinary detaches
+  // (staging, cache moves, live adoption) never dispose; this fenced path does, exactly once,
+  // restoring PBR originals before the deferred disposer walks materials.
+  const worldStudioRetirement = typeof candidate.root.userData.worldStudioRetire === 'function';
+  candidate.root.userData.worldStudioRetire?.();
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
   const textures = new Set<THREE.Texture>();
@@ -3594,10 +3622,17 @@ function retireArenaAfterGpuFence(arenaId: ArenaId, candidate: ArenaMap): void {
   // A failed generation can be replaced before its deferred retirement runs.
   // Never let the old generation delete that fresh successor.
   if (arenaCache.get(arenaId) === candidate) arenaCache.delete(arenaId);
-  scheduleDeferredGpuRetirement(candidate.root);
+  if (worldStudioRetirement) {
+    scheduleDeferredGpuRetirement(candidate.root, false, () => disposeRetiredArena(arenaId, candidate, false));
+  } else {
+    scheduleDeferredGpuRetirement(candidate.root);
+  }
 }
 
-function disposeRetiredArena(arenaId: ArenaId, candidate: ArenaMap): void {
+function disposeRetiredArena(arenaId: ArenaId, candidate: ArenaMap, inventoryAlreadyRecorded = false): void {
+  // Same explicit retirement as retireArenaAfterGpuFence, before the synchronous walk.
+  const finalize = candidate.root.userData.worldStudioRetire?.();
+  finalize?.();
   candidate.root.removeFromParent();
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();
@@ -3623,13 +3658,15 @@ function disposeRetiredArena(arenaId: ArenaId, candidate: ArenaMap): void {
   for (const material of materials) material.dispose();
   // TextureLoader/Cache may return the same texture to a newly constructed
   // arena. Keep shared texture objects alive; terminal teardown owns them.
-  arenaRetirementInventory.roots += 1;
-  arenaRetirementInventory.geometries += geometries.size;
-  arenaRetirementInventory.materials += materials.size;
-  arenaRetirementInventory.shadowMaps += shadowMaps;
-  arenaRetirementInventory.texturesDeferredToSharedCache += textures.size;
+  if (!inventoryAlreadyRecorded) {
+    arenaRetirementInventory.roots += 1;
+    arenaRetirementInventory.geometries += geometries.size;
+    arenaRetirementInventory.materials += materials.size;
+    arenaRetirementInventory.shadowMaps += shadowMaps;
+    arenaRetirementInventory.texturesDeferredToSharedCache += textures.size;
+  }
   candidate.root.clear();
-  arenaCache.delete(arenaId);
+  if (arenaCache.get(arenaId) === candidate) arenaCache.delete(arenaId);
 }
 
 function disposeArenaPresentationRoot(root: THREE.Group): void {

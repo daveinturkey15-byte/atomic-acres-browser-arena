@@ -11,11 +11,12 @@ import { createStudioVehicles } from './vehicles';
 import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
 import { createStudioGardens } from './gardens';
 import { createStudioBlenderAssets } from './blender-assets';
+import { attachHousePresentation, type HousePresentationOptions } from './blender-presentation/houses';
 import { createStudioLighting } from './lighting';
 import { createStudioPbrLibrary } from './pbr-library';
 
 /** A new arena with one authority root; never aliases or wraps an old map builder. */
-export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
+export function buildWorldStudio(scene: THREE.Scene, housePresentationOptions?: HousePresentationOptions): ArenaMap {
   const root = new THREE.Group(); root.name = 'world-studio-authoritative-arena';
   const ground = createStudioGround();
   const architecture = createStudioArchitecture();
@@ -56,22 +57,66 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
     .filter(solid => /-house-(?:ext-)?stair-\d+$/.test(solid.id))
     .map(solid => solid.bounds));
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
+  // Blender house shells: presentation only. The root is attached now but stays invisible until
+  // every shell has been decided; only a house whose load resolved AND audit passed is then
+  // shown, and only that house's procedural art is hidden. Failure leaves procedural art.
+  // Solids, colliders, shot surfaces, the dynamic glass registry, spawns and navigation above
+  // are already final and are never derived from these meshes. Failure leaves procedural art.
+  const housePresentation = attachHousePresentation({ architectureRoot: architecture.root, breakableWindows, raycastMeshes }, housePresentationOptions);
+  root.add(housePresentation.root);
+  root.userData.worldStudioHouseStatus = housePresentation.status();
+  root.userData.worldStudioHousePresentation = housePresentation;
+  // Lifecycle (wave 3, 2026-09-12): `retired` is the only terminal signal. Ordinary reparenting —
+  // the staging detach in legacy-main constructArena, arena-cache moves, live adoption through
+  // arenaVisualStream — must never dispose the loaders. Terminal retirement is explicit through
+  // `root.userData.worldStudioRetire()`, called by the fenced retirement paths in legacy-main.
+  let retired = false;
+  let finalized = false;
+  let retirePbr: (() => void) | null = null;
+  let retireHeroes: (() => void) | null = null;
+  let finalizeWorldStudioPresentation: (() => void) | null = null;
+  const retireWorldStudioPresentation = (): (() => void) => {
+    if (!retired) {
+      retired = true;
+      root.visible = false;
+      housePresentation.root.visible = false;
+      finalizeWorldStudioPresentation = () => {
+        if (finalized) return;
+        finalized = true;
+        retirePbr?.();
+        retireHeroes?.();
+        housePresentation.dispose();
+        root.userData.worldStudioHouseStatus = housePresentation.status();
+      };
+    }
+    return finalizeWorldStudioPresentation!;
+  };
+  root.userData.worldStudioRetire = retireWorldStudioPresentation;
+  root.userData.worldStudioIsRetired = (): boolean => retired;
+  void housePresentation.ready.then(outcomes => {
+    if (retired) {
+      housePresentation.root.visible = false;
+      return;
+    }
+    root.userData.worldStudioHouseStatus = housePresentation.status();
+    root.userData.worldStudioHouseOutcomes = Object.fromEntries([...outcomes].map(([variant, outcome]) =>
+      [variant, { substituted: outcome.substituted, reason: outcome.reason, glass: outcome.glass?.authority ?? null }]));
+  });
   if (typeof window !== 'undefined') {
     const pbr = createStudioPbrLibrary();
-    let retired = false;
     const originals = ground.surfaces.slice(0, 2).map(material => ({
       material, map: material.map, normalMap: material.normalMap, roughnessMap: material.roughnessMap,
     }));
     root.userData.worldStudioPbrStatus = 'loading';
-    root.addEventListener('removed', () => {
-      retired = true;
+    retirePbr = () => {
       // Restore originals before the arena disposer walks materials. The PBR
       // library releases its own clones; root disposal still owns the old maps.
       originals.forEach(({ material, ...maps }) => Object.assign(material, maps));
       pbr.dispose();
-    });
+      root.userData.worldStudioPbrStatus = 'disposed';
+    };
     void pbr.whenReady().then(() => {
-      if (retired || root.parent !== scene) { pbr.dispose(); return; }
+      if (retired) return;
       ['asphalt_02', 'brushed_concrete_03'].forEach((id, index) => {
         // Ground UVs are already in two-metre units, including box faces.
         const consumer = pbr.createConsumer(id, { sizeMeters: [2, 2], normalScale: .5 });
@@ -84,13 +129,19 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
       });
       root.userData.worldStudioPbrStatus = 'ready';
     }).catch(error => {
-      pbr.dispose();
-      if (!retired) root.userData.worldStudioPbrStatus = `failed: ${String(error)}`;
+      if (!retired) {
+        pbr.dispose();
+        root.userData.worldStudioPbrStatus = `failed: ${String(error)}`;
+      }
     });
     const heroes = createStudioBlenderAssets({ headingRadians: Math.PI });
     root.userData.worldStudioBlenderStatus = 'loading';
+    retireHeroes = () => {
+      heroes.dispose();
+      root.userData.worldStudioBlenderStatus = 'disposed';
+    };
     void heroes.ready.then(() => {
-      if (root.parent !== scene) { heroes.dispose(); return; }
+      if (retired) return;
       // The procedural contract uses a -Z bus nose and +Z truck nose. The
       // Blender exports use +Z locally; the revised truck is centered on its
       // authored origin, aligned with the existing envelope without an offset.
@@ -107,9 +158,11 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
       });
       root.userData.worldStudioBlenderStatus = 'ready';
     }).catch(error => {
-      heroes.dispose();
-      root.userData.worldStudioBlenderStatus = `failed: ${String(error)}`;
-      console.error('World Studio Blender assets failed to load', error);
+      if (!retired) {
+        heroes.dispose();
+        root.userData.worldStudioBlenderStatus = `failed: ${String(error)}`;
+        console.error('World Studio Blender assets failed to load', error);
+      }
     });
   }
   root.userData.worldStudioBuild = Object.freeze({

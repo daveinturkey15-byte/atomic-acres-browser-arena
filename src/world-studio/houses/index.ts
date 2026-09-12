@@ -232,7 +232,22 @@ function applyPresentationContract(scene: THREE.Object3D, spec: HouseShellSpec):
   });
 }
 
-function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudit {
+/**
+ * Finds the authored semantic root from glTF extras, rather than from the display name.
+ *
+ * GLTFLoader exposes the glTF scene as a wrapper (`Scene`) and sanitizes dotted node names for
+ * animation bindings. Neither is a reliable identity for the Blender-authored contract. The
+ * partition extra is the identity, and exactly one node must carry it.
+ */
+function contractRoots(scene: THREE.Object3D, spec: HouseShellSpec): THREE.Object3D[] {
+  const matches: THREE.Object3D[] = [];
+  scene.traverse((node) => {
+    if (extras(node).atomic_presentation_partition === spec.partition) matches.push(node);
+  });
+  return matches;
+}
+
+export function auditStudioHouseShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudit {
   const failures: string[] = [];
   const windowIds: string[] = [];
   const apertureIds: string[] = [];
@@ -285,16 +300,19 @@ function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudi
     }
   });
 
-  const partitionRoot = scene.name === spec.partition ? scene : scene.getObjectByName(spec.partition);
-  const rootProps = extras(partitionRoot ?? scene);
-  if (rootProps.atomic_presentation_partition !== spec.partition) {
-    failures.push(`missing atomic_presentation_partition=${spec.partition}`);
-  }
-  if (rootProps.atomic_house_id !== spec.houseId) {
-    failures.push(`missing atomic_house_id=${spec.houseId}`);
-  }
-  if (rootProps.atomic_units !== 'meters' || rootProps.atomic_up_axis !== 'Y') {
-    failures.push('scene root does not declare metres / Y-up');
+  const roots = contractRoots(scene, spec);
+  if (roots.length === 0) {
+    failures.push(`missing semantic metadata node atomic_presentation_partition=${spec.partition}`);
+  } else if (roots.length > 1) {
+    failures.push(`multiple semantic metadata nodes atomic_presentation_partition=${spec.partition}`);
+  } else {
+    const rootProps = extras(roots[0]);
+    if (rootProps.atomic_house_id !== spec.houseId) {
+      failures.push(`missing atomic_house_id=${spec.houseId}`);
+    }
+    if (rootProps.atomic_units !== 'meters' || rootProps.atomic_up_axis !== 'Y') {
+      failures.push('scene root does not declare metres / Y-up');
+    }
   }
   if (windowIds.length === 0) failures.push('no breakable-window markers');
   if (apertureIds.length === 0) failures.push('no aperture-audit markers');
@@ -407,7 +425,7 @@ export function createStudioHouseShells(options: StudioHouseShellOptions = {}): 
         scene.name = spec.partition;
         scene.position.set(spec.position[0], spec.position[1], spec.position[2]);
         applyPresentationContract(scene, spec);
-        audits.set(spec.variant, auditShell(scene, spec));
+        audits.set(spec.variant, auditStudioHouseShell(scene, spec));
         loaded.push(scene);
         root.add(scene);
       }),

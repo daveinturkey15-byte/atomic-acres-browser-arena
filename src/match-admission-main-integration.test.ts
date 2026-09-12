@@ -199,7 +199,13 @@ describe('legacy match admission integration', () => {
   it('evicts and fence-retires only the exact failed arena generation', () => {
     const construction = slice('function constructArena(', 'function ensureArenaConstructed(');
     const arena = slice('async function performArenaSelection(', 'function activateArenaSelection(');
-    expect(construction).toContain('for (const partialRoot of [...stagingScene.children]) scheduleDeferredGpuRetirement(partialRoot);');
+    const partialRetireAt = construction.indexOf('partialRoot.userData.worldStudioRetire?.();');
+    const partialScheduleAt = construction.indexOf('scheduleDeferredGpuRetirement(partialRoot, false');
+    expect(partialRetireAt).toBeGreaterThanOrEqual(0);
+    expect(partialScheduleAt).toBeGreaterThan(partialRetireAt);
+    const disposer = slice('function disposeRetiredArena(', 'function disposeArenaPresentationRoot(');
+    expect(disposer).toContain('if (arenaCache.get(arenaId) === candidate) arenaCache.delete(arenaId);');
+    expect(source).toContain('scheduleDeferredGpuRetirement(candidate.root, false, () => disposeRetiredArena(arenaId, candidate, false));');
     expect(arena).toContain('if (arenaVisualStream.discardGameplayRoot(nextSelection.id, nextArena.root)) arenaVisualReceipt = null;');
     expect(arena).toContain('evictExactFailedArenaGeneration(');
     expect(arena).toContain('(failedArena) => retireArenaAfterGpuFence(nextSelection.id, failedArena)');

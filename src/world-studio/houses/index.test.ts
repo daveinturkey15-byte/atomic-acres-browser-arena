@@ -9,6 +9,7 @@ import {
   INTERIOR_CONTRACT,
   ROAD_CLEARANCE_LOCAL_X,
   SHELL_LOCAL_BOUNDS,
+  auditStudioHouseShell,
   createStudioHouseShells,
   proceduralPartitionNodes,
   resolveHouseShellUrl,
@@ -237,6 +238,42 @@ describe.each(VARIANTS)('world-studio house shell GLB: $spec.variant', ({ spec, 
 });
 
 describe('world-studio house shell loader', () => {
+  it('audits the authored GLB root below the GLTFLoader wrapper and ignores sanitized names', () => {
+    const { spec, gltf } = VARIANTS[0];
+    const authoredRoot = gltf.nodes[gltf.scenes[gltf.scene].nodes[0]];
+    const wrapper = new THREE.Group();
+    wrapper.name = 'world-studio.house.teal.shell';
+    const authored = new THREE.Group();
+    // GLTFLoader sanitizes the dotted Blender node name; extras remain the identity.
+    authored.name = 'world-studio_house_teal_shell';
+    authored.userData = { ...(authoredRoot.extras ?? {}) };
+    wrapper.add(authored);
+
+    const audit = auditStudioHouseShell(wrapper, spec);
+    expect(audit.failures).not.toContain(`missing semantic metadata node atomic_presentation_partition=${spec.partition}`);
+    expect(audit.failures).not.toContain(`missing atomic_house_id=${spec.houseId}`);
+    expect(audit.failures).not.toContain('scene root does not declare metres / Y-up');
+  });
+
+  it('fails closed when semantic partition metadata is missing or duplicated', () => {
+    const { spec, gltf } = VARIANTS[0];
+    const authoredRoot = gltf.nodes[gltf.scenes[gltf.scene].nodes[0]];
+    const missing = new THREE.Group();
+    missing.name = spec.partition;
+    const missingAudit = auditStudioHouseShell(missing, spec);
+    expect(missingAudit.failures).toContain(`missing semantic metadata node atomic_presentation_partition=${spec.partition}`);
+
+    const duplicate = new THREE.Group();
+    for (const name of ['world-studio_house_teal_shell', 'world-studio_house_teal_shell_1']) {
+      const authored = new THREE.Group();
+      authored.name = name;
+      authored.userData = { ...(authoredRoot.extras ?? {}) };
+      duplicate.add(authored);
+    }
+    const duplicateAudit = auditStudioHouseShell(duplicate, spec);
+    expect(duplicateAudit.failures).toContain(`multiple semantic metadata nodes atomic_presentation_partition=${spec.partition}`);
+  });
+
   it('resolves base-aware URLs rather than assuming a host root', () => {
     expect(resolveHouseShellUrl('teal', '/')).toBe(`/${HOUSE_SHELLS[0].path}`);
     expect(resolveHouseShellUrl('yellow', '/atomic-acres/')).toBe(`/atomic-acres/${HOUSE_SHELLS[1].path}`);
