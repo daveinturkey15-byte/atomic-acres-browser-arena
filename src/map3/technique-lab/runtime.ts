@@ -499,17 +499,7 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   if (record.group) meta.append(metaRow('Demo group', record.group));
   d.append(meta);
 
-<<<<<<< HEAD
   d.append(text('h2', 'tl-section-title', 'Original source links'));
-=======
-  d.append(
-    text(
-      'h2',
-      'tl-section-title',
-      'Sources (links only; the host never fetches them — research reads are recorded below where they exist)',
-    ),
-  );
->>>>>>> d8d5196c7 (technique-lab host: wire real research records into stage evidence, honest notices, visible-geometry framing)
   const list = document.createElement('ul');
   list.className = 'tl-sources';
   if (record.sources.length === 0) {
@@ -1145,16 +1135,8 @@ async function refreshGroups(
       }
       record.entry = entry;
       record.group = group;
-<<<<<<< HEAD
       // An adapted technique can have a more specific demonstration title.
       // Identity is bound to sourceId, not text equality with the source title.
-=======
-      if (record.title !== entry.title) {
-        // Informational, never a load failure: a nominal title difference is
-        // provenance detail; only a sourceId mismatch is an operational alert.
-        addNotice(record, 'Demo title differs from public record; showing demo title.');
-      }
->>>>>>> d8d5196c7 (technique-lab host: wire real research records into stage evidence, honest notices, visible-geometry framing)
       record.title = entry.title;
       record.sources = [...entry.sources];
     }
