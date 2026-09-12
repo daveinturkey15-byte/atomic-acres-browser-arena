@@ -1,0 +1,85 @@
+{
+  "schema": "atomic-acres.pbr-asset-manifest/1",
+  "lane": "contrib/dave-gaming-pc/omp/lighting-author-20260912",
+  "downloadedAtUtc": "2026-09-12T17:40Z",
+  "license": "CC0-1.0",
+  "licenseSource": "https://polyhaven.com/license",
+  "metadataSource": "https://api.polyhaven.com/files",
+  "candidatePacket": "C:/Users/david/Documents/Codex/2026-09-11/p-le/work/fresh-world-20260912/research/PBR_TEXTURE_CANDIDATES.json",
+  "verification": "CPU decode check 2026-09-12: all six files decode as 1024x1024 (PNG IHDR / JPEG SOF parse via node); byte lengths and MD5 match the provider metadata exactly; SHA256 below measured on the downloaded bytes.",
+  "consumer": "src/world-studio/pbr-library.ts (albedo sRGB, normal/roughness NoColorSpace, physical tile repeat)",
+  "assets": [
+    {
+      "assetId": "brushed_concrete_03",
+      "name": "Brushed Concrete 03",
+      "source": "https://polyhaven.com/a/brushed_concrete_03",
+      "resolution": "1k",
+      "realWorldTileMeters": [2.0, 2.0],
+      "maps": [
+        {
+          "role": "albedo",
+          "file": "brushed_concrete_03/brushed_concrete_03_diff_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete_03/brushed_concrete_03_diff_1k.jpg",
+          "bytes": 892099,
+          "md5FromProvider": "0c96f09bc0119d372c1521cb6f40c5dc",
+          "sha256": "1b76a9867b410e295e5df09fe2b667a9280ac1145bf4b66e96015594421fc6a0",
+          "decodedDimensions": [1024, 1024]
+        },
+        {
+          "role": "normalOpenGL",
+          "file": "brushed_concrete_03/brushed_concrete_03_nor_gl_1k.png",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brushed_concrete_03/brushed_concrete_03_nor_gl_1k.png",
+          "bytes": 5852392,
+          "md5FromProvider": "f573fa91881e19ab17f9b648e28a9fed",
+          "sha256": "0be625d4de0f4f951fae75c5c6ed31d032f1bcf4fb51df211439ae0b5486e384",
+          "decodedDimensions": [1024, 1024]
+        },
+        {
+          "role": "roughness",
+          "file": "brushed_concrete_03/brushed_concrete_03_rough_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete_03/brushed_concrete_03_rough_1k.jpg",
+          "bytes": 530188,
+          "md5FromProvider": "0515bf50ced5d25985ec5168ea243914",
+          "sha256": "67a2db32e7fdde4a56c2443161972eea0fa6ee6830c9a9b5e451902d4a1b5f2c",
+          "decodedDimensions": [1024, 1024]
+        }
+      ]
+    },
+    {
+      "assetId": "asphalt_02",
+      "name": "Asphalt 02",
+      "source": "https://polyhaven.com/a/asphalt_02",
+      "resolution": "1k",
+      "realWorldTileMeters": [3.0, 3.0],
+      "maps": [
+        {
+          "role": "albedo",
+          "file": "asphalt_02/asphalt_02_diff_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_diff_1k.jpg",
+          "bytes": 731707,
+          "md5FromProvider": "fa19772d4817754c3efab708c651f5a8",
+          "sha256": "1aa5ce99f58a625c71d48cfc3e68b65ca85ccb00f39e045c0a928608a0ea25ed",
+          "decodedDimensions": [1024, 1024]
+        },
+        {
+          "role": "normalOpenGL",
+          "file": "asphalt_02/asphalt_02_nor_gl_1k.png",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/asphalt_02/asphalt_02_nor_gl_1k.png",
+          "bytes": 2323825,
+          "md5FromProvider": "910d4b3882858368622eaa1b973bb290",
+          "sha256": "b2069741070f0107c81d001eabfffd6d6644f249cd4ffdf52852e4b5e746a959",
+          "decodedDimensions": [1024, 1024]
+        },
+        {
+          "role": "roughness",
+          "file": "asphalt_02/asphalt_02_rough_1k.jpg",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/asphalt_02/asphalt_02_rough_1k.jpg",
+          "bytes": 544032,
+          "md5FromProvider": "ec80a2929797c1b3ffc121c4f665585a",
+          "sha256": "70ba3edc65525eb4dc366cf010ca7ae0bd34e0251ff0225c2dad627a873d0712",
+          "decodedDimensions": [1024, 1024]
+        }
+      ]
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import {
   planStudioRoomPracticals,
   type StudioLightingMode,
 } from './index';
+import { createStudioPbrLibrary, type StudioPbrConsumer } from '../pbr-library';
 
 const preset = (id: StudioPresetId): StudioEnvironment =>
   STUDIO_ENVIRONMENTS.find((environment) => environment.id === id)!;
@@ -281,5 +282,100 @@ describe('studio lighting input validation', () => {
     controller.update();
     expect(controller.telemetry().lastEnvironmentId).toBe('golden-wind');
     controller.dispose();
+  });
+});
+
+describe('studio pbr library', () => {
+  const makeTexture = (): THREE.Texture => {
+    const texture = new THREE.Texture();
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.image = {}; // sentinel: observable through dispose-to-null in r185
+    return texture;
+  };
+  /** DI loader seam: resolves every request against a fresh dummy texture. */
+  const stubLoader = (): { loader: Parameters<typeof createStudioPbrLibrary>[1]; loaded: string[] } => {
+    const loaded: string[] = [];
+    const loader: Parameters<typeof createStudioPbrLibrary>[1] = {
+      load(url, onLoad) {
+        loaded.push(url);
+        onLoad(makeTexture());
+      },
+    };
+    return { loader, loaded };
+  };
+
+  it('loads every map once, marks albedo sRGB and keeps normal/roughness linear', async () => {
+    const { loader, loaded } = stubLoader();
+    const library = createStudioPbrLibrary('test-base', loader);
+    expect(library.isReady()).toBe(false);
+    await library.whenReady();
+    expect(library.isReady()).toBe(true);
+    expect(loaded).toHaveLength(6); // 3 maps x 2 assets, requested exactly once
+    library.load(); // second call is idempotent: no further requests
+    expect(loaded).toHaveLength(6);
+    const consumer = library.createConsumer('brushed_concrete_03', { sizeMeters: [8, 2.55] });
+    expect(consumer.material.map!.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(consumer.material.normalMap!.colorSpace).toBe(THREE.NoColorSpace);
+    expect(consumer.material.roughnessMap!.colorSpace).toBe(THREE.NoColorSpace);
+    library.dispose();
+  });
+
+  it('derives physical UV repeat from real surface size over the tile meters', async () => {
+    const { loader } = stubLoader();
+    const library = createStudioPbrLibrary('test-base', loader);
+    await library.whenReady();
+    const road = library.createConsumer('asphalt_02', { sizeMeters: [12, 60] }); // 3 m tile
+    expect(road.material.map!.repeat.x).toBeCloseTo(4, 12);
+    expect(road.material.map!.repeat.y).toBeCloseTo(20, 12);
+    const wall = library.createConsumer('brushed_concrete_03', { sizeMeters: [8, 2.55] }); // 2 m tile
+    expect(wall.material.map!.repeat.x).toBeCloseTo(4, 12);
+    expect(wall.material.map!.repeat.y).toBeCloseTo(2.55 / 2, 12);
+    expect(wall.material.normalScale.x).toBeLessThanOrEqual(1); // restrained by default
+    library.dispose();
+  });
+
+  it('clones textures per consumer so repeat mutations never leak', async () => {
+    const { loader } = stubLoader();
+    const library = createStudioPbrLibrary('test-base', loader);
+    await library.whenReady();
+    const a = library.createConsumer('asphalt_02', { sizeMeters: [3, 3] });
+    const b = library.createConsumer('asphalt_02', { sizeMeters: [6, 6] });
+    expect(a.material.map).not.toBe(b.material.map);
+    a.material.map!.repeat.set(99, 99);
+    expect(b.material.map!.repeat.x).toBeCloseTo(2, 12); // unaffected
+    expect(a.material.map!.image).toBe(b.material.map!.image); // shared original pixels
+    const spyDisposes = (consumer: StudioPbrConsumer): (() => number[]) => {
+      const counts = consumer.textures.map(() => ({ n: 0 }));
+      consumer.textures.forEach((texture, index) => {
+        const original = texture.dispose.bind(texture);
+        texture.dispose = (): void => {
+          counts[index]!.n += 1;
+          original();
+        };
+      });
+      return () => counts.map((count) => count.n);
+    };
+    const countA = spyDisposes(a);
+    const countB = spyDisposes(b);
+    library.release(a);
+    expect(countA()).toEqual([1, 1, 1]); // exactly a's clones, exactly once
+    expect(countB()).toEqual([0, 0, 0]); // sibling untouched by a's release
+    library.dispose(); // originals + remaining consumer b
+    expect(countB()).toEqual([1, 1, 1]);
+    library.dispose(); // idempotent: no second pass over anything
+    expect(countB()).toEqual([1, 1, 1]);
+  });
+
+  it('fails closed on unknown assets, premature consumers and non-finite sizes', async () => {
+    const { loader } = stubLoader();
+    const library = createStudioPbrLibrary('test-base', loader);
+    expect(() => library.createConsumer('asphalt_02', { sizeMeters: [3, 3] })).toThrow(/not loaded/i);
+    await library.whenReady();
+    expect(() => library.createConsumer('blue_painted_planks', { sizeMeters: [3, 3] })).toThrow(/unknown asset/i);
+    expect(() => library.createConsumer('asphalt_02', { sizeMeters: [Number.NaN, 3] })).toThrow(/finite positive/i);
+    expect(() => library.createConsumer('asphalt_02', { sizeMeters: [3, 3], normalScale: 4 })).toThrow(/restrained/i);
+    library.dispose();
+    expect(() => library.createConsumer('asphalt_02', { sizeMeters: [3, 3] })).toThrow(/not loaded/i);
   });
 });

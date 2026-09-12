@@ -106,6 +106,32 @@ Cost delta vs the table below: lights unchanged (4 shadowed + 10 clustered); +2 
 
 ## Residual risks / OPEN
 
-- Practical placement uses per-room anchor centroids; ceiling heights are authored constants (`FIXTURE_HEIGHT`), not measured against every roof pitch — parent visual pass may want ±0.1 m nudges (constants only, no structure).
+- Practical placement now prefers focal anchors (`FOCAL_TOKEN` id-suffix match); centroid fallback remains. Ceiling heights are authored constants (`FIXTURE_HEIGHT`); parent visual pass may want ±0.1 m nudges (constants only, no structure).
 - Intensity is calibrated to the repo's decay-2 practical family, not to a rendered histogram; first render may want a one-number retune (`KEY_SPOT_BASE`/`FILL_BASE`).
 - Windows read "lit from outside" only if glass is transparent enough at review angles; glass treatment itself is not this lane's file.
+
+## PBR material library (optional deliverable, same lane)
+
+`src/world-studio/pbr-library.ts` — a reusable factory over two locally hosted original CC0 Poly Haven assets: `brushed_concrete_03` (2 m tile) and `asphalt_02` (3 m tile), 1k albedo/normal(OpenGL)/roughness only. Provenance, source URLs, byte lengths, provider MD5s and measured SHA256s: `public/assets/original/world-studio/pbr/manifest.json`. All six files verified 1024×1024 by CPU header parse; no dependency installed.
+
+- Colour contract: albedo `SRGBColorSpace`; normal + roughness `NoColorSpace` (linear). No tone mapping, no renderer writes, no scene writes — materials only.
+- UV contract: physical tiling, `repeat = sizeMeters / tileMeters`. The library never rescales geometry UVs; root passes the real surface size per consumer (walls `brushed_concrete_03` with `[width, height]` metres; road/ground `asphalt_02`). Wrapping `RepeatWrapping`; default `normalScale` 0.7 (restrained, max 1.5); roughness scalar ∈ (0, 1].
+- Sharing rule: one original `THREE.Texture` per map; every consumer gets clones with its own repeat, so no cross-consumer mutation. `release(consumer)` disposes exactly that consumer's clones + material; `dispose()` disposes originals + live consumers, idempotent.
+- Loading: `load()` (idempotent kick-off) + `await whenReady()` (resolves when all six maps decoded; rejects naming the failing URL) + `isReady()`. `createConsumer` before ready throws — fail closed.
+
+Root integration example (parent performs it):
+
+```ts
+import { createStudioPbrLibrary } from './world-studio/pbr-library';
+
+const studioPbr = createStudioPbrLibrary(); // hosted under assets/original/world-studio/pbr
+studioPbr.load();
+// after admission, once `await studioPbr.whenReady()` settles:
+const road = studioPbr.createConsumer('asphalt_02', { sizeMeters: [12, 60] }); // 4×20 tiles
+roadMesh.material = road.material;
+const walls = studioPbr.createConsumer('brushed_concrete_03', { sizeMeters: [8, 2.55] });
+wallMesh.material = walls.material;
+// arena retirement: release consumers / studioPbr.dispose()
+```
+
+Tests: 4 focused CPU contracts appended to `src/world-studio/lighting/lighting.test.ts` (the lane allowlist admits no sibling test file): single-load idempotence + colour-space split; physical repeat math; per-consumer clone isolation with exact-once dispose spying; fail-closed errors (unknown asset, premature consumer, non-finite size, over-range normalScale) + idempotent dispose. Suite total **29/29**; `npx tsc --noEmit` **0 errors** (three 0.185.1 APIs used: `TextureLoader` load seam, `Texture.clone/dispose`, `colorSpace`; none changed since ≤r155).
