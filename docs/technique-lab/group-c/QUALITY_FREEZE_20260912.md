@@ -38,3 +38,26 @@ forest-floor blend and a sculpted ground its spline field is projected onto.
 **What is deliberately NOT touched:** all sixteen source IDs 35–50 keep their identity, row 44 stays
 `blocked`, every surviving limitation stays, no existing assertion is relaxed, and rendered/pixel
 acceptance stays OPEN for every factory.
+
+---
+
+## Outcome against this freeze (written at the end of the same window)
+
+**Gap 1 (row 46) — closed.** `46a99247c`. Analytic Jacobian of the applied displacement, verified
+against central finite differences; turbulence exactly zero off the fold; one decaying field read as
+both surface foam and in-integral bubble source; the shipped sea's inability to fold measured and
+reported rather than hidden.
+
+**Gap 2 (row 36) — closed.** `cc43b1819`. Headless Blender 5.1.2 executed, `.blend` + artefact +
+command + hashes + reopen proof retained, third panel added so the bake is isolated. Full evidence:
+`blender/PROVENANCE.md`.
+
+**Gap 3 (row 38) — NOT closed in this window, and not partially started.** One of its two carrier
+bodies was read to EOF (`threejs-procedural-vegetation`, 444 lines, sha256
+`7aa8c750c461d9741ccd760354664372ff64813b3fa043c0b515202895b9881e`, matching the packet with no
+drift), which closes that half of the recorded source hole; `atomic-acres-procedural-art-authoring`
+(sha256 `19f93b23…`) remains unread. The scene is unchanged: it still implements only
+mask-before-density, still runs over flat ground, and still has no species parameter sets, no clump
+geometry or blade material, and no forest-floor blend. It was left alone rather than rushed, because
+a half-authored vegetation pass with unverified tests would have cost more than it delivered. The
+gap as written above stands as the next unit of work.
