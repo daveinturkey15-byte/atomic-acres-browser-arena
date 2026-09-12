@@ -243,6 +243,112 @@ export function mergeForgedPlacements(
   return { meshes, drawCalls: meshes.length, triangles, skins };
 }
 
+/** The per-vertex attribute `stampVehicleAnchor` writes: quantised (x, z) of the owning vehicle. */
+export const FORGE_VEHICLE_ANCHOR_ATTRIBUTE = 'forgeVehicleAnchor';
+
+/** One vehicle's share of a merged forge mesh. */
+export interface MergedVehicleComponent {
+  /** `${x},${z}` of the stamped anchor, the same key `mergedVehicleBounds` uses. */
+  readonly key: string;
+  readonly anchor: readonly [number, number];
+  /** Bounds of this vehicle's vertices only, in the space `matrixWorld` maps to. */
+  readonly box: THREE.Box3;
+  readonly vertices: number;
+}
+
+/**
+ * How a geometry partitions by vehicle. `unanchored` is an ordinary mesh with
+ * no anchor attribute; `malformed` carries an anchor attribute that cannot be
+ * trusted (wrong item size, count mismatch, non-finite values). Both leave the
+ * caller to measure the whole mesh, so no vertex ever drops out of a census.
+ */
+export type MergedVehiclePartition =
+  | { readonly kind: 'partitioned'; readonly components: readonly MergedVehicleComponent[]; readonly vertices: number }
+  | { readonly kind: 'unanchored'; readonly vertices: number }
+  | { readonly kind: 'malformed'; readonly reason: string; readonly vertices: number };
+
+/**
+ * Partition a merged forge mesh into per-VEHICLE bounds by the quantised
+ * anchor `stampVehicleAnchor` wrote on every vertex.
+ *
+ * The per-material merge folds every vehicle that shares a paint into one
+ * mesh, so the mesh's own AABB spans the road between two saloons and no
+ * single collider explains it - the exact false "walk-through" the header
+ * warns about. The anchor attribute is the only record of which vehicle each
+ * triangle belongs to, and it survives the merge untouched, so any audit that
+ * reads a merged mesh must partition by it before comparing against
+ * colliders: the whole-mesh AABB is the wrong unit of measurement.
+ *
+ * Every vertex lands in exactly one component (component vertex counts sum
+ * to the position count), so a census over the parts is a census over the
+ * mesh. `matrixWorld`, when given, is applied per vertex, so a rotated
+ * placement yields the tight world box, not a transformed local AABB.
+ * Presentation-only diagnostics: builds nothing, registers nothing.
+ */
+export function partitionMergedVehicles(
+  geometry: THREE.BufferGeometry,
+  matrixWorld?: THREE.Matrix4,
+): MergedVehiclePartition {
+  const position = geometry.getAttribute('position');
+  if (!position) return { kind: 'unanchored', vertices: 0 };
+  const vertices = position.count;
+  const anchor = geometry.getAttribute(FORGE_VEHICLE_ANCHOR_ATTRIBUTE);
+  if (!anchor) return { kind: 'unanchored', vertices };
+  // The forge emits non-indexed triangles. Other topologies must be audited
+  // whole until their ownership can be proved, never guessed from vertex order.
+  if (geometry.index || position.itemSize !== 3 || vertices % 3 !== 0) {
+    return { kind: 'malformed', reason: 'expected non-indexed xyz triangles', vertices };
+  }
+  if (matrixWorld && !matrixWorld.elements.every(Number.isFinite)) {
+    return { kind: 'malformed', reason: 'non-finite world transform', vertices };
+  }
+  if (anchor.itemSize !== 2) return { kind: 'malformed', reason: `anchor itemSize ${anchor.itemSize}, expected 2`, vertices };
+  if (anchor.count !== vertices) return { kind: 'malformed', reason: `anchor count ${anchor.count} != position count ${vertices}`, vertices };
+  const byKey = new Map<string, { anchor: [number, number]; box: THREE.Box3; vertices: number }>();
+  const point = new THREE.Vector3();
+  for (let index = 0; index < vertices; index += 1) {
+    const ax = anchor.getX(index);
+    const az = anchor.getY(index);
+    if (!Number.isFinite(ax) || !Number.isFinite(az)) {
+      return { kind: 'malformed', reason: `non-finite anchor at vertex ${index}`, vertices };
+    }
+    const key = `${ax},${az}`;
+    const triangleStart = index - index % 3;
+    if (ax !== anchor.getX(triangleStart) || az !== anchor.getY(triangleStart)) {
+      return { kind: 'malformed', reason: `ownership changes within triangle ${triangleStart / 3}`, vertices };
+    }
+    let entry = byKey.get(key);
+    if (!entry) {
+      entry = { anchor: [ax, az], box: new THREE.Box3(), vertices: 0 };
+      byKey.set(key, entry);
+    }
+    point.fromBufferAttribute(position as THREE.BufferAttribute, index);
+    if (matrixWorld) point.applyMatrix4(matrixWorld);
+    if (![point.x, point.y, point.z].every(Number.isFinite)) {
+      return { kind: 'malformed', reason: `non-finite position at vertex ${index}`, vertices };
+    }
+    entry.box.expandByPoint(point);
+    entry.vertices += 1;
+  }
+  const components = [...byKey.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, entry]) => ({ key, ...entry }));
+  return { kind: 'partitioned', components, vertices };
+}
+
+/**
+ * Per-VEHICLE local bounds of a merged forge mesh keyed by anchor. Empty when
+ * the geometry carries no trustworthy anchor: callers that need to tell
+ * "no anchor" from "bad anchor" read `partitionMergedVehicles` directly.
+ */
+export function mergedVehicleBounds(geometry: THREE.BufferGeometry): ReadonlyMap<string, THREE.Box3> {
+  const partition = partitionMergedVehicles(geometry);
+  const bounds = new Map<string, THREE.Box3>();
+  if (partition.kind !== 'partitioned') return bounds;
+  for (const component of partition.components) bounds.set(component.key, component.box);
+  return bounds;
+}
+
 export interface LampPlacement {
   /** Distance of each lamp pair from the centre plane. */
   readonly x: number;

@@ -111,6 +111,8 @@ describe('collider/visual parity gate (all six arenas)', () => {
     expect(results.map(({ id }) => id)).toEqual([...ALL_ARENA_IDS]);
     for (const result of results) {
       expect(result.error, `${result.id} failed to construct`).toBeUndefined();
+      expect(result.unmeasurableMeshes ?? [], `${result.id}: visible meshes with unusable bounds`).toEqual([]);
+      expect(result.meshComponents?.malformedAnchorMeshes ?? 0, `${result.id}: malformed vehicle ownership`).toBe(0);
     }
   }, 120_000);
 

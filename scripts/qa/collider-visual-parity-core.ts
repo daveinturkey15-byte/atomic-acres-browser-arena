@@ -36,6 +36,7 @@ import * as THREE from 'three';
 import type { Box2 } from '../../src/collision';
 import type { ArenaMap } from '../../src/map';
 import { ARENA_IDS } from '../../src/arena-identity';
+import { partitionMergedVehicles } from '../../src/vehicle-forge/build';
 
 // ---------------------------------------------------------------------------
 // Calibration constants. These were set against the first measured sweep on
@@ -158,6 +159,19 @@ export type ColliderEntry = {
   sources: string[];
 };
 
+/**
+ * Which vehicle of a merged forge mesh this entry measures. The forge folds
+ * every vehicle that shares a material into ONE mesh (HF-491, one draw per
+ * material) and stamps each vertex with its vehicle's placement anchor; the
+ * mesh's own AABB spans the road between two saloons, which no collider
+ * explains, so the audit measures one entry per anchor instead.
+ */
+export type MeshComponent = {
+  anchor: [number, number];
+  index: number;
+  of: number;
+};
+
 export type MeshEntry = {
   name: string;
   path: string;
@@ -165,6 +179,8 @@ export type MeshEntry = {
   presentationOnly: boolean;
   instanced: boolean;
   vertices: number;
+  /** Set when the entry is one vehicle of a merged forge mesh (see MeshComponent). */
+  component?: MeshComponent;
   /** Direction C: the mesh's own registration stamp, when the arena builder rated it. */
   ballisticSurfaceId: string | null;
   /** Direction C: dynamic raycast target (practice target / test dummy limb). */
@@ -224,6 +240,21 @@ export type ArenaAuditResult = {
   colliderSamples?: ColliderSample[];
   /** How many eligible colliders the sample was drawn from. */
   colliderSamplePopulation?: number;
+  /**
+   * Unit-of-measurement ledger for merged forge meshes: how many meshes were
+   * partitioned by vehicle anchor, into how many per-vehicle entries, and how
+   * many vertices those entries account for (always the meshes' full count).
+   * A mesh whose anchor attribute is malformed is measured WHOLE and counted
+   * here, never dropped.
+   */
+  meshComponents?: {
+    partitionedMeshes: number;
+    components: number;
+    partitionedVertices: number;
+    malformedAnchorMeshes: number;
+  };
+  /** Visible geometry that cannot be measured must block the gate, not vanish. */
+  unmeasurableMeshes?: Array<{ name: string; path: string; vertices: number }>;
 };
 
 type ArenaBuild = (scene: THREE.Scene) => Omit<ArenaMap, 'id'> & { id?: string };
@@ -252,26 +283,96 @@ function objectPath(object: THREE.Object3D): string {
   return parts.join('/');
 }
 
-export function collectMeshes(scene: THREE.Scene): MeshEntry[] {
+export type MeshCensus = {
+  meshes: MeshEntry[];
+  /** Distinct visible mesh objects (a partitioned mesh counts once). */
+  visibleMeshes: number;
+  meshComponents: NonNullable<ArenaAuditResult['meshComponents']>;
+  unmeasurableMeshes: NonNullable<ArenaAuditResult['unmeasurableMeshes']>;
+};
+
+function finiteMeshBox(box: THREE.Box3): boolean {
+  return [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z].every(Number.isFinite)
+    && !box.isEmpty();
+}
+
+/**
+ * Every visible mesh, ONE ENTRY PER VEHICLE for merged forge meshes. A mesh
+ * with no anchor attribute is one entry with its whole AABB, as before; a mesh
+ * whose anchor attribute is malformed is ALSO measured whole (fail closed: the
+ * stricter whole-mesh check still runs) and counted in `malformedAnchorMeshes`.
+ * Per-vehicle boxes are built from the vertices through `matrixWorld`, so a
+ * yawed placement is measured tight rather than as a transformed local AABB.
+ */
+export function collectMeshCensus(scene: THREE.Scene): MeshCensus {
   scene.updateMatrixWorld(true);
   const meshes: MeshEntry[] = [];
+  const meshComponents = { partitionedMeshes: 0, components: 0, partitionedVertices: 0, malformedAnchorMeshes: 0 };
+  const unmeasurableMeshes: MeshCensus['unmeasurableMeshes'] = [];
+  let visibleMeshes = 0;
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
     if (!visibleChain(object)) return;
-    const box = new THREE.Box3().setFromObject(object);
-    if (!Number.isFinite(box.min.x) || box.isEmpty()) return;
-    meshes.push({
+    visibleMeshes += 1;
+    const base = {
       name: object.name || `(unnamed ${object.type})`,
       path: objectPath(object),
-      box,
       presentationOnly: object.userData.presentationOnly === true,
       instanced: object instanceof THREE.InstancedMesh,
-      vertices: object.geometry.attributes?.position?.count ?? 0,
       ballisticSurfaceId: typeof object.userData.ballisticSurfaceId === 'string' ? object.userData.ballisticSurfaceId : null,
       dynamicTarget: typeof object.userData.targetId === 'string' || typeof object.userData.hitZone === 'string',
-    });
+    };
+    // Instanced geometry is shared by every instance; only a plain mesh's
+    // vertices are its own, so only a plain mesh is partitioned by anchor.
+    const partition = base.instanced
+      ? { kind: 'unanchored' as const, vertices: object.geometry.attributes?.position?.count ?? 0 }
+      : partitionMergedVehicles(object.geometry, object.matrixWorld);
+    if (partition.kind === 'partitioned') {
+      const components = partition.components;
+      if (components.length === 0 || components.some(component => !finiteMeshBox(component.box))
+        || components.reduce((sum, component) => sum + component.vertices, 0) !== partition.vertices) {
+        meshComponents.malformedAnchorMeshes += 1;
+        unmeasurableMeshes.push({ name: base.name, path: base.path, vertices: partition.vertices });
+        return;
+      }
+      meshComponents.partitionedMeshes += 1;
+      meshComponents.components += components.length;
+      meshComponents.partitionedVertices += components.reduce((sum, component) => sum + component.vertices, 0);
+      components.forEach((component, index) => {
+        meshes.push({
+          ...base,
+          box: component.box,
+          vertices: component.vertices,
+          component: { anchor: [component.anchor[0], component.anchor[1]], index, of: components.length },
+        });
+      });
+      return;
+    }
+    if (partition.kind === 'malformed') {
+      meshComponents.malformedAnchorMeshes += 1;
+      // A cached bounding box cannot rehabilitate invalid source coordinates.
+      if (partition.reason.startsWith('non-finite position') || partition.reason === 'non-finite world transform') {
+        unmeasurableMeshes.push({ name: base.name, path: base.path, vertices: partition.vertices });
+        return;
+      }
+    }
+    const box = new THREE.Box3().setFromObject(object);
+    if (!finiteMeshBox(box)) {
+      unmeasurableMeshes.push({ name: base.name, path: base.path, vertices: partition.vertices });
+      return;
+    }
+    meshes.push({ ...base, box, vertices: partition.vertices });
   });
-  return meshes;
+  return { meshes, visibleMeshes, meshComponents, unmeasurableMeshes };
+}
+
+export function collectMeshes(scene: THREE.Scene): MeshEntry[] {
+  return collectMeshCensus(scene).meshes;
+}
+
+/** The finding fields that say WHICH vehicle of a merged mesh a row is about. */
+function componentFields(entry: MeshEntry): Record<string, unknown> {
+  return entry.component ? { component: { ...entry.component, anchor: [...entry.component.anchor] } } : {};
 }
 
 export function collectColliders(map: ArenaMap): ColliderEntry[] {
@@ -392,7 +493,7 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     return { id, error: String((error as Error)?.stack ?? error).slice(0, 600) };
   }
   const colliders = collectColliders(map as ArenaMap);
-  const meshes = collectMeshes(scene);
+  const { meshes, visibleMeshes, meshComponents, unmeasurableMeshes } = collectMeshCensus(scene);
   const bounds = map.bounds;
 
   // Runtime-replaced statics are counted, never flagged (see header).
@@ -498,6 +599,7 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
       presentationOnly: entry.presentationOnly,
       instanced: entry.instanced,
       vertices: entry.vertices,
+      ...componentFields(entry),
     });
   }
   walkThroughMeshes.sort((a, b) => Number(b.vertices) - Number(a.vertices));
@@ -595,6 +697,7 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
       vertices: entry.vertices,
       instanced: entry.instanced,
       bestSurfaceShare: round(bestShare),
+      ...componentFields(entry),
     });
   }
   ballisticGhostMeshes.sort((a, b) => String(a.name).localeCompare(String(b.name))
@@ -629,7 +732,9 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     defaultedYColliders,
     boundaryColliders,
     runtimeReplacedStaticColliders,
-    visibleMeshes: meshes.length,
+    visibleMeshes,
+    meshComponents,
+    unmeasurableMeshes,
     invisibleColliders,
     walkThroughMeshes,
     excludedByRuleCounts,
