@@ -129,7 +129,7 @@ export function createDemo(context: DemoContext): Demo {
    * shows the whole shallow-to-deep ramp, which is where a per-channel
    * absorption model separates from a two-colour lerp.
    */
-  function depthAt(x: number, z: number): number {
+  function depthAt(z: number): number {
     return 0.15 + (z + EXTENT / 2) * 2.6;
   }
 
@@ -148,7 +148,7 @@ export function createDemo(context: DemoContext): Demo {
         // Jacobian breaking test keys off and the same one that drives foam.
         const slope = Math.hypot(sample.slopeX, sample.slopeZ);
         const turbulence = Math.min(1, slope * 1.15);
-        const colour = panel.shade(depthAt(x, z), turbulence);
+        const colour = panel.shade(depthAt(z), turbulence);
         panel.colours[i * 3] = colour.r;
         panel.colours[i * 3 + 1] = colour.g;
         panel.colours[i * 3 + 2] = colour.b;

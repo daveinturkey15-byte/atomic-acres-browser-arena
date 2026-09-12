@@ -20,7 +20,18 @@ import { applyBrief } from './source-35';
 import { voxelRemesh } from './source-36';
 import { convertZupCentimetres } from './source-37';
 import { isSolid, litRoomCells, voxelIndex, type VoxelGrid } from './source-40';
+import { maskField, splineDensity } from './source-38';
+import { OPERATION_LOG, replay } from './source-39';
+import { deriveBuilding } from './source-42';
+import { fillHoles, voxelToMesh, weldVertices } from './source-45';
 import { shadeCorrect, shadeTintedAfter } from './source-46';
+import { stepCriticallyDamped } from './source-49';
+import {
+  CLEARED_OBSTACLES,
+  DEFECTIVE_OBSTACLES,
+  PLAYER_RADIUS,
+  sweepCorridor,
+} from './source-50';
 
 const SEED = 20260912;
 
@@ -238,5 +249,122 @@ describe('source 46 — where the bubble term is injected changes the colour', (
     // Absorption alone must still darken with depth in the red first.
     const shallow = shadeCorrect(0.2, 0);
     expect(shallow.r).toBeGreaterThan(calmCorrect.r);
+  });
+});
+
+describe('source 38 — the mask gates admissibility independently of density', () => {
+  it('keeps the clearing clear however high the spline density goes there', () => {
+    const curve = [[-1, -1], [0, 0], [1, -1]] as const;
+    expect(splineDensity(0, 0, curve)).toBeGreaterThan(splineDensity(0, 1.2, curve));
+    // Dense by the spline field, and still inadmissible by the mask.
+    expect(splineDensity(0.7, 0.5, curve, 10)).toBeGreaterThan(0.5);
+    expect(maskField(0.7, 0.5)).toBe(false);
+    expect(maskField(-1.2, -1.2)).toBe(true);
+  });
+});
+
+describe('source 39 — the replayer refuses an operation whose precondition is unmet', () => {
+  it('rejects the scatter that arrives before its terrain, with a reason', () => {
+    const state = replay(OPERATION_LOG, 7);
+    expect(state.rejected).toHaveLength(1);
+    expect(state.rejected[0].op).toBe('scatter_props');
+    expect(state.rejected[0].reason).toContain('terrain');
+    expect(state.applied).toBe(OPERATION_LOG.length - 1);
+    const clearing = state.clearings[0];
+    for (const prop of state.props) {
+      expect(Math.hypot(prop.x - clearing.x, prop.z - clearing.z))
+        .toBeGreaterThanOrEqual(clearing.radius);
+    }
+  });
+});
+
+describe('source 42 — the grammar derives rather than authors', () => {
+  it('tiles the mass exactly and derives bay count from face width', () => {
+    const parameters = {
+      storeys: 9,
+      storeyHeight: 0.26,
+      podiumStoreys: 2,
+      crownStoreys: 2,
+      bayWidth: 0.3,
+    };
+    const shapes = deriveBuilding({ width: 1.2, depth: 0.9 }, parameters);
+    const massHeight = shapes
+      .filter((shape) => shape.rule !== 'bay' && shape.rule !== 'roof')
+      .reduce((sum, shape) => sum + shape.size[1], 0);
+    expect(massHeight).toBeCloseTo(parameters.storeys * parameters.storeyHeight, 9);
+
+    const bays = shapes.filter((shape) => shape.rule === 'bay');
+    const shaftStoreys = parameters.storeys - parameters.podiumStoreys - parameters.crownStoreys;
+    expect(bays).toHaveLength(Math.floor(1.2 / parameters.bayWidth) * shaftStoreys * 2);
+
+    // A wider building gets MORE bays of the same size, not wider bays.
+    const wider = deriveBuilding({ width: 2.4, depth: 0.9 }, parameters)
+      .filter((shape) => shape.rule === 'bay');
+    expect(wider.length).toBeGreaterThan(bays.length);
+    expect(wider[0].size[0]).toBeCloseTo(bays[0].size[0], 6);
+  });
+});
+
+describe('source 45 — the chain is ordered, and the order is what makes it work', () => {
+  it('welds duplicates, fills the boundary loops, and leaves no single-use edge', () => {
+    const size = 8;
+    const centre = (size - 1) / 2;
+    const occupied = (x: number, y: number, z: number) => {
+      if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size) return false;
+      const radius = Math.hypot(x - centre, y - centre, z - centre);
+      return radius <= centre * 0.95 && radius >= centre * 0.5;
+    };
+    const raw = voxelToMesh(occupied, size, 0.1);
+    const welded = weldVertices(raw);
+
+    // VoxelToMesh emits four vertices per quad; welding must collapse them
+    // without changing the surface, which is why triangle count is unchanged.
+    expect(raw.positions.length / 3).toBe((raw.indices.length / 6) * 4);
+    expect(welded.positions.length).toBeLessThan(raw.positions.length);
+    expect(welded.indices.length).toBe(raw.indices.length);
+
+    const filled = fillHoles(welded);
+    expect(filled.mesh.indices.length).toBeGreaterThanOrEqual(welded.indices.length);
+
+    const useCount = new Map<string, number>();
+    for (let i = 0; i < filled.mesh.indices.length; i += 3) {
+      for (const [a, b] of [[0, 1], [1, 2], [2, 0]] as const) {
+        const x = filled.mesh.indices[i + a];
+        const y = filled.mesh.indices[i + b];
+        const key = x < y ? `${x}:${y}` : `${y}:${x}`;
+        useCount.set(key, (useCount.get(key) ?? 0) + 1);
+      }
+    }
+    expect([...useCount.values()].filter((count) => count === 1)).toHaveLength(0);
+  });
+});
+
+describe('source 49 — critically damped means it converges without overshoot', () => {
+  it('reaches the target and never crosses it', () => {
+    let state = { value: 0, velocity: 0 };
+    let overshoot = 0;
+    for (let step = 0; step < 400; step += 1) {
+      state = stepCriticallyDamped(state, 1, 0.2, 1 / 120);
+      overshoot = Math.max(overshoot, state.value - 1);
+    }
+    expect(state.value).toBeCloseTo(1, 3);
+    expect(overshoot).toBeLessThan(1e-3);
+  });
+});
+
+describe('source 50 — the sweep fails the blocked corridor and passes the cleared one', () => {
+  it('reports blocked runs where no player-radius disc fits', () => {
+    const defective = sweepCorridor(9, 2.2, DEFECTIVE_OBSTACLES);
+    const cleared = sweepCorridor(9, 2.2, CLEARED_OBSTACLES);
+
+    expect(defective.blocked).toBeGreaterThan(0);
+    expect(defective.blockedRuns.length).toBeGreaterThan(0);
+    expect(cleared.blocked).toBe(0);
+    expect(cleared.passableFraction).toBe(1);
+    expect(defective.stations).toHaveLength(7);
+
+    // A corridor narrower than the disc's diameter must fail at every station.
+    const pinched = sweepCorridor(9, PLAYER_RADIUS, []);
+    expect(pinched.blocked).toBe(pinched.stations.length);
   });
 });
