@@ -53,7 +53,7 @@ export const HERO_TRUCK_PLACEMENT = { position: [3.5, 0, -2] as const, headingRa
 
 /** Measured on the exported GLBs; see docs/world-studio-blender-assets.md. */
 export const HERO_BUS_DIMENSIONS = { width: 2.976, height: 3.197, length: 9.97 } as const;
-export const HERO_TRUCK_DIMENSIONS = { width: 2.944, height: 3.942, length: 13.473 } as const;
+export const HERO_TRUCK_DIMENSIONS = { width: 2.976, height: 3.942, length: 13.518 } as const;
 
 interface HeroAssetSpec {
   readonly name: string;

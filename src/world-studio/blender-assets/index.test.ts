@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 
@@ -41,6 +44,38 @@ describe('world-studio blender assets', () => {
     // They must not overlap: the bus sits at X -3.5 and the truck at X +3.5.
     const gap = Math.abs(HERO_TRUCK_PLACEMENT.position[0] - HERO_BUS_PLACEMENT.position[0]);
     expect(gap).toBeGreaterThan((HERO_BUS_DIMENSIONS.width + HERO_TRUCK_DIMENSIONS.width) / 2);
+  });
+
+  it('matches the shipped truck GLB: declared size and an origin centred along Z', () => {
+    // Read the accessor bounds straight out of the binary, so the declared dimensions cannot
+    // drift away from the asset the loader actually fetches.
+    const glb = readFileSync(
+      fileURLToPath(new URL('../../../public/assets/world-studio/blender/hero-truck.glb', import.meta.url)),
+    );
+    const jsonLength = glb.readUInt32LE(12);
+    const gltf = JSON.parse(glb.subarray(20, 20 + jsonLength).toString('utf8')) as {
+      meshes: { primitives: { attributes: { POSITION: number } }[] }[];
+      accessors: { min: number[]; max: number[] }[];
+    };
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const mesh of gltf.meshes) {
+      for (const primitive of mesh.primitives) {
+        const accessor = gltf.accessors[primitive.attributes.POSITION];
+        for (let axis = 0; axis < 3; axis += 1) {
+          min[axis] = Math.min(min[axis], accessor.min[axis]);
+          max[axis] = Math.max(max[axis], accessor.max[axis]);
+        }
+      }
+    }
+    expect(max[0] - min[0]).toBeCloseTo(HERO_TRUCK_DIMENSIONS.width, 2);
+    expect(max[1] - min[1]).toBeCloseTo(HERO_TRUCK_DIMENSIONS.height, 2);
+    expect(max[2] - min[2]).toBeCloseTo(HERO_TRUCK_DIMENSIONS.length, 2);
+    // Centred presentation: the declared placement is the middle of the envelope, not the
+    // fifth wheel. Tyre contact stays on the ground plane.
+    expect(min[2] + max[2]).toBeCloseTo(0, 3);
+    expect(min[1]).toBeGreaterThanOrEqual(0);
+    expect(min[1]).toBeLessThan(0.02);
   });
 
   it('returns a usable root immediately, before anything has loaded', () => {
