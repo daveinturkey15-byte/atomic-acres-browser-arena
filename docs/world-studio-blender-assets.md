@@ -40,17 +40,19 @@ Blender I/O v5.1.20. Runtime three.js: 0.185.1.
 | `public/assets/world-studio/blender/bus_body_basecolor.png` | `7925c38c10361b215febbad4919f994a31f7083642d4b2ec90030c2ab8ce6478` | 103,299 |
 | `public/assets/world-studio/blender/bus_body_roughness.png` | `39d5920d3eea908af5693b4d5f20d483397627b210f18f6b698ee62719108f2b` | 70,583 |
 | `public/assets/world-studio/blender/bus_body_normal.png` | `0c3ac3fa27d942fb1553c4073e5a7ad8ab17b993f217e32b576234def55c7d36` | 164,359 |
-| `scripts/blender/world-studio/source/hero-bus.blend` | not byte-stable, see determinism below | 1,867,688 |
-| `public/assets/world-studio/blender/hero-truck.glb` | `f3bf24362566094e0e8970c70c7af24e3f6a257a9427cb5773d130ec8a12b6d7` | 1,530,540 |
+| `scripts/blender/world-studio/source/hero-bus.blend` | `ed1cac9598d3033e40a5b6b74aa897d782aa596f22c8416422dce5b41f744f15` | 1,867,688 |
+| `public/assets/world-studio/blender/hero-truck.glb` | `b602d3037c5d6c23d174e17006a9b5ae6abb9de4835fba5d23fee377fdd74199` | 1,554,816 |
 | `public/assets/world-studio/blender/truck_red_basecolor.png` | `6827ec7d474e00106711b93db0bf3ed979e39c82990f3885d33182343ce985cb` | 83,395 |
 | `public/assets/world-studio/blender/truck_red_roughness.png` | `8cd7548d2e0ea80a851fc060bc65d92313e577d4d4ab6f3bce39f427b9710130` | 71,875 |
-| `public/assets/world-studio/blender/truck_red_normal.png` | `5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e` | 161,011 |
+| `public/assets/world-studio/blender/truck_panel_normal.png` | `5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e` | 161,011 |
 | `public/assets/world-studio/blender/trailer_white_basecolor.png` | `612c1d57d66302fcd9a88171e6d4116100a5c995e4837012c30cbe398371b586` | 95,068 |
 | `public/assets/world-studio/blender/trailer_white_roughness.png` | `5a4e7079462741e39822201fdb2696e1594b03ff93ad426995b79c38b66f5411` | 71,128 |
-| `public/assets/world-studio/blender/trailer_white_normal.png` | `5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e` | 161,011 |
-| `scripts/blender/world-studio/source/hero-truck.blend` | not byte-stable, see determinism below | — |
+| `scripts/blender/world-studio/source/hero-truck.blend` | `caac4ba9ea4ee62d78b14d47ccff8ec4c55bcc694b0ea467b5d6bff6c8c53f58` | 1,942,340 |
 
-Source and tooling: `scripts/blender/world-studio/build_hero_bus.py`,
+The `.blend` hashes identify the committed source containers at `d045bf04e`; this is not a
+claim that Blender's session-bearing container is byte-identical across rebuilds.
+
+Source and tooling: `scripts/blender/world-studio/build_hero_bus.py`, `build_hero_truck.py`,
 `blender_launcher.py`, `probe_api.py`, `verify_blend.py`, `validate_glb.mjs`;
 runtime API `src/world-studio/blender-assets/index.ts` (+ `index.test.ts`).
 
@@ -81,25 +83,37 @@ node scripts/blender/world-studio/validate_glb.mjs public/assets/world-studio/bl
 python scripts/blender/world-studio/blender_launcher.py scripts/blender/world-studio/verify_blend.py hero-truck.blend
 ```
 
-Measured: **18,576 indexed triangles**, 23,964 vertices, **8 materials / 8 primitives / 1 mesh**,
-bounds **2.944 m × 3.942 m × 13.473 m**, minimum Y `0.0081`, 6 embedded images. All container,
-geometry, material and image checks pass; three.js parsed 8 meshes / 18,576 triangles on CPU; a
-fresh Blender reopens the `.blend` with all 8 slots, `UVMap` and six 512×512 maps at the correct
-colour spaces; a second rebuild produced a byte-identical `.glb`.
+Measured at `d045bf04e`: **23,492 indexed triangles**, 28,835 vertices,
+**8 materials / 8 primitives / 1 mesh**, bounds **2.976 m × 3.942 m × 13.518 m**, minimum Y
+`0.0081`, 5 embedded images. Independent CPU validation on 2026-09-12 passed all container,
+geometry, material and image checks; three.js parsed 8 meshes / 23,492 triangles with matching
+bounds. Node emitted five texture-decode warnings because it has no browser image decoder;
+the embedded bytes are verified, while browser texture response remains OPEN. The native
+continuation recorded a fresh Blender reopen with 8 slots, `UVMap`, metric units and exportable
+geometry, and a second rebuild with byte-identical GLB and PNGs. That Blender execution was not
+repeated during the independent documentation review.
 
-Bonneted tractor: tapered bonnet stack, superellipse front fenders swept with the recipe's
-`p = 2.6` arch profile, recessed grille with nine chrome bars, round headlamps layered
-bezel→lens, chrome bumper, rounded cab with two-piece screen, door reveals with handles, mirror
-arms, chrome fuel tanks, steps, twin exhaust stacks and five roof marker lamps. Box trailer:
+Bonneted tractor: cab and hood are station-ring lofts with an anchored flank profile, tumblehome
+and clamped shoulders. Superellipse front arches are cut into the fender skin with the recipe's
+`p = 2.6` profile and a lip bead following the same points. The steer axle sits mid-hood; a raked
+windscreen, recessed glazing, door shut lines and pillars follow the cab skin, with a dark liner,
+dashboard, steering wheel and seats behind the glass. Rectangular headlamps, recessed grille,
+air cleaners, wrapped bumper, mirror arms, chrome fuel tanks, steps, twin exhaust stacks and
+five roof marker lamps complete the cab. Box trailer:
 ribbed flanks (22 swept ribs per side), top and bottom rails, rear doors in a dark reveal with
 lock bars and hinges, underride bar, bogie frame, landing gear and rear lamps. Running gear is
 18 wheels — two steer, eight drive in tandem duals, eight trailer duals — plus axles and four
 mudflaps, with lug detail only on the wheels whose outboard face is visible.
 
 Two paint families carry maps (`truck_paint_red`, `trailer_paint_white`); the other six are
-constant-parameter PBR. The red and white **normal maps are byte-identical** (same seed, and the
-normal map does not depend on colour), so the GLB embeds that 161 KB tile twice; harmless, but it
-is a real redundancy rather than two distinct maps.
+constant-parameter PBR. Both paint families now share `truck_panel_normal.png`; the two former
+identical normal PNGs were consolidated and the GLB embeds five images rather than six.
+
+The prop is centered along its own long axis: local glTF Z is `[-6.7587, +6.7588]` m. Root's
+existing arena integration compensates the old asymmetric export with `truck.position.z =
+-2.41375`. When integrating this centered export, change that presentation position to **-2.0**
+and retain root's **heading 0** (`truck.rotation.y = 0`) to preserve the intended world center.
+This is an integration instruction; this lane changes no arena code or accepted colliders.
 
 ### Materials as they survived export
 
@@ -187,7 +201,8 @@ the references are the owner's own concept images.
   PNGs (same SHA-256). The `.blend` is **not** byte-stable across rebuilds — Blender embeds
   session state — so geometry/manifest determinism is proven on the exported artefacts and the
   `.blend` hash is recorded per build rather than pinned.
-- `src/world-studio/blender-assets/index.test.ts` — **7 passed**: base-aware URL resolution,
+- `src/world-studio/blender-assets/index.test.ts` — **8 passed** independently at `d045bf04e`:
+  the shipped truck binary matches declared dimensions and is centered along Z; base-aware URL resolution,
   both declared placements inside their envelopes and not overlapping, root usable before load,
   visible rejection on load failure, repeated/early dispose safety, no collider-or-authority
   surface.
@@ -246,13 +261,11 @@ to the bus only, so nudging one prop cannot silently stack the other on top of i
    animated, and it carries no interaction or traversal semantics of any kind.
 6. **No livery, lettering or number plate graphics** — no branded trade dress was authored, and
    the plate is a blank clear panel.
-7. **The truck was authored after the bus was complete and committed**, as the brief ordered. It
-   is held to the same mechanical standard (measured counts, CPU glTF + three.js parse, fresh
-   Blender reopen, byte-identical rebuild) but it received **less iteration than the bus** — the
-   bus went through two full proportion corrections and the truck one. Its cab is a rounded
-   chamfered box rather than a station-ring loft, so its body has less surface shaping than the
-   bus; that is a deliberate, stated difference, not an unnoticed one. As with the bus, no
-   rendered-quality claim is made.
+7. **The truck received a second authoring pass after the bus**, replacing its earlier rounded
+   box cab with station-ring cab and hood lofts, shaped fender/glazing details and a centered
+   export. That continuation ended on the CLI budget limit with clean committed assets;
+   retaining those assets does not change the run's failed budget status. No rendered-quality
+   claim is made. Its tyres sit approximately 8 mm above ground from the existing lathe phase.
 8. **`tasklist` was denied** in this session's permission mode, so running Blender processes could
    not be enumerated before execution. Coordination was done through the authorized exclusive
    lock at `…/extra-quality-20260912/blender-execution.lock` instead: acquired with `O_EXCL`,
