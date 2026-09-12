@@ -200,6 +200,7 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { buildWorldStudio } from './world-studio/arena';
+import { createStudioWeatherRouter, isStudioPresetId, studioWeatherSeed, type StudioWeatherRoute } from './world-studio/weather-routing';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
 // imported here: Map 3 is the one lazily loaded arena (HF-409, see
@@ -5009,6 +5010,39 @@ void mistQuery;
 // weather model is built on collapses. It is derived from the authoritative
 // host identity and the match start stamp - never Math.random or a local clock.
 let weatherMatchSeed = 0;
+const worldStudioWeatherRouter = createStudioWeatherRouter();
+let worldStudioWeatherOverride: string | null = new URLSearchParams(window.location.search).get('studioWeather');
+
+/** One shared preset, with local presentation ceilings, installed before arena animation. */
+function syncWorldStudioEnvironment(target: ArenaMap = arena): StudioWeatherRoute | null {
+  if (target.id !== 'world-studio') return null;
+  const snapshot = privateLobbySnapshot;
+  const hosted = network.role !== 'offline' || snapshot !== null;
+  const hostId = snapshot?.hostId ?? (network.role === 'host' ? player.id : null);
+  const hostEpoch = privateMatchActiveAtEpochMs ?? snapshot?.activeAtEpochMs ?? null;
+  // The existing per-boot player identity and per-round epoch supply the solo
+  // seed. Hosted peers never read either as a fallback for missing authority.
+  const offlineSeed = hosted ? 0 : deriveWeatherMatchSeed(player.id, killstreakMatchEpoch);
+  const seed = studioWeatherSeed(hosted, hostId, hostEpoch, offlineSeed);
+  if (seed === null) {
+    delete target.root.userData.worldStudioEnvironment;
+    delete target.root.userData.worldStudioEnvironmentSeed;
+    return null;
+  }
+  const route = worldStudioWeatherRouter.resolve(seed, hosted, worldStudioWeatherOverride);
+  if (target.root.userData.worldStudioEnvironment !== route.environment) {
+    target.root.userData.worldStudioEnvironment = route.environment;
+  }
+  target.root.userData.worldStudioEnvironmentSeed = seed;
+  // A staged root may be rejected: only the admitted root can rekey shared
+  // presentation. The existing transition still owns gameplay/physics commit.
+  if (target === arena && weatherMatchSeed !== seed) {
+    weatherMatchSeed = seed;
+    weatherWindField = createWindField('world-studio', seed);
+    hfParticleRuntime.reseed(seed);
+  }
+  return route;
+}
 let lastRainUpdateAtMs = 0;
 // LIGHTING: `let`, not `const`, only so the QA hook below can move the weather
 // WITHOUT a reload. The lane needed to prove that a weather change reaches the
@@ -17338,6 +17372,7 @@ function respawn(
   // rekeying it here gives every match its own air on the same peer-agreed
   // `hostId:matchEpoch` derivation the weather model uses.
   hfParticleRuntime.reseed(weatherMatchSeed);
+  syncWorldStudioEnvironment();
   lastRainUpdateAtMs = performance.now();
   killConfirmPulseState = createKillConfirmPulseState(accessibilityRuntime.weaponMotionScale);
   audio.setLowHealthFeedback({ active: false, severity: 0, vignetteOpacity: 0, breathingGain: 0, heartbeatGain: 0, pulseHz: 0 });
@@ -30031,6 +30066,7 @@ async function performArenaSelection(
     setBootstrapStage('binding-world');
     profileArenaTransition('arena-construction');
     nextArena = ensureArenaConstructed(nextSelection.id);
+    syncWorldStudioEnvironment(nextArena);
     profileArenaTransition('interactive-world-construction');
     nextInteractiveWorldRuntime = createInteractiveWorldRuntime(
       nextArena,
@@ -30057,6 +30093,7 @@ async function performArenaSelection(
     clearDebugRiggedEvidenceCaptureTargets();
     lastDebugCapturePresentation = null;
     arena = nextArena;
+    syncWorldStudioEnvironment();
     localSwimState = createSwimState();
     // Tear the previous arena's overlay down before the new one is dressed, so
     // it can never outlive the arena it was measuring.
@@ -31492,6 +31529,7 @@ function frame(now: number, scheduleNext = true): void {
     // `arena` is the admitted arena; staged and cached arenas are never passed
     // here, so a not-yet-admitted world cannot advance its clock behind the
     // loading transition. The context factory allocates only when a hook exists.
+    const studioWeather = syncWorldStudioEnvironment();
     arenaFrameAnimator.tick(arena, frameDt, (): ArenaFrameContext => ({
       arenaId: arena.id,
       cameraPosition: camera.position,
@@ -31623,7 +31661,9 @@ function frame(now: number, scheduleNext = true): void {
     // Natural weather reaches rain in roughly a fifth of five-minute matches,
     // which is the right variety to PLAY with and the wrong odds to TEST with -
     // without this you would have to reroll matches to see the feature at all.
-    const weatherNow = weatherOverrideState
+    const weatherNow = selectedArena.id === 'world-studio'
+      ? studioWeather?.weather ?? clearWeatherSample(selectedArena.id)
+      : weatherOverrideState
       ? forcedWeatherSample(selectedArena.id, weatherOverrideState)
       : gameStarted
         ? sampleWeather(selectedArena.id, weatherMatchSeed, weatherElapsedSeconds)
@@ -32697,6 +32737,7 @@ const debugWindow = window as Window & {
     admissionState: () => ReturnType<typeof sampleAdmissionState>;
     sampleSceneGraph: () => THREE.Scene;
     sampleWeather: () => Record<string, unknown>;
+    setStudioWeatherOverride: (presetId: string | null) => Record<string, unknown>;
     // LIGHTING: time-of-day telemetry for the QA probes (Lane AB).
     sampleLightingConditions: () => Record<string, unknown>;
     setLightingTimeChoice: (choice: string) => Record<string, unknown>; triggerNukeEvent: (matchEndHostTimeMs?: number) => Record<string, unknown>;
@@ -33944,9 +33985,20 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
   // merely imported.
   sampleWeather: () => ({
     seed: weatherMatchSeed,
+    studioEnvironment: arena.id === 'world-studio' ? arena.root.userData.worldStudioEnvironment ?? null : null,
+    // Presets carry an authored hour; the generic daylight resolver remains
+    // pinned pending actual visual safety evidence. Never call this implemented.
+    studioTimeOfDayImplemented: false,
     rain: rainPresentation.telemetry(),
     particles: hfParticleRuntime.telemetry(),
   }),
+  setStudioWeatherOverride: (presetId: string | null) => {
+    if (network.role !== 'offline' || privateLobbySnapshot || (presetId !== null && !isStudioPresetId(presetId))) {
+      return { accepted: false };
+    }
+    worldStudioWeatherOverride = presetId;
+    return { accepted: true, environment: syncWorldStudioEnvironment()?.environment ?? null };
+  },
   // LIGHTING: read-only time-of-day telemetry. No light is touched by reading.
   sampleLightingConditions: () => lightingConditionsTelemetry(),
   // LIGHTING: capture/QA hook. Writes uniforms over the frozen light set only.
