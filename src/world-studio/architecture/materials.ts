@@ -62,7 +62,27 @@ type MaterialSpec = Readonly<{
   transparent?: boolean;
   opacity?: number;
   side?: THREE.Side;
+  /** Transparent surfaces that must not depth-reject what is behind them. */
+  depthWrite?: boolean;
 }>;
+
+/**
+ * Per-FAMILY albedo contrast, applied once to the shared buffer so the sampler census
+ * stays at one albedo/normal/roughness triplet per family.
+ *
+ * The forge authors weathered surfaces: lap siding carries 45 mm paint-wear edge bands and
+ * 55 mm scuff blotches that drop a painted board to 0.44/0.34/0.245, and the 12 mm shadow
+ * gap is a hard albedo step on top of a metric-true 6 mm height drop. Read at house scale
+ * that stacks into "damaged", not "maintained". Compressing each texel towards the family's
+ * own linear mean keeps the course rhythm and the grain while removing the blotch depth;
+ * the mean is preserved exactly, so `tintFor` still lands the authored target.
+ */
+const FAMILY_ALBEDO_CONTRAST: Readonly<Partial<Record<MaterialFamily, number>>> = {
+  lapSiding: 0.55,
+  shingle: 0.88,
+  brick: 0.82,
+  concrete: 0.9,
+};
 
 /**
  * Tiling is authored, not inherited: lap siding keeps the forge's 220 mm course pitch at
@@ -70,30 +90,41 @@ type MaterialSpec = Readonly<{
  * stiles. Stone veneer is the brick family at a coarser tile with a stronger normal.
  */
 const SPECS: Readonly<Record<StudioMaterialId, MaterialSpec>> = {
-  'siding-teal': { family: 'lapSiding', metresPerTile: 1.76, target: 0x55a894, roughness: 0.74, normalScale: 1 },
-  'siding-yellow': { family: 'lapSiding', metresPerTile: 1.76, target: 0xe3c257, roughness: 0.74, normalScale: 1 },
-  trim: { family: 'concrete', metresPerTile: 0.9, target: 0xeae4d8, roughness: 0.58, normalScale: 0.22 },
-  roof: { family: 'shingle', metresPerTile: 3, target: 0x6e7176, roughness: 0.92, normalScale: 1.1 },
-  brick: { family: 'brick', metresPerTile: 1.8, target: 0x9a5f4a, roughness: 0.9, normalScale: 1 },
-  stone: { family: 'brick', metresPerTile: 2.6, target: 0x8d8577, roughness: 0.95, normalScale: 1.35 },
-  foundation: { family: 'concrete', metresPerTile: 3, target: 0xa8a298, roughness: 0.93, normalScale: 0.8 },
+  'siding-teal': { family: 'lapSiding', metresPerTile: 1.76, target: 0x5fbfa6, roughness: 0.62, normalScale: 0.55 },
+  'siding-yellow': { family: 'lapSiding', metresPerTile: 1.76, target: 0xecc65c, roughness: 0.62, normalScale: 0.55 },
+  trim: { family: 'concrete', metresPerTile: 0.9, target: 0xf2ede2, roughness: 0.46, normalScale: 0.16 },
+  roof: { family: 'shingle', metresPerTile: 2.1, target: 0x7e7b74, roughness: 0.9, normalScale: 0.85 },
+  brick: { family: 'brick', metresPerTile: 1.8, target: 0xa06a52, roughness: 0.88, normalScale: 0.85 },
+  stone: { family: 'brick', metresPerTile: 2.6, target: 0xa89b86, roughness: 0.92, normalScale: 1.1 },
+  foundation: { family: 'concrete', metresPerTile: 3, target: 0xb0aa9e, roughness: 0.93, normalScale: 0.8 },
   'interior-wall': { family: 'concrete', metresPerTile: 2.2, target: 0xe6dfd0, roughness: 0.88, normalScale: 0.12 },
   'interior-accent-teal': { family: 'concrete', metresPerTile: 2.2, target: 0x8fbdad, roughness: 0.88, normalScale: 0.12 },
   'interior-accent-yellow': { family: 'concrete', metresPerTile: 2.2, target: 0xd8c59c, roughness: 0.88, normalScale: 0.12 },
   'floor-hard': { family: 'terrazzo', metresPerTile: TERRAZZO_METRES_PER_TILE, target: 0xcfc6b2, roughness: 1, normalScale: 0.8 },
   'floor-soft': { family: 'carpet', metresPerTile: CARPET_METRES_PER_TILE, target: 0xb0a48d, roughness: 1, normalScale: 1 },
   door: { family: 'lapSiding', metresPerTile: 0.44, target: 0x8a6a45, roughness: 0.6, normalScale: 0.7 },
+  /**
+   * Window glazing, alpha-blended rather than transmissive (no `MeshPhysicalMaterial`,
+   * no refraction pass). Three corrections against the capture's milky panes:
+   * - a DARK dielectric tint. A pane is mostly the reflection of the sky plus whatever the
+   *   room returns; a light base colour at low opacity is fog, and it hid the interiors.
+   * - `FrontSide` on the pane's closed box, so one glazed opening is ONE alpha layer
+   *   instead of the two `DoubleSide` drew (0.28 twice composites to 0.48 of white).
+   * - `depthWrite: false`, so a pane never depth-rejects the room behind it. This is why
+   *   rooms vanished: the glazing wrote depth, then the interior drew and was discarded.
+   */
   glass: {
     family: null,
     metresPerTile: 1,
-    target: 0xcdd9d9,
-    roughness: 0.06,
-    metalness: 0.05,
+    target: 0x2c3a40,
+    roughness: 0.05,
+    metalness: 0,
     transparent: true,
-    opacity: 0.28,
-    side: THREE.DoubleSide,
+    opacity: 0.34,
+    side: THREE.FrontSide,
+    depthWrite: false,
   },
-  metal: { family: 'concrete', metresPerTile: 1.4, target: 0xb2b6ba, roughness: 0.42, metalness: 0.75, normalScale: 0.2 },
+  metal: { family: 'concrete', metresPerTile: 1.4, target: 0xc0c6cc, roughness: 0.32, metalness: 0.85, normalScale: 0.2 },
 };
 
 export type StudioMaterialKit = Readonly<{
@@ -113,6 +144,31 @@ type FamilyMaps = Readonly<{
 
 function srgbToLinear(value: number): number {
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function linearToSrgb(value: number): number {
+  return value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+}
+
+/**
+ * Compresses every texel towards `mean` in LINEAR light and re-encodes to sRGB bytes.
+ * Linear is the right space for this: it is the space the mean was measured in and the
+ * space the GPU lights in, so the mean survives the round trip and `tintFor` stays valid.
+ */
+function compressAlbedoContrast(
+  rgba: Uint8Array,
+  mean: readonly [number, number, number],
+  contrast: number,
+): Uint8Array {
+  if (contrast >= 1) return rgba;
+  for (let index = 0; index < rgba.length; index += 4) {
+    for (let channel = 0; channel < 3; channel++) {
+      const linear = srgbToLinear(rgba[index + channel] / 255);
+      const pulled = mean[channel] + (linear - mean[channel]) * contrast;
+      rgba[index + channel] = Math.round(255 * Math.min(1, Math.max(0, linearToSrgb(pulled))));
+    }
+  }
+  return rgba;
 }
 
 /** Copies `channels`-interleaved rows bottom-to-top so v = 0 is the forge's bottom row. */
@@ -180,27 +236,48 @@ function buildFamily(family: MaterialFamily): FamilyMaps {
   const set = isStudioFamily(family)
     ? generateStudioTextureSet(family, STUDIO_TEXTURE_SIZE, STUDIO_TEXTURE_SEED)
     : generateTextureSet(family, { size: STUDIO_TEXTURE_SIZE, seed: STUDIO_TEXTURE_SEED });
+  const mean = meanLinear(set);
+  const albedo = compressAlbedoContrast(
+    flipRows(set.albedo, set.size, 4),
+    mean,
+    FAMILY_ALBEDO_CONTRAST[family] ?? 1,
+  );
   return {
-    albedo: dataTexture(flipRows(set.albedo, set.size, 4), set.size, THREE.SRGBColorSpace),
+    albedo: dataTexture(albedo, set.size, THREE.SRGBColorSpace),
     normal: dataTexture(flipRows(set.normal, set.size, 4), set.size, THREE.NoColorSpace),
     roughness: dataTexture(expandRoughness(set.roughness, set.size), set.size, THREE.NoColorSpace),
-    meanLinear: meanLinear(set),
+    meanLinear: mean,
   };
 }
 
+/** Highest gain a tint may apply to a family mean before the whole tint is scaled back. */
+export const MAX_TINT_GAIN = 4;
+
 /**
  * Normalises an authored sRGB target against the family's measured mean albedo so the
- * painted result lands on the intended hue instead of double-darkening through the map.
- * Clamped below 1.9 to keep the palette off the oversaturated end the brief warns about.
+ * painted result lands on the intended colour instead of darkening through the map.
+ *
+ * `new THREE.Color(hex)` already converts sRGB to the linear working space
+ * (`Color.setHex(hex, colorSpace = SRGBColorSpace)`, three 0.185.1). The former
+ * `.convertSRGBToLinear()` on top of it was a SECOND decode: every target was
+ * gamma-crushed before it was divided by the mean, which is why the shingle roof resolved
+ * to linear 0.021 (a navy slab) against an authored 0.152, and the brick chimney to
+ * 0.085/0.012/0.006 - near black - against an authored warm red. Targets now land.
+ *
+ * The gain limit is applied to the PEAK channel and scaled uniformly so a bright target on
+ * a dark family (the roof) desaturates towards grey rather than swinging hue, which is what
+ * per-channel clamping did to any target that clipped on one channel only.
  */
 function tintFor(target: number, mean: readonly [number, number, number]): THREE.Color {
-  const color = new THREE.Color(target).convertSRGBToLinear();
-  const factor = new THREE.Color(
-    Math.min(1.9, color.r / Math.max(0.02, mean[0])),
-    Math.min(1.9, color.g / Math.max(0.02, mean[1])),
-    Math.min(1.9, color.b / Math.max(0.02, mean[2])),
-  );
-  return factor;
+  const color = new THREE.Color(target);
+  const gain: [number, number, number] = [
+    color.r / Math.max(0.02, mean[0]),
+    color.g / Math.max(0.02, mean[1]),
+    color.b / Math.max(0.02, mean[2]),
+  ];
+  const peak = Math.max(gain[0], gain[1], gain[2]);
+  const scale = peak > MAX_TINT_GAIN ? MAX_TINT_GAIN / peak : 1;
+  return new THREE.Color(gain[0] * scale, gain[1] * scale, gain[2] * scale);
 }
 
 /**
@@ -230,6 +307,7 @@ export function createStudioMaterialKit(): StudioMaterialKit {
       transparent: spec.transparent ?? false,
       opacity: spec.opacity ?? 1,
       side: spec.side ?? THREE.FrontSide,
+      depthWrite: spec.depthWrite ?? true,
       vertexColors: true,
     });
     if (!spec.family) {
