@@ -1,0 +1,101 @@
+{
+  "note": "Hashes were recomputed from the canonical shared skill store in this lane and every one matched the sha256 recorded in the source packet, so the carrier skills are unchanged since the packet was cut. Skills whose rows were not implemented here were deliberately NOT read, and no claim is made about them.",
+  "skillsReadInFull": [
+    {
+      "skill": "game-hud-menu-overhaul",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\game-hud-menu-overhaul\\SKILL.md",
+      "sha256": "8b590d9fd7848070e46155ee8a61feaf6539cfe28c2b1ee0bdf1162665878c0a",
+      "bytes": 7298,
+      "lines": 91,
+      "readInFull": true,
+      "coversSourceIds": [
+        26
+      ],
+      "whatItGoverned": "Read in full (91 lines). Lines 30-77 'Pre-match and game-select shells' carry row 26's eleven restated principles and the explicit all-rights-reserved warning."
+    },
+    {
+      "skill": "webgpu-tsl-arena-forging",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\webgpu-tsl-arena-forging\\SKILL.md",
+      "sha256": "0ba350ae25b818af70beea5da5493de0cebe9a68e96842808017ba5dcc8509bc",
+      "bytes": 4140,
+      "lines": 39,
+      "readInFull": true,
+      "coversSourceIds": [
+        28,
+        33
+      ],
+      "whatItGoverned": "Read in full (39 lines). Step 7 forbids ShaderMaterial/RawShaderMaterial/GLSL on the WebGPU path, which is why rows 18, 19, 23 and 26 are reimplemented without shaders."
+    },
+    {
+      "skill": "threejs-game-development",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\software-development\\threejs-game-development\\SKILL.md",
+      "sha256": "707888880f11fe498e5233417ba0b2a808f943c27954881fa19ca239798e2ce9",
+      "bytes": 8463,
+      "lines": 131,
+      "readInFull": true,
+      "coversSourceIds": [
+        18,
+        20,
+        27,
+        29,
+        33,
+        34
+      ],
+      "whatItGoverned": "Read in full (131 lines). Lines 95-122 carry row 34's subsystem-contract pattern; the safety boundary at line 92 forbids importing source from repositories lacking a compatible licence, which governs rows 23, 28, 29 and 33."
+    },
+    {
+      "skill": "atomic-acres-procedural-art-authoring",
+      "path": "C:\\Users\\david\\Documents\\desky-bootstrap-clone\\Skills\\game-development\\atomic-acres-procedural-art-authoring\\SKILL.md",
+      "sha256": "19f93b23bdcef5832c246772600c7740631cb3a43b6d424324a58eecfdab9508",
+      "bytes": 10377,
+      "lines": 152,
+      "readInFull": true,
+      "coversSourceIds": [
+        23,
+        24,
+        33
+      ],
+      "whatItGoverned": "Read in full (152 lines). Section 1 hard rules (determinism, no Math.random, frozen budgets, commit-pinned licence-reviewed intake) shaped every demo in this group."
+    }
+  ],
+  "skillsNotRead": [
+    {
+      "skill": "threejs-rtx-runtime-route",
+      "rows": [
+        19,
+        21
+      ],
+      "why": "Row 19 was implemented from the PRIMARY source (the CC0 repository and its Whitted shader), not from the carrier skill. The skill body was not read in this lane and is not cited as evidence."
+    },
+    {
+      "skill": "atomic-acres-asset-authoring",
+      "rows": [
+        22
+      ],
+      "why": "Row 22 is blocked with no source to implement."
+    },
+    {
+      "skill": "threejs-webgpu-water",
+      "rows": [
+        25
+      ],
+      "why": "Row 25 is blocked."
+    },
+    {
+      "skill": "game-animation-asset-pipeline",
+      "rows": [
+        30,
+        31,
+        32
+      ],
+      "why": "Rows 30 and 32 are blocked; row 31 was not delivered."
+    },
+    {
+      "skill": "local-video-generation",
+      "rows": [
+        32
+      ],
+      "why": "Row 32 is blocked."
+    }
+  ]
+}
