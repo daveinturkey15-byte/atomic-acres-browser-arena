@@ -1,0 +1,98 @@
+/* Owner 2026-09-12: dark menus, restrained neon accents, no map previews or
+   leaderboard surfaces. Supersedes the earlier bright-deck art direction.
+   Menu presentation only: combat HUD, input and match authority are unchanged. */
+:is(#menu, [role='dialog'], #deployment-transition) {
+  color-scheme: dark;
+  --menu-ground: #0b1018;
+  --menu-panel: #121b28;
+  --menu-raised: #192536;
+  --menu-line: #334458;
+  --menu-text: #edf4ff;
+  --menu-muted: #b0c1d6;
+  --menu-blue: #58d8ff;
+  --menu-green: #6aefb0;
+  --menu-purple: #bfa0ff;
+  --menu-orange: #ffb06b;
+  --menu-yellow: #f7dd72;
+  --menu-red: #ff7e92;
+}
+#menu.pass64-command-deck {
+  --p77-ink: var(--menu-text); --p77-ink-soft: var(--menu-muted); --p77-ink-quiet: #a0b2c9;
+  --p77-paper: var(--menu-ground); --p77-paper-lit: var(--menu-panel);
+  --p77-accent: var(--menu-blue); --p77-accent-lit: var(--menu-blue);
+  --p77-accent-wash: #58d8ff12; --p77-accent-line: #58d8ff66;
+  --p77-data: var(--menu-green); --p77-hair: #334458; --p77-hair-strong: #455a73;
+  --p77-dark-top: #152131; --p77-dark-bottom: #0c121c;
+  --p77-dark-ink: var(--menu-text); --p77-dark-ink-soft: var(--menu-muted);
+  --p77-offset: 3px 3px 0 #0005; --p77-offset-tight: 2px 2px 0 #0005;
+  --p75-deck-ink: var(--menu-text); --p75-deck-ink-soft: var(--menu-muted);
+  --p75-deck-line: #334458; --p75-deck-line-strong: #455a73; --p75-deck-tick: #58d8ff66;
+  --p74-ink: var(--menu-text); --p74-accent: var(--menu-blue); --p74-accent-bright: var(--menu-blue);
+  --aqua: var(--menu-blue); --coral: var(--menu-red); --gold: var(--menu-yellow);
+  color: var(--menu-text) !important;
+  background: var(--menu-ground) !important;
+  border-color: var(--menu-line) !important;
+}
+#menu :is(.command-header,.command-rail,.command-workspace,.menu-panel,.arena-command,.deployment-manifest) {
+  background: var(--menu-ground) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+}
+#menu :is(.manifest-heading,.map-selector,.settings-section,.selected-kit-summary,.loadout-manager,.kit-heading,
+  .operator-group,.operator-preview-panel,.advanced-settings,.killstreak-preview-rail,#private-lobby,.controls) {
+  background: var(--menu-panel) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+}
+#menu :is(h1,h2,h3,h4,strong,b,label,summary,span,em) { color: var(--menu-text) !important; }
+#menu :is(p,small,.lede,.legal,.controls) { color: var(--menu-muted) !important; }
+#menu :is(input,select,textarea,button,.kit-card,.operator-skin-card,.operator-anim-card,.killstreak-slot-card) {
+  color: var(--menu-text) !important;
+  background: var(--menu-raised) !important;
+  border-color: var(--menu-line) !important;
+  box-shadow: none !important;
+  accent-color: var(--menu-blue);
+}
+#menu :is(input,textarea)::placeholder { color: #9aaec8 !important; }
+#menu :is(button,a,input,select,textarea):focus-visible { outline: 2px solid var(--menu-blue) !important; outline-offset: 3px; }
+#menu :is(button,a):hover { border-color: var(--menu-blue) !important; }
+#menu :is(button.active,button.selected,[aria-selected='true'],[aria-pressed='true']) {
+  background: #173449 !important; border-color: var(--menu-blue) !important;
+}
+#menu :is(.command-brand strong,#arena-title span,.eyebrow,.map-selector-heading>span) { color: var(--menu-blue) !important; }
+#menu .menu-actions :is(.primary,#solo,#resume), #menu #lobby-start {
+  background: #6aefb0 !important; color: #071c15 !important; border-color: #6aefb0 !important;
+}
+#menu #host, #menu #join { border-color: var(--menu-blue) !important; color: var(--menu-blue) !important; }
+#menu #menu-tab-kit :is(span,i), #menu .kit-heading b { color: var(--menu-purple) !important; }
+#menu #menu-tab-streaks :is(span,i) { color: var(--menu-orange) !important; }
+#menu #menu-tab-options :is(span,i) { color: var(--menu-yellow) !important; }
+#menu :is(.input-error,[data-kind='error'],#lobby-leave) { color: var(--menu-red) !important; }
+#menu :is(#network-status[data-kind='ok'],#lobby-ready) { color: var(--menu-green) !important; }
+#menu :is(#menu-showcase,#high-score-card,#privacy-settings),
+#deployment-transition :is(img,video,.preview-cockpit-hud) { display: none !important; }
+#menu .map-card-grid { grid-template-columns: repeat(2,minmax(0,220px)); align-items: stretch; }
+#menu :is(.map-card,.technique-card) {
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
+  width: 100%; min-height: 0; aspect-ratio: 1; padding: 18px; text-align: left;
+  background: var(--menu-panel) !important; color: var(--menu-text) !important;
+  border: 1px solid var(--menu-line); border-radius: 3px; text-decoration: none;
+  box-shadow: none !important; clip-path: none; overflow: hidden;
+}
+#menu :is(.map-card,.technique-card) .map-index { font: 700 12px/1 Inter,sans-serif; color: var(--menu-blue); }
+#menu :is(.map-card,.technique-card)>span { font: 800 19px/1.15 Inter,sans-serif; }
+#menu :is(.map-card,.technique-card)>strong { font: 500 12px/1.4 Inter,sans-serif; color: var(--menu-muted) !important; }
+#menu :is(.map-card,.technique-card)>small { margin-top: auto; font: 700 10px/1.3 Inter,sans-serif; }
+#menu :is(.map-card,.technique-card)::before { display: none; }
+#menu .map-card :is(.map-authoring,.map-prototype) { display: none; }
+#menu .technique-card { border-color: #bfa0ff88; }
+#menu .technique-card :is(.map-index,span) { color: var(--menu-purple) !important; }
+:is([role='dialog'],#deployment-transition) { color: var(--menu-text) !important; background-color: var(--menu-ground) !important; }
+[role='dialog'] :is(section,header,article,.panel,button,input,select) { background-color: var(--menu-panel) !important; color: var(--menu-text) !important; border-color: var(--menu-line) !important; }
+[role='dialog'] :is(p,small,label) { color: var(--menu-muted) !important; }
+@media(max-width:600px) {
+  #menu .map-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #menu :is(.map-card,.technique-card) { padding: 12px; gap: 8px; }
+  #menu :is(.map-card,.technique-card)>span { font-size: 14px; }
+  #menu :is(.map-card,.technique-card)>strong { display: none; }
+}

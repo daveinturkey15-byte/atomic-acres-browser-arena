@@ -30006,7 +30006,7 @@ function applyArenaLightingForSelection(): void {
 }
 
 function menuPreviewShouldBeActive(): boolean {
-  return (menuLifecycle.surface === 'pre-match' || menuLifecycle.surface === 'deploying')
+  return !menuShowcase.hidden && (menuLifecycle.surface === 'pre-match' || menuLifecycle.surface === 'deploying')
     && !gameStarted
     && !menu.classList.contains('hidden')
     && (menuLifecycle.surface === 'deploying' || !element<HTMLElement>('#menu-panel-deploy').hidden);

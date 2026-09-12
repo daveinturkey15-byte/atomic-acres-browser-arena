@@ -136,15 +136,19 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         -->
         <a class="arena-showcase-link" id="arena-showcase-link" hidden target="_blank" rel="noopener noreferrer">OPEN THE STANDALONE SHOWCASE ↗</a>
       </header>
-      <aside id="menu-showcase" aria-hidden="true">
+      <aside id="menu-showcase" aria-hidden="true" hidden>
         <canvas id="match-pause-frame-fallback" aria-hidden="true" hidden width="1" height="1"></canvas>
         ${menuPreviewVideoMarkup(menuArenaSelection(null).id)}
         <div class="showcase-telemetry"><span id="menu-preview-label">PRERECORDED HELO // NUKE TOWN</span><b id="menu-preview-motion">AUTHORED COCKPIT FLYOVER</b></div>
       </aside>
       <section id="map-selector" class="map-selector" aria-label="Choose map">
         <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${SELECTABLE_ARENAS.length} deployable spaces · choose before launch</small></div>
-        <div class="map-card-grid">${mapCardsMarkup()}</div>
-        <p><a id="technique-showcase" href="./map3.html?lab=techniques" style="color:inherit;font-weight:700">TECHNIQUE SHOWCASE · EXPLORE THE 50 SOURCE REFERENCES ↗</a></p>
+        <div class="map-card-grid">${mapCardsMarkup()}
+          <a id="technique-showcase" class="technique-card" href="./map3.html?lab=techniques">
+            <i class="map-index">LAB</i><span>TECHNIQUE SHOWCASE ↗</span>
+            <strong>Explore the numbered source experiments.</strong><small>50 SOURCE REFERENCES</small>
+          </a>
+        </div>
       </section>
     </section>
     <aside class="deployment-manifest" aria-label="Deployment manifest">
@@ -203,7 +207,7 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <button id="menu-download-match-summary" type="button">HUMAN SUMMARY JSON</button>
         <button id="menu-download-match-technical" type="button">TECHNICAL DEBUG JSON</button>
       </section>
-      <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak">
+      <section id="high-score-card" aria-labelledby="high-score-title" data-board="streak" hidden>
         <div class="high-score-heading"><span><small id="global-leaderboard-status">GLOBAL STREAK RECORDS</small><strong id="high-score-title">NUKE TOWN LEADERBOARD</strong></span><b id="personal-best">NO PERSONAL BEST</b></div>
         <ol id="high-score-list"><li class="empty">Set the first named streak record.</li></ol>
         <p id="high-score-footnote">Global streak records sync across builds and devices · local cache remains available offline.</p>
@@ -347,7 +351,7 @@ function optionsPanelMarkup(): string {
         <p>Clears cached game files and reloads the newest version from the server. Use this when a new release has not appeared after an update — the clickable equivalent of Ctrl+Shift+R on desktop, built for mobile. Settings and loadouts are kept.</p>
       </div>
     </section>
-    <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title">
+    <section id="privacy-settings" class="settings-section" aria-labelledby="privacy-settings-title" hidden>
       <header><b id="privacy-settings-title">PRIVACY + ONLINE SHARING</b><span id="global-leaderboard-sharing-state">SHARING OFF</span></header>
       <div class="privacy-setting-row">
         <label class="setting-check"><input id="share-global-leaderboard" type="checkbox"> SHARE MY GLOBAL LEADERBOARD RESULTS</label>
@@ -473,9 +477,9 @@ function menuMarkup(model: Pass64ShellViewModel): string {
 }
 
 function deploymentTransitionMarkup(): string {
-  const preview = menuPreviewVideoDefinition('atomic-acres');
+  const preview = menuPreviewVideoDefinition(menuArenaSelection(null).id);
   return `<section id="deployment-transition" hidden aria-hidden="true" aria-live="polite" aria-busy="true" data-arena="atomic-acres" data-media="prerecorded-video" data-live-render="false">
-    <img id="deployment-transition-poster" src="${preview.poster}" width="${preview.width}" height="${preview.height}" alt="" decoding="async" fetchpriority="high">
+    <img id="deployment-transition-poster" width="${preview.width}" height="${preview.height}" alt="" decoding="async" hidden>
     <video id="deployment-transition-video" width="${preview.width}" height="${preview.height}" muted playsinline preload="none" hidden aria-hidden="true"></video>
     <div class="deployment-transition-scrim" aria-hidden="true"></div>
     <div class="preview-cockpit-hud deployment-cockpit-hud" aria-hidden="true">
