@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "releasePass": "PASS 96",
+  "feedbackReceivedAt": "2026-09-12T06:02:14Z",
+  "status": "candidate",
+  "bindingState": "awaiting-mechanical-verification-immutable-preview-and-owner-hitl",
+  "preview": null,
+  "humanAcceptance": null,
+  "requirements": [
+    {
+      "id": "R1",
+      "summary": "One deterministic shared selector distributes player and bot spawns across all 11 registered arena tables",
+      "expected": "Every player and bot deployment scores the complete valid candidate pool using threat distance, line-of-sight safety, recent death pressure, recent-use avoidance, occupancy, repeat avoidance and team-side awareness; each team arena keeps at least eight points per team, each explore arena keeps its authored five-point contract, and every table meets its recorded spread and mean-nearest-neighbour floor.",
+      "falsifier": "A runtime path selects only the first point, a side-local list, or a point inside the avoidance window while a fresh valid alternative exists; or any registered row, including parked farcrysis, fails count, spread, floor, route, cover, standoff, open-arc or cross-team measurement.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R1",
+        "pass-94 R2"
+      ],
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/spawn-selection.test.ts",
+          "command": "npx vitest run src/spawn-selection.test.ts src/spawn-safety.test.ts src/spawn-layout-quality.test.ts src/farcrysis-spawns.test.ts",
+          "note": "NOT YET RUN AT THIS HEAD. Required receipt, not a claim."
+        }
+      ]
+    },
+    {
+      "id": "R2",
+      "summary": "Nuke Town Rebuild keeps distributed, gate-passing authored spawn points",
+      "expected": "nuketown2 offers eight gate-passing points per team across the house-side yards, street-end and cul-de-sac approach, and no authored point lies inside the truck or coach.",
+      "falsifier": "The built audit finds an authored point inside geometry, or any point fails floor, route, cover, standoff, open-arc or LOS validity.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R3 (product invariant only)"
+      ],
+      "note": "pass-94 R3's diff-scoped clause 'only the spawn declaration changes' is preserved in docs/acceptance-archive/pass-94.json as a historical process restriction on that contribution. It is deliberately not restated here and is not a standing ban on future nuketown2 geometry work.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/verify-spawn-deploys.mjs",
+          "command": "node scripts/qa/verify-spawn-deploys.mjs --label pass96-nuketown2 --dist dist --arenas nuketown2",
+          "note": "NOT YET RUN AT THIS HEAD. Requires a permitted single-browser run; no probe is claimed without one."
+        }
+      ]
+    },
+    {
+      "id": "R3",
+      "summary": "Review cameras cover every catalog station, including the close-range prop and grime stations",
+      "expected": "The live visual definition and the roster-derived viewpoint catalog cover every authored station, including both HF-465 stations, both appliance banks, the three yard hero props, the driveway apron, the border path and both wall-grime runs, with poses derived from the shared layout and handedness applied once.",
+      "falsifier": "A catalog station has no matching authored runtime camera, a catalog entry is stale, or an HF-465 camera reverts to a mirrored literal.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R6",
+        "pass-94 R11"
+      ],
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-review-camera.test.ts",
+          "command": "npx vitest run src/nuketown2-review-camera.test.ts; node --test scripts/qa/arena-viewpoint-regression.test.mjs",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R4",
+      "summary": "Nuke Town authored material, prop and grime invariants hold",
+      "expected": "Overlapping transparent ground grime families stay vertically separated inside the 0.03 m audited film window; the appliance bank stays in the derived west front-lawn zone and out of the carriageway with paired rotational partner and collider authority; the HF-477 north-orange/south-cream house sides keep red north and blue south appliance tops; and createNuketown2PoolWaterMaterial remains absent from src/nuketown2-interior-materials.ts with the live pool module as the only caller target.",
+      "falsifier": "Two overlapping ground families share one y depth, a film leaves the audit window, the appliance footprint leaves the lawn zone or enters the road, a prop loses its paired authority, a hob resolves to the wrong side material, or the obsolete interior water export returns.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R7",
+        "pass-94 R8",
+        "pass-94 R9",
+        "pass-94 R10"
+      ],
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/nuketown2-grime-decals.test.ts",
+          "command": "npx vitest run src/nuketown2-grime-decals.test.ts src/nuketown2-yard-props.test.ts src/nuketown2-pool-water.test.ts",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R5",
+      "summary": "The coplanar and fidelity ratchet holds without relaxation",
+      "expected": "Coplanar inspection reports HOUSE-INTERIOR 0, STREET 0, FINDINGS 0 and UNAUDITED no greater than 52, with the fidelity and collider-visual-parity suites green.",
+      "falsifier": "FINDINGS becomes non-zero, HOUSE-INTERIOR or STREET becomes non-zero, UNAUDITED grows beyond 52, or any threshold is raised to admit the result.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R13 (numeric ratchet)"
+      ],
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/qa/find-coplanar-pairs.ts",
+          "command": "npx vitest run src/nuketown2-fidelity.test.ts src/collider-visual-parity-gate.test.ts; npx tsx scripts/qa/find-coplanar-pairs.ts",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R6",
+      "summary": "The existing HF-500 in-match chat layout is retained unchanged",
+      "expected": "Game chat continues to sit above the weapon/ammo cluster, outside the crosshair band and minimap at 1920x1080, 2560x1440 and 390x844; it remains a readable one-line pointer-inert strip when unfocused and opens only from the explicit Enter key.",
+      "falsifier": "Any supported viewport overlaps chat with ammo, the crosshair band or minimap; a closed panel captures pointer input or opens from a play-area click; or this candidate removes, weakens or extends the chat surface.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-94 R14"
+      ],
+      "note": "Retention only. This candidate neither implements nor waives any new chat feature; removal remains a later, separately authorized change.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/hud-chat-layout.test.ts",
+          "command": "npx vitest run src/hud-chat-layout.test.ts src/text-chat-ui.test.ts",
+          "note": "NOT YET RUN AT THIS HEAD. pass-94 recorded this as 'implemented', which is not a valid requirement state; it is carried here as pending verification rather than silently upgraded."
+        }
+      ]
+    },
+    {
+      "id": "R7",
+      "summary": "The bounded three-peer multiplayer soak gate passes with deterministic impairment and fails closed",
+      "expected": "The built candidate runs host plus two guests in headless installed Chrome for three minutes on ports 4227-4229 with a hard timeout below four minutes; 60 ms one-way delay and seeded 1% pre-send loss are applied to state and event traffic inside the loopback QA fence with trace counters; and the assertion table covers directed position replication within 1.5 m every second, guest-B leave/rejoin and damage within one RTT, reload after death, respawn reset, stair firing, clean browser logs and scoreboard agreement.",
+      "falsifier": "Fewer than three peers, a headed or bundled browser, an unbounded process, a port outside 4227-4229, a duration under three minutes, nondeterministic or event-only impairment, an omitted assertion row, an ignored divergence, an admitted console error, or a zero exit with a failed row.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-95 R1",
+        "pass-95 R2",
+        "pass-95 R3"
+      ],
+      "note": "REQUIRED AND NOT WAIVED. The later HF-566-569 multiplayer FEATURE requests are deferred; that deferral does not touch this existing release-blocking soak. No deferApproval is asserted here.",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "artifacts/qa/mp-soak-gate/",
+          "command": "PASS73_NATIVE_WEBGPU=1 npm run qa:mp-soak",
+          "note": "NOT YET RUN AT THIS HEAD. The real bundle and table are the release evidence and must be reported honestly, including any failed row."
+        }
+      ]
+    },
+    {
+      "id": "R8",
+      "summary": "Close-range visual inspection waits for a valid owner-machine GPU window",
+      "expected": "The close-range PNG set is captured and inspected only when both ComfyUI queue arrays are empty, GPU free memory is at least 3,000 MiB, and no other headless Chrome is present.",
+      "falsifier": "A capture is made during another headless Chrome workload, below the GPU-free threshold, with a non-empty queue, or without visual inspection.",
+      "acceptance": "visual",
+      "state": "pending",
+      "projects": [
+        "pass-94 R12"
+      ],
+      "note": "Carried forward OPEN. The 2026-09-04 poll met the queue and GPU thresholds but headless Chrome remained 4-12, so no PNGs were written. This is honest unfinished work, not an owner deferral.",
+      "evidence": []
+    },
+    {
+      "id": "R9",
+      "summary": "The candidate's mechanical gates are green on a quiet machine without weakening any verifier",
+      "expected": "TypeScript and the focused suites pass, measured with the agent swarm drained, and every recorded verdict is a real measurement.",
+      "falsifier": "Any gate is measured under swarm load, a CANNOT_MEASURE result is treated as a pass, a threshold, assertion or test is weakened to obtain green, or a browser probe is claimed without a permitted run.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "projects": [
+        "pass-80 R2",
+        "pass-94 R4 (retained invariant)"
+      ],
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "focused-pass96-gates",
+          "command": "npx tsc --noEmit; npx vitest run --reporter=dot",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R10",
+      "summary": "The contribution presents exactly one enforced acceptance manifest in the base..head delta",
+      "expected": "enforcedManifestPaths(changedPaths(main, head)) returns exactly ['acceptance/pass-96.json']; pass-80, pass-94 and pass-95 are relocated byte-identically to docs/acceptance-archive/ with unchanged blob SHAs and unchanged recorded statuses.",
+      "falsifier": "selectCiAcceptanceManifest sees a set other than one; any archived manifest differs from its recorded blob SHA; or an archived requirement state, falsifier or status is edited in place.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "renewedOutcome": "contribution reconciliation",
+      "evidence": [
+        {
+          "kind": "contract",
+          "ref": "scripts/release/acceptance-gate.mjs",
+          "command": "node scripts/release/acceptance-gate.mjs --phase ci --base <main-sha> --head <head-sha> --impact <impact>",
+          "note": "NOT YET RUN AT THIS HEAD. Expected to report the single manifest and then fail on candidate status; see expectedRedReason."
+        }
+      ]
+    },
+    {
+      "id": "R11",
+      "summary": "Work on this candidate is performed under a resolved project-routing lane receipt",
+      "expected": "scripts/release/project-routing.mjs resolves a registered lane for this machine and harness, one writer per lane, and the routing contract test passes.",
+      "falsifier": "Work proceeds without a routed receipt, in a lane owned by another writer, or in a dated fallback checkout after a refused lane.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "renewedOutcome": "routing",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "scripts/release/project-routing.test.mjs",
+          "command": "node --test scripts/release/project-routing.test.mjs",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R12",
+      "summary": "One reusable code-only method is adopted at a second call site",
+      "expected": "An existing src/forge-kit capability is reused by at least one additional arena or prefab call site, with the shared module remaining the single definition and the forge-kit suites green.",
+      "falsifier": "The capability is copy-pasted rather than imported, a second parallel definition appears, or adoption is claimed without a passing test at the new call site.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "renewedOutcome": "adopted reusable method",
+      "note": "Scoped to one code-only capability. No whole-library or full-visual completion is claimed.",
+      "evidence": [
+        {
+          "kind": "unit",
+          "ref": "src/forge-kit/forge-kit.test.ts",
+          "command": "npx vitest run src/forge-kit",
+          "note": "NOT YET RUN AT THIS HEAD."
+        }
+      ]
+    },
+    {
+      "id": "R13",
+      "summary": "Native WebGPU is exercised at two distinct verification uses",
+      "expected": "Two separate native-WebGPU runs are recorded on this candidate: an arena viewpoint capture and the multiplayer soak run, each on the owner machine's real device with PASS73_NATIVE_WEBGPU=1.",
+      "falsifier": "Either use is a software or bundled-browser fallback, the two uses are the same run counted twice, or a native run is claimed without its receipt.",
+      "acceptance": "mechanical",
+      "state": "pending",
+      "renewedOutcome": "two-use WebGPU proof",
+      "evidence": [
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/capture-arena-viewpoints.mjs",
+          "command": "node scripts/qa/capture-arena-viewpoints.mjs --arenas nuketown2 --out docs/evidence/pass96/review-cameras",
+          "note": "NOT YET RUN AT THIS HEAD. Use 1 of 2."
+        },
+        {
+          "kind": "browser",
+          "ref": "scripts/qa/mp-soak-gate.mjs",
+          "command": "PASS73_NATIVE_WEBGPU=1 npm run qa:mp-soak",
+          "note": "NOT YET RUN AT THIS HEAD. Use 2 of 2; shares the R7 receipt."
+        }
+      ]
+    },
+    {
+      "id": "R14",
+      "summary": "Dave reviews the immutable PASS 96 preview and the completed evidence before publication",
+      "expected": "After the mechanical gates, the soak bundle and table, and the close-range inspection are complete, Dave plays the exact immutable preview and explicitly authorizes publication for THIS pass, with attention to spawn distribution in Nuke Town's yards and street ends.",
+      "falsifier": "This manifest represents owner inspection, approval or publication before an immutable preview exists and Dave has played it; a preview block is fabricated to make the manifest validate; or authorization is inherited from a previous pass.",
+      "acceptance": "human",
+      "state": "pending",
+      "projects": [
+        "pass-80 R1 (retained invariant)",
+        "pass-80 R3",
+        "pass-80 R4 (falsifier)",
+        "pass-94 R5",
+        "pass-95 R4"
+      ],
+      "evidence": []
+    }
+  ],
+  "deliberatelyIncomplete": {
+    "why": "This candidate is staged honestly at 089cb13, where nothing has been re-verified and no preview exists. It is NOT built to pass validateAcceptanceManifest. Making it validate now would require fabricating status, states, a preview SHA and an owner approval.",
+    "expectedRedReason": [
+      "status must be accepted (scripts/release/acceptance-gate.mjs:197) - status is 'candidate'.",
+      "R1-R14: state must be verified or deferred (line 215) - every state is 'pending', which is outside REQUIREMENT_STATES {verified, deferred}, because no gate has been run at this head and root ruled that unfinished work is not converted to owner deferrals.",
+      "preview block invalid (line 228) - preview is null; no immutable preview exists.",
+      "humanAcceptance must be approved by Dave with timestamped evidence (line 251) - humanAcceptance is null.",
+      "preview approval invalid: preview source SHA is invalid (line 730) - follows from the null preview."
+    ],
+    "resolutionPath": "Each red clears only by real evidence: run the gate, record the receipt, set that requirement to verified. Owner-scoped rows clear only by Dave's own act. No test, threshold or policy file is modified to admit this manifest.",
+    "notModified": [
+      "acceptance/policy.json",
+      "src/acceptance-gate.test.ts",
+      "scripts/release/acceptance-gate.mjs",
+      "scripts/release/change-impact.mjs"
+    ]
+  }
+}

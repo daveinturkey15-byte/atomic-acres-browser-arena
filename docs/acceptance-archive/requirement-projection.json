@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "status": "Historical obligations reconciled into the active candidate; no requirement acceptance granted.",
+  "observedAt": "2026-09-12T06:02:14Z",
+  "baselineSha": "089cb13a4d3e23d9f3c6ff499eda43f32670a04a",
+  "correctionOf": "The initial review projected only pass-94 R1-R11 and omitted R4, R12, R13 and R14, then asserted no loss. That assertion was false. This file enumerates ALL 22 original IDs, one entry per ID, read directly from the manifests at 089cb13.",
+  "idCounts": {
+    "pass-80": 4,
+    "pass-94": 14,
+    "pass-95": 4,
+    "total": 22
+  },
+  "dispositions": {
+    "PROJECT": "The obligation remains live at the active candidate and is carried into acceptance/pass-96.json.",
+    "SUPERSEDED": "A later owner instruction or a later published pass replaced this obligation's target. The record is archived verbatim; only the retained invariant (if any) is projected.",
+    "HISTORICAL": "The obligation was scoped to a past contribution or past publication event and does not restate as a live obligation. Archived verbatim. Any durable invariant it protected is named and projected separately."
+  },
+  "processClauseRule": "A process-scoped restriction on a past diff (for example pass-94 R3 'only the spawn declaration changes') is NOT an indefinite ban on future geometry work. Such clauses are preserved as historical, and only the retained PRODUCT invariant is projected. This is recorded per ID in historicalClause.",
+  "projection": [
+    {
+      "source": "pass-80",
+      "id": "R1",
+      "summary": "Publication authorised explicitly by the owner for this pass",
+      "originalAcceptance": "human",
+      "originalState": "verified",
+      "disposition": "SUPERSEDED",
+      "basis": "The falsifier 'any previously published channel becomes unreachable' was superseded by owner instruction HF-400 of 2026-09-02 ('pin this version and remove all past versions, this can be the safe backup'). The retain-all-channels condition no longer holds.",
+      "retainedInvariant": "Publication still requires an explicit owner instruction for THIS pass; it is never inherited from a previous pass.",
+      "projectedInto": "pass-96 R14"
+    },
+    {
+      "source": "pass-80",
+      "id": "R2",
+      "summary": "Mechanical gates green on a QUIET machine before publication",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Machine-quiet measurement and the ban on treating CANNOT_MEASURE as a pass are durable measurement hygiene, not pass-80 specifics.",
+      "projectedInto": "pass-96 R9"
+    },
+    {
+      "source": "pass-80",
+      "id": "R3",
+      "summary": "Owner HITL on the public Pages build",
+      "originalAcceptance": "human",
+      "originalState": "pending",
+      "disposition": "PROJECT",
+      "basis": "Still owed and never satisfied. Root's ruling stands: an unfinished obligation is not converted to an owner deferral to make a manifest validate. It is carried forward honestly as pending at the active candidate.",
+      "projectedInto": "pass-96 R14"
+    },
+    {
+      "source": "pass-80",
+      "id": "R4",
+      "summary": "No immutable preview artifact backs this publication",
+      "originalAcceptance": "mechanical",
+      "originalState": "pending",
+      "disposition": "HISTORICAL",
+      "basis": "This is an honest provenance disclosure about the pass-80 publication specifically: it was built and published from a local bundle, not bound to a GitHub Actions immutable preview. PASS 96 takes the immutable-preview route, so the disclosure does not restate as a live obligation.",
+      "retainedInvariant": "Never fabricate a preview block to make a manifest validate. Honoured in staged/pass-96.json by preview: null.",
+      "projectedInto": "pass-96 R14 (falsifier)"
+    },
+    {
+      "source": "pass-94",
+      "id": "R1",
+      "summary": "One deterministic shared selector distributes player and bot spawns",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Live product invariant of the shipped runtime; must not regress at the active candidate head.",
+      "projectedInto": "pass-96 R1"
+    },
+    {
+      "source": "pass-94",
+      "id": "R2",
+      "summary": "All 11 registered arena spawn tables meet count and spread floors",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Live product invariant with an explicit measured floor table, including parked farcrysis.",
+      "projectedInto": "pass-96 R1"
+    },
+    {
+      "source": "pass-94",
+      "id": "R3",
+      "summary": "Nuke Town Rebuild has distributed authored bot points without geometry edits",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "The product invariant is durable: eight gate-passing points per team across the house-side yards, street-end and cul-de-sac approach, with no point inside the truck or coach.",
+      "historicalClause": "'only the spawn declaration changes' and 'the source diff changes nuketown2 geometry' were scoped to the pass-94 contribution diff. Preserved verbatim in the archive as a historical process restriction. They are NOT projected as an indefinite ban on future nuketown2 geometry work; future geometry changes are governed by the ordinary gates, not by this clause.",
+      "projectedInto": "pass-96 R2"
+    },
+    {
+      "source": "pass-94",
+      "id": "R4",
+      "summary": "The candidate is mechanically ready for immutable preview review",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "HISTORICAL",
+      "basis": "This is pass-94's own readiness snapshot, naming a pass-94-specific gate set and the then-current 37,130-line legacy-main ceiling. It cannot restate as a live obligation at a different head.",
+      "retainedInvariant": "The candidate's own focused gates must be recorded green with no weakened threshold or assertion, and no browser probe claimed without a permitted run. PASS 96 carries its own equivalent.",
+      "projectedInto": "pass-96 R9"
+    },
+    {
+      "source": "pass-94",
+      "id": "R5",
+      "summary": "Owner reviews the immutable PASS 94 preview before publication",
+      "originalAcceptance": "human",
+      "originalState": "pending",
+      "disposition": "SUPERSEDED",
+      "basis": "PASS 94 is no longer the publication target; the stamped identity is PASS 96. An owner preview review of a PASS 94 immutable preview is not the live gate. The obligation retargets to the active candidate's preview, undiminished.",
+      "retainedInvariant": "Dave plays the exact immutable preview and confirms spawn distribution, with attention to Nuke Town's yards and street ends, before publication.",
+      "projectedInto": "pass-96 R14"
+    },
+    {
+      "source": "pass-94",
+      "id": "R6",
+      "summary": "Nuke Town Rebuild review cameras cover every catalog station",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Roster-derived camera/catalog coverage is a durable inspectability invariant.",
+      "projectedInto": "pass-96 R3"
+    },
+    {
+      "source": "pass-94",
+      "id": "R7",
+      "summary": "Nuke Town ground grime families have distinct visual depth",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Z-separation inside the audited 0.03 m ground-film window is a durable rendering invariant.",
+      "projectedInto": "pass-96 R4"
+    },
+    {
+      "source": "pass-94",
+      "id": "R8",
+      "summary": "Yard props remain on the authored front and back lawn zones",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Lawn-zone containment, carriageway exclusion and paired rotational partner/collider authority are durable placement invariants.",
+      "projectedInto": "pass-96 R4"
+    },
+    {
+      "source": "pass-94",
+      "id": "R9",
+      "summary": "Hob colours follow the pushed accuracy-lane house sides",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "The HF-477 north-orange/south-cream and red/blue side binding is a durable authored-material invariant.",
+      "projectedInto": "pass-96 R4"
+    },
+    {
+      "source": "pass-94",
+      "id": "R10",
+      "summary": "The obsolete interior water factory is removed",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Single-live-definition for pool water is a durable anti-resurrection invariant; the export must stay absent.",
+      "projectedInto": "pass-96 R4"
+    },
+    {
+      "source": "pass-94",
+      "id": "R11",
+      "summary": "Close-range prop and grime review stations are authored and catalogued",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Catalog coverage of both appliance banks, three yard hero props, driveway apron, border path and both wall-grime runs is durable.",
+      "projectedInto": "pass-96 R3"
+    },
+    {
+      "source": "pass-94",
+      "id": "R12",
+      "summary": "Close-range visual inspection waits for a valid owner-machine GPU window",
+      "originalAcceptance": "visual",
+      "originalState": "deferred",
+      "disposition": "PROJECT",
+      "basis": "Omitted entirely by the initial review. The capture is still OPEN: the 2026-09-04 poll met the queue and GPU-free thresholds but headless Chrome remained 4-12, so no PNGs were written. The GPU-window precondition governs any future close-range capture, so it carries forward live and unfinished.",
+      "projectedInto": "pass-96 R8"
+    },
+    {
+      "source": "pass-94",
+      "id": "R13",
+      "summary": "The techniques candidate passes its focused mechanical gates",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Omitted entirely by the initial review. The measurable ratchet is durable and must not be weakened: FINDINGS 0, HOUSE-INTERIOR 0, STREET 0 and UNAUDITED no greater than 52.",
+      "historicalClause": "The phrase 'the techniques candidate' scopes the surrounding gate list to the pass-94 contribution. The numeric ratchet is what projects.",
+      "projectedInto": "pass-96 R5"
+    },
+    {
+      "source": "pass-94",
+      "id": "R14",
+      "summary": "HF-500 keeps in-match chat above the play-critical HUD lane",
+      "originalAcceptance": "mechanical",
+      "originalState": "implemented",
+      "disposition": "PROJECT",
+      "basis": "Omitted entirely by the initial review. The active chat layout must REMAIN until a later explicit removal. This projection preserves the existing layout contract only; it neither implements nor waives any new chat feature.",
+      "note": "Original state 'implemented' is not in REQUIREMENT_STATES {verified, deferred}. It is preserved as recorded in the archive and is carried at pass-96 as an honest pending verification at this head, not silently upgraded.",
+      "projectedInto": "pass-96 R6"
+    },
+    {
+      "source": "pass-95",
+      "id": "R1",
+      "summary": "A bounded three-peer soak gate runs through the real multiplayer lobby and audit scenario engine",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "Root ruled explicitly: deferring the HF-566-569 later feature requests does NOT waive this existing release-blocking multiplayer soak. It remains required verification. No deferApproval is inferred or inserted.",
+      "projectedInto": "pass-96 R7"
+    },
+    {
+      "source": "pass-95",
+      "id": "R2",
+      "summary": "Deterministic 120 ms RTT and 1% loss impairment is applied to both multiplayer lanes",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "The deterministic, loopback-QA-fenced impairment seam is part of the required soak conditions; not waived.",
+      "projectedInto": "pass-96 R7"
+    },
+    {
+      "source": "pass-95",
+      "id": "R3",
+      "summary": "The soak bundle fails closed on all required multiplayer invariants",
+      "originalAcceptance": "mechanical",
+      "originalState": "verified",
+      "disposition": "PROJECT",
+      "basis": "The fail-closed assertion table, including the exact 1.5 m replication bound, is the substance of the soak gate; not waived.",
+      "projectedInto": "pass-96 R7"
+    },
+    {
+      "source": "pass-95",
+      "id": "R4",
+      "summary": "Dave reviews the immutable Pass 95 preview and the soak evidence before publication",
+      "originalAcceptance": "human",
+      "originalState": "pending",
+      "disposition": "SUPERSEDED",
+      "basis": "The PASS 95 preview is not the live publication target; the stamped identity is PASS 96. The obligation retargets to the active candidate's immutable preview SHA, undiminished, and still requires the completed soak bundle and table to exist first.",
+      "projectedInto": "pass-96 R14"
+    }
+  ],
+  "noLossClaim": {
+    "assertion": "Every one of the 22 original IDs appears exactly once above, with an explicit disposition and basis. Verified mechanically by check_coverage.py against the source manifests, not asserted by hand.",
+    "scope": "This is ID-level coverage. It does not claim that every projected obligation is currently verified; states at pass-96 are pending and are reported as such."
+  }
+}
