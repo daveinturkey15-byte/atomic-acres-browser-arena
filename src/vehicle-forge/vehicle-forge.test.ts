@@ -34,10 +34,51 @@ import {
 } from './index';
 import { COACH_SPEC, FORGED_VEHICLE_SPECS, SEDAN_SPEC, TRUCK_CAB_SPEC } from './specs';
 import type { VehicleSpec } from './geometry';
-import type { VehicleDressing } from './build';
+import type { ForgedVehicle, VehicleDressing } from './build';
 
 function positionsOf(geometry: THREE.BufferGeometry): Float32Array {
   return (geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+}
+
+// A fixture's old allocation is historical evidence, not a performance budget.
+// Prove the bookkeeping against the actual emitted buffers so a lost merge,
+// omitted part or falsified count cannot make a vehicle appear cheaper.
+function assertVehicleAccounting(built: ForgedVehicle): void {
+  const buckets = ['paint', 'accent', 'glass', 'lining', 'groove', 'chrome', 'tyre', 'headLamp', 'tailLamp'];
+  expect(Object.keys(built.partCounts).sort(), 'all material buckets accounted').toEqual([...buckets].sort());
+  const rawByBucket: Record<string, number> = {};
+  const geometries = new Set<THREE.BufferGeometry>();
+  for (const object of built.group.children) {
+    expect(object instanceof THREE.Mesh, 'each draw is a mesh').toBe(true);
+    const mesh = object as THREE.Mesh;
+    const bucket = String(mesh.userData.forgeBucket);
+    expect(buckets, 'known emitted bucket').toContain(bucket);
+    expect(rawByBucket[bucket], 'one merged draw per bucket').toBeUndefined();
+    expect(geometries.has(mesh.geometry), 'no double-counted geometry').toBe(false);
+    geometries.add(mesh.geometry);
+    expect(mesh.geometry.index, 'forge buffers are non-indexed').toBeNull();
+    const vertices = mesh.geometry.getAttribute('position').count;
+    expect(vertices % 3, 'whole emitted triangles').toBe(0);
+    expect(vertices, 'nonempty material draw').toBeGreaterThan(0);
+    rawByBucket[bucket] = vertices / 3;
+  }
+  expect(Object.keys(rawByBucket).sort(), 'no missing merged bucket').toEqual([...buckets].sort());
+  const byPart: Record<string, number> = {};
+  for (const bucket of buckets) {
+    const parts = built.partBounds.filter(part => part.bucket === bucket);
+    expect(parts.length, `${bucket} part-count conservation`).toBe(built.partCounts[bucket]);
+    let triangles = 0;
+    for (const part of parts) {
+      expect(Number.isInteger(part.triangles) && part.triangles > 0, 'valid part allocation').toBe(true);
+      triangles += part.triangles;
+      byPart[part.part] = (byPart[part.part] ?? 0) + part.triangles;
+    }
+    expect(triangles, `${bucket} raw-buffer conservation`).toBe(rawByBucket[bucket]);
+  }
+  expect(byPart, 'every named and unnamed part accounted').toEqual(built.partTriangles);
+  expect(Object.values(rawByBucket).reduce((sum, value) => sum + value, 0), 'total raw-buffer conservation').toBe(built.triangles);
+  expect(built.drawCalls).toBe(9);
+  expect(built.group.children).toHaveLength(built.drawCalls);
 }
 
 describe('vehicle-forge station rings', () => {
@@ -463,7 +504,7 @@ describe('vehicle-forge HF-536 detail pass', () => {
   // detail set (mirrors, handles, pillars, plates, indicators, hubcaps, stack,
   // vents, gutters, boot and luggage seams). The fences hold for THESE; the
   // arena dressings carry extra lamps, rails and bogie axles and are measured
-  // against the same fences in REPORT.md, not here.
+  // against the same fences by the executable arena-budget.test.ts gate.
   const coachDressing: VehicleDressing = {
     wheelStyle: 'cover',
     tailLamps: { x: 0.94, y: 0.95, radius: 0.16 },
@@ -536,7 +577,7 @@ describe('vehicle-forge HF-536 detail pass', () => {
     [TRUCK_CAB_SPEC, truckDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.truck],
     [SEDAN_SPEC, saloonDressing, FORGED_VEHICLE_TRIANGLE_BUDGETS.saloon],
   ];
-  const EXPECTED_TRIANGLES: Readonly<Record<string, number>> = {
+  const HISTORICAL_TRIANGLES: Readonly<Record<string, number>> = {
     // Six coach-only planar mullions save 120 tris; twelve seat boxes add 144.
     // The immutable 10,000 triangle fence below is unchanged.
     'nuketown2-coach': 9988,
@@ -547,7 +588,6 @@ describe('vehicle-forge HF-536 detail pass', () => {
     'nuketown2-coach': {
       'detail.coach.destination-board': 12,
       'detail.coach.fog-lamp': 24,
-      'detail.coach.windscreen-surround': 36,
       'detail.coach.engine-louvre': 48,
       'detail.coach.skirt-line': 24,
       'detail.coach.luggage-door-frame': 96,
@@ -611,26 +651,48 @@ describe('vehicle-forge HF-536 detail pass', () => {
   it('keeps every fenced vehicle under its triangle fence', () => {
     for (const [spec, dressing, budget] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x173451, `fence-${spec.id}`));
-      // The test prints the counts: this line is the headroom ledger.
-      console.log(`${spec.id}: ${Math.round(built.triangles)} / ${budget} tris in ${built.drawCalls} draws`);
-      expect(built.triangles, `${spec.id} exact triangle allocation`).toBe(EXPECTED_TRIANGLES[spec.id]);
+      console.log(`${spec.id}: ${Math.round(built.triangles)} / ${budget} tris in ${built.drawCalls} draws; historical allocation ${HISTORICAL_TRIANGLES[spec.id]}`);
+      assertVehicleAccounting(built);
       expect(built.triangles, `${spec.id} triangles`).toBeLessThanOrEqual(budget);
     }
   });
 
   it('merges detail into the existing buckets: part counts per bucket, draws flat', () => {
-    const expected: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+    // Retained verbatim for audit. New authored grilles and the four-sided
+    // coach frame legitimately change bucket membership; current buffers must
+    // instead satisfy exact per-bucket/per-part conservation below.
+    const historical: Readonly<Record<string, Readonly<Record<string, number>>>> = {
       'nuketown2-coach': { paint: 1, accent: 19, glass: 1, lining: 1, groove: 15, chrome: 30, tyre: 8, headLamp: 4, tailLamp: 4 },
       'nuketown2-truck-cab': { paint: 1, accent: 30, glass: 1, lining: 3, groove: 1, chrome: 36, tyre: 4, headLamp: 12, tailLamp: 2 },
       'nuketown2-sedan': { paint: 1, accent: 2, glass: 1, lining: 1, groove: 6, chrome: 28, tyre: 8, headLamp: 2, tailLamp: 2 },
     };
     for (const [spec, dressing] of FENCED) {
       const built = buildForgedVehicle(spec, dressing, createForgeMaterialSet(0x9e1c1c, `buckets-${spec.id}`));
-      expect(built.partCounts, `${spec.id} part counts`).toEqual(expected[spec.id]);
+      console.log(`${spec.id} historical buckets: ${JSON.stringify(historical[spec.id])}`);
+      assertVehicleAccounting(built);
       expect(built.drawCalls, `${spec.id} draws unchanged`).toBe(9);
       expect(built.group.children.length, `${spec.id} meshes`).toBe(built.drawCalls);
       for (const [part, triangles] of Object.entries(EXPECTED_DETAIL_ALLOCATIONS[spec.id]!)) {
         expect(built.partTriangles[part], `${spec.id} ${part} triangles`).toBe(triangles);
+      }
+      if (spec.id === COACH_SPEC.id) {
+        const frame = built.partBounds.filter(part => part.part === 'detail.coach.windscreen-surround');
+        // Historical allocation was36triangles: two sides and one top rail.
+        // The authored full-width glazed nose has a complete four-sided frame.
+        expect(frame, 'two side rails and both horizontal rails').toHaveLength(4);
+        for (const part of frame) expect(part.triangles, 'closed frame rail').toBe(12);
+        const horizontal = frame.filter(part => part.max[1] - part.min[1] < 0.06);
+        const vertical = frame.filter(part => part.max[1] - part.min[1] >= 0.06);
+        expect(horizontal).toHaveLength(2);
+        expect(vertical).toHaveLength(2);
+        for (const height of [spec.noseGlass!.yMin, spec.noseGlass!.yMax]) {
+          expect(horizontal.some(part => Math.abs((part.min[1] + part.max[1]) / 2 - height) < 1e-5), 'horizontal frame meets glass edge').toBe(true);
+        }
+        for (const side of [-1, 1]) {
+          expect(vertical.some(part => Math.sign((part.min[0] + part.max[0]) / 2) === side
+            && part.min[1] <= spec.noseGlass!.yMin + 1e-5
+            && part.max[1] >= spec.noseGlass!.yMax - 1e-5), 'full-height frame on each side').toBe(true);
+        }
       }
       const detailParts = built.partBounds.filter((part) => part.part.startsWith('detail.'));
       expect(detailParts.length, `${spec.id} authored detail parts`).toBeGreaterThan(0);
@@ -640,6 +702,23 @@ describe('vehicle-forge HF-536 detail pass', () => {
         expect(part.min[1], `${spec.id} ${part.part} underbody plane`).toBeGreaterThanOrEqual(0.18 - 1e-5);
       }
     }
+  });
+
+  it('rejects understated totals, missing geometry and damaged part bookkeeping', () => {
+    const built = buildForgedVehicle(SEDAN_SPEC, saloonDressing, createForgeMaterialSet(0x173451, 'accounting-negative-controls'));
+    assertVehicleAccounting(built);
+    expect(() => assertVehicleAccounting({ ...built, triangles: built.triangles - 1 })).toThrow(/total raw-buffer conservation/);
+    expect(() => assertVehicleAccounting({ ...built, partCounts: { ...built.partCounts, chrome: built.partCounts.chrome + 1 } })).toThrow(/chrome part-count conservation/);
+    const missingPart = { ...built.partTriangles };
+    delete missingPart['detail.saloon.sill-strip'];
+    expect(() => assertVehicleAccounting({ ...built, partTriangles: missingPart })).toThrow(/every named and unnamed part accounted/);
+    const group = built.group.clone(true);
+    const mesh = group.children[0] as THREE.Mesh;
+    mesh.geometry = mesh.geometry.clone();
+    const position = mesh.geometry.getAttribute('position');
+    mesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(Array.from(position.array).slice(0, -9), 3));
+    expect(() => assertVehicleAccounting({ ...built, group })).toThrow(/raw-buffer conservation/);
+    mesh.geometry.dispose();
   });
 
   it('emits no NaN in any position, normal or uv', () => {

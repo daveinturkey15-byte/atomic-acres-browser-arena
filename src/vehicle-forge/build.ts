@@ -1298,11 +1298,14 @@ export function buildForgedVehicle(
           const a = endpoint(gutterZ - half + 0.01);
           const b = endpoint(gutterZ + half - 0.01);
           const direction = b.clone().sub(a);
-          const bar = chamferedBar(direction.length() / 2, 0.012, 0.012, 0.004);
+          const gutterHalfDepth = 0.012;
+          const bar = chamferedBar(direction.length() / 2, gutterHalfDepth, gutterHalfDepth, 0.004);
           bar.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize()));
           const centre = a.add(b).multiplyScalar(0.5);
           const placed = translated(bar, centre.x, centre.y, centre.z);
-          parts.chrome.push(markPart(side === 1 ? placed : reflectedAcrossCentre(placed), 'detail.saloon.roof-gutter'));
+          // Record the actual24mm nominal cross-section depth for the detail
+          // audit; this metadata is distinct from distance off the curved roof.
+          parts.chrome.push(markPart(side === 1 ? placed : reflectedAcrossCentre(placed), 'detail.saloon.roof-gutter', gutterHalfDepth * 2));
         } else {
           const bar = chamferedBar(half - 0.01, 0.012, 0.012, 0.004);
           bar.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
