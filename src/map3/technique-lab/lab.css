@@ -1,0 +1,367 @@
+/**
+ * src/map3/technique-lab/lab.css — Technique Lab HOST styles (scoped, no globals).
+ *
+ * Everything lives under .tl-root so the host never restyles the application.
+ * Layout: bounded central canvas with gallery (left) + detail sidebar (right) on
+ * 1280px desktop; single stacked column with horizontal-bounded canvas on 390px
+ * mobile. Root wires this file in (e.g. <link> in map3.html) — the runtime never
+ * touches document.head.
+ */
+
+.tl-root {
+  box-sizing: border-box;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #d7e6e5;
+  background: #0a1113;
+  font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+.tl-root *,
+.tl-root *::before,
+.tl-root *::after {
+  box-sizing: inherit;
+}
+
+.tl-header {
+  margin-bottom: 12px;
+  border: 1px solid rgba(79, 191, 198, 0.35);
+  border-radius: 8px;
+  background: rgba(10, 17, 19, 0.7);
+  padding: 12px 16px;
+}
+
+.tl-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: #eef7f6;
+}
+
+.tl-sub {
+  margin: 0;
+  font-size: 13px;
+  color: #9dbdbb;
+}
+
+.tl-layout {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) 300px;
+  gap: 12px;
+  align-items: start;
+}
+
+.tl-gallery,
+.tl-stage,
+.tl-detail {
+  border: 1px solid rgba(79, 191, 198, 0.35);
+  border-radius: 8px;
+  background: rgba(13, 22, 24, 0.9);
+  padding: 12px;
+  min-width: 0;
+}
+
+.tl-section-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8fd6da;
+}
+
+.tl-search,
+.tl-filters select {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(79, 191, 198, 0.4);
+  background: #0a1113;
+  color: #e6f3f2;
+  font: inherit;
+}
+
+.tl-search:focus-visible,
+.tl-filters select:focus-visible,
+.tl-btn:focus-visible,
+.tl-item:focus-visible,
+.tl-detail a:focus-visible {
+  outline: 2px solid #4fbfc6;
+  outline-offset: 2px;
+}
+
+.tl-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tl-filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #9dbdbb;
+}
+
+.tl-count {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #9dbdbb;
+}
+
+.tl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 560px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.tl-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tl-item:hover {
+  border-color: rgba(79, 191, 198, 0.4);
+}
+
+.tl-item.is-selected {
+  border-color: #4fbfc6;
+  background: rgba(79, 191, 198, 0.12);
+}
+
+.tl-num {
+  font-variant-numeric: tabular-nums;
+  color: #8fd6da;
+}
+
+.tl-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tl-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(79, 191, 198, 0.5);
+  color: #bfe6e4;
+  white-space: nowrap;
+}
+
+.tl-badge.is-loaded {
+  border-color: #7fd08a;
+  color: #c9efcf;
+}
+
+.tl-badge.is-error {
+  border-color: #d08a7f;
+  color: #f0c9c2;
+}
+
+.tl-canvas-wrap {
+  position: relative;
+  height: min(62vh, 560px);
+  min-height: 320px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #060b0c;
+  border: 1px solid rgba(79, 191, 198, 0.25);
+}
+
+.tl-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tl-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cfe3e2;
+  background: rgba(6, 11, 12, 0.82);
+}
+
+.tl-empty[hidden] {
+  display: none;
+}
+
+.tl-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.tl-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(79, 191, 198, 0.5);
+  background: rgba(79, 191, 198, 0.12);
+  color: #e6f3f2;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tl-btn:hover {
+  background: rgba(79, 191, 198, 0.22);
+}
+
+.tl-metrics {
+  font-size: 12px;
+  color: #9dbdbb;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-error {
+  margin-top: 10px;
+  border: 1px solid rgba(208, 138, 127, 0.6);
+  border-radius: 6px;
+  background: rgba(60, 18, 14, 0.5);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #f0d4cd;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.tl-error:empty {
+  display: none;
+}
+
+.tl-error p {
+  margin: 0 0 6px;
+}
+
+.tl-error p:last-child {
+  margin-bottom: 0;
+}
+
+.tl-detail h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #eef7f6;
+}
+
+.tl-status {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #9dbdbb;
+}
+
+.tl-method {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.tl-meta {
+  margin: 0 0 10px;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.tl-meta dt {
+  color: #8fd6da;
+  font-weight: 600;
+}
+
+.tl-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.tl-sources {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.tl-sources a {
+  color: #8fd6da;
+}
+
+.tl-stages {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.tl-stage-done {
+  color: #c9efcf;
+}
+
+.tl-stage-open {
+  color: #9dbdbb;
+}
+
+.tl-legend {
+  margin-top: 12px;
+  border: 1px solid rgba(79, 191, 198, 0.35);
+  border-radius: 8px;
+  background: rgba(13, 22, 24, 0.9);
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #9dbdbb;
+}
+
+.tl-legend strong {
+  color: #d7e6e5;
+}
+
+@media (max-width: 900px) {
+  .tl-root {
+    padding: 10px;
+  }
+
+  .tl-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tl-canvas-wrap {
+    height: 300px;
+    min-height: 300px;
+  }
+
+  .tl-list {
+    max-height: 220px;
+  }
+
+  .tl-filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}

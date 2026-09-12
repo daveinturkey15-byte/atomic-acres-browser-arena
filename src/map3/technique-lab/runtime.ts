@@ -1,0 +1,1033 @@
+/**
+ * src/map3/technique-lab/runtime.ts — Technique Lab HOST UI (not the demos).
+ *
+ * Standalone gallery host for Map 3 · Technique Lab. Owns exactly one renderer
+ * (`THREE.WebGPURenderer` from 'three/webgpu'), one RAF loop, one OrbitControls
+ * and a small isolated scene with host-owned helper lights. Demo groups arriving
+ * later under `./demos/group-N/index.ts` overlay manifest entries onto the 50
+ * public records; nothing is fabricated for absent groups.
+ *
+ * Honesty rules (enforced, not aspirational):
+ * - Association with this manifest or a URL only supports `Link saved`.
+ * - `Source inspected`, `Technique extracted` and `Result tested` stay open:
+ *   no validated evidence pipeline exists yet, so missing evidence renders as
+ *   unknown/pending, never as green.
+ * - A successfully mounted factory only proves the implementation loaded. It
+ *   proves nothing about source research, visual quality or result testing.
+ * - With no factory, the stage shows Missing/not delivered — never an unrelated
+ *   placeholder scene and never a wrong-index fallback.
+ * - Backend is read from the real renderer flags after init: WebGPU, WebGL
+ *   fallback, or unknown. Renderer failure stays visible in the stage.
+ */
+
+import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PUBLIC_RECORDS } from './manifest';
+import type {
+  Adaptation,
+  DemoFactory,
+  DemoInstance,
+  DemoManifestEntry,
+  GroupModule,
+} from './types';
+
+/** Fixed deterministic seed handed to every demo factory. */
+export const LAB_SEED = 20260912;
+
+export interface TechniqueLabHandle {
+  dispose(): void;
+}
+
+export async function mountTechniqueLab(
+  container: HTMLElement,
+): Promise<TechniqueLabHandle> {
+  const state = createState(container);
+  buildDom(state);
+  wireControls(state);
+
+  const initial = readUrlSelection();
+  mountSelection(state, validId(initial) ? initial : 1);
+
+  // Renderer init and demo-group discovery race each other and dispose;
+  // both re-check the generation guard before touching host state.
+  const gen = state.generation;
+  void initRenderer(state, gen).then(() => {
+    if (state.disposed || gen !== state.generation) return;
+    if (state.renderer) {
+      startLoop(state);
+      // Re-mount: the first pass ran before the renderer existed.
+      mountSelection(state, state.selectedId);
+    }
+  });
+  void refreshGroups(state, gen);
+
+  return {
+    dispose: () => disposeLab(state),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* State                                                               */
+/* ------------------------------------------------------------------ */
+
+type BackendLabel = 'WebGPU' | 'WebGL fallback' | 'unknown';
+
+interface ResolvedRecord {
+  id: number;
+  title: string;
+  sources: string[];
+  aliasOf: number | null;
+  entry: DemoManifestEntry | null;
+  group: string | null;
+  problems: string[];
+}
+
+interface ActiveDemo {
+  demo: DemoInstance;
+  id: number;
+}
+
+interface LabState {
+  container: HTMLElement;
+  disposed: boolean;
+  generation: number;
+  records: ResolvedRecord[];
+  selectedId: number;
+  query: string;
+  statusFilter: string;
+  adaptationFilter: string;
+  // Renderer / scene.
+  canvas: HTMLCanvasElement;
+  renderer: WebGPURenderer | null;
+  rendererError: string | null;
+  backend: BackendLabel;
+  scene: THREE.Scene;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls | null;
+  lights: THREE.Light[];
+  // Frame loop.
+  raf: number;
+  lastTime: number;
+  elapsed: number;
+  frames: number;
+  fpsWindowStart: number;
+  fps: number;
+  active: ActiveDemo | null;
+  // DOM refs.
+  root: HTMLElement;
+  list: HTMLOListElement;
+  count: HTMLParagraphElement;
+  search: HTMLInputElement;
+  statusSelect: HTMLSelectElement;
+  adaptationSelect: HTMLSelectElement;
+  wrap: HTMLElement;
+  empty: HTMLElement;
+  metrics: HTMLElement;
+  errorBox: HTMLElement;
+  detail: HTMLElement;
+  statusLine: HTMLElement;
+  resizeObserver: ResizeObserver | null;
+  onFallbackResize: () => void;
+  onWindowError: (event: ErrorEvent) => void;
+  onWindowRejection: (event: PromiseRejectionEvent) => void;
+}
+
+function createState(container: HTMLElement): LabState {
+  const canvas = document.createElement('canvas');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a1113);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 1000);
+  camera.position.set(4, 3, 6);
+  return {
+    container,
+    disposed: false,
+    generation: 0,
+    records: PUBLIC_RECORDS.map((r) => ({
+      id: r.sourceId,
+      title: r.title,
+      sources: [...r.sources],
+      aliasOf: r.aliasOf,
+      entry: null,
+      group: null,
+      problems: [],
+    })),
+    selectedId: 1,
+    query: '',
+    statusFilter: 'all',
+    adaptationFilter: 'all',
+    canvas,
+    renderer: null,
+    rendererError: null,
+    backend: 'unknown',
+    scene,
+    camera,
+    controls: null,
+    lights: [],
+    raf: 0,
+    lastTime: 0,
+    elapsed: 0,
+    frames: 0,
+    fpsWindowStart: 0,
+    fps: 0,
+    active: null,
+    root: document.createElement('div'),
+    list: document.createElement('ol'),
+    count: document.createElement('p'),
+    search: document.createElement('input'),
+    statusSelect: document.createElement('select'),
+    adaptationSelect: document.createElement('select'),
+    wrap: document.createElement('div'),
+    empty: document.createElement('div'),
+    metrics: document.createElement('div'),
+    errorBox: document.createElement('div'),
+    detail: document.createElement('aside'),
+    statusLine: document.createElement('p'),
+    resizeObserver: null,
+    onFallbackResize: () => undefined,
+    onWindowError: () => undefined,
+    onWindowRejection: () => undefined,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* DOM                                                                 */
+/* ------------------------------------------------------------------ */
+
+function text<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  cls: string,
+  value: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = cls;
+  node.textContent = value;
+  return node;
+}
+
+function buildDom(state: LabState): void {
+  const s = state;
+  s.root.className = 'tl-root';
+
+  const header = document.createElement('header');
+  header.className = 'tl-header';
+  header.append(
+    text('h1', 'tl-title', 'Map 3 · Technique Lab'),
+    text(
+      'p',
+      'tl-sub',
+      'Host gallery for 50 public sources. Demos arrive separately; ' +
+        'missing work stays missing — nothing here is a placeholder render.',
+    ),
+  );
+
+  const layout = document.createElement('div');
+  layout.className = 'tl-layout';
+
+  // Gallery.
+  const gallery = document.createElement('nav');
+  gallery.className = 'tl-gallery';
+  gallery.setAttribute('aria-label', 'Technique gallery');
+  gallery.append(text('h2', 'tl-section-title', 'Gallery 1–50'));
+
+  s.search.className = 'tl-search';
+  s.search.type = 'search';
+  s.search.placeholder = 'Search title, method or id…';
+  s.search.setAttribute('aria-label', 'Search techniques');
+
+  const filters = document.createElement('div');
+  filters.className = 'tl-filters';
+  const statusLabel = document.createElement('label');
+  statusLabel.append(document.createTextNode('Status'));
+  fillSelect(s.statusSelect, ['all', 'pending', 'loaded', 'manifest', 'error']);
+  statusLabel.append(s.statusSelect);
+  const adaptLabel = document.createElement('label');
+  adaptLabel.append(document.createTextNode('Adaptation'));
+  fillSelect(s.adaptationSelect, [
+    'all',
+    'exact',
+    'adapted',
+    'blocked',
+    'pending',
+  ]);
+  adaptLabel.append(s.adaptationSelect);
+  filters.append(statusLabel, adaptLabel);
+
+  s.count.className = 'tl-count';
+  s.list.className = 'tl-list';
+  for (const record of s.records) {
+    s.list.append(galleryItem(s, record));
+  }
+  gallery.append(s.search, filters, s.count, s.list);
+
+  // Stage.
+  const stage = document.createElement('section');
+  stage.className = 'tl-stage';
+  stage.setAttribute('aria-label', 'Demo stage');
+  stage.append(text('h2', 'tl-section-title', 'Stage'));
+  s.wrap.className = 'tl-canvas-wrap';
+  s.wrap.append(s.canvas);
+  s.empty.className = 'tl-empty';
+  s.empty.textContent = 'Starting renderer…';
+  s.wrap.append(s.empty);
+  const toolbar = document.createElement('div');
+  toolbar.className = 'tl-toolbar';
+  const recenter = text('button', 'tl-btn', 'Recenter');
+  recenter.type = 'button';
+  recenter.addEventListener('click', () => frameSelection(s));
+  toolbar.append(recenter);
+  s.metrics.className = 'tl-metrics';
+  s.metrics.textContent = 'backend unknown · awaiting first render';
+  toolbar.append(s.metrics);
+  s.errorBox.className = 'tl-error';
+  s.errorBox.setAttribute('role', 'alert');
+  stage.append(s.wrap, toolbar, s.errorBox);
+
+  // Detail sidebar.
+  s.detail.className = 'tl-detail';
+  s.detail.setAttribute('aria-label', 'Selection detail');
+  s.statusLine.className = 'tl-status';
+
+  const legend = document.createElement('footer');
+  legend.className = 'tl-legend';
+  const legendTitle = text('strong', '', 'State legend. ');
+  const legendBody = text(
+    'span',
+    '',
+    'Link saved = manifest/URL association only. Source inspected, Technique ' +
+      'extracted and Result tested stay open until validated evidence exists. ' +
+      'Implementation loaded means the factory mounted — not that research, ' +
+      'quality or testing is proven. Visual/FPS acceptance: OPEN.',
+  );
+  legend.append(legendTitle, legendBody);
+
+  layout.append(gallery, stage, s.detail);
+  s.root.append(header, layout, legend);
+  s.container.append(s.root);
+}
+
+function fillSelect(select: HTMLSelectElement, values: string[]): void {
+  for (const value of values) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  }
+}
+
+function badgeFor(record: ResolvedRecord): { label: string; cls: string } {
+  if (record.problems.length > 0) return { label: 'error', cls: 'is-error' };
+  if (record.entry?.createDemo) return { label: 'loaded', cls: 'is-loaded' };
+  if (record.entry) return { label: 'manifest', cls: '' };
+  return { label: 'pending', cls: '' };
+}
+
+function galleryItem(state: LabState, record: ResolvedRecord): HTMLLIElement {
+  const li = document.createElement('li');
+  li.dataset.sourceId = String(record.id);
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'tl-item';
+  button.dataset.sourceId = String(record.id);
+  const num = document.createElement('span');
+  num.className = 'tl-num';
+  num.textContent = String(record.id).padStart(2, '0');
+  const name = document.createElement('span');
+  name.className = 'tl-name';
+  name.textContent = record.title;
+  const badge = document.createElement('span');
+  const b = badgeFor(record);
+  badge.className = `tl-badge ${b.cls}`.trim();
+  badge.textContent = b.label;
+  button.append(num, name, badge);
+  button.addEventListener('click', () => mountSelection(state, record.id));
+  li.append(button);
+  return li;
+}
+
+function refreshGallery(state: LabState): void {
+  let shown = 0;
+  for (const li of Array.from(state.list.children)) {
+    const item = li as HTMLLIElement;
+    const id = Number(item.dataset.sourceId);
+    const record = state.records[id - 1];
+    const button = item.querySelector('button');
+    const badge = item.querySelector('.tl-badge');
+    if (record && button && badge) {
+      const b = badgeFor(record);
+      badge.textContent = b.label;
+      badge.className = `tl-badge ${b.cls}`.trim();
+      const selected = id === state.selectedId;
+      button.classList.toggle('is-selected', selected);
+      if (selected) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
+      const visible = recordVisible(state, record);
+      item.hidden = !visible;
+      if (visible) shown += 1;
+    }
+  }
+  state.count.textContent = `Showing ${shown} of ${state.records.length}`;
+}
+
+function recordVisible(state: LabState, record: ResolvedRecord): boolean {
+  const q = state.query.trim().toLowerCase();
+  if (q) {
+    const hay = `${record.id} ${record.title} ${record.entry?.method ?? ''}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  const b = badgeFor(record).label;
+  if (state.statusFilter !== 'all' && b !== state.statusFilter) return false;
+  const adaptation = record.entry?.adaptation ?? 'pending';
+  if (state.adaptationFilter !== 'all' && adaptation !== state.adaptationFilter) {
+    return false;
+  }
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Detail panel                                                        */
+/* ------------------------------------------------------------------ */
+
+const STAGE_LABELS = [
+  'Link saved',
+  'Source inspected',
+  'Technique extracted',
+  'Implemented',
+  'Result tested',
+] as const;
+
+function stagesFor(record: ResolvedRecord): Array<{ label: string; done: boolean }> {
+  return [
+    { label: STAGE_LABELS[0], done: true },
+    { label: STAGE_LABELS[1], done: false },
+    { label: STAGE_LABELS[2], done: false },
+    { label: STAGE_LABELS[3], done: record.entry?.createDemo != null },
+    { label: STAGE_LABELS[4], done: false },
+  ];
+}
+
+function statusText(record: ResolvedRecord): string {
+  if (record.problems.length > 0) {
+    return `Source ${record.id} · load issue — see notices below.`;
+  }
+  if (record.entry?.createDemo) {
+    return `Source ${record.id} · implementation loaded — untested, acceptance OPEN.`;
+  }
+  if (record.entry) {
+    return `Source ${record.id} · manifest only (no factory) — not yet delivered.`;
+  }
+  return `Source ${record.id} · Pending / Not yet delivered.`;
+}
+
+function renderDetail(state: LabState, record: ResolvedRecord): void {
+  const d = state.detail;
+  d.replaceChildren();
+  d.append(text('h2', '', `${record.id}. ${record.title}`));
+  state.statusLine.textContent = statusText(record);
+  d.append(state.statusLine);
+
+  const method = record.entry?.method ?? 'Pending / Not yet delivered — no method recorded.';
+  const methodP = text('p', 'tl-method', method);
+  d.append(methodP);
+
+  const meta = document.createElement('dl');
+  meta.className = 'tl-meta';
+  const adaptation: string = record.entry?.adaptation ?? 'unknown (pending)';
+  meta.append(
+    metaRow('Adaptation', adaptation),
+    metaRow(
+      'Limitation',
+      record.entry?.limitation ??
+        (record.entry
+          ? 'No limitation recorded.'
+          : 'Pending / Not yet delivered.'),
+    ),
+  );
+  if (record.aliasOf !== null) {
+    meta.append(
+      metaRow(
+        'Alias',
+        `Aliases row ${record.aliasOf} — shares its technique, not a distinct technique.`,
+      ),
+    );
+  }
+  if (record.group) meta.append(metaRow('Demo group', record.group));
+  d.append(meta);
+
+  d.append(text('h2', 'tl-section-title', 'Sources (links only, never fetched)'));
+  const list = document.createElement('ul');
+  list.className = 'tl-sources';
+  if (record.sources.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'No source URL recorded for this row.';
+    list.append(li);
+  }
+  for (const url of record.sources) {
+    const li = document.createElement('li');
+    if (isHttpUrl(url)) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.textContent = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      li.append(a);
+    } else {
+      li.textContent = 'Withheld: non-http(s) URL is displayed, never linked.';
+    }
+    list.append(li);
+  }
+  d.append(list);
+
+  d.append(text('h2', 'tl-section-title', 'Stages'));
+  const stages = document.createElement('ul');
+  stages.className = 'tl-stages';
+  for (const stage of stagesFor(record)) {
+    const li = document.createElement('li');
+    li.className = stage.done ? 'tl-stage-done' : 'tl-stage-open';
+    li.textContent = `${stage.done ? '●' : '○'} ${stage.label}`;
+    stages.append(li);
+  }
+  d.append(stages);
+
+  if (record.problems.length > 0) {
+    d.append(text('h2', 'tl-section-title', 'Notices'));
+    const probs = document.createElement('ul');
+    probs.className = 'tl-stages';
+    for (const problem of record.problems) {
+      const li = document.createElement('li');
+      li.className = 'tl-stage-open';
+      li.textContent = problem;
+      probs.append(li);
+    }
+    d.append(probs);
+  }
+}
+
+function metaRow(term: string, value: string): DocumentFragment {
+  const frag = document.createDocumentFragment();
+  const dt = document.createElement('dt');
+  dt.textContent = term;
+  const dd = document.createElement('dd');
+  dd.textContent = value;
+  frag.append(dt, dd);
+  return frag;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Selection + URL                                                     */
+/* ------------------------------------------------------------------ */
+
+function validId(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 50
+  );
+}
+
+function readUrlSelection(): number | null {
+  try {
+    const param = new URLSearchParams(window.location.search).get('source');
+    if (param !== null) {
+      const id = Number(param);
+      return validId(id) ? id : null;
+    }
+    const hash = window.location.hash.match(/source-(\d{1,2})/);
+    if (hash) {
+      const id = Number(hash[1]);
+      return validId(id) ? id : null;
+    }
+  } catch {
+    // URL unreadable: fall back to the first record, never a wrong index.
+  }
+  return null;
+}
+
+function writeUrlSelection(id: number): void {
+  try {
+    window.history.replaceState(null, '', `#source-${id}`);
+  } catch {
+    // Hash sync is a nicety; selection state lives in the host.
+  }
+}
+
+function mountSelection(state: LabState, id: number): void {
+  if (!validId(id) || state.disposed) return;
+  state.selectedId = id;
+  const record = state.records[id - 1];
+  teardownActive(state);
+  renderDetail(state, record);
+  refreshGallery(state);
+  writeUrlSelection(id);
+
+  const factory: DemoFactory | null = record.entry?.createDemo ?? null;
+  if (!state.renderer) {
+    showEmpty(
+      state,
+      state.rendererError
+        ? `Renderer failed: ${state.rendererError}`
+        : 'Renderer starting…',
+    );
+    refreshMetrics(state);
+    return;
+  }
+  if (!factory) {
+    showEmpty(
+      state,
+      record.entry
+        ? `Source ${id} · manifest registered but no demo factory delivered yet.`
+        : `Source ${id} · Missing / not delivered — no demo factory for this source.`,
+    );
+    refreshMetrics(state);
+    return;
+  }
+  let demo: DemoInstance;
+  try {
+    demo = factory({ THREE, seed: LAB_SEED });
+  } catch (err) {
+    const message = `Source ${id} · factory threw: ${toMessage(err)}`;
+    record.problems.push(message);
+    reportError(state, message);
+    showEmpty(state, message);
+    refreshGallery(state);
+    return;
+  }
+  if (!(demo.root instanceof THREE.Group)) {
+    const message = `Source ${id} · factory did not return a THREE.Group root; not mounted.`;
+    record.problems.push(message);
+    reportError(state, message);
+    showEmpty(state, message);
+    refreshGallery(state);
+    return;
+  }
+  if (demo.metadata.sourceId !== id) {
+    const message =
+      `Source ${id} · metadata.sourceId ${String(demo.metadata.sourceId)} ` +
+      `does not match manifest/URL id ${id}; mounted but flagged.`;
+    record.problems.push(message);
+    reportError(state, message);
+  }
+  state.scene.add(demo.root);
+  state.active = { demo, id };
+  hideEmpty(state);
+  frameSelection(state);
+  refreshGallery(state);
+  refreshMetrics(state);
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Renderer, loop, framing                                             */
+/* ------------------------------------------------------------------ */
+
+function readBackend(renderer: WebGPURenderer): BackendLabel {
+  try {
+    const backend = (
+      renderer as unknown as { backend?: { isWebGPUBackend?: unknown } }
+    ).backend;
+    if (backend?.isWebGPUBackend === true) return 'WebGPU';
+    if (backend) return 'WebGL fallback';
+  } catch {
+    // Unknown remains unknown.
+  }
+  return 'unknown';
+}
+
+async function initRenderer(state: LabState, gen: number): Promise<void> {
+  const hemi = new THREE.HemisphereLight(0xdfeff0, 0x0a1113, 0.9);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+  dir.position.set(4, 6, 3);
+  state.lights = [hemi, dir];
+
+  let renderer: WebGPURenderer;
+  try {
+    renderer = new WebGPURenderer({ canvas: state.canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    sizeToWrap(state, renderer);
+    await renderer.init();
+  } catch (err) {
+    if (state.disposed || gen !== state.generation) return;
+    state.rendererError = toMessage(err);
+    reportError(
+      state,
+      `Renderer failed and stays visible: ${state.rendererError}`,
+    );
+    showEmpty(state, `Renderer failed: ${state.rendererError}`);
+    refreshMetrics(state);
+    return;
+  }
+  if (state.disposed || gen !== state.generation) {
+    try {
+      renderer.dispose();
+    } catch {
+      // Already torn down; dispose is best-effort here.
+    }
+    return;
+  }
+  state.renderer = renderer;
+  state.backend = readBackend(renderer);
+  state.scene.add(hemi, dir);
+  state.controls = new OrbitControls(state.camera, state.canvas);
+  state.controls.enableDamping = true;
+  sizeToWrap(state, renderer);
+  observeResize(state);
+  refreshMetrics(state);
+}
+
+function sizeToWrap(state: LabState, renderer: WebGPURenderer): void {
+  const w = Math.max(1, Math.floor(state.wrap.clientWidth || 640));
+  const h = Math.max(1, Math.floor(state.wrap.clientHeight || 360));
+  state.camera.aspect = w / h;
+  state.camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+}
+
+function observeResize(state: LabState): void {
+  const onResize = (): void => {
+    if (state.disposed || !state.renderer) return;
+    sizeToWrap(state, state.renderer);
+  };
+  state.onFallbackResize = onResize;
+  if (typeof ResizeObserver !== 'undefined') {
+    state.resizeObserver = new ResizeObserver(onResize);
+    state.resizeObserver.observe(state.wrap);
+  }
+  window.addEventListener('resize', onResize);
+}
+
+function startLoop(state: LabState): void {
+  state.lastTime = performance.now() / 1000;
+  state.fpsWindowStart = state.lastTime;
+  state.frames = 0;
+  const tick = (): void => {
+    if (state.disposed || !state.renderer) return;
+    state.raf = requestAnimationFrame(tick);
+    const now = performance.now() / 1000;
+    let dt = now - state.lastTime;
+    state.lastTime = now;
+    if (!Number.isFinite(dt) || dt < 0) dt = 0;
+    if (dt > 0.1) dt = 0.1; // clamped delta
+    state.elapsed += dt;
+    state.controls?.update();
+
+    const active = state.active;
+    if (active) {
+      const update = active.demo.update;
+      if (update) {
+        try {
+          update(state.elapsed, dt);
+        } catch (err) {
+          const message = `Source ${active.id} · update threw and was stopped: ${toMessage(err)} — host stays usable.`;
+          reportError(state, message);
+          const record = state.records[active.id - 1];
+          record.problems.push(message);
+          teardownActive(state);
+          showEmpty(state, message);
+          refreshGallery(state);
+        }
+      }
+    }
+
+    state.renderer.render(state.scene, state.camera);
+    state.frames += 1;
+    if (now - state.fpsWindowStart >= 0.5) {
+      state.fps = state.frames / (now - state.fpsWindowStart);
+      state.frames = 0;
+      state.fpsWindowStart = now;
+      refreshMetrics(state);
+    }
+  };
+  state.raf = requestAnimationFrame(tick);
+}
+
+function frameSelection(state: LabState): void {
+  const active = state.active;
+  if (!active || !state.controls) return;
+  const box = new THREE.Box3().setFromObject(active.demo.root);
+  if (box.isEmpty()) return;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  if (!Number.isFinite(sphere.radius) || sphere.radius <= 0) return;
+  if (
+    !Number.isFinite(sphere.center.x) ||
+    !Number.isFinite(sphere.center.y) ||
+    !Number.isFinite(sphere.center.z)
+  ) {
+    return;
+  }
+  // Frame once per new demo / explicit Recenter only — never per frame.
+  const distance =
+    (sphere.radius / Math.tan(THREE.MathUtils.degToRad(state.camera.fov / 2))) *
+    1.4;
+  const dir = new THREE.Vector3(1, 0.6, 1).normalize();
+  state.camera.position.copy(sphere.center).addScaledVector(dir, Math.max(distance, 0.1));
+  state.camera.near = Math.max(distance / 1000, 0.01);
+  state.camera.far = Math.max(distance * 100, 10);
+  state.camera.updateProjectionMatrix();
+  state.controls.target.copy(sphere.center);
+  state.controls.update();
+}
+
+function refreshMetrics(state: LabState): void {
+  const info = state.renderer?.info?.render as
+    | { drawCalls?: number; calls?: number; triangles?: number }
+    | undefined;
+  const draws = info?.drawCalls ?? info?.calls ?? 0;
+  const tris = info?.triangles ?? 0;
+  const triLabel =
+    tris >= 1000 ? `${(tris / 1000).toFixed(1)}k` : String(tris);
+  const fpsLabel = state.raf === 0 ? '—' : String(Math.round(state.fps));
+  state.metrics.textContent =
+    `backend ${state.backend} · ${fpsLabel} fps · ` +
+    `${draws} draws · ${triLabel} tris (last render)`;
+}
+
+/* ------------------------------------------------------------------ */
+/* Demo groups                                                         */
+/* ------------------------------------------------------------------ */
+
+function isAdaptation(value: unknown): value is Adaptation {
+  return value === 'exact' || value === 'adapted' || value === 'blocked';
+}
+
+async function refreshGroups(state: LabState, gen: number): Promise<void> {
+  // Group modules arrive after root cherry-picks them; an empty match is a
+  // normal pending state, never a build-time or runtime error.
+  const loaders = import.meta.glob<GroupModule>('./demos/group-*/index.ts');
+  const keys = Object.keys(loaders);
+  if (keys.length === 0) {
+    reportError(
+      state,
+      'Notice: no demo groups delivered yet (./demos/group-*/index.ts matched nothing). All 50 records stay Pending / Not yet delivered.',
+    );
+    return;
+  }
+  const seen = new Map<number, string>();
+  for (const key of keys.sort()) {
+    if (state.disposed || gen !== state.generation) return;
+    const group = key.replace(/^\.\/demos\//, '').replace(/\/index\.ts$/, '');
+    let module: GroupModule;
+    try {
+      module = await loaders[key]();
+    } catch (err) {
+      reportError(state, `Group ${group} failed to import: ${toMessage(err)}`);
+      continue;
+    }
+    if (state.disposed || gen !== state.generation) return;
+    const manifest = (module as GroupModule).manifest;
+    if (!Array.isArray(manifest)) {
+      reportError(state, `Group ${group} has no array manifest; ignored.`);
+      continue;
+    }
+    for (const raw of manifest) {
+      const checked = validateEntry(raw);
+      if (!checked.entry) {
+        reportError(
+          state,
+          `Group ${group} ignored a bad manifest entry (${checked.problems.join(', ')}); nothing fabricated for it.`,
+        );
+        continue;
+      }
+      const entry = checked.entry;
+      if (!validId(entry.sourceId)) {
+        reportError(
+          state,
+          `Group ${group} entry has out-of-range sourceId ${String((raw as { sourceId?: unknown }).sourceId)}; ignored, no fallback applied.`,
+        );
+        continue;
+      }
+      const prior = seen.get(entry.sourceId);
+      const record = state.records[entry.sourceId - 1];
+      if (prior) {
+        const message = `Duplicate sourceId ${entry.sourceId}: kept ${prior}, ignored ${group}; no silent overwrite.`;
+        record.problems.push(message);
+        reportError(state, message);
+        continue;
+      }
+      seen.set(entry.sourceId, group);
+      record.entry = entry;
+      record.group = group;
+      if (record.title !== entry.title) {
+        record.problems.push(
+          `Demo title differs from public record; showing demo title.`,
+        );
+      }
+      record.title = entry.title;
+      record.sources = [...entry.sources];
+    }
+  }
+  if (state.disposed || gen !== state.generation) return;
+  // Rebuild gallery labels (titles may come from demos) and re-render.
+  state.list.replaceChildren();
+  for (const record of state.records) {
+    state.list.append(galleryItem(state, record));
+  }
+  mountSelection(state, state.selectedId);
+}
+
+function validateEntry(raw: unknown): { entry: DemoManifestEntry | null; problems: string[] } {
+  if (typeof raw !== 'object' || raw === null) {
+    return { entry: null, problems: ['non-object entry'] };
+  }
+  const candidate = raw as Record<string, unknown>;
+  const problems: string[] = [];
+  if (!validId(candidate.sourceId)) problems.push('bad sourceId');
+  if (typeof candidate.title !== 'string' || candidate.title.trim() === '') {
+    problems.push('bad title');
+  }
+  if (typeof candidate.method !== 'string' || candidate.method.trim() === '') {
+    problems.push('bad method');
+  }
+  if (!isAdaptation(candidate.adaptation)) problems.push('bad adaptation');
+  if (
+    !Array.isArray(candidate.sources) ||
+    !candidate.sources.every((s) => typeof s === 'string')
+  ) {
+    problems.push('bad sources');
+  }
+  if (
+    candidate.limitation !== undefined &&
+    typeof candidate.limitation !== 'string'
+  ) {
+    problems.push('bad limitation');
+  }
+  if (
+    candidate.createDemo !== undefined &&
+    typeof candidate.createDemo !== 'function'
+  ) {
+    problems.push('bad createDemo');
+  }
+  if (problems.length > 0) {
+    return { entry: null, problems };
+  }
+  return {
+    entry: {
+      sourceId: candidate.sourceId as number,
+      title: (candidate.title as string).trim(),
+      method: (candidate.method as string).trim(),
+      adaptation: candidate.adaptation as Adaptation,
+      sources: [...(candidate.sources as string[])],
+      limitation:
+        typeof candidate.limitation === 'string' ? candidate.limitation : undefined,
+      createDemo: (candidate.createDemo as DemoFactory | undefined) ?? undefined,
+    },
+    problems,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Wiring, errors, teardown                                            */
+/* ------------------------------------------------------------------ */
+
+function wireControls(state: LabState): void {
+  state.search.addEventListener('input', () => {
+    state.query = state.search.value;
+    refreshGallery(state);
+  });
+  state.statusSelect.addEventListener('change', () => {
+    state.statusFilter = state.statusSelect.value;
+    refreshGallery(state);
+  });
+  state.adaptationSelect.addEventListener('change', () => {
+    state.adaptationFilter = state.adaptationSelect.value;
+    refreshGallery(state);
+  });
+  // Capture relevant renderer/demo failures plus page-level error events.
+  // Only short message strings are displayed — no stacks, URLs or objects —
+  // so unrelated private data never lands in the error box.
+  state.onWindowError = (event: ErrorEvent) => {
+    if (state.disposed) return;
+    reportError(state, `Page error: ${truncate(event.message || 'unknown error', 240)}`);
+  };
+  state.onWindowRejection = (event: PromiseRejectionEvent) => {
+    if (state.disposed) return;
+    const reason =
+      event.reason instanceof Error ? event.reason.message : String(event.reason);
+    reportError(state, `Unhandled rejection: ${truncate(reason, 240)}`);
+  };
+  window.addEventListener('error', state.onWindowError);
+  window.addEventListener('unhandledrejection', state.onWindowRejection);
+}
+
+function showEmpty(state: LabState, message: string): void {
+  state.empty.textContent = message;
+  state.empty.hidden = false;
+}
+
+function hideEmpty(state: LabState): void {
+  state.empty.hidden = true;
+}
+
+function reportError(state: LabState, message: string): void {
+  const line = text('p', '', truncate(message, 500));
+  state.errorBox.append(line);
+  while (state.errorBox.children.length > 50) {
+    state.errorBox.firstElementChild?.remove();
+  }
+}
+
+function teardownActive(state: LabState): void {
+  const active = state.active;
+  state.active = null;
+  if (!active) return;
+  state.scene.remove(active.demo.root);
+  try {
+    active.demo.dispose();
+  } catch (err) {
+    reportError(
+      state,
+      `Source ${active.id} · dispose threw: ${toMessage(err)} — host stays usable.`,
+    );
+  }
+}
+
+function disposeLab(state: LabState): void {
+  if (state.disposed) return; // exactly-once teardown
+  state.disposed = true;
+  state.generation += 1;
+  if (state.raf !== 0) {
+    cancelAnimationFrame(state.raf);
+    state.raf = 0;
+  }
+  state.resizeObserver?.disconnect();
+  state.resizeObserver = null;
+  window.removeEventListener('resize', state.onFallbackResize);
+  window.removeEventListener('error', state.onWindowError);
+  window.removeEventListener('unhandledrejection', state.onWindowRejection);
+  teardownActive(state);
+  state.controls?.dispose();
+  state.controls = null;
+  for (const light of state.lights) {
+    state.scene.remove(light);
+    light.dispose();
+  }
+  state.lights = [];
+  if (state.renderer) {
+    try {
+      state.renderer.dispose();
+    } catch {
+      // Best-effort: init/dispose races may already have torn down.
+    }
+    state.renderer = null;
+  }
+  state.root.remove();
+}
+
+function toMessage(err: unknown): string {
+  if (err instanceof Error) return err.message || err.name;
+  return String(err);
+}
+
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
