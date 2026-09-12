@@ -18,7 +18,7 @@ export type NatureTextures = Readonly<{
   bark: THREE.DataTexture;
   /** Birch bark: pale with dark lenticel bands. */
   birchBark: THREE.DataTexture;
-  /** Conifer needle mass (opaque). */
+  /** 2x1 conifer atlas: 0 opaque needle mass (cone core), 1 alpha-cut branch spray. */
   needles: THREE.DataTexture;
   /** Tileable ground/rock detail multiplied over terrain vertex colours. */
   groundDetail: THREE.DataTexture;
@@ -203,17 +203,93 @@ export function createBarkData(size = 256, birch = false): Uint8Array {
   return data;
 }
 
-export function createNeedleData(size = 128): Uint8Array {
-  const data = new Uint8Array(size * size * 4);
+/** Distance from (px, py) to the segment (ax, ay)-(bx, by). */
+function segmentDistance(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const vx = bx - ax;
+  const vy = by - ay;
+  const len2 = vx * vx + vy * vy;
+  const t = len2 > 0 ? clamp01(((px - ax) * vx + (py - ay) * vy) / len2) : 0;
+  return Math.hypot(px - (ax + vx * t), py - (ay + vy * t));
+}
+
+/**
+ * Conifer needle atlas, 2 cells side by side (width = 2 x height):
+ *   cell 0 (u 0..0.5)  opaque needle mass, tileable inside the cell — the
+ *                      cone core under the branches samples this;
+ *   cell 1 (u 0.5..1)  alpha-cut branch spray: one twig from the base up
+ *                      the cell with side twigs and needle strokes — the
+ *                      branch cards sample this.
+ */
+export function createNeedleData(width = 256, height = 128): Uint8Array {
+  const data = new Uint8Array(width * height * 4);
+  const cell = width / 2;
   const period = 6;
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const u = (x / size) * period;
-      const v = (y / size) * period;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < cell; x += 1) {
+      const u = (x / cell) * period;
+      const v = (y / height) * period;
       const mass = fbm2(u * 2, v * 2, 3, 0x9e, period * 2) * 0.5 + 0.5;
       const streak = valueNoise2(u * 14, v * 3, 0x9f, period * 14) * 0.5 + 0.5;
       const lum = 0.55 + mass * 0.45 + (streak - 0.5) * 0.3;
-      put(data, (y * size + x) * 4, 0.10 * lum, 0.30 * lum, 0.13 * lum, 1);
+      put(data, (y * width + x) * 4, 0.10 * lum, 0.30 * lum, 0.13 * lum, 1);
+    }
+  }
+  // Branch spray strokes, authored in cell pixels: main twig bottom-centre to
+  // near the top, side twigs alternating left/right, needles off every twig.
+  type Stroke = readonly [number, number, number, number, number, number]; // ax, ay, bx, by, halfWidth, tone
+  const rng = mulberry32(0x5b4a_9ce1);
+  const strokes: Stroke[] = [];
+  const mainX = cell * 0.5;
+  const baseY = height * 0.04;
+  const tipY = height * 0.96;
+  strokes.push([mainX, baseY, mainX, tipY, 1.4, 0.55]);
+  const needlesAlong = (ax: number, ay: number, bx: number, by: number, count: number, len: number): void => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const L = Math.hypot(dx, dy) || 1;
+    const tx = dx / L;
+    const ty = dy / L;
+    for (let n = 0; n < count; n += 1) {
+      const t = (n + 0.5) / count;
+      const px = ax + dx * t;
+      const py = ay + dy * t;
+      const side = n % 2 === 0 ? 1 : -1;
+      const ang = 0.95 + rng() * 0.35;
+      const nx = tx * Math.cos(ang) - ty * Math.sin(ang) * side;
+      const ny = tx * Math.sin(ang) * side + ty * Math.cos(ang);
+      const l = len * (0.7 + rng() * 0.6) * (1 - t * 0.35);
+      strokes.push([px, py, px + nx * l, py + ny * l, 0.75, 0.75 + rng() * 0.3]);
+    }
+  };
+  needlesAlong(mainX, baseY + height * 0.08, mainX, tipY, 26, height * 0.075);
+  const sideTwigs = 9;
+  for (let s = 0; s < sideTwigs; s += 1) {
+    const t = 0.12 + (s / sideTwigs) * 0.78;
+    const y0 = baseY + (tipY - baseY) * t;
+    const side = s % 2 === 0 ? 1 : -1;
+    const reach = cell * (0.42 - t * 0.30) * (0.85 + rng() * 0.3);
+    const rise = height * (0.08 + rng() * 0.05);
+    const x1 = mainX + side * reach;
+    const y1 = y0 + rise;
+    strokes.push([mainX, y0, x1, y1, 1.0, 0.6]);
+    needlesAlong(mainX + side * reach * 0.15, y0 + rise * 0.15, x1, y1, 12, height * 0.06);
+  }
+  const edge = 0.9;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < cell; x += 1) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      let cover = 0;
+      let tone = 0.6;
+      for (const [ax, ay, bx, by, hw, tn] of strokes) {
+        const d = segmentDistance(px, py, ax, ay, bx, by) - hw;
+        const c = 1 - smoothstep(-edge, edge, d);
+        if (c > cover) { cover = c; tone = tn; }
+      }
+      const t = y / height;
+      const shade = tone * (0.7 + 0.3 * t) + hash2(x, y, 0x5b) * 0.08;
+      const border = x < 2 || y < 2 || x >= cell - 2 || y >= height - 2;
+      put(data, (y * width + cell + x) * 4, 0.09 * shade, 0.27 * shade, 0.11 * shade, border ? 0 : cover);
     }
   }
   return data;
@@ -314,7 +390,7 @@ export function createNatureTextures(): NatureTextures {
   const hedgeSurface = makeTexture(createHedgeSurfaceData(256), 256, 256, 'ws-nature-hedge-surface', true, true);
   const bark = makeTexture(createBarkData(256, false), 256, 256, 'ws-nature-bark', true, true);
   const birchBark = makeTexture(createBarkData(128, true), 128, 128, 'ws-nature-birch-bark', true, true);
-  const needles = makeTexture(createNeedleData(128), 128, 128, 'ws-nature-needles', true, true);
+  const needles = makeTexture(createNeedleData(256, 128), 256, 128, 'ws-nature-needles', true, false);
   const groundDetail = makeTexture(createGroundDetailData(256), 256, 256, 'ws-nature-ground-detail', true, true);
   const flowers = makeTexture(createFlowerAtlasData(128), 128, 128, 'ws-nature-flowers', true, false);
   const farTrees = makeTexture(createFarTreeData(128, 64), 128, 64, 'ws-nature-far-trees', true, false);

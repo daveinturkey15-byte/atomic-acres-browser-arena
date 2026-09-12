@@ -3,9 +3,14 @@
  *
  *   broadleaf  — tapered trunk with three branches, three-lobed canopy of
  *                alpha-cut leaf-cluster cards (oak/maple atlas cells)
- *   conifer    — trunk plus six ragged-rim needle tiers and a leader
+ *   conifer    — trunk, a dark four-tier cone core, and six tiers of drooping
+ *                alpha-cut needle-spray cards that break the cone silhouette
  *   birch      — thin pale trunk, tall narrow canopy of small-leaf cards
  *   far cards  — crossed silhouette cards on the foothills past 95 m
+ *
+ * Every card carries an authored normal (canopy-radial, biased up) and the
+ * foliage materials shade with it on both faces, so a canopy reads as one
+ * lit volume rather than a checkerboard of front/back-lit planes.
  *
  * Two draws per near species (bark bucket, foliage bucket), two for the far
  * cards. Placement is seeded, grove-clustered, keeps a minimum separation
@@ -75,7 +80,19 @@ export function triangleCount(geom: THREE.BufferGeometry): number {
   return geom.index ? geom.index.count / 3 : geom.getAttribute('position').count / 3;
 }
 
-function card(width: number, height: number, cell: number, rng: () => number, centre: THREE.Vector3, windWeight: number): THREE.BufferGeometry {
+/** Overwrite every vertex normal with one authored direction (normalised). */
+function setNormal(geom: THREE.BufferGeometry, nx: number, ny: number, nz: number): void {
+  const len = Math.hypot(nx, ny, nz) || 1;
+  const n = geom.getAttribute('normal') as THREE.BufferAttribute;
+  for (let i = 0; i < n.count; i += 1) n.setXYZ(i, nx / len, ny / len, nz / len);
+}
+
+/** Canopy-radial normal: away from the canopy centroid, biased upward. */
+function canopyNormal(geom: THREE.BufferGeometry, centre: THREE.Vector3, canopyCentre: THREE.Vector3, upBias: number): void {
+  setNormal(geom, centre.x - canopyCentre.x, centre.y - canopyCentre.y + upBias, centre.z - canopyCentre.z);
+}
+
+function card(width: number, height: number, cell: number, rng: () => number, centre: THREE.Vector3, windWeight: number, canopyCentre: THREE.Vector3): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(width, height);
   setUvCell(g, cell % 2, Math.floor(cell / 2), 2, 2);
   const m = new THREE.Matrix4();
@@ -83,7 +100,28 @@ function card(width: number, height: number, cell: number, rng: () => number, ce
   m.makeRotationFromEuler(e);
   m.setPosition(centre);
   g.applyMatrix4(m);
+  canopyNormal(g, centre, canopyCentre, 1.0);
   return addWindWeight(g, () => windWeight);
+}
+
+/**
+ * One drooping conifer branch: a near-horizontal card pointing outward from
+ * the trunk at `yaw`, tilted down by `droop`, rolled a little, sampling the
+ * spray cell (right half) of the needle atlas with the twig base at the trunk.
+ */
+function branchCard(length: number, width: number, yaw: number, droop: number, roll: number, y: number, inset: number, windWeight: number): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(width, length);
+  // Plane is in XY with V running up; lay it flat so V runs along +Z (radial).
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0, length / 2 - inset);
+  const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, 0.5 + uv.getX(i) * 0.5, uv.getY(i));
+  const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(droop, yaw, roll, 'YXZ'));
+  m.setPosition(0, y, 0);
+  g.applyMatrix4(m);
+  // Shade as the top of a branch: up, leaning outward.
+  setNormal(g, Math.sin(yaw) * 0.45, 1, Math.cos(yaw) * 0.45);
+  return addWindWeight(g, (_x, _y, _z) => windWeight);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,12 +131,14 @@ function card(width: number, height: number, cell: number, rng: () => number, ce
 export function createBroadleafGeometry(): { trunk: THREE.BufferGeometry; canopy: THREE.BufferGeometry } {
   const rng = mulberry32(0xb20a_d1ea);
   const trunkParts: THREE.BufferGeometry[] = [];
-  const trunk = new THREE.CylinderGeometry(0.15, 0.36, 3.6, 9, 3);
+  // Trunks and branches are open-ended: the feet are sunk and the tops are
+  // inside the canopy, so caps only cost triangles.
+  const trunk = new THREE.CylinderGeometry(0.15, 0.36, 3.6, 9, 3, true);
   trunk.translate(0, 1.8, 0);
   scaleUv(trunk, 2, 2.4);
   trunkParts.push(addWindWeight(trunk, (_x, y) => Math.max(0, (y - 2.2) / 6)));
   for (let b = 0; b < 3; b += 1) {
-    const branch = new THREE.CylinderGeometry(0.05, 0.13, 2.3, 6, 1);
+    const branch = new THREE.CylinderGeometry(0.05, 0.13, 2.3, 6, 1, true);
     branch.translate(0, 1.15, 0);
     scaleUv(branch, 1, 1.6);
     const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0.55 + rng() * 0.25, b * 2.1 + rng() * 0.5, 0, 'YXZ'));
@@ -109,6 +149,7 @@ export function createBroadleafGeometry(): { trunk: THREE.BufferGeometry; canopy
   const canopyParts: THREE.BufferGeometry[] = [];
   const lobes: Array<[number, number, number, number]> = [[0, 4.9, 0, 1.55], [1.25, 4.25, 0.6, 1.2], [-1.0, 4.5, -0.85, 1.25], [0.2, 5.9, -0.3, 1.0]];
   const centre = new THREE.Vector3();
+  const canopyCentre = new THREE.Vector3(0.1, 4.8, -0.1);
   for (const [lx, ly, lz, lr] of lobes) {
     for (let i = 0; i < 8; i += 1) {
       const u = rng() * 2 - 1;
@@ -117,7 +158,7 @@ export function createBroadleafGeometry(): { trunk: THREE.BufferGeometry; canopy
       const s = Math.sqrt(1 - u * u);
       centre.set(lx + Math.cos(phi) * s * rad, ly + u * rad * 0.8, lz + Math.sin(phi) * s * rad);
       const reach = Math.min(1, Math.hypot(centre.x, centre.z) / 2.6);
-      canopyParts.push(card(1.5 + rng() * 0.5, 1.3 + rng() * 0.5, rng() < 0.6 ? 0 : 1, rng, centre, 0.45 + reach * 0.55));
+      canopyParts.push(card(1.5 + rng() * 0.5, 1.3 + rng() * 0.5, rng() < 0.6 ? 0 : 1, rng, centre, 0.45 + reach * 0.55, canopyCentre));
     }
   }
   return {
@@ -128,41 +169,68 @@ export function createBroadleafGeometry(): { trunk: THREE.BufferGeometry; canopy
 
 export function createConiferGeometry(): { trunk: THREE.BufferGeometry; canopy: THREE.BufferGeometry } {
   const rng = mulberry32(0xc0_1f3a);
-  const trunk = new THREE.CylinderGeometry(0.08, 0.32, 9.4, 7, 1);
+  const trunk = new THREE.CylinderGeometry(0.08, 0.32, 9.4, 7, 1, true);
   trunk.translate(0, 4.7, 0);
   scaleUv(trunk, 2, 5);
   addWindWeight(trunk, (_x, y) => Math.max(0, (y - 5) / 12));
-  const tiers: THREE.BufferGeometry[] = [];
-  const tierCount = 6;
-  for (let i = 0; i < tierCount; i += 1) {
-    const radius = 2.3 - i * 0.32;
-    const height = 2.0 - i * 0.12;
-    const cone = new THREE.ConeGeometry(radius, height, 9, 1, true);
+  const parts: THREE.BufferGeometry[] = [];
+  // Dark core: four ragged open cones inside the branch reach. They give the
+  // tree its mass and hide the trunk; the branch cards own the silhouette.
+  const coreTiers = 4;
+  for (let i = 0; i < coreTiers; i += 1) {
+    const radius = 1.45 - i * 0.28;
+    const height = 2.6 - i * 0.2;
+    const cone = new THREE.ConeGeometry(radius, height, 8, 1, true);
     const pos = cone.getAttribute('position') as THREE.BufferAttribute;
     for (let v = 0; v < pos.count; v += 1) {
       if (pos.getY(v) < 0) {
         const k = 0.78 + rng() * 0.36;
-        pos.setXYZ(v, pos.getX(v) * k, pos.getY(v) + (rng() - 0.5) * 0.25, pos.getZ(v) * k);
+        pos.setXYZ(v, pos.getX(v) * k, pos.getY(v) + (rng() - 0.5) * 0.3, pos.getZ(v) * k);
       }
     }
     cone.computeVertexNormals();
-    cone.translate(0, 1.6 + i * 1.28 + height / 2, 0);
-    scaleUv(cone, 3, 1);
-    const w = 0.04 + (i / tierCount) * 0.22;
-    tiers.push(addWindWeight(cone, (_x, y, _z) => (y > 1.6 + i * 1.28 + height * 0.9 ? w * 0.4 : w)));
+    cone.translate(0, 2.0 + i * 1.9 + height / 2, 0);
+    // Mass cell is the left half of the needle atlas (u 0.02 .. 0.48).
+    const uv = cone.getAttribute('uv') as THREE.BufferAttribute;
+    for (let v = 0; v < uv.count; v += 1) uv.setXY(v, 0.02 + uv.getX(v) * 0.46, uv.getY(v));
+    const w = 0.03 + (i / coreTiers) * 0.12;
+    parts.push(addWindWeight(cone, () => w));
   }
-  const leader = new THREE.ConeGeometry(0.5, 1.6, 7, 1, false);
-  leader.translate(0, 1.6 + tierCount * 1.28 + 0.6, 0);
-  tiers.push(addWindWeight(leader, () => 0.3));
+  // Branch tiers: six rings of drooping spray cards, longer and lower at the
+  // base, shorter and steeper toward the leader, each ring rotated so the
+  // branches never stack into a star.
+  const tierCount = 6;
+  for (let i = 0; i < tierCount; i += 1) {
+    const t = i / (tierCount - 1);
+    const y = 1.7 + i * 1.32;
+    const perTier = i < 4 ? 6 : 5;
+    const baseYaw = i * 0.9 + rng() * 0.6;
+    for (let b = 0; b < perTier; b += 1) {
+      const yaw = baseYaw + (b / perTier) * Math.PI * 2 + (rng() - 0.5) * 0.35;
+      const length = (2.9 - t * 1.6) * (0.85 + rng() * 0.3);
+      const width = length * (0.55 + rng() * 0.15);
+      const droop = 0.42 + t * 0.12 + (rng() - 0.5) * 0.2;
+      const roll = (rng() - 0.5) * 0.5;
+      const w = 0.05 + t * 0.2;
+      parts.push(branchCard(length, width, yaw, droop, roll, y + (rng() - 0.5) * 0.3, 0.15, w));
+    }
+  }
+  const leader = new THREE.ConeGeometry(0.42, 1.9, 7, 1, true);
+  leader.translate(0, 1.7 + (tierCount - 1) * 1.32 + 0.95, 0);
+  {
+    const uv = leader.getAttribute('uv') as THREE.BufferAttribute;
+    for (let v = 0; v < uv.count; v += 1) uv.setXY(v, 0.02 + uv.getX(v) * 0.46, uv.getY(v));
+  }
+  parts.push(addWindWeight(leader, () => 0.3));
   return {
     trunk: addWindWeight(trunk, (_x, y) => Math.max(0, (y - 5) / 12)),
-    canopy: mergeParts(tiers, 'ws-nature-conifer-canopy'),
+    canopy: mergeParts(parts, 'ws-nature-conifer-canopy'),
   };
 }
 
 export function createBirchGeometry(): { trunk: THREE.BufferGeometry; canopy: THREE.BufferGeometry } {
   const rng = mulberry32(0xb1_2c4e);
-  const trunk = new THREE.CylinderGeometry(0.06, 0.17, 7.4, 7, 3);
+  const trunk = new THREE.CylinderGeometry(0.06, 0.17, 7.4, 7, 3, true);
   trunk.translate(0, 3.7, 0);
   scaleUv(trunk, 1.5, 4);
   const lean = new THREE.Matrix4().makeRotationZ(0.06);
@@ -170,13 +238,14 @@ export function createBirchGeometry(): { trunk: THREE.BufferGeometry; canopy: TH
   addWindWeight(trunk, (_x, y) => Math.max(0, (y - 3) / 9) * 0.6);
   const parts: THREE.BufferGeometry[] = [];
   const centre = new THREE.Vector3();
+  const canopyCentre = new THREE.Vector3(0.3, 6.0, 0);
   for (let i = 0; i < 18; i += 1) {
     const u = rng() * 2 - 1;
     const phi = rng() * Math.PI * 2;
     const s = Math.sqrt(1 - u * u);
     const rad = Math.cbrt(rng());
     centre.set(Math.cos(phi) * s * rad * 1.15 + 0.3, 6.0 + u * 2.0, Math.sin(phi) * s * rad * 1.15);
-    parts.push(card(1.1 + rng() * 0.4, 1.4 + rng() * 0.5, 2, rng, centre, 0.6 + rad * 0.4));
+    parts.push(card(1.1 + rng() * 0.4, 1.4 + rng() * 0.5, 2, rng, centre, 0.6 + rad * 0.4, canopyCentre));
   }
   return { trunk, canopy: mergeParts(parts, 'ws-nature-birch-canopy') };
 }
@@ -189,6 +258,8 @@ export function createFarCardGeometry(cell: number): THREE.BufferGeometry {
   for (const g of [a, b]) {
     const uv = g.getAttribute('uv') as THREE.BufferAttribute;
     for (let i = 0; i < uv.count; i += 1) uv.setXY(i, (cell + uv.getX(i)) / 2, uv.getY(i));
+    // Both crossed planes shade like a lit crown top, not two half-lit walls.
+    setNormal(g, 0, 1, 0);
     addWindWeight(g, (_x, y) => y * 0.25);
   }
   return mergeParts([a, b], `ws-nature-far-card-${cell}`);
@@ -306,9 +377,9 @@ export function createTreeFamily(textures: NatureTextures, uniforms: NatureUnifo
 
   const barkMat = createSurfaceMaterial({ name: 'ws-nature-bark', map: textures.bark, roughness: 0.92, wind: { amplitudeM: 0.12, frequency: 0.9 }, snowResponse: 0.6 }, uniforms);
   const birchBarkMat = createSurfaceMaterial({ name: 'ws-nature-birch-bark', map: textures.birchBark, roughness: 0.8, wind: { amplitudeM: 0.18, frequency: 1.0 }, snowResponse: 0.6 }, uniforms);
-  const leafMat = createSurfaceMaterial({ name: 'ws-nature-leaf', map: textures.leafAtlas, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.72, wind: { amplitudeM: 0.32, frequency: 1.15 }, snowResponse: 1, emissive: 0x1a2a10, emissiveIntensity: 0.08 }, uniforms);
-  const needleMat = createSurfaceMaterial({ name: 'ws-nature-needle', map: textures.needles, side: THREE.DoubleSide, roughness: 0.85, wind: { amplitudeM: 0.22, frequency: 0.75 }, snowResponse: 1, emissive: 0x0e1c10, emissiveIntensity: 0.08 }, uniforms);
-  const farMat = createSurfaceMaterial({ name: 'ws-nature-far-tree', map: textures.farTrees, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95, wind: { amplitudeM: 0.5, frequency: 0.6 }, snowResponse: 1 }, uniforms);
+  const leafMat = createSurfaceMaterial({ name: 'ws-nature-leaf', map: textures.leafAtlas, alphaTest: 0.5, side: THREE.DoubleSide, foliageNormals: true, roughness: 0.72, wind: { amplitudeM: 0.32, frequency: 1.15 }, snowResponse: 1, emissive: 0x1a2a10, emissiveIntensity: 0.08 }, uniforms);
+  const needleMat = createSurfaceMaterial({ name: 'ws-nature-needle', map: textures.needles, alphaTest: 0.5, side: THREE.DoubleSide, foliageNormals: true, roughness: 0.85, wind: { amplitudeM: 0.22, frequency: 0.75 }, snowResponse: 1, emissive: 0x0e1c10, emissiveIntensity: 0.08 }, uniforms);
+  const farMat = createSurfaceMaterial({ name: 'ws-nature-far-tree', map: textures.farTrees, alphaTest: 0.5, side: THREE.DoubleSide, foliageNormals: true, roughness: 0.95, wind: { amplitudeM: 0.5, frequency: 0.6 }, snowResponse: 1 }, uniforms);
   const materials = [barkMat, birchBarkMat, leafMat, needleMat, farMat];
 
   const broadleaf = createBroadleafGeometry();
@@ -356,7 +427,9 @@ export function createTreeFamily(textures: NatureTextures, uniforms: NatureUnifo
     const x = Math.sin(a) * r;
     const z = -Math.cos(a) * r;
     if (coastalFactor(x, z) > 0.45 || waterDepthAt(x, z) > 0 || terrainHeight(x, z) > TREELINE_M) continue;
-    const slot: Slot = { x, z, yaw: farRng() * Math.PI * 2, scale: 8 + farRng() * 7, tone: farRng(), tilt: 0 };
+    // Same height range as the near species (7-12 m) so the hand-off at 96 m
+    // does not step up in scale.
+    const slot: Slot = { x, z, yaw: farRng() * Math.PI * 2, scale: 7 + farRng() * 5, tone: farRng(), tilt: 0 };
     (farRng() < 0.62 ? farA : farB).push(slot);
   }
   const fillFar = (geom: THREE.BufferGeometry, slots: Slot[], name: string): void => {

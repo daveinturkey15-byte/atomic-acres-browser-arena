@@ -21,7 +21,7 @@ import {
   terrainHeight,
   waterDepthAt,
 } from './layout';
-import { createLeafAtlasData, createFlowerAtlasData } from './textures';
+import { createLeafAtlasData, createFlowerAtlasData, createNeedleData } from './textures';
 import { cutHedgeRun, HEDGE_MAX_HEIGHT_M } from './gardens';
 import { createWaterDepthMaskData } from './terrain';
 import { createTreeFamily } from './trees';
@@ -136,6 +136,54 @@ describe('world-studio nature', () => {
     for (let i = 0; i < mask.length; i += 4) { if (mask[i] === 0) dry += 1; if (mask[i] > 200) deep += 1; }
     expect(dry).toBeGreaterThan(0);
     expect(deep).toBeGreaterThan(0);
+  });
+
+  it('terrain ring faces up: every triangle normal has positive Y', () => {
+    // Falsifier for the inverted-winding defect seen in the 2026-09-12
+    // captures (ring culled from above, trees floating on sky). A heightfield
+    // over the XZ plane must have every face normal pointing up.
+    const ring = nature.root.getObjectByName('ws-nature-terrain-ring') as THREE.Mesh;
+    const pos = ring.geometry.getAttribute('position');
+    const index = ring.geometry.index!;
+    const a = new THREE.Vector3();
+    const b = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    let down = 0;
+    for (let i = 0; i < index.count; i += 3) {
+      a.fromBufferAttribute(pos, index.getX(i));
+      b.fromBufferAttribute(pos, index.getX(i + 1));
+      c.fromBufferAttribute(pos, index.getX(i + 2));
+      b.sub(a);
+      c.sub(a);
+      if (b.cross(c).y <= 0) down += 1;
+    }
+    expect(down).toBe(0);
+    expect((ring.material as THREE.Material).side).toBe(THREE.FrontSide);
+    const normals = ring.geometry.getAttribute('normal');
+    for (let i = 0; i < normals.count; i += 97) expect(normals.getY(i)).toBeGreaterThan(0);
+  });
+
+  it('foliage cards carry authored normals and the needle atlas has a mass cell and a spray cell', () => {
+    const canopy = nature.root.getObjectByName('ws-nature-conifer-canopies') as THREE.InstancedMesh;
+    const n = canopy.geometry.getAttribute('normal');
+    let up = 0;
+    for (let i = 0; i < n.count; i += 1) if (n.getY(i) > 0.6) up += 1;
+    expect(up / n.count).toBeGreaterThan(0.5);
+    const broad = nature.root.getObjectByName('ws-nature-broadleaf-canopies') as THREE.InstancedMesh;
+    const bn = broad.geometry.getAttribute('normal');
+    for (let i = 0; i < bn.count; i += 1) expect(bn.getY(i)).toBeGreaterThan(-0.2);
+    const needles = createNeedleData(64, 32);
+    let massOpaque = 0;
+    let sprayCut = 0;
+    for (let y = 0; y < 32; y += 1) {
+      for (let x = 0; x < 32; x += 1) {
+        if (needles[(y * 64 + x) * 4 + 3] === 255) massOpaque += 1;
+        if (needles[(y * 64 + 32 + x) * 4 + 3] < 128) sprayCut += 1;
+      }
+    }
+    expect(massOpaque).toBe(32 * 32);
+    expect(sprayCut).toBeGreaterThan(200);
+    expect(sprayCut).toBeLessThan(32 * 32 - 100);
   });
 
   it('generates leaf and flower atlases with alpha-cut cells that differ', () => {

@@ -20,11 +20,13 @@ const {
   fract,
   instanceIndex,
   mix,
+  normalLocal,
   normalWorld,
   positionLocal,
   sin,
   smoothstep,
   texture,
+  transformNormalToView,
   uniform,
   uv,
   vec3,
@@ -79,6 +81,14 @@ export type SurfaceMaterialOptions = Readonly<{
   /** Optional emissive floor so dark foliage never goes black under fog. */
   emissive?: number;
   emissiveIntensity?: number;
+  /**
+   * Foliage cards: shade with the geometry's authored normal on BOTH faces.
+   * Three's `normalView` negates the normal on back faces of a DoubleSide
+   * material (src/nodes/accessors/Normal.js, negateOnBackSide), which turns a
+   * cloud of crossed cards into a light/dark checkerboard. Card authors set
+   * a canopy-radial normal instead and this flag stops the flip.
+   */
+  foliageNormals?: boolean;
 }>;
 
 function instanceHash(salt: number) {
@@ -127,6 +137,10 @@ export function createSurfaceMaterial(opts: SurfaceMaterialOptions, u: NatureUni
     // Lean with the prevailing wind (+X, -Z) plus a little cross flutter.
     const sway = vec3(amount.mul(0.8), amount.mul(-0.18), amount.mul(-0.55));
     mat.positionNode = positionLocal.add(sway);
+  }
+
+  if (opts.foliageNormals) {
+    mat.normalNode = transformNormalToView(normalLocal);
   }
 
   // ---- fragment: albedo, wetness, snow -------------------------------------

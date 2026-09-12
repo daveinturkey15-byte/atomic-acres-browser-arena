@@ -119,8 +119,13 @@ export function createTerrainRing(textures: NatureTextures, uniforms: NatureUnif
       const b = i * N + j1;
       const c = (i + 1) * N + j;
       const d = (i + 1) * N + j1;
-      // Outward-facing (up) winding: a -> c -> b, b -> c -> d.
-      indices.push(a, c, b, b, c, d);
+      // Up-facing winding. With x = sin(a)·r, z = -cos(a)·r the angular
+      // direction (a -> b) crossed into the radial direction (a -> c) points
+      // -Y, so the CCW-front triangles must run a -> b -> c and b -> d -> c.
+      // (The first build had a -> c -> b: every face pointed down, FrontSide
+      // culled the whole ring from above and the trees floated on sky.
+      // `terrain ring faces up` in index.test.ts falsifies this.)
+      indices.push(a, b, c, b, d, c);
     }
   }
   const geometry = new THREE.BufferGeometry();
