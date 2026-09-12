@@ -52,7 +52,32 @@ reported rather than hidden.
 command + hashes + reopen proof retained, third panel added so the bake is isolated. Full evidence:
 `blender/PROVENANCE.md`.
 
-**Gap 3 (row 38) — NOT closed in this window, and not partially started.** One of its two carrier
+**Gap 3 (row 38) — closed in the continuation window (2026-09-12, 17:26–), `d02b442a9`.** Both
+carrier bodies are now read to EOF in the window that used them: `threejs-procedural-vegetation`
+(444 lines, sha256 `7aa8c750…`) and `atomic-acres-procedural-art-authoring` (152 lines, sha256
+`19f93b23…`), both matching the packet with no drift, plus the ground-clutter reference. Five of the
+register's six technique atoms are implemented against a sculpted terrain that carries the mask's own
+features — the watercourse is a carved channel, the glade is a levelled pad — and the sixth (the tree
+editor with GLB export) is declared deliberately absent because the register calls it a product
+question. Species parameter sets gate on slope and moisture per species, clump geometry under a sheen
+blade material carpets what the canopy leaves, and a baked floor blend ties the scatter back into the
+ground material with both panels sharing one base bake so the blend is isolated. Re-editability is a
+control rather than a prose claim: `update()` steps three authored curve poses and re-derives
+everything downstream. Tests 37 → 42; `tsc --noEmit` clean project-wide. Rendered acceptance OPEN.
+
+**Follow-up outside the three gaps, same window: row 36's 97.7 ° outlier is diagnosed.** It is a
+vertex-normal weighting convention, not a transfer flip and not a bake defect: Blender's
+`mesh.vertex_normals` weights face normals by corner angle, three.js `computeVertexNormals` weights
+by area, and at one vertex (v46) a sliver face 90× smaller than its neighbours points the opposite
+way while holding the fan's largest corner angle, so corner-angle weighting cancels the sum to 1.85 %
+of its magnitude. Reproduced from the committed artefact alone, with no Blender:
+`scripts/technique-lab/group-c/blender/inspect_bake_outlier.py` matches Blender's recorded mean to
+four decimals. Nothing was re-run or re-exported; the raw number stays in the artefact. Full working:
+`blender/PROVENANCE.md`.
+
+---
+
+**Superseded record of the previous window's outcome for gap 3, kept for the audit trail:** One of its two carrier
 bodies was read to EOF (`threejs-procedural-vegetation`, 444 lines, sha256
 `7aa8c750c461d9741ccd760354664372ff64813b3fa043c0b515202895b9881e`, matching the packet with no
 drift), which closes that half of the recorded source hole; `atomic-acres-procedural-art-authoring`

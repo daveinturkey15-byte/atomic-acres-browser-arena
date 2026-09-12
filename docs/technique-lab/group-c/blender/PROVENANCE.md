@@ -57,13 +57,53 @@ blender --background --factory-startup \
 | Max deviation, baked vs the normals THIS SCENE replaces | 11.006 ° |
 | Flipped vertices (opposite hemisphere), this scene | **0** |
 
-**Unresolved, and recorded as unresolved.** Blender's bake-time maximum of 97.739 ° is a single
-vertex measured against Blender's own `vertex_normals` on the remeshed mesh. Recomputing the same
-comparison against the normals the exhibit actually replaces — `computeVertexNormals` on the same
-positions and indices — gives a maximum of 11.006 ° and zero hemisphere flips. The outlier does not
-reproduce, its cause was not diagnosed in this window (a degenerate normal on Blender's side is the
-suspicion, not a finding), and it is **not** described anywhere as a nearest-surface transfer flip.
-The raw number stays in the artefact JSON.
+**Diagnosed 2026-09-12 (continuation window). It is a vertex-normal weighting convention, not a
+transfer flip.** Both numbers are correct measurements of different quantities, and the difference is
+now reproducible from the committed artefact alone, with no Blender and no GPU:
+
+```
+python scripts/technique-lab/group-c/blender/inspect_bake_outlier.py
+```
+
+The script decodes the committed lowpoly (464 vertices, 924 triangles; **0 degenerate triangles, 0
+orphan vertices**) and recomputes each vertex's own normal three ways, then compares each against the
+committed baked normals:
+
+| Weighting of the face normals | Max deviation | Mean | Vertices past 90 ° |
+|---|---|---|---|
+| **Corner angle** — what Blender's `mesh.vertex_normals` uses | **97.924 °** | **3.561 °** | 1 |
+| **Face area** — what three.js `computeVertexNormals` uses | 11.006 ° | 4.180 ° | 0 |
+| Unweighted | 13.436 ° | 3.635 ° | 0 |
+
+The corner-angle row reproduces Blender's recorded mean to four decimal places (3.561 vs **3.5609**)
+and its maximum to within 0.19 ° (97.92 vs **97.7394**; the residue is the Int8 normal quantisation
+in the artefact, amplified precisely because this vertex's direction is ill-conditioned — see below).
+The area-weighted row reproduces the scene's 11.006 ° exactly. So the 97.7 ° was never a property of
+the bake: it is the angle to a *differently averaged* vertex normal.
+
+**The one vertex, exactly.** v46, at (−0.1993, −0.0097, −1.0399), has a four-face fan:
+
+| Face | Normal | Area | Corner angle at v46 |
+|---|---|---|---|
+| (60, 46, 59) | (−0.313, −0.016, −0.950) | 0.00540 | 40.5 ° |
+| (60, 47, 46) | (−0.295, −0.013, −0.955) | 0.00702 | 58.8 ° |
+| (152, 59, 46) | **(+0.288, −0.014, +0.957)** | **0.00006** | **106.6 °** |
+| (152, 46, 47) | (−0.194, −0.135, −0.972) | 0.00001 | 7.4 ° |
+
+Two ordinary faces point −Z; a near-degenerate sliver 90× smaller points almost exactly the opposite
+way, and its corner at v46 is the *largest* angle in the fan. Weighted by area the sliver is ignored
+(‖Σ‖/Σw = 0.9910, i.e. the fan agrees) and the vertex normal is (−0.303, −0.015, −0.953), 9.01 ° from
+the baked normal. Weighted by corner angle the sliver outvotes both real faces, the sum cancels to
+1.85 % of its possible magnitude (‖Σ‖/Σw = 0.0185) and what survives is numerical residue pointing
+(−0.182, −0.982, +0.055) — a direction **no face in the fan has** — which is 97.92 ° from the baked
+normal (−0.292, +0.142, −0.946).
+
+**What this changes and what it does not.** The bake is not implicated: the baked normal at v46 is
+9.01 ° from the area-weighted surface normal, in line with the rest of the mesh. Nothing is re-run,
+re-tuned or re-exported, and the raw 97.739 ° stays in the artefact JSON exactly as Blender recorded
+it. The voxel remesher emitting occasional slivers is a real property of this recipe at a 0.22 m
+voxel, retained rather than smoothed away. It is still **not** a nearest-surface transfer flip, and
+it is still not described as one anywhere.
 
 ## Hashes (build run)
 
