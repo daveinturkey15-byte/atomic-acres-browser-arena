@@ -3,6 +3,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { verifyCapabilityHandoff } from './capability-handoff.mjs';
 import { readCompleteAncestry } from './ancestry-inventory.mjs';
 import {
   createGitProbe,
@@ -167,9 +168,14 @@ function resolveRoute(values, machine, harness) {
 }
 
 const { mode, values } = parseArgs(process.argv.slice(2));
-if (!['doctor', 'contribute', 'release', 'lane-close'].includes(mode)) {
-  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|release|lane-close> [options]');
+if (!['doctor', 'contribute', 'handoff', 'release', 'lane-close'].includes(mode)) {
+  throw new Error('Usage: pipeline-guard.mjs <doctor|contribute|handoff|release|lane-close> [options]');
 }
+
+if (values.offline !== undefined && (mode !== 'doctor' || values.offline !== true)) {
+  throw new Error('--offline is a doctor-only flag; contribution, handoff, release and closure require normal verification');
+}
+const offline = values.offline === true;
 
 const repo = run('git', ['rev-parse', '--show-toplevel']).stdout;
 const remote = git(repo, 'remote', 'get-url', 'origin');
@@ -178,7 +184,7 @@ const timestamp = new Date().toISOString();
 const branch = git(repo, 'branch', '--show-current') || 'DETACHED';
 const headSha = git(repo, 'rev-parse', 'HEAD');
 const dirty = git(repo, 'status', '--porcelain=v1').split(/\r?\n/).filter(Boolean);
-const ghStatus = run('gh', ['auth', 'status'], { allowFailure: true });
+const ghStatus = offline ? { status: null, stdout: '', stderr: '' } : run('gh', ['auth', 'status'], { allowFailure: true });
 const authText = `${ghStatus.stdout}\n${ghStatus.stderr}`;
 
 const receipt = {
@@ -190,13 +196,15 @@ const receipt = {
   headSha,
   clean: dirty.length === 0,
   dirtyPathCount: dirty.length,
-  tools: {
+  offline,
+  tools: offline ? { status: 'skipped-offline', reason: 'Doctor offline inspects Git ancestry only; tool versions were not probed' } : {
     git: toolVersion('git'),
     node: toolVersion(process.execPath),
     npm: npmVersion(),
     gh: toolVersion('gh'),
   },
   githubAuth: {
+    status: offline ? 'skipped-offline' : 'checked',
     authenticated: ghStatus.status === 0,
     repoScope: /(?:^|[,\s'])repo(?:[,\s']|$)/.test(authText),
     workflowScope: /(?:^|[,\s'])workflow(?:[,\s']|$)/.test(authText),
@@ -244,7 +252,10 @@ if (mode !== 'doctor') {
   }
 }
 
-if (mode === 'contribute') {
+if (mode === 'contribute' || mode === 'handoff') {
+  if (mode === 'handoff' && (typeof values.project !== 'string' || typeof values.lane !== 'string')) {
+    throw new Error('handoff requires --project <id> and --lane <id>');
+  }
   const machine = slug(values.machine, 'machine');
   const harness = slug(values.harness, 'harness');
   const prefix = `contrib/${machine}/${harness}/`;
@@ -298,6 +309,17 @@ if (mode === 'release') {
   if (failures.length) {
     throw new Error(`Required checks are not green: ${failures.map((check) => `${check.name}=${check.conclusion}`).join(', ')}`);
   }
+}
+
+// Final candidate delivery requires a fresh live proof. CI release remains portable.
+// Contribution, backup, and rejected/historical lane closure remain independent.
+if (mode === 'handoff') {
+  const identity = readProjectIdentity(repo);
+  const registry = loadRegistry(resolveRegistryPath(), identity);
+  receipt.capabilityHandoff = verifyCapabilityHandoff({
+    candidateRoot: repo, headSha, policy: identity.capabilityHandoff, config: registry.capabilityHandoff,
+  });
+  receipt.grantsAcceptance = false;
 }
 
 const receiptPath = writeReceipt(repo, mode, receipt);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { BallisticSurface } from '../../src/ballistics';
 
-/** Float32 scene-coordinate tolerance, not a gameplay coverage allowance. */
+/** Expands each shot box by 10 micrometres for Float32 coordinate rounding. */
 const COORDINATE_EPSILON_M = 1e-5;
 
 /**

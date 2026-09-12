@@ -92,7 +92,11 @@ describe('nuketown2 road edge: HF-536 night-gemini13 mechanical proof', () => {
     // and all 12 solid cover meshes retain collider+ballistic and are asserted present.
     // These stay exact equalities so the gate still catches an ADDED body, which is its job.
     expect(map.colliders.length).toBe(369);
-    expect(map.raycastMeshes.length).toBe(385);
+    // c58f233 rates the existing rear frame with exactly four shot-only rails.
+    // Keep the 385-surface historical census plus that independently tested addition.
+    expect(map.raycastMeshes.length).toBe(385 + 4);
+    expect(map.raycastMeshes.filter(mesh => mesh.name.includes('truck rear-frame rail')).map(mesh => mesh.name).sort())
+      .toEqual([0, 1, 2, 3].map(index => `nuketown2 street-vehicle truck rear-frame rail ${index}`));
 
     // Ensure no name contains ' verge ' so declutter / verge-furniture ratchets stay untouched
     const names: string[] = [];

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { buildNuketown2 } from './nuketown2-arena';
+import { buildNuketown2, NUKETOWN2_SECTION } from './nuketown2-arena';
 import { isBlocked } from './collision';
-import { NUKETOWN2_CENTRAL_TRUCK as truck, nuketown2HandedX as hx } from './nuketown2-layout';
+import { NUKETOWN2_CENTRAL_TRUCK as truck, NUKETOWN2_GARAGE_SPAN as garage, NUKETOWN2_HOUSE_FRONT_Z, nuketown2HandedX as hx } from './nuketown2-layout';
 import { definition as nuketown2VisualDefinition } from './rendering/arenas/nuketown2';
 
 describe('nuketown2 review-camera roster', () => {
@@ -23,6 +23,37 @@ describe('nuketown2 review-camera roster', () => {
     expect(hits.length).toBeGreaterThan(0);
     expect(hits[0]!.object.name, 'first authoritative surface is the truck, not an intervening car').toMatch(/truck cab/);
   });
+
+  it.each(['nuketown2-garage-exterior-close', 'nuketown2-trailer-rear-frame'])(
+    '%s frames its full subject from a clear eye with the intended first surface', (id) => {
+      const station = nuketown2VisualDefinition.reviewCameras.find((camera) => camera.id === id)!;
+      expect(station).toBeDefined();
+      const eye = new THREE.Vector3(...station.position);
+      const target = new THREE.Vector3(...station.target);
+      const garageZ = NUKETOWN2_HOUSE_FRONT_Z - NUKETOWN2_SECTION.garageSetback;
+      const rearX = hx(truck.x - truck.boxLength / 2 - .006);
+      const isGarage = id === 'nuketown2-garage-exterior-close';
+      const corners = isGarage
+        ? [garage.x0, garage.x1].flatMap(x => [0, 3.6].map(y => new THREE.Vector3(hx(x), y, garageZ)))
+        : [.645, 2.755].flatMap(y => [-.92, .92].map(z => new THREE.Vector3(rearX, y, truck.z + z)));
+      const probe = isGarage
+        ? new THREE.Vector3(hx((garage.x0 + garage.x1) / 2), 2.9, garageZ)
+        : new THREE.Vector3(rearX, 2.72, truck.z);
+      const camera = new THREE.PerspectiveCamera(70, 1280 / 720, .05, 190);
+      camera.position.copy(eye); camera.lookAt(target); camera.updateMatrixWorld(true);
+      for (const corner of corners) {
+        const ndc = corner.project(camera);
+        expect(Math.abs(ndc.x), 'subject horizontal extent').toBeLessThanOrEqual(1);
+        expect(Math.abs(ndc.y), 'subject vertical extent').toBeLessThanOrEqual(1);
+        expect(ndc.z).toBeGreaterThan(-1); expect(ndc.z).toBeLessThan(1);
+      }
+      const map = buildNuketown2(new THREE.Scene()); map.root.updateMatrixWorld(true);
+      expect(isBlocked(eye, map.colliders), 'eye clear of movement authority').toBe(false);
+      const first = new THREE.Raycaster(eye, probe.clone().sub(eye).normalize(), 0, eye.distanceTo(probe) + .15)
+        .intersectObjects(map.raycastMeshes, true)[0];
+      expect(first?.object.name).toBe(isGarage
+        ? 'nuketown2 north garage door head' : 'nuketown2 street-vehicle truck rear-frame rail 3');
+    });
 
   it('keeps every catalog station registered in the authored runtime set', async () => {
     // The catalog is executable QA JavaScript; keep this test's contract typed

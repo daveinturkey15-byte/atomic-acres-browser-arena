@@ -264,3 +264,14 @@ test('the outside-ownership patch is tracked and either applies cleanly or is al
   assert.ok(forward.status === 0 || reverse.status === 0,
     `the patch neither applies (${forward.stderr.trim()}) nor is already applied (${reverse.stderr.trim()}); re-cut it against src/bootstrap.ts and src/release-channel.ts`);
 });
+
+
+test('live capability enforcement precedes normal publish mutation and preserves pure plans and rollback', () => {
+  const run = spawnSync(python(), ['-B', join(repo, 'scripts', 'orchestration', 'publish_pass96_handoff_test.py')], {
+    cwd: repo, encoding: 'utf8', windowsHide: true,
+    env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' },
+  });
+  assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
+  assert.match(run.stderr, /Ran 5 tests/);
+  assert.match(run.stderr, /OK/);
+});

@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """Publish the Pass 96 candidate as its own gh-pages channel and retire every other tree.
 
-NOTE ON THE FARCRYSIS GUARD (HF-423, edited 2026-09-03): this pass is ALREADY PUBLISHED
-and this script will not be run again for it. The farcrysis guard below is edited here only
-because roll_pass.py copies THIS file to make the NEXT pass's publish script at the cut, so
-the template is the only place a guard can be changed before the script that needs it
-exists. Everything in that guard is pass-number-derived and rolls with the copy - the
-receipt path is built from LIVE_TREE, so it names the cut pass's own
-docs/evidence/pass<N>/lane-r/ directory with no literal to forget to update.
+NOTE ON TEMPLATE CONTINUITY: Pass 96 is an unpromoted candidate; Pass 95 remains
+public. roll_pass.py copies this publisher forward for the next cut, including its
+mandatory capability handoff and farcrysis guards. Guard paths derive from LIVE_TREE
+so each cut uses its own evidence. Editing this template does not publish a pass.
 
 Sibling of publish_pass95.py, with one policy change from the owner (HF-400).
 
@@ -1017,6 +1014,28 @@ def rollback(worktree, sources):
     return commit_and_push(worktree, ROLLBACK_COMMIT_MESSAGE)
 
 
+def require_capability_handoff():
+    """Certify the actual candidate HEAD before any normal publish mutation.
+
+    Dry-run and rollback do not deliver a new candidate and remain independent.
+    The helper runs the trusted checker live; a saved GREEN receipt is not input.
+    """
+    helper = os.path.join(SRC, "scripts", "release", "capability-handoff-check.mjs")
+    result = subprocess.run(["node", helper], cwd=SRC, capture_output=True,
+                            text=True, encoding="utf-8", errors="replace", timeout=180,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if result.returncode != 0:
+        sys.exit(f"REFUSING publish: live capability handoff failed\n{result.stdout}{result.stderr}")
+    try:
+        proof = json.loads(result.stdout)
+        if proof.get("ok") is not True or not proof.get("capabilityHandoff", {}).get("records"):
+            raise ValueError("missing live capability proof")
+    except (ValueError, TypeError) as error:
+        sys.exit(f"REFUSING publish: malformed capability handoff output: {error}")
+    print("  capability handoff: GREEN at", proof["capabilityHandoff"]["headSha"])
+    return proof["capabilityHandoff"]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dry-run", action="store_true",
@@ -1043,6 +1062,8 @@ def main(argv=None):
 
     if args.rollback:
         return rollback(checkout_gh_pages(), read_shell_sources())
+
+    require_capability_handoff()
 
     if not os.path.isdir(DIST):
         sys.exit(f"no build at {DIST}")

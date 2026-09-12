@@ -66,10 +66,12 @@ describe('complete ancestry inventory', () => {
     f.git('remote', 'add', 'origin', 'https://github.com/daveinturkey15-byte/atomic-acres-browser-arena.git');
     writeFileSync(join(f.gitDir, 'shallow'), `${f.child}\n`);
     const script = fileURLToPath(new URL('../scripts/release/pipeline-guard.mjs', import.meta.url));
-    const report = JSON.parse(execFileSync(process.execPath, [script, 'doctor'], {
+    const report = JSON.parse(execFileSync(process.execPath, [script, 'doctor', '--offline'], {
       cwd: f.repo, encoding: 'utf8', windowsHide: true,
     }));
     expect(report.ok).toBe(true);
+    expect(report.githubAuth).toMatchObject({ authenticated: false, status: 'skipped-offline' });
+    expect(report.tools.status).toBe('skipped-offline');
     expect(report.shallow).toBe(true);
     expect(report.rootCommitCount).toBeNull();
     expect(report.ancestryUnavailable).toMatch(/Shallow boundaries are not actual roots/);

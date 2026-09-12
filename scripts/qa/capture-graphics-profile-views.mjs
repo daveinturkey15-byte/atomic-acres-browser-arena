@@ -30,6 +30,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { SILENT_ARGS } from './lib/browser-launch-flags.mjs';
 import { VIEWPOINT_CATALOG } from './viewpoint-catalog.mjs';
+import { prepareProfileCapture, readHealthyProfileCapture } from './lib/profile-capture-staging.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -99,18 +100,7 @@ for (const preset of PRESETS) {
 
     await page.evaluate(async (id) => { await window.__ATOMIC_ACRES_DEBUG__.selectArena(id); }, ARENA);
     await page.evaluate(() => { window.__ATOMIC_ACRES_DEBUG__.startSolo(); });
-    await page.waitForFunction(() => {
-      const snapshot = window.__ATOMIC_ACRES_DEBUG__.snapshot();
-      return snapshot.matchPhase === 'active' && snapshot.gameStarted === true;
-    }, undefined, { timeout: BOOT_TIMEOUT_MS });
-    await page.waitForTimeout(SETTLE_MS);
-    // Hide the viewmodel and freeze the bot: a bot that engages the idle
-    // player paints a damage vignette over the frame, which would read as a
-    // profile difference and is not one.
-    await page.evaluate(() => {
-      window.__ATOMIC_ACRES_DEBUG__.setCaptureViewmodelHidden(true);
-      window.__ATOMIC_ACRES_DEBUG__.setBotsFrozen(true);
-    });
+    record.staging = await prepareProfileCapture(page, SETTLE_MS, BOOT_TIMEOUT_MS);
 
     mkdirSync(resolve(OUT_DIR, ARENA), { recursive: true });
     for (const cameraId of CAMERAS) {
@@ -147,8 +137,10 @@ for (const preset of PRESETS) {
         continue;
       }
       const path = resolve(OUT_DIR, ARENA, `${cameraId}.${preset}.png`);
+      const healthBefore = await page.evaluate(readHealthyProfileCapture);
       await page.screenshot({ path });
-      record.shots.push({ cameraId, ok: true, path: path.replaceAll('\\', '/'), ...receipt });
+      const healthAfter = await page.evaluate(readHealthyProfileCapture);
+      record.shots.push({ cameraId, ok: true, path: path.replaceAll('\\', '/'), ...receipt, healthBefore, healthAfter });
     }
     record.ok = record.shots.every((shot) => shot.ok);
   } catch (error) {

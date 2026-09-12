@@ -72,6 +72,8 @@ jobs:
         run: npx playwright install-deps chromium-headless-shell
       - name: Provision Playwright headless Chromium shell for the unit-level audio probe
         run: npx playwright install chromium-headless-shell
+      - name: Verify portable delivery and capture contracts
+        run: npm run qa:delivery-contracts
       - run: npm test
       - name: Verify Pass 73 required browser-group wiring
         run: npm run qa:pass73:ci-wiring-contract

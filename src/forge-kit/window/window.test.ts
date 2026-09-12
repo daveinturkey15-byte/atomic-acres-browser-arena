@@ -208,8 +208,14 @@ describe('window dressing in the composed arena', () => {
     // These stay exact equalities so the gate still catches an ADDED body, which is its job.
     expect(arena.colliders).toHaveLength(369);
     expect(arena.physicsColliders).toHaveLength(373);
-    expect(arena.raycastMeshes).toHaveLength(385);
-    expect(arena.shotSurfaces).toHaveLength(385);
+    // c58f233 adds exactly four shot-only frame rails; window dressing still
+    // adds no authority. Physical coverage and no movement boxes are verified
+    // in nuketown2-trailer-frame-ballistics.test.ts. All counts remain exact.
+    expect(arena.raycastMeshes).toHaveLength(385 + 4);
+    expect(arena.shotSurfaces).toHaveLength(385 + 4);
+    const frameNames = [0, 1, 2, 3].map(index => `nuketown2 street-vehicle truck rear-frame rail ${index}`);
+    expect(arena.raycastMeshes.filter(mesh => mesh.name.includes('truck rear-frame rail')).map(mesh => mesh.name).sort()).toEqual(frameNames);
+    expect(arena.shotSurfaces.filter(surface => surface.name.includes('truck rear-frame rail')).map(surface => surface.name).sort()).toEqual(frameNames);
     const north: string[] = [];
     const south: string[] = [];
     const raycast = new Set(arena.raycastMeshes.map((m) => (m as THREE.Mesh).name));

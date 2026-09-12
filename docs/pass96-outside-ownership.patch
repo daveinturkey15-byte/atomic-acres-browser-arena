@@ -1,16 +1,6 @@
 diff --git a/src/bootstrap.ts b/src/bootstrap.ts
-index 265dba4b..e6f27b1e 100644
 --- a/src/bootstrap.ts
 +++ b/src/bootstrap.ts
-@@ -17,7 +17,7 @@ import './ui/pass75-menu-redesign.css';
- // unlayered and outranks every @layer, so a layered sheet could not land.
- import './ui/pass77-instrument-hud.css';
- import './ui/pass77-command-shell.css';
--import './ui/pass94-hud-chat.css';
-+import './ui/pass95-hud-chat.css';
- import {
-   releaseChannelDecision,
-   stableReleaseUrl,
 @@ -32,15 +32,15 @@ const releaseChannels: ReleaseChannelConfig = releaseChannelsJson;
  // second card was a dead link.
  //
@@ -33,7 +23,6 @@ index 265dba4b..e6f27b1e 100644
  // The pass name used to be hand-written into both of these strings, and had been stale for
  // ten passes: the shipped chooser introduced PASS 80 as "the local Pass 70 HITL candidate"
 diff --git a/src/release-channel.ts b/src/release-channel.ts
-index 5628521c..5ba0d8d2 100644
 --- a/src/release-channel.ts
 +++ b/src/release-channel.ts
 @@ -28,14 +28,14 @@ export type ReleaseChannelConfig = {

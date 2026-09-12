@@ -3221,12 +3221,12 @@ function retireSupersededPresentation(builder: Builder): { retired: number; mism
  * Loft the coach, the moving truck's cab and all three cars, and hide the
  * boxes those skins now cover.
  *
- * NOTHING HERE TOUCHES AUTHORITY. Every collider, physics collider and
- * ballistic surface on this street was registered by the `streetVehicle` and
- * `pair` calls above and is untouched; the forged groups register nothing and
- * carry `presentationOnly` on every mesh, so `solidMeshes` in the fidelity
- * gate - which selects parametric BoxGeometry that is NOT presentation-only -
- * cannot see them and the enumerated asymmetric-vehicle list cannot grow.
+ * Movement authority remains with the `streetVehicle` and `pair` calls above.
+ * Forged presentation meshes register no authority and carry `presentationOnly`.
+ * This function also registers four hidden, shot-only rear-frame rail proxies
+ * to rate the visible metal around the open cargo mouth. They add no movement
+ * colliders. The fidelity inventory names those four asymmetric proxies
+ * explicitly; the frame ballistics test verifies their physical coverage.
  *
  * Each spec's envelope is its box's envelope, so the collider/visual parity
  * audit still finds a visible mesh over every collider and no visible mesh
