@@ -58,16 +58,22 @@ export const manifest: ManifestEntry[] = [
     sourceId: 36,
     title: 'Voxel remesh with a highpoly attribute bake',
     method:
-      'Vertex-clustering voxel remesh at a settable grid spacing, with the highpoly normals '
-      + 'averaged into the replacing cell so the reduced mesh keeps detail its geometry lost.',
+      'A highpoly authored in headless Blender, reduced by Blender\'s OpenVDB voxel remesher at a '
+      + '0.22 m voxel (the silhouette control), with the highpoly\'s smooth normals transferred '
+      + 'onto the result by nearest-surface BVH lookup. Three panels isolate the bake: highpoly, '
+      + 'reduced mesh with its own normals, reduced mesh with the baked ones.',
     adaptation: 'adapted',
     sources: [
       'https://x.com/hybridherbst/status/2093299068441092380',
       'https://mesh-baker.needle.tools/',
     ],
     limitation:
-      'Proprietary hosted tool, not used or purchased and with no public source. No UV atlas, no '
-      + 'normal/ORM texture bake, no tangents, and none of its TRELLIS generation stage.',
+      'Proprietary hosted tool, not used or purchased and with no public source; the Blender lane '
+      + 'shown is the register\'s own recommended free alternative and upstream does NOT use '
+      + 'Blender. No UV atlas, no normal/ORM texture bake, no tangents, and none of its TRELLIS '
+      + 'generation stage. Nearest-surface transfer has no cage; no vertex flipped against the '
+      + 'normals this scene replaces, and Blender\'s own 97.7 degree outlier does not reproduce '
+      + 'there and is not claimed as one.',
     createDemo: createSource36,
   },
   {

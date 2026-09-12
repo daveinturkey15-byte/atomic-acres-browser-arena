@@ -17,7 +17,14 @@ import { describe, expect, it } from 'vitest';
 
 import { manifest } from './index';
 import { applyBrief } from './source-35';
-import { voxelRemesh } from './source-36';
+import { SOURCE_36_BLENDER_REMESH } from './assets/source-36-blender-remesh';
+import {
+  compareNormals,
+  decodeIndices,
+  decodeNormals,
+  decodePositions,
+  voxelRemesh,
+} from './source-36';
 import { convertZupCentimetres } from './source-37';
 import { isSolid, litRoomCells, voxelIndex, type VoxelGrid } from './source-40';
 import { maskField, splineDensity } from './source-38';
@@ -170,6 +177,73 @@ describe('source 36 — the remesh actually reduces, and the bake carries direct
       expect(length).toBeGreaterThan(0.99);
       expect(length).toBeLessThan(1.01);
     }
+    geometry.dispose();
+  });
+});
+
+describe('source 36 — the committed Blender artefact is real, and the bake carries detail', () => {
+  const asset = SOURCE_36_BLENDER_REMESH;
+
+  it('decodes to exactly the mesh headless Blender reported, with usable indices', () => {
+    const highPositions = decodePositions(
+      asset.highpoly.positions, asset.highpoly.positionCentre, asset.highpoly.positionExtent,
+    );
+    const lowPositions = decodePositions(
+      asset.lowpoly.positions, asset.lowpoly.positionCentre, asset.lowpoly.positionExtent,
+    );
+    const highIndices = decodeIndices(asset.highpoly.indices);
+    const lowIndices = decodeIndices(asset.lowpoly.indices);
+
+    expect(highPositions.length / 3).toBe(asset.counts.highpolyVertices);
+    expect(lowPositions.length / 3).toBe(asset.counts.lowpolyVertices);
+    expect(highIndices.length / 3).toBe(asset.counts.highpolyTriangles);
+    expect(lowIndices.length / 3).toBe(asset.counts.lowpolyTriangles);
+
+    // Every index must address a vertex that exists, or the panel renders junk.
+    for (let i = 0; i < lowIndices.length; i += 1) {
+      expect(lowIndices[i]).toBeLessThan(asset.counts.lowpolyVertices);
+    }
+    for (let i = 0; i < highPositions.length; i += 1) {
+      expect(Number.isFinite(highPositions[i])).toBe(true);
+    }
+
+    // The reduction is the claim, so it is a measured number, not an adjective.
+    expect(asset.counts.lowpolyTriangles).toBeLessThan(asset.counts.highpolyTriangles * 0.25);
+  });
+
+  it('bakes normals that genuinely differ from the reduced mesh\'s own', () => {
+    const lowPositions = decodePositions(
+      asset.lowpoly.positions, asset.lowpoly.positionCentre, asset.lowpoly.positionExtent,
+    );
+    const lowIndices = decodeIndices(asset.lowpoly.indices);
+    const baked = decodeNormals(asset.lowpoly.bakedNormals);
+
+    for (let i = 0; i < baked.length; i += 3) {
+      expect(Math.hypot(baked[i], baked[i + 1], baked[i + 2])).toBeCloseTo(1, 5);
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(lowPositions, 3));
+    geometry.setIndex(new THREE.BufferAttribute(lowIndices, 1));
+    geometry.computeVertexNormals();
+    const own = geometry.getAttribute('normal').array as Float32Array;
+
+    const comparison = compareNormals(baked, own);
+    // A bake that agreed with the reduced geometry everywhere would be doing
+    // nothing; this is the detail the geometry lost and the bake carried.
+    expect(comparison.meanDegrees).toBeGreaterThan(0.5);
+    // And it must stay close to what Blender itself measured at bake time —
+    // the check that the committed typed data IS that run's output.
+    expect(Math.abs(comparison.meanDegrees - asset.bakeStats.meanDeviationDegrees))
+      .toBeLessThan(2.5);
+    expect(comparison.maxDegrees).toBeGreaterThan(8);
+    // No vertex points into the opposite hemisphere: against the normals the
+    // renderer will actually replace, the nearest-surface transfer did not
+    // flip anywhere. Blender's own bake-time stat records a single 97.7 degree
+    // outlier measured against BLENDER's vertex normals, which does not
+    // reproduce here; its cause is unresolved and it is NOT claimed as a flip.
+    expect(comparison.flipped).toBe(0);
+    expect(asset.bakeStats.maxDeviationDegrees).toBeGreaterThan(comparison.maxDegrees);
     geometry.dispose();
   });
 });
