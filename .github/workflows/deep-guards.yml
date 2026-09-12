@@ -1,0 +1,55 @@
+name: deep-guards
+on:
+  schedule:
+    - cron: '20 2 * * *'
+    - cron: '40 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Which suite to run (property | mutation | chaos-soak | all)'
+        required: false
+        default: 'all'
+permissions:
+  contents: read
+concurrency:
+  group: deep-guards
+  cancel-in-progress: false
+jobs:
+  property:
+    if: (github.event_name == 'workflow_dispatch' && (inputs.suite == 'property' || inputs.suite == 'all')) || github.event.schedule == '20 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:gameplay-contract
+      - run: npm run test:property:nightly
+  mutation:
+    if: (github.event_name == 'workflow_dispatch' && (inputs.suite == 'mutation' || inputs.suite == 'all')) || github.event.schedule == '40 3 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mutation
+  chaos-soak:
+    if: github.event_name == 'workflow_dispatch' && (inputs.suite == 'chaos-soak' || inputs.suite == 'all')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run qa:network-chaos:soak
