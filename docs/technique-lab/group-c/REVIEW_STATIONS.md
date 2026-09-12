@@ -87,7 +87,11 @@ all move with the ribbon, and step 108 must be pixel-identical to step 0 under t
 **Known and expected, not defects:** the amber ribbon is an authoring overlay drawn with an unlit
 basic material — it is meant to look like a tool, not like scenery, and it does not respond to the
 host's lights. The floor blend is a 64 × 64 baked map over 3 m (≈ 4.7 cm per texel), so it is soft by
-construction; it carries large-scale canopy shading, not micro-detail, and has no normal map. Left
+construction; it carries large-scale canopy shading, not micro-detail. Micro-detail is a separate
+128 × 128 procedural normal map tiled at 0.5 m, shared by both panels, so a repeat at that pitch is
+expected — what would be a defect is a **seam line** at a tile edge, which the toroidal bake exists
+to prevent and a CPU check measures. It is a normal map only: the ground silhouette is unchanged by
+it, exactly as row 36's bake cannot change an outline. Left
 and right panels must have **identical ground silhouettes** — it is one geometry — so a difference
 there is a real bug. Ground cover thinning under dense canopy is the rule working, not a hole.
 

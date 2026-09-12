@@ -67,6 +67,9 @@ const COVER_CANDIDATES = 520;
 // measures.
 const TERRAIN_SEGMENTS = 120;
 const FLOOR_SIZE = 64;
+const RELIEF_SIZE = 128;
+/** Detail tiles per patch edge: 3 m / 6 = 0.5 m per tile. */
+const RELIEF_REPEAT = 6;
 
 /** Seconds one authored curve pose is held before the next. */
 export const POSE_SECONDS = 0.6;
@@ -400,6 +403,53 @@ export function bakeFloorBlend(
   return data;
 }
 
+/**
+ * Micro-relief for the floor: a tileable height field for the ground's normal
+ * map. Every term is periodic in both axes at an integer frequency, so the
+ * field wraps exactly and the map can repeat without a seam.
+ */
+export function microReliefHeight(nx: number, ny: number): number {
+  const tau = Math.PI * 2;
+  const grain = 0.5 + 0.5 * Math.sin(tau * 6 * nx + 1.3) * Math.sin(tau * 5 * ny - 0.4);
+  const fibres = 0.5 + 0.5 * Math.sin(tau * 13 * nx - tau * 9 * ny);
+  const pebbleField = 0.5 + 0.5 * Math.sin(tau * 3 * nx + 0.7) * Math.cos(tau * 4 * ny - 1.1);
+  const pebbles = pebbleField > 0.62 ? (pebbleField - 0.62) / 0.38 : 0;
+  return grain * 0.45 + fibres * 0.18 + pebbles * 0.37;
+}
+
+/**
+ * Tangent-space normal map from that height field, with TOROIDAL neighbour
+ * sampling so the gradient at an edge sees the opposite edge rather than a
+ * step. Encoding, strength and the [0.5, 0.5, 1] flat convention follow the
+ * carrier skill's canvas generator; this writes the same bytes into a
+ * DataTexture instead of a canvas, because a technique-lab factory must build
+ * without a DOM and stay assertable on the CPU.
+ */
+export function bakeGroundNormalMap(size: number, strength: number): Uint8Array {
+  const field = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) field[y * size + x] = microReliefHeight(x / size, y / size);
+  }
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const left = field[y * size + ((x + size - 1) % size)];
+      const right = field[y * size + ((x + 1) % size)];
+      const down = field[((y + size - 1) % size) * size + x];
+      const up = field[((y + 1) % size) * size + x];
+      const gradX = (right - left) * strength;
+      const gradY = (up - down) * strength;
+      const length = Math.sqrt(gradX * gradX + gradY * gradY + 1);
+      const i = (y * size + x) * 4;
+      data[i] = Math.round((-gradX / length) * 127.5 + 127.5);
+      data[i + 1] = Math.round((-gradY / length) * 127.5 + 127.5);
+      data[i + 2] = Math.round((1 / length) * 127.5 + 127.5);
+      data[i + 3] = 255;
+    }
+  }
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Geometry. Plants are merged into one geometry per species so a species costs
 // one draw, and each is authored at unit height with its base at y = 0, so a
@@ -640,14 +690,34 @@ export function createDemo(context: DemoContext): Demo {
   const plainTexture = makeFloorTexture(plainBytes);
   const blendTexture = makeFloorTexture(blendBytes);
 
-  before.add(new THREE.Mesh(
-    terrainGeometry,
-    new THREE.MeshStandardMaterial({ map: plainTexture, roughness: 0.97, metalness: 0 }),
-  ));
-  after.add(new THREE.Mesh(
-    terrainGeometry,
-    new THREE.MeshStandardMaterial({ map: blendTexture, roughness: 0.97, metalness: 0 }),
-  ));
+  // Micro-relief, shared by both panels so the ONLY difference between the two
+  // floors stays the forest-floor blend. The colour bake is unique to the patch
+  // and must not tile; the relief is a detail tile and must.
+  const reliefTexture = new THREE.DataTexture(
+    bakeGroundNormalMap(RELIEF_SIZE, 2.2),
+    RELIEF_SIZE,
+    RELIEF_SIZE,
+    THREE.RGBAFormat,
+  );
+  reliefTexture.colorSpace = THREE.NoColorSpace;
+  reliefTexture.wrapS = THREE.RepeatWrapping;
+  reliefTexture.wrapT = THREE.RepeatWrapping;
+  reliefTexture.repeat.set(RELIEF_REPEAT, RELIEF_REPEAT);
+  reliefTexture.minFilter = THREE.LinearMipmapLinearFilter;
+  reliefTexture.magFilter = THREE.LinearFilter;
+  reliefTexture.generateMipmaps = true;
+  reliefTexture.needsUpdate = true;
+  const groundMaterial = (map: import('three').DataTexture): import('three').Material =>
+    new THREE.MeshStandardMaterial({
+      map,
+      normalMap: reliefTexture,
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      roughness: 0.97,
+      metalness: 0,
+    });
+
+  before.add(new THREE.Mesh(terrainGeometry, groundMaterial(plainTexture)));
+  after.add(new THREE.Mesh(terrainGeometry, groundMaterial(blendTexture)));
 
   // --- one geometry and one material per species, whatever the plant count
   const speciesGeometries = SPECIES.map((species) => buildSpeciesGeometry(THREE, species));
@@ -1018,7 +1088,8 @@ export function createDemo(context: DemoContext): Demo {
         + 'terrain streaming, and no tree editor or GLB export — the register calls the editor a '
         + 'product question, so atom 6 is deliberately absent. Plants are merged primitives, not '
         + 'authored assets. The floor blend is a 64x64 baked colour map, not a terrain-material '
-        + 'splat graph, and carries no micro-relief normal map. The spline control is a fixed '
+        + 'splat graph; micro-relief is a separate tiled procedural normal map, not an authored or '
+        + 'scanned detail set, and nothing parallax-displaces the ground. The spline control is a fixed '
         + 'three-pose cycle on a timer, not an interactive editor, and separation is enforced on '
         + 'the candidate set rather than per pose. The register\'s "30+ tree types" is an author '
         + 'claim and is not verified here; four species are demonstrated. Licence state conflicts '

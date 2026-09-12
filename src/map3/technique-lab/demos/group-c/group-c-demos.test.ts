@@ -34,9 +34,11 @@ import {
   SPECIES,
   bakeFloorBase,
   bakeFloorBlend,
+  bakeGroundNormalMap,
   channelOffset,
   floorTexelToWorld,
   maskField,
+  microReliefHeight,
   moistureAt,
   splineDensity,
   splineDistance,
@@ -732,6 +734,70 @@ describe('source 38 — the forest floor answers the scatter', () => {
     }
     expect(differing).toBeGreaterThan(beforeBytes.length / 4 * 0.2);
     expect(afterSum).toBeLessThan(beforeSum);
+    demo.dispose();
+  });
+
+  it('gives the floor tangent-space micro-relief that tiles without a seam', () => {
+    const size = 64;
+    const bytes = bakeGroundNormalMap(size, 2.2);
+    const decode = (col: number, row: number): [number, number, number] => {
+      const i = (row * size + col) * 4;
+      return [
+        (bytes[i] - 127.5) / 127.5,
+        (bytes[i + 1] - 127.5) / 127.5,
+        (bytes[i + 2] - 127.5) / 127.5,
+      ];
+    };
+
+    let tilted = 0;
+    for (let row = 0; row < size; row += 1) {
+      for (let col = 0; col < size; col += 1) {
+        const [nx, ny, nz] = decode(col, row);
+        // A tangent-space normal must point out of the surface and be unit.
+        expect(nz).toBeGreaterThan(0);
+        expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 1);
+        expect(bytes[(row * size + col) * 4 + 3]).toBe(255);
+        if (Math.hypot(nx, ny) > 0.05) tilted += 1;
+      }
+    }
+    // A map that is flat everywhere would pass the checks above and do nothing.
+    expect(tilted).toBeGreaterThan(size * size * 0.5);
+
+    // The height field is periodic, so the map tiles exactly...
+    expect(Math.abs(microReliefHeight(0, 0.37) - microReliefHeight(1, 0.37))).toBeLessThan(1e-12);
+    expect(Math.abs(microReliefHeight(0.61, 0) - microReliefHeight(0.61, 1))).toBeLessThan(1e-12);
+    // ...and the toroidal gradient leaves no step at the wrap, which is the
+    // whole reason for sampling neighbours modulo the size. The seam must cost
+    // no more than an ordinary interior neighbour step.
+    const columnStep = (a: number, b: number): number => {
+      let sum = 0;
+      for (let row = 0; row < size; row += 1) {
+        const first = decode(a, row);
+        const second = decode(b, row);
+        sum += Math.hypot(first[0] - second[0], first[1] - second[1], first[2] - second[2]);
+      }
+      return sum / size;
+    };
+    let interior = 0;
+    for (let col = 0; col < size - 1; col += 1) interior += columnStep(col, col + 1);
+    interior /= size - 1;
+    expect(columnStep(size - 1, 0)).toBeLessThan(interior * 3);
+
+    // Wiring: the unique colour bake must NOT tile, the detail relief must, and
+    // both panels share one relief so the floors still differ only by the blend.
+    const demo = manifest.find((row) => row.sourceId === 38)!.createDemo!({ THREE, seed: SEED });
+    const materialOf = (panel: string): any => (demo.root.getObjectByName(panel)!.children
+      .find((child: any) => child.isMesh && !child.isInstancedMesh) as any).material;
+    const beforeMaterial = materialOf('before');
+    const afterMaterial = materialOf('after');
+    expect(beforeMaterial.normalMap).toBe(afterMaterial.normalMap);
+    expect(beforeMaterial.map).not.toBe(afterMaterial.map);
+    expect(afterMaterial.normalMap.colorSpace).toBe(THREE.NoColorSpace);
+    expect(afterMaterial.normalMap.wrapS).toBe(THREE.RepeatWrapping);
+    expect(afterMaterial.normalMap.repeat.x).toBeGreaterThan(1);
+    expect(afterMaterial.normalScale.x).toBeGreaterThan(0);
+    expect(afterMaterial.map.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(afterMaterial.map.wrapS).toBe(THREE.ClampToEdgeWrapping);
     demo.dispose();
   });
 });
