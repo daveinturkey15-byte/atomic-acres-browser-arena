@@ -289,12 +289,22 @@ describe('HF-536 texture forge: determinism, sizes, timing', () => {
       expect(set.albedo.length).toBe(512 * 512 * 4);
       expect(set.roughness.length).toBe(512 * 512);
       expect(set.heightMm.length).toBe(512 * 512);
+      // One plain scan evaluates both per-texel predicates at every index. The assertion
+      // framework is then consulted once per predicate per family (5 calls) instead of once
+      // per texel (262 148 calls): identical pass/fail, and the failing index and value are
+      // named explicitly instead of being implied by where the per-texel loop stopped.
+      let firstNonFiniteIndex = -1;
       let maxLuma = 0;
       for (let i = 0; i < 512 * 512; i++) {
-        expect(Number.isFinite(set.heightMm[i]), `${family} finite height`).toBe(true);
+        if (firstNonFiniteIndex < 0 && !Number.isFinite(set.heightMm[i])) firstNonFiniteIndex = i;
         const l = set.albedo[i * 4];
         if (l > maxLuma) maxLuma = l;
       }
+      const finiteMessage =
+        firstNonFiniteIndex < 0
+          ? `${family} finite height`
+          : `${family} finite height: heightMm[${firstNonFiniteIndex}] = ${set.heightMm[firstNonFiniteIndex]}`;
+      expect(firstNonFiniteIndex, finiteMessage).toBe(-1);
       expect(maxLuma, `${family} not clamped black`).toBeGreaterThan(30);
     }
   });

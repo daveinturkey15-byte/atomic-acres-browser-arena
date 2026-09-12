@@ -38,8 +38,8 @@ export function generateBrick(options: TextureSetOptions = {}): TextureSet {
       `texture forge: brick tile must be a multiple of 225 mm and 150 mm, got ${tileMm} mm`,
     );
   }
-const coursesPerTile = tileMm / COURSE_PITCH_MM;
-const columnsPerTile = tileMm / RUN_PITCH_MM;
+  const coursesPerTile = tileMm / COURSE_PITCH_MM;
+  const columnsPerTile = tileMm / RUN_PITCH_MM;
 
   const stainCells = Math.max(2, Math.round(tileMm / 240));
   const mortarStain = tileableFbm(size, stainCells, 2, seed * 11 + 3);
@@ -47,52 +47,95 @@ const columnsPerTile = tileMm / RUN_PITCH_MM;
   const faceRelief = tileableFbm(size, reliefCells, 2, seed * 17 + 9);
   const speckle = tileableSpeckle(size, seed * 23 + 7);
 
+  // RENDER-CONTRACT-REPAIR (2026-09-12): a brick's identity is its wrapped
+  // (column, course) pair, so every per-brick hash is tabled once here instead
+  // of three to five `hash2u` calls per texel. The calls, their arguments and
+  // the derived arithmetic are the ones the shader made per texel, so the
+  // output is byte-identical; brick-byte-identity.test.ts pins the buffers.
+  const brickCount = coursesPerTile * columnsPerTile;
+  const toneTable = new Float64Array(brickCount);
+  const tiltTable = new Float64Array(brickCount);
+  const chipTable = new Float64Array(brickCount);
+  const chipCxTable = new Float64Array(brickCount);
+  const chipCyTable = new Float64Array(brickCount);
+  const chipRadiusTable = new Float64Array(brickCount);
+  for (let courseW = 0; courseW < coursesPerTile; courseW++) {
+    for (let columnW = 0; columnW < columnsPerTile; columnW++) {
+      const i = courseW * columnsPerTile + columnW;
+      const toneH = hash2u(columnW, courseW, seed);
+      const tiltH = hash2u(columnW, courseW, seed ^ 0x5bd1);
+      const chipH = hash2u(columnW, courseW, seed ^ 0x1b56);
+      toneTable[i] = 0.52 * (1 + (toneH - 0.5) * 0.24);
+      tiltTable[i] = (tiltH - 0.5) * 0.5;
+      chipTable[i] = chipH;
+      if (chipH > 0.86) {
+        const cornerH = hash2u(columnW, courseW, seed ^ 0x77aa);
+        chipRadiusTable[i] = 9 + 10 * hash2u(columnW, courseW, seed ^ 0x9931);
+        const corner = Math.floor(cornerH * 4);
+        chipCxTable[i] = (corner & 1) !== 0 ? 215 : 0;
+        chipCyTable[i] = (corner & 2) !== 0 ? 65 : 0;
+      }
+    }
+  }
+
+  // Row-constant terms, refreshed when the sampled row changes. The render
+  // driver walks x inside y and the wrap gate alternates y per probe; both
+  // are keyed on the actual y, so no stale row can leak.
+  let rowY = Number.NaN;
+  let yLocal = 0;
+  let offset = 0;
+  let courseRow = 0;
+
   const shader: FamilyShader = (x, y, out) => {
+    if (y !== rowY) {
+      rowY = y;
+      const yMm = y * mmPerPx;
+      const course = Math.floor(yMm / COURSE_PITCH_MM);
+      yLocal = yMm - course * COURSE_PITCH_MM;
+      offset = (course * (RUN_PITCH_MM / 2)) % RUN_PITCH_MM;
+      // Wrap lattice identities so the SAME physical brick hashes identically in
+      // the neighbouring tile (the wrap gate fails loud otherwise).
+      const courseW = ((course % coursesPerTile) + coursesPerTile) % coursesPerTile;
+      courseRow = courseW * columnsPerTile;
+    }
     const xMm = x * mmPerPx;
-    const yMm = y * mmPerPx;
-    const course = Math.floor(yMm / COURSE_PITCH_MM);
-    const yLocal = yMm - course * COURSE_PITCH_MM;
-    const offset = (course * (RUN_PITCH_MM / 2)) % RUN_PITCH_MM;
     const xs = xMm - offset;
     const column = Math.floor(xs / RUN_PITCH_MM);
     const xLocal = xs - column * RUN_PITCH_MM;
-    // Wrap lattice identities so the SAME physical brick hashes identically in the
-    // neighbouring tile (the wrap gate fails loud otherwise).
     const columnW = ((column % columnsPerTile) + columnsPerTile) % columnsPerTile;
-    const courseW = ((course % coursesPerTile) + coursesPerTile) % coursesPerTile;
 
     const s = fieldAt(speckle, size, x, y);
 
     if (yLocal < 65 && xLocal < 215) {
       // Brick face.
-      const toneH = hash2u(columnW, courseW, seed);
-      const tiltH = hash2u(columnW, courseW, seed ^ 0x5bd1);
-      const chipH = hash2u(columnW, courseW, seed ^ 0x1b56);
-      const tone = 0.52 * (1 + (toneH - 0.5) * 0.24);
+      const brick = courseRow + columnW;
+      const tone = toneTable[brick];
       let r = tone * 1.045 + (s - 0.5) * 0.036;
       let g = tone * 0.7 + (s - 0.5) * 0.03;
       let b = tone * 0.585 + (s - 0.5) * 0.026;
       let rough = 0.66 + (s - 0.5) * 0.06;
       let height =
-        (tiltH - 0.5) * 0.5 * ((xLocal - 107.5) / 107.5) +
+        tiltTable[brick] * ((xLocal - 107.5) / 107.5) +
         (s - 0.5) * 0.7 +
         (fieldAt(faceRelief, size, x, y) - 0.5) * 0.8;
 
       // Chipped corner: one per ~14% of bricks, 9-19 mm quarter-disc.
-      if (chipH > 0.86) {
-        const cornerH = hash2u(columnW, courseW, seed ^ 0x77aa);
-        const radius = 9 + 10 * hash2u(columnW, courseW, seed ^ 0x9931);
-        const corner = Math.floor(cornerH * 4);
-        const cx = (corner & 1) !== 0 ? 215 : 0;
-        const cy = (corner & 2) !== 0 ? 65 : 0;
-        const dc = Math.hypot(xLocal - cx, yLocal - cy);
-        const chip = 1 - smoothstep(radius * 0.5, radius, dc);
-        if (chip > 0) {
-          r *= 1 + 0.14 * chip;
-          g *= 1 + 0.13 * chip;
-          b *= 1 + 0.12 * chip;
-          rough += 0.16 * chip;
-          height -= 1.7 * chip;
+      if (chipTable[brick] > 0.86) {
+        const radius = chipRadiusTable[brick];
+        const dx = xLocal - chipCxTable[brick];
+        const dy = yLocal - chipCyTable[brick];
+        // Outside the chip's bounding square the distance is >= radius, the
+        // smoothstep saturates to 1 and chip is exactly 0: skip the hypot.
+        if (dx > -radius && dx < radius && dy > -radius && dy < radius) {
+          const dc = Math.hypot(dx, dy);
+          const chip = 1 - smoothstep(radius * 0.5, radius, dc);
+          if (chip > 0) {
+            r *= 1 + 0.14 * chip;
+            g *= 1 + 0.13 * chip;
+            b *= 1 + 0.12 * chip;
+            rough += 0.16 * chip;
+            height -= 1.7 * chip;
+          }
         }
       }
 
