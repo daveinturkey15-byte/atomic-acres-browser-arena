@@ -315,3 +315,28 @@ The existing garage expectation remains 200 mm; the default house courses are un
 The house leaf, parked east of the door, laps the east window's cut by 150 mm in plan; also
 pre-existing, left for the owner's eye. Claim states: assembly/tests VERIFIED by focused Vitest and
 `tsc --noEmit` in the lane worktree; boot, captures and taste OPEN.
+
+## R-012 — Give shallow siding joints their own finish role
+
+HF-570, 12 September 2026. `lapSidingParts` now accepts an optional `jointRole`;
+`facadeElevationParts` forwards it to the piers. Defaults retain the original
+dark reveal, while the real house and garage adapters select a quieter existing
+registry finish for narrow lap joints. Deep window and door reveals stay dark.
+The orange and cream upper storeys resolve their joint role as a material pair.
+Four street-lamp shafts use the existing architectural painted metal instead
+of the automotive chrome whose relief made them look crumpled.
+
+This is a reusable material decision, with no new geometry, material instance,
+shader graph, sampler or frame loop. The source audit preserves every authored
+mesh, complete authority values, instance transforms and the rendered triangle
+multiset. Source count and geometry proof are distinct from actual GPU draws
+and image quality. Frozen measurements, implementation paths, existing tests,
+upstream references and visual falsifiers are in
+`docs/threejs-knowledge/architectural-finish.md`.
+
+The previous 30 mm setback comment was incorrect: the actual front-face
+setback is 20 mm behind a 4 mm joint. Measure before diagnosing z-fighting.
+The planned fixed-camera comparison keeps the original camera, daylight,
+exposure and Performance/High settings. Root runtime inspection and owner
+taste are recorded with the exact preview evidence; this recipe grants no
+appearance or release approval.
