@@ -87,6 +87,13 @@
 #menu .map-card :is(.map-authoring,.map-prototype) { display: none; }
 #menu .technique-card { border-color: #bfa0ff88; }
 #menu .technique-card :is(.map-index,span) { color: var(--menu-purple) !important; }
+body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018 !important; }
+#menu :is(.arena-brief .eyebrow,.map-selector-heading>span,.manifest-heading small) { background: transparent !important; }
+#menu :is(#network-status,.settings-grid,.settings-grid label,.weapon-menu-presentation,.weapon-menu-stat-deck) {
+  background: var(--menu-panel) !important; border-color: var(--menu-line) !important;
+}
+#menu .weapon-menu-dps { background: #ffb06b12 !important; border-color: #ffb06b66 !important; }
+#menu .arena-brief h1 { min-width: 0; font-size: clamp(28px,3vw,48px); line-height: 1.1; overflow-wrap: anywhere; }
 :is([role='dialog'],#deployment-transition) { color: var(--menu-text) !important; background-color: var(--menu-ground) !important; }
 [role='dialog'] :is(section,header,article,.panel,button,input,select) { background-color: var(--menu-panel) !important; color: var(--menu-text) !important; border-color: var(--menu-line) !important; }
 [role='dialog'] :is(p,small,label) { color: var(--menu-muted) !important; }
