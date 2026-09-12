@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
   "releasePass": "PASS 96",
-  "feedbackReceivedAt": "2026-09-12T06:02:14Z",
+  "feedbackReceivedAt": null,
+  "feedbackTimestampStatus": "OPEN: the previous value was a reviewer timestamp, not verified owner feedback timing. Bind the actual owner feedback timestamp before acceptance; do not infer it from a worker run.",
   "status": "candidate",
   "bindingState": "awaiting-mechanical-verification-immutable-preview-and-owner-hitl",
   "preview": null,
@@ -276,8 +277,9 @@
     }
   ],
   "deliberatelyIncomplete": {
-    "why": "This candidate is staged honestly at 089cb13, where nothing has been re-verified and no preview exists. It is NOT built to pass validateAcceptanceManifest. Making it validate now would require fabricating status, states, a preview SHA and an owner approval.",
+    "why": "This is an unaccepted integration candidate. Earlier preview 089cb13 remains available, but final mechanical and runtime evidence must be bound to the completed candidate. No owner approval or exact owner-feedback timestamp is claimed.",
     "expectedRedReason": [
+      "feedbackReceivedAt must be bound to a verified owner timestamp; the reviewer timestamp was removed.",
       "status must be accepted (scripts/release/acceptance-gate.mjs:197) - status is 'candidate'.",
       "R1-R14: state must be verified or deferred (line 215) - every state is 'pending', which is outside REQUIREMENT_STATES {verified, deferred}, because no gate has been run at this head and root ruled that unfinished work is not converted to owner deferrals.",
       "preview block invalid (line 228) - preview is null; no immutable preview exists.",
