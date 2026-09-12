@@ -67,6 +67,26 @@ describe('studio practical tuning derivation', () => {
       expect(derivePracticalTuning(environment)).toEqual(derivePracticalTuning(again));
     }
   });
+
+  it('gives service-room fills a cooler base than living-room fills at clear noon', () => {
+    const scene = new THREE.Scene();
+    const root = new THREE.Object3D();
+    const controller = createStudioLighting({
+      root, scene, anchors: ALL_ANCHORS, mode: 'presentation',
+      getEnvironment: () => preset('clear-noon'),
+    });
+    controller.update();
+    const rig = scene.getObjectByName('world-studio-lighting')!;
+    const colorOf = (room: string): THREE.Color => {
+      const light = rig.children.find((node) => node.name === `world-studio-practical-teal-${room}`) as THREE.Light;
+      return light.color;
+    };
+    const kitchen = colorOf('kitchen');
+    const dining = colorOf('dining');
+    expect(kitchen.b).toBeGreaterThan(kitchen.r); // cool service fill
+    expect(dining.r).toBeGreaterThan(dining.b); // warm living fill
+    controller.dispose();
+  });
 });
 
 describe('room practical planning', () => {

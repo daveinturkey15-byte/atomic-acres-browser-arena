@@ -51,6 +51,14 @@ const GARAGE_FILL_BASE = 6;
 
 const WARM_NEUTRAL = 0xffe9c8;
 const WARM_DEEP = 0xffd9a8;
+/** Room-differentiated fill bases: service rooms cooler, living rooms warmer-neutral. */
+const FILL_TINT: Readonly<Record<string, number>> = Object.freeze({
+  dining: 0xf0ece2,
+  kitchen: 0xe9f0f4,
+  study: 0xf0ece2,
+  bedroom2: 0xeef2f6,
+  garage: 0xe4ecf2,
+});
 const FILL_NEUTRAL = 0xeef2f6;
 const COOL_SHIFT = 0xe7f0f8;
 
@@ -190,7 +198,6 @@ export function planStudioRoomPracticals(anchors: readonly StudioInteriorAnchor[
 
 const scratchWarm = new THREE.Color(WARM_NEUTRAL);
 const scratchDeep = new THREE.Color(WARM_DEEP);
-const scratchFill = new THREE.Color(FILL_NEUTRAL);
 const scratchCool = new THREE.Color(COOL_SHIFT);
 
 const isKeyRoom = (room: string): boolean => room === 'living' || room === 'bedroom';
@@ -274,7 +281,7 @@ export function createStudioLighting(input: StudioLightingInput): StudioLighting
       if (isKeyRoom(entry.room)) {
         presenceScratch.copy(scratchWarm).lerp(scratchDeep, lastTuning.warmth);
       } else {
-        presenceScratch.copy(scratchFill).lerp(scratchCool, lastTuning.coldness);
+        presenceScratch.setHex(FILL_TINT[entry.room] ?? FILL_NEUTRAL).lerp(scratchCool, lastTuning.coldness);
       }
       entry.light.color.copy(presenceScratch);
     }
