@@ -166,3 +166,6 @@ body:has(#menu:not(.hidden)), #app:has(#menu:not(.hidden)) { background: #0b1018
 #menu #menu-panel-kit :is(.kit-heading strong,.kit-heading b) { color: var(--menu-purple) !important; }
 #menu #menu-panel-operator :is(.kit-heading strong,.kit-heading b) { color: var(--menu-green) !important; }
 #menu #menu-panel-deploy .manifest-heading strong { color: var(--menu-green) !important; }
+#menu #menu-panel-options :is(.options-heading>b,.settings-section>header>b,.advanced-settings>summary>span,.graphics-preset-row>label) { color: var(--menu-yellow) !important; }
+#menu #menu-panel-operator :is(.operator-heading>b,.operator-group>h3) { color: var(--menu-green) !important; }
+#menu .audio-setting-row { grid-template-columns: minmax(115px,auto) minmax(70px,1fr) auto auto !important; }
