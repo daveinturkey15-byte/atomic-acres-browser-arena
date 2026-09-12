@@ -52,6 +52,8 @@ export type FacadeDoorTreatment = 'bare' | 'parked-leaf' | 'sectional-head';
 export interface FacadeStyle {
   /** Role every pier board asks its arena for. Default `siding`. */
   readonly sidingRole?: FacadePartRole;
+  /** Pier lap backing; does not affect window liners or door treatment. */
+  readonly jointRole?: FacadePartRole;
   readonly courseHeight?: number;
   readonly courseOffset?: number;
   /** Line each window opening with reveal liners. Default true. */
@@ -188,7 +190,7 @@ export function facadeElevationParts(options: FacadeElevationOptions): FacadeEle
     groups.push({
       prop: `${id} siding ${pierIndex}`,
       parts: translate(lapSidingParts({
-        run, height, facing, role: sidingRole,
+        run, height, facing, role: sidingRole, jointRole: style.jointRole,
         courseHeight: style.courseHeight, courseOffset: style.courseOffset,
       }), facing, (from + to) / 2, 0, 0),
     });

@@ -1671,9 +1671,9 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // seen from both yards and from the upper windows of the other house - the
   // largest single flat surface on the map before this pass.
   facadePair(builder, m, 'house west siding', [HOUSE_X0, 0, zMid],
-    lapSidingParts({ run: HOUSE_DEPTH, height: GROUND_H, facing: 'x-' }));
+    lapSidingParts({ run: HOUSE_DEPTH, height: GROUND_H, facing: 'x-', jointRole: 'sidingJoint' }));
   facadePair(builder, m, 'house west siding upper', [HOUSE_X0, GROUND_H, zMid],
-    lapSidingParts({ run: HOUSE_DEPTH, height: ROOF_Y0 - GROUND_H, facing: 'x-', role: 'sidingUpper', courseOffset: 20 }));
+    lapSidingParts({ run: HOUSE_DEPTH, height: ROOF_Y0 - GROUND_H, facing: 'x-', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 20 }));
 
   // --- east side wall: the garage link doorway is a REAL hole ---------------
   // The previous cut cut a doorway in the garage's shared wall and left the
@@ -1698,15 +1698,15 @@ function house(builder: Builder, m: Nuketown2Materials): void {
     const openRun = HOUSE_FRONT_Z - GARAGE_FRONT_Z;
     const openZ = (HOUSE_FRONT_Z + GARAGE_FRONT_Z) / 2;
     facadePair(builder, m, 'house east siding', [HOUSE_X1, 0, openZ],
-      lapSidingParts({ run: openRun, height: GROUND_H, facing: 'x+' }));
+      lapSidingParts({ run: openRun, height: GROUND_H, facing: 'x+', jointRole: 'sidingJoint' }));
     facadePair(builder, m, 'house east siding upper', [HOUSE_X1, GROUND_H, openZ],
-      lapSidingParts({ run: openRun, height: ROOF_Y0 - GROUND_H, facing: 'x+', role: 'sidingUpper', courseOffset: 20 }));
+      lapSidingParts({ run: openRun, height: ROOF_Y0 - GROUND_H, facing: 'x+', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 20 }));
     const overGarageBase = GARAGE_H + 0.3;
     facadePair(builder, m, 'house east siding over garage',
       [HOUSE_X1, overGarageBase, (GARAGE_FRONT_Z + GARAGE_BACK_Z) / 2],
       lapSidingParts({
         run: GARAGE_DEPTH, height: ROOF_Y0 - overGarageBase, facing: 'x+',
-        role: 'sidingUpper', courseOffset: 40,
+        role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 40,
       }));
   }
 
@@ -1746,7 +1746,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       { kind: 'door', along: FRONT_DOOR, head: DOOR_HEAD_Y },
       { kind: 'window', along: FRONT_WINDOW_B, sill: 1.0, head: 2.1 },
     ],
-    style: { door: 'parked-leaf', leafRole: 'trim', leafThickness: 0.03 },
+    style: { jointRole: 'sidingJoint', door: 'parked-leaf', leafRole: 'trim', leafThickness: 0.03 },
   })) {
     facadePair(builder, m, group.prop, [0, 0, HOUSE_FRONT_Z], group.parts);
   }
@@ -1761,7 +1761,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
   // short so the sill overhangs the last course the way a real sill does; the
   // sill's own body still laps into the course below it, so nothing is open.
   facadePair(builder, m, 'house front storey band', [cx, GROUND_H, HOUSE_FRONT_Z],
-    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H - 0.01, facing: 'z+', role: 'sidingUpper', courseOffset: 90 }));
+    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H - 0.01, facing: 'z+', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 90 }));
   // Window sills (0 -> 1.0) and heads (2.1 -> 3.0). Standing eye is 1.65, so the
   // 1.1 m band between them is the shot corridor.
   // HF-435, owner after PASS 91: "putting glass on the windows." The pane is a
@@ -1872,7 +1872,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [(run[0] + run[1]) / 2, UPPER_Y0 + UPPER_H / 2, zFront], [run[1] - run[0], UPPER_H, WALL_T], sidingUpper);
     facadePair(builder, m, `house upper front siding ${index}`,
       [(run[0] + run[1]) / 2, UPPER_Y0, HOUSE_FRONT_Z],
-      lapSidingParts({ run: run[1] - run[0], height: UPPER_H, facing: 'z+', role: 'sidingUpper', courseOffset: 20 }));
+      lapSidingParts({ run: run[1] - run[0], height: UPPER_H, facing: 'z+', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 20 }));
   });
   {
     const width = UPPER_WINDOW[1] - UPPER_WINDOW[0];
@@ -1939,10 +1939,10 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [(run[0] + run[1]) / 2, GROUND_H / 2, zBack], [run[1] - run[0], GROUND_H, WALL_T], siding);
     facadePair(builder, m, `house back siding ${index}`,
       [(run[0] + run[1]) / 2, 0, HOUSE_BACK_Z],
-      lapSidingParts({ run: run[1] - run[0], height: GROUND_H, facing: 'z-' }));
+      lapSidingParts({ run: run[1] - run[0], height: GROUND_H, facing: 'z-', jointRole: 'sidingJoint' }));
   });
   facadePair(builder, m, 'house back storey band', [cx, GROUND_H, HOUSE_BACK_Z],
-    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H, facing: 'z-', role: 'sidingUpper', courseOffset: 90 }));
+    lapSidingParts({ run: HOUSE_WIDTH, height: UPPER_Y0 - GROUND_H, facing: 'z-', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 90 }));
   pair(builder, 'house back door lintel',
     [(BACK_DOOR[0] + BACK_DOOR[1]) / 2, (DOOR_HEAD_Y + GROUND_H) / 2, zBack],
     [BACK_DOOR[1] - BACK_DOOR[0], GROUND_H - DOOR_HEAD_Y, WALL_T], m.trim);
@@ -1974,7 +1974,7 @@ function house(builder: Builder, m: Nuketown2Materials): void {
       [(run[0]! + run[1]!) / 2, UPPER_Y0 + UPPER_H / 2, zBack], [run[1]! - run[0]!, UPPER_H, WALL_T], sidingUpper);
     facadePair(builder, m, `house upper back siding ${index}`,
       [(run[0]! + run[1]!) / 2, UPPER_Y0, HOUSE_BACK_Z],
-      lapSidingParts({ run: run[1]! - run[0]!, height: UPPER_H, facing: 'z-', role: 'sidingUpper', courseOffset: 20 }));
+      lapSidingParts({ run: run[1]! - run[0]!, height: UPPER_H, facing: 'z-', role: 'sidingUpper', jointRole: 'sidingUpperJoint', courseOffset: 20 }));
   });
   // The door's head band: the 0.4 m header between its clear head and the
   // roof deck's underside.
@@ -2693,7 +2693,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
   }
   pair(builder, 'garage wall outboard', [GARAGE_X1 - WALL_T / 2, H / 2, zMid], [WALL_T, H, GARAGE_DEPTH], m.garageSiding);
   facadePair(builder, m, 'garage outboard siding', [GARAGE_X1, 0, zMid],
-    lapSidingParts({ run: GARAGE_DEPTH, height: H, facing: 'x+', role: 'garageSiding' }));
+    lapSidingParts({ run: GARAGE_DEPTH, height: H, facing: 'x+', role: 'garageSiding', jointRole: 'sidingJoint' }));
 
   // Shared wall with the house, with an internal doorway so the garage is a
   // route into the house rather than a dead-end box. Matches the hole cut in
@@ -2726,7 +2726,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
     facing: 'z+',
     wallThickness: WALL_T,
     openings: [{ kind: 'door', along: DOOR, head: H - 0.8, prop: 'garage door panels' }],
-    style: { sidingRole: 'garageSiding', door: 'sectional-head' },
+    style: { sidingRole: 'garageSiding', jointRole: 'sidingJoint', door: 'sectional-head' },
   })) {
     facadePair(builder, m, group.prop, [0, 0, GARAGE_FRONT_Z], group.parts);
   }
@@ -2762,7 +2762,7 @@ function garage(builder: Builder, m: Nuketown2Materials): void {
       [(run[0]! + run[1]!) / 2, H / 2, zBack], [run[1]! - run[0]!, H, WALL_T], m.garageSiding);
     facadePair(builder, m, `garage back siding ${index}`,
       [(run[0]! + run[1]!) / 2, 0, GARAGE_BACK_Z],
-      lapSidingParts({ run: run[1]! - run[0]!, height: H, facing: 'z-', role: 'garageSiding' }));
+      lapSidingParts({ run: run[1]! - run[0]!, height: H, facing: 'z-', role: 'garageSiding', jointRole: 'sidingJoint' }));
   });
   pair(builder, 'garage back head', [(REAR[0] + REAR[1]) / 2, H - 0.4, zBack], [REAR[1] - REAR[0], 0.8, WALL_T], m.trim);
 
@@ -4380,11 +4380,10 @@ function streetPairKit(
  * zero samplers. The program set is unchanged, which is the condition the
  * black-surface lane puts on every forge pass.
  *
- * `reveal` is the one role with no same-named registry entry. It is the dark
- * line at every lap joint, inside every window head and behind every door
- * panel, and it resolves onto `roof` - the registry's only dark matte
- * non-metal. Borrowing it costs nothing and keeps the reveal the SAME dark on
- * both houses, which a two-tone pair material would not.
+ * `reveal` carries deep window/door insets and the default lap backing. The
+ * maintained siding consumers opt into separate joint roles, keeping the
+ * recessed geometry while reducing its contrast against each house's paint.
+ * Opening liners retain the same dark roof material on both houses.
  */
 function facadeMaterial(
   m: Nuketown2Materials,
@@ -4395,6 +4394,10 @@ function facadeMaterial(
     // The storey the two houses differ on: terracotta north, cream south.
     case 'sidingUpper': return [m.sidingA, m.sidingB] as const;
     case 'garageSiding': return m.garageSiding;
+    // Narrow course joints borrow muted existing finishes; deep opening
+    // reveals retain the dark roof role and their room-depth reading.
+    case 'sidingJoint': return m.sign;
+    case 'sidingUpperJoint': return [m.fence, m.sign] as const;
     case 'reveal': return m.roof;
     case 'roof': return m.roof;
     // The north house's dark deck and the south house's pale roof glazing.
@@ -4473,7 +4476,8 @@ function verge(builder: Builder, m: Nuketown2Materials): void {
   // Fixed presentation-only lamp posts. The clustered-light catalog reads the
   // same anchors, while pair() keeps both residential halves identical.
   for (const lamp of NUKETOWN2_LAMP_POST_LAYOUT) {
-    pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.chrome,
+    // Reuse the architectural painted-metal finish, without automotive pitting.
+    pair(builder, `verge ${lamp.id} lamp post`, [lamp.x, lamp.poleHeight / 2, lamp.z], [0.12, lamp.poleHeight, 0.12], m.sign,
       { solid: false, shots: false, cast: false, presentationOnly: true });
     // HF-536 (night-kit) SHIPPED. What stood here was ONE 0.52 x 0.12 x 0.26 m
     // box of `trim` at 4.35 m: from 20 m down the street that is a dark

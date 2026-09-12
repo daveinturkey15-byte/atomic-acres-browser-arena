@@ -334,6 +334,7 @@ export const FACADE_SHINGLE_COURSE = 0.30;
 /** Material roles a facade part may ask its host arena for. */
 export type FacadePartRole =
   | 'siding' | 'sidingUpper' | 'garageSiding'
+  | 'sidingJoint' | 'sidingUpperJoint'
   | 'trim' | 'reveal' | 'roof' | 'roofPair' | 'interior' | 'panel';
 
 /** One box, in the forge-kit convention. Structurally a `ForgeKitBox`. */
@@ -383,6 +384,8 @@ export interface LapSidingPartsOptions {
   readonly height: number;
   readonly facing: FacadeFacing;
   readonly role?: FacadePartRole;
+  /** Narrow lap backing only; opening reveals keep their own role. */
+  readonly jointRole?: FacadePartRole;
   readonly courseHeight?: number;
   /** Course index the run starts on, so neighbouring runs line up. */
   readonly courseOffset?: number;
@@ -395,11 +398,11 @@ export interface LapSidingPartsOptions {
  * WHY A SEPARATE REVEAL BOX AND NOT A SHADOW. Every part here is authored
  * `cast:false` on purpose: nine hundred 60 mm boards standing 50 mm off a wall
  * that also casts is the classic shadow-acne generator, and the owner's live
- * complaint tonight is z-fighting. The reveal strip is a dark box set 30 mm
+ * complaint tonight is z-fighting. The reveal strip is a box set 20 mm
  * BEHIND the board faces and overlapping the boards above and below it by
  * 20 mm, so there is no coplanar pair anywhere in the construction and the
- * dark line is geometric rather than lit - it reads identically at every hour
- * of the authored day and in both render profiles.
+ * line is geometric rather than lit. The default is the dark reveal role;
+ * consumers may request a quieter joint finish without changing opening liners.
  */
 export function lapSidingParts(options: LapSidingPartsOptions): FacadePart[] {
   const { run, height, facing } = options;
@@ -426,7 +429,7 @@ export function lapSidingParts(options: LapSidingPartsOptions): FacadePart[] {
     if (jointY + 0.01 >= height) continue;
     parts.push({
       suffix: `reveal ${base + index}`,
-      role: 'reveal',
+      role: options.jointRole ?? 'reveal',
       ...place(facing, 0, jointY + (pitch - boardH) / 2, revealOut,
         run - 0.004, (pitch - boardH) + 0.04, FACADE_REVEAL_T),
     });
