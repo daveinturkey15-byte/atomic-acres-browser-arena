@@ -5,6 +5,32 @@ export interface MeshComponent {
   readonly vertexCount: number;
 }
 
+/** Conservatively join touching piece bounds, including unwelded intersecting
+ * surfaces. Only original pairs establish contact; a union's empty interior
+ * cannot bridge a new component. This prevents tiled solid cover from being
+ * reclassified as many individually small decorations. */
+export function mergeTouchingComponentBounds(parts: readonly MeshComponent[]): MeshComponent[] {
+  const parents = parts.map((_, i) => i);
+  function find(i: number): number {
+    while (parents[i] !== i) { parents[i] = parents[parents[i]!]!; i = parents[i]!; }
+    return i;
+  }
+  for (let i = 0; i < parts.length; i++) {
+    const a = parts[i]!.bounds.clone().expandByScalar(1e-5);
+    for (let j = i + 1; j < parts.length; j++) {
+      if (a.intersectsBox(parts[j]!.bounds)) parents[find(j)] = find(i);
+    }
+  }
+  const grouped = new Map<number, { bounds: THREE.Box3; vertexCount: number }>();
+  parts.forEach((part, i) => {
+    const key = find(i);
+    if (!grouped.has(key)) grouped.set(key, { bounds: new THREE.Box3(), vertexCount: 0 });
+    const group = grouped.get(key)!;
+    group.bounds.union(part.bounds); group.vertexCount += part.vertexCount;
+  });
+  return [...grouped.values()];
+}
+
 /**
  * Connected triangle components, with 10-micrometre world-space welding for
  * Float32 seams. Unlike moving-centroid clustering, membership does not depend

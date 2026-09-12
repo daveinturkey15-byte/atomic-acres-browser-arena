@@ -37,6 +37,7 @@ import type { Box2 } from '../../src/collision';
 import type { ArenaMap } from '../../src/map';
 import { ARENA_IDS } from '../../src/arena-identity';
 import { partitionMergedVehicles } from '../../src/vehicle-forge/build';
+import { meshComponentCensus, mergeTouchingComponentBounds } from './mesh-component-census';
 
 // ---------------------------------------------------------------------------
 // Calibration constants. These were set against the first measured sweep on
@@ -181,6 +182,9 @@ export type MeshEntry = {
   vertices: number;
   /** Set when the entry is one vehicle of a merged forge mesh (see MeshComponent). */
   component?: MeshComponent;
+  /** Connected physical pieces of an anchored material batch, for gunfire only. */
+  ballisticParts?: MeshEntry[];
+  ballisticPart?: { index: number; of: number };
   /** Direction C: the mesh's own registration stamp, when the arena builder rated it. */
   ballisticSurfaceId: string | null;
   /** Direction C: dynamic raycast target (practice target / test dummy limb). */
@@ -339,12 +343,40 @@ export function collectMeshCensus(scene: THREE.Scene): MeshCensus {
       meshComponents.components += components.length;
       meshComponents.partitionedVertices += components.reduce((sum, component) => sum + component.vertices, 0);
       components.forEach((component, index) => {
-        meshes.push({
+        const entry: MeshEntry = {
           ...base,
           box: component.box,
           vertices: component.vertices,
           component: { anchor: [component.anchor[0], component.anchor[1]], index, of: components.length },
-        });
+        };
+        // A vehicle's material batch is still not necessarily one surface:
+        // bumpers, wheel faces and roof rails enclose air between them. Keep
+        // the owner envelope for movement, but measure physical components
+        // for gunfire under the unchanged substantial-cover thresholds.
+        const position = object.geometry.getAttribute('position');
+        const anchor = object.geometry.getAttribute('forgeVehicleAnchor');
+        const positions: number[] = [];
+        for (let i = 0; i < position.count; i++) {
+          if (anchor.getX(i) === component.anchor[0] && anchor.getY(i) === component.anchor[1]) {
+            positions.push(position.getX(i), position.getY(i), position.getZ(i));
+          }
+        }
+        if (positions.length / 3 !== component.vertices) throw new Error(`${base.name}: ballistic owner vertex accounting mismatch`);
+        const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const proxy = new THREE.Mesh(geometry, object.material);
+        proxy.matrixAutoUpdate = false;
+        proxy.matrix.copy(object.matrixWorld);
+        try {
+          const pieces = mergeTouchingComponentBounds(meshComponentCensus([proxy]));
+          if (pieces.reduce((sum, piece) => sum + piece.vertexCount, 0) !== component.vertices) {
+            throw new Error(`${base.name}: ballistic component vertex accounting mismatch`);
+          }
+          entry.ballisticParts = pieces.map((piece, partIndex) => ({
+            ...base, component: entry.component, box: piece.bounds, vertices: piece.vertexCount,
+            ballisticPart: { index: partIndex, of: pieces.length },
+          }));
+        } finally { geometry.dispose(); }
+        meshes.push(entry);
       });
       return;
     }
@@ -372,7 +404,10 @@ export function collectMeshes(scene: THREE.Scene): MeshEntry[] {
 
 /** The finding fields that say WHICH vehicle of a merged mesh a row is about. */
 function componentFields(entry: MeshEntry): Record<string, unknown> {
-  return entry.component ? { component: { ...entry.component, anchor: [...entry.component.anchor] } } : {};
+  return {
+    ...(entry.component ? { component: { ...entry.component, anchor: [...entry.component.anchor] } } : {}),
+    ...(entry.ballisticPart ? { ballisticPart: entry.ballisticPart } : {}),
+  };
 }
 
 export function collectColliders(map: ArenaMap): ColliderEntry[] {
@@ -628,7 +663,7 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     ballisticExcluded += 1;
     ballisticExcludedByRuleCounts[reason] = (ballisticExcludedByRuleCounts[reason] ?? 0) + 1;
   };
-  for (const entry of meshes) {
+  for (const entry of meshes.flatMap(mesh => mesh.ballisticParts ?? [mesh])) {
     const height = entry.box.max.y - entry.box.min.y;
     const footW = entry.box.max.x - entry.box.min.x;
     const footD = entry.box.max.z - entry.box.min.z;
