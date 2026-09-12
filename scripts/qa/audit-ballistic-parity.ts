@@ -46,7 +46,7 @@ async function main(): Promise<void> {
     const census = result.ballisticCensus!;
     const { unmatched, accepted, staleRows } = matchAcceptedShootThrough(result.id, result.ballisticGhostMeshes ?? []);
     const ceiling = BALLISTIC_UNRATED_CEILINGS[result.id] ?? 0;
-    const explained = census.ratedDirect + census.ratedByFootprint + census.dynamicTargets
+    const explained = census.ratedDirect + census.ratedByFootprint + census.ratedByTriangles + census.dynamicTargets
       + census.excludedByRule + accepted.length;
     const completionPercent = census.total === 0 ? 100 : Math.round((explained / census.total) * 1000) / 10;
     const ledger = {
@@ -59,6 +59,7 @@ async function main(): Promise<void> {
       shotSurfaceStats: result.shotSurfaceStats,
       excludedByRule: result.ballisticExcludedByRuleCounts,
       footprintExplained: result.ballisticFootprintExplained,
+      triangleExplained: result.ballisticTriangleExplained,
       acceptedShootThrough: accepted,
       unratedMeshes: unmatched,
       staleLedgerRows: staleRows,
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
     const path = resolve(OUT_DIR, `${result.id}.json`);
     writeFileSync(path, `${JSON.stringify(ledger, null, 1)}\n`);
     console.log(`\n=== ${result.id}: census ${census.total} | direct ${census.ratedDirect}`
-      + ` | footprint ${census.ratedByFootprint} | targets ${census.dynamicTargets}`
+      + ` | footprint ${census.ratedByFootprint} | triangles ${census.ratedByTriangles} | targets ${census.dynamicTargets}`
       + ` | excluded ${census.excludedByRule} | accepted ${accepted.length}`
       + ` | UNRATED ${unmatched.length} (ceiling ${ceiling}) | completion ${completionPercent}%`);
     console.log(`  surfaces: ${JSON.stringify(result.shotSurfaceStats)}`);

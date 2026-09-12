@@ -1,12 +1,18 @@
-import { buildNuketown2 } from '../../nuketown2-arena';
+import { buildNuketown2, NUKETOWN2_SECTION } from '../../nuketown2-arena';
 import {
   NUKETOWN2_CENTRAL_TRUCK as truck,
+  NUKETOWN2_GARAGE_SPAN,
+  NUKETOWN2_HOUSE_FRONT_Z,
   NUKETOWN2_REVIEW_CAMERA_ANCHORS,
   nuketown2HandedX as hx,
 } from '../../nuketown2-layout';
 import { NUKE_EVENT_CAMERA_FAR_M } from '../../nuke-event';
 import { createProceduralArenaVisualDefinition } from '../arena-visual-definition';
 import { budgets, camera, colorPipeline, SHARED_GAMEPLAY_ASSETS } from './shared';
+
+const garageFrontZ = NUKETOWN2_HOUSE_FRONT_Z - NUKETOWN2_SECTION.garageSetback;
+const garageCentreX = (NUKETOWN2_GARAGE_SPAN.x0 + NUKETOWN2_GARAGE_SPAN.x1) / 2;
+const trailerRearX = truck.x - truck.boxLength / 2;
 
 /**
  * NUKETOWN2: Nuke Town Rebuild (PREVIEW), HF-407, re-pointed at the corrected
@@ -182,6 +188,15 @@ export const definition = createProceduralArenaVisualDefinition({
     camera('nuketown2-north-interior', [hx(-1.25), 1.7, -19.5], [hx(-1.25), 1.6, -12.0], 'geometry', 1.08),
     camera('nuketown2-south-interior', [hx(1.25), 1.7, 19.5], [hx(1.25), 1.6, 12.0], 'geometry', 1.08),
     camera('nuketown2-garage', [hx(6.75), 1.7, -20.5], [hx(6.75), 1.5, -14.0], 'geometry', 1.08),
+    // Actual facade consumer from outside, clear of the driveway vehicle.
+    camera('nuketown2-garage-exterior-close',
+      [hx(NUKETOWN2_GARAGE_SPAN.x1 + 1), 1.7, garageFrontZ + 3],
+      [hx(garageCentreX), 1.85, garageFrontZ], 'geometry', 1.08),
+    // Cargo-interior view looking outward: the narrow rear approach cannot
+    // frame the complete2.11m rail assembly at the standard review FOV.
+    camera('nuketown2-trailer-rear-frame',
+      [hx(trailerRearX + 2.6), 1.7, truck.z],
+      [hx(trailerRearX - .006), 1.7, truck.z], 'geometry', 1.08),
     // HF-473: the rear balcony, its exterior flight and the upper back door,
     // from the yard at the flight's foot.
     // HF-465: the rear balcony, exterior flight and upper back door. These

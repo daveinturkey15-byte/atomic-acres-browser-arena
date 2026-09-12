@@ -2093,6 +2093,14 @@ describe('Nuke Town Rebuild fidelity', () => {
     // one coach and one moving truck, they are different objects, and no
     // rotation maps one onto the other.
     const EXPECTED_ASYMMETRIC = [
+      // The existing asymmetric truck's four rear-frame shot proxies. They
+      // match its visible rails, add no movement area, and leave the mouth
+      // open; exact per-rail rays and occupied-union tests live beside this
+      // gate in nuketown2-trailer-frame-ballistics.test.ts.
+      'nuketown2 street-vehicle truck rear-frame rail 0',
+      'nuketown2 street-vehicle truck rear-frame rail 1',
+      'nuketown2 street-vehicle truck rear-frame rail 2',
+      'nuketown2 street-vehicle truck rear-frame rail 3',
       'nuketown2 street-vehicle coach body',
       'nuketown2 street-vehicle coach roof cap',
       'nuketown2 street-vehicle coach wheel 0',

@@ -122,6 +122,8 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'nuketown2-north-interior',
     'nuketown2-south-interior',
     'nuketown2-garage',
+    'nuketown2-garage-exterior-close',
+    'nuketown2-trailer-rear-frame',
     // HF-465: the rear balcony with its exterior flight, and the front climb
     // chain (hedge, porch canopy, window ledge, upper window) - the two things
     // this arena gained that no existing station looks at.

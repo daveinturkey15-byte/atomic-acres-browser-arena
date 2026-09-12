@@ -113,6 +113,7 @@ import type { ArenaMap } from './map';
 import { NUKETOWN_DISPLAY_NAME } from './map-selection';
 import { classifyImpactSurface } from './combat-feedback';
 import { createBallisticSurface } from './ballistics';
+import { trailerFrameBoxes } from './vehicle-forge/trailer-frame';
 import {
   NUKETOWN2_FOREST_ENVELOPE,
   buildNuketownForestSurround,
@@ -3276,6 +3277,24 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
   const c = NUKETOWN2_STREET_COACH;
   const t = NUKETOWN2_CENTRAL_TRUCK;
   const truckNoseX = t.cabX + t.cabLength / 2;
+  const truckRearDoor = { y0: 0.68, y1: 2.72, halfWidth: 0.92 };
+  const truckRearZ = 11.70;
+  // Match the forge's final placement transform, including handedness once.
+  // These four hidden raycast boxes rate the visible metal only; no movement
+  // collider or cargo-mouth slab is added. The shared material never draws.
+  const frameYaw = NUKETOWN2_HANDEDNESS === 1 ? -Math.PI / 2 : Math.PI / 2;
+  const frameOrigin = new THREE.Vector3(nuketown2HandedX(truckNoseX), 0, t.z);
+  const frameRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), frameYaw);
+  const frameProxyMaterial = new THREE.MeshBasicMaterial({ visible: false });
+  trailerFrameBoxes(truckRearDoor, truckRearZ).forEach((rail, index) => {
+    const centre = new THREE.Vector3((rail.minX + rail.maxX) / 2, (rail.minY! + rail.maxY!) / 2,
+      (rail.minZ + rail.maxZ) / 2).applyQuaternion(frameRotation).add(frameOrigin);
+    const proxy = box(builder, `nuketown2 street-vehicle truck rear-frame rail ${index}`, centre.toArray(),
+      [rail.maxX - rail.minX, rail.maxY! - rail.minY!, rail.maxZ - rail.minZ], frameProxyMaterial,
+      { solid: false, shots: true, cast: false, ballisticMaterial: 'thin-metal', rotation: [0, frameYaw, 0] });
+    proxy.visible = false;
+    proxy.userData.collisionProxy = true;
+  });
   const placements: Array<{ built: ForgedVehicle; x: number; z: number; yaw: number }> = [];
 
   placements.push({
@@ -3358,12 +3377,12 @@ function forgedStreetVehicles(builder: Builder): Nuketown2ForgeAudit {
         trailer: {
           side: { z0: 5.45, z1: 11.45, step: 0.5, y0: 0.65, y1: 2.75 },
           rubRail: { y: 0.78, height: 0.08 },
-          rearDoor: { y0: 0.68, y1: 2.72, halfWidth: 0.92 },
+          rearDoor: truckRearDoor,
           rearLocks: { y0: 0.68, y1: 2.72, x: [0.24] },
           hinges: { y: [0.86, 2.54], x: [0.55] },
           mudFlaps: { z: 10.6, y0: 0.28, y1: 0.72 },
           sideMarkers: { z: [5.45, 6.95, 8.45, 9.95, 11.45], y: 1.10 },
-          rearZ: 11.70,
+          rearZ: truckRearZ,
         },
       },
       // HF-536 (R14). The cab-over sits on a 0.6 m sill, the highest on the

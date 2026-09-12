@@ -23,8 +23,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { VIEWPOINT_CATALOG, CATALOG_ARENAS, CATALOG_VIEWPOINT_COUNT } from './viewpoint-catalog.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..', '..');
@@ -461,19 +462,33 @@ test('diff manifest validation refuses non-PASS verdicts and identical bundleAtS
   assert.match(problemsSameBundle[0], /both runs served the same bundle '\/bundle-base\.js' - harness mistake, not a code regression/);
 });
 
-test('diff CLI refuses real invalid fixture pair on disk (both FAIL and identical bundle)', () => {
-  const baseDir = resolve(ROOT, 'artifacts/viewpoint-regression/base-c736d48c');
-  const headDir = resolve(ROOT, 'artifacts/viewpoint-regression/head-55833a07');
-  const res = spawnSync(process.execPath, [
-    resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'),
-    '--base', baseDir,
-    '--candidate', headDir,
-  ], { encoding: 'utf8' });
-
-  assert.equal(res.status, 2, 'diff CLI must exit 2 when given invalid captures');
-  assert.match(res.stderr, /base capture did not pass \(verdict='FAIL'\)/);
-  assert.match(res.stderr, /candidate capture did not pass \(verdict='FAIL'\)/);
-  assert.match(res.stderr, /both runs served the same bundle '\/legacy-main-C7nXu8gj\.js' - harness mistake, not a code regression/);
+test('diff CLI refuses an on-disk combined invalid fixture (both FAIL and identical bundle)', () => {
+  // The original test depended on gitignored base-c736d48c/head-55833a07
+  // captures from one machine. Reproduce their three invalid fields in an
+  // explicitly synthetic fixture; no historical screenshot is manufactured.
+  const prefix = resolve(tmpdir(), 'aa-viewpoint-invalid-');
+  const fixtureRoot = mkdtempSync(prefix);
+  assert.ok(resolve(fixtureRoot).startsWith(prefix), 'fixture stays under its owned temporary prefix');
+  try {
+    const baseDir = resolve(fixtureRoot, 'base'); const headDir = resolve(fixtureRoot, 'head');
+    for (const directory of [baseDir, headDir]) {
+      mkdirSync(directory);
+      writeFileSync(resolve(directory, 'capture-manifest.json'), JSON.stringify({
+        contract: 'arena-viewpoint-regression-capture-v1', verdict: 'FAIL', backend: 'webgpu',
+        bundleAtStart: '/legacy-main-C7nXu8gj.js',
+      }));
+    }
+    const res = spawnSync(process.execPath, [
+      resolve(ROOT, 'scripts/qa/diff-arena-viewpoints.mjs'), '--base', baseDir, '--candidate', headDir,
+    ], { encoding: 'utf8' });
+    assert.equal(res.status, 2, 'diff CLI must exit 2 when given invalid captures');
+    assert.match(res.stderr, /base capture did not pass \(verdict='FAIL'\)/);
+    assert.match(res.stderr, /candidate capture did not pass \(verdict='FAIL'\)/);
+    assert.match(res.stderr, /both runs served the same bundle '\/legacy-main-C7nXu8gj\.js' - harness mistake, not a code regression/);
+  } finally {
+    assert.ok(resolve(fixtureRoot).startsWith(prefix));
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 });
 
 test('diff CLI refuses when a capture manifest has non-PASS verdict', () => {

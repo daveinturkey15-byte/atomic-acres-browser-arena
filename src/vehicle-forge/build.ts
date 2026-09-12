@@ -31,6 +31,7 @@ import {
   stationRing,
 } from './geometry';
 import { type WheelStyle, hubcapDome, lampParts, wheelParts } from './wheels';
+import { TRAILER_FRAME_DEPTH_M, TRAILER_FRAME_RAIL_M } from './trailer-frame';
 import {
   createForgeChromeMaterial,
   createForgeGlassMaterial,
@@ -1427,9 +1428,13 @@ export function buildForgedVehicle(
     const rearDoor = trailer.rearDoor;
     const doorHeight = rearDoor.y1 - rearDoor.y0;
     const doorY = (rearDoor.y0 + rearDoor.y1) / 2;
-    reliefRearPair(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth - 0.035, doorY, 0.07, doorHeight, trailer.rearZ, 0.012);
+    // Horizontal bars own the corners. The old upright ends were fully
+    // buried inside those bars; shorten only that duplicate interior volume.
+    reliefRearPair(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth - TRAILER_FRAME_RAIL_M / 2,
+      doorY, TRAILER_FRAME_RAIL_M, doorHeight - TRAILER_FRAME_RAIL_M, trailer.rearZ, TRAILER_FRAME_DEPTH_M);
     for (const y of [rearDoor.y0, rearDoor.y1] as const) {
-      reliefRearBox(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth * 2, y, 0.07, trailer.rearZ, 0.012);
+      reliefRearBox(parts, 'chrome', 'detail.trailer.rear-door-frame', rearDoor.halfWidth * 2, y,
+        TRAILER_FRAME_RAIL_M, trailer.rearZ, TRAILER_FRAME_DEPTH_M);
     }
     for (const x of trailer.rearLocks.x) {
       reliefRearPair(parts, 'chrome', 'detail.trailer.rear-lock-bar', Math.abs(x), doorY, 0.045, doorHeight * 0.86, trailer.rearZ + 0.004, 0.012);

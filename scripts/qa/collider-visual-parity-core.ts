@@ -38,6 +38,7 @@ import type { ArenaMap } from '../../src/map';
 import { ARENA_IDS } from '../../src/arena-identity';
 import { partitionMergedVehicles } from '../../src/vehicle-forge/build';
 import { meshComponentCensus, mergeTouchingComponentBounds } from './mesh-component-census';
+import { proveTriangleShotCoverage } from './triangle-shot-coverage';
 
 // ---------------------------------------------------------------------------
 // Calibration constants. These were set against the first measured sweep on
@@ -184,6 +185,7 @@ export type MeshEntry = {
   component?: MeshComponent;
   /** Connected physical pieces of an anchored material batch, for gunfire only. */
   ballisticParts?: MeshEntry[];
+  ballisticTriangles?: readonly THREE.Vector3[];
   ballisticPart?: { index: number; of: number };
   /** Direction C: the mesh's own registration stamp, when the arena builder rated it. */
   ballisticSurfaceId: string | null;
@@ -224,6 +226,8 @@ export type ArenaAuditResult = {
    * explanation instead of trusting the count (fake coverage guard).
    */
   ballisticFootprintExplained?: Array<{ name: string; centre: [number, number, number]; surfaceId: string; surfaceMaterial: string; share: number }>;
+  /** Exact physical-triangle coverage, distinct from the coarse footprint heuristic. */
+  ballisticTriangleExplained?: Array<{ name: string; triangles: number; surfaceIds: string[] }>;
   /** Direction C: substantial visible meshes with NO gunfire rating at all. */
   ballisticGhostMeshes?: Array<Record<string, unknown>>;
   ballisticExcludedByRuleCounts?: Record<string, number>;
@@ -231,6 +235,7 @@ export type ArenaAuditResult = {
     total: number;
     ratedDirect: number;
     ratedByFootprint: number;
+    ratedByTriangles: number;
     dynamicTargets: number;
     excludedByRule: number;
     unrated: number;
@@ -371,8 +376,13 @@ export function collectMeshCensus(scene: THREE.Scene): MeshCensus {
           if (pieces.reduce((sum, piece) => sum + piece.vertexCount, 0) !== component.vertices) {
             throw new Error(`${base.name}: ballistic component vertex accounting mismatch`);
           }
+          if (pieces.some(piece => !piece.worldVertices || piece.worldVertices.length !== piece.vertexCount
+            || piece.worldVertices.length % 3 !== 0)) {
+            throw new Error(`${base.name}: ballistic triangle retention mismatch`);
+          }
           entry.ballisticParts = pieces.map((piece, partIndex) => ({
             ...base, component: entry.component, box: piece.bounds, vertices: piece.vertexCount,
+            ballisticTriangles: piece.worldVertices,
             ballisticPart: { index: partIndex, of: pieces.length },
           }));
         } finally { geometry.dispose(); }
@@ -652,11 +662,13 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
     footprint: surfaceWorldFootprint(surface.bounds),
   }));
   const ballisticFootprintExplained: NonNullable<ArenaAuditResult['ballisticFootprintExplained']> = [];
+  const ballisticTriangleExplained: NonNullable<ArenaAuditResult['ballisticTriangleExplained']> = [];
   const ballisticExcludedByRuleCounts: Record<string, number> = {};
   const ballisticGhostMeshes: Array<Record<string, unknown>> = [];
   let ballisticCensusTotal = 0;
   let ratedDirect = 0;
   let ratedByFootprint = 0;
+  let ratedByTriangles = 0;
   let dynamicTargets = 0;
   let ballisticExcluded = 0;
   const excludeBallistic = (reason: string) => {
@@ -715,6 +727,13 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
         surfaceMaterial: explainedBy.surface.material,
         share: round(bestShare),
       });
+      continue;
+    }
+    const triangleProof = entry.ballisticTriangles
+      ? proveTriangleShotCoverage(entry.ballisticTriangles, shotSurfaces) : null;
+    if (triangleProof) {
+      ratedByTriangles += 1;
+      ballisticTriangleExplained.push({ name: entry.name, ...triangleProof });
       continue;
     }
     // Only exclude above-volume dressing AFTER the footprint attempt, so an
@@ -785,12 +804,14 @@ export async function auditArena(id: string, build: ArenaBuild, enrich?: ArenaEn
       classification: surface.classification,
     })),
     ballisticFootprintExplained,
+    ballisticTriangleExplained,
     ballisticGhostMeshes,
     ballisticExcludedByRuleCounts,
     ballisticCensus: {
       total: ballisticCensusTotal,
       ratedDirect,
       ratedByFootprint,
+      ratedByTriangles,
       dynamicTargets,
       excludedByRule: ballisticExcluded,
       unrated: ballisticGhostMeshes.length,

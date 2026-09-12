@@ -24,6 +24,16 @@ in separate VM contexts and negative setup controls. The first VM fixtures
 omitted document query methods used by the existing view reader; those fixtures
 were corrected before acceptance. No application reload behavior changed.
 
-OPEN: fresh three-player browser proof, the independent rejoin damage-timing
-finding and the sampling of intentional disconnects. The original failed soak
-remains at `artifacts/pipeline/completion-mp-soak-450134/`.
+VERIFIED: the fresh 99c1e6a three-player WebGPU soak completed 180009 ms and
+both reload-after-death checks passed. The whole soak remains RED. It recorded
+30 presence failures during intentional disconnect/rejoin, rejoin damage
+observed as host80/guestA100/guestB80, and target first-seen165 ms against120 ms.
+Guest A also failed the stair probe. The new protocol trace caught pre-death
+requests with lifeId3 rejected by host lifeId2; post-death reloads succeeded.
+This resembles the owner's deferred movement report but does not establish
+its full historical cause. No application admission or movement fix was made.
+
+OPEN: those multiplayer findings, their measurement/runtime causes and the
+owner-deferred feature work. The original failed soak remains at
+`artifacts/pipeline/completion-mp-soak-450134/`; the new failed bundle is in
+`artifacts/pipeline/completion-mp-soak-reload-99c1e6/`.
