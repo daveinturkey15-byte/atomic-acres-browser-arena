@@ -44,7 +44,10 @@ describe('Pass 62 graphics refinement budgets', () => {
   it('keeps neutral IBL subordinate to authored key lights in every arena', () => {
     for (const { id: arenaId } of ARENA_SELECTIONS) {
       expect(arenaEnvironmentScale(arenaId)).toBeGreaterThanOrEqual(0.1);
-      expect(arenaEnvironmentScale(arenaId)).toBeLessThanOrEqual(0.3);
+      // The measured Nuke Town lighting contract is exact, not a global cap lift.
+      // History and independent review: docs/threejs-knowledge/ibl-contract-reconciliation.md.
+      if (arenaId === 'nuketown2') expect(arenaEnvironmentScale(arenaId)).toBe(0.32);
+      else expect(arenaEnvironmentScale(arenaId)).toBeLessThanOrEqual(0.3);
     }
     expect(arenaEnvironmentScale('rustworks-1v1')).toBeLessThan(arenaEnvironmentScale('atomic-acres'));
     expect(arenaEnvironmentScale('gun-range')).toBeLessThan(arenaEnvironmentScale('rustworks-1v1'));

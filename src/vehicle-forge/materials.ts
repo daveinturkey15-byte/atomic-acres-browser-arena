@@ -343,8 +343,8 @@ export function createForgePaintMaterial(options: PaintOptions): MeshPhysicalNod
     const pigment = TSL.uniform(new THREE.Vector3(base.r, base.g, base.b));
     const enamel = valueNoise2(vec2(positionWorld.x.add(positionWorld.z).mul(700), positionWorld.y.mul(700)));
     material.userData.forgeFinish = 'clean';
-    // Keep the shared 0.08 base-lobe look on both finishes. Clean paint gets
-    // its smoother, stronger reflection from the coat below. This deliberate
+    // Keep the shared 0.08 base-lobe look on both finishes. Compared with the
+    // worn finish, the clean coat is smoother and stronger. This deliberate
     // suppression is an art choice: Three's default 1 is physically valid and
     // its clearcoat attenuates the base rather than double-counting Fresnel.
     // Decision and conflicting pin history: docs/threejs-knowledge/material-contract-reconciliation.md.

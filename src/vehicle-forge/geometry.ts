@@ -560,15 +560,20 @@ export interface LoftResult {
   readonly quadCounts: Readonly<Record<QuadKind, number>>;
 }
 
-function pushTriangle(
-  sink: Sink,
+/**
+ * The orientation step of `pushTriangle`, exposed so a test can drive it with
+ * arbitrary records (`triangle-orientation.test.ts`). It returns the emitted
+ * vertex ORDER: `indices` as given, or with its second and third entries
+ * swapped. It never reads a UV and never writes a record, so the copy loop in
+ * `pushTriangle` carries every position/normal/UV record across unchanged.
+ */
+export function orientTriangle(
   p: readonly Vec3[],
   n: readonly Vec3[],
-  uv: readonly Vec2[],
   indices: readonly [number, number, number],
   flip: boolean,
   orientPerTriangle = false,
-): void {
+): readonly [number, number, number] {
   if (orientPerTriangle) {
     // A twisted quad's second triangle need not share the first triangle's
     // winding decision. Use this triangle's averaged analytic normal in the
@@ -580,8 +585,19 @@ function pushTriangle(
     const reference = [0, 1, 2].map(axis => indices.reduce((sum, index) => sum + Math.fround(n[index]![axis]!), 0));
     if (Math.hypot(...face) >= 1e-10) flip = face.reduce((sum, value, axis) => sum + value * reference[axis]!, 0) < 0;
   }
-  const order = flip ? ([indices[0], indices[2], indices[1]] as const) : indices;
-  for (const index of order) {
+  return flip ? ([indices[0], indices[2], indices[1]] as const) : indices;
+}
+
+export function pushTriangle(
+  sink: Sink,
+  p: readonly Vec3[],
+  n: readonly Vec3[],
+  uv: readonly Vec2[],
+  indices: readonly [number, number, number],
+  flip: boolean,
+  orientPerTriangle = false,
+): void {
+  for (const index of orientTriangle(p, n, indices, flip, orientPerTriangle)) {
     const position = p[index]!;
     const normal = n[index]!;
     const coordinate = uv[index]!;
@@ -594,7 +610,7 @@ function pushTriangle(
 }
 
 /** Winding follows the analytic normal, never a guess. */
-function needsFlip(positions: readonly Vec3[], reference: Vec3): boolean {
+export function needsFlip(positions: readonly Vec3[], reference: Vec3): boolean {
   const a = positions[0]!;
   const b = positions[1]!;
   const c = positions[2]!;
