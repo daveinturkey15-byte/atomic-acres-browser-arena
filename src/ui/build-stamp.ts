@@ -9,9 +9,9 @@ export function buildStampMarkup(): string {
   return `<div class="build-stamp">
     <button type="button" aria-describedby="build-changes"><b>BUILD ${number}</b><time>${stamp}${date ? ' UK' : ''}</time></button>
     <div id="build-changes" role="tooltip"><strong>In this build</strong><ul>
-      <li>Dark menus with clearer colour highlights.</li>
-      <li>Quick killstreak choices and updated defaults.</li>
-      <li>World materials, lighting and technique updates.</li>
+      <li>Readable Skills Lab with three browsing tabs.</li>
+      <li>Original source links and clearer unblock steps.</li>
+      <li>Blender asset gallery with real model inspection.</li>
     </ul></div>
   </div>`;
 }

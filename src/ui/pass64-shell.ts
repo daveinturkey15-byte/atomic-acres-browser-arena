@@ -146,8 +146,8 @@ function deploymentPanelMarkup(model: Pass64ShellViewModel): string {
         <div class="map-selector-heading"><span>THEATRE INDEX</span><small>${SELECTABLE_ARENAS.length} deployable spaces · choose before launch</small></div>
         <div class="map-card-grid">${mapCardsMarkup()}
           <a id="technique-showcase" class="technique-card" href="./map3.html?lab=techniques">
-            <i class="map-index">LAB</i><span>TECHNIQUE SHOWCASE ↗</span>
-            <strong>Explore the numbered source experiments.</strong><small>50 SOURCE REFERENCES</small>
+            <i class="map-index">LAB</i><span>SKILLS LAB ↗</span>
+            <strong>Explore demos, original sources and Blender assets.</strong><small>50 SOURCE REFERENCES</small>
           </a>
         </div>
       </section>

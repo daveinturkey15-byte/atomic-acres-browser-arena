@@ -1,0 +1,93 @@
+{
+  "variant": "teal",
+  "houseId": "teal-house",
+  "partition": "world-studio.house.teal.shell",
+  "blender": "5.1.2",
+  "glb": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
+  "sha256": "5f987101ab0f2500361ddef79ab4526c5f23ecb48387456f3b282a8fce826c09",
+  "bytes": 5545104,
+  "localBounds": {
+    "min": [
+      -9.44,
+      -0.42,
+      -10.14
+    ],
+    "max": [
+      9.049999999999999,
+      9.42,
+      20.6
+    ]
+  },
+  "placement": [
+    -20.0,
+    0.0,
+    0.0
+  ],
+  "triangles": 36360,
+  "trianglesByMaterial": {
+    "concrete": 60,
+    "door": 252,
+    "glass": 264,
+    "masonry": 5316,
+    "metal": 276,
+    "shingle": 1320,
+    "siding": 21228,
+    "trim": 7644
+  },
+  "materials": 8,
+  "drawGroups": 8,
+  "textureBytes": 2843343,
+  "textureMeasurements": {
+    "siding": {
+      "tilePixels": 512,
+      "tileMetres": 2.4384,
+      "texelsPerMetre": 209.974,
+      "featureMillimetres": 152.4,
+      "measuredFeaturePixels": 32
+    },
+    "shingle": {
+      "tilePixels": 512,
+      "tileMetres": 2.286,
+      "texelsPerMetre": 223.972,
+      "featureMillimetres": 142.875,
+      "measuredFeaturePixels": 32,
+      "measuredTabPixels": 64
+    },
+    "masonry": {
+      "tilePixels": 512,
+      "tileMetres": 2.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 250.0,
+      "measuredFeaturePixels": 64,
+      "measuredJointPixels": 3
+    },
+    "trim": {
+      "tilePixels": 256,
+      "tileMetres": 1.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0,
+      "measuredBrushPixels": 5
+    },
+    "concrete": {
+      "tilePixels": 512,
+      "tileMetres": 2.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0
+    },
+    "metal": {
+      "tilePixels": 256,
+      "tileMetres": 1.0,
+      "texelsPerMetre": 256.0,
+      "featureMillimetres": 0.0,
+      "measuredFeaturePixels": 0.0
+    }
+  },
+  "panes": 22,
+  "apertureMarkers": 26,
+  "routeLandmarks": 3,
+  "apertureMismatches": [],
+  "roadClearanceLocalX": 9.5,
+  "roadClearanceOk": true
+}

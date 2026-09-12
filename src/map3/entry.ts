@@ -8,7 +8,7 @@ async function boot(): Promise<void> {
   const { mountTechniqueLab } = await import('./technique-lab/runtime');
   document.getElementById('status')?.remove();
   document.getElementById('hud')?.remove();
-  document.title = 'Atomic Acres · Technique Showcase';
+  document.title = 'Atomic Acres · Skills Lab';
   const container = document.createElement('main');
   container.style.height = '100%';
   document.body.append(container);
