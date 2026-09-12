@@ -1,8 +1,8 @@
 # world-studio lighting adapter — integration instructions
 
 Lane: `contrib/dave-gaming-pc/omp/lighting-author-20260912` (OMP, dave-gaming-pc).
-Module: `src/world-studio/lighting/index.ts` (+ `lighting.test.ts`). Committed: `401480f6d`, then this doc.
-Status: implementation + focused CPU tests complete. **Visual acceptance OPEN — the parent must render it.** Nothing here claims pixels were improved; only that the rig is bounded, policy-clean, deterministic and wired to real state.
+Module: `src/world-studio/lighting/index.ts` (+ `lighting.test.ts`). Base: `401480f6d`+docs+`8bf4610ac`; continuation applied 2026-09-12 PM.
+Status: implementation + focused CPU tests complete (25/25, `tsc --noEmit` 0). **Visual acceptance OPEN — the parent must render it.** Continuation addressed owner feedback "lamp pool but flat/even/pale" with fixture geometry, focal placement and a contrast retune (below); nothing here claims pixels were improved.
 
 ## What this is
 
@@ -66,10 +66,10 @@ The module never touches the renderer, render targets, tone mapping, or post cha
 | Shadowed spot keys | 4 (≤2 per house — skill ceiling "≤2 shadowed per chunk") | `STUDIO_LIGHTING_PRESET.maximumShadowLights` |
 | Shadow maps | 4 × 256² (presentation), 0 (preview) | preset.shadowMapSize |
 | Clustered fills | 10 (≤5 per house, ceiling "≤6 unshadowed per chunk") | `maximumFillLights` |
-| Intensity range | 6 → 18 × presence ≤ 1.45 (≤ 26.1) | `derivePracticalTuning` bounds |
+| Intensity range | 5 → 20 × presence ≤ 1.45 (≤ 29) | `derivePracticalTuning` bounds |
 | Lights outside named rooms | 0 | `LIT_ROOMS` catalog |
 | Per-frame allocation | none after first apply | identity cache |
-| Materials created | 0 (lights only) | — |
+| Materials created | 2 (fixture shell + glow, shared, instanced) | continuation 2026-09-12 |
 
 Failure policy: throws on duplicate/invalid anchors, on key-count > budget (fail closed, never silently truncates), and at module init on any tuning bound drift.
 
@@ -91,6 +91,18 @@ Read evidence (native full-body reads this session, 2026-09-12):
 - **Upstream docs**: `https://threejs.org/docs/llms.txt` (read 2026-09-12; its import-map example cites three@0.186.0 — deliberately NOT used). APIs used (`SpotLight(color,intensity,distance,angle,penumbra,decay)`, `PointLight(color,intensity,distance,decay)`, `shadow.mapSize/bias/normalBias/radius`, `Object3D.traverse/clear`) verified against installed **three 0.185.1** (`node_modules/three`, `@types/three` 0.185.0; SpotLight/PointLight shadow API unchanged since ≤r155 physical-lights default). No r186+ API copied. Repo convention evidence: `src/arena-contrast-lighting.ts:166-201` (same constructor + shadow parameterisation), `src/rendering/light-occlusion.ts:27-31,63-74` (policies), `src/rendering/lighting-conditions.ts:544-553` (studio band [9.5,16.5], inspection profile), `src/world-studio/arena.ts:73-84` (environment identity-cache pattern), `src/world-studio/architecture/house.ts:985-994` (anchor rooms/floors), `legacy-main.ts:5060-5072` (environment writer).
 - **Captures**: all eight `world-studio-*.png` under `captures/fourth/world-studio/` read as actual pixels (vision-capable route confirmed). Critic `REPORT.md` read; its ground/apron/furniture findings belong to other lanes and were not actioned here.
 - **References**: `living-room-eye.png` read — intended hierarchy is warm sun pool + warm practical accents over mid-value carpet; shipped key color 0xffe9c8 and fill 0xeef2f6 chosen against it. (street-teal/street-yellow not separately consumed; street capture covered the exterior-window claim.)
+
+## Continuation 2026-09-12 (same lane, same API)
+
+Owner feedback after the parent's render: interior has a lamp pool but reads flat, evenly bright, pale. Changes, all inside this module:
+
+1. **Visible fixtures.** Every practical now has geometry: pendant (mount+stem+open shade+bulb) in living/dining, flush disc (mount+lens) in kitchen/bedroom/bedroom2/study, batten (body+tube) in garage. One `InstancedMesh` per (kind, part): ≤8 draw calls total, 2 shared `MeshStandardMaterial`s (shell `0x2b2e33`, glow emissive `0xffe2ae` driven `1.2+0.8·presence ≤ 2.36`), `castShadow/receiveShadow` false, tagged `presentationOnly`/`blocksShots` like every light. Fixture origin = light position; pendant hangs 0.35 m below the ceiling line (`FIXTURE_DROP`), so pools read as fixture-produced.
+2. **Focal placement.** `planStudioRoomPracticals` prefers the room's focal furniture anchor (exact `-<token>` id suffix per `FOCAL_TOKEN`, e.g. `<house>-coffee-table`) over the blind centroid; centroid stays the fallback. Positions are always actual authored anchor positions — never invented coordinates. Living pools now land over the coffee table.
+3. **Local contrast.** Keys tightened: `SPOT_ANGLE` 0.7→0.5 rad, penumbra 0.7→0.45, `KEY_SPOT_BASE` 16→20, `BEDROOM_SPOT_BASE` 12→14, key distance 7.5→6.5. Fill wash reduced: `FILL_BASE` 8→6.5, `GARAGE_FILL_BASE` 6→5, fill distances 5.5→5 / 6→5.5. Net: brighter hotspot with faster falloff, dimmer even wash — richer local contrast without touching exposure, ambient, sun or tone mapping.
+
+New tests: focal-over-centroid placement + centroid fallback; fixture instance/draw-call bounds (14 fixtures, ≤8 meshes, part instances 4×4+8×2+2×2=36); no shadow participation; glow emissive finite and ≤2.4 across all five frozen environments. Suite: **25/25** (`npx vitest run src/world-studio/lighting/lighting.test.ts`), `npx tsc --noEmit` **0 errors**.
+
+Cost delta vs the table below: lights unchanged (4 shadowed + 10 clustered); +2 materials; ≤8 instanced fixture draw calls; ≤36 fixture part instances; triangles ≤ ~1.2k. `createStudioLighting` signature, `update()/telemetry()/dispose()` and all prior telemetry fields unchanged (`fixtures`, `fixtureDrawCalls` added).
 
 ## Residual risks / OPEN
 

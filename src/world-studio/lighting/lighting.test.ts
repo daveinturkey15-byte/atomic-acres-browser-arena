@@ -90,14 +90,27 @@ describe('studio practical tuning derivation', () => {
 });
 
 describe('room practical planning', () => {
-  it('plans one centroid per lit house room, sorted, ignoring unlit rooms', () => {
+  it('plans one practical per lit house room over the focal furniture anchor, sorted', () => {
     const plans = planStudioRoomPracticals(ALL_ANCHORS);
     expect(plans).toHaveLength(14); // 7 rooms x 2 houses
     const living = plans.find((plan) => plan.house === 'teal' && plan.room === 'living')!;
-    expect(living.position.x).toBeCloseTo((5.4 + 3.6) / 2, 5);
+    // Focal rule: lands on the <house>-coffee-table anchor, not the centroid.
+    expect(living.position.x).toBeCloseTo(3.6, 5);
     expect(living.position.y).toBeCloseTo(0.08, 5);
+    expect(living.position.z).toBeCloseTo(-4.4, 5);
+    const bedroom = plans.find((plan) => plan.house === 'yellow' && plan.room === 'bedroom')!;
+    expect(bedroom.position.x).toBeCloseTo(-4.6, 5); // focal <house>-bed anchor
     const sorted = [...plans].sort((a, b) => a.house.localeCompare(b.house) || a.room.localeCompare(b.room));
     expect(plans).toEqual(sorted);
+  });
+
+  it('falls back to the centroid when a room has no focal anchor', () => {
+    const anchors: StudioInteriorAnchor[] = [
+      { id: 'h-sofa', room: 'living', position: [2, 0.1, 3], yaw: 0, footprint: [1, 1] },
+      { id: 'h-chair', room: 'living', position: [4, 0.1, 3], yaw: 0, footprint: [1, 1] },
+    ];
+    const [plan] = planStudioRoomPracticals(anchors);
+    expect(plan!.position.x).toBeCloseTo(3, 5);
   });
 
   it('fails closed on duplicate, unnamed or non-finite anchors', () => {
@@ -149,6 +162,44 @@ describe.each<StudioLightingMode>(['presentation', 'preview'])('studio lighting 
       expect(node.userData.presentationOnly).toBe(true);
       expect(node.userData.blocksShots).toBe(false);
     });
+    controller.dispose();
+  });
+
+  it(`hangs one visible fixture per practical with bounded instanced cost (${mode})`, () => {
+    const { scene, controller } = make();
+    controller.update();
+    const telemetry = controller.telemetry();
+    expect(telemetry.fixtures).toBe(14);
+    const rig = scene.getObjectByName('world-studio-lighting')!;
+    const fixtureMeshes = rig.children.filter((node): node is THREE.InstancedMesh => node instanceof THREE.InstancedMesh);
+    expect(telemetry.fixtureDrawCalls).toBe(fixtureMeshes.length);
+    expect(fixtureMeshes.length).toBeGreaterThan(0);
+    expect(fixtureMeshes.length).toBeLessThanOrEqual(8); // ≤8 draw calls: pendant×4 + flush×2 + batten×2
+    const totalInstances = fixtureMeshes.reduce((sum, mesh) => sum + mesh.count, 0);
+    // Part instances, not fixtures: pendant 4 plans x 4 parts, flush 8 x 2, batten 2 x 2.
+    expect(totalInstances).toBe(4 * 4 + 8 * 2 + 2 * 2);
+    for (const mesh of fixtureMeshes) {
+      expect(mesh.castShadow).toBe(false);
+      expect(mesh.receiveShadow).toBe(false);
+      expect(Number.isFinite(mesh.instanceMatrix.array[0] as number)).toBe(true);
+    }
+    controller.dispose();
+    expect(scene.children.length).toBe(0);
+  });
+
+  it(`keeps fixture glow emissive finite and bounded across every environment (${mode})`, () => {
+    const { root, scene, controller } = make();
+    for (const environment of STUDIO_ENVIRONMENTS) {
+      root.userData.env = environment;
+      controller.update();
+      const rig = scene.getObjectByName('world-studio-lighting')!;
+      rig.traverse((node) => {
+        if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshStandardMaterial && node.material.emissiveIntensity > 0) {
+          expect(Number.isFinite(node.material.emissiveIntensity)).toBe(true);
+          expect(node.material.emissiveIntensity).toBeLessThanOrEqual(2.4 + 1e-9);
+        }
+      });
+    }
     controller.dispose();
   });
 
