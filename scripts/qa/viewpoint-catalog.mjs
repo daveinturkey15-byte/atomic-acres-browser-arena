@@ -29,6 +29,10 @@ export const VIEWPOINT_CATALOG = Object.freeze({
     'world-studio-street',
     'world-studio-west-house',
     'world-studio-east-house',
+    'world-studio-west-living',
+    'world-studio-east-living',
+    'world-studio-west-bedroom',
+    'world-studio-west-yard',
   ]),
   'atomic-acres': Object.freeze([
     'nuke-town-overview',
