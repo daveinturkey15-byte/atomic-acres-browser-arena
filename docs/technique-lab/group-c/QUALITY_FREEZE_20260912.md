@@ -1,0 +1,40 @@
+# Group-C showcase-quality freeze — 2026-09-12
+
+Frozen BEFORE any change, at `2b5c7e2111806e4ea6c43ba74969e9d8bbbfbd36`, routed preflight green
+(`artifacts/pipeline/20260912T161855472Z-contribute.json`, `routing.mode: "routed"`, lane
+`showcase-c-quality-20260912`, clean).
+
+**The three largest concrete quality/source implementation gaps in the delivered group-C set, and
+nothing else this window.** (1) **Row 46** claims the register's items 4 and 6, but the bubble
+source is driven by `min(1, |∇h|·1.15)` — a slope proxy — while the register states the term must be
+"driven by the same turbulence estimator that drives foam", and names that estimator in item 7:
+*Jacobian-based breaking detection*, feeding a *persistent* world-fixed foam field that decays, "so
+foam rolls off the back of a breaker instead of appearing and vanishing with a threshold". Slope
+magnitude is not a Jacobian, a fold is not a slope, and a field with no memory is the exact failure
+mode the source calls out; the demo currently asserts the causal chain in prose and implements
+neither end of it. (2) **Row 36** demonstrates remesh-plus-bake entirely inside the browser factory
+on a wobbled icosahedron, so the register's own operative decision — "**Blender remesh+bake remains
+the free lane**", the free alternative it recommends over the proprietary hosted product — is
+recorded and never exercised, and the panel pair shows highpoly-vs-baked-lowpoly, which cannot show
+what the bake bought because the un-baked lowpoly is never rendered beside it. (3) **Row 38** is the
+only row whose two carrier bodies were both unread at delivery, and its scene implements exactly one
+of the register's six named technique atoms (mask-before-density); splines that "conform to terrain"
+run over flat ground, and per-**species** parameter sets, clump geometry with a blade material for
+ground cover, and the forest-floor blend that ties scatter back into the ground material are all
+absent, so the exhibit reads as a scatter test rather than the source's forest.
+
+**Method for closing them, declared in advance.** Row 46 gets a real Jacobian determinant of the
+horizontal displacement map with the fold test `J < 1` driving one shared turbulence scalar, that
+scalar feeding both a persistent decaying foam field and the in-integral bubble source, and the
+before/after panels retained so the tint-after-absorption failure stays inspectable. Row 36 gets an
+independently authored, deterministic, CPU-only headless Blender recipe (voxel remesh plus a
+BVH-nearest normal transfer), its `.blend`, its exported artefact, its command and hashes retained
+under owned folders, a reopen proof, and a third panel so un-baked and baked lowpoly sit side by
+side — declared as *our* adaptation of the register's free lane, **never** as a claim that the
+upstream product used Blender, which the evidence contradicts (it is a browser WebGPU app). Row 38
+gets its carriers read to EOF first, then species parameter sets, clump/blade ground cover, the
+forest-floor blend and a sculpted ground its spline field is projected onto.
+
+**What is deliberately NOT touched:** all sixteen source IDs 35–50 keep their identity, row 44 stays
+`blocked`, every surviving limitation stays, no existing assertion is relaxed, and rendered/pixel
+acceptance stays OPEN for every factory.

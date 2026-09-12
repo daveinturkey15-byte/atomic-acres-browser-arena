@@ -220,15 +220,21 @@ export const manifest: ManifestEntry[] = [
     title: 'Beer-Lambert absorption with broadband backscatter upstream of the integral',
     method:
       'Per-channel absorption over a depth ramp with a spectrally flat bubble source injected '
-      + 'inside the integral, beside the same energy added as a tint afterwards.',
+      + 'inside the integral, beside the same energy added as a tint afterwards. The source is '
+      + 'driven by the determinant of the horizontal-displacement Jacobian — the fold test that '
+      + 'locates breaking — accumulated into one decaying field read twice: as surface foam '
+      + 'composited after absorption, and as the bubble source inside it.',
     adaptation: 'adapted',
     sources: [
       'https://x.com/dangreenheck/status/2095028187063280085',
       'https://docs.threejswaterpro.com/license.html',
     ],
     limitation:
-      'Items 4 and 6 of thirteen. NOT an FFT ocean: the surface is the repository\'s existing '
-      + 'Gerstner forge. No foam field, SSR, refraction, caustics or Snell window.',
+      'Items 4, 6 and the breaking-detection half of 7, of thirteen. NOT an FFT ocean: the '
+      + 'spectrum is the repository\'s existing Gerstner forge. The foam field is per-vertex '
+      + 'state on a fixed patch, not a world-fixed camera-following texture, and its three layers '
+      + 'are not separated. No SSR, refraction, caustics or Snell window. Amplitude is the shipped '
+      + 'authored value; presentation choppiness Q is raised to 8 so the surface can fold at all.',
     createDemo: createSource46,
   },
   {

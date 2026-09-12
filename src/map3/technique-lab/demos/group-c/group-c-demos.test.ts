@@ -24,7 +24,14 @@ import { maskField, splineDensity } from './source-38';
 import { OPERATION_LOG, replay } from './source-39';
 import { deriveBuilding } from './source-42';
 import { fillHoles, voxelToMesh, weldVertices } from './source-45';
-import { shadeCorrect, shadeTintedAfter } from './source-46';
+import {
+  BREAKING_ONSET,
+  breakingTurbulence,
+  createFoamField,
+  gerstnerChop,
+  shadeCorrect,
+  shadeTintedAfter,
+} from './source-46';
 import { stepCriticallyDamped } from './source-49';
 import {
   CLEARED_OBSTACLES,
@@ -249,6 +256,145 @@ describe('source 46 — where the bubble term is injected changes the colour', (
     // Absorption alone must still darken with depth in the red first.
     const shallow = shadeCorrect(0.2, 0);
     expect(shallow.r).toBeGreaterThan(calmCorrect.r);
+  });
+});
+
+describe('source 46 — the breaking estimator is a real Jacobian, not a slope proxy', () => {
+  const AMPLITUDE = 1.55;
+  const CHOPPINESS = 5.6;
+
+  it('agrees with a finite-difference determinant of the displacement it applies', () => {
+    // The claim being checked is that `jacobian` is the derivative of the SAME
+    // map that moves the vertices. If the analytic term drifted from the
+    // displacement, the foam would appear where the surface is not folding.
+    const h = 1e-3;
+    for (const [x, z, t] of [[0, 0, 0], [37, -19, 2.5], [-84, 61, 7.25]] as const) {
+      const centre = gerstnerChop(x, z, t, AMPLITUDE, CHOPPINESS);
+      const px = gerstnerChop(x + h, z, t, AMPLITUDE, CHOPPINESS);
+      const mx = gerstnerChop(x - h, z, t, AMPLITUDE, CHOPPINESS);
+      const pz = gerstnerChop(x, z + h, t, AMPLITUDE, CHOPPINESS);
+      const mz = gerstnerChop(x, z - h, t, AMPLITUDE, CHOPPINESS);
+
+      const numericXX = (px.displacementX - mx.displacementX) / (2 * h);
+      const numericXZ = (pz.displacementX - mz.displacementX) / (2 * h);
+      const numericZX = (px.displacementZ - mx.displacementZ) / (2 * h);
+      const numericZZ = (pz.displacementZ - mz.displacementZ) / (2 * h);
+
+      expect(centre.dXdx).toBeCloseTo(numericXX, 6);
+      expect(centre.dXdz).toBeCloseTo(numericXZ, 6);
+      expect(centre.dZdx).toBeCloseTo(numericZX, 6);
+      expect(centre.dZdz).toBeCloseTo(numericZZ, 6);
+
+      const numericDeterminant = (1 + numericXX) * (1 + numericZZ) - numericXZ * numericZX;
+      expect(centre.jacobian).toBeCloseTo(numericDeterminant, 6);
+      // The displacement is a gradient field, so the cross terms must match.
+      expect(centre.dXdz).toBeCloseTo(centre.dZdx, 12);
+    }
+  });
+
+  it('is exactly 1 and exactly zero turbulence on water with no wave energy', () => {
+    for (const [x, z, t] of [[0, 0, 0], [12.5, -40, 3.5], [-77, 5, 11]] as const) {
+      const calm = gerstnerChop(x, z, t, 0, CHOPPINESS);
+      expect(calm.displacementX).toBe(0);
+      expect(calm.displacementZ).toBe(0);
+      expect(calm.jacobian).toBe(1);
+      expect(breakingTurbulence(calm.jacobian)).toBe(0);
+    }
+    // And an undisturbed surface is below onset, so nothing entrains there.
+    expect(breakingTurbulence(1)).toBe(0);
+    expect(breakingTurbulence(BREAKING_ONSET)).toBe(0);
+    expect(breakingTurbulence(0)).toBe(1);
+  });
+
+  it('measures that the SHIPPED sea never folds while the exhibit sea does', () => {
+    // Shipping choppiness is OCEAN_STEEPNESS_GAIN * OCEAN_CHOP_PRESENTATION_GAIN
+    // at the authored amplitude. This is a finding about our forge, and the
+    // demo states it in its counters rather than implying otherwise.
+    const shipping = 0.42 * 0.22;
+    let shippingMin = Number.POSITIVE_INFINITY;
+    let exhibitMin = Number.POSITIVE_INFINITY;
+    for (let step = 0; step < 24; step += 1) {
+      const t = step * 0.5;
+      for (let i = 0; i < 40; i += 1) {
+        const x = -100 + i * 5;
+        for (let j = 0; j < 8; j += 1) {
+          const z = -100 + j * 25;
+          shippingMin = Math.min(shippingMin, gerstnerChop(x, z, t, 1.55, shipping).jacobian);
+          exhibitMin = Math.min(exhibitMin, gerstnerChop(x, z, t, AMPLITUDE, CHOPPINESS).jacobian);
+        }
+      }
+    }
+    expect(shippingMin).toBeGreaterThan(BREAKING_ONSET);
+    expect(shippingMin).toBeLessThan(1);
+    expect(exhibitMin).toBeLessThan(BREAKING_ONSET);
+  });
+
+  it('keeps foam as decaying state so it outlives the crest that made it', () => {
+    const field = createFoamField(3, { decaySeconds: 2, crestStrength: 1, windwardStrength: 0 });
+    const dt = 1 / 60;
+    field.deposit(0, 1, 0, dt);
+    const deposited = field.energy[0];
+    // Float32 storage: the field is a Float32Array, so seven digits is the
+    // precision the representation actually carries, not a relaxed bar.
+    expect(deposited).toBeCloseTo(dt, 7);
+
+    // The crest has passed: nothing more is entrained anywhere.
+    let seconds = 0;
+    for (let step = 0; step < 120; step += 1) {
+      field.decay(dt);
+      seconds += dt;
+    }
+    // A per-frame threshold would be zero the instant turbulence stopped. This
+    // must still be there, and must follow the declared time constant.
+    expect(field.energy[0]).toBeGreaterThan(0);
+    expect(field.energy[0]).toBeCloseTo(deposited * Math.exp(-seconds / 2), 7);
+    expect(field.energy[1]).toBe(0);
+
+    // Accumulation saturates rather than running away.
+    for (let step = 0; step < 600; step += 1) field.deposit(2, 1, 0, dt);
+    expect(field.energy[2]).toBeLessThanOrEqual(1);
+  });
+
+  it('builds an exhibit that actually breaks, and says so in its counters', () => {
+    const entry = manifest.find((row) => row.sourceId === 46)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const counters = demo.metadata.counters!;
+
+    // The exhibit must reach the regime it claims to show. A demo whose
+    // Jacobian never crossed the onset would be a still life with a caption.
+    expect(counters.minJacobianSeen).toBeLessThan(BREAKING_ONSET);
+    expect(counters.peakBreakingVertices).toBeGreaterThan(0);
+    expect(counters.peakBreakingVertices).toBeLessThan(counters.surfaceVertices);
+
+    // And the measured claim about our own forge: the shipped sea does not.
+    expect(counters.shippingJacobianMinimum).toBeGreaterThan(BREAKING_ONSET);
+    expect(counters.shippingJacobianMinimum).toBeLessThan(1);
+
+    // The green shift is the whole point, and only the correct model has it.
+    expect(counters.peakGreenMinusRed).toBeGreaterThan(counters.tintedGreenMinusRed);
+
+    demo.dispose();
+  });
+
+  it('routes one state to both consumers, and foam floats on top of the colour', () => {
+    const depth = 3.2;
+    // Same bubble state, different consumer: inside the integral it shifts hue,
+    // on the surface it whitens. A demo that used two different estimators
+    // could show glow with no whitecap; these cannot disagree.
+    const glow = shadeCorrect(depth, 0.8, 0);
+    const whitened = shadeCorrect(depth, 0.8, 1);
+    expect(whitened.r).toBeGreaterThan(glow.r);
+    expect(whitened.g).toBeGreaterThan(glow.g);
+    // Foam cover is capped, so the water still reads through it rather than
+    // becoming the foam colour, and the brightest sample the exhibit can
+    // produce — deepest water, saturated bubbles, full foam — must not clip.
+    // Clipping is not cosmetic here: white is where the green shift dies.
+    expect(whitened.g).toBeLessThan(0.86);
+    const brightest = shadeCorrect(3.4, 1, 1);
+    for (const channel of [brightest.r, brightest.g, brightest.b]) {
+      expect(channel).toBeGreaterThan(0);
+      expect(channel).toBeLessThan(1);
+    }
   });
 });
 
