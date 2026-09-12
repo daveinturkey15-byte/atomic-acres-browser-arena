@@ -500,6 +500,7 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   d.append(meta);
 
   d.append(text('h2', 'tl-section-title', 'Original source links'));
+  d.append(text('p', 'tl-muted', 'These links open externally; the host never fetches them. Recorded research reads are shown separately below.'));
   const list = document.createElement('ul');
   list.className = 'tl-sources';
   if (record.sources.length === 0) {
@@ -1026,6 +1027,11 @@ function addProblem(record: ResolvedRecord, message: string, alert = false): voi
   if (alert) record.alerts += 1;
 }
 
+/** A display-title difference is provenance information, not a demo failure. */
+function addNotice(record: ResolvedRecord, message: string): void {
+  if (!record.notices.includes(message)) record.notices.push(message);
+}
+
 function refreshMetrics(state: LabState): void {
   const info = state.renderer?.info?.render as
     | { drawCalls?: number; calls?: number; triangles?: number }
@@ -1130,6 +1136,9 @@ async function refreshGroups(
       record.group = group;
       // An adapted technique can have a more specific demonstration title.
       // Identity is bound to sourceId, not text equality with the source title.
+      if (record.title !== entry.title) {
+        addNotice(record, 'Demo title differs from public record; showing demo title.');
+      }
       record.title = entry.title;
       record.sources = [...entry.sources];
     }
