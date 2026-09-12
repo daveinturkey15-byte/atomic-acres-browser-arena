@@ -72,7 +72,7 @@ export function createGardenPalette(): GardenPalette {
     const knot = Math.exp(-Math.hypot((u * 4) % 1 - 0.5, (v * 4) % 1 - 0.5) * 9) * (noise.hash(board, Math.floor(u * 4)) > 0.82 ? 1 : 0);
     const gap = ((v * 4) % 1) < 0.045 ? 0.55 : 1;
     const value = (0.56 + grain * 0.045 + silver - knot * 0.22) * gap;
-    return { albedo: [value * 1.0, value * 0.82, value * 0.62], height: 0.5 + grain * 0.12 - knot * 0.3 - (gap < 1 ? 0.35 : 0), roughness: 0.78 + grain * 0.05 + knot * 0.1 };
+    return { albedo: [value * 0.98, value * 0.86, value * 0.72], height: 0.5 + grain * 0.12 - knot * 0.3 - (gap < 1 ? 0.35 : 0), roughness: 0.78 + grain * 0.05 + knot * 0.1 };
   }, 0.6, 0.0025, 9101);
   // Painted lap siding: a 190 mm course shadow line every course, brush texture inside.
   const painted = forge('painted-lap', (u, v, noise) => {

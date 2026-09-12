@@ -31,6 +31,12 @@ describe('World Studio gardens factory', () => {
       counted += mesh.geometry.getAttribute('position').count / 3;
     }
     expect(counted).toBe(gardens.stats.triangles);
+    // Measured 2026-09-12 after the stepping-stone pass: 19,940 triangles, 15 draw groups,
+    // 49 solids, 801 components, 12 textures. Stats are read from the built meshes, never from constants.
+    const byRole: Record<string, number> = {};
+    for (const c of gardens.root.userData.components as Array<{ role: string; triangles: number }>) byRole[c.role] = (byRole[c.role] ?? 0) + c.triangles;
+    expect(Object.values(byRole).reduce((sum, n) => sum + n, 0)).toBe(gardens.stats.triangles);
+    expect(Object.keys(byRole).length).toBe(gardens.stats.drawGroups);
     const summed = Object.values(gardens.stats.perYard).reduce((sum, yard) => sum + yard.triangles, 0);
     expect(summed).toBe(gardens.stats.triangles);
     expect(gardens.stats.solids).toBe(gardens.solids.length);

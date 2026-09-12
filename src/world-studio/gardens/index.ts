@@ -92,7 +92,6 @@ type PartOptions = Readonly<{
   segments?: number;
   /** Cylinder/cone top radius as a fraction of the bottom radius. */
   taper?: number;
-  cast?: boolean;
 }>;
 
 const DEFAULT_SOLID_MATERIAL: Partial<Record<GardenRole, BallisticMaterialId>> = {
@@ -235,6 +234,14 @@ export function createStudioGardens(options: StudioGardensOptions = {}): StudioG
     for (let i = 0; i < 7; i += 1) for (let j = 0; j < 8; j += 1) {
       const dark = rng() > 0.7;
       part(`paver-${i}-${j}`, 'concrete', [0.65 + i * 0.6, 0.045 + (dark ? 0.004 : 0), 4.75 + j * 0.6], [0.586, 0.05, 0.586]);
+    }
+
+    // Stepping stones link the patio to the laundry and shed, skipping the concrete cross path.
+    prop = 'stepping-stones';
+    for (let k = 0; k < 30; k += 1) {
+      const z = 3.6 - k * 0.72;
+      if (z < -18.4 || (z > -14.3 && z < -11.7)) continue;
+      part(`stone-${k}`, 'concrete', [4.6 + (rng() - 0.5) * 0.12, 0.02 + (rng() > 0.6 ? 0.006 : 0), z], [0.44 + rng() * 0.06, 0.04, 0.44 + rng() * 0.06], { shape: 'cylinder', segments: 11 });
     }
 
     // ------------------------------------------------------------------ deck
@@ -393,8 +400,10 @@ export function createStudioGardens(options: StudioGardensOptions = {}): StudioG
       part(`door-${k}`, yard.side === 'teal' ? 'paintedWhite' : 'paintedGreen', [S.lx0 - 0.04, 0.12 + 0.98, dz], [0.04, 1.96, leafW]);
       for (const [j, y] of [0.45, 1.12, 1.8].entries()) part(`door-${k}-ledge-${j}`, trim, [S.lx0 - 0.075, y, dz], [0.03, 0.09, leafW - 0.06]);
       segment(`door-${k}-brace`, trim, [S.lx0 - 0.075, 0.5, dz - (leafW / 2 - 0.08)], [S.lx0 - 0.075, 1.76, dz + (leafW / 2 - 0.08)], 0.05);
-      if (yard.side === 'yellow') for (const [j, y] of [0.5, 1.75].entries()) part(`door-${k}-hinge-${j}`, 'blackSteel', [S.lx0 - 0.1, y, dz + side * 0.12], [0.012, 0.04, 0.3]);
-      part(`door-${k}-handle`, 'galvanised', [S.lx0 - 0.1, 1.05, dz - side * (leafW / 2 - 0.1) * (yard.side === 'teal' ? -1 : 1)], [0.03, 0.12, 0.03], { shape: 'cylinder', segments: 8 });
+      // Strap hinges hang off the outer jamb of each yellow leaf; handles sit at the meeting edge.
+      if (yard.side === 'yellow') for (const [j, y] of [0.5, 1.75].entries()) part(`door-${k}-hinge-${j}`, 'blackSteel', [S.lx0 - 0.1, y, dz + side * (leafW / 2 - 0.17)], [0.012, 0.04, 0.3]);
+      const handleZ = yard.side === 'teal' ? dz + leafW / 2 - 0.12 : dz - side * (leafW / 2 - 0.1);
+      part(`door-${k}-handle`, 'galvanised', [S.lx0 - 0.1, 1.05, handleZ], [0.03, 0.12, 0.03], { shape: 'cylinder', segments: 8 });
     }
     part('door-jamb-0', trim, [S.lx0 - 0.035, 0.12 + 1.0, sz - doorW / 2 - 0.04], [0.07, 2.0, 0.08]);
     part('door-jamb-1', trim, [S.lx0 - 0.035, 0.12 + 1.0, sz + doorW / 2 + 0.04], [0.07, 2.0, 0.08]);
