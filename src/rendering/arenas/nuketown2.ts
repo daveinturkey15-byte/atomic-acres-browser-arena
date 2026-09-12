@@ -256,7 +256,7 @@ export const definition = createProceduralArenaVisualDefinition({
     // the old fixed coordinates kept capturing the street cars. Apply handedness
     // once, as for the vehicle itself. The near station frames its front quarter.
     camera('nuketown2-truck-cab-near',
-      [hx(truck.cabX + truck.cabLength / 2 + 2), 1.7, truck.z - 3.5],
+      [hx(truck.cabX + truck.cabLength / 2 + 2), 1.7, truck.z + 3.5],
       [hx(truck.cabX + 1), 1.5, truck.z], 'geometry', 1.08),
     // PASS 94 TECHNIQUES close-range evidence. These cameras are deliberately
     // authored against the prop/decal coordinates, not added to the gameplay

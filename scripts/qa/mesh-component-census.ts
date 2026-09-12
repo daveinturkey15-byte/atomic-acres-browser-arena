@@ -1,0 +1,61 @@
+import * as THREE from 'three';
+
+export interface MeshComponent {
+  readonly bounds: THREE.Box3;
+  readonly vertexCount: number;
+}
+
+/**
+ * Connected triangle components, with 10-micrometre world-space welding for
+ * Float32 seams. Unlike moving-centroid clustering, membership does not depend
+ * on vertex order or assume a maximum wheel radius. Every vertex is accounted
+ * for; unsupported or unmeasurable geometry is an error, never an empty census.
+ */
+export function meshComponentCensus(meshes: readonly THREE.Mesh[]): MeshComponent[] {
+  const vertices: THREE.Vector3[] = [];
+  const parents: number[] = [];
+  const welded = new Map<string, number>();
+  function find(index: number): number {
+    while (parents[index] !== index) {
+      parents[index] = parents[parents[index]!]!;
+      index = parents[index]!;
+    }
+    return index;
+  }
+  function join(a: number, b: number): void {
+    a = find(a); b = find(b);
+    if (a !== b) parents[b] = a;
+  }
+  for (const mesh of meshes) {
+    mesh.updateWorldMatrix(true, false);
+    const position = mesh.geometry.getAttribute('position');
+    if (mesh.geometry.index || !position || position.itemSize !== 3 || position.count === 0 || position.count % 3 !== 0) {
+      throw new Error(`${mesh.name}: component census requires nonempty non-indexed XYZ triangles`);
+    }
+    if (!mesh.matrixWorld.elements.every(Number.isFinite)) throw new Error(`${mesh.name}: non-finite world transform`);
+    for (let i = 0; i < position.count; i++) {
+      const vertex = new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      if (!vertex.toArray().every(Number.isFinite)) throw new Error(`${mesh.name}: non-finite position at ${i}`);
+      const index = vertices.length;
+      vertices.push(vertex); parents.push(index);
+      const key = vertex.toArray().map(value => Math.round(value * 1e5)).join(',');
+      const previous = welded.get(key);
+      if (previous !== undefined) join(index, previous);
+      else welded.set(key, index);
+      if (i % 3 !== 0) join(index, index - 1);
+    }
+  }
+  const components = new Map<number, { bounds: THREE.Box3; vertexCount: number }>();
+  vertices.forEach((vertex, index) => {
+    const root = find(index);
+    let component = components.get(root);
+    if (!component) {
+      component = { bounds: new THREE.Box3(), vertexCount: 0 };
+      components.set(root, component);
+    }
+    component.bounds.expandByPoint(vertex);
+    component.vertexCount++;
+  });
+  return [...components.values()].sort((a, b) =>
+    a.bounds.min.x - b.bounds.min.x || a.bounds.min.y - b.bounds.min.y || a.bounds.min.z - b.bounds.min.z);
+}

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { meshComponentCensus } from '../scripts/qa/mesh-component-census';
 import { describe, expect, it } from 'vitest';
 import { auditNuketown2Coplanar } from './nuketown2-coplanar-audit';
 import { isBlocked } from './collision';
@@ -786,8 +787,7 @@ describe('Nuke Town Rebuild fidelity', () => {
    * world-space tyre geometry the player actually sees, clusters it into
    * wheels, and requires every wheel to sit on the authored body it dresses.
    */
-  it('lands every forged tyre on the authored vehicle body it dresses', () => {
-    const map = buildNuketown2(new THREE.Scene());
+  function assertForgedTyrePlacement(map: ArenaMap): void {
     map.root.updateMatrixWorld(true);
 
     // 1. The baked, world-space tyre bucket.
@@ -799,35 +799,21 @@ describe('Nuke Town Rebuild fidelity', () => {
     });
     expect(tyreMeshes.length, 'forged tyre-bucket meshes in the scene').toBeGreaterThan(0);
 
-    // 2. Cluster tyre vertices into WHEELS: greedy buckets by plan position
-    //    within 0.5 m (a wheel is 0.84 m across at most, and the nearest two
-    //    wheels on any vehicle here are 1.58 m apart in plan).
-    type Cluster = { x: number; z: number; yMin: number; yMax: number; n: number };
-    const clusters: Cluster[] = [];
-    for (const mesh of tyreMeshes) {
-      const position = mesh.geometry.getAttribute('position');
-      const vertex = new THREE.Vector3();
-      for (let i = 0; i < position.count; i += 1) {
-        vertex.fromBufferAttribute(position as THREE.BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
-        let found = clusters.find((c) => Math.hypot(c.x / c.n - vertex.x, c.z / c.n - vertex.z) < 0.5);
-        if (!found) {
-          found = { x: 0, z: 0, yMin: Infinity, yMax: -Infinity, n: 0 };
-          clusters.push(found);
-        }
-        found.x += vertex.x;
-        found.z += vertex.z;
-        found.yMin = Math.min(found.yMin, vertex.y);
-        found.yMax = Math.max(found.yMax, vertex.y);
-        found.n += 1;
-      }
-    }
+    // 2. Follow triangle connectivity, not proximity to a moving centroid.
+    // The latter split the authored 0.94m coach tyres into tall "dressing".
+    // Every vertex remains accounted for; malformed geometry fails closed.
+    const components = meshComponentCensus(tyreMeshes);
+    expect(components.reduce((sum, c) => sum + c.vertexCount, 0))
+      .toBe(tyreMeshes.reduce((sum, mesh) => sum + mesh.geometry.getAttribute('position').count, 0));
     // A WHEEL IS THE TALL THING IN THE TYRE BUCKET. HF-536 also puts the
     // grounded dressing there - the underbody block and the contact pool, both
     // matte dark, both merged into the same draw - so the bucket is separated
     // by vertical extent rather than by name: a wheel spans its full diameter
     // (0.68 m at the smallest), a dressing plate is flat.
-    const all = clusters.map((c) => ({
-      x: c.x / c.n, z: c.z / c.n, y: (c.yMin + c.yMax) / 2, height: c.yMax - c.yMin,
+    const all = components.map(({ bounds }) => ({
+      x: (bounds.min.x + bounds.max.x) / 2, z: (bounds.min.z + bounds.max.z) / 2,
+      y: (bounds.min.y + bounds.max.y) / 2, height: bounds.max.y - bounds.min.y,
+      minY: bounds.min.y,
     }));
     const wheels = all.filter((c) => c.height >= 0.5);
     const dressing = all.filter((c) => c.height < 0.5);
@@ -866,13 +852,21 @@ describe('Nuke Town Rebuild fidelity', () => {
 
     // 4b. Every wheel is at a real wheel height.
     for (const wheel of wheels) {
-      const nearest = [0.34, 0.42].reduce((best, r) => (
-        Math.abs(r - wheel.y) < Math.abs(best - wheel.y) ? r : best), 0.42);
+      // The coach's 0.47m radius is independently pinned in coach-polish.test.
+      // Select by the authoritative body, so a larger coach wheel cannot excuse
+      // an oversized sedan or truck tyre. Preserve the existing 50mm tolerance.
+      const radii = bodies.filter(({ box }) => wheel.x >= box.min.x - 0.6 && wheel.x <= box.max.x + 0.6
+        && wheel.z >= box.min.z - 0.6 && wheel.z <= box.max.z + 0.6)
+        .map(({ name }) => /coach body$/.test(name) ? 0.47 : /truck/.test(name) ? 0.42 : 0.34);
+      expect(radii.length).toBeGreaterThan(0);
+      const nearest = radii.reduce((best, r) => Math.abs(r - wheel.y) < Math.abs(best - wheel.y) ? r : best, radii[0]!);
       expect(
         Math.abs(wheel.y - nearest),
         `wheel at (${wheel.x.toFixed(2)}, ${wheel.z.toFixed(2)}) centres at y ${wheel.y.toFixed(3)}, `
-          + `which is not a forge wheel radius (0.34 / 0.42)`,
+          + `which does not match the body radius ${nearest}`,
       ).toBeLessThanOrEqual(0.05);
+      expect(wheel.minY, 'tyre must meet the ground/contact patch').toBeGreaterThanOrEqual(-1e-5);
+      expect(wheel.minY, 'tyre must not float').toBeLessThanOrEqual(0.05);
     }
 
     // 4c. R24 in its strict form for the TRUCK, the vehicle the defect is on:
@@ -896,6 +890,30 @@ describe('Nuke Town Rebuild fidelity', () => {
           + 'constants that place the box wheels (src/nuketown2-arena.ts ~2917-2925).',
       ).toBeGreaterThanOrEqual(2);
     }
+  }
+
+  it('lands every forged tyre on the authored vehicle body it dresses', () => {
+    assertForgedTyrePlacement(buildNuketown2(new THREE.Scene()));
+  });
+
+  it.each(['displaced', 'floating', 'malformed'] as const)('rejects %s tyre geometry through the actual placement gate', defect => {
+    const map = buildNuketown2(new THREE.Scene());
+    let touched = 0;
+    map.root.traverse(object => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh || !/^vehicle-forge (merged )?[\w-]* ?tyre$/u.test(mesh.name)) return;
+      const p = mesh.geometry.getAttribute('position');
+      touched += p.count;
+      for (let i = 0; i < p.count; i++) {
+        if (defect === 'displaced') p.setX(i, p.getX(i) + 30);
+        if (defect === 'floating') p.setY(i, p.getY(i) + 0.2);
+      }
+      if (defect === 'malformed') p.setX(0, NaN);
+    });
+    expect(touched).toBeGreaterThan(0);
+    const expected = defect === 'displaced' ? /sit on no authored vehicle body/
+      : defect === 'floating' ? /does not match the body radius/ : /non-finite position/;
+    expect(() => assertForgedTyrePlacement(map)).toThrow(expected);
   });
 
   it('lands every forged vehicle skin on the collider body it dresses, mirrored with it', () => {
