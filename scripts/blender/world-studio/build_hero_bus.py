@@ -65,6 +65,8 @@ COWL_Y = -HALF_LEN + 0.62      # front ring of the main loft
 PILLAR_Y0 = COWL_Y + 0.33      # first window pillar
 PILLAR_STEP = 0.93
 PILLAR_COUNT = 10              # ten pillars -> nine glazed bays per side
+# Kerb side in Blender X. Exported nose faces +Z with +Y up, so right = forward x up = -X.
+DOOR_SIDE = -1
 TAIL_Y = HALF_LEN
 HOOD_TOP = 1.805
 # The mid-century snub-nose transit bus in the reference carries a near-vertical windscreen.
@@ -302,6 +304,18 @@ def flank_x(z: float, hw_sill: float, hw_belt: float) -> float:
     return hw_sill + (hw_belt - hw_sill) * (t ** 0.45)
 
 
+def skin_x(z: float) -> float:
+    """Outer half width of the body at any height - the single source the door follows."""
+    if z <= Z_BOTTOM + 0.098:
+        return HW_SILL * 0.996
+    if z <= Z_SILL:
+        t = (z - (Z_BOTTOM + 0.098)) / (Z_SILL - (Z_BOTTOM + 0.098))
+        return HW_SILL * (0.996 + 0.004 * t)
+    if z <= Z_BELT:
+        return flank_x(z, HW_SILL, HW_BELT)
+    return tumble_x(z, HW_BELT, HW_TOP)
+
+
 def tumble_x(z: float, hw_belt: float, hw_top: float) -> float:
     t = (z - Z_BELT) / ((Z_TOP - R_TOP) - Z_BELT)
     t = min(1.0, max(0.0, t))
@@ -437,6 +451,8 @@ def glazing(b: Builder) -> int:
         y0 = PILLAR_Y0 + bay * PILLAR_STEP + 0.054
         y1 = PILLAR_Y0 + (bay + 1) * PILLAR_STEP - 0.054
         for side in (-1, 1):
+            if bay == 0 and side == DOOR_SIDE:
+                continue  # the kerb-side entry door occupies the first bay
             chamfer_box(b, (side * (x_seat + GLASS_PROUD), (y0 + y1) / 2.0, z_mid),
                         (0.012, y1 - y0, z_h), M_GLASS, 0.004)
             panes += 1
@@ -481,6 +497,39 @@ def trim(b: Builder) -> None:
             us.append((ca, 0.0, sa))
             vs.append((0.0, 1.0, 0.0))
         sweep(b, path, us, vs, 0.014, 0.030, M_PAINT)
+
+
+def entry_door(b: Builder) -> None:
+    """Kerb-side entry door in the first bay: two leaves, solid below the waist, glazed above.
+
+    Every part is swept up the body's own `skin_x` profile, so the door follows the flank curve
+    instead of cutting a flat slab through a body that changes width with height.
+    """
+    side = DOOR_SIDE
+    y0, y1 = PILLAR_Y0 + 0.055, PILLAR_Y0 + PILLAR_STEP - 0.055
+    y_mid, span = (y0 + y1) / 2.0, y1 - y0
+    z_lo, z_hi = 0.735, Z_WIN_TOP - 0.015
+
+    def slab(y_centre: float, half_len: float, inset: float, half_thick: float,
+             mat: int, zlo: float, zhi: float) -> None:
+        pts = [zlo + (zhi - zlo) * k / 8.0 for k in range(9)]
+        sweep(b, [(side * (skin_x(z) - inset), y_centre, z) for z in pts],
+              [(side, 0.0, 0.0)] * len(pts), [(0.0, 1.0, 0.0)] * len(pts),
+              half_thick, half_len, mat)
+
+    # The aperture: a dark reveal the leaves sit inside, so the door reads as a real opening.
+    slab(y_mid, span / 2.0 + 0.014, 0.060, 0.020, M_INTERIOR, z_lo - 0.014, z_hi + 0.014)
+    gap = 0.026
+    leaf_half = (span - gap) / 4.0
+    for leaf in (-1, 1):
+        y_leaf = y_mid + leaf * (leaf_half + gap / 2.0)
+        slab(y_leaf, leaf_half, 0.012, 0.016, M_PAINT, z_lo, 1.790)          # lower panel
+        slab(y_leaf, leaf_half, 0.012, 0.016, M_PAINT, 1.790, 1.830)         # waist rail
+        slab(y_leaf, leaf_half - 0.030, 0.020, 0.007, M_GLASS, 1.856, z_hi - 0.026)
+    # Grab handle on the leading edge and the step well below the sill.
+    sweep(b, [(side * (skin_x(z) - 0.004), y0 - 0.012, z) for z in (1.15, 1.55, 1.95)],
+          [(side, 0.0, 0.0)] * 3, [(0.0, 1.0, 0.0)] * 3, 0.016, 0.016, M_CHROME)
+    slab(y_mid, span / 2.0 - 0.02, 0.115, 0.015, M_INTERIOR, Z_BOTTOM + 0.02, z_lo - 0.02)
 
 
 def front_end(b: Builder) -> None:
@@ -845,6 +894,7 @@ def main() -> None:
     shell = Builder()
     info = build_body(shell)
     panes = glazing(shell)
+    entry_door(shell)
     trim(shell)
     front_end(shell)
     rear_end(shell)

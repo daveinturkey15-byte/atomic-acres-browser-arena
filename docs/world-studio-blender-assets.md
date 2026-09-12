@@ -36,11 +36,11 @@ Blender I/O v5.1.20. Runtime three.js: 0.185.1.
 
 | File | SHA-256 | Bytes |
 |---|---|---|
-| `public/assets/world-studio/blender/hero-bus.glb` | `6300e2e488cd46e6e977cc4ab80fa381a4464cbbf884e30b729b81ef47dae44a` | 1,318,396 |
+| `public/assets/world-studio/blender/hero-bus.glb` | `a7059b50bdd41281377a54cb65f51c51b06d67c4ca2ae03d7e0ee9982a6b0ff5` | 1,339,668 |
 | `public/assets/world-studio/blender/bus_body_basecolor.png` | `7925c38c10361b215febbad4919f994a31f7083642d4b2ec90030c2ab8ce6478` | 103,299 |
 | `public/assets/world-studio/blender/bus_body_roughness.png` | `39d5920d3eea908af5693b4d5f20d483397627b210f18f6b698ee62719108f2b` | 70,583 |
 | `public/assets/world-studio/blender/bus_body_normal.png` | `0c3ac3fa27d942fb1553c4073e5a7ad8ab17b993f217e32b576234def55c7d36` | 164,359 |
-| `scripts/blender/world-studio/source/hero-bus.blend` | see note on determinism | 1,841,484 |
+| `scripts/blender/world-studio/source/hero-bus.blend` | not byte-stable, see determinism below | 1,867,688 |
 
 Source and tooling: `scripts/blender/world-studio/build_hero_bus.py`,
 `blender_launcher.py`, `probe_api.py`, `verify_blend.py`, `validate_glb.mjs`;
@@ -50,7 +50,7 @@ runtime API `src/world-studio/blender-assets/index.ts` (+ `index.test.ts`).
 
 Measured by `validate_glb.mjs` against the exported binary, not asserted from intent:
 
-- **21,924 indexed triangles**, 26,271 vertices (budget: ≤ 25,000).
+- **22,440 indexed triangles**, 26,839 vertices (budget: ≤ 25,000).
 - **8 materials, 8 glTF primitives, 1 mesh** — one draw group per material (budget: ≤ 8).
 - **Bounds 2.976 m (X) × 3.197 m (Y) × 9.970 m (Z)**, minimum Y `0.002` — inside the 3 × 3.2 ×
   10 m game envelope, long axis Z, Y-up, real metres, tyre contact patch on the ground plane.
@@ -112,6 +112,10 @@ Specific methods applied, with where they live in the build script:
 - **Wheels as lathes** (§7) — `wheel()` revolves a closed 11-point tyre section and a 9-point
   steel-rim section, dished outboard, with hub ring and five lug nuts on the four wheels whose
   outboard face is visible. Six wheels: two front, four in rear duals.
+- **The entry door follows the surface it sits on** — `entry_door()` sweeps every part (reveal,
+  two leaves, waist rail, glazing, handle, step well) along `skin_x(z)`, the single function that
+  returns the body's outer half width at any height. A flat door slab would be 50 mm proud at the
+  skirt and 50 mm sunk at the belt, because the flank changes width with height.
 - **Bevels authored into the geometry** — `chamfer_box()` emits 6 face quads, 12 chamfer quads
   and 8 corner triangles, so every box edge catches a highlight without a modifier.
 - **Determinism** (`atomic-acres-procedural-art-authoring` §1) — seeded integer hash, no
@@ -131,12 +135,12 @@ the references are the owner's own concept images.
   chunk walk, per-primitive accessor checks, raw normal-buffer scan for NaN/zero normals,
   material and embedded-image checks. **All checks passed.**
 - **Real three.js CPU parse** in the same script: `GLTFLoader.parse()` on the bytes produced
-  8 meshes and 21,924 triangles with bounds matching the container. Node cannot decode the
+  8 meshes and 22,440 triangles with bounds matching the container. Node cannot decode the
   embedded PNGs (no DOM image decoder), so three logs three `Couldn't load texture` warnings;
   that is a Node limitation, not an asset defect — the images are verified present and embedded
   by the container check. A shim sets `globalThis.self` because the jsm loader probes it.
 - **Fresh-Blender reopen** (`verify_blend.py`, separate headless invocation): the saved `.blend`
-  reopens with 1 mesh object, 21,924 triangles, all 8 material slots, a `UVMap` layer, three
+  reopens with 1 mesh object, 22,440 triangles, all 8 material slots, a `UVMap` layer, three
   512×512 images with correct colour spaces, metric units at scale 1.0, `exportable: true`.
 - **Determinism**: a second full rebuild produced **byte-identical** `hero-bus.glb` and all three
   PNGs (same SHA-256). The `.blend` is **not** byte-stable across rebuilds — Blender embeds
@@ -191,8 +195,10 @@ are untouched.
    station behind it or the loft folds over itself at the roof. The reference bus's screen is
    only a few degrees off vertical, so this reads correctly, but it is a deliberate deviation
    from the recipe's "cut the glass out of the loft" rule for those two panes.
-5. **No entry door on the kerb side.** The reference's folding passenger door was not modelled;
-   the front-right bay is plain glazing. This is the most visible remaining gap.
+5. **The kerb-side entry door is modelled but static.** Two leaves, solid below the waist and
+   glazed above, swept up the body's own `skin_x` profile inside a dark reveal, with a grab
+   handle and a step well. It does not open and is not a separate node, so it cannot be
+   animated, and it carries no interaction or traversal semantics of any kind.
 6. **No livery, lettering or number plate graphics** — no branded trade dress was authored, and
    the plate is a blank clear panel.
 7. **The truck and white trailer were not authored.** The brief ordered a coherent bus first and
