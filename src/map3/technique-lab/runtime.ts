@@ -427,6 +427,7 @@ function recordVisible(state: LabState, record: ResolvedRecord): boolean {
 
 const STAGE_LABELS = [
   'Link saved',
+  'Source fetched',
   'Source inspected',
   'Technique extracted',
   'Implemented',
@@ -439,10 +440,11 @@ function stagesFor(
 ): Array<{ label: string; done: boolean }> {
   return [
     { label: STAGE_LABELS[0], done: record.sources.length > 0 },
-    { label: STAGE_LABELS[1], done: evidence?.inspected === true },
-    { label: STAGE_LABELS[2], done: evidence?.extracted === true },
-    { label: STAGE_LABELS[3], done: record.entry?.createDemo != null },
-    { label: STAGE_LABELS[4], done: false },
+    { label: STAGE_LABELS[1], done: evidence?.fetched === true },
+    { label: STAGE_LABELS[2], done: evidence?.inspected === true },
+    { label: STAGE_LABELS[3], done: evidence?.extracted === true },
+    { label: STAGE_LABELS[4], done: record.entry?.createDemo != null },
+    { label: STAGE_LABELS[5], done: false },
   ];
 }
 
@@ -545,6 +547,7 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
   d.append(stages);
 
   d.append(text('h2', 'tl-section-title', 'Research records'));
+  d.append(text('p', 'tl-research-note', 'Research stages below report group-authored read and extraction records; they are not independent attestations or owner approval.'));
   d.append(text('p', 'tl-research-summary', state.researchSummary));
   for (const line of state.researchIgnored) {
     d.append(text('p', 'tl-research-ignored', line));
@@ -1275,6 +1278,7 @@ function validateEntry(raw: unknown): { entry: DemoManifestEntry | null; problem
 /** Validated, bounded evidence taken from one group's research record. */
 interface ResearchEvidence {
   group: string;
+  fetched: boolean;
   inspected: boolean;
   inspectedDetail: string[];
   extracted: boolean;
@@ -1322,7 +1326,8 @@ function absorbResearchRow(
   }
   if (into.has(id)) return 'duplicate';
   const evidence: ResearchEvidence = {
-    group,
+    group: nonEmpty(r.group) ?? group,
+    fetched: false,
     inspected: false,
     inspectedDetail: [],
     extracted: false,
@@ -1332,7 +1337,6 @@ function absorbResearchRow(
   // Pinned revision (group A `pin`, groups B/C `canonical`).
   const pin = nonEmpty(r.pin) ?? nonEmpty(r.canonical);
   if (pin) {
-    evidence.inspected = true;
     evidence.inspectedDetail.push(`pin: ${truncate(pin, 200)}`);
     const sha = pin.match(/[0-9a-f]{40}/i);
     if (sha) evidence.inspectedDetail.push(`git sha: ${sha[0].toLowerCase()}`);
@@ -1341,7 +1345,7 @@ function absorbResearchRow(
   }
   // Recorded read depth (evidence kind: an actual read, not a saved link).
   const readDepth = nonEmpty(r.readDepth);
-  if (readDepth) {
+  if (readDepth && !/not read|not inspected|unread|fetched only|^none|^unknown|nothing was retrieved|no technique content/i.test(readDepth)) {
     evidence.inspected = true;
     evidence.inspectedDetail.push(`read depth: ${truncate(readDepth, 160)}`);
   }
@@ -1351,33 +1355,42 @@ function absorbResearchRow(
       return u.outcome === 'ok';
     }).length;
     if (okReads > 0) {
-      evidence.inspected = true;
-      evidence.inspectedDetail.push(`${okReads} recorded source URL read(s)`);
+      evidence.fetched = true;
+      evidence.inspectedDetail.push(`${okReads} successful source fetch(es); fetching alone is not inspection`);
     }
   }
-  if (Array.isArray(r.filesRead) && r.filesRead.length > 0) {
+  if (Array.isArray(r.urls) && r.urls.some((u) => {
+    if (typeof u !== 'object' || u === null) return false;
+    const depth = nonEmpty((u as Record<string, unknown>).readDepth);
+    return depth !== null && !/not read|not inspected|unread|fetched only|^none|^unknown|nothing was retrieved|no technique content/i.test(depth);
+  })) evidence.inspected = true;
+  if (Array.isArray(r.filesRead) && r.filesRead.some((file) =>
+    typeof file === 'string' && /full|lines|inspected|\bread\b/i.test(file) && !/not read|not inspected|unread|fetched only/i.test(file))) {
     evidence.inspected = true;
     evidence.inspectedDetail.push(`${r.filesRead.length} source file(s) read`);
   }
   if (r.carrierReadComplete === true) {
     evidence.inspected = true;
-    evidence.inspectedDetail.push('carrier read recorded complete');
+    evidence.inspectedDetail.push('carrier skill read recorded complete; not a full upstream-source read claim');
   }
   const licence = nonEmpty(r.licence);
   if (licence) evidence.inspectedDetail.push(`licence: ${truncate(licence, 160)}`);
   // Method extraction (the carrying field differs per group schema).
-  const method = nonEmpty(r.method);
+  const method = nonEmpty(r.method) ?? nonEmpty(r.methodExtracted);
   const decision = nonEmpty(r.decision);
   if (r.methodExtracted === true) evidence.extracted = true;
   if (method) {
-    evidence.extracted = true;
+    evidence.extracted = !/^(not determined|not an implementation|none|unknown)/i.test(method);
     evidence.extractedDetail.push(`method: ${truncate(method, 200)}`);
   }
   if (decision) {
-    evidence.extracted = true;
     evidence.extractedDetail.push(`decision: ${truncate(decision, 200)}`);
   }
-  if (nonEmpty(r.methodConsumer)) evidence.extracted = true;
+  const consumer = nonEmpty(r.methodConsumer);
+  if (consumer) {
+    evidence.extracted = true;
+    evidence.extractedDetail.push(`method consumer: ${truncate(consumer, 200)}`);
+  }
   // Group-authored claims — recorded assertions, never test receipts here.
   for (const key of [
     'cpuCheck',
@@ -1407,7 +1420,7 @@ async function loadResearch(
   const loaders =
     options.researchLoaders ??
     import.meta.glob<unknown>(
-      '../../../docs/technique-lab/group-*/SOURCE_RESEARCH.json',
+      '../../../scripts/technique-lab/host/public-research.json',
     );
   const keys = Object.keys(loaders);
   if (keys.length === 0) {
@@ -1433,7 +1446,9 @@ async function loadResearch(
       ignored += 1;
       continue;
     }
-    const rows = researchRows(data);
+    const normalized = typeof data === 'object' && data !== null && 'default' in data
+      ? data.default : data;
+    const rows = researchRows(normalized);
     if (!rows) {
       state.researchIgnored.push(
         `Research file ${name} has an unrecognized shape (expected records[] or rows[]); ignored, nothing inferred.`,

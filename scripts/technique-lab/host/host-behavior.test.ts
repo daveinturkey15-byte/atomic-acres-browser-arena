@@ -701,7 +701,7 @@ describe('technique lab host behaviour', () => {
 describe('source evidence honesty', () => {
   it('replaces the false never-fetched sources heading with the honest one', async () => {
     const renderer = { inits: 0, renders: 0, disposed: 0 };
-    const host = await mountHost({ groupLoaders: {} }, renderer);
+    const host = await mountHost({ groupLoaders: {}, researchLoaders: {} }, renderer);
     click(galleryButton(1) as FakeElement);
     const detail = detailText();
     expect(detail).toContain('the host never fetches them');
@@ -754,7 +754,7 @@ describe('source evidence honesty', () => {
                 ],
                 pin: '00dfd5385506022d533c84f6737a09f5f4392623 (resolves; committed 2026-08-18T13:22:54Z)',
                 licence: 'MIT read at the pinned revision',
-                methodExtracted: true,
+                methodExtracted: 'Tessendorf spectral displacement reconstructed from the recorded source section',
                 cpuCheck: { passed: true, note: 'focused vitest' },
               },
             ],
@@ -803,6 +803,7 @@ describe('source evidence honesty', () => {
                 canonical:
                   'Canonical:** `StarKnightt/gas-station-highway` @ `3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c`',
                 decision: 'one-page-brief pattern only, no code reuse',
+                methodConsumer: 'A three-action whitelist rejects all other interaction verbs',
                 carrierReadComplete: true,
                 renderedAcceptance: 'captured stills reviewed',
               },
@@ -821,6 +822,27 @@ describe('source evidence honesty', () => {
     expect(detailText()).toContain('● Technique extracted');
     expect(detailText()).toContain('3e1b7cbb1f46bb0b0601b4d06ceef63438ae132c');
     expect(detailText()).toContain('renderedAcceptance: captured stills reviewed');
+    host.dispose();
+  });
+
+  it('does not promote pins, fetch-only records or archive decisions to read/extraction proof', async () => {
+    const renderer = { inits: 0, renders: 0, disposed: 0 };
+    const host = await mountHost({ groupLoaders: {}, researchLoaders: {
+      'public.json': async () => ({ default: { records: [
+        { sourceId: 1, pin: 'none', decision: 'archive only; no extracted implementation' },
+        { sourceId: 2, urls: [{ outcome: 'ok', status: 200 }] },
+        { sourceId: 3, readDepth: 'NOT READ; fetched only', filesRead: ['implementation.ts (fetched only)'] },
+        { sourceId: 4, urls: [{ outcome: 'error', readDepth: 'none - nothing was retrieved' }], methodExtracted: 'NOT DETERMINED. No implementation was inspected.' },
+      ] } }),
+    } }, renderer);
+    for (const id of [1, 2, 3, 4]) {
+      click(galleryButton(id) as FakeElement);
+      expect(detailText()).toContain('○ Source inspected');
+      expect(detailText()).toContain('○ Technique extracted');
+      expect(detailText()).toContain('○ Result tested');
+    }
+    click(galleryButton(2) as FakeElement);
+    expect(detailText()).toContain('● Source fetched');
     host.dispose();
   });
 

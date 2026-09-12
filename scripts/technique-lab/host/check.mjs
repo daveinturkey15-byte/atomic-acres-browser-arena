@@ -175,7 +175,7 @@ check(
 check(
   'research records load through an injectable seam with an honest empty fallback',
   runtime.includes('options.researchLoaders ??') &&
-    runtime.includes('../../../docs/technique-lab/group-*/SOURCE_RESEARCH.json') &&
+    runtime.includes('../../../scripts/technique-lab/host/public-research.json') &&
     runtime.includes('No research records loadable in this tree'),
 );
 check(

@@ -257,3 +257,23 @@ map3.html/favicon remain root's.
 - Outside-lane AKP audit REDs (stale Antigravity receipt on
   dave-gaming-pc, several quarantined jigglyclaw receipts) remain OPEN —
   other harnesses' registry hygiene, not this lane's to write.
+# Public research projection correction (2026-09-12)
+
+Browser code now imports only `scripts/technique-lab/host/public-research.json`.
+Raw `SOURCE_RESEARCH.json` files contain local cache and skill paths and must
+never be imported into browser chunks. The allowlisted projection records the
+SHA-256 of each source document, without its private filesystem provenance.
+From the final integration checkout, regenerate after any research-record change:
+
+```sh
+node scripts/technique-lab/host/project-research.mjs
+node --test scripts/technique-lab/host/project-research.test.mjs
+```
+
+The committed projection was generated from the root integration checkout's
+three actual documents (50 source records). These are group-authored assertions,
+not independent attestations. Fetch success has a separate stage and cannot
+establish inspection. Pins and archive decisions cannot establish inspection or
+extraction. String-valued method extraction is retained, while explicitly
+undetermined methods remain open. Carrier-skill reads identify that narrower
+evidence kind. Result-tested and owner visual approval remain open.
