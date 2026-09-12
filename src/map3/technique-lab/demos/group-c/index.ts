@@ -94,18 +94,25 @@ export const manifest: ManifestEntry[] = [
   },
   {
     sourceId: 38,
-    title: 'Spline-field foliage scatter with mask and density separated',
+    title: 'Spline-field forest on sculpted terrain: mask, species, ground cover, floor blend',
     method:
-      'Density comes from distance to an authored spline; a separate mask field decides '
-      + 'admissibility first, so the clearing and watercourse stay clear at any density.',
+      'An authored spline field drives density on a sculpted patch and a separate mask field '
+      + 'decides admissibility first, so the glade and the watercourse stay clear at any density. '
+      + 'Four species carry their own slope/moisture windows, separation and normal-follow, one '
+      + 'material each; clump geometry under a blade material carpets what the canopy leaves; a '
+      + 'baked floor blend ties the scatter into the ground material. update() steps the curve '
+      + 'through three authored poses and re-derives placement, cover, floor and overlay.',
     adaptation: 'adapted',
     sources: [
       'https://x.com/alightinastorm/status/2093648383202259325',
       'https://github.com/vibe-stack/super-terrain',
     ],
     limitation:
-      'Flat ground, not terrain: no sculpting, CSG, LOD streaming, tree editor or GLB export. '
-      + 'Licence state conflicts with the register — see SOURCE_RESEARCH.json.',
+      'A 3 m analytic terrain patch, not the source\'s sculpting, CSG, tunnels or LOD streaming; '
+      + 'no tree editor and no GLB export (the register calls the editor a product question). The '
+      + 'floor blend is a 64x64 baked colour map, not a splat graph. Four species, not the '
+      + 'unverified "30+ tree types". Licence state conflicts with the register — see '
+      + 'SOURCE_RESEARCH.json.',
     createDemo: createSource38,
   },
   {

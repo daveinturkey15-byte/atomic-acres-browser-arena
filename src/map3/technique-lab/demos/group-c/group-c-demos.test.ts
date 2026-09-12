@@ -27,7 +27,23 @@ import {
 } from './source-36';
 import { convertZupCentimetres } from './source-37';
 import { isSolid, litRoomCells, voxelIndex, type VoxelGrid } from './source-40';
-import { maskField, splineDensity } from './source-38';
+import {
+  CURVE_POSES,
+  PATCH,
+  POSE_SECONDS,
+  SPECIES,
+  bakeFloorBase,
+  bakeFloorBlend,
+  channelOffset,
+  floorTexelToWorld,
+  maskField,
+  moistureAt,
+  splineDensity,
+  splineDistance,
+  terrainHeight,
+  terrainNormal,
+  terrainSlope,
+} from './source-38';
 import { OPERATION_LOG, replay } from './source-39';
 import { deriveBuilding } from './source-42';
 import { fillHoles, voxelToMesh, weldVertices } from './source-45';
@@ -480,6 +496,243 @@ describe('source 38 — the mask gates admissibility independently of density', 
     expect(splineDensity(0.7, 0.5, curve, 10)).toBeGreaterThan(0.5);
     expect(maskField(0.7, 0.5)).toBe(false);
     expect(maskField(-1.2, -1.2)).toBe(true);
+  });
+});
+
+describe('source 38 — the terrain the forest claims to conform to', () => {
+  it('carves the watercourse the mask excludes and levels the glade it protects', () => {
+    // The stream the mask refuses is a real trough: its bed sits below both banks.
+    const bed = terrainHeight(0, 1.0);
+    expect(Math.abs(channelOffset(0, 1.0))).toBeLessThan(1e-12);
+    expect(bed).toBeLessThan(terrainHeight(0, 1.0 + 0.55));
+    expect(bed).toBeLessThan(terrainHeight(0, 1.0 - 0.55));
+    // The glade is flat, so a clearing reads as authored ground and not a gap.
+    const centre = terrainHeight(0.7, 0.5);
+    expect(Math.abs(terrainHeight(0.78, 0.52) - centre)).toBeLessThan(1e-6);
+    expect(terrainSlope(0.7, 0.5)).toBeLessThan(1e-3);
+    // And the patch as a whole is not flat, which is the defect this replaces.
+    let maxSlope = 0;
+    for (let i = 0; i < 40; i += 1) {
+      const x = (i / 39 - 0.5) * PATCH;
+      maxSlope = Math.max(maxSlope, terrainSlope(x, x * 0.6));
+    }
+    expect(maxSlope).toBeGreaterThan(0.25);
+  });
+
+  it('agrees with the mesh it builds, in normals and in UVs', () => {
+    const demo = manifest.find((entry) => entry.sourceId === 38)!.createDemo!({ THREE, seed: SEED });
+    const ground = demo.root.getObjectByName('after')!.children
+      .find((child: any) => child.isMesh && !child.isInstancedMesh) as any;
+    const position = ground.geometry.getAttribute('position');
+    const normal = ground.geometry.getAttribute('normal');
+    const uv = ground.geometry.getAttribute('uv');
+
+    let worstAngle = 0;
+    let worstAt: [number, number] = [0, 0];
+    let angleSum = 0;
+    let sampled = 0;
+    let worstUv = 0;
+    for (let i = 0; i < position.count; i += 7) {
+      const x = position.getX(i);
+      const z = position.getZ(i);
+      // Vertices sit exactly on the analytic surface.
+      expect(Math.abs(position.getY(i) - terrainHeight(x, z))).toBeLessThan(1e-6);
+      // Mesh normals agree with the closed-form normal the scatter leans on.
+      const [nx, ny, nz] = terrainNormal(x, z);
+      const dot = nx * normal.getX(i) + ny * normal.getY(i) + nz * normal.getZ(i);
+      const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+      angleSum += angle;
+      sampled += 1;
+      if (angle > worstAngle) {
+        worstAngle = angle;
+        worstAt = [x, z];
+      }
+      // The floor blend's texel mapping is the mesh's own UV mapping.
+      const [ux, uz] = floorTexelToWorld(uv.getX(i), uv.getY(i));
+      worstUv = Math.max(worstUv, Math.hypot(ux - x, uz - z));
+    }
+    // Across the patch the two agree closely. The worst vertex is a
+    // discretisation artefact with a known address: it sits on the carved
+    // channel, where averaged face normals over a plane's fixed diagonal
+    // triangulation lag the closed-form normal to first order in grid spacing
+    // (0.21 rad at 80 segments, 0.14 at 120). Asserting WHERE the maximum is
+    // keeps this from being a tolerance that would also hide a sign error.
+    expect(angleSum / sampled).toBeLessThan(0.02);
+    expect(worstAngle).toBeLessThan(0.16);
+    expect(Math.abs(channelOffset(worstAt[0], worstAt[1]))).toBeLessThan(0.5);
+    expect(worstUv).toBeLessThan(1e-6);
+
+    // Both panels stand on the same ground object, not on two similar ones.
+    const other = demo.root.getObjectByName('before')!.children
+      .find((child: any) => child.isMesh && !child.isInstancedMesh) as any;
+    expect(other.geometry).toBe(ground.geometry);
+    expect(other.material).not.toBe(ground.material);
+    demo.dispose();
+  });
+});
+
+describe('source 38 — species parameter sets, ground conformance and one material per species', () => {
+  const gather = (group: any): Array<{ name: string; x: number; y: number; z: number }> => {
+    const found: Array<{ name: string; x: number; y: number; z: number }> = [];
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    group.traverse((object: any) => {
+      if (!object.isInstancedMesh) return;
+      for (let i = 0; i < object.count; i += 1) {
+        object.getMatrixAt(i, matrix);
+        matrix.decompose(position, quaternion, scale);
+        found.push({ name: object.name, x: position.x, y: position.y, z: position.z });
+      }
+    });
+    return found;
+  };
+
+  it('places every species only inside its own slope and moisture window', () => {
+    const demo = manifest.find((entry) => entry.sourceId === 38)!.createDemo!({ THREE, seed: SEED });
+    const after = demo.root.getObjectByName('after')!;
+    const placedInstances = gather(after);
+    expect(placedInstances.length).toBeGreaterThan(200);
+
+    for (const species of SPECIES) {
+      const mine = placedInstances.filter((entry) => entry.name === `field-${species.name}`);
+      expect(mine.length, `${species.name} placed nothing`).toBeGreaterThan(0);
+      for (const entry of mine) {
+        expect(maskField(entry.x, entry.z), `${species.name} broke the mask`).toBe(true);
+        expect(terrainSlope(entry.x, entry.z)).toBeLessThanOrEqual(species.maxSlope);
+        const wet = moistureAt(entry.x, entry.z);
+        expect(wet).toBeGreaterThanOrEqual(species.minMoisture);
+        expect(wet).toBeLessThanOrEqual(species.maxMoisture);
+        // Conformance: every plant's base is ON the surface, not near it. The
+        // tolerance is float32 instance-matrix precision, not a fudge factor:
+        // the y written is terrainHeight(x, z) itself, read back through the
+        // Float32Array the InstancedMesh stores its matrices in.
+        expect(Math.abs(entry.y - terrainHeight(entry.x, entry.z))).toBeLessThan(1e-6);
+      }
+    }
+
+    // The failure the BEFORE panel exists to show, counted rather than asserted.
+    const counters = demo.metadata.counters!;
+    expect(counters.fieldOffGround).toBe(0);
+    expect(counters.fieldViolatingMask).toBe(0);
+    expect(counters.uniformOffGround).toBeGreaterThan(counters.uniformPlaced * 0.5);
+    expect(counters.uniformViolatingMask).toBeGreaterThan(0);
+    expect(counters.groundCoverPlaced).toBeGreaterThan(50);
+
+    // One material per species however many plants stand in it, and a separate
+    // blade material for the ground cover.
+    const materials = new Set<unknown>();
+    let instanced = 0;
+    after.traverse((object: any) => {
+      if (object.material) materials.add(object.material);
+      if (object.isInstancedMesh) instanced += object.count;
+    });
+    expect(materials.size).toBe(SPECIES.length + 3); // species + ground + clumps + overlay
+    expect(instanced).toBeGreaterThan(materials.size * 30);
+    const clumps = after.children.find((child: any) => child.name === 'ground-cover-clumps') as any;
+    expect(clumps.material.sheen).toBeGreaterThan(0);
+    expect(clumps.material.side).toBe(THREE.DoubleSide);
+    demo.dispose();
+  });
+
+  it('moves the forest when the authored curve moves, and repeats exactly', () => {
+    const entry = manifest.find((row) => row.sourceId === 38)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const after = demo.root.getObjectByName('after')!;
+    const meanDistance = (curveIndex: number): number => {
+      const trees = gather(after).filter((item) => item.name.startsWith('field-'));
+      let sum = 0;
+      for (const tree of trees) sum += splineDistance(tree.x, tree.z, CURVE_POSES[curveIndex]);
+      return sum / trees.length;
+    };
+
+    const poseZeroAgainstZero = meanDistance(0);
+    const poseZeroAgainstOne = meanDistance(1);
+    const poseZeroCounters = { ...demo.metadata.counters! };
+    expect(poseZeroAgainstZero).toBeLessThan(poseZeroAgainstOne);
+
+    demo.update!(POSE_SECONDS * 1.5, 1 / 60);
+    expect(demo.metadata.counters!.curvePose).toBe(1);
+    const poseOneAgainstOne = meanDistance(1);
+    expect(poseOneAgainstOne).toBeLessThan(poseZeroAgainstOne);
+    // Every pose obeys the mask; density never overrides admissibility.
+    expect(demo.metadata.counters!.fieldViolatingMask).toBe(0);
+
+    demo.update!(POSE_SECONDS * 2.5, 1 / 60);
+    expect(demo.metadata.counters!.curvePose).toBe(2);
+    expect(demo.metadata.counters!.fieldViolatingMask).toBe(0);
+    expect(demo.metadata.counters!.fieldPlaced).toBeGreaterThan(0);
+
+    // Returning to the first pose reproduces it exactly: the control is a pure
+    // function of the pose, not an accumulating state.
+    demo.update!(POSE_SECONDS * 3.5, 1 / 60);
+    const back = demo.metadata.counters!;
+    expect(back.curvePose).toBe(0);
+    expect(back.fieldPlaced).toBe(poseZeroCounters.fieldPlaced);
+    expect(back.groundCoverPlaced).toBe(poseZeroCounters.groundCoverPlaced);
+    expect(back.meanDistanceToCurve).toBeCloseTo(poseZeroCounters.meanDistanceToCurve, 12);
+    expect(back.poseRebuilds).toBe(4);
+
+    // Bounded cost, measured from the scene rather than promised in prose.
+    expect(back.triangles).toBeLessThan(200_000);
+    expect(back.instancedMeshes).toBe(SPECIES.length * 2 + 1);
+    demo.dispose();
+  });
+});
+
+describe('source 38 — the forest floor answers the scatter', () => {
+  it('darkens only where plants stand, and bakes the same bytes twice', () => {
+    const size = 32;
+    const base = bakeFloorBase(size);
+    const plain = bakeFloorBlend(base, [], size);
+    const withPlant = bakeFloorBlend(
+      base,
+      [{ x: 0, z: 0, radius: 0.35, shade: 0.6, litter: 0.35 }],
+      size,
+    );
+
+    const texel = (bytes: Uint8Array, x: number, z: number): number => {
+      const col = Math.min(size - 1, Math.max(0, Math.floor((x / PATCH + 0.5) * size)));
+      const row = Math.min(size - 1, Math.max(0, Math.floor((0.5 - z / PATCH) * size)));
+      const i = (row * size + col) * 4;
+      return bytes[i] + bytes[i + 1] + bytes[i + 2];
+    };
+
+    expect(texel(withPlant, 0, 0)).toBeLessThan(texel(plain, 0, 0));
+    // Away from the plant the blend must change nothing at all.
+    expect(texel(withPlant, -1.4, -1.4)).toBe(texel(plain, -1.4, -1.4));
+    for (let i = 0; i < plain.length; i += 4) expect(plain[i + 3]).toBe(255);
+
+    const again = bakeFloorBlend(
+      base,
+      [{ x: 0, z: 0, radius: 0.35, shade: 0.6, litter: 0.35 }],
+      size,
+    );
+    expect(Array.from(again)).toEqual(Array.from(withPlant));
+
+    // In the exhibit, the two panels differ ONLY by this blend: one base bake,
+    // and the AFTER floor additionally carries the plants that were placed.
+    const demo = manifest.find((row) => row.sourceId === 38)!.createDemo!({ THREE, seed: SEED });
+    const floorOf = (panel: string): Uint8Array => {
+      const mesh = demo.root.getObjectByName(panel)!.children
+        .find((child: any) => child.isMesh && !child.isInstancedMesh) as any;
+      return mesh.material.map.image.data as Uint8Array;
+    };
+    const beforeBytes = floorOf('before');
+    const afterBytes = floorOf('after');
+    expect(afterBytes.length).toBe(beforeBytes.length);
+    let differing = 0;
+    let afterSum = 0;
+    let beforeSum = 0;
+    for (let i = 0; i < beforeBytes.length; i += 4) {
+      if (beforeBytes[i] !== afterBytes[i]) differing += 1;
+      beforeSum += beforeBytes[i] + beforeBytes[i + 1] + beforeBytes[i + 2];
+      afterSum += afterBytes[i] + afterBytes[i + 1] + afterBytes[i + 2];
+    }
+    expect(differing).toBeGreaterThan(beforeBytes.length / 4 * 0.2);
+    expect(afterSum).toBeLessThan(beforeSum);
+    demo.dispose();
   });
 });
 
