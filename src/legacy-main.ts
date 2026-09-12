@@ -200,7 +200,7 @@ import {
 import { buildFarcrysis } from './farcrysis';
 import { buildHighSeas } from './high-seas';
 import { buildWorldStudio } from './world-studio/arena';
-import { createStudioWeatherRouter, isStudioPresetId, studioWeatherSeed, type StudioWeatherRoute } from './world-studio/weather-routing';
+import { createStudioWeatherRouter, isStudioPresetId, resolveStudioLightingConditions, studioWeatherSeed, type StudioWeatherRoute } from './world-studio/weather-routing';
 import { TEST2_DOMINATION_ZONES, buildTest1, buildTest2 } from './test-maps';
 // MAP3: Map 3 (PREVIEW), owner 2026-09-02 via HF-405. Its builder is NOT
 // imported here: Map 3 is the one lazily loaded arena (HF-409, see
@@ -4238,6 +4238,11 @@ function activeLightingTimeChoice(): LightingTimeChoice {
   // `?tod=` URL cannot take one peer off the shared sky; the host changes the
   // mode through the lobby row, which replicates.
   const snapshot = privateLobbySnapshot;
+  // New World also excludes local overrides during hosted admission before
+  // the lobby snapshot arrives. Other arenas retain their existing boundary.
+  if (selectedArena.id === 'world-studio' && network.role !== 'offline') {
+    return activeLightingTimeChoiceFrom({ replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay, hosted: true });
+  }
   return activeLightingTimeChoiceFrom({
     localOverride: lightingTimeChoiceOverride,
     replicated: (snapshot?.config ?? privateMatchConfig).timeOfDay,
@@ -4262,6 +4267,8 @@ let lightingConditionsGateChoice: LightingTimeChoice | null = null;
 let lightingConditionsGateSkyStep = Number.NaN;
 let lightingConditionsGateClockStep = Number.NaN;
 let lightingConditionsGateSeed = Number.NaN;
+let lightingConditionsGateStudioHour = Number.NaN;
+let studioLightingBackdropBaseline: number | null = null;
 let lightingConditionsResolves = 0;
 let lightingConditionsUniformWrites = 0;
 
@@ -4289,6 +4296,10 @@ function conditionedFogBaseColorHex(): number {
 }
 
 function captureLightingConditionBaseline(baseline: LightingConditionBaseline): void {
+  if (studioLightingBackdropBaseline !== null) {
+    scene.backgroundIntensity = studioLightingBackdropBaseline;
+    studioLightingBackdropBaseline = null;
+  }
   lightingConditionBaseline = Object.freeze(baseline);
   lightingConditionsAppliedWrites = null;
   lightingConditionsGateChoice = null;
@@ -4297,6 +4308,17 @@ function captureLightingConditionBaseline(baseline: LightingConditionBaseline): 
 }
 
 function resolveActiveLightingConditions(): LightingConditionWrites {
+  if (selectedArena.id === 'world-studio') {
+    return resolveStudioLightingConditions({
+      matchSeed: weatherMatchSeed,
+      elapsedSeconds: lightingConditionsElapsedSeconds,
+      choice: activeLightingTimeChoice(),
+      skyDarkenAmount: lightingConditionsSkyDarken,
+      hosted: network.role !== 'offline' || privateLobbySnapshot !== null,
+      offlinePresetOverride: worldStudioWeatherOverride,
+      ...(lightingCaptureFixedHour === null ? {} : { fixedHour: lightingCaptureFixedHour }),
+    });
+  }
   // LIGHTING: the Nuke Town Rebuild owns three authored skies (src/nuketown2-lighting); every other arena takes the game-wide sun arc, and both return the same record.
   return (selectedArena.id === NUKETOWN2_ARENA_ID ? resolveNuketown2LightingConditions : resolveLightingConditions)({
     arenaId: selectedArena.id,
@@ -4360,17 +4382,21 @@ function applyLightingConditionUniforms(force = false): void {
   // the weather's sky-darken and, in `cycle`, the clock -- so both are quantised
   // and compared first. In `fixed`/`random` steady state this function costs four
   // comparisons and returns.
+  const studioHour = selectedArena.id === 'world-studio'
+    ? Number(arena.root.userData.worldStudioEnvironment?.hour ?? 12) : 12;
   const skyStep = Math.round(lightingConditionsSkyDarken * 256);
   const clockStep = (choice === 'cycle' ? Math.round(lightingConditionsElapsedSeconds * 4) : 0) + nukeEvent.lightingStep;
   if (!force
     && choice === lightingConditionsGateChoice
     && skyStep === lightingConditionsGateSkyStep
     && clockStep === lightingConditionsGateClockStep
-    && weatherMatchSeed === lightingConditionsGateSeed) return;
+    && weatherMatchSeed === lightingConditionsGateSeed
+    && studioHour === lightingConditionsGateStudioHour) return;
   lightingConditionsGateChoice = choice;
   lightingConditionsGateSkyStep = skyStep;
   lightingConditionsGateClockStep = clockStep;
   lightingConditionsGateSeed = weatherMatchSeed;
+  lightingConditionsGateStudioHour = studioHour;
   lightingConditionsResolves += 1;
   const writes = resolveActiveLightingConditions();
   activeLightingConditions = writes;
@@ -4403,6 +4429,13 @@ function applyLightingConditionUniforms(force = false): void {
   if (fillLight) {
     fillLight.color.copy(lightingConditionTint(baseline.fillColor, writes.fillTint));
     fillLight.intensity = baseline.fillIntensity * indirect * writes.fillIntensityScale;
+  }
+  // The actual sky owner is the equirectangular background, not the retired
+  // skyMaterial. Scale its existing uniform with the same daylight response;
+  // preserve the horizon and texture identity (no shader or light-set rebuild).
+  if (selectedArena.id === 'world-studio') {
+    studioLightingBackdropBaseline ??= scene.backgroundIntensity;
+    scene.backgroundIntensity = studioLightingBackdropBaseline * writes.sunIntensityScale;
   }
   nuketown2ClusteredLightRig?.applyLighting(selectedArena.id, writes.hour);
   applyLampPoolLighting(selectedArena.id, writes.hour);
@@ -33991,7 +34024,11 @@ debugWindow.__ATOMIC_ACRES_DEBUG__ = {
     studioEnvironment: arena.id === 'world-studio' ? arena.root.userData.worldStudioEnvironment ?? null : null,
     // Presets carry an authored hour; the generic daylight resolver remains
     // pinned pending actual visual safety evidence. Never call this implemented.
-    studioTimeOfDayImplemented: false,
+    studioTimeOfDayImplemented: false, // Default activation awaits measured band evidence.
+    studioTimeOfDayInspection: selectedArena.id === 'world-studio'
+      && network.role === 'offline' && privateLobbySnapshot === null && lightingCaptureFixedHour !== null,
+    studioLightingHour: selectedArena.id === 'world-studio' ? activeLightingConditions?.hour ?? null : null,
+    studioSkyIntensity: selectedArena.id === 'world-studio' ? scene.backgroundIntensity : null,
     rain: rainPresentation.telemetry(),
     particles: hfParticleRuntime.telemetry(),
   }),

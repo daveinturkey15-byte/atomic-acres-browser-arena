@@ -532,7 +532,29 @@ export type LightingConditionsInput = Readonly<{
 
 /** The whole model, in one pure call. */
 export function resolveLightingConditions(input: LightingConditionsInput): LightingConditionWrites {
-  const daylight = ARENA_DAYLIGHT_PROFILES[input.arenaId];
+  return resolveLightingConditionsWithProfile(input, ARENA_DAYLIGHT_PROFILES[input.arenaId]);
+}
+
+/**
+ * Offline band-scan candidate only. This is NOT a measured playable band and
+ * does not change the pinned production catalog. The existing fixed-hour QA
+ * control is its only runtime entry point until paired readability evidence
+ * permits promoting this exact profile into ARENA_DAYLIGHT_PROFILES.
+ */
+const WORLD_STUDIO_INSPECTION_DAYLIGHT = profile(
+  'world-studio', 'new-world-daylight-inspection', false, 12,
+  [9.5, 16.5], [6, 18], [18, 62], 46, 6,
+);
+
+export function resolveWorldStudioLightingInspection(
+  input: Omit<LightingConditionsInput, 'arenaId'> & { fixedHour: number },
+): LightingConditionWrites {
+  return resolveLightingConditionsWithProfile({ ...input, arenaId: 'world-studio' }, WORLD_STUDIO_INSPECTION_DAYLIGHT);
+}
+
+function resolveLightingConditionsWithProfile(
+  input: LightingConditionsInput, daylight: ArenaDaylightProfile,
+): LightingConditionWrites {
   const low = daylight.hourRange[0];
   const high = daylight.hourRange[1];
   const requested = input.fixedHour !== undefined

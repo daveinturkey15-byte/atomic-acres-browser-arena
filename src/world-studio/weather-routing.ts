@@ -1,3 +1,4 @@
+import { resolveLightingConditions, resolveWorldStudioLightingInspection, type LightingConditionsInput, type LightingConditionWrites } from '../rendering/lighting-conditions';
 import { deriveWeatherMatchSeed } from '../legacy-pure-helpers-2';
 import { activeWeatherPresentation, type WeatherPresentationRuntime } from '../weather/weather-settings';
 import { forcedWeatherSample, weatherStateRow, type WeatherSample, type WeatherState } from '../weather/weather-state';
@@ -59,4 +60,26 @@ export function createStudioWeatherRouter(): Readonly<{
       return previousRoute;
     },
   };
+}
+
+/**
+ * Shared random mode follows the weather preset's hour. The production catalog
+ * remains pinned until its band scan passes. Explicit fixed-hour inspection is
+ * offline only; neither a guest URL nor its preset override can change the sun.
+ */
+export function resolveStudioLightingConditions(
+  input: Omit<LightingConditionsInput, 'arenaId'> & {
+    hosted: boolean;
+    offlinePresetOverride?: string | null;
+  },
+): LightingConditionWrites {
+  const { hosted, offlinePresetOverride, fixedHour, ...shared } = input;
+  if (!hosted && fixedHour !== undefined && Number.isFinite(fixedHour)) {
+    return resolveWorldStudioLightingInspection({ ...shared, fixedHour });
+  }
+  const preset = studioEnvironmentForSeed(shared.matchSeed ?? 0, hosted ? null : offlinePresetOverride);
+  return resolveLightingConditions({
+    ...shared, arenaId: 'world-studio',
+    ...((shared.choice ?? 'random') === 'random' ? { fixedHour: preset.hour } : {}),
+  });
 }
