@@ -16,6 +16,9 @@ import { createDemo as createSource23 } from './source-23';
 import { createDemo as createSource26 } from './source-26';
 import { createDemo as createSource20 } from './source-20';
 import { createDemo as createSource33 } from './source-33';
+import { createDemo as createSource27 } from './source-27';
+import { createDemo as createSource28 } from './source-28';
+import { createDemo as createSource29 } from './source-29';
 import { createDemo as createSource31 } from './source-31';
 import { createDemo as createSource34 } from './source-34';
 import type { Demo, DemoContext } from './types';
@@ -167,6 +170,51 @@ export const manifest: ManifestEntry[] = [
     createDemo: createSource26,
   },
   {
+    sourceId: 27,
+    title: 'Three.js game skill pack (majidmanzarpour)',
+    method:
+      'Game-feel loop from the gameplay-systems skill: hitstop freezing the response clock, '
+      + 'pooled impact flash, decaying positional shake and a gating cooldown, run in an '
+      + 'explicit cooldown -> hitstop -> physics -> feedback update order.',
+    adaptation: 'adapted',
+    sources: ['https://github.com/majidmanzarpour/threejs-game-skills'],
+    limitation:
+      'MIT pack whose register decision is COMPARISON, not import: the scene demonstrates the '
+      + 'extracted feel-loop method only. Coverage comparison in docs/technique-lab/group-b/'
+      + 'skill-pack-comparisons.md.',
+    createDemo: createSource27,
+  },
+  {
+    sourceId: 28,
+    title: 'WebGPU Claude skill (dgreenheck)',
+    method:
+      'Threshold-driven dissolve over a deterministic hash-noise field with a bright edge '
+      + 'band isolated just above the threshold, threshold animated as a uniform - the '
+      + 'node-material graph shape the skill teaches, evaluated per-vertex on the CPU.',
+    adaptation: 'adapted',
+    sources: ['https://github.com/dgreenheck/webgpu-claude-skill'],
+    limitation:
+      'Source has NO licence (probe 404) - all rights reserved; concepts restated, nothing '
+      + 'copied. CPU per-vertex evaluation approximates the per-fragment GPU graph; no '
+      + 'WebGPURenderer or node-material construction.',
+    createDemo: createSource28,
+  },
+  {
+    sourceId: 29,
+    title: 'Three.js skills collection (CloudAI-X)',
+    method:
+      'InstancedMesh batching of a deterministic 240-instance field: per-instance transforms '
+      + 'through one scratch Object3D and a single matrix upload, per-instance colors through '
+      + 'an InstancedBufferAttribute, shown against the same field as individual meshes.',
+    adaptation: 'adapted',
+    sources: ['https://github.com/CloudAI-X/threejs-skills'],
+    limitation:
+      'Source has NO licence (probe 404) - all rights reserved; concepts restated, nothing '
+      + 'copied. Only the geometry skill body was read this session. Coverage comparison in '
+      + 'docs/technique-lab/group-b/skill-pack-comparisons.md.',
+    createDemo: createSource29,
+  },
+  {
     sourceId: 30,
     title: 'Generated video as MOTION REFERENCE, not as the asset (the owner\'s bridge)',
     method:
@@ -250,12 +298,11 @@ export const manifest: ManifestEntry[] = [
 ];
 
 /**
- * Rows whose primary source WAS recovered, read and licence-checked in this lane, but whose
- * demo was not built inside the lane's time budget. They are deliberately absent from the
- * manifest rather than present as placeholders or mislabelled as blocked: blocked means no
- * honest demo is possible, and that is not true of these. Their research is complete in
+ * Rows whose source was recovered but whose demo was not built. All 17 rows of this group
+ * are now delivered as scenes or honest blocked entries, so this list is empty; it is kept
+ * as the group's standing completeness check. Research for every row lives in
  * docs/technique-lab/group-b/SOURCE_RESEARCH.json.
  */
-export const notDeliveredSourceIds: readonly number[] = [27, 28, 29];
+export const notDeliveredSourceIds: readonly number[] = [];
 
 export default manifest;

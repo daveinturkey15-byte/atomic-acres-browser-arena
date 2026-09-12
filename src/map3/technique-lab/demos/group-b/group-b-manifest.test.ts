@@ -104,6 +104,61 @@ describe('technique-lab group B manifest', () => {
     expect(stats.penetrations + stats.bounces).toBeLessThanOrEqual(stats.shellsFired);
     demo.dispose();
   });
+  it('source 27 freezes feedback through hitstop and gates strikes by cooldown', () => {
+    const entry = manifest.find((row) => row.sourceId === 27)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      hits: number;
+      hitstopFramesConsumed: number;
+      lastShakeAmplitude: number;
+      cooldownsGated: number;
+    };
+    for (let frame = 0; frame < 300; frame += 1) demo.update?.(frame / 60, 1 / 60);
+    expect(stats.hits).toBeGreaterThanOrEqual(2);
+    // Each hit consumes a bounded hitstop beat, and cooldown gating actually fires.
+    expect(stats.hitstopFramesConsumed).toBeGreaterThanOrEqual(stats.hits * 5);
+    expect(stats.hitstopFramesConsumed).toBeLessThanOrEqual(stats.hits * 10);
+    expect(stats.lastShakeAmplitude).toBeGreaterThan(0);
+    expect(stats.cooldownsGated).toBeGreaterThan(0);
+    demo.dispose();
+  });
+
+  it('source 28 sweeps the dissolve threshold and isolates a bright edge band', () => {
+    const entry = manifest.find((row) => row.sourceId === 28)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      threshold: number;
+      dissolvedVertices: number;
+      edgeVertices: number;
+    };
+    let sawEdge = false;
+    for (let frame = 0; frame < 300; frame += 1) {
+      demo.update?.(frame / 60, 1 / 60);
+      if (stats.edgeVertices > 0) sawEdge = true;
+    }
+    expect(sawEdge, 'edge band must appear during the sweep').toBe(true);
+    expect(stats.threshold).toBeGreaterThanOrEqual(0);
+    expect(stats.threshold).toBeLessThanOrEqual(0.85);
+    demo.dispose();
+  });
+
+  it('source 29 batches 240 instances into one drawable', () => {
+    const entry = manifest.find((row) => row.sourceId === 29)!;
+    const demo = entry.createDemo!({ THREE, seed: SEED });
+    const stats = demo.root.userData.stats as {
+      individualDrawables: number;
+      instancedDrawables: number;
+      instanceCount: number;
+      matricesRechecked: number;
+    };
+    demo.update?.(0.5, 1 / 60);
+    expect(stats.individualDrawables).toBe(240);
+    expect(stats.instancedDrawables).toBe(1);
+    expect(stats.instanceCount).toBe(stats.individualDrawables);
+    expect(stats.matricesRechecked).toBe(240);
+    demo.dispose();
+  });
+
 
   it('source 31 keeps the IK chain on its handle target with a bounded curl', () => {
     const entry = manifest.find((row) => row.sourceId === 31)!;
