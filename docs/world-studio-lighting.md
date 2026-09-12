@@ -135,3 +135,10 @@ wallMesh.material = walls.material;
 ```
 
 Tests: 4 focused CPU contracts appended to `src/world-studio/lighting/lighting.test.ts` (the lane allowlist admits no sibling test file): single-load idempotence + colour-space split; physical repeat math; per-consumer clone isolation with exact-once dispose spying; fail-closed errors (unknown asset, premature consumer, non-finite size, over-range normalScale) + idempotent dispose. Suite total **29/29**; `npx tsc --noEmit` **0 errors** (three 0.185.1 APIs used: `TextureLoader` load seam, `Texture.clone/dispose`, `colorSpace`; none changed since ≤r155).
+
+
+## Independent host repair (Codex Astra, 2026-09-12)
+
+The native PBR candidate had three blocking gaps missed by its stub tests: duplicate asset-ID path segments, an onError callback in TextureLoader's unsupported progress slot, and pending-load resource leaks. The host repaired these against installed r185 TextureLoader source. The optional library now rejects readiness on failures/disposal, disposes partially loaded and late-arriving textures exactly once, preserves independent consumer repeats, validates options before allocating clones, and keeps rejection observable through whenReady(). Call await library.whenReady() with normal error handling; load() is only an optional non-throwing kick-off.
+
+Independent validation: 32 focused tests pass, including actual TextureLoader prototype callback-slot checks, existence of all six generated public URLs, failed-map cleanup and disposal before load completion. TypeScript noEmit passes. All six actual images fully decode to 1024x1024 in Pillow and match byte lengths/SHA256/provider MD5. Exact download timestamps were not recorded, so the manifest now records the native run interval rather than an invented minute. Browser image loading and visual acceptance remain OPEN for the parent. Native authorship and this host repair are separate commits.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /**
- * world-studio/pbr-library — reusable CC0 PBR material factory (2026-09-12).
+ * world-studio/pbr-library â€” reusable CC0 PBR material factory (2026-09-12).
  *
  * Additive, presentation-only. This module owns NO scene, renderer, lights or
  * tone mapping: it builds `MeshStandardMaterial`s from locally hosted original
@@ -16,18 +16,18 @@ import * as THREE from 'three';
  * `release(consumer)` disposes exactly that consumer's clones; `dispose()`
  * disposes the originals and any live consumers.
  *
- * UV contract: tiling is PHYSICAL. `repeat = sizeMeters / tileMeters` —
+ * UV contract: tiling is PHYSICAL. `repeat = sizeMeters / tileMeters` â€”
  * callers pass the real-world surface size; the library never rescales
  * geometry UVs. Root integration example (parent performs it):
  *
  * ```ts
  * const pbr = createStudioPbrLibrary();          // defaults to the hosted dir
  * void pbr.load();                                // kick off; errors land in whenReady()
- * // …after `await pbr.whenReady()` (or poll isReady()):
+ * // â€¦after `await pbr.whenReady()` (or poll isReady()):
  * const road = pbr.createConsumer('asphalt_02', { sizeMeters: [12, 60] });
- * roadMesh.material = road.material;              // 3 m tile → repeat 4×20
+ * roadMesh.material = road.material;              // 3 m tile â†’ repeat 4Ã—20
  * const wall = pbr.createConsumer('brushed_concrete_03', { sizeMeters: [8, 2.55], normalScale: 0.6 });
- * wallMesh.material = wall.material;              // 2 m tile → repeat 4×1.275
+ * wallMesh.material = wall.material;              // 2 m tile â†’ repeat 4Ã—1.275
  * // on arena retirement: road consumers first, then pbr.dispose()
  * ```
  */
@@ -98,7 +98,7 @@ export interface StudioPbrLibrary {
 
 /** Minimal loader seam so CPU tests never touch Image/decoder stacks. */
 export interface PbrTextureLoader {
-  load(url: string, onLoad: (texture: THREE.Texture) => void, onError: (error: unknown) => void): void;
+  load(url: string, onLoad: (texture: THREE.Texture) => void, onProgress: undefined, onError: (error: unknown) => void): THREE.Texture | void;
 }
 
 interface LoadedSet {
@@ -112,19 +112,45 @@ export function createStudioPbrLibrary(baseUrl: string = ASSET_DIR, loader: PbrT
   const consumers = new Set<StudioPbrConsumer>();
   let loadPromise: Promise<void> | null = null;
   let disposed = false;
+  let failed = false;
+  const ownedTextures = new Set<THREE.Texture>();
+  const releasedTextures = new WeakSet<THREE.Texture>();
+  const pendingRejects = new Set<(error: Error) => void>();
+  const releaseTexture = (texture: THREE.Texture): void => {
+    if (releasedTextures.has(texture)) return;
+    releasedTextures.add(texture);
+    ownedTextures.delete(texture);
+    texture.dispose();
+  };
   const loadOne = (url: string): Promise<THREE.Texture> => new Promise((resolve, reject) => {
-    loader.load(url, resolve, (error) => reject(new Error(`pbr-library: failed to load ${url}: ${String(error)}`)));
+    const cancel = (error: Error): void => { pendingRejects.delete(cancel); reject(error); };
+    pendingRejects.add(cancel);
+    const texture = loader.load(url, (loaded) => {
+      pendingRejects.delete(cancel);
+      if (disposed || failed) {
+        releaseTexture(loaded);
+        reject(new Error('pbr-library: disposed or failed during load'));
+        return;
+      }
+      ownedTextures.add(loaded);
+      resolve(loaded);
+    }, undefined, (error) => cancel(new Error(`pbr-library: failed to load ${url}: ${String(error)}`)));
+    if (texture) {
+      if (disposed || failed) releaseTexture(texture);
+      else ownedTextures.add(texture);
+    }
   });
   const load = (): Promise<void> => {
-    if (loadPromise) return loadPromise;
     if (disposed) return Promise.reject(new Error('pbr-library: disposed'));
+    if (loadPromise) return loadPromise;
     const entries = Object.values(STUDIO_PBR_ASSETS).map((asset) => {
-      const prefix = `${baseUrl}/${asset.assetId}/`;
+      const prefix = `${baseUrl.replace(/\/$/, '')}/`;
       return Promise.all([
         loadOne(prefix + asset.albedoFile),
         loadOne(prefix + asset.normalFile),
         loadOne(prefix + asset.roughnessFile),
       ]).then(([albedo, normal, roughness]) => {
+        if (disposed || failed) throw new Error('pbr-library: disposed or failed during load');
         albedo.colorSpace = THREE.SRGBColorSpace;
         normal.colorSpace = THREE.NoColorSpace;
         roughness.colorSpace = THREE.NoColorSpace;
@@ -135,19 +161,25 @@ export function createStudioPbrLibrary(baseUrl: string = ASSET_DIR, loader: PbrT
         originals.set(asset.assetId, { albedo, normal, roughness });
       });
     });
-    loadPromise = Promise.all(entries).then(() => undefined);
+    loadPromise = Promise.all(entries).then(() => undefined).catch((error: unknown) => {
+      failed = true;
+      originals.clear();
+      for (const texture of [...ownedTextures]) releaseTexture(texture);
+      for (const rejectPending of [...pendingRejects]) rejectPending(new Error('pbr-library: another map failed'));
+      throw error;
+    });
     return loadPromise;
   };
 
   return {
     load() {
-      void load();
+      void load().catch(() => undefined); // whenReady retains the rejection for callers.
     },
     whenReady(): Promise<void> {
       return load();
     },
     isReady(): boolean {
-      return originals.size === Object.keys(STUDIO_PBR_ASSETS).length;
+      return !disposed && !failed && originals.size === Object.keys(STUDIO_PBR_ASSETS).length;
     },
     createConsumer(assetId: string, options: StudioPbrConsumerOptions): StudioPbrConsumer {
       const asset = STUDIO_PBR_ASSETS[assetId];
@@ -163,13 +195,6 @@ export function createStudioPbrLibrary(baseUrl: string = ASSET_DIR, loader: PbrT
       if (!Number.isFinite(repeatX) || !Number.isFinite(repeatY)) {
         throw new Error('pbr-library: computed repeat is not finite');
       }
-      const clones = [set.albedo, set.normal, set.roughness].map((texture) => {
-        const clone = texture.clone();
-        clone.wrapS = THREE.RepeatWrapping;
-        clone.wrapT = THREE.RepeatWrapping;
-        clone.repeat.set(repeatX, repeatY);
-        return clone;
-      });
       const normalScale = options.normalScale ?? DEFAULT_NORMAL_SCALE;
       if (!Number.isFinite(normalScale) || normalScale < 0 || normalScale > 1.5) {
         throw new Error('pbr-library: normalScale must be finite within [0, 1.5] (restrained)');
@@ -178,6 +203,13 @@ export function createStudioPbrLibrary(baseUrl: string = ASSET_DIR, loader: PbrT
       if (!Number.isFinite(roughness) || roughness <= 0 || roughness > 1) {
         throw new Error('pbr-library: roughness must be finite within (0, 1]');
       }
+      const clones = [set.albedo, set.normal, set.roughness].map((texture) => {
+        const clone = texture.clone();
+        clone.wrapS = THREE.RepeatWrapping;
+        clone.wrapT = THREE.RepeatWrapping;
+        clone.repeat.set(repeatX, repeatY);
+        return clone;
+      });
       const material = new THREE.MeshStandardMaterial({
         map: clones[0]!,
         normalMap: clones[1]!,
@@ -198,16 +230,13 @@ export function createStudioPbrLibrary(baseUrl: string = ASSET_DIR, loader: PbrT
     dispose(): void {
       if (disposed) return;
       disposed = true;
+      for (const rejectPending of [...pendingRejects]) rejectPending(new Error('pbr-library: disposed during load'));
       for (const consumer of [...consumers]) {
         for (const texture of consumer.textures) texture.dispose();
         consumer.material.dispose();
       }
       consumers.clear();
-      for (const set of originals.values()) {
-        set.albedo.dispose();
-        set.normal.dispose();
-        set.roughness.dispose();
-      }
+      for (const texture of [...ownedTextures]) releaseTexture(texture);
       originals.clear();
     },
   };

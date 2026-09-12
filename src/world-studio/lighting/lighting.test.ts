@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
 import * as THREE from 'three';
 import { STUDIO_ENVIRONMENTS, studioEnvironmentForSeed } from '../environment';
 import type { StudioEnvironment, StudioPresetId } from '../environment';
@@ -286,6 +287,61 @@ describe('studio lighting input validation', () => {
 });
 
 describe('studio pbr library', () => {
+  it('requests existing public files and uses the real TextureLoader error callback slot', async () => {
+    const urls: string[] = [];
+    const spy = vi.spyOn(THREE.TextureLoader.prototype, 'load').mockImplementation((url, _ok, progress, fail) => {
+      urls.push(url);
+      expect(progress).toBeUndefined();
+      expect(fail).toBeTypeOf('function');
+      queueMicrotask(() => fail!(new Error('synthetic decode failure')));
+      return new THREE.Texture();
+    });
+    try {
+      const library = createStudioPbrLibrary();
+      await expect(library.whenReady()).rejects.toThrow(/failed to load/);
+      expect(urls).toHaveLength(6);
+      for (const url of urls) expect(existsSync(`public/${url}`), url).toBe(true);
+      expect(library.isReady()).toBe(false);
+      library.dispose();
+    } finally { spy.mockRestore(); }
+  });
+
+  it('rejects pending readiness on disposal and releases late loaded textures exactly once', async () => {
+    const pending: Array<{ texture: THREE.Texture; resolve: (texture: THREE.Texture) => void; dispose: ReturnType<typeof vi.spyOn> }> = [];
+    const library = createStudioPbrLibrary('test', { load(_url, resolve) {
+      const texture = new THREE.Texture();
+      pending.push({ texture, resolve, dispose: vi.spyOn(texture, 'dispose') });
+      return texture;
+    } });
+    const ready = library.whenReady();
+    const rejection = expect(ready).rejects.toThrow(/disposed/);
+    library.dispose();
+    await rejection;
+    for (const request of pending) request.resolve(request.texture);
+    await Promise.resolve();
+    expect(library.isReady()).toBe(false);
+    for (const request of pending) expect(request.dispose).toHaveBeenCalledTimes(1);
+    await expect(library.whenReady()).rejects.toThrow(/disposed/);
+  });
+
+  it('cleans partial successes and late arrivals after a map fails', async () => {
+    const requests: Array<{ texture: THREE.Texture; ok: (texture: THREE.Texture) => void; fail: (error: unknown) => void; dispose: ReturnType<typeof vi.spyOn> }> = [];
+    const library = createStudioPbrLibrary('test', { load(_url, ok, _progress, fail) {
+      const texture = new THREE.Texture();
+      requests.push({ texture, ok, fail, dispose: vi.spyOn(texture, 'dispose') });
+      return texture;
+    } });
+    const rejection = expect(library.whenReady()).rejects.toThrow(/failed to load/);
+    requests[0]!.ok(requests[0]!.texture);
+    requests[1]!.fail(new Error('bad image'));
+    await rejection;
+    for (const request of requests.slice(2)) request.ok(request.texture);
+    await Promise.resolve();
+    library.dispose();
+    for (const request of requests) expect(request.dispose).toHaveBeenCalledTimes(1);
+    expect(library.isReady()).toBe(false);
+  });
+
   const makeTexture = (): THREE.Texture => {
     const texture = new THREE.Texture();
     texture.colorSpace = THREE.NoColorSpace;
