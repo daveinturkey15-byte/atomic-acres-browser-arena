@@ -12,6 +12,7 @@ import { createStudioInteriors, type StudioInteriorAnchor } from './interiors';
 import { createStudioGardens } from './gardens';
 import { createStudioBlenderAssets } from './blender-assets';
 import { createStudioLighting } from './lighting';
+import { createStudioPbrLibrary } from './pbr-library';
 
 /** A new arena with one authority root; never aliases or wraps an old map builder. */
 export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
@@ -56,15 +57,45 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
     .map(solid => solid.bounds));
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
   if (typeof window !== 'undefined') {
+    const pbr = createStudioPbrLibrary();
+    let retired = false;
+    const originals = ground.surfaces.slice(0, 2).map(material => ({
+      material, map: material.map, normalMap: material.normalMap, roughnessMap: material.roughnessMap,
+    }));
+    root.userData.worldStudioPbrStatus = 'loading';
+    root.addEventListener('removed', () => {
+      retired = true;
+      // Restore originals before the arena disposer walks materials. The PBR
+      // library releases its own clones; root disposal still owns the old maps.
+      originals.forEach(({ material, ...maps }) => Object.assign(material, maps));
+      pbr.dispose();
+    });
+    void pbr.whenReady().then(() => {
+      if (retired || root.parent !== scene) { pbr.dispose(); return; }
+      ['asphalt_02', 'brushed_concrete_03'].forEach((id, index) => {
+        // Ground UVs are already in two-metre units, including box faces.
+        const consumer = pbr.createConsumer(id, { sizeMeters: [2, 2], normalScale: .5 });
+        const material = ground.surfaces[index]!;
+        material.map = consumer.material.map;
+        material.normalMap = consumer.material.normalMap;
+        material.roughnessMap = consumer.material.roughnessMap;
+        material.normalScale.copy(consumer.material.normalScale);
+        material.needsUpdate = true;
+      });
+      root.userData.worldStudioPbrStatus = 'ready';
+    }).catch(error => {
+      pbr.dispose();
+      if (!retired) root.userData.worldStudioPbrStatus = `failed: ${String(error)}`;
+    });
     const heroes = createStudioBlenderAssets({ headingRadians: Math.PI });
     root.userData.worldStudioBlenderStatus = 'loading';
     void heroes.ready.then(() => {
       if (root.parent !== scene) { heroes.dispose(); return; }
       // The procedural contract uses a -Z bus nose and +Z truck nose. The
-      // Blender exports use +Z locally; center the truck's authored asymmetric
-      // frame on its existing road envelope without changing physics.
+      // Blender exports use +Z locally; the revised truck is centered on its
+      // authored origin, aligned with the existing envelope without an offset.
       const truck = heroes.root.getObjectByName('world-studio-hero-truck');
-      if (truck) { truck.rotation.y = 0; truck.position.z = -2.41375; }
+      if (truck) { truck.rotation.y = 0; truck.position.z = -2.0; }
       root.add(heroes.root);
       heroes.root.traverse(object => {
         if (!(object instanceof THREE.Mesh)) return;
