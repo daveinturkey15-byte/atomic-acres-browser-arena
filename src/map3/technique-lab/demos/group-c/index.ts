@@ -199,7 +199,7 @@ export const manifest: ManifestEntry[] = [
   },
   {
     sourceId: 45,
-    title: 'Generated-shell post-processing: VoxelToMesh, WeldVertices, FillHoles, SmoothNormals',
+    title: 'Generated-shell post-processing: surface, WeldVertices, FillHoles, SmoothNormals',
     method:
       'A voxel field is surfaced, coincident vertices welded, single-use boundary edges chained '
       + 'into loops and fan-filled, then normals averaged — which only smooths because weld ran.',
@@ -210,7 +210,9 @@ export const manifest: ManifestEntry[] = [
     ],
     limitation:
       'The generator is absent: no Trellis.2/Pixal3D inference, no weights installed, no ComfyUI '
-      + 'contacted. The PBR bake stage is not implemented. Independent TS, not a port.',
+      + 'contacted. The PBR bake stage is not implemented. Independent TS, not a port. Three of '
+      + 'the four named nodes were inspected at the pin; VoxelToMesh is not in that file and its '
+      + 'implementation is unseen — see SOURCE_RESEARCH.json.',
     createDemo: createSource45,
   },
   {

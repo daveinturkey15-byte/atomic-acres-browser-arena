@@ -21,6 +21,13 @@
  * The chain, restated and implemented here in TypeScript from scratch:
  *   VoxelToMesh -> WeldVertices -> FillHoles -> MeshSmoothNormals
  *
+ * Verified against that pinned file 2026-09-12: `WeldVertices`, `FillHoles` and
+ * `MeshSmoothNormals` are classes in it; `VoxelToMesh` is NOT — it is named by
+ * the documented node chain but lives in another module that was not fetched,
+ * so its implementation is unseen and only its stated role is used here. The
+ * ordering claim is upstream's own: `WeldVertices` describes itself as a
+ * "pre-pass before FillHoles, DecimateMesh, or any topology-aware op".
+ *
  * BEFORE is the raw voxel shell: every face its own four vertices, a hole
  * punched through it, hard faceting. AFTER is the same shell through the chain.
  */
@@ -228,7 +235,7 @@ export function createDemo(context: DemoContext): Demo {
     dispose: () => disposeTree(root),
     metadata: {
       sourceId: 45,
-      title: 'Generated-shell post-processing: VoxelToMesh, WeldVertices, FillHoles, SmoothNormals',
+      title: 'Generated-shell post-processing: surface, WeldVertices, FillHoles, SmoothNormals',
       method:
         'A voxel field is surfaced by emitting the outward face of every solid cell with an empty '
         + 'neighbour; coincident vertices are welded within a tolerance; edges used by exactly '
@@ -247,6 +254,10 @@ export function createDemo(context: DemoContext): Demo {
         + 'image-to-3D claim is made — the input voxel field is authored by this file. The PBR '
         + 'bake stage (BakeTextureFromVoxel, BakeNormalMapFromMesh, BakeAmbientOcclusion, '
         + 'UnwrapMesh) is NOT implemented: there is no UV atlas, no normal map and no AO here. '
+        + 'Only three of the four named nodes were inspected at the pin: WeldVertices, FillHoles '
+        + 'and MeshSmoothNormals are classes in that file, VoxelToMesh is not — it belongs to '
+        + 'another module that was never fetched, so the surfacing step follows its documented '
+        + 'role and NOT its unseen implementation. '
         + 'These are independent TypeScript reimplementations, not ports of the Python nodes, '
         + 'and DecimateMesh/RemeshMesh are not included (source 36 carries a clustering '
         + 'reduction separately). The DINOv3 attribution condition the register flags applies to '
