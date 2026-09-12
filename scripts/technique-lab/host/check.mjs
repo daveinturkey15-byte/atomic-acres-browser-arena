@@ -112,6 +112,55 @@ check('bounded pixel ratio', /Math\.min\(window\.devicePixelRatio \|\| 1, 2\)/.t
 check('Recenter control', runtime.includes('Recenter'));
 check('Missing/not delivered path', /Missing \/ not delivered/.test(runtime));
 
+// Host-quality pass: honesty guards, options seam, framing bounds.
+check(
+  'group loaders default to import.meta.glob with injectable override',
+  runtime.includes("import.meta.glob<GroupModule>('./demos/group-*/index.ts')") &&
+    runtime.includes('options.groupLoaders ??'),
+);
+check(
+  'blocked entries carrying a factory are stripped, never mounted',
+  runtime.includes('entry.createDemo = undefined') &&
+    runtime.includes('blocked entry carried a factory'),
+);
+check(
+  'alias rows are flagged as non-distinct credits',
+  runtime.includes('not a distinct technique credit') &&
+    runtime.includes('record.aliasOf !== null'),
+);
+check(
+  'group notDeliveredSourceIds are surfaced, not fabricated',
+  runtime.includes('module.notDeliveredSourceIds') &&
+    runtime.includes('no honest demo'),
+);
+check(
+  'renderer is structural (LabRendererLike) so CPU tests can stub it',
+  runtime.includes('renderer: LabRendererLike | null') &&
+    types.includes('export interface LabRendererLike') &&
+    types.includes('export interface LabHostOptions') &&
+    types.includes('notDeliveredSourceIds?: readonly number[]'),
+);
+check(
+  'host owns a neutral ambient floor light disposed with the rig',
+  runtime.includes('new THREE.AmbientLight(') &&
+    /for \(const light of \[hemi, dir, ambient\]\) light\.dispose\(\)/.test(runtime),
+);
+check(
+  'framing is aspect-aware and bounded, with a stable home fallback',
+  runtime.includes('function boundedBoundingSphere(') &&
+    runtime.includes('Math.max(vertical, horizontal)') &&
+    runtime.includes('function homeCamera('),
+);
+check(
+  'informational notices do not force the error badge',
+  runtime.includes('if (alert) record.alerts += 1;') &&
+    runtime.includes('record.alerts > 0'),
+);
+check(
+  'status filter exposes the blocked state',
+  /'pending',\s*'loaded',\s*'manifest',\s*'blocked',\s*'error'/s.test(runtime),
+);
+
 // Types: frozen factory contract.
 for (const piece of [
   'context: DemoContext',
@@ -123,6 +172,11 @@ for (const piece of [
   "Adaptation = 'exact' | 'adapted' | 'blocked'",
   'DemoManifestEntry',
   'createDemo?: DemoFactory',
+  'export interface LabRendererLike',
+  'export interface LabHostOptions',
+  'notDeliveredSourceIds?: readonly number[]',
+  'groupLoaders?: Record<string, () => Promise<GroupModule>>',
+  'createRenderer?: (canvas: HTMLCanvasElement) => LabRendererLike',
 ]) {
   check(`contract piece present: ${piece}`, types.includes(piece));
 }

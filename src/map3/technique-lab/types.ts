@@ -57,4 +57,39 @@ export interface DemoManifestEntry {
 /** Shape of a dynamically imported `./demos/group-N/index.ts` module. */
 export interface GroupModule {
   manifest?: unknown;
+  /**
+   * Optional group-honesty flag (shipped by group B): stable source IDs whose
+   * primary source was recovered and read in the group's lane but which still
+   * carries no honest demo. The host surfaces these rows; it never invents
+   * content for them.
+   */
+  notDeliveredSourceIds?: readonly number[];
+}
+
+/**
+ * Structural surface of the renderer the host actually drives. The production
+ * host passes a real `THREE.WebGPURenderer`; focused CPU tests may pass a stub
+ * with the same surface so mount/switch/teardown transitions are exercised
+ * without a GPU. This is a test seam only — the default path never changes.
+ */
+export interface LabRendererLike {
+  init(): Promise<unknown>;
+  setPixelRatio(ratio: number): void;
+  setSize(width: number, height: number, updateStyle?: boolean): void;
+  render(scene: THREE.Scene, camera: THREE.Camera): unknown;
+  dispose(): void;
+  backend?: unknown;
+  info?: { render?: { drawCalls?: number; calls?: number; triangles?: number } };
+}
+
+/** Optional host wiring overrides. Defaults keep the production behaviour. */
+export interface LabHostOptions {
+  /**
+   * Demo-group module loaders. Defaults to the host's vite glob over
+   * demos/group-star/index.ts modules; tests supply fake loaders so manifest
+   * validation, mounting and teardown run against actual code.
+   */
+  groupLoaders?: Record<string, () => Promise<GroupModule>>;
+  /** Renderer factory. Defaults to a real WebGPURenderer on the host canvas. */
+  createRenderer?: (canvas: HTMLCanvasElement) => LabRendererLike;
 }

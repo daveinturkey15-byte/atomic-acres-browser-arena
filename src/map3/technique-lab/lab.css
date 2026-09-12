@@ -178,6 +178,11 @@
   color: #f0c9c2;
 }
 
+.tl-badge.is-blocked {
+  border-color: #c9b37f;
+  color: #efe6c9;
+}
+
 .tl-canvas-wrap {
   position: relative;
   height: min(62vh, 560px);

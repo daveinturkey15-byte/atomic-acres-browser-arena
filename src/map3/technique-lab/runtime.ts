@@ -30,6 +30,8 @@ import type {
   DemoInstance,
   DemoManifestEntry,
   GroupModule,
+  LabHostOptions,
+  LabRendererLike,
 } from './types';
 
 /** Fixed deterministic seed handed to every demo factory. */
@@ -41,6 +43,7 @@ export interface TechniqueLabHandle {
 
 export async function mountTechniqueLab(
   container: HTMLElement,
+  options: LabHostOptions = {},
 ): Promise<TechniqueLabHandle> {
   const state = createState(container);
   buildDom(state);
@@ -52,7 +55,7 @@ export async function mountTechniqueLab(
   // Renderer init and demo-group discovery race each other and dispose;
   // both re-check the generation guard before touching host state.
   const gen = state.generation;
-  void initRenderer(state, gen).then(() => {
+  void initRenderer(state, gen, options).then(() => {
     if (state.disposed || gen !== state.generation) return;
     if (state.renderer) {
       startLoop(state);
@@ -60,7 +63,7 @@ export async function mountTechniqueLab(
       mountSelection(state, state.selectedId);
     }
   });
-  void refreshGroups(state, gen);
+  void refreshGroups(state, gen, options);
 
   return {
     dispose: () => disposeLab(state),
@@ -81,6 +84,8 @@ interface ResolvedRecord {
   entry: DemoManifestEntry | null;
   group: string | null;
   problems: string[];
+  /** Operational problems that turn the gallery badge red (notices excluded). */
+  alerts: number;
 }
 
 interface ActiveDemo {
@@ -99,7 +104,7 @@ interface LabState {
   adaptationFilter: string;
   // Renderer / scene.
   canvas: HTMLCanvasElement;
-  renderer: WebGPURenderer | null;
+  renderer: LabRendererLike | null;
   rendererError: string | null;
   backend: BackendLabel;
   scene: THREE.Scene;
@@ -151,6 +156,7 @@ function createState(container: HTMLElement): LabState {
       entry: null,
       group: null,
       problems: [],
+      alerts: 0,
     })),
     selectedId: 1,
     query: '',
@@ -239,7 +245,14 @@ function buildDom(state: LabState): void {
   filters.className = 'tl-filters';
   const statusLabel = document.createElement('label');
   statusLabel.append(document.createTextNode('Status'));
-  fillSelect(s.statusSelect, ['all', 'pending', 'loaded', 'manifest', 'error']);
+  fillSelect(s.statusSelect, [
+    'all',
+    'pending',
+    'loaded',
+    'manifest',
+    'blocked',
+    'error',
+  ]);
   statusLabel.append(s.statusSelect);
   const adaptLabel = document.createElement('label');
   adaptLabel.append(document.createTextNode('Adaptation'));
@@ -316,9 +329,13 @@ function fillSelect(select: HTMLSelectElement, values: string[]): void {
 }
 
 function badgeFor(record: ResolvedRecord): { label: string; cls: string } {
-  if (record.problems.length > 0) return { label: 'error', cls: 'is-error' };
-  if (record.entry?.createDemo) return { label: 'loaded', cls: 'is-loaded' };
-  if (record.entry) return { label: 'manifest', cls: '' };
+  const entry = record.entry;
+  if (entry?.adaptation === 'blocked') {
+    return { label: 'blocked', cls: 'is-blocked' };
+  }
+  if (record.alerts > 0) return { label: 'error', cls: 'is-error' };
+  if (entry?.createDemo) return { label: 'loaded', cls: 'is-loaded' };
+  if (entry) return { label: 'manifest', cls: '' };
   return { label: 'pending', cls: '' };
 }
 
@@ -407,6 +424,9 @@ function stagesFor(record: ResolvedRecord): Array<{ label: string; done: boolean
 }
 
 function statusText(record: ResolvedRecord): string {
+  if (record.entry?.adaptation === 'blocked') {
+    return `Source ${record.id} · blocked — no honest demo delivered; limitation recorded below.`;
+  }
   if (record.problems.length > 0) {
     return `Source ${record.id} · load issue — see notices below.`;
   }
@@ -472,7 +492,9 @@ function renderDetail(state: LabState, record: ResolvedRecord): void {
       a.rel = 'noopener noreferrer';
       li.append(a);
     } else {
-      li.textContent = 'Withheld: non-http(s) URL is displayed, never linked.';
+      li.textContent =
+        `${url} — not linked (non-http(s) or unverified served path; ` +
+        `shown as text only).`;
     }
     list.append(li);
   }
@@ -596,16 +618,18 @@ function mountSelection(state: LabState, id: number): void {
     demo = factory({ THREE, seed: LAB_SEED });
   } catch (err) {
     const message = `Source ${id} · factory threw: ${toMessage(err)}`;
-    record.problems.push(message);
+    addProblem(record, message, true);
     reportError(state, message);
+    renderDetail(state, record);
     showEmpty(state, message);
     refreshGallery(state);
     return;
   }
   if (!(demo.root instanceof THREE.Group)) {
     const message = `Source ${id} · factory did not return a THREE.Group root; not mounted.`;
-    record.problems.push(message);
+    addProblem(record, message, true);
     reportError(state, message);
+    renderDetail(state, record);
     showEmpty(state, message);
     refreshGallery(state);
     return;
@@ -614,12 +638,15 @@ function mountSelection(state: LabState, id: number): void {
     const message =
       `Source ${id} · metadata.sourceId ${String(demo.metadata.sourceId)} ` +
       `does not match manifest/URL id ${id}; mounted but flagged.`;
-    record.problems.push(message);
+    addProblem(record, message, true);
     reportError(state, message);
   }
   state.scene.add(demo.root);
   state.active = { demo, id };
   hideEmpty(state);
+  // A post-mount flag (e.g. sourceId mismatch) must reach the detail panel
+  // too, not only the gallery badge and the error box.
+  if (record.problems.length > 0) renderDetail(state, record);
   frameSelection(state);
   refreshGallery(state);
   refreshMetrics(state);
@@ -630,32 +657,36 @@ function mountSelection(state: LabState, id: number): void {
 /* Renderer, loop, framing                                             */
 /* ------------------------------------------------------------------ */
 
-function readBackend(renderer: WebGPURenderer): BackendLabel {
-  try {
-    const backend = (
-      renderer as unknown as { backend?: { isWebGPUBackend?: unknown } }
-    ).backend;
-    if (backend?.isWebGPUBackend === true) return 'WebGPU';
-    if (backend) return 'WebGL fallback';
-  } catch {
-    // Unknown remains unknown.
-  }
+function readBackend(renderer: LabRendererLike): BackendLabel {
+  const backend = renderer.backend as { isWebGPUBackend?: boolean } | undefined;
+  if (backend?.isWebGPUBackend === true) return 'WebGPU';
+  if (backend) return 'WebGL fallback';
   return 'unknown';
 }
 
-async function initRenderer(state: LabState, gen: number): Promise<void> {
+async function initRenderer(
+  state: LabState,
+  gen: number,
+  options: LabHostOptions,
+): Promise<void> {
   const hemi = new THREE.HemisphereLight(0xdfeff0, 0x0a1113, 0.9);
   const dir = new THREE.DirectionalLight(0xffffff, 1.1);
   dir.position.set(4, 6, 3);
-  state.lights = [hemi, dir];
+  // Neutral ambient floor: demos whose materials rely on scene lights never
+  // disappear into pure black from below; host-owned and disposed with the rig.
+  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+  state.lights = [hemi, dir, ambient];
 
-  let renderer: WebGPURenderer;
+  let renderer: LabRendererLike;
   try {
-    renderer = new WebGPURenderer({ canvas: state.canvas, antialias: true });
+    renderer = options.createRenderer
+      ? options.createRenderer(state.canvas)
+      : new WebGPURenderer({ canvas: state.canvas, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     sizeToWrap(state, renderer);
     await renderer.init();
   } catch (err) {
+    for (const light of [hemi, dir, ambient]) light.dispose();
     if (state.disposed || gen !== state.generation) return;
     state.rendererError = toMessage(err);
     reportError(
@@ -667,6 +698,7 @@ async function initRenderer(state: LabState, gen: number): Promise<void> {
     return;
   }
   if (state.disposed || gen !== state.generation) {
+    for (const light of [hemi, dir, ambient]) light.dispose();
     try {
       renderer.dispose();
     } catch {
@@ -676,7 +708,7 @@ async function initRenderer(state: LabState, gen: number): Promise<void> {
   }
   state.renderer = renderer;
   state.backend = readBackend(renderer);
-  state.scene.add(hemi, dir);
+  state.scene.add(hemi, dir, ambient);
   state.controls = new OrbitControls(state.camera, state.canvas);
   state.controls.enableDamping = true;
   sizeToWrap(state, renderer);
@@ -684,7 +716,7 @@ async function initRenderer(state: LabState, gen: number): Promise<void> {
   refreshMetrics(state);
 }
 
-function sizeToWrap(state: LabState, renderer: WebGPURenderer): void {
+function sizeToWrap(state: LabState, renderer: LabRendererLike): void {
   const w = Math.max(1, Math.floor(state.wrap.clientWidth || 640));
   const h = Math.max(1, Math.floor(state.wrap.clientHeight || 360));
   state.camera.aspect = w / h;
@@ -731,7 +763,7 @@ function startLoop(state: LabState): void {
           const message = `Source ${active.id} · update threw and was stopped: ${toMessage(err)} — host stays usable.`;
           reportError(state, message);
           const record = state.records[active.id - 1];
-          record.problems.push(message);
+          addProblem(record, message, true);
           teardownActive(state);
           showEmpty(state, message);
           refreshGallery(state);
@@ -751,32 +783,81 @@ function startLoop(state: LabState): void {
   state.raf = requestAnimationFrame(tick);
 }
 
+/**
+ * Frame the active demo once per mount / explicit Recenter. The fit satisfies
+ * BOTH frustum extents (vertical fov and horizontal fov at the current aspect)
+ * so flat planes and tall towers frame fully at any stage shape, and the
+ * radius/centre are sanity-bounded against NaN and absurd scale.
+ */
 function frameSelection(state: LabState): void {
+  if (!state.controls) return;
   const active = state.active;
-  if (!active || !state.controls) return;
-  const box = new THREE.Box3().setFromObject(active.demo.root);
-  if (box.isEmpty()) return;
-  const sphere = box.getBoundingSphere(new THREE.Sphere());
-  if (!Number.isFinite(sphere.radius) || sphere.radius <= 0) return;
-  if (
-    !Number.isFinite(sphere.center.x) ||
-    !Number.isFinite(sphere.center.y) ||
-    !Number.isFinite(sphere.center.z)
-  ) {
+  const sphere = active
+    ? boundedBoundingSphere(active.demo.root)
+    : null;
+  if (!sphere) {
+    homeCamera(state);
     return;
   }
-  // Frame once per new demo / explicit Recenter only — never per frame.
-  const distance =
-    (sphere.radius / Math.tan(THREE.MathUtils.degToRad(state.camera.fov / 2))) *
-    1.4;
+  const halfFov = THREE.MathUtils.degToRad(state.camera.fov / 2);
+  const vertical = sphere.radius / Math.tan(halfFov);
+  const aspect = Math.max(state.camera.aspect, 1e-3);
+  const horizontal = sphere.radius / (Math.tan(halfFov) * aspect);
+  const distance = Math.max(vertical, horizontal) * 1.2;
   const dir = new THREE.Vector3(1, 0.6, 1).normalize();
-  state.camera.position.copy(sphere.center).addScaledVector(dir, Math.max(distance, 0.1));
+  state.camera.position.copy(sphere.center).addScaledVector(dir, distance);
   state.camera.near = Math.max(distance / 1000, 0.01);
   state.camera.far = Math.max(distance * 100, 10);
   state.camera.updateProjectionMatrix();
   state.controls.target.copy(sphere.center);
   state.controls.update();
 }
+
+/**
+ * Bounding sphere of a demo root, or null when the root has no finite,
+ * positive-volume bounds (empty scene graph, degenerate or NaN geometry).
+ */
+function boundedBoundingSphere(root: THREE.Group): THREE.Sphere | null {
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return null;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  if (
+    !Number.isFinite(sphere.radius) ||
+    sphere.radius <= 0 ||
+    !Number.isFinite(sphere.center.x) ||
+    !Number.isFinite(sphere.center.y) ||
+    !Number.isFinite(sphere.center.z)
+  ) {
+    return null;
+  }
+  sphere.radius = Math.min(Math.max(sphere.radius, 1e-3), 1e4);
+  return sphere;
+}
+
+/** Stable default framing used when there is nothing finite to frame. */
+function homeCamera(state: LabState): void {
+  state.camera.position.set(4, 3, 6);
+  state.camera.near = 0.01;
+  state.camera.far = 1000;
+  state.camera.updateProjectionMatrix();
+  if (state.controls) {
+    state.controls.target.set(0, 0, 0);
+    state.controls.update();
+  }
+}
+
+
+/**
+ * Record one row notice. Operational failures (alert=true) also turn the
+ * gallery badge red; informational notices (alias, not-delivered markers)
+ * stay visible in the detail panel without crying wolf in the gallery.
+ */
+function addProblem(record: ResolvedRecord, message: string, alert = false): void {
+  if (record.problems.includes(message)) return;
+  record.problems.push(message);
+  if (alert) record.alerts += 1;
+}
+
 
 function refreshMetrics(state: LabState): void {
   const info = state.renderer?.info?.render as
@@ -800,10 +881,16 @@ function isAdaptation(value: unknown): value is Adaptation {
   return value === 'exact' || value === 'adapted' || value === 'blocked';
 }
 
-async function refreshGroups(state: LabState, gen: number): Promise<void> {
+async function refreshGroups(
+  state: LabState,
+  gen: number,
+  options: LabHostOptions,
+): Promise<void> {
   // Group modules arrive after root cherry-picks them; an empty match is a
   // normal pending state, never a build-time or runtime error.
-  const loaders = import.meta.glob<GroupModule>('./demos/group-*/index.ts');
+  const loaders =
+    options.groupLoaders ??
+    import.meta.glob<GroupModule>('./demos/group-*/index.ts');
   const keys = Object.keys(loaders);
   if (keys.length === 0) {
     reportError(
@@ -850,17 +937,57 @@ async function refreshGroups(state: LabState, gen: number): Promise<void> {
       const record = state.records[entry.sourceId - 1];
       if (prior) {
         const message = `Duplicate sourceId ${entry.sourceId}: kept ${prior}, ignored ${group}; no silent overwrite.`;
-        record.problems.push(message);
+        addProblem(record, message, true);
         reportError(state, message);
         continue;
       }
       seen.set(entry.sourceId, group);
+      // Honesty guards applied at adoption time, before any mount can happen.
+      if (entry.adaptation === 'blocked' && entry.createDemo) {
+        entry.createDemo = undefined;
+        addProblem(
+          record,
+          `Source ${entry.sourceId} · blocked entry carried a factory; the ` +
+            `factory was ignored (a blocked row has no honest demo).`,
+          true,
+        );
+      }
+      if (record.aliasOf !== null) {
+        addProblem(
+          record,
+          `Source ${entry.sourceId} · aliases row ${record.aliasOf}; any ` +
+            `factory here is a convenience alias, not a distinct technique credit.`,
+        );
+      }
       record.entry = entry;
       record.group = group;
       // An adapted technique can have a more specific demonstration title.
       // Identity is bound to sourceId, not text equality with the source title.
       record.title = entry.title;
       record.sources = [...entry.sources];
+    }
+    const notDelivered = module.notDeliveredSourceIds;
+    if (Array.isArray(notDelivered)) {
+      for (const rawId of notDelivered) {
+        if (typeof rawId !== 'number' || !validId(rawId)) continue;
+        const record = state.records[rawId - 1];
+        if (!record) continue;
+        if (record.entry?.createDemo) {
+          addProblem(
+            record,
+            `Group ${group} marks source ${rawId} as not delivered but also ` +
+              `shipped a factory; the factory stays mounted and this ` +
+              `inconsistency is flagged.`,
+            true,
+          );
+        } else {
+          addProblem(
+            record,
+            `Group ${group} marks source ${rawId} as not delivered in its ` +
+              `lane (source recovered/read, no honest demo).`,
+          );
+        }
+      }
     }
   }
   if (state.disposed || gen !== state.generation) return;
