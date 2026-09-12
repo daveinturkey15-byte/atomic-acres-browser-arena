@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { studioBoxGeometry } from './build';
+import { generateCarpet, generateTerrazzo } from './interior-textures';
 import { GROUND_FLOOR_Y, RIDGE_Y, UPPER_FLOOR_Y, countDrawGroups, countTriangles, createStudioArchitecture, type StudioArchitecture } from './index';
 
 let architecture: StudioArchitecture;
@@ -260,8 +261,39 @@ describe('world-studio architecture contract', () => {
         images.add(image.data);
       }
     }
-    // One albedo buffer per texture family, shared by every material that tints it.
-    expect(images.size).toBeLessThanOrEqual(4);
+    // One albedo buffer per texture family, shared by every material that tints it:
+    // four forge families plus the two interior floors this lane generates.
+    expect(images.size).toBeLessThanOrEqual(6);
+  });
+
+  it('generates deterministic, distinguishable interior floors', () => {
+    const terrazzo = generateTerrazzo(128, 5);
+    const again = generateTerrazzo(128, 5);
+    expect(Array.from(terrazzo.albedo)).toEqual(Array.from(again.albedo));
+    const carpet = generateCarpet(128, 5);
+    expect(Array.from(carpet.albedo)).not.toEqual(Array.from(terrazzo.albedo));
+
+    const meanRoughness = (set: { roughness: Uint8ClampedArray }): number => {
+      let total = 0;
+      for (const value of set.roughness) total += value;
+      return total / set.roughness.length / 255;
+    };
+    // Polished stone against loop pile: the two must not read as the same surface.
+    expect(meanRoughness(terrazzo)).toBeLessThan(0.55);
+    expect(meanRoughness(carpet)).toBeGreaterThan(0.85);
+
+    // Chip and tuft contrast: a flat fill would defeat the point of generating them.
+    const spread = (set: { albedo: Uint8ClampedArray }): number => {
+      let min = 255;
+      let max = 0;
+      for (let index = 0; index < set.albedo.length; index += 4) {
+        min = Math.min(min, set.albedo[index]);
+        max = Math.max(max, set.albedo[index]);
+      }
+      return (max - min) / 255;
+    };
+    expect(spread(terrazzo)).toBeGreaterThan(0.3);
+    expect(spread(carpet)).toBeGreaterThan(0.08);
   });
 
   it('publishes furniture anchors and review cameras for the other lanes', () => {

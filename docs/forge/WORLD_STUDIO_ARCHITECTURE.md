@@ -40,7 +40,7 @@ Counted by `studio-architecture.test.ts`, not estimated:
 | triangles | 20,088 | ≤ 100,000 |
 | renderable draw groups | 24 | ≤ 80 |
 | solids (colliders) | 444 | — |
-| generated texture families | 4 × 512² (albedo + normal + roughness) | "modest handful" |
+| generated texture families | 6 × 512² (albedo + normal + roughness) | "modest handful" |
 
 ## Layout
 
@@ -75,8 +75,10 @@ asserted, not assumed, in `studio-architecture.test.ts`.
 
 ## Method
 
-- **Materials.** One 512² set per texture family from the in-repo forge
-  (`src/forge/textures`: `lapSiding`, `shingle`, `brick`, `concrete`), uploaded as
+- **Materials.** One 512² set per texture family: four from the in-repo forge
+  (`src/forge/textures`: `lapSiding`, `shingle`, `brick`, `concrete`) plus two authored in
+  this lane (`interior-textures.ts`: polished `terrazzo` with 20 mm aggregate chips and
+  600 mm brass dividers, and loop-pile `carpet`). All six are uploaded as
   `DataTexture` triplets and shared by every material that tints them. Tints are normalised
   against each family's measured mean albedo so an authored sRGB target lands on the intended
   hue instead of double-darkening through the map, and are clamped below 1.9 to stay off the
@@ -118,8 +120,9 @@ interior furniture; those belong to other lanes and to root.
 5. **Stone veneer** is the `brick` family at a coarser tile with a stronger normal rather
    than a dedicated stacked-stone generator. It reads as coursed masonry, not as the rubble
    stone in the yellow-house reference.
-6. **Carpet and terrazzo** are the `concrete` family retinted and rescaled. Plausible at
-   player distance; a dedicated generator would be better and is cheap to add later.
+6. **Interior wall paint** is the `concrete` family at a low normal scale. It reads as
+   painted plaster; a dedicated generator would carry brush texture better. (Carpet and
+   terrazzo now have their own generators.)
 7. **Gable infill** above the attic ceiling is non-colliding: it is enclosed by the ceiling
    slab below and the roof slabs above, both of which do collide.
 8. **No lighting, renderer, rAF, listeners or window globals** are created here, per the

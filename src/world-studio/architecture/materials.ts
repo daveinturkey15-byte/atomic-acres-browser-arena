@@ -19,6 +19,16 @@
 
 import * as THREE from 'three';
 import { generateTextureSet, type TextureFamily, type TextureSet } from '../../forge/textures';
+import {
+  CARPET_METRES_PER_TILE,
+  TERRAZZO_METRES_PER_TILE,
+  generateStudioTextureSet,
+  type StudioTextureFamily,
+  type StudioTextureSet,
+} from './interior-textures';
+
+/** Forge families plus the two interior floors this lane authors locally. */
+type MaterialFamily = TextureFamily | StudioTextureFamily;
 
 export const STUDIO_TEXTURE_SIZE = 512;
 export const STUDIO_TEXTURE_SEED = 571;
@@ -41,7 +51,7 @@ export type StudioMaterialId =
   | 'metal';
 
 type MaterialSpec = Readonly<{
-  family: TextureFamily | null;
+  family: MaterialFamily | null;
   /** Real-world metres covered by one texture tile. */
   metresPerTile: number;
   /** Target look in sRGB hex; the tint is normalised against the family's mean albedo. */
@@ -70,8 +80,8 @@ const SPECS: Readonly<Record<StudioMaterialId, MaterialSpec>> = {
   'interior-wall': { family: 'concrete', metresPerTile: 2.2, target: 0xe6dfd0, roughness: 0.88, normalScale: 0.12 },
   'interior-accent-teal': { family: 'concrete', metresPerTile: 2.2, target: 0x8fbdad, roughness: 0.88, normalScale: 0.12 },
   'interior-accent-yellow': { family: 'concrete', metresPerTile: 2.2, target: 0xd8c59c, roughness: 0.88, normalScale: 0.12 },
-  'floor-hard': { family: 'concrete', metresPerTile: 1.1, target: 0xd5cbb7, roughness: 0.52, normalScale: 0.35 },
-  'floor-soft': { family: 'concrete', metresPerTile: 0.7, target: 0xb5a892, roughness: 0.98, normalScale: 0.5 },
+  'floor-hard': { family: 'terrazzo', metresPerTile: TERRAZZO_METRES_PER_TILE, target: 0xcfc6b2, roughness: 1, normalScale: 0.8 },
+  'floor-soft': { family: 'carpet', metresPerTile: CARPET_METRES_PER_TILE, target: 0xb0a48d, roughness: 1, normalScale: 1 },
   door: { family: 'lapSiding', metresPerTile: 0.44, target: 0x8a6a45, roughness: 0.6, normalScale: 0.7 },
   glass: {
     family: null,
@@ -90,7 +100,7 @@ export type StudioMaterialKit = Readonly<{
   get(id: StudioMaterialId): THREE.MeshStandardMaterial;
   metresPerTile(id: StudioMaterialId): number;
   /** Families actually generated, for budget reporting. */
-  readonly families: readonly TextureFamily[];
+  readonly families: readonly MaterialFamily[];
   dispose(): void;
 }>;
 
@@ -147,7 +157,7 @@ function dataTexture(data: Uint8Array, size: number, colorSpace: THREE.ColorSpac
   return texture;
 }
 
-function meanLinear(set: TextureSet): [number, number, number] {
+function meanLinear(set: TextureSet | StudioTextureSet): [number, number, number] {
   let r = 0;
   let g = 0;
   let b = 0;
@@ -162,8 +172,14 @@ function meanLinear(set: TextureSet): [number, number, number] {
   return [r / samples, g / samples, b / samples];
 }
 
-function buildFamily(family: TextureFamily): FamilyMaps {
-  const set = generateTextureSet(family, { size: STUDIO_TEXTURE_SIZE, seed: STUDIO_TEXTURE_SEED });
+function isStudioFamily(family: MaterialFamily): family is StudioTextureFamily {
+  return family === 'terrazzo' || family === 'carpet';
+}
+
+function buildFamily(family: MaterialFamily): FamilyMaps {
+  const set = isStudioFamily(family)
+    ? generateStudioTextureSet(family, STUDIO_TEXTURE_SIZE, STUDIO_TEXTURE_SEED)
+    : generateTextureSet(family, { size: STUDIO_TEXTURE_SIZE, seed: STUDIO_TEXTURE_SEED });
   return {
     albedo: dataTexture(flipRows(set.albedo, set.size, 4), set.size, THREE.SRGBColorSpace),
     normal: dataTexture(flipRows(set.normal, set.size, 4), set.size, THREE.NoColorSpace),
@@ -192,11 +208,11 @@ function tintFor(target: number, mean: readonly [number, number, number]): THREE
  * caller owns its lifetime and `dispose()` releases every generated map exactly once.
  */
 export function createStudioMaterialKit(): StudioMaterialKit {
-  const families = new Map<TextureFamily, FamilyMaps>();
+  const families = new Map<MaterialFamily, FamilyMaps>();
   const materials = new Map<StudioMaterialId, THREE.MeshStandardMaterial>();
   const owned: THREE.Texture[] = [];
 
-  const family = (id: TextureFamily): FamilyMaps => {
+  const family = (id: MaterialFamily): FamilyMaps => {
     const existing = families.get(id);
     if (existing) return existing;
     const built = buildFamily(id);
@@ -248,7 +264,7 @@ export function createStudioMaterialKit(): StudioMaterialKit {
     metresPerTile(id: StudioMaterialId): number {
       return SPECS[id].metresPerTile;
     },
-    get families(): readonly TextureFamily[] {
+    get families(): readonly MaterialFamily[] {
       return [...families.keys()];
     },
     dispose(): void {
