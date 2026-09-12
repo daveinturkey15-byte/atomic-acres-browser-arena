@@ -41,6 +41,14 @@ Blender I/O v5.1.20. Runtime three.js: 0.185.1.
 | `public/assets/world-studio/blender/bus_body_roughness.png` | `39d5920d3eea908af5693b4d5f20d483397627b210f18f6b698ee62719108f2b` | 70,583 |
 | `public/assets/world-studio/blender/bus_body_normal.png` | `0c3ac3fa27d942fb1553c4073e5a7ad8ab17b993f217e32b576234def55c7d36` | 164,359 |
 | `scripts/blender/world-studio/source/hero-bus.blend` | not byte-stable, see determinism below | 1,867,688 |
+| `public/assets/world-studio/blender/hero-truck.glb` | `f3bf24362566094e0e8970c70c7af24e3f6a257a9427cb5773d130ec8a12b6d7` | 1,530,540 |
+| `public/assets/world-studio/blender/truck_red_basecolor.png` | `6827ec7d474e00106711b93db0bf3ed979e39c82990f3885d33182343ce985cb` | 83,395 |
+| `public/assets/world-studio/blender/truck_red_roughness.png` | `8cd7548d2e0ea80a851fc060bc65d92313e577d4d4ab6f3bce39f427b9710130` | 71,875 |
+| `public/assets/world-studio/blender/truck_red_normal.png` | `5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e` | 161,011 |
+| `public/assets/world-studio/blender/trailer_white_basecolor.png` | `612c1d57d66302fcd9a88171e6d4116100a5c995e4837012c30cbe398371b586` | 95,068 |
+| `public/assets/world-studio/blender/trailer_white_roughness.png` | `5a4e7079462741e39822201fdb2696e1594b03ff93ad426995b79c38b66f5411` | 71,128 |
+| `public/assets/world-studio/blender/trailer_white_normal.png` | `5a6dfbe62390c176de6ffd883bb2a344ad06100c667c170fb9bfecb078edb56e` | 161,011 |
+| `scripts/blender/world-studio/source/hero-truck.blend` | not byte-stable, see determinism below | — |
 
 Source and tooling: `scripts/blender/world-studio/build_hero_bus.py`,
 `blender_launcher.py`, `probe_api.py`, `verify_blend.py`, `validate_glb.mjs`;
@@ -59,6 +67,39 @@ Measured by `validate_glb.mjs` against the exported binary, not asserted from in
 - 3 images, all **embedded as buffer views** — the GLB is self-contained, no external texture
   fetch, no third-party content, no download.
 - `extensionsUsed`: `KHR_materials_clearcoat`.
+
+### Truck and box trailer (`hero-truck.glb`)
+
+Built by `scripts/blender/world-studio/build_hero_truck.py`, which **imports** the bus script's
+`Builder`, `chamfer_box`, `revolve`, `disc`, `sweep`, `to_object` and the CPU noise/texture
+machinery rather than copying them — a second consumer of the same generator, with only the
+vehicle spec and assembly new. Rebuild:
+
+```
+python scripts/blender/world-studio/blender_launcher.py scripts/blender/world-studio/build_hero_truck.py
+node scripts/blender/world-studio/validate_glb.mjs public/assets/world-studio/blender/hero-truck.glb
+python scripts/blender/world-studio/blender_launcher.py scripts/blender/world-studio/verify_blend.py hero-truck.blend
+```
+
+Measured: **18,576 indexed triangles**, 23,964 vertices, **8 materials / 8 primitives / 1 mesh**,
+bounds **2.944 m × 3.942 m × 13.473 m**, minimum Y `0.0081`, 6 embedded images. All container,
+geometry, material and image checks pass; three.js parsed 8 meshes / 18,576 triangles on CPU; a
+fresh Blender reopens the `.blend` with all 8 slots, `UVMap` and six 512×512 maps at the correct
+colour spaces; a second rebuild produced a byte-identical `.glb`.
+
+Bonneted tractor: tapered bonnet stack, superellipse front fenders swept with the recipe's
+`p = 2.6` arch profile, recessed grille with nine chrome bars, round headlamps layered
+bezel→lens, chrome bumper, rounded cab with two-piece screen, door reveals with handles, mirror
+arms, chrome fuel tanks, steps, twin exhaust stacks and five roof marker lamps. Box trailer:
+ribbed flanks (22 swept ribs per side), top and bottom rails, rear doors in a dark reveal with
+lock bars and hinges, underride bar, bogie frame, landing gear and rear lamps. Running gear is
+18 wheels — two steer, eight drive in tandem duals, eight trailer duals — plus axles and four
+mudflaps, with lug detail only on the wheels whose outboard face is visible.
+
+Two paint families carry maps (`truck_paint_red`, `trailer_paint_white`); the other six are
+constant-parameter PBR. The red and white **normal maps are byte-identical** (same seed, and the
+normal map does not depend on colour), so the GLB embeds that 161 KB tile twice; harmless, but it
+is a real redundancy rather than two distinct maps.
 
 ### Materials as they survived export
 
@@ -146,9 +187,10 @@ the references are the owner's own concept images.
   PNGs (same SHA-256). The `.blend` is **not** byte-stable across rebuilds — Blender embeds
   session state — so geometry/manifest determinism is proven on the exported artefacts and the
   `.blend` hash is recorded per build rather than pinned.
-- `src/world-studio/blender-assets/index.test.ts` — **6 passed**: base-aware URL resolution,
-  declared placement inside the envelope, root usable before load, visible rejection on load
-  failure, repeated/early dispose safety, no collider-or-authority surface.
+- `src/world-studio/blender-assets/index.test.ts` — **7 passed**: base-aware URL resolution,
+  both declared placements inside their envelopes and not overlapping, root usable before load,
+  visible rejection on load failure, repeated/early dispose safety, no collider-or-authority
+  surface.
 - `npx --no-install tsc --noEmit` — **zero errors in owned paths**. Errors elsewhere in the tree
   belong to other lanes and were neither touched nor fixed.
 
@@ -175,10 +217,13 @@ createStudioBlenderAssets(options?: {
   (the exporter writes everything double-sided) while transparent glass keeps two-sided
   presentation and stops writing depth.
 
-Declared placement, from the brief's coordinate contract: `HERO_BUS_PLACEMENT` = position
-`[-3.5, 0, 2]`, heading 0, with the nose towards +Z. The export is local and metre-scale; the
-placement lives in the factory, not baked into the geometry, so lanes and the existing colliders
-are untouched.
+The factory loads **both** props and `ready` resolves only once both have attached.
+Declared placement, from the brief's coordinate contract: `HERO_BUS_PLACEMENT` = `[-3.5, 0, 2]`
+heading 0, and `HERO_TRUCK_PLACEMENT` = `[3.5, 0, -2]` heading π, so the two face opposite ways
+as in the reference street images. Both exports are local and metre-scale with the nose towards
++Z at heading 0; placement lives in the factory, not baked into the geometry, so lanes and the
+existing colliders are untouched. An `options.position`/`options.headingRadians` override applies
+to the bus only, so nudging one prop cannot silently stack the other on top of it.
 
 ## Limitations and open items — read before integration
 
@@ -201,8 +246,13 @@ are untouched.
    animated, and it carries no interaction or traversal semantics of any kind.
 6. **No livery, lettering or number plate graphics** — no branded trade dress was authored, and
    the plate is a blank clear panel.
-7. **The truck and white trailer were not authored.** The brief ordered a coherent bus first and
-   the truck only after; the bus proof consumed the window. Nothing about the truck is claimed.
+7. **The truck was authored after the bus was complete and committed**, as the brief ordered. It
+   is held to the same mechanical standard (measured counts, CPU glTF + three.js parse, fresh
+   Blender reopen, byte-identical rebuild) but it received **less iteration than the bus** — the
+   bus went through two full proportion corrections and the truck one. Its cab is a rounded
+   chamfered box rather than a station-ring loft, so its body has less surface shaping than the
+   bus; that is a deliberate, stated difference, not an unnoticed one. As with the bus, no
+   rendered-quality claim is made.
 8. **`tasklist` was denied** in this session's permission mode, so running Blender processes could
    not be enumerated before execution. Coordination was done through the authorized exclusive
    lock at `…/extra-quality-20260912/blender-execution.lock` instead: acquired with `O_EXCL`,

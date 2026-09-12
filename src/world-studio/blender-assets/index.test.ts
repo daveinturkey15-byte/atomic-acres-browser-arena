@@ -5,6 +5,8 @@ import {
   HERO_BUS_ASSET_PATH,
   HERO_BUS_DIMENSIONS,
   HERO_BUS_PLACEMENT,
+  HERO_TRUCK_DIMENSIONS,
+  HERO_TRUCK_PLACEMENT,
   createStudioBlenderAssets,
   resolveHeroBusUrl,
 } from './index';
@@ -28,6 +30,17 @@ describe('world-studio blender assets', () => {
     expect(HERO_BUS_DIMENSIONS.width).toBeLessThanOrEqual(3.0);
     expect(HERO_BUS_DIMENSIONS.height).toBeLessThanOrEqual(3.2);
     expect(HERO_BUS_DIMENSIONS.length).toBeLessThanOrEqual(10.0);
+  });
+
+  it('declares the truck placement and its about 3 x 14 m envelope', () => {
+    expect(HERO_TRUCK_PLACEMENT.position).toEqual([3.5, 0, -2]);
+    expect(HERO_TRUCK_DIMENSIONS.width).toBeLessThanOrEqual(3.0);
+    expect(HERO_TRUCK_DIMENSIONS.length).toBeLessThanOrEqual(14.0);
+    // The two props face opposite ways, as in the reference street images.
+    expect(HERO_TRUCK_PLACEMENT.headingRadians).not.toBe(HERO_BUS_PLACEMENT.headingRadians);
+    // They must not overlap: the bus sits at X -3.5 and the truck at X +3.5.
+    const gap = Math.abs(HERO_TRUCK_PLACEMENT.position[0] - HERO_BUS_PLACEMENT.position[0]);
+    expect(gap).toBeGreaterThan((HERO_BUS_DIMENSIONS.width + HERO_TRUCK_DIMENSIONS.width) / 2);
   });
 
   it('returns a usable root immediately, before anything has loaded', () => {

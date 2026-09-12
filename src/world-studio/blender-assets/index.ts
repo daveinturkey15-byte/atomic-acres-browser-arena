@@ -39,15 +39,32 @@ export interface StudioBlenderAssets {
 /** Path of the exported hero bus relative to the deployment base. */
 export const HERO_BUS_ASSET_PATH = 'assets/world-studio/blender/hero-bus.glb';
 
+/** Path of the exported hero truck and box trailer relative to the deployment base. */
+export const HERO_TRUCK_ASSET_PATH = 'assets/world-studio/blender/hero-truck.glb';
+
 /**
- * Declared placement from the build brief's coordinate contract: bus at X -3.5, Z 2, ground
- * Y 0, long axis Z. The export is a local, metre-scale, Y-up asset with its origin centred on
- * the footprint and the tyre contact patch at Y = 0, so placement lives here, not in the mesh.
+ * Declared placement from the build brief's coordinate contract: bus at X -3.5, Z 2 and truck at
+ * X 3.5, Z -2, ground Y 0, long axis Z. Both exports are local, metre-scale, Y-up assets with
+ * their origin centred on the footprint and the tyre contact patch at Y = 0, so placement lives
+ * here and not in the mesh. The two face opposite ways, as in the reference images.
  */
 export const HERO_BUS_PLACEMENT = { position: [-3.5, 0, 2] as const, headingRadians: 0 };
+export const HERO_TRUCK_PLACEMENT = { position: [3.5, 0, -2] as const, headingRadians: Math.PI };
 
-/** Measured on the exported GLB; see docs/world-studio-blender-assets.md. */
+/** Measured on the exported GLBs; see docs/world-studio-blender-assets.md. */
 export const HERO_BUS_DIMENSIONS = { width: 2.976, height: 3.197, length: 9.97 } as const;
+export const HERO_TRUCK_DIMENSIONS = { width: 2.944, height: 3.942, length: 13.473 } as const;
+
+interface HeroAssetSpec {
+  readonly name: string;
+  readonly path: string;
+  readonly placement: { readonly position: readonly [number, number, number]; readonly headingRadians: number };
+}
+
+const HERO_ASSETS: readonly HeroAssetSpec[] = [
+  { name: 'world-studio-hero-bus', path: HERO_BUS_ASSET_PATH, placement: HERO_BUS_PLACEMENT },
+  { name: 'world-studio-hero-truck', path: HERO_TRUCK_ASSET_PATH, placement: HERO_TRUCK_PLACEMENT },
+];
 
 function resolveBaseUrl(explicit?: string): string {
   if (typeof explicit === 'string' && explicit.length > 0) return explicit;
@@ -123,37 +140,40 @@ export function createStudioBlenderAssets(options: StudioBlenderAssetOptions = {
   root.name = 'world-studio-blender-assets';
   root.userData.presentationOnly = true;
 
-  const url = joinUrl(resolveBaseUrl(options.baseUrl), HERO_BUS_ASSET_PATH);
-  const position = options.position ?? HERO_BUS_PLACEMENT.position;
-  const heading = options.headingRadians ?? HERO_BUS_PLACEMENT.headingRadians;
-
+  const base = resolveBaseUrl(options.baseUrl);
   let disposed = false;
-  let loaded: THREE.Object3D | null = null;
+  const loaded: THREE.Object3D[] = [];
 
   const loader = new GLTFLoader();
-  const ready = loader.loadAsync(url).then((gltf) => {
-    const scene = gltf.scene;
-    if (disposed) {
-      // Lost the race with dispose(): release the payload instead of attaching it.
-      disposeSubtree(scene);
-      return;
-    }
-    scene.name = 'world-studio-hero-bus';
-    scene.position.set(position[0], position[1], position[2]);
-    scene.rotation.y = heading;
-    applyPresentationContract(scene);
-    loaded = scene;
-    root.add(scene);
-  });
+  const ready = Promise.all(
+    HERO_ASSETS.map((spec, index) => loader.loadAsync(joinUrl(base, spec.path)).then((gltf) => {
+      const scene = gltf.scene;
+      if (disposed) {
+        // Lost the race with dispose(): release the payload instead of attaching it.
+        disposeSubtree(scene);
+        return;
+      }
+      // A single-asset override applies to the first asset only; the rest keep their declared
+      // placement, so the caller can nudge one prop without silently stacking the others.
+      const position = index === 0 ? options.position ?? spec.placement.position : spec.placement.position;
+      const heading = index === 0 ? options.headingRadians ?? spec.placement.headingRadians : spec.placement.headingRadians;
+      scene.name = spec.name;
+      scene.position.set(position[0], position[1], position[2]);
+      scene.rotation.y = heading;
+      applyPresentationContract(scene);
+      loaded.push(scene);
+      root.add(scene);
+    })),
+  ).then(() => undefined);
 
   const dispose = (): void => {
     if (disposed) return;
     disposed = true;
-    if (loaded) {
-      root.remove(loaded);
-      disposeSubtree(loaded);
-      loaded = null;
+    for (const node of loaded) {
+      root.remove(node);
+      disposeSubtree(node);
     }
+    loaded.length = 0;
     root.clear();
   };
 

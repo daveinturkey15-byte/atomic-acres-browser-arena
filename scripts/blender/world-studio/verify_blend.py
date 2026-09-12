@@ -5,12 +5,16 @@ reopenable, exportable Blender file with its meshes, materials and images intact
 """
 
 import json
+import sys
 from pathlib import Path
 
 import bpy
 
 REPO = Path(__file__).resolve().parents[3]
-BLEND = REPO / "scripts" / "blender" / "world-studio" / "source" / "hero-bus.blend"
+_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+BLEND = REPO / "scripts" / "blender" / "world-studio" / "source" / (
+    _args[0] if _args else "hero-bus.blend"
+)
 
 bpy.ops.wm.open_mainfile(filepath=str(BLEND))
 
