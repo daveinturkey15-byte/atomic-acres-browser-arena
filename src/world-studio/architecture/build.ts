@@ -207,7 +207,8 @@ export class StudioSurfaceCollector {
     }
     this.seenIds.add(spec.id);
 
-    const key = `${spec.group}:${spec.material}`;
+    // Glass must remain independently breakable; static structural families stay batched.
+    const key = `${spec.group}:${spec.material}${spec.ballistic === 'glass' ? `:${spec.id}` : ''}`;
     let bucket = this.buckets.get(key);
     if (!bucket) {
       bucket = { key, material: spec.material, group: spec.group, geometries: [] };

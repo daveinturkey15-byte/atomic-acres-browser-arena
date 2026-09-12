@@ -24,6 +24,12 @@
 // src/rendering/arenas/ now fails this instrument until its cameras land here.
 
 export const VIEWPOINT_CATALOG = Object.freeze({
+  'world-studio': Object.freeze([
+    'world-studio-overview',
+    'world-studio-street',
+    'world-studio-west-house',
+    'world-studio-east-house',
+  ]),
   'atomic-acres': Object.freeze([
     'nuke-town-overview',
     'nuke-town-plan',

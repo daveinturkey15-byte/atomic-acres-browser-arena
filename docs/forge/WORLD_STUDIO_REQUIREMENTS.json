@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "registerId": "atomic-acres-world-studio-20260912",
+  "scope": "Owner-authorized fresh map and visual pipeline pass; historical obligations remain retained",
+  "grantsAcceptance": false,
+  "source": "docs/forge/WORLD_STUDIO_BRIEF.md",
+  "requirements": [
+    {"id":"WORLD-STUDIO-MAP-001","feedbackId":"HF-571","owner":"world-studio-20260912 / Codex integrator","state":"OPEN","outcomes":["One fresh visible arena with original Nuketown-style spawn and traversal loops, preserving historical identities and accepted gameplay."],"tests":["src/world-studio/routing.test.ts","src/world-studio/arena.test.ts"],"evidence":[]},
+    {"id":"WORLD-STUDIO-LOOK-001","feedbackId":"HF-572","owner":"world-studio-20260912 / Codex integrator","state":"OPEN","outcomes":["Concept-directed architecture, materials, lighting, furnished interiors, vegetation and vehicles inspected in the actual running level."],"tests":["src/world-studio/arena.test.ts"],"evidence":[],"spec":"docs/forge/WORLD_STUDIO_BRIEF.md"},
+    {"id":"WORLD-STUDIO-WEATHER-001","feedbackId":"HF-573","owner":"world-studio-20260912 / Codex integrator","state":"OPEN","outcomes":["Shared deterministic sun, rain, wind and snow admission presets with coastal, forest and mountain surroundings."],"tests":["src/world-studio/environment.test.ts"],"evidence":[]},
+    {"id":"WORLD-STUDIO-METHODS-001","feedbackId":"HF-574","owner":"world-studio-20260912 / Codex integrator","state":"OPEN","outcomes":["Applied skill and source techniques trace to real runtime consumers, exact versions and inspected output."],"tests":["src/world-studio/arena.test.ts"],"evidence":[]}
+  ]
+}
