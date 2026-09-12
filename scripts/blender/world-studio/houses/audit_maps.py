@@ -67,7 +67,21 @@ EXPECTED = {
     "routeLandmarks": 3,
     "panes": 22,
     "images": 18,
+    # Wave 3. The interior contract transcribed from house.ts:502-700: seven partitions carrying
+    # nine cased openings between them, and a sixteen-tread flight. These are counts of a frozen
+    # contract, not targets, so any drift is a failure in either direction.
+    "interiorPartitions": 7,
+    "interiorApertureMarkers": 9,
+    "stairTreads": 16,
 }
+
+# Wave 3 declared the interior cost up front rather than discovering it afterwards. Wave 2 shipped
+# 36,360 / 36,528 triangles with no interior at all; partitions, architraves, the stair, the
+# landing guard, the skirting band and the two missing handrails are the whole of the increase.
+# The ceiling is a budget, not a measurement: it fails if the interior ever starts costing more
+# than the ~5% of the exterior it is worth.
+MAX_TRIANGLES = 40_000
+MAX_GLB_BYTES = 6_000_000
 
 
 # ---------------------------------------------------------------- minimal PNG reader
@@ -188,6 +202,20 @@ def audit() -> int:
             ("panes", report["panes"] == EXPECTED["panes"]),
             ("apertureMismatches empty", report["apertureMismatches"] == []),
             ("roadClearanceOk", bool(report["roadClearanceOk"])),
+            # ---- wave 3: interior substitution ----
+            ("interiorPartitions", report.get("interiorPartitions") == EXPECTED["interiorPartitions"]),
+            ("interiorApertureMarkers", report.get("interiorApertureMarkers") == EXPECTED["interiorApertureMarkers"]),
+            ("interiorApertureMismatches empty", report.get("interiorApertureMismatches") == []),
+            ("stairTreads", report.get("stairTreads") == EXPECTED["stairTreads"]),
+            ("stairTreadProblems empty", report.get("stairTreadProblems") == []),
+            ("blockedRuntimeProbes empty", report.get("blockedRuntimeProbes") == []),
+            ("runtimeProbesChecked >= 24", int(report.get("runtimeProbesChecked", 0)) >= 24),
+            ("no pane has opaque geometry in it",
+             all(pane["opaqueBehind"] == 0 for pane in report.get("paneDetail", []))),
+            ("every pane carries a unique window id",
+             len({pane["windowId"] for pane in report.get("paneDetail", [])}) == EXPECTED["panes"]),
+            ("triangles under budget", int(report["triangles"]) <= MAX_TRIANGLES),
+            ("glb bytes under budget", int(report["bytes"]) <= MAX_GLB_BYTES),
         ]
         for label, ok in checks:
             if not ok:

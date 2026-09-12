@@ -177,6 +177,131 @@ GARAGE_OPENINGS: Dict[str, List[Opening]] = {
     ],
 }
 
+# ---------------------------------------------------------------- interior partitions
+#
+# Wave 3. Transcribed from ``house.ts:502-700`` at the same frozen SHA — the ``partition(...)``
+# calls, the skirting/cornice band, the sixteen-tread stair and the landing guard. Nothing here
+# is invented: every number below appears literally in that file.
+#
+# ``axis`` matches ``WallFrame``: ``'z'`` means the wall plane's normal is local X and ``u`` is
+# local Z; ``'x'`` means the normal is local Z and ``u`` is local X. ``house.ts`` pushes the
+# ``'x'`` case through ``wx()``, which is exactly the mirror this lane bakes at export, so every
+# coordinate below is already in the canonical local frame for BOTH houses.
+
+PARTITION = 0.14           # house.ts:40
+ARCHITRAVE = 0.08          # cased board width, house.ts:554-556
+ARCHITRAVE_PROUD = 0.02    # ``half = PARTITION / 2 + 0.02``, house.ts:541
+
+
+class PartitionFrame(NamedTuple):
+    key: str
+    axis: str
+    at: float
+    u_from: float
+    u_to: float
+    y0: float
+    y1: float
+    storey: str                    # 'ground' | 'upper'
+    openings: Tuple[Opening, ...]  # kind is always 'cased' — an interior opening, never glazed
+
+
+INTERIOR_PARTITIONS: Tuple[PartitionFrame, ...] = (
+    # Ground: living/hall on the street side of the spine, dining/kitchen on the yard side.
+    PartitionFrame("p-spine", "z", 0.0, -INNER_Z, INNER_Z, 0.02, UPPER_FLOOR_Y - SLAB, "ground", (
+        Opening("living-dining", -7.4, -5.4, GROUND_FLOOR_Y, 2.40, "cased"),
+        Opening("hall-kitchen", 5.0, 5.9, GROUND_FLOOR_Y, 2.15, "cased"),
+    )),
+    PartitionFrame("p-hall", "x", 0.0, 0.0, INNER_X, 0.02, UPPER_FLOOR_Y - SLAB, "ground", (
+        Opening("living-hall", 3.6, 6.4, GROUND_FLOOR_Y, 2.50, "cased"),
+    )),
+    PartitionFrame("p-kitchen", "x", 2.0, -INNER_X, 0.0, 0.02, UPPER_FLOOR_Y - SLAB, "ground", (
+        Opening("dining-kitchen", -5.6, -3.6, GROUND_FLOOR_Y, 2.40, "cased"),
+    )),
+    # Upper: landing on the street side, bath/study/bedroom 2 on the yard side.
+    PartitionFrame("q-spine", "z", 0.0, -INNER_Z, INNER_Z, UPPER_FLOOR_Y, UPPER_CEILING_Y, "upper", (
+        Opening("hall-bath", 1.4, 2.5, UPPER_FLOOR_Y, 5.4, "cased"),
+        Opening("hall-bedroom2", 5.4, 6.5, UPPER_FLOOR_Y, 5.4, "cased"),
+    )),
+    PartitionFrame("q-bedroom", "x", 1.0, 0.0, INNER_X, UPPER_FLOOR_Y, UPPER_CEILING_Y, "upper", (
+        Opening("landing-bedroom", 4.6, 5.7, UPPER_FLOOR_Y, 5.4, "cased"),
+    )),
+    PartitionFrame("q-study", "x", -1.0, -INNER_X, 0.0, UPPER_FLOOR_Y, UPPER_CEILING_Y, "upper", (
+        Opening("bath-study", -6.0, -4.9, UPPER_FLOOR_Y, 5.4, "cased"),
+    )),
+    PartitionFrame("q-bedroom2", "x", 4.0, -INNER_X, 0.0, UPPER_FLOOR_Y, UPPER_CEILING_Y, "upper", (
+        Opening("bath-bedroom2", -2.2, -1.1, UPPER_FLOOR_Y, 5.4, "cased"),
+    )),
+)
+
+# house.ts:869-875. The threshold board that bridges the 0.2 m rise from the upper floor to the
+# garage roof. Its local X is NOT mirror-symmetric in the TypeScript: ``garageRoofDoorX`` weights
+# the open half three-to-one toward the larger *world* X, so the two houses land on different
+# local offsets. Both are transcribed rather than averaged or invented.
+GARAGE_ROOF_THRESHOLD_X: Dict[str, float] = {"teal": -2.65, "yellow": -3.45}
+GARAGE_ROOF_THRESHOLD_Z0 = 7.6
+GARAGE_ROOF_THRESHOLD_Z1 = GARAGE_Z0 - 0.2
+GARAGE_ROOF_THRESHOLD_WIDTH = 1.1
+GARAGE_ROOF_THRESHOLD_THICKNESS = 0.04
+
+# ---------------------------------------------------------------- runtime probe transcription
+#
+# Falsifier 2 of the wave-2 handoff: "the aperture audit is self-referential — it measures this
+# lane's own opaque-solid list, not the runtime probes in studio-architecture.test.ts:96-140."
+# These three tables close most of that gap. They are the runtime's own probe coordinates,
+# converted from the teal house's world frame (``worldX = -20 + localX``) into the local frame
+# the builder works in, which is identical for both houses because the yellow mesh is a pure
+# mirror. They are checked against the built solids at build time, so agreement between the two
+# audits is now measured rather than assumed.
+#
+# What this still does NOT prove: the runtime probes run against the TypeScript collider set and
+# these run against the GLB's opaque presentation solids. Both being clear at the same point is
+# agreement, not identity.
+
+# studio-architecture.test.ts:96-115 — exterior routes that must stay physically open.
+RUNTIME_ROUTE_PROBES: Tuple[Tuple[str, float, float, float], ...] = (
+    ("front door", 6.89, 1.2, 3.95),
+    ("front door head", 6.89, 2.0, 3.95),
+    ("rear slider open leaf", -6.89, 1.4, -2.6),
+    ("balcony door open leaf", -6.89, 4.2, -2.9),
+    ("garage roof door open leaf", -2.5, 4.2, 8.89),
+    ("street balcony door open leaf", 6.89, 4.2, 4.95),
+    ("garage link", -4.05, 1.2, 8.89),
+    ("garage vehicle door", 0.0, 1.5, 18.9),
+)
+
+# studio-architecture.test.ts:118-140 — every ground room, every upper room, every interior door.
+INTERIOR_ROOM_PROBES: Tuple[Tuple[str, float, float, float], ...] = (
+    ("living room", 3.5, 1.2, -4.5),
+    ("entry hall", 3.5, 1.2, 5.0),
+    ("dining room", -3.5, 1.2, -4.5),
+    ("kitchen", -3.5, 1.2, 5.5),
+    ("living to dining opening", 0.0, 1.2, -6.4),
+    ("hall to kitchen door", 0.0, 1.2, 5.45),
+    ("living to hall arch", 5.0, 1.2, 0.0),
+    ("dining to kitchen opening", -4.6, 1.2, 2.0),
+    ("upper landing", 3.5, 4.4, 4.0),
+    ("master bedroom", 4.0, 4.4, -5.0),
+    ("study", -4.5, 4.4, -5.0),
+    ("bedroom two", -4.0, 4.4, 6.5),
+    ("landing to bedroom door", 4.8, 4.4, 1.0),
+    ("landing to bath door", 0.0, 4.4, 2.0),
+    ("bath to study door", -5.4, 4.4, -1.0),
+)
+
+# studio-architecture.test.ts:157 — the stairwell is a real hole, not a capped shaft.
+STAIRWELL_HEAD_PROBES: Tuple[Tuple[str, float, float, float], ...] = (
+    ("stairwell head height", (STAIR_X0 + STAIR_X1) / 2, UPPER_FLOOR_Y - 0.15, 3.2),
+)
+
+# The centre line the tread audit queries, from studio-architecture.test.ts:143-146.
+STAIR_PROBE_X = (STAIR_X0 + STAIR_X1) / 2
+
+
+def stair_tread_top(step: int) -> float:
+    """Contracted top of tread ``step``, house.ts:666. Never rounded, never re-derived."""
+    return GROUND_FLOOR_Y + (step + 1) * STAIR_RISE
+
+
 ROUTE_LANDMARKS: Dict[str, Tuple[float, float, float]] = {
     # ``<house-id>-`` is prefixed at build time. Positions are local-frame foot points taken
     # from house.ts:699-700, :794-795 and :874-875.

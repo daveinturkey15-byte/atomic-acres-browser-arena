@@ -4,8 +4,8 @@
   "partition": "world-studio.house.yellow.shell",
   "blender": "5.1.2",
   "glb": "public/assets/world-studio/blender/houses/house-yellow-shell.glb",
-  "sha256": "eb7afd7299cad8e367f1d84bea0865541e4dbf07b602927a080ec16738028b25",
-  "bytes": 5519604,
+  "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6",
+  "bytes": 5644996,
   "localBounds": {
     "min": [
       -9.049999999999999,
@@ -23,16 +23,16 @@
     0.0,
     0.0
   ],
-  "triangles": 36528,
+  "triangles": 38112,
   "trianglesByMaterial": {
     "concrete": 60,
-    "door": 252,
+    "door": 492,
     "glass": 264,
     "masonry": 5484,
-    "metal": 276,
+    "metal": 636,
     "shingle": 1320,
     "siding": 21228,
-    "trim": 7644
+    "trim": 8628
   },
   "materials": 8,
   "drawGroups": 8,
@@ -89,5 +89,348 @@
   "routeLandmarks": 3,
   "apertureMismatches": [],
   "roadClearanceLocalX": 9.5,
-  "roadClearanceOk": true
+  "roadClearanceOk": true,
+  "interiorPartitions": 7,
+  "interiorApertureMarkers": 9,
+  "interiorApertureMismatches": [],
+  "stairTreads": 16,
+  "stairRise": 0.20124999999999998,
+  "stairGoing": 0.28125,
+  "stairTreadTops": [
+    0.28125,
+    0.4825,
+    0.68375,
+    0.8849999999999999,
+    1.08625,
+    1.2875,
+    1.48875,
+    1.69,
+    1.8912499999999999,
+    2.0925,
+    2.2937499999999997,
+    2.495,
+    2.69625,
+    2.8975,
+    3.09875,
+    3.3
+  ],
+  "stairTreadProblems": [],
+  "stairHole": {
+    "x0": 0.08,
+    "x1": 1.55,
+    "z0": 2.55,
+    "z1": 6.7
+  },
+  "blockedRuntimeProbes": [],
+  "runtimeProbesChecked": 24,
+  "paneDetail": [
+    {
+      "name": "pane-front-living-picture",
+      "windowId": "world-studio-window:yellow-house-front-living-picture-glass",
+      "solidId": "yellow-house-front-living-picture-glass",
+      "localBounds": [
+        6.875,
+        1.04,
+        -6.56,
+        6.905,
+        2.41,
+        -2.64
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-entry-sidelight",
+      "windowId": "world-studio-window:yellow-house-front-entry-sidelight-glass",
+      "solidId": "yellow-house-front-entry-sidelight-glass",
+      "localBounds": [
+        6.875,
+        0.64,
+        4.76,
+        6.905,
+        2.18,
+        5.08
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-hall-window",
+      "windowId": "world-studio-window:yellow-house-front-hall-window-glass",
+      "solidId": "yellow-house-front-hall-window-glass",
+      "localBounds": [
+        6.875,
+        1.04,
+        6.44,
+        6.905,
+        2.31,
+        7.76
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-bedroom-street-a",
+      "windowId": "world-studio-window:yellow-house-front-bedroom-street-a-glass",
+      "solidId": "yellow-house-front-bedroom-street-a-glass",
+      "localBounds": [
+        6.875,
+        4.14,
+        -6.56,
+        6.905,
+        5.61,
+        -4.64
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-bedroom-street-b",
+      "windowId": "world-studio-window:yellow-house-front-bedroom-street-b-glass",
+      "solidId": "yellow-house-front-bedroom-street-b-glass",
+      "localBounds": [
+        6.875,
+        4.14,
+        -3.36,
+        6.905,
+        5.61,
+        -1.44
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-front-landing-balcony-door",
+      "windowId": "world-studio-window:yellow-house-front-landing-balcony-door-glass",
+      "solidId": "yellow-house-front-landing-balcony-door-glass",
+      "localBounds": [
+        6.875,
+        3.34,
+        3.64,
+        6.905,
+        5.61,
+        4.5
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-dining-slider",
+      "windowId": "world-studio-window:yellow-house-rear-dining-slider-glass",
+      "solidId": "yellow-house-rear-dining-slider-glass",
+      "localBounds": [
+        -6.905,
+        0.12,
+        -3.86,
+        -6.875,
+        2.31,
+        -3.0
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-dining-window",
+      "windowId": "world-studio-window:yellow-house-rear-dining-window-glass",
+      "solidId": "yellow-house-rear-dining-window-glass",
+      "localBounds": [
+        -6.905,
+        1.04,
+        -7.56,
+        -6.875,
+        2.31,
+        -6.04
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-kitchen-window",
+      "windowId": "world-studio-window:yellow-house-rear-kitchen-window-glass",
+      "solidId": "yellow-house-rear-kitchen-window-glass",
+      "localBounds": [
+        -6.905,
+        1.09,
+        3.64,
+        -6.875,
+        2.26,
+        5.56
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-study-window",
+      "windowId": "world-studio-window:yellow-house-rear-study-window-glass",
+      "solidId": "yellow-house-rear-study-window-glass",
+      "localBounds": [
+        -6.905,
+        4.19,
+        -7.76,
+        -6.875,
+        5.56,
+        -6.24
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-balcony-door",
+      "windowId": "world-studio-window:yellow-house-rear-balcony-door-glass",
+      "solidId": "yellow-house-rear-balcony-door-glass",
+      "localBounds": [
+        -6.905,
+        3.34,
+        -4.16,
+        -6.875,
+        5.56,
+        -3.3
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-back-hall-window",
+      "windowId": "world-studio-window:yellow-house-rear-back-hall-window-glass",
+      "solidId": "yellow-house-rear-back-hall-window-glass",
+      "localBounds": [
+        -6.905,
+        4.24,
+        1.04,
+        -6.875,
+        5.56,
+        2.36
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-rear-bedroom2-rear",
+      "windowId": "world-studio-window:yellow-house-rear-bedroom2-rear-glass",
+      "solidId": "yellow-house-rear-bedroom2-rear-glass",
+      "localBounds": [
+        -6.905,
+        4.19,
+        6.04,
+        -6.875,
+        5.56,
+        7.56
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-living-side",
+      "windowId": "world-studio-window:yellow-house-sidea-living-side-glass",
+      "solidId": "yellow-house-sideA-living-side-glass",
+      "localBounds": [
+        2.04,
+        1.04,
+        -8.905,
+        4.56,
+        2.36,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-dining-side",
+      "windowId": "world-studio-window:yellow-house-sidea-dining-side-glass",
+      "solidId": "yellow-house-sideA-dining-side-glass",
+      "localBounds": [
+        -5.56,
+        1.09,
+        -8.905,
+        -3.64,
+        2.26,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-bedroom-side",
+      "windowId": "world-studio-window:yellow-house-sidea-bedroom-side-glass",
+      "solidId": "yellow-house-sideA-bedroom-side-glass",
+      "localBounds": [
+        2.44,
+        4.19,
+        -8.905,
+        4.56,
+        5.56,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideA-study-side",
+      "windowId": "world-studio-window:yellow-house-sidea-study-side-glass",
+      "solidId": "yellow-house-sideA-study-side-glass",
+      "localBounds": [
+        -5.36,
+        4.19,
+        -8.905,
+        -3.64,
+        5.56,
+        -8.875
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-hall-side",
+      "windowId": "world-studio-window:yellow-house-sideb-hall-side-glass",
+      "solidId": "yellow-house-sideB-hall-side-glass",
+      "localBounds": [
+        3.44,
+        1.04,
+        8.875,
+        5.36,
+        2.31,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-bedroom2-roof-door",
+      "windowId": "world-studio-window:yellow-house-sideb-bedroom2-roof-door-glass",
+      "solidId": "yellow-house-sideB-bedroom2-roof-door-glass",
+      "localBounds": [
+        -3.96,
+        3.34,
+        8.875,
+        -3.1,
+        5.51,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-sideB-landing-side",
+      "windowId": "world-studio-window:yellow-house-sideb-landing-side-glass",
+      "solidId": "yellow-house-sideB-landing-side-glass",
+      "localBounds": [
+        2.64,
+        4.24,
+        8.875,
+        4.36,
+        5.56,
+        8.905
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-garage-west-garage-side-window",
+      "windowId": "world-studio-window:yellow-house-garage-west-garage-side-window-glass",
+      "solidId": "yellow-house-garage-west-garage-side-window-glass",
+      "localBounds": [
+        -3.915,
+        1.24,
+        15.54,
+        -3.885,
+        2.16,
+        16.76
+      ],
+      "opaqueBehind": 0
+    },
+    {
+      "name": "pane-garage-east-garage-east-window",
+      "windowId": "world-studio-window:yellow-house-garage-east-garage-east-window-glass",
+      "solidId": "yellow-house-garage-east-garage-east-window-glass",
+      "localBounds": [
+        3.885,
+        1.24,
+        14.54,
+        3.915,
+        2.16,
+        15.96
+      ],
+      "opaqueBehind": 0
+    }
+  ]
 }

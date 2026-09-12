@@ -217,6 +217,55 @@ class Builder:
                 pts, uvs = list(reversed(pts)), list(reversed(uvs))
             slot.quad(pts[0], pts[1], pts[2], pts[3], uvs)
 
+    def rotated_slab_x(
+        self,
+        material: str,
+        centre: Vec3,
+        size: Vec3,
+        pitch_x: float,
+    ) -> None:
+        """A slab rotated about the local X axis — the two stair handrails and the garage-roof
+        threshold, which rise along Z rather than along X.
+
+        ``rotated_slab`` cannot serve: it rotates in the (X, Y) plane, which would tilt a rail
+        sideways instead of up the flight. The mirror is applied after the rotation and does not
+        interact with it, because a rotation about X leaves X alone.
+        """
+        hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
+        cos_a, sin_a = math.cos(pitch_x), math.sin(pitch_x)
+        tile = TILE_M.get(material, 1.0)
+        s = self.mirror
+        slot = self.slot(material)
+
+        def place(dx: float, dy: float, dz: float) -> Vec3:
+            ry = dy * cos_a - dz * sin_a
+            rz = dy * sin_a + dz * cos_a
+            return ((centre[0] + dx) * s, centre[1] + ry, centre[2] + rz)
+
+        corners = {
+            (i, j, k): place(i * hx, j * hy, k * hz)
+            for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)
+        }
+        quads = [
+            ([(1, 1, -1), (1, 1, 1), (-1, 1, 1), (-1, 1, -1)], "top"),
+            ([(-1, -1, -1), (-1, -1, 1), (1, -1, 1), (1, -1, -1)], "bottom"),
+            ([(1, -1, 1), (1, 1, 1), (-1, 1, 1), (-1, -1, 1)], "zpos"),
+            ([(-1, -1, -1), (-1, 1, -1), (1, 1, -1), (1, -1, -1)], "zneg"),
+            ([(1, -1, -1), (1, 1, -1), (1, 1, 1), (1, -1, 1)], "xpos"),
+            ([(-1, -1, 1), (-1, 1, 1), (-1, 1, -1), (-1, -1, -1)], "xneg"),
+        ]
+        for keys, kind in quads:
+            pts = [corners[k] for k in keys]
+            if kind in ("top", "bottom"):
+                uvs = [(k[0] * hx / tile, k[2] * hz / tile) for k in keys]
+            elif kind in ("zpos", "zneg"):
+                uvs = [(k[0] * hx / tile, k[1] * hy / tile) for k in keys]
+            else:
+                uvs = [(k[2] * hz / tile, k[1] * hy / tile) for k in keys]
+            if s < 0:
+                pts, uvs = list(reversed(pts)), list(reversed(uvs))
+            slot.quad(pts[0], pts[1], pts[2], pts[3], uvs)
+
     # ---- semantic markers ---------------------------------------------------
 
     def marker(self, name: str, position: Vec3, props: Dict[str, object]) -> None:
@@ -352,12 +401,19 @@ def _emit_pane(b: Builder, frame: C.WallFrame, opening: C.Opening, rect: C.Rect)
     u0, u1, y0, y1 = rect
     cu, cy = (u0 + u1) / 2, (y0 + y1) / 2
     pos = (frame.at, cy, cu) if frame.axis == "z" else (cu, cy, frame.at)
+    # The pane's own glass solid, in the canonical local frame. Recorded so each pane stays an
+    # individually inspectable component rather than an anonymous slice of the merged glass mesh.
+    if frame.axis == "z":
+        local = [frame.at - 0.015, y0, u0, frame.at + 0.015, y1, u1]
+    else:
+        local = [u0, y0, frame.at - 0.015, u1, y1, frame.at + 0.015]
     b.panes.append(
         {
             "name": f"pane-{frame.key}-{opening.id}",
             "position": pos,
             "windowId": C.window_runtime_id(v.house_id, frame.key, opening.id),
             "solidId": C.window_solid_id(v.house_id, frame.key, opening.id),
+            "localBounds": local,
         }
     )
 
@@ -372,7 +428,18 @@ def build_shell(variant_name: str) -> Builder:
     b.box("concrete", -C.HALF_WIDTH, C.HALF_WIDTH, -0.42, 0.02, -C.HALF_DEPTH, C.HALF_DEPTH)
     b.box("concrete", -C.GARAGE_HALF_X, C.GARAGE_HALF_X, -0.42, 0.06, C.GARAGE_Z0, C.GARAGE_Z1)
     b.box("trim", -C.INNER_X, C.INNER_X, 0.02, C.GROUND_FLOOR_Y, -C.INNER_Z, C.INNER_Z, opaque=False)
-    b.box("trim", -C.INNER_X, C.INNER_X, C.UPPER_FLOOR_Y - C.SLAB, C.UPPER_FLOOR_Y, -C.INNER_Z, C.INNER_Z, opaque=False)
+    # Upper slab, split around the stairwell exactly as ``house.ts:464-497`` splits it. Wave 2
+    # shipped this as one unbroken box, which capped the shaft: a shell that substitutes for the
+    # procedural presentation would have run the stair into a solid ceiling. Marked opaque so the
+    # transcribed head-height probe (studio-architecture.test.ts:157) actually tests the hole.
+    hole = C.STAIR_HOLE
+    for hx0, hx1, hz0, hz1 in (
+        (-C.INNER_X, hole["x0"], -C.INNER_Z, C.INNER_Z),
+        (hole["x1"], C.INNER_X, -C.INNER_Z, C.INNER_Z),
+        (hole["x0"], hole["x1"], -C.INNER_Z, hole["z0"]),
+        (hole["x0"], hole["x1"], hole["z1"], C.INNER_Z),
+    ):
+        b.box("trim", hx0, hx1, C.UPPER_FLOOR_Y - C.SLAB, C.UPPER_FLOOR_Y, hz0, hz1)
     b.box("trim", -C.INNER_X, C.INNER_X, C.UPPER_CEILING_Y, C.EAVE_Y, -C.INNER_Z, C.INNER_Z, opaque=False)
 
     # ---- exterior walls -----------------------------------------------------
@@ -405,6 +472,7 @@ def build_shell(variant_name: str) -> Builder:
     build_porch_and_pergola(b)
     build_rear_balcony(b)
     build_garage(b)
+    build_interior(b)
 
     for route, (rx, ry, rz) in C.ROUTE_LANDMARKS.items():
         b.marker(
@@ -592,6 +660,16 @@ def build_rear_balcony(b: Builder) -> None:
         sz0 = bz1 + step * C.STAIR_GOING
         top = C.UPPER_FLOOR_Y - (step + 1) * C.STAIR_RISE
         b.box("door", C.EXT_STAIR_X0, C.EXT_STAIR_X1, max(top - 0.10, 0.0), top, sz0, sz0 + C.STAIR_GOING)
+    # Its handrail, from house.ts:787-793. Wave 2 omitted it, which would have left a visible
+    # hole the moment the procedural presentation was hidden: the procedural mesh is merged per
+    # (group, material), so there is no way to hide the walls and keep this one rail.
+    pitch = math.atan2(C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y, C.STAIR_RUN)
+    b.rotated_slab_x(
+        "trim",
+        (C.EXT_STAIR_X0 - 0.05, C.UPPER_FLOOR_Y - (C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y) / 2 + 0.95, bz1 + C.STAIR_RUN / 2),
+        (0.08, 0.08, math.hypot(C.STAIR_RUN, C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y)),
+        pitch,
+    )
 
 
 def build_garage(b: Builder) -> None:
@@ -631,6 +709,159 @@ def build_garage(b: Builder) -> None:
     b.box("trim", 2.3, 2.48, 0.0, 2.74, z1 - 0.28, z1 + 0.04)
 
 
+# ---------------------------------------------------------------- interior (wave 3)
+
+def build_interior(b: Builder) -> None:
+    """Interior partitions, cased openings, skirting/cornice and the 16-tread internal stair.
+
+    Wave 2 shipped a deliberately minimal interior shell and recorded it as falsifier 5. That
+    made substitution unsafe for a reason worth restating: ``build.ts:310-334`` merges the whole
+    procedural house into one mesh per ``(group, material)`` pair, so a root that hides
+    ``world-studio-<houseId>-*`` hides the interior walls and the stair together with the
+    exterior. There is no partial hide. Either the GLB carries the interior or hiding is a
+    regression.
+
+    Every dimension comes from ``house_contract`` and therefore from ``house.ts``; none is
+    chosen here. The stair in particular reproduces the contracted rise, going, run and the
+    ``STAIR_HOLE`` the upper slab is split around.
+    """
+    for frame in C.INTERIOR_PARTITIONS:
+        build_partition(b, frame)
+    build_interior_stair(b)
+    build_interior_trim(b)
+    build_garage_roof_threshold(b)
+
+
+def build_partition(b: Builder, frame: C.PartitionFrame) -> None:
+    """One interior partition leaf plus a cased architrave around each of its openings."""
+    v = b.variant
+    half = C.PARTITION / 2
+    solids = C.subtract_apertures((frame.u_from, frame.u_to, frame.y0, frame.y1), _aperture_rects(frame.openings))
+    for rect in solids:
+        _wall_box(b, frame, "trim", rect, -half, half)
+
+    arch, face = C.ARCHITRAVE, half + C.ARCHITRAVE_PROUD
+    for opening in frame.openings:
+        u0, u1, y0, y1 = opening.u0, opening.u1, opening.y0, opening.y1
+        # Head and both jambs stand proud of the leaf on both faces, and all three sit strictly
+        # outside the declared void, so the opening stays a clear route through the partition.
+        _wall_box(b, frame, "trim", (u0 - arch, u1 + arch, y1, y1 + arch), -face, face)
+        _wall_box(b, frame, "trim", (u0 - arch, u0, y0, y1), -face, face)
+        _wall_box(b, frame, "trim", (u1, u1 + arch, y0, y1), -face, face)
+
+        cu, cy = (u0 + u1) / 2, (y0 + y1) / 2
+        pos = (frame.at, cy, cu) if frame.axis == "z" else (cu, cy, frame.at)
+        b.marker(
+            f"interior-{frame.key}-{opening.id}",
+            pos,
+            {
+                # A distinct semantic from the exterior ``aperture-audit``: the 26 declared
+                # gameplay apertures are a frozen contract and their count must not move.
+                "atomic_semantic": "interior-aperture-audit",
+                "atomic_interior_aperture_id": f"{v.house_id}:{frame.key}:{opening.id}",
+                "atomic_aperture_kind": "cased",
+                "atomic_aperture_clear": True,
+                "atomic_aperture_samples": 9,
+                "atomic_aperture_bounds": [u0, y0, u1, y1],
+                "atomic_aperture_wall": frame.key,
+            },
+        )
+
+    lo = (frame.at - half, frame.y0, frame.u_from) if frame.axis == "z" else (frame.u_from, frame.y0, frame.at - half)
+    hi = (frame.at + half, frame.y1, frame.u_to) if frame.axis == "z" else (frame.u_to, frame.y1, frame.at + half)
+    b.marker(
+        f"partition-{frame.key}",
+        ((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2),
+        {
+            "atomic_semantic": "interior-partition",
+            "atomic_partition_id": f"{v.house_id}:{frame.key}",
+            "atomic_partition_storey": frame.storey,
+            "atomic_partition_bounds": [*lo, *hi],
+            "atomic_partition_openings": [o.id for o in frame.openings],
+        },
+    )
+
+
+def build_interior_stair(b: Builder) -> None:
+    """The contracted straight flight: 16 treads at 201.25 mm rise and 281.25 mm going.
+
+    Each tread is a solid block from the floor to its own top, which is what ``house.ts:667``
+    builds and what makes ``supportHeight`` return the contracted value at every step. A tread
+    marker records the measured top so the 16 treads are inspectable from the GLB alone.
+    """
+    v = b.variant
+    x0, x1 = C.STAIR_X0, C.STAIR_X1
+    for step in range(C.STAIR_STEPS):
+        z0 = C.STAIR_Z0 + step * C.STAIR_GOING
+        z1 = z0 + C.STAIR_GOING
+        top = C.stair_tread_top(step)
+        b.box("door", x0, x1, 0.02, top, z0, z1)
+        b.box("trim", x0, x1 + 0.03, top - 0.04, top, z0 - 0.03, z0 + 0.06, opaque=False)
+        bz = C.STAIR_Z0 + (step + 0.5) * C.STAIR_GOING
+        b.box("metal", x1, x1 + 0.04, top, top + 0.93, bz - 0.02, bz + 0.02, opaque=False)
+        b.marker(
+            f"stair-tread-{step:02d}",
+            ((x0 + x1) / 2, top, (z0 + z1) / 2),
+            {
+                "atomic_semantic": "stair-tread",
+                "atomic_route_id": f"{v.house_id}-interior-stair",
+                "atomic_stair_index": step,
+                "atomic_stair_tread_top": top,
+                "atomic_stair_tread_bounds": [x0, 0.02, z0, x1, top, z1],
+            },
+        )
+
+    pitch = math.atan2(C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y, C.STAIR_RUN)
+    b.rotated_slab_x(
+        "door",
+        (x1 + 0.04, C.GROUND_FLOOR_Y + (C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y) / 2 + 0.95, C.STAIR_Z0 + C.STAIR_RUN / 2),
+        (0.09, 0.07, math.hypot(C.STAIR_RUN, C.UPPER_FLOOR_Y - C.GROUND_FLOOR_Y)),
+        -pitch,
+    )
+
+    # Landing guard around the stairwell opening, house.ts:691-697.
+    hole = C.STAIR_HOLE
+    guard_top = C.UPPER_FLOOR_Y + 1.02
+    b.box("door", hole["x1"], hole["x1"] + 0.08, C.UPPER_FLOOR_Y, guard_top, hole["z0"], hole["z1"])
+    b.box("door", hole["x0"], hole["x1"] + 0.08, C.UPPER_FLOOR_Y, guard_top, hole["z0"], hole["z0"] + 0.08)
+    for baluster in range(14):
+        z = hole["z0"] + 0.2 + baluster * 0.29
+        if z > hole["z1"] - 0.1:
+            break
+        b.box("metal", hole["x1"] + 0.02, hole["x1"] + 0.06, C.UPPER_FLOOR_Y, C.UPPER_FLOOR_Y + 0.95,
+              z - 0.02, z + 0.02, opaque=False)
+
+
+def build_interior_trim(b: Builder) -> None:
+    """Skirting and picture rail, house.ts:652-660 — the cheap detail that stops a room reading
+    as a box at the interior review camera."""
+    g, u, s = C.GROUND_FLOOR_Y, C.UPPER_FLOOR_Y, C.SLAB
+    b.box("trim", C.INNER_X - 0.03, C.INNER_X, g, g + 0.14, -C.INNER_Z, C.INNER_Z, opaque=False)
+    b.box("trim", -C.INNER_X, -C.INNER_X + 0.03, g, g + 0.14, -C.INNER_Z, C.INNER_Z, opaque=False)
+    b.box("trim", -C.INNER_X, C.INNER_X, u, u + 0.14, -C.INNER_Z, -C.INNER_Z + 0.03, opaque=False)
+    b.box("trim", -C.INNER_X, C.INNER_X, u, u + 0.14, C.INNER_Z - 0.03, C.INNER_Z, opaque=False)
+    b.box("trim", -C.INNER_X, C.INNER_X, u - s - 0.1, u - s, -C.INNER_Z, -C.INNER_Z + 0.08, opaque=False)
+    b.box("trim", -C.INNER_X, C.INNER_X, u - s - 0.1, u - s, C.INNER_Z - 0.08, C.INNER_Z, opaque=False)
+
+
+def build_garage_roof_threshold(b: Builder) -> None:
+    """The sloped board that bridges upper floor 3.30 to garage roof 3.50, house.ts:869-873."""
+    run = C.GARAGE_ROOF_THRESHOLD_Z1 - C.GARAGE_ROOF_THRESHOLD_Z0
+    rise = C.GARAGE_ROOF_Y - C.UPPER_FLOOR_Y
+    pitch = math.atan2(rise, run)
+    thickness = C.GARAGE_ROOF_THRESHOLD_THICKNESS
+    b.rotated_slab_x(
+        "door",
+        (
+            C.GARAGE_ROOF_THRESHOLD_X[b.variant.name],
+            (C.UPPER_FLOOR_Y + C.GARAGE_ROOF_Y) / 2 - math.cos(pitch) * thickness / 2,
+            (C.GARAGE_ROOF_THRESHOLD_Z0 + C.GARAGE_ROOF_THRESHOLD_Z1) / 2 + math.sin(pitch) * thickness / 2,
+        ),
+        (C.GARAGE_ROOF_THRESHOLD_WIDTH, thickness, math.hypot(run, rise)),
+        -pitch,
+    )
+
+
 # ---------------------------------------------------------------- self-audit
 
 def assert_apertures_clear(b: Builder) -> List[dict]:
@@ -639,14 +870,18 @@ def assert_apertures_clear(b: Builder) -> List[dict]:
     Nine samples per aperture (centre plus the inner-third grid), exactly the minimum the
     visual contract requires. A hit is a mismatch, reported rather than silently exported.
     """
+    frames: Dict[str, object] = {**C.WALLS, **C.GARAGE_WALLS}
+    for partition in C.INTERIOR_PARTITIONS:
+        frames[partition.key] = partition
+
     mismatches: List[dict] = []
     for marker in b.markers:
         props = marker["props"]
-        if props.get("atomic_semantic") != "aperture-audit":
+        if props.get("atomic_semantic") not in ("aperture-audit", "interior-aperture-audit"):
             continue
         u0, y0, u1, y1 = props["atomic_aperture_bounds"]
         wall_key = props["atomic_aperture_wall"]
-        frame = C.WALLS.get(wall_key) or C.GARAGE_WALLS[wall_key]
+        frame = frames[wall_key]
         kind = props["atomic_aperture_kind"]
         # A slider's glazed leaf is legitimate: only audit the clear half.
         if kind == "slider":
@@ -663,8 +898,107 @@ def assert_apertures_clear(b: Builder) -> List[dict]:
                         break
         props["atomic_aperture_clear"] = hits == 0
         if hits:
-            mismatches.append({"aperture": props["atomic_aperture_id"], "blockedSamples": hits, "of": 9})
+            mismatches.append({
+                "aperture": props.get("atomic_aperture_id") or props["atomic_interior_aperture_id"],
+                "interior": props["atomic_semantic"] == "interior-aperture-audit",
+                "blockedSamples": hits,
+                "of": 9,
+            })
     return mismatches
+
+
+def support_height(solids: Sequence[Tuple[float, ...]], x: float, z: float, below_y: float) -> float | None:
+    """Highest opaque top at or below ``below_y`` under ``(x, z)``.
+
+    The presentation-side mirror of the runtime's ``supportHeight`` helper, so the transcribed
+    tread probe in ``studio-architecture.test.ts:150`` can be run against this mesh.
+    """
+    best: float | None = None
+    for sx0, sx1, sy0, sy1, sz0, sz1 in solids:
+        if sx0 - 1e-6 <= x <= sx1 + 1e-6 and sz0 - 1e-6 <= z <= sz1 + 1e-6 and sy1 <= below_y + 1e-6:
+            best = sy1 if best is None else max(best, sy1)
+    return best
+
+
+def assert_stair_treads(b: Builder) -> List[dict]:
+    """Re-measure all 16 treads from the built mesh, the way the runtime test measures them.
+
+    ``studio-architecture.test.ts:142-155`` queries the support height a millimetre above each
+    contracted tread top and requires it to equal the contract, with no rise above 0.5 m. The
+    same query is run here against the accumulated opaque solids. This is a *presentation*
+    measurement — it proves the visible tread exists at the height the collider claims, which is
+    exactly the substitution question. It does not re-derive or replace the collider.
+    """
+    problems: List[dict] = []
+    previous = C.GROUND_FLOOR_Y
+    for step in range(C.STAIR_STEPS):
+        z = C.STAIR_Z0 + (step + 0.5) * C.STAIR_GOING
+        expected = C.stair_tread_top(step)
+        got = support_height(b.opaque, C.STAIR_PROBE_X, z, expected + 0.001)
+        if got is None or abs(got - expected) > 1e-5:
+            problems.append({"tread": step, "expected": expected, "measured": got})
+        elif got - previous >= 0.5:
+            problems.append({"tread": step, "rise": got - previous, "limit": 0.5})
+        if got is not None:
+            previous = got
+    return problems
+
+
+def assert_probes_clear(b: Builder) -> List[dict]:
+    """Run the runtime's own transcribed probe coordinates against the built opaque solids.
+
+    Wave 2's falsifier 2 was that the aperture audit only ever measured this lane's own list.
+    These probes are not this lane's: they are the exact coordinates
+    ``studio-architecture.test.ts:96-157`` uses, converted into the local frame. A hit means the
+    presentation shell would visually block a route the runtime believes is open.
+    """
+    blocked: List[dict] = []
+    groups = (
+        ("runtime-route", C.RUNTIME_ROUTE_PROBES),
+        ("interior-room", C.INTERIOR_ROOM_PROBES),
+        ("stairwell-head", C.STAIRWELL_HEAD_PROBES),
+    )
+    for kind, probes in groups:
+        for label, x, y, z in probes:
+            for sx0, sx1, sy0, sy1, sz0, sz1 in b.opaque:
+                if sx0 + 1e-4 < x < sx1 - 1e-4 and sy0 + 1e-4 < y < sy1 - 1e-4 and sz0 + 1e-4 < z < sz1 - 1e-4:
+                    blocked.append({"kind": kind, "probe": label, "at": [x, y, z],
+                                    "blocker": [sx0, sy0, sz0, sx1, sy1, sz1]})
+                    break
+    return blocked
+
+
+def measure_panes(b: Builder) -> List[dict]:
+    """Per-pane glass evidence: identity, position and the exact glass box that carries it.
+
+    The prompt for this wave is explicit that a pane must stay a real, inspectable glass
+    component with its own window identity, and that no opaque duplicate or superposed pane may
+    appear. ``glass_bounds`` is the pane's own solid; ``opaqueBehind`` is a nine-sample test of
+    the pane rectangle against every opaque solid in the build, so a partition or lining placed
+    across a window shows up as a number rather than as an opinion.
+    """
+    out: List[dict] = []
+    for pane in b.panes:
+        x, y, z = pane["localBounds"][0], pane["localBounds"][1], pane["localBounds"][2]
+        x1, y1, z1 = pane["localBounds"][3], pane["localBounds"][4], pane["localBounds"][5]
+        hits = 0
+        for fu in (0.25, 0.5, 0.75):
+            for fv in (0.25, 0.5, 0.75):
+                px = x + (x1 - x) * (fu if x1 - x > 0.05 else 0.5)
+                py = y + (y1 - y) * fv
+                pz = z + (z1 - z) * (fu if z1 - z > 0.05 else 0.5)
+                for sx0, sx1, sy0, sy1, sz0, sz1 in b.opaque:
+                    if sx0 + 1e-4 < px < sx1 - 1e-4 and sy0 + 1e-4 < py < sy1 - 1e-4 and sz0 + 1e-4 < pz < sz1 - 1e-4:
+                        hits += 1
+                        break
+        out.append({
+            "name": pane["name"],
+            "windowId": pane["windowId"],
+            "solidId": pane["solidId"],
+            "localBounds": [round(v, 4) for v in pane["localBounds"]],
+            "opaqueBehind": hits,
+        })
+    return out
 
 
 # ---------------------------------------------------------------- Blender realisation
@@ -727,6 +1061,14 @@ def make_material(name: str, maps: Dict[str, Path], *, glass: bool = False, base
         links.new(node.outputs["Color"], nmap.inputs["Color"])
         links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
 
+    if not maps:
+        # Wave-3 defect, found while wiring the stair: ``base_rgb`` was accepted and never used,
+        # so the untextured "door" slot shipped at Blender's 0.8 grey default. Every front door,
+        # both balcony decks and the whole external stair were therefore neutral grey rather than
+        # the ``door_rgb`` the variant declares. The parameter is now applied; the declared
+        # colour was already in ``house_contract.VARIANTS``, so nothing new was invented.
+        bsdf.inputs["Base Color"].default_value = (*base_rgb, 1.0)
+
     # The "metal" slot is gutters, downpipes and a sectional garage door: all powder-coated,
     # i.e. a paint film over metal. Wave 1's 0.85 made them behave as bare polished aluminium
     # and they came back as silver glints in the close renders.
@@ -767,7 +1109,12 @@ def realise(b: Builder, textures: Dict[str, Dict[str, Path]]) -> Tuple[bpy.types
         if name == "glass":
             mat = make_material(f"{v.name}-glass", {}, glass=True)
         else:
-            mat = make_material(f"{v.name}-{name}", textures.get(name, {}))
+            # "door" is the only slot with no synthesised map set: doors, decks, stair treads
+            # and handrails are a flat painted/stained colour, so it takes its declared albedo.
+            maps = textures.get(name, {})
+            if not maps and name != "door":
+                raise RuntimeError(f"material slot '{name}' has no texture set and no declared colour")
+            mat = make_material(f"{v.name}-{name}", maps, base_rgb=v.door_rgb)
         mesh.materials.append(mat)
         census[name] = slot.triangles
 
@@ -781,6 +1128,9 @@ def realise(b: Builder, textures: Dict[str, Dict[str, Path]]) -> Tuple[bpy.types
         empty["atomic_window_id"] = pane["windowId"]
         empty["atomic_solid_id"] = pane["solidId"]
         empty["atomic_house_id"] = v.house_id
+        # The exact glass solid this identity names, so an inspector can find the pane in the
+        # merged glass mesh instead of trusting that the marker sits on one.
+        empty["atomic_window_bounds"] = [float(value) for value in pane["localBounds"]]
 
     for marker in b.markers:
         empty = bpy.data.objects.new(f"{C.partition_key(v.name)}.{marker['name']}", None)
@@ -830,7 +1180,14 @@ def main(argv: Sequence[str]) -> int:
     print(f"[houses] building {v.house_id} (Blender {bpy.app.version_string})", flush=True)
 
     b = build_shell(args.variant)
-    mismatches = assert_apertures_clear(b)
+    all_mismatches = assert_apertures_clear(b)
+    # The 26 declared gameplay apertures keep their own frozen list; the 7 interior cased
+    # openings are reported separately so the exterior gate's meaning never drifts.
+    mismatches = [m for m in all_mismatches if not m["interior"]]
+    interior_mismatches = [m for m in all_mismatches if m["interior"]]
+    tread_problems = assert_stair_treads(b)
+    blocked_probes = assert_probes_clear(b)
+    panes = measure_panes(b)
     bounds = measure_bounds(b)
 
     tex_dir = SOURCE_DIR / args.variant / "textures"
@@ -888,16 +1245,44 @@ def main(argv: Sequence[str]) -> int:
         "apertureMismatches": mismatches,
         "roadClearanceLocalX": C.ROAD_CLEARANCE_LOCAL_X,
         "roadClearanceOk": max(abs(bounds["min"][0]), abs(bounds["max"][0])) <= C.ROAD_CLEARANCE_LOCAL_X + 1e-6,
+        # ---- wave 3: interior substitution evidence ----
+        "interiorPartitions": sum(1 for m in b.markers if m["props"].get("atomic_semantic") == "interior-partition"),
+        "interiorApertureMarkers": sum(1 for m in b.markers if m["props"].get("atomic_semantic") == "interior-aperture-audit"),
+        "interiorApertureMismatches": interior_mismatches,
+        "stairTreads": sum(1 for m in b.markers if m["props"].get("atomic_semantic") == "stair-tread"),
+        "stairRise": C.STAIR_RISE,
+        "stairGoing": C.STAIR_GOING,
+        "stairTreadTops": [C.stair_tread_top(step) for step in range(C.STAIR_STEPS)],
+        "stairTreadProblems": tread_problems,
+        "stairHole": C.STAIR_HOLE,
+        "blockedRuntimeProbes": blocked_probes,
+        "runtimeProbesChecked": len(C.RUNTIME_ROUTE_PROBES) + len(C.INTERIOR_ROOM_PROBES) + len(C.STAIRWELL_HEAD_PROBES),
+        "paneDetail": panes,
     }
     report_path = SOURCE_DIR / args.variant / "build-report.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("[houses] " + json.dumps({k: report[k] for k in (
         "variant", "sha256", "bytes", "triangles", "materials", "panes",
-        "apertureMarkers", "routeLandmarks", "roadClearanceOk")}), flush=True)
-    if mismatches:
-        print(f"[houses] APERTURE MISMATCHES: {json.dumps(mismatches)}", flush=True)
-    return 0
+        "apertureMarkers", "routeLandmarks", "roadClearanceOk",
+        "interiorPartitions", "interiorApertureMarkers", "stairTreads")}), flush=True)
+    failed = False
+    for label, payload in (
+        ("APERTURE MISMATCHES", mismatches),
+        ("INTERIOR APERTURE MISMATCHES", interior_mismatches),
+        ("STAIR TREAD PROBLEMS", tread_problems),
+        ("BLOCKED RUNTIME PROBES", blocked_probes),
+    ):
+        if payload:
+            failed = True
+            print(f"[houses] {label}: {json.dumps(payload)}", flush=True)
+    superposed = [p for p in panes if p["opaqueBehind"] > 0]
+    if superposed:
+        failed = True
+        print(f"[houses] PANES WITH OPAQUE GEOMETRY IN THE GLASS: {json.dumps(superposed)}", flush=True)
+    # The export above already happened, deliberately: an inspectable failing artefact is worth
+    # more than none. The non-zero exit is what stops it being treated as a passing build.
+    return 4 if failed else 0
 
 
 if __name__ == "__main__":

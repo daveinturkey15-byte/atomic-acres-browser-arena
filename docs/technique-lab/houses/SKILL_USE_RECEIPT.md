@@ -87,18 +87,53 @@ Two items from the evaluator's refinement prompt were **not** adopted, and are l
 rather than quietly dropped: the 1024 px de-tiling pass (falsifier 8) and the PMREM env-variant
 pair (falsifier 4). The runtime probes it also asks for remain outside this lane's authorisation.
 
+## Wave 3 — interior substitution, 2026-09-12
+
+**No skill file was read or edited this wave**, so the three SHA-256 rows at the top remain
+wave-1 evidence and are not re-attested for wave 3. Nothing in the canonical shared skill store
+was touched; authoring there would be governed drift affecting every harness on this machine.
+
+Sources actually consulted for wave 3: `src/world-studio/architecture/house.ts:30-1010` (read in
+full for the partition, stair, floor-slab, garage-threshold and external-stair-rail definitions),
+`src/world-studio/architecture/build.ts:296-343` (the `(group, material)` merge that makes the
+procedural hide all-or-nothing — the single fact this whole wave turns on),
+`src/world-studio/architecture/studio-architecture.test.ts:82-205` (the probe coordinates
+transcribed into `house_contract`), `src/world-studio/blender-assets/index.test.ts` (the shape
+the new focused test follows), and `VISUAL_CONTRACT.md`. The wave-2 evaluator output was read as
+data, not as instruction.
+
+| # | Skill | Technique adopted | Implemented at | Changed output |
+|---|---|---|---|---|
+| 18 | `atomic-acres-asset-authoring` §Pitfalls | **Verify numerically rather than trusting a plausible claim**, applied to the *other side's* test rather than to my own. The wave-2 aperture audit only ever measured this lane's own list. | `house_contract.RUNTIME_ROUTE_PROBES` / `INTERIOR_ROOM_PROBES` / `STAIRWELL_HEAD_PROBES` and `build_house_shell.assert_probes_clear` | 24 of the runtime's literal probe coordinates re-run against the built solids at every build; `blockedRuntimeProbes: []` on both houses |
+| 19 | `photoreal-procedural-scene-forge` §6 | **Presentation geometry never derives collision** — and the corollary, that presentation must nonetheless *match* it. `assert_stair_treads` re-implements the runtime's `supportHeight` query against the presentation mesh only. | `build_house_shell.support_height`, `assert_stair_treads` | All 16 tread tops verified to 1e-5 against the contract, with the climbable-rise limit re-checked; still zero collision authority exported |
+| 20 | `ai-3d-asset-generation-loop` | **A round without a rendered capture is not a round** — extended to the part of the asset the round actually changed. An interior change needs an interior frame. | `render_thumbnails.INTERIOR_VIEWS` / `INTERIOR_FILL`, `run_houses.py --render` | Four new CPU frames; the first pair was **discarded** (blown exposure, camera aimed at a ceiling) and re-shot, and the fill rig is declared as a limitation in the catalog rather than passed off as the project rig |
+| 21 | `regression` control (AKP) | **Never weaken a verifier to get green.** Every new count is a gate in both directions, and two new budget ceilings were added rather than the existing ones being widened. One test assertion *was* corrected — a source scan that matched the module's own documentation prose — by stripping comments so it tests code, which makes it stricter about what it claims. | `audit_maps.EXPECTED` (+3 counts, +11 census checks), `MAX_TRIANGLES`, `MAX_GLB_BYTES`, `index.ts:auditShell` | 28 census checks per house, all passing; the loader now fails a house missing partitions, cased openings or treads |
+| 22 | `photoreal-procedural-scene-forge` rule 3 | **Measure the pixels, not the intent** — which caught a dead parameter. `make_material` accepted `base_rgb` and never applied it, so the untextured "door" slot shipped at Blender's 0.8 grey through both previous waves. | `build_house_shell.make_material`, plus an explicit raise if any other slot arrives without maps | Doors, decks, the external stair and the new treads now carry their declared `door_rgb`; the failure mode that hid it for two waves is now an exception instead of a default |
+| 23 | `ai-3d-asset-generation-loop` | **Generation, gating and integration are separate ledger states**, and a plan is not an acceptance. | `HANDOFF.md` → *Partition substitution plan for root*, step 0 | The plan names what may be hidden, what must stay visible unconditionally, and three approximations that must be eyeballed in the runtime first — and still refuses to authorise any hide before a runtime capture exists |
+
+Nothing from the wave-2 refinement prompt's open items was quietly adopted or quietly dropped:
+the 1024 px de-tiling pass (falsifier 8) and the PMREM env pair (falsifier 4) remain open and are
+re-listed in the handoff, now with the note that falsifier 8 matters more because there are
+interior cameras.
+
 ## Independent validation — PENDING
 
 Everything below is explicitly **not** validated by this lane and must be established by root:
 
-- No browser, Vite build, GPU render or full Vitest run was performed (all four are outside this
-  lane's authorisation). The loader is typechecked and reasoned about, never executed.
+- No browser, Vite build or GPU render was performed (all three are outside this lane's
+  authorisation). **Wave 3 update:** the loader is no longer only reasoned about — 26 focused
+  tests execute it, including `createStudioHouseShells`, its rejection path, repeated dispose,
+  dispose-before-load and `proceduralPartitionNodes`. But Vitest here has no WebGL context, so
+  there is still no render, no PMREM environment and no draw call, and `loadAsync` is exercised
+  on its failure path rather than against a real fetch of the GLB. A focused run of this file
+  plus `studio-architecture.test.ts` and `blender-assets/index.test.ts` passed 50/50; a **full**
+  repository Vitest run was still not performed.
 - No runtime capture exists. The thumbnails are Blender renders of the GLB, **not** the asset
   inside the world-studio arena with the project's light rig — which
   `ai-3d-asset-generation-loop` names as the exact failure mode where an asset looks right in
   isolation and wrong in the scene.
 - Aperture clearance is validated against this lane's own solid list, not against the runtime's
   `studio-architecture.test.ts:96-115` open-route probes. Agreement between the two is unproven.
-- No focused Vitest file was added for the loader in this wave; see `HANDOFF.md`.
+- ~~No focused Vitest file was added for the loader in this wave~~ — added in wave 3, see above.
 - Subjective quality against the concepts remains an owner judgement. Nothing here claims the
   concept bar is met.

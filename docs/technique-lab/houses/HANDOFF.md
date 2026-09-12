@@ -1,4 +1,200 @@
-# Houses lane handoff — wave 2 refinement, 2026-09-12
+# Houses lane handoff — wave 3 interior substitution, 2026-09-12
+
+> **Wave 3 summary.** The shells now carry the interior: seven partitions, their nine cased
+> openings, the contracted **16-tread** internal stair, the landing guard, the skirting band and
+> the stairwell hole cut through the upper slab. Falsifier 5 is retired and falsifier 3 is
+> retired; falsifiers 1, 4, 8 and 9 stand, and two new mismatches are recorded below. The wave-1
+> and wave-2 sections that follow are unchanged history and still describe what those waves did
+> and failed to do. **Still not integrated, not observed in the runtime, not visually accepted.**
+>
+> | | wave 2 | wave 3 |
+> |---|---|---|
+> | teal GLB | 5,545,104 B `5f987101…` | **5,670,288 B `0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50`** |
+> | yellow GLB | 5,519,604 B `eb7afd72…` | **5,644,996 B `bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6`** |
+> | triangles | 36,360 / 36,528 | **37,944 / 38,112** (budget 40,000, gated) |
+> | materials / texture images / texture bytes | 8 / 18 / 2,843,343 / 2,806,733 | **unchanged** |
+> | panes / aperture markers / route landmarks | 22 / 26 / 3 | **unchanged** |
+> | interior partitions / cased openings / treads | 0 / 0 / 0 | **7 / 9 / 16** |
+
+---
+
+# Wave 3 — what was authored, and what the numbers say
+
+## The change
+
+Wave 2 recorded the interior as falsifier 5 and left it. That made substitution not merely
+incomplete but *unsafe*, for a reason worth stating plainly because it is the whole argument for
+this wave: `build.ts:310-334` merges the entire procedural house into one mesh per
+`(group, material)` pair, so `world-studio-<houseId>-*` **is** the house — exterior, partitions
+and stair in the same buffers. There is no partial hide. Hiding it in wave 2 would have deleted
+the interior walls and the stair. The GLB either carries the interior or hiding is a regression.
+
+Everything authored is transcribed, never invented. `house_contract.INTERIOR_PARTITIONS`,
+`GARAGE_ROOF_THRESHOLD_*`, `STAIR_*` and `STAIR_HOLE` each cite the `house.ts` line they came
+from at the same frozen SHA `6e9b2cafd…`.
+
+| Added | From | Result |
+|---|---|---|
+| 7 interior partitions at 140 mm, split around their openings, with cased architraves | `house.ts:502-650` | `interiorPartitions: 7`, `interiorApertureMarkers: 9`, all marked clear |
+| 16-tread stair: treads, nosings, balusters, raked handrail | `house.ts:664-689` | `stairTreads: 16`, every tread top on the contract to 1e-5 |
+| Landing guard, guard end and 14 landing balusters | `house.ts:691-697` | present |
+| **Stairwell hole cut through the upper slab** | `house.ts:464-497` | wave 2 shipped this as one unbroken box, i.e. a capped shaft over the stair |
+| Skirting and picture rail | `house.ts:652-660` | present |
+| External stair handrail | `house.ts:787-793` | wave 2 omitted it; it would have vanished on the first hide |
+| Garage-roof threshold board | `house.ts:869-873` | same; its local X differs per house and both values are transcribed |
+
+## Measured, not asserted
+
+Every number below comes out of `build-report.json`, which is written by the build that produced
+the bytes, and is re-checked by `audit_maps.py` and by `src/world-studio/houses/index.test.ts`.
+
+* **Stair.** All 16 treads re-measured from the built mesh with the runtime's own method: the
+  support height a millimetre above each contracted top (`studio-architecture.test.ts:150`).
+  `stairTreadProblems: []` on both houses. Rise 0.20125 m, going 0.28125 m, the flight lands
+  exactly on 3.30.
+* **The runtime's own probes, transcribed.** This is the first direct attack on falsifier 2.
+  `RUNTIME_ROUTE_PROBES`, `INTERIOR_ROOM_PROBES` and `STAIRWELL_HEAD_PROBES` are the literal
+  coordinates of `studio-architecture.test.ts:96-157` converted into the local frame; 24 of them
+  are run against the built opaque solids at every build. `blockedRuntimeProbes: []` on both
+  houses, including the stairwell head-height probe that only passes because the slab hole is
+  real. This is **agreement, not identity**: those probes query the TypeScript colliders and
+  these query the GLB's presentation solids.
+* **Glazing.** 22 panes, 22 distinct `atomic_window_id`s, one shared glass material and exactly
+  one glass mesh per house — so no pane can be quietly swapped for an opaque stand-in. Each pane
+  marker now also carries `atomic_window_bounds`, the exact glass solid it names, and the build
+  samples each pane rectangle nine times against every opaque solid: `opaqueBehind: 0` for all 44
+  panes. No duplicate, superposed or permanently hidden pane was introduced.
+* **Budget.** Triangles +1,584 / +1,584 (+4.4%), which is the entire interior. Materials 8,
+  texture images 18 and texture bytes are byte-identical to wave 2. `audit_maps.py` now fails
+  above 40,000 triangles or 6,000,000 GLB bytes; nothing was relaxed to fit.
+* **Determinism.** The teal build was run twice and reproduced `0748813f…` byte for byte.
+
+## A dead parameter found and fixed
+
+`make_material` accepted `base_rgb` and never used it. The "door" slot has no synthesised map
+set, so every front door, both balcony decks and the whole external stair shipped at Blender's
+0.8 grey default instead of the `door_rgb` each variant declares — wave 1 and wave 2 both. This
+surfaced because the stair treads use that slot. The parameter is now applied, and the builder
+raises rather than silently defaulting if any other slot ever arrives without maps. The colour
+was already in `VARIANTS`; nothing new was chosen. **This changes the exterior**: teal doors and
+decks are now brown `(0.400, 0.235, 0.157)` and yellow's are slate `(0.290, 0.310, 0.345)`.
+
+## Executable evidence — wave 3
+
+* `python scripts/blender/world-studio/houses/run_houses.py --variant all --render` → returncode
+  **0**, Blender reporting **`Blender 5.1.2 (hash ec6e62d40fa9)`**, `--background
+  --factory-startup --threads 4 --python-exit-code 9`, `cycles.device = "CPU"`. Build 2.3 s per
+  house, render 32-34 s per house.
+* `python scripts/blender/world-studio/houses/audit_maps.py` → **all checks passed**, 28 census
+  checks per house including the 11 new interior ones. Palette and normal-tilt results are
+  unchanged from wave 2 to the reported decimal.
+* `python scripts/blender/world-studio/houses/write_catalog.py` → 2 assets, revision 3, hashes
+  recomputed from the bytes.
+* `node node_modules/vitest/vitest.mjs run src/world-studio/houses/index.test.ts
+  src/world-studio/architecture/studio-architecture.test.ts
+  src/world-studio/blender-assets/index.test.ts` → **50 passed**, 0 failed.
+* `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json` → clean.
+
+## Interior captures — and what they are not
+
+`house-{teal,yellow}-interior-stair.png` and `-interior-living.png`, 512x320 CPU Cycles at 64
+samples, rendered from the **re-imported GLB**. The stair frame shows the flight, the nosings,
+the balusters, the raked handrail, the stringer face and the stairwell opening above it.
+
+Two honest deviations, both recorded in `catalog.json` as well:
+
+1. **Four interior fill lamps were added.** A closed house lit only by the exterior sun renders
+   as noise at any sample count this lane can afford. They are a photographic rig for inspecting
+   geometry. They are **not** the project light rig, and nothing about interior lighting, bounce
+   or mood may be concluded from these frames.
+2. **The stair camera keeps the review point's position `(4.6, 1.7, 7.8)` but is aimed at the
+   flight**, not at the published target `(0.6, 2.6, 3.0)`. Aimed as published the frame is a
+   ceiling and a slab edge — the first attempt produced exactly that, plus a blown exposure from
+   lamps run an order of magnitude hot, and both frames were discarded and re-shot.
+
+## New files in wave 3
+
+```
+src/world-studio/houses/index.test.ts                       NEW 26 tests, retires falsifier 3
+public/assets/world-studio/blender/houses/house-teal-interior-stair.png    NEW
+public/assets/world-studio/blender/houses/house-teal-interior-living.png   NEW
+public/assets/world-studio/blender/houses/house-yellow-interior-stair.png  NEW
+public/assets/world-studio/blender/houses/house-yellow-interior-living.png NEW
+```
+
+`house_contract.py`, `build_house_shell.py`, `audit_maps.py`, `write_catalog.py`,
+`render_thumbnails.py`, `src/world-studio/houses/index.ts`, both GLBs, both build reports and
+`catalog.json` were modified. `arena.ts`, `assets.manifest.json`, the registry, shared config,
+the architecture sources and every other lane were **not** touched. No commit was made.
+
+## Partition substitution plan for root
+
+This is the section wave 2 could not write. It is a plan, not an acceptance: step 0 is still
+falsifier 1.
+
+**0. Capture first.** Load additively, capture from the existing review cameras in the runtime,
+and compare against the procedural frame. Nothing below is authorised before that frame exists.
+
+**1. What may be hidden after a passing audit.** For a house whose `audit.passed === true`,
+`proceduralPartitionNodes(architectureRoot, houseId)` returns exactly the merged meshes named
+`world-studio-<houseId>-*`. All of them may be set `visible = false` **together**. Per-part
+hiding is impossible: the merge is by `(group, material)`, so these meshes each span exterior and
+interior geometry. Set `visible = false` only; never remove or dispose, so rollback costs one
+boolean.
+
+**2. What must stay visible, unconditionally.**
+   * `world-studio-interiors-*` — the procedural furniture root. It is a different partition,
+     it is merged by material role with no per-house split, and **none of it is in these GLBs**.
+     The `world-studio.interiors.all` fallback in the visual contract still applies.
+   * The other house's nodes, if its own audit failed. Hide per house, never globally.
+   * Everything, for any house where `ready` is still pending or `passed === false`.
+
+**3. What must remain visible until runtime review, even on a pass.** Nothing structural is now
+missing from the GLB, but three things are *approximations* rather than transcriptions and should
+be eyeballed in the runtime frame before the procedural version is considered replaced:
+   * **Baluster counts.** The GLB spaces balusters by a 0.13 m while-loop; the TypeScript uses
+     bounded `for` loops. Counts may differ by one at the ends of each run.
+   * **Interior surfacing.** Every partition, lining, skirting and architrave is the `trim`
+     material. The TypeScript uses `accent` for `p-spine` and `q-bedroom` and `interior-wall`
+     elsewhere, so the two-tone interior of the procedural house is currently one tone.
+   * **Stair treads are wood (`door`), not the procedural `floor-soft` carpet.**
+
+**4. Still owned by root and deliberately untouched:** `arena.ts` wiring, the central catalog,
+`assets.manifest.json`, the registry, and the browser capture.
+
+## Remaining mismatches and falsifiers after wave 3
+
+Numbering continues from the wave-2 list below; **1, 4, 8 and 9 stand unchanged**, 3 and 5 are
+retired, 2 is narrowed, and 10-12 are new.
+
+* **2 (narrowed, not closed).** 24 runtime probe coordinates are now transcribed and re-checked
+  at every build, and both houses pass all of them. What is still unproven is that the GLB's
+  opaque presentation solids and the TypeScript collider set are the *same* set — only that both
+  are clear at the same 24 points. The falsifier stands: run the real probes against a build with
+  the shells visible and the procedural house hidden.
+* **3 — RETIRED.** `src/world-studio/houses/index.test.ts` exists and executes: 26 tests covering
+  the GLB's declared contract, bounds, apertures, partitions, treads, pane identity and budget,
+  plus the loader's URL resolution, early-`ready` behaviour, repeated dispose, dispose-before-load
+  and variant filter. It states its own limits: no WebGL context, so no render and no draw call,
+  and `loadAsync` is exercised on its rejection path rather than against `file://`.
+* **5 — RETIRED.** The interior is in both GLBs and is gated in three places: the build's own
+  self-audit, `audit_maps.py`, and `auditShell`, which now fails a house that is missing its
+  partitions, its cased openings or any of its 16 treads.
+* **10 (new). The interior is one tone.** See substitution plan step 3. The material roster has
+  no `accent`/`interior-wall` split, so the procedural two-tone interior is flattened. Adding it
+  would cost one more material slot and one more texture set, which is why it was not done
+  silently.
+* **11 (new). The garage-roof threshold board is not mirror-symmetric.** `garageRoofDoorX` in
+  `house.ts:861` weights the open half three-to-one toward the larger *world* X, so teal lands at
+  local −2.65 and yellow at −3.45. Both are transcribed rather than averaged, which means the two
+  GLBs are **not** exact mirrors of each other at that one board. If root prefers symmetry, that
+  is a TypeScript decision, not a presentation one.
+* **12 (new). The interior frames use an added fill rig.** See *Interior captures* above. They
+  prove geometry, not lighting.
+
+---
+
+# Wave 2 — refinement, 2026-09-12 (unchanged history)
 
 Lane `houses-night-20260912` · harness `claude` · model `claude-opus-5` · effort `xhigh` ·
 machine `dave-gaming-pc` · worktree `C:/Users/david/projects/worktrees/aa-houses-night-20260912`
@@ -176,6 +372,10 @@ intended consequence of a roof that is no longer near-black.
 
 ## Unresolved falsifiers
 
+*(Wave-2 state, kept as written. Superseded by the wave-3 list above: 3 and 5 are now retired
+and 2 is narrowed. Where this section and the wave-3 section disagree, the wave-3 section is
+current.)*
+
 Wave 1's list, updated. **1, 2, 3, 4 and 8 are what root must still close.**
 
 1. **No runtime capture exists.** Still true and still the most important gap. The six review
@@ -212,6 +412,9 @@ Wave 1's list, updated. **1, 2, 3, 4 and 8 are what root must still close.**
 
 ## Needed root wiring
 
+*(Wave-2 state. **Item 3 below is now obsolete** — the interior exists, so substitution is no
+longer deferred. Follow *Partition substitution plan for root* in the wave-3 section instead.)*
+
 Unchanged from wave 1 and repeated because none of it was done here:
 
 1. Nothing in `src/world-studio/arena.ts` imports this loader. Root owns that wire-up.
@@ -227,13 +430,17 @@ Unchanged from wave 1 and repeated because none of it was done here:
 
 ## Next best improvement, in priority order
 
-1. **Author the interior shell partitions and the 16-tread internal stair into the GLB.** Still
-   the one change that converts this from "nice exterior" to "can replace the procedural
-   partition", and it retires falsifier 5. The contract is already transcribed (`STAIR_*`).
-2. **1024 px siding/ashlar tiles plus a second de-tiling UV offset** — retires falsifier 8.
-3. **`src/world-studio/houses/index.test.ts`** — retires falsifier 3, and is cheap.
-4. Emit `collision-visual-owner` markers with `atomic_collision_bounds` (falsifier 7).
-5. An env-variant render pair to settle falsifier 4.
+*(Wave-2 list. Items 1 and 3 were done in wave 3; the rest still stand, re-ordered below.)*
+
+1. ~~Author the interior shell partitions and the 16-tread internal stair into the GLB.~~ **Done
+   in wave 3**, retiring falsifier 5.
+2. **1024 px siding/ashlar tiles plus a second de-tiling UV offset** — retires falsifier 8, and
+   it matters more now that there are interior cameras that see the tile repeat at close range.
+3. ~~`src/world-studio/houses/index.test.ts`~~ **Done in wave 3**, retiring falsifier 3.
+4. A second interior material so the procedural `accent` / `interior-wall` two-tone survives
+   substitution (wave-3 falsifier 10).
+5. Emit `collision-visual-owner` markers with `atomic_collision_bounds` (falsifier 7).
+6. An env-variant render pair to settle falsifier 4.
 
 ## Permissions and limits encountered
 

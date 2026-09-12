@@ -10,24 +10,48 @@
       "license": "Original project work",
       "files": "public/assets/world-studio/blender/houses/*",
       "sourceProvenance": "public/assets/world-studio/blender/houses/catalog.json",
-      "modifications": "Blender Python authored assets and PBR maps. Skills Lab inspection candidate; level substitution and visual acceptance remain open.",
+      "modifications": "Revision3 includes exact internal partitions, 16-tread stair and slab aperture. CPU loader/route checks pass; level integration and visual acceptance remain open.",
       "attributionRequired": false,
       "runtimeFiles": [
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-shell.glb",
-          "sha256": "5f987101ab0f2500361ddef79ab4526c5f23ecb48387456f3b282a8fce826c09"
+          "sha256": "0748813fa082fb694978168c55a896124ac4d052237d226cccafc241df7ccd50"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-teal-street.png",
-          "sha256": "4ea30176d7b2edda327f1f34df7a87a44d64408d06dd2e5e9525ada04603ac86"
+          "sha256": "19c6a88802c26f05c0e203a7573147491481b3a88ff83a56be8f109da16d5f34"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-teal-backyard.png",
+          "sha256": "02cd7ac8c0abe08d09a7183e7fdcf35dbfc8919240369e2c236b438623713b85"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-teal-interior-stair.png",
+          "sha256": "0379235ef9a39b9e11f89e94528b080c3bd8777dcd8c28112e1151c0e77d53d5"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-teal-interior-living.png",
+          "sha256": "265124b7f9d98e0198e4b661fc23e3c8160cfc3555c9ce237939374c6b18f42e"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-shell.glb",
-          "sha256": "eb7afd7299cad8e367f1d84bea0865541e4dbf07b602927a080ec16738028b25"
+          "sha256": "bdd2867e05a36266cca8d468fdc56b01168e7eea65ebe29b6a5ee4a91dcc5ee6"
         },
         {
           "path": "public/assets/world-studio/blender/houses/house-yellow-street.png",
-          "sha256": "2aafe165aa12dad0b57b15ea5620e9c1d0583f779bd937a528973a27f54ce164"
+          "sha256": "c24ab9523c9e0705fdcf1a3b806663c90ff27c3b0db51fa6bd80b03031bea40e"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-yellow-backyard.png",
+          "sha256": "7ed7d61335e98b90428b519bfaab7ff2a40fab133a07c3e1a5e7ce6e30666a8e"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-yellow-interior-stair.png",
+          "sha256": "9ba274e0d7ffc1dac5788883465c0d78db45e0063a493af0fed73c9cc49cbd68"
+        },
+        {
+          "path": "public/assets/world-studio/blender/houses/house-yellow-interior-living.png",
+          "sha256": "64d1a532a9154272c6a65935e306e1d0227afbfcca7cd2c1201d9655e24ddfbc"
         }
       ]
     },

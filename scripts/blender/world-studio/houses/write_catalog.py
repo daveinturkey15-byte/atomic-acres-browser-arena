@@ -25,14 +25,21 @@ URL_BASE = "assets/world-studio/blender/houses"
 VARIANTS = ("teal", "yellow")
 
 LIMITATIONS = [
-    "Exterior shell only: walls, floors, ceilings, roof, chimney, porch, balcony, garage, trim, "
-    "gutters and glazing. Furniture and interior decor belong to the interiors lane.",
+    "Structural shell, inside and out: walls, floors, ceilings, roof, chimney, porch, balcony, "
+    "garage, trim, gutters, glazing, the seven interior partitions with their nine cased "
+    "openings, and the contracted 16-tread internal stair. Furniture and interior decor still "
+    "belong to the interiors lane and are NOT in this file.",
     "Presentation only. No collider, shot surface, spawn or navigation data is exported or "
     "derived; movement and shot authority stay in src/world-studio/architecture.",
     "Not yet observed in the running arena. Generated and audited is not integrated or visually "
     "accepted; root must inspect runtime and visuals before acceptance.",
-    "Thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile rather "
-    "than for judging material detail.",
+    "Exterior thumbnails are 512x320 CPU Cycles renders at 24 samples, sized for a gallery tile "
+    "rather than for judging material detail.",
+    "The two interior thumbnails add four interior fill lamps because a closed house lit only by "
+    "the exterior sun renders as noise at any sample count this lane can afford. They are a "
+    "photographic rig for inspecting geometry and say nothing about the project light rig, "
+    "interior bounce or mood. The stair frame is also aimed at the flight rather than at the "
+    "review point's published target.",
     "Siding, shingle and stone maps are 512px procedural tiles; close-camera interior inspection "
     "will show the tile repeat.",
 ]
@@ -67,18 +74,25 @@ def main() -> int:
                 "title": f"{variant.capitalize()} two-storey house shell",
                 "assetUrl": f"{URL_BASE}/house-{variant}-shell.glb",
                 "thumbnailUrl": f"{URL_BASE}/house-{variant}-street.png",
-                "additionalThumbnails": [f"{URL_BASE}/house-{variant}-backyard.png"],
+                "additionalThumbnails": [
+                    f"{URL_BASE}/house-{variant}-backyard.png",
+                    f"{URL_BASE}/house-{variant}-interior-stair.png",
+                    f"{URL_BASE}/house-{variant}-interior-living.png",
+                ],
                 "category": "architecture",
                 # Curator assessment, not a measurement. Teal is ranked first because it is the
                 # house the street hero concept frames and the one authored to completion first.
                 "qualityRank": 1 if variant == "teal" else 2,
                 "qualityReason": (
-                    "Full exterior shell with real lap-siding relief, stepped shingle courses, a "
+                    "Full structural shell with real lap-siding relief, stepped shingle courses, a "
                     "random-ashlar masonry chimney built from individual stones, open slatted "
-                    "pergola, balustrades and open gameplay apertures; audited clear against all "
-                    f"{report['apertureMarkers']} declared openings."
+                    "pergola, balustrades and open gameplay apertures, plus the interior "
+                    f"partitions and the {report['stairTreads']}-tread internal stair; audited "
+                    f"clear against all {report['apertureMarkers']} declared openings, "
+                    f"{report['interiorApertureMarkers']} interior cased openings and "
+                    f"{report['runtimeProbesChecked']} transcribed runtime probes."
                 ),
-                "revision": 2,
+                "revision": 3,
                 "authoredBy": {"harness": "claude", "model": "claude-opus-5", "effort": "xhigh"},
                 "sourceUrls": [
                     "https://docs.blender.org/manual/en/5.1/addons/import_export/scene_gltf2.html",
@@ -102,7 +116,15 @@ def main() -> int:
                     "routeLandmarks": report["routeLandmarks"],
                     "trianglesByMaterial": report["trianglesByMaterial"],
                     "localBounds": report["localBounds"],
+                    "interiorPartitions": report["interiorPartitions"],
+                    "interiorApertureMarkers": report["interiorApertureMarkers"],
+                    "stairTreads": report["stairTreads"],
+                    "stairRise": report["stairRise"],
+                    "stairGoing": report["stairGoing"],
                 },
+                "interiorApertureMismatches": report["interiorApertureMismatches"],
+                "stairTreadProblems": report["stairTreadProblems"],
+                "blockedRuntimeProbes": report["blockedRuntimeProbes"],
                 "sha256": digest,
                 "partition": report["partition"],
                 "houseId": report["houseId"],

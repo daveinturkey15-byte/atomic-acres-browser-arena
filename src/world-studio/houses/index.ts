@@ -33,6 +33,15 @@
  *      never globally, and never on `ready` alone.
  *   6. Never hide a partition while `ready` is still pending — that is exactly the doubled/
  *      missing-wall window this protocol exists to close.
+ *
+ * WHY STEP 4 IS NOW SAFE (wave 3). It was not safe in wave 2. `build.ts:310-334` merges the
+ * procedural house into one mesh per `(group, material)` pair, so `world-studio-<houseId>-*` is
+ * the whole house — exterior, interior partitions and stair together — and there is no way to
+ * hide the walls while keeping the stair. Until the GLB carried an interior, hiding it deleted
+ * the interior. The shell now carries the seven partitions, their nine cased openings and the
+ * contracted 16-tread flight, and `auditShell` fails the house if any of them is missing or
+ * blocked. The procedural *furniture* root (`world-studio-interiors-*`) is separate, is not
+ * reproduced here, and must stay visible.
  */
 
 import * as THREE from 'three';
@@ -85,6 +94,29 @@ export const SHELL_LOCAL_BOUNDS = {
 };
 export const ROAD_CLEARANCE_LOCAL_X = 9.5;
 
+/**
+ * The interior contract the wave-3 shells carry, transcribed from `architecture/house.ts:51-63`
+ * and `:502-700`. These are the numbers that decide whether the GLB can stand in for the
+ * procedural presentation, so the loader checks them rather than trusting the exporter.
+ *
+ * `build.ts:310-334` merges the whole procedural house into one mesh per `(group, material)`
+ * pair, so a root that hides `world-studio-<houseId>-*` hides the interior walls and the stair
+ * along with the exterior. There is no partial hide. That is why the tread count and the
+ * partition count are audit failures and not warnings.
+ */
+export const INTERIOR_CONTRACT = {
+  stairTreads: 16,
+  groundFloorY: 0.08,
+  upperFloorY: 3.3,
+  /** (3.30 - 0.08) / 16 */
+  stairRise: (3.3 - 0.08) / 16,
+  stairGoing: 0.28125,
+  partitions: 7,
+  interiorApertures: 9,
+  /** Largest step a player may be asked to climb, `studio-architecture.test.ts:153`. */
+  maxTreadRise: 0.5,
+} as const;
+
 export interface HouseShellAudit {
   readonly variant: HouseVariant;
   readonly houseId: string;
@@ -96,6 +128,13 @@ export interface HouseShellAudit {
   readonly apertureIds: readonly string[];
   readonly blockedApertureIds: readonly string[];
   readonly routeIds: readonly string[];
+  /** `<house-id>:<partition-key>:<opening-id>` for each cased interior opening. */
+  readonly interiorApertureIds: readonly string[];
+  readonly blockedInteriorApertureIds: readonly string[];
+  /** `<house-id>:<partition-key>` for each interior partition leaf. */
+  readonly partitionIds: readonly string[];
+  /** Measured tread tops in local metres, ascending. Length is the tread count. */
+  readonly stairTreadTops: readonly number[];
   readonly triangles: number;
   readonly drawGroups: number;
   readonly localBounds: { min: readonly number[]; max: readonly number[] } | null;
@@ -199,6 +238,10 @@ function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudi
   const apertureIds: string[] = [];
   const blockedApertureIds: string[] = [];
   const routeIds: string[] = [];
+  const interiorApertureIds: string[] = [];
+  const blockedInteriorApertureIds: string[] = [];
+  const partitionIds: string[] = [];
+  const stairTreadTops: number[] = [];
   let triangles = 0;
   let drawGroups = 0;
 
@@ -217,6 +260,16 @@ function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudi
     }
     if (semantic === 'route-landmark' && typeof props.atomic_route_id === 'string') {
       routeIds.push(props.atomic_route_id);
+    }
+    if (semantic === 'interior-aperture-audit' && typeof props.atomic_interior_aperture_id === 'string') {
+      interiorApertureIds.push(props.atomic_interior_aperture_id);
+      if (props.atomic_aperture_clear !== true) blockedInteriorApertureIds.push(props.atomic_interior_aperture_id);
+    }
+    if (semantic === 'interior-partition' && typeof props.atomic_partition_id === 'string') {
+      partitionIds.push(props.atomic_partition_id);
+    }
+    if (semantic === 'stair-tread' && typeof props.atomic_stair_tread_top === 'number') {
+      stairTreadTops.push(props.atomic_stair_tread_top);
     }
     const mesh = node as THREE.Mesh;
     if (!mesh.isMesh || !mesh.geometry) return;
@@ -251,6 +304,43 @@ function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudi
   for (const route of ['interior-stair', 'external-stair', 'garage-roof-door']) {
     if (!routeIds.includes(`${spec.houseId}-${route}`)) failures.push(`missing route landmark ${route}`);
   }
+
+  // Interior substitution. Hiding the procedural house is all-or-nothing, so a shell without
+  // these is not a substitute for it — it is a house with no inside.
+  if (partitionIds.length !== INTERIOR_CONTRACT.partitions) {
+    failures.push(`${partitionIds.length} interior partitions, expected ${INTERIOR_CONTRACT.partitions}`);
+  }
+  if (interiorApertureIds.length !== INTERIOR_CONTRACT.interiorApertures) {
+    failures.push(`${interiorApertureIds.length} interior cased openings, expected ${INTERIOR_CONTRACT.interiorApertures}`);
+  }
+  if (blockedInteriorApertureIds.length > 0) {
+    failures.push(`opaque geometry crosses ${blockedInteriorApertureIds.length} interior opening(s)`);
+  }
+  stairTreadTops.sort((left, right) => left - right);
+  if (stairTreadTops.length !== INTERIOR_CONTRACT.stairTreads) {
+    failures.push(`${stairTreadTops.length} stair treads, expected ${INTERIOR_CONTRACT.stairTreads}`);
+  } else {
+    let previous: number = INTERIOR_CONTRACT.groundFloorY;
+    for (let step = 0; step < stairTreadTops.length; step += 1) {
+      const expected = INTERIOR_CONTRACT.groundFloorY + (step + 1) * INTERIOR_CONTRACT.stairRise;
+      if (Math.abs(stairTreadTops[step] - expected) > 1e-4) {
+        failures.push(`tread ${step} top ${stairTreadTops[step]} is not the contracted ${expected}`);
+      }
+      if (stairTreadTops[step] - previous >= INTERIOR_CONTRACT.maxTreadRise) {
+        failures.push(`tread ${step} rise exceeds ${INTERIOR_CONTRACT.maxTreadRise} m`);
+      }
+      previous = stairTreadTops[step];
+    }
+    const top = stairTreadTops[stairTreadTops.length - 1];
+    if (Math.abs(top - INTERIOR_CONTRACT.upperFloorY) > 1e-4) {
+      failures.push(`the flight lands at ${top}, not on the upper floor at ${INTERIOR_CONTRACT.upperFloorY}`);
+    }
+  }
+  // Every pane must still name exactly one window, and no two panes may claim the same one: a
+  // duplicated id is how an opaque stand-in or a superposed second pane would hide here.
+  if (new Set(windowIds).size !== windowIds.length) {
+    failures.push('duplicate atomic_window_id: a pane identity is claimed twice');
+  }
   if (!hasBounds) {
     failures.push('no mesh geometry');
   } else {
@@ -276,6 +366,10 @@ function auditShell(scene: THREE.Object3D, spec: HouseShellSpec): HouseShellAudi
     apertureIds,
     blockedApertureIds,
     routeIds,
+    interiorApertureIds,
+    blockedInteriorApertureIds,
+    partitionIds,
+    stairTreadTops,
     triangles,
     drawGroups,
     localBounds: hasBounds ? { min: box.min.toArray(), max: box.max.toArray() } : null,

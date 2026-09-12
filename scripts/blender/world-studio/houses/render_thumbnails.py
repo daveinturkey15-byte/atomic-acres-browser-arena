@@ -43,6 +43,38 @@ VIEWS = [
     ("backyard", (-24.0, 8.0, -16.0), (-1.0, 3.6, 2.0)),
 ]
 
+# ---------------------------------------------------------------- wave-3 interior views
+#
+# Wave 2 shipped no interior capture because there was no interior to capture. These two cameras
+# are the project's own review points ``<id>-stair`` and ``<id>-living`` (house.ts:998,1001),
+# reproduced in the local frame, so the frames are comparable with whatever root captures from
+# the same points in the runtime.
+#
+# HONEST LIMITATION, repeated in the catalog and the handoff: a closed house lit only by the
+# exterior sun renders as noise at any sample count this lane can afford, so these two frames add
+# three interior fill lamps. They are a *photographic* rig for inspecting geometry — the stair,
+# the partitions, the cased openings — and they are emphatically not the project light rig. No
+# conclusion about interior lighting, bounce or mood may be drawn from them.
+INTERIOR_VIEWS = [
+    # Position is the review point verbatim. The stair *target* is lowered from the review
+    # point's (0.6, 2.6, 3.0) to the centre of the flight: aimed as published, the frame is a
+    # ceiling and an upper-slab edge, and a capture that does not contain the thing under test
+    # cannot be evidence for it. The camera position is unchanged so the two are comparable.
+    ("interior-stair", (4.6, 1.7, 7.8), (0.745, 1.55, 4.45)),
+    ("interior-living", (5.6, 1.65, -6.6), (0.5, 1.5, 1.5)),
+]
+INTERIOR_SAMPLES = 64
+INTERIOR_LENS_MM = 20.0
+# (local position, watts). Hall, upper landing, dining and kitchen, all above head height and
+# below the 3.08 m ground-floor ceiling. The first pass ran these an order of magnitude hot and
+# returned a white frame; a point lamp two metres from the lens at 1.4 kW is a flash, not a room.
+INTERIOR_FILL = [
+    ((2.4, 2.62, 5.6), 140.0),
+    ((2.4, 5.80, 4.2), 120.0),
+    ((-3.2, 2.62, -3.0), 150.0),
+    ((-3.2, 2.62, 5.0), 120.0),
+]
+
 # ---------------------------------------------------------------- wave-2 review recipe
 #
 # ``--review`` reproduces the independent evaluator's frozen three-view recipe bit for bit, so a
@@ -243,16 +275,31 @@ def main(argv) -> int:
         return render_review(scene, cam, args.variant)
 
     mirror = -1.0 if C.VARIANTS[args.variant].mirror_x else 1.0
-    for view_id, position, target in VIEWS:
-        pos = (position[0] * mirror, position[1], position[2])
-        tgt = (target[0] * mirror, target[1], target[2])
-        cam.location = _to_blender(pos)
-        direction = _to_blender(tgt) - cam.location
+
+    def shoot(view_id: str, position, target) -> None:
+        cam.location = _to_blender((position[0] * mirror, position[1], position[2]))
+        direction = _to_blender((target[0] * mirror, target[1], target[2])) - cam.location
         cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
         out = ASSET_DIR / f"house-{args.variant}-{view_id}.png"
         scene.render.filepath = str(out)
         bpy.ops.render.render(write_still=True)
-        print(f"[thumbs] wrote {out.name} ({out.stat().st_size} bytes)", flush=True)
+        print(f"[thumbs] wrote {out.name} ({out.stat().st_size} bytes) "
+              f"cam={tuple(round(v, 3) for v in cam.location)} spp={scene.cycles.samples}", flush=True)
+
+    for view_id, position, target in VIEWS:
+        shoot(view_id, position, target)
+
+    for index, (local, watts) in enumerate(INTERIOR_FILL):
+        data = bpy.data.lights.new(f"interior-fill-{index}", type="POINT")
+        data.energy = watts
+        data.shadow_soft_size = 0.35
+        lamp = bpy.data.objects.new(f"interior-fill-{index}", data)
+        lamp.location = _to_blender((local[0] * mirror, local[1], local[2]))
+        scene.collection.objects.link(lamp)
+    scene.cycles.samples = INTERIOR_SAMPLES
+    cam.data.lens = INTERIOR_LENS_MM
+    for view_id, position, target in INTERIOR_VIEWS:
+        shoot(view_id, position, target)
     return 0
 
 
