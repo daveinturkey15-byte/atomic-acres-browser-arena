@@ -1,5 +1,6 @@
 import { buildNuketown2 } from '../../nuketown2-arena';
 import {
+  NUKETOWN2_CENTRAL_TRUCK as truck,
   NUKETOWN2_REVIEW_CAMERA_ANCHORS,
   nuketown2HandedX as hx,
 } from '../../nuketown2-layout';
@@ -251,9 +252,12 @@ export const definition = createProceduralArenaVisualDefinition({
     // wheelbase, glass band height - because a three-quarter view cannot be
     // measured and an opinion about proportion is not evidence.
     camera('nuketown2-coach-elevation', [hx(-6.4), 1.6, 9.4], [hx(-6.4), 1.5, -2.65], 'geometry', 1.08),
-    // The truck cab's front three-quarter at ~4 m: the cab-over rake, its
-    // screen cut from the loft, and the steel wheels under the cargo box.
-    camera('nuketown2-truck-cab-near', [hx(12.0), 1.6, 0.4], [hx(7.6), 1.5, 2.4], 'geometry', 1.08),
+    // Follow the cab's current placement: HF-477 moved it into the bulb, while
+    // the old fixed coordinates kept capturing the street cars. Apply handedness
+    // once, as for the vehicle itself. The near station frames its front quarter.
+    camera('nuketown2-truck-cab-near',
+      [hx(truck.cabX + truck.cabLength / 2 + 2), 1.7, truck.z - 3.5],
+      [hx(truck.cabX + 1), 1.5, truck.z], 'geometry', 1.08),
     // PASS 94 TECHNIQUES close-range evidence. These cameras are deliberately
     // authored against the prop/decal coordinates, not added to the gameplay
     // camera path: each makes one small visual claim legible in a capture.

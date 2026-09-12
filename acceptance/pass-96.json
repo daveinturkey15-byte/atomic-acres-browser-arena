@@ -4,7 +4,7 @@
   "feedbackReceivedAt": null,
   "feedbackTimestampStatus": "OPEN: the previous value was a reviewer timestamp, not verified owner feedback timing. Bind the actual owner feedback timestamp before acceptance; do not infer it from a worker run.",
   "status": "candidate",
-  "bindingState": "awaiting-mechanical-verification-immutable-preview-and-owner-hitl",
+  "bindingState": "awaiting-immutable-preview-and-owner-hitl",
   "preview": null,
   "humanAcceptance": null,
   "requirements": [
