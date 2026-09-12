@@ -27,7 +27,7 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
   const solids: StudioSolid[] = [...ground.solids, ...architecture.solids, ...vehicles.solids, ...interiors.solids];
   const breakableWindows: BreakableWindow[] = [];
   const shotSurfaces = solids.map((solid) => {
-    const windowId = solid.material === 'glass' ? `world-studio-window:${solid.id}` : undefined;
+    const windowId = solid.material === 'glass' ? `world-studio-window:${solid.id.toLowerCase()}` : undefined;
     const surface = createBallisticSurface(`world-studio:${solid.id}`, solid.id, solid.bounds, { material: solid.material }, windowId);
     if (windowId && solid.mesh instanceof THREE.Mesh) {
       breakableWindows.push({ id: windowId, mesh: solid.mesh, broken: false });
@@ -42,6 +42,12 @@ export function buildWorldStudio(scene: THREE.Scene): ArenaMap {
   // Intact panes join movement through the game's dynamic glass registry.
   // Keeping them in this static set would leave an invisible wall after a break.
   const physicsColliders = solids.filter(solid => solid.material !== 'glass').map(solid => solid.bounds);
+  // Bots use authored ramp elevations; their horizontal solver must not
+  // collide with each rise before reaching that ramp. Player physics and
+  // shared LOS/shot authority retain every physical tread unchanged.
+  root.userData.worldStudioBotStepColliders = new Set(solids
+    .filter(solid => /-house-(?:ext-)?stair-\d+$/.test(solid.id))
+    .map(solid => solid.bounds));
   const raycastMeshes = [...new Set(solids.map(solid => solid.mesh))];
   root.userData.worldStudioBuild = Object.freeze({
     id: 'world-studio', version: '20260912-first-slice', solidCount: solids.length,

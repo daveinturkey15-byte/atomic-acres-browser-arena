@@ -20931,7 +20931,10 @@ function botElevationAt(position: THREE.Vector3, previousY: number): number {
 }
 
 function navigationCollidersFor(activeArena: ArenaMap): ArenaMap['colliders'] {
+  const studioSteps = activeArena.id === 'world-studio'
+    ? activeArena.root.userData.worldStudioBotStepColliders as ReadonlySet<Box2> | undefined : undefined;
   return activeWorldColliders(activeArena).filter((box) => {
+    if (studioSteps?.has(box)) return false;
     const minY = box.minY ?? 0;
     const maxY = box.maxY ?? 8;
     const thinSurface = maxY - minY <= 0.5;

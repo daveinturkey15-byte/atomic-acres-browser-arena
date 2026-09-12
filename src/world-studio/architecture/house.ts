@@ -759,9 +759,10 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   const railTop = UPPER_FLOOR_Y + 1.02;
   box('balcony-rail-outer', 'trim', 'wood', BALCONY_X0, BALCONY_X0 + 0.08, railTop - 0.09, railTop, BALCONY_Z0, BALCONY_Z1);
   box('balcony-rail-north', 'trim', 'wood', BALCONY_X0, BALCONY_X1, railTop - 0.09, railTop, BALCONY_Z0, BALCONY_Z0 + 0.08);
-  // The south rail stops short of the external stair head: the run starts at localX -9.25,
-  // so railing that end would stand a collider across the route it serves.
-  box('balcony-rail-south', 'trim', 'wood', BALCONY_X1 - 1.4, BALCONY_X1, railTop - 0.09, railTop, BALCONY_Z1 - 0.08, BALCONY_Z1);
+  // Keep the entire external stair width (-9.25..-8), plus 0.1 m, clear.
+  // A centre-line point fits the old opening, but the actual 0.38 m capsule
+  // hit the rail before reaching the top step.
+  box('balcony-rail-south', 'trim', 'wood', -7.9, BALCONY_X1, railTop - 0.09, railTop, BALCONY_Z1 - 0.08, BALCONY_Z1);
   let balconyBaluster = 0;
   for (let step = 0; step < 46; step++) {
     const z = BALCONY_Z0 + 0.12 + step * 0.13;
@@ -855,7 +856,23 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   box('garage-door-jamb-b', 'trim', null, 2.3, 2.45, 0, 2.72, GARAGE_Z1 - 0.26, GARAGE_Z1 + 0.02, EXTERIOR_CONTACT, true);
   platforms.push({ id: `${id}-garage-roof`, ...boundsOf(spanX(-GARAGE_HALF_X - 0.2, GARAGE_HALF_X + 0.2), [GARAGE_Z0 - 0.2, GARAGE_Z1 + 0.25]), y: GARAGE_ROOF_Y });
   // Bedroom floor (3.30) out onto the garage roof deck (3.50): a 0.2 m step either way.
-  routes.push({ id: `${id}-garage-roof-door`, foot: [wx(-3.1), UPPER_FLOOR_Y, HOUSE_HALF_DEPTH - 0.6], top: [wx(-3.1), GARAGE_ROOF_Y, GARAGE_Z0 + 1.4] });
+  // dressOpening parks glass in the smaller-world-X half. Route through
+  // the centre of the genuinely open half, not the glass meeting stile.
+  const garageRoofDoorX = (Math.min(wx(-4), wx(-2.2)) + 3 * Math.max(wx(-4), wx(-2.2))) / 4;
+  // A real low threshold ramp bridges the 0.2 m roof rise before the narrow
+  // opening. Autostep cannot find capsule clearance at the original roof lip.
+  const thresholdFromZ = 7.6, thresholdToZ = GARAGE_Z0 - 0.2;
+  const thresholdRun = thresholdToZ - thresholdFromZ;
+  const thresholdRise = GARAGE_ROOF_Y - UPPER_FLOOR_Y;
+  const thresholdPitch = Math.atan2(thresholdRise, thresholdRun);
+  const thresholdThickness = 0.04;
+  rotatedBox('garage-roof-threshold', 'door', 'wood', [
+    garageRoofDoorX,
+    (UPPER_FLOOR_Y + GARAGE_ROOF_Y) / 2 - Math.cos(thresholdPitch) * thresholdThickness / 2,
+    (thresholdFromZ + thresholdToZ) / 2 + Math.sin(thresholdPitch) * thresholdThickness / 2,
+  ], [1.1, thresholdThickness, Math.hypot(thresholdRun, thresholdRise)], [-thresholdPitch, 0, 0]);
+  routes.push({ id: `${id}-garage-roof-door`, foot: [garageRoofDoorX, UPPER_FLOOR_Y, thresholdFromZ], top: [garageRoofDoorX, GARAGE_ROOF_Y, GARAGE_Z0 + 1.4] });
+  ramps.push({ id: `${id}-garage-roof-threshold`, from: [garageRoofDoorX, UPPER_FLOOR_Y, thresholdFromZ], to: [garageRoofDoorX, GARAGE_ROOF_Y, thresholdToZ], width: 1.1 });
 
   // ---------------------------------------------------------------- chimney
 
@@ -944,7 +961,16 @@ export function buildHouse(collector: StudioSurfaceCollector, config: HouseConfi
   // ---------------------------------------------------------------- navigation, anchors, cameras
 
   platforms.push({ id: `${id}-ground`, ...boundsOf(spanX(-INNER_X, INNER_X), [-INNER_Z, INNER_Z]), y: GROUND_FLOOR_Y });
-  platforms.push({ id: `${id}-upper`, ...boundsOf(spanX(-INNER_X, INNER_X), [-INNER_Z, INNER_Z]), y: UPPER_FLOOR_Y });
+  // Bot support must have the same hole as slabWithHole. A single upper
+  // rectangle lets actors retain storey height over the open stairwell.
+  for (const [suffix, x0, x1, z0, z1] of [
+    ['a', -INNER_X, STAIR_HOLE.x0, -INNER_Z, INNER_Z],
+    ['b', STAIR_HOLE.x1, INNER_X, -INNER_Z, INNER_Z],
+    ['c', STAIR_HOLE.x0, STAIR_HOLE.x1, -INNER_Z, STAIR_HOLE.z0],
+    ['d', STAIR_HOLE.x0, STAIR_HOLE.x1, STAIR_HOLE.z1, INNER_Z],
+  ] as const) {
+    platforms.push({ id: `${id}-upper-${suffix}`, ...boundsOf(spanX(x0, x1), [z0, z1]), y: UPPER_FLOOR_Y });
+  }
   platforms.push({ id: `${id}-garage-floor`, ...boundsOf(spanX(-GARAGE_HALF_X + 0.1, GARAGE_HALF_X - 0.1), [GARAGE_Z0, GARAGE_Z1 - 0.2]), y: 0.06 });
 
   const anchor = (anchorId: string, room: string, lx: number, y: number, lz: number, yaw: number, footprint: [number, number]): void => {
