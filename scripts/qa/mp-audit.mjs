@@ -1111,17 +1111,33 @@ async function scenarioSwapSlowThenFastThenFire(guest, host, role) {
 
 /** OWNER ITEM "cannot reload". Spend the magazine, reload, require both the
  *  local magazine AND the host's replica to refill. */
+async function stageReloadAmmo(guest, host, selfId) {
+  const selected = await guest.page.evaluate(() => {
+    const player = window.__ATOMIC_ACRES_DEBUG__.snapshot().player;
+    return { id: player.id, weapon: player.weapon };
+  });
+  if (selected.id !== selfId) throw new Error('reload setup changed player identity');
+  const staged = await host.page.evaluate(({ id, weapon }) =>
+    window.__ATOMIC_ACRES_DEBUG__.setRemoteAmmoAuthoritatively?.(weapon, 1, 90, id) === true,
+  selected);
+  if (!staged) throw new Error('reload setup could not stage the host-authoritative magazine');
+  await guest.page.evaluate(({ weapon }) => window.__ATOMIC_ACRES_DEBUG__.setAmmo(weapon, 1, 90), selected);
+  await sleep(200);
+  const local = (await viewOf(guest.page))?.players?.[selfId];
+  const authority = (await viewOf(host.page))?.players?.[selfId];
+  if (local?.weapon !== selected.weapon || authority?.weapon !== selected.weapon
+    || local?.ammo !== 1 || authority?.ammo !== 1) {
+    throw new Error(`reload setup requires matching weapon and depleted magazines: ${JSON.stringify({ selected, localAmmo: local?.ammo, hostAmmo: authority?.ammo, hostWeapon: authority?.weapon })}`);
+  }
+  return { weapon: selected.weapon, guestAmmo: local.ammo, hostAmmo: authority.ammo, verified: true };
+}
+
 async function scenarioReload(guest, host, peers, role, phase = 'pre-respawn') {
   const result = { ok: false, phase, measuredRows: phase === 'post-respawn' ? ['R-1', 'R-2', 'R-5'] : ['R-5'] };
   const selfId = (await viewOf(guest.page)).selfId;
-  // Drain the magazine to a known low value through the QA ammo hook so the
-  // reload has something to do regardless of which weapon is held.
-  await guest.page.evaluate(() => {
-    const debug = window.__ATOMIC_ACRES_DEBUG__;
-    const weapon = debug.snapshot().player.weapon;
-    debug.setAmmo(weapon, 1, 90);
-  });
-  await sleep(200);
+  // Local setAmmo never updates the host's canonical inventory. Prepare both
+  // through their existing fenced QA hooks and prove the reload can occur.
+  result.staging = await stageReloadAmmo(guest, host, selfId);
   const before = await viewOf(guest.page);
   result.ammoBefore = before.players[selfId].ammo;
   const mark = await markOf(guest);
@@ -1149,6 +1165,9 @@ async function scenarioReload(guest, host, peers, role, phase = 'pre-respawn') {
   result.sentIntent = trace.some((entry) => entry.direction === 'out' && /reload/i.test(entry.type));
   result.gotResult = trace.some((entry) => entry.direction === 'in' && /reload/i.test(entry.type));
   result.fireBlock = after.fireBlock;
+  result.authorityTrace = await host.page.evaluate((id) =>
+    (window.__ATOMIC_ACRES_DEBUG__.snapshot().reloadAuthority?.protocolTrace ?? [])
+      .filter(entry => entry.actorId === id).slice(-20), selfId);
 
   if (!(result.ammoAfter > result.ammoBefore)) {
     record(`RELOAD-NO-EFFECT-${role}`, 'critical', 'guest reload never refilled the magazine',
@@ -1533,6 +1552,7 @@ export {
   scenarioFire,
   scenarioPickup,
   scenarioReload,
+  stageReloadAmmo,
   scenarioDamageDeath,
   scenarioKillstreakAwareness,
   scenarioRejoin,
