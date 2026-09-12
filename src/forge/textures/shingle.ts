@@ -64,23 +64,40 @@ export function generateShingle(options: TextureSetOptions = {}): TextureSet {
     rowRevealShadow[i] = smoothstep(12, 0, yLocal);
   }
 
+  // Row geometry and lattice tone are constant across a scanline. Cache the
+  // exact original expressions without normalizing sample coordinates; offset
+  // origins and the wrap probes therefore keep the same floating-point path.
+  let lastY = NaN;
+  let rowOffset = 0;
+  let rowCourseW = NaN;
+  // Cache memory is bounded by the image width, including unusual large tiles.
+  const rowTones = columnsPerTile <= size ? new Float64Array(columnsPerTile) : null;
   const shader: FamilyShader = (x, y, out) => {
     const yi = y & (size - 1);
     const xMm = x * mmPerPx;
-    const yMm = y * mmPerPx;
-    const course = Math.floor(yMm / COURSE_PITCH_MM);
-    const offset = (course * (SHINGLE_WIDTH_MM / 2)) % SHINGLE_WIDTH_MM;
-    const xs = xMm - offset;
+    if (y !== lastY) {
+      const yMm = y * mmPerPx;
+      const course = Math.floor(yMm / COURSE_PITCH_MM);
+      rowOffset = (course * (SHINGLE_WIDTH_MM / 2)) % SHINGLE_WIDTH_MM;
+      const courseW = ((course % coursesPerTile) + coursesPerTile) % coursesPerTile;
+      if (rowTones && courseW !== rowCourseW) {
+        for (let column = 0; column < columnsPerTile; column++) {
+          rowTones[column] = 0.27 * (1 + (hash2u(column, courseW, seed) - 0.5) * 0.2);
+        }
+      }
+      rowCourseW = courseW;
+      lastY = y;
+    }
+    const xs = xMm - rowOffset;
     const column = Math.floor(xs / SHINGLE_WIDTH_MM);
     const xLocal = xs - column * SHINGLE_WIDTH_MM;
     // Wrapped lattice identities: the same physical shingle hashes identically next tile.
     const columnW = ((column % columnsPerTile) + columnsPerTile) % columnsPerTile;
-    const courseW = ((course % coursesPerTile) + coursesPerTile) % coursesPerTile;
 
     const s = fieldAt(speckle, size, x, y);
     const g = fieldAt(granules, size, x, y);
 
-    const tone = 0.27 * (1 + (hash2u(columnW, courseW, seed) - 0.5) * 0.2);
+    const tone = rowTones ? rowTones[columnW] : 0.27 * (1 + (hash2u(columnW, rowCourseW, seed) - 0.5) * 0.2);
     let r = tone * 0.96 + (g - 0.5) * 0.05 + (s - 0.5) * 0.055;
     let gg = tone * 1.0 + (g - 0.5) * 0.05 + (s - 0.5) * 0.055;
     let b = tone * 0.92 + (g - 0.5) * 0.045 + (s - 0.5) * 0.05;
